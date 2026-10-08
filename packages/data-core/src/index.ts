@@ -18,3 +18,13 @@ export type {
   ObjectRef,
   ReferentialAction,
 } from './metadata.js'
+export { generateForm } from './generate/generate.js'
+export type {
+  ConcurrencyBinding,
+  FieldBinding,
+  FormBindings,
+  GeneratedForm,
+  GenerationNote,
+  GenerationRequest,
+  LookupChoice,
+} from './generate/types.js'
