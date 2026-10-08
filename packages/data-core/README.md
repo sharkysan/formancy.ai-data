@@ -22,6 +22,10 @@ browser.
   permission-filtered catalog is never mistaken for a complete one.
 - **Form generation**: `generateForm(snapshot, request)` returns a spec 3
   formancy document, its `FormBindings`, and a note on every choice it made.
+- **Codecs**: `codecFor(column)` checks and canonicalises one API value for a
+  column — decimals as strings, never rounded; integers past 2^53 as strings;
+  formancy's date and time shapes on real days
+  ([0008](../../docs/decisions/0008-exact-values-travel-as-strings.md)).
 
 ```ts
 import { generateForm } from '@formancy/data-core'

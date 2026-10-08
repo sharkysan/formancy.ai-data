@@ -28,3 +28,6 @@ export type {
   GenerationRequest,
   LookupChoice,
 } from './generate/types.js'
+export { codecFor } from './codecs/codec.js'
+export type { ApiValue, Codec, CodecOutcome } from './codecs/codec.js'
+export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
