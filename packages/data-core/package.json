@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",
+    "@formancy/core": "0.3.0",
     "@vitest/coverage-v8": "catalog:",
     "publint": "catalog:",
     "tsdown": "catalog:",

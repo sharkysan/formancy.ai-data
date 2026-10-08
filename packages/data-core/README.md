@@ -14,16 +14,30 @@ browser.
 
 ## What is here today
 
-The adapter port, and nothing that generates a form yet:
+- **The adapter port**, `DatabaseAdapter`, with two implementations from the
+  first day.
+- **The metadata contract**: `MetadataSnapshot` and what it holds, made only
+  through `createSnapshot`, which sorts, checks and fingerprints. A snapshot
+  carries **gaps** — what the connection could not see — so a
+  permission-filtered catalog is never mistaken for a complete one.
+- **Form generation**: `generateForm(snapshot, request)` returns a spec 3
+  formancy document, its `FormBindings`, and a note on every choice it made.
 
 ```ts
-import type { DatabaseAdapter } from '@formancy/data-core'
-import { DATABASE_KINDS, isDatabaseKind } from '@formancy/data-core'
+import { generateForm } from '@formancy/data-core'
+
+const { form, bindings, notes } = generateForm(snapshot, {
+  connection: 'erp',
+  root: { schema: 'sales', name: 'order' },
+  formId: 'sales-order',
+  title: 'Order',
+  lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+})
 ```
 
-`DatabaseAdapter` has two implementations from the first day —
-`@formancy/data-postgres` and `@formancy/data-sqlserver` — which is what makes
-it a port rather than an interface with one implementation.
+Exact decimals and integers past 2^53 become text fields with an exact pattern,
+never JavaScript numbers. Update is offered only with a proven concurrency
+token. See [0009](../../docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md).
 
 ## Licence
 
