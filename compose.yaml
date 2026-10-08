@@ -1,0 +1,52 @@
+# The two databases the adapters are developed against, and nothing else: this
+# repository has no server to run yet. The test suites start their own
+# containers through testcontainers and need none of this; it is for a
+# developer who wants a database to poke at from a shell or a client.
+#
+#   docker compose up -d
+#
+# Both are bound to loopback, not to every interface, and both on a port one
+# off the default -- a locally installed Postgres usually has 5432 and a local
+# SQL Server 1433, and formancy.ai's compose file already took 5439. A silent
+# collision looks exactly like a wrong password.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: formancy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-formancy}
+      POSTGRES_DB: formancy_data
+    ports:
+      - "127.0.0.1:5440:5432"
+    volumes:
+      - formancy-data-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U formancy"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      # The EULA is Microsoft's and accepting it is the operator's act, which is
+      # why it is spelled out here rather than hidden in an image default.
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      # `:?` means compose stops with this message rather than starting a
+      # server with no password. There is no default, here or in the image.
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?set it in .env -- see .env.example}
+    ports:
+      - "127.0.0.1:1434:1433"
+    volumes:
+      - formancy-data-mssql:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -b -Q 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  formancy-data-pg:
+  formancy-data-mssql:

@@ -1,0 +1,52 @@
+{
+  "name": "@formancy/data-postgres",
+  "version": "0.1.0",
+  "description": "The PostgreSQL adapter for Formancy Data: catalog inspection, quoting, binding, transactions and error translation, behind the port @formancy/data-core defines.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "test:coverage": "vitest run --coverage",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check:pkg": "publint && attw --pack . --profile esm-only"
+  },
+  "dependencies": {
+    "@formancy/data-core": "workspace:*",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "catalog:",
+    "@testcontainers/postgresql": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "publint": "catalog:",
+    "testcontainers": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "unrun": "^0.3.1",
+    "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sharkysan/formancy.ai-data.git",
+    "directory": "packages/data-postgres"
+  },
+  "homepage": "https://github.com/sharkysan/formancy.ai-data",
+  "bugs": "https://github.com/sharkysan/formancy.ai-data/issues"
+}
