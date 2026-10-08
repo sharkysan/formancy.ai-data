@@ -25,6 +25,7 @@ jobs:
     permissions:
       contents: write # create the GitHub release
       id-token: write # OIDC, for npm provenance and keyless signing
+      packages: write # push the server image to GHCR
     steps:
       - uses: actions/checkout@v4
         with:
@@ -135,9 +136,57 @@ jobs:
             --bundle "formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json.sigstore" \
             "formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json"
 
-      # No container image yet: there is no server in this repository. When
-      # @formancy/data-server lands, its image is built, signed and attested
-      # here the way formancy.ai's is, and not carried between jobs.
+      # ── The server image ────────────────────────────────────────────────
+      #
+      # Built here rather than reusing CI's: an image somebody deploys should be
+      # produced by the workflow that signs it, at the commit the tag names, and
+      # not carried between jobs where the thing signed and the thing built could
+      # drift apart. The same steps as formancy.ai's release, with the same pins.
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to the registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # No `latest`, deliberately: an image somebody runs in production should be
+      # one they chose by version, and a moving tag is not a version.
+      - name: Build and push the server image
+        id: image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: packages/data-server/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/formancy-data-server:${{ github.ref_name }}
+          provenance: mode=max
+
+      # By DIGEST, never by tag. A tag is mutable, so signing a tag says nothing
+      # about the bytes anybody later pulls under that name.
+      - name: Sign the image
+        run: |
+          cosign sign --yes \
+            "ghcr.io/${{ github.repository_owner }}/formancy-data-server@${{ steps.image.outputs.digest }}"
+
+      - name: Attach the SBOM to the image
+        run: |
+          cosign attest --yes \
+            --type cyclonedx \
+            --predicate "formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json" \
+            "ghcr.io/${{ github.repository_owner }}/formancy-data-server@${{ steps.image.outputs.digest }}"
+
+      - name: Say which image this release is
+        run: |
+          {
+            echo "### Container image"
+            echo
+            echo '```'
+            echo "ghcr.io/${{ github.repository_owner }}/formancy-data-server:${GITHUB_REF_NAME}"
+            echo "digest: ${{ steps.image.outputs.digest }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # The body is this version's section, not the whole changelog. GitHub
       # refuses a release body over 125,000 characters, and it refuses it HERE
