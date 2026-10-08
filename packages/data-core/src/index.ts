@@ -28,6 +28,28 @@ export type {
   GenerationRequest,
   LookupChoice,
 } from './generate/types.js'
+export { decodeKeyToken, encodeKeyToken, KEY_TOKEN_MAX_LENGTH } from './lookup/token.js'
+export type { KeyTokenDecoding, KeyTokenEncoding, KeyTokenErrorCode, KeyTokenRefusal } from './lookup/token.js'
+export { MAX_SEARCH_LENGTH, validateLookupQuery } from './lookup/query.js'
+export type { LookupQueryCheck, LookupQueryErrorCode } from './lookup/query.js'
+export { formatLabel, LABEL_SEPARATOR } from './lookup/label.js'
+export { buildLookupConfig, DEFAULT_MAX_PAGE_SIZE } from './lookup/config.js'
+export type { LookupOptions } from './lookup/config.js'
+export { lookupKeys, lookupPage, rejectedTokens, resolvedRows } from './lookup/rows.js'
+export type { FoundRow } from './lookup/rows.js'
+export type {
+  LookupAdapter,
+  LookupConfig,
+  LookupMembership,
+  LookupQuery,
+  LookupResolve,
+  LookupResult,
+  LookupRow,
+  LookupSearch,
+  LookupSort,
+  RowFilters,
+} from './lookup/types.js'
+
 export { codecFor } from './codecs/codec.js'
 export type { ApiValue, Codec, CodecOutcome } from './codecs/codec.js'
 export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
