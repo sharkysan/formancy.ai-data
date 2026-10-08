@@ -1,3 +1,5 @@
+import type { DiscoveryScope, MetadataSnapshot } from './metadata.js'
+
 /**
  * The databases the first release speaks, as a tuple so that a `switch` over
  * them is exhaustive and a third one is a compile error everywhere it matters.
@@ -56,6 +58,13 @@ export interface DatabaseAdapter {
    * configuration would pass against a server that is not there.
    */
   ping(): Promise<ServerIdentity>
+
+  /**
+   * What this connection can see in the approved schemas, and — as gaps —
+   * what it cannot (0004). Built through `createSnapshot` only, so the two
+   * adapters cannot disagree about order or fingerprint.
+   */
+  discover(scope: DiscoveryScope): Promise<MetadataSnapshot>
 
   /** Releases the driver's resources. Calling it twice is allowed and does nothing the second time. */
   close(): Promise<void>

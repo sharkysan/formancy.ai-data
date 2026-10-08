@@ -1,7 +1,6 @@
 import type { CoverageGap, DiscoveryScope, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
 import { createSnapshot } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
-import { createSqlServerAdapter } from '../adapter.js'
 import type { ObjectGap } from './catalog.js'
 import { readChecks } from './checks.js'
 import { readColumns } from './columns.js'
@@ -9,6 +8,7 @@ import { readForeignKeys } from './foreign-keys.js'
 import { readKeys } from './keys.js'
 import { readObjects } from './objects.js'
 import { readObjectVisibility } from './visibility.js'
+import { readServerVersion } from '../version.js'
 
 /**
  * What this connection can see of the tables and views in `scope`, and --
@@ -26,8 +26,9 @@ import { readObjectVisibility } from './visibility.js'
  */
 export async function discoverSqlServer(pool: ConnectionPool, scope: DiscoveryScope): Promise<MetadataSnapshot> {
   const schemas = [...new Set(scope.schemas)]
-  // The version as ping reports it, by asking ping, so the two cannot differ.
-  const { version } = await createSqlServerAdapter(pool).ping()
+  // The same query ping runs, so the version a snapshot records and the
+  // version a ping reports cannot differ.
+  const version = await readServerVersion(pool)
   if (schemas.length === 0) return createSnapshot({ kind: 'sqlserver', serverVersion: version, scope, objects: [], gaps: [] })
 
   const [objects, columns, keys, foreignKeys, checks, scopeGaps] = await Promise.all([

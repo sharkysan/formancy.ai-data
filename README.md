@@ -10,14 +10,13 @@ in the first release, through one database-neutral core and two adapters. The
 published form renders in Angular or React with the formancy renderers and
 operates without any AI dependency.
 
-> **Status: started 8 October 2026. Nothing generates a form yet.**
->
-> What exists is the shape of the product and the pipeline that will prove it:
-> three packages, two of which reach a real PostgreSQL and a real SQL Server
-> and report which version answered, and a CI gate that runs them against
-> both on every pull request. The next step is the both-database spike —
-> metadata discovery, composite keys, exact decimals and a concurrency
-> strategy, on both engines, before anything is generated.
+> **Status: in development, nothing released.** The phase-1 spike is done:
+> both adapters discover a real database, including what a restricted
+> account cannot see, and the same model checks both. A form can be generated
+> from a snapshot; values are checked exactly; access policy, lookup tokens and
+> the record port are defined. Not yet: the adapters' record and lookup
+> operations, the HTTP routes that call them, the studio and the examples.
+> `CHANGELOG.md` says what each step found.
 
 ## Licence, in one table
 

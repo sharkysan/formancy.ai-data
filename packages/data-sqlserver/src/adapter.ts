@@ -1,5 +1,7 @@
-import type { DatabaseAdapter, ServerIdentity } from '@formancy/data-core'
+import type { DatabaseAdapter } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
+import { discoverSqlServer } from './discovery/discover.js'
+import { readServerVersion } from './version.js'
 
 /**
  * SQL Server, through a pool the composition root connected.
@@ -19,23 +21,11 @@ export function createSqlServerAdapter(pool: ConnectionPool): DatabaseAdapter {
   return {
     kind: 'sqlserver',
 
-    async ping(): Promise<ServerIdentity> {
-      // ProductVersion is the build the server runs ("16.0.4205.1"). @@VERSION
-      // adds the edition, the OS and a paragraph of text, which is not a
-      // version. Cast, because SERVERPROPERTY returns sql_variant and the
-      // driver would hand that back as something other than a string.
-      const result = await pool
-        .request()
-        .query<{ version: string }>("select cast(serverproperty('ProductVersion') as nvarchar(128)) as version")
-      const row = result.recordset[0]
-      // Never reached against a real server -- a SELECT of one expression
-      // returns one row -- and kept because `recordset[0]` is `T | undefined`
-      // under noUncheckedIndexedAccess. A non-null assertion would be the same
-      // claim without the check, so the coverage report shows this line
-      // uncovered and that is the honest reading of it.
-      if (row === undefined) throw new Error('SQL Server answered the ping with no row')
-      return { kind: 'sqlserver', version: row.version }
+    async ping() {
+      return { kind: 'sqlserver', version: await readServerVersion(pool) }
     },
+
+    discover: (scope) => discoverSqlServer(pool, scope),
 
     async close(): Promise<void> {
       // A closed pool closes again without complaint, which is what lets a
