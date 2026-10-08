@@ -125,9 +125,53 @@ field grants and no operation grant gets nothing from any of them.
 `validatePolicy(policy, bindings)` refuses a policy that does not fit its
 form, and every function given the bindings refuses it too — the lookup
 filter among them, so an options search cannot run under a policy the save
-would refuse. Nothing runs these yet; the record operations that will are
-still to come. See
+would refuse. The request planner below runs them on every read, create and
+update it plans. See
 [0011](../../docs/decisions/0011-every-operation-carries-a-trusted-policy-context.md).
+
+## Record requests
+
+The one place a browser's request becomes an adapter's: the policy, the
+codecs, the tokens and the bindings meet here, so both adapters receive the
+same typed request for the same answers. Pure — no I/O, no clock — and
+nothing calls it yet; the server that will is still to come.
+
+```ts
+import { planCreate, planUpdate, rejectedSelection, toFormAnswers } from '@formancy/data-core'
+
+const planned = planCreate(snapshot, bindings, policy, context, body)
+if (!planned.ok) return planned // a refusal with a stable code, or { code: 'invalid-values', fieldErrors }
+for (const check of planned.memberships) {
+  if ((await lookups.rejects(check.config, check.tokens, check.filters)).length > 0) {
+    return { ok: false, code: 'invalid-values', fieldErrors: [rejectedSelection(check.field)] }
+  }
+}
+const saved = await records.insert(planned.request)
+return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { record, version, answers }
+```
+
+- **A record token** addresses a record: `recordToken` encodes its identity
+  values with the lookup's key-token encoding, and `decodeRecordKey` holds
+  each value to its key column's spelling.
+- **`planRead`, `planCreate`, `planUpdate`** check the bindings against the
+  snapshot they were generated from (`drift` otherwise), the policy —
+  over-posting first — and then every answer through its column's codec,
+  reporting every bad field at once. The tenant is written from the context;
+  an omitted field lets a default apply on create and is unchanged on update;
+  the key and the pinned columns are never set; update needs a confirmed
+  concurrency token.
+- **Membership is the database's.** A lookup token whose key carries the tenant
+  is refused when the tenant is not the context's; one that does not — a
+  surrogate id — cannot be judged without a query. Every selection comes back
+  as a `MembershipCheck` for the caller to run against `rejects` before it
+  writes, and every non-member, forged or foreign, gets the same
+  `rejectedSelection`.
+- **`toFormAnswers`** is the inverse, for the fields the actor may read: a
+  lookup as its token, the three-state radio as `'true'`/`'false'`/`null`, and
+  a whole number as a number, because the released engine reports canonical
+  text in a number field as below its minimum.
+
+See [0018](../../docs/decisions/0018-one-planner-turns-answers-into-requests.md).
 
 ## Licence
 

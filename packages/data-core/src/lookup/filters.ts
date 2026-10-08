@@ -2,13 +2,14 @@ import type { RowFilter } from '../policy/types.js'
 import type { RowFilterTerm, RowFilters } from './types.js'
 
 /**
- * The lookup filters for what `lookupRowFilter` returned.
+ * The filters for what `lookupRowFilter` returned — or `rowFilter`, which the
+ * request planner turns into a record request's filters the same way.
  *
- * The one place an empty list may become `unrestricted`: `lookupRowFilter`
- * returns `[]` only when the policy's entry for the lookup is `[]`, which is
- * the policy saying "every row" in so many words — a missing entry, or a
- * missing attribute, is a refusal there and never reaches this. Anywhere
- * else, an empty list is still refused, as `RowFilters` says.
+ * The one place an empty list may become `unrestricted`: each returns `[]`
+ * only when the policy's entry is `[]` — the lookup's, or `rowFilters` for the
+ * root — which is the policy saying "every row" in so many words; a missing
+ * entry, or a missing attribute, is a refusal there and never reaches this.
+ * Anywhere else, an empty list is still refused, as `RowFilters` says.
  */
 export function lookupFilters(filter: RowFilter): RowFilters {
   const [first, ...rest] = filter.map(({ column, value }) => ({ column, value }))
