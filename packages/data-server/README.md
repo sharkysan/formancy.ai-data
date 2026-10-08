@@ -28,6 +28,11 @@ existed would be documented and inert.
   databases a form may bind to, with secret references for passwords, opened
   lazily through driver factories the composition root supplies.
 
+- **The administrator's plane** — connections, discovery, proposals,
+  publication and drift, for a host token holding an administrator role
+  ([0020](../../docs/decisions/0020-administration-is-a-separate-plane.md)).
+  Registered only when the server is given a registry, a store and those roles.
+
 ## Running it
 
 ```bash
