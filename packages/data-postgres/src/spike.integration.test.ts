@@ -94,6 +94,29 @@ describe('reading sales.order through the postgres driver', () => {
   })
 })
 
+describe('binding a value the driver did not type', () => {
+  // postgres.js sends a statement with untyped parameters as Parse and
+  // Describe, learns the type the server inferred for each, and serialises
+  // the value with ITS serializer for that type. The boolean one writes 't'
+  // only for the JavaScript `true`, so the text 'true' is sent as 'f': a row
+  // filter written this way selects the rows where the column is false
+  // (0016). The date one is `new Date(value)`, which throws on a value
+  // PostgreSQL stores happily. Cast to text where it stands, the value is
+  // sent as written and the server converts it.
+  test('is serialised for the type the server inferred: text "true" becomes false, and "infinity" throws', async () => {
+    await owner.unsafe(`
+      create table public.flags (id integer primary key, on_off boolean not null, day date);
+      insert into public.flags values (1, true, '2026-10-08'), (2, false, 'infinity')`)
+    const untyped = await owner.unsafe<{ id: number }[]>('select id from public.flags where on_off = $1', ['true'])
+    expect(untyped.map((row) => row.id)).toEqual([2])
+    const asText = await owner.unsafe<{ id: number }[]>('select id from public.flags where on_off = $1::text::boolean', ['true'])
+    expect(asText.map((row) => row.id)).toEqual([1])
+    await expect(owner.unsafe('select id from public.flags where day = $1', ['infinity'])).rejects.toThrow(RangeError)
+    const infinite = await owner.unsafe<{ id: number }[]>('select id from public.flags where day = $1::text::date', ['infinity'])
+    expect(infinite.map((row) => row.id)).toEqual([2])
+  })
+})
+
 describe("the driver's identifier helper", () => {
   // ObjectRef keeps a schema and a name in two fields because a dotted
   // string is ambiguous (data-core, metadata.ts). The driver's sql(name)
