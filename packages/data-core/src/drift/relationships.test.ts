@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import type { GenerationRequest } from '../generate/types.js'
-import type { ForeignKeyMeta, NormalizedType, ObjectMeta } from '../metadata.js'
+import type { ForeignKeyMeta, NormalizedType, ObjectMeta, ObjectRef } from '../metadata.js'
 import {
+  addColumn,
   col,
   column,
   CUSTOMER_REF,
@@ -12,6 +13,7 @@ import {
   EMPLOYEE_REF,
   foreignKey,
   gap,
+  INT32,
   kinds,
   named,
   object,
@@ -53,6 +55,39 @@ describe('diffSnapshots: lookups', () => {
 
     const gone = drift((objects) => dropForeignKey(objects, 'fk_order_customer'))
     expect(only(gone)).toMatchObject({ kind: 'lookup-changed', severity: 'blocking', message: expect.stringMatching(/^fk_order_customer is gone/) })
+  })
+
+  // Both engines allow a dot in a schema or table name and a comma in a column
+  // name, so two different foreign keys can read alike: a.b.c is schema a.b's
+  // table c and schema a's table b.c, and (tenant_id, customer_no) is two
+  // columns or one. Compared as sentences, a key retargeted from one to the
+  // other was unchanged, and the lookup kept storing keys that now resolve in
+  // a different table; the same for a key moved onto one oddly named column.
+  test('a foreign key is compared by what it is, never by how it reads', () => {
+    const schemas = ['a', 'a.b', 'crm', 'sales']
+    const twins = (target: ObjectRef) => (objects: ObjectMeta[]) => {
+      const customer = object(objects, 'customer')
+      objects.push({ ...customer, ref: { schema: 'a.b', name: 'c' } }, { ...customer, ref: { schema: 'a', name: 'b.c' } })
+      foreignKey(objects, 'fk_order_customer').references = { table: target, columns: ['tenant_id', 'customer_no'] }
+    }
+    const retargeted = drift(twins({ schema: 'a', name: 'b.c' }), { schemas }, ORDER, snapshot(twins({ schema: 'a.b', name: 'c' }), { schemas }))
+    // The generator names the lookup's field after its target, here c.
+    expect(only(retargeted)).toMatchObject({ kind: 'lookup-changed', severity: 'blocking', subject: { kind: 'foreign-key', object: ORDER_REF, name: 'fk_order_customer' }, affects: ['c'] })
+    expect(retargeted.writable).toEqual({ create: false, update: false })
+
+    // Both sides moved onto one column, and both still read (tenant_id, customer_no).
+    const merged = drift((objects) => {
+      const pair = col('tenant_id, customer_no', 'int', INT32, { nullable: true })
+      addColumn(objects, 'order', pair)
+      addColumn(objects, 'customer', pair)
+      object(objects, 'customer').uniqueKeys.push({ name: 'uq_customer_pair', columns: [pair.name] })
+      Object.assign(foreignKey(objects, 'fk_order_customer'), { columns: [pair.name], references: { table: CUSTOMER_REF, columns: [pair.name] } })
+    })
+    expect(merged.changes.map((change) => [change.kind, change.severity, named(change)])).toEqual([
+      ['lookup-changed', 'blocking', 'fk_order_customer'],
+      ['column-added', 'review', 'tenant_id, customer_no'],
+    ])
+    expect(merged.writable).toEqual({ create: false, update: false })
   })
 
   // The other half of the relationship: the key the foreign key points at,
@@ -147,6 +182,16 @@ describe('diffSnapshots: the identity', () => {
       ['key-changed', 'info', 'pk_order'],
     ])
     expect(renamed.writable).toEqual({ create: true, update: true })
+
+    // So does the primary key declared again as a unique key under its name:
+    // the new role is noted, and update stays open.
+    const demoted = drift((objects) => {
+      const order = object(objects, 'order')
+      order.primaryKey = null
+      order.uniqueKeys.push({ name: 'pk_order', columns: ['id'] })
+    })
+    expect(only(demoted)).toMatchObject({ kind: 'key-changed', severity: 'info', message: expect.stringMatching(/^pk_order changed: its role from primary to unique\./) })
+    expect(demoted.writable).toEqual({ create: true, update: true })
   })
 
   // A key column no field shows still addresses the record an update changes.
@@ -221,6 +266,23 @@ describe('diffSnapshots: constraints the form does not rest on', () => {
     ])
     const blind = drift((objects) => (foreignKey(objects, 'fk_order_created_by').references = null))
     expect(only(blind)).toMatchObject({ kind: 'foreign-key-changed', severity: 'info', message: expect.stringMatching(/its target from sales\.employee \(id\) to not visible/) })
+
+    // Compared by its columns, not by how they read: a key moved from two
+    // columns onto one whose name has a comma in it read like the old key, and
+    // went unnoted.
+    const lookalike = drift(
+      (objects) => {
+        addColumn(objects, 'order', col('order_date, created_by', 'int', INT32, { nullable: true }))
+        object(objects, 'order').uniqueKeys = [{ name: 'uq_order_date', columns: ['order_date, created_by'] }]
+      },
+      {},
+      ORDER,
+      snapshot((objects) => object(objects, 'order').uniqueKeys.push({ name: 'uq_order_date', columns: ['order_date', 'created_by'] })),
+    )
+    expect(lookalike.changes.map((change) => [change.kind, change.severity, named(change)])).toEqual([
+      ['column-added', 'review', 'order_date, created_by'],
+      ['key-changed', 'info', 'uq_order_date'],
+    ])
   })
 
   // Out of sight is not gone, for a constraint as for a table. The gap says

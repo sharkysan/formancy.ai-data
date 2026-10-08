@@ -1,5 +1,5 @@
 import type { FieldBinding } from '../generate/types.js'
-import type { CheckMeta, CoverageAspect, ForeignKeyMeta, KeyMeta, ObjectMeta } from '../metadata.js'
+import type { CheckMeta, CoverageAspect, ForeignKeyMeta, ForeignKeyTarget, KeyMeta, ObjectMeta } from '../metadata.js'
 import { findObject } from '../snapshot.js'
 import { absence, cite, hiding, unseen } from './access.js'
 import {
@@ -14,6 +14,7 @@ import {
   lookups,
   objectIn,
   sameList,
+  sameRef,
   sameSet,
 } from './context.js'
 import type { DriftKind, DriftSubject } from './types.js'
@@ -56,8 +57,7 @@ function identityChanges(comparison: Comparison): NamedDraft[] {
   const shared = { subject: { kind: 'key', object: after.ref, name: key.name } as const, affects: fieldsOver(bindings, key.columns), stops: ['update'] as const, breaksReads: false, otherwise: 'info' as const }
   const gaps = hiding(comparison.current.gaps, after.ref, 'keys')
   if (gaps.length > 0) {
-    cite(comparison, gaps)
-    return [{ ...shared, kind: 'access-narrowed', message: unseen(`Key ${key.name} of ${describe(after.ref)}`, gaps) }]
+    return [cite(comparison, gaps, { ...shared, kind: 'access-narrowed', message: unseen(`Key ${key.name} of ${describe(after.ref)}`, gaps) })]
   }
   const now = candidateKeys(after).find((candidate) => candidate.name === key.name)
   return [
@@ -69,28 +69,45 @@ function identityChanges(comparison: Comparison): NamedDraft[] {
   ]
 }
 
-/** Each property of a foreign key, as a person reads it. Every one counts behind a lookup. */
-const FOREIGN_KEY: ReadonlyArray<[string, (key: ForeignKeyMeta) => string]> = [
-  ['its columns', (key) => `(${list(key.columns)})`],
-  ['its target', (key) => (key.references === null ? 'not visible' : `${describe(key.references.table)} (${list(key.references.columns)})`)],
-  ['on update', (key) => key.onUpdate],
-  ['on delete', (key) => key.onDelete],
-  ['enforcement', (key) => (key.enforced ? 'enforced' : 'not enforced')],
-  ['validation', (key) => (key.validated ? 'validated' : 'not validated')],
+/**
+ * One property of a constraint: what it is called, how a person reads it, and
+ * whether two are the same. Sameness is decided on the values and never on the
+ * reading: a schema or a table may contain a dot and a column a comma, so
+ * schema a.b's table c and schema a's table b.c both read a.b.c, for the
+ * reason `ObjectRef` is two strings.
+ */
+type Property<T> = [label: string, show: (item: T) => string, same: (before: T, after: T) => boolean]
+
+function sameTarget(before: ForeignKeyTarget | null, after: ForeignKeyTarget | null): boolean {
+  return before === null || after === null ? before === after : sameRef(before.table, after.table) && sameList(before.columns, after.columns)
+}
+
+/** Each property of a foreign key. Every one counts behind a lookup. */
+const FOREIGN_KEY: ReadonlyArray<Property<ForeignKeyMeta>> = [
+  ['its columns', (key) => `(${list(key.columns)})`, (was, now) => sameList(was.columns, now.columns)],
+  [
+    'its target',
+    (key) => (key.references === null ? 'not visible' : `${describe(key.references.table)} (${list(key.references.columns)})`),
+    (was, now) => sameTarget(was.references, now.references),
+  ],
+  ['on update', (key) => key.onUpdate, (was, now) => was.onUpdate === now.onUpdate],
+  ['on delete', (key) => key.onDelete, (was, now) => was.onDelete === now.onDelete],
+  ['enforcement', (key) => (key.enforced ? 'enforced' : 'not enforced'), (was, now) => was.enforced === now.enforced],
+  ['validation', (key) => (key.validated ? 'validated' : 'not validated'), (was, now) => was.validated === now.validated],
 ]
 
-const CHECK: ReadonlyArray<[string, (check: CheckMeta) => string]> = [
-  ['expression', (check) => check.expression ?? 'not readable'],
-  ['validation', (check) => (check.validated ? 'validated' : 'not validated')],
+const CHECK: ReadonlyArray<Property<CheckMeta>> = [
+  ['expression', (check) => check.expression ?? 'not readable', (was, now) => was.expression === now.expression],
+  ['validation', (check) => (check.validated ? 'validated' : 'not validated'), (was, now) => was.validated === now.validated],
 ]
 
-const KEY: ReadonlyArray<[string, (key: KeyMeta & { primary: boolean }) => string]> = [
-  ['its columns', (key) => `(${list(key.columns)})`],
-  ['its role', (key) => (key.primary ? 'primary' : 'unique')],
+const KEY: ReadonlyArray<Property<KeyMeta & { primary: boolean }>> = [
+  ['its columns', (key) => `(${list(key.columns)})`, (was, now) => sameList(was.columns, now.columns)],
+  ['its role', (key) => (key.primary ? 'primary' : 'unique'), (was, now) => was.primary === now.primary],
 ]
 
-function differences<T>(properties: ReadonlyArray<[string, (item: T) => string]>, before: T, after: T): string[] {
-  return properties.flatMap(([label, read]) => (read(before) === read(after) ? [] : [`${label} from ${read(before)} to ${read(after)}`]))
+function differences<T>(properties: ReadonlyArray<Property<T>>, before: T, after: T): string[] {
+  return properties.flatMap(([label, show, same]) => (same(before, after) ? [] : [`${label} from ${show(before)} to ${show(after)}`]))
 }
 
 /**
@@ -110,8 +127,7 @@ function lookupChanges(comparison: Comparison, lookup: Lookup): Draft[] {
     const gaps = hiding(comparison.current.gaps, after.ref, 'foreign-keys')
     // A key reported with no target says by itself that the target is out of sight (0004).
     if (now !== undefined || gaps.length > 0) {
-      cite(comparison, gaps)
-      return [{ ...blocked, kind: 'access-narrowed', subject, message: unseen(now === undefined ? `Foreign key ${lookup.foreignKey} of ${describe(after.ref)}` : `What ${lookup.foreignKey} references`, gaps) }]
+      return [cite(comparison, gaps, { ...blocked, kind: 'access-narrowed', subject, message: unseen(now === undefined ? `Foreign key ${lookup.foreignKey} of ${describe(after.ref)}` : `What ${lookup.foreignKey} references`, gaps) })]
     }
     return [{ ...blocked, kind: 'lookup-changed', subject, message: `${lookup.foreignKey} is gone, and the ${lookup.field} lookup selects through it. The lookup is blocked until the form is reviewed.` }]
   }
@@ -135,8 +151,7 @@ function targetChanges(comparison: Comparison, lookup: Lookup, blocked: Pick<Dra
       return [{ ...blocked, kind: 'scope-narrowed', subject, message: `${where}, the target of the ${lookup.field} lookup, is outside the discovery scope: ${ref.schema} is no longer approved, so the lookup cannot be checked. It is blocked until the scope is restored or the form is reviewed.` }]
     }
     if (absent.why === 'access') {
-      cite(comparison, absent.gaps)
-      return [{ ...blocked, kind: 'access-narrowed', subject, message: unseen(where, absent.gaps) }]
+      return [cite(comparison, absent.gaps, { ...blocked, kind: 'access-narrowed', subject, message: unseen(where, absent.gaps) })]
     }
     return [{ ...blocked, kind: 'lookup-changed', subject, message: `${where}, the target of the ${lookup.field} lookup, is gone. The lookup is blocked until the form is reviewed.` }]
   }
@@ -144,10 +159,9 @@ function targetChanges(comparison: Comparison, lookup: Lookup, blocked: Pick<Dra
   const drafts: Draft[] = []
   const lost = (subject: DriftSubject, aspect: CoverageAspect, thing: string, gone: string) => {
     const gaps = hiding(comparison.current.gaps, ref, aspect)
-    cite(comparison, gaps)
     drafts.push(
       gaps.length > 0
-        ? { ...blocked, kind: 'access-narrowed', subject, message: unseen(thing, gaps) }
+        ? cite(comparison, gaps, { ...blocked, kind: 'access-narrowed', subject, message: unseen(thing, gaps) })
         : { ...blocked, kind: 'lookup-changed', subject, message: `${gone} The ${lookup.field} lookup rests on it, so it is blocked until the form is reviewed.` },
     )
   }
@@ -170,7 +184,7 @@ interface Unbound<T> {
   kind: Extract<DriftKind, 'key-changed' | 'foreign-key-changed' | 'check-changed'>
   subject: 'key' | 'foreign-key' | 'check'
   aspect: CoverageAspect
-  properties: ReadonlyArray<[string, (item: T) => string]>
+  properties: ReadonlyArray<Property<T>>
   columns: (item: T) => string[]
   added: (item: T) => string
   /** What the form has to do with it: nothing, said in a way that fits the kind. */

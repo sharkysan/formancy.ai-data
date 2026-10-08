@@ -22,6 +22,11 @@ export interface Draft {
   otherwise: 'review' | 'info'
 }
 
+/** The writes a change stops: every one, when the form can no longer read what it binds. */
+export function stopped(draft: Draft): readonly Operation[] {
+  return draft.breaksReads ? ['create', 'update'] : draft.stops
+}
+
 /** One review: the two snapshots, the form, and its root in each. */
 export interface Comparison {
   base: MetadataSnapshot
@@ -32,7 +37,7 @@ export interface Comparison {
   /**
    * Gaps a change has already given as the reason something is missing. A gap
    * that explains a vanished column is said once, on the column, and not again
-   * on its own.
+   * on its own, provided the column's change stops everything the gap would.
    */
   cited: Set<string>
 }

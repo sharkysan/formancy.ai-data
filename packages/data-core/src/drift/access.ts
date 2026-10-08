@@ -1,5 +1,5 @@
 import type { CoverageAspect, CoverageGap, MetadataSnapshot, ObjectRef } from '../metadata.js'
-import { allFields, type Comparison, describe, type Draft, fieldsOver, lookups, type Operation, refKey, sameRef } from './context.js'
+import { allFields, type Comparison, describe, type Draft, fieldsOver, lookups, type Operation, refKey, sameRef, stopped } from './context.js'
 import type { DriftSubject } from './types.js'
 
 /*
@@ -24,11 +24,6 @@ export function hiding(gaps: readonly CoverageGap[], object: ObjectRef, aspect: 
 /** Gaps that could hide `object` itself: any gap about it, or one about the scope's objects. */
 export function hidingObject(gaps: readonly CoverageGap[], object: ObjectRef): CoverageGap[] {
   return gaps.filter((gap) => (gap.object === null ? gap.aspect === 'objects' : sameRef(gap.object, object)))
-}
-
-/** Record gaps as the stated reason for a change, so they are not reported a second time on their own. */
-export function cite(comparison: Comparison, gaps: readonly CoverageGap[]): void {
-  for (const gap of gaps) comparison.cited.add(gapId(gap))
 }
 
 function quote(gaps: readonly CoverageGap[]): string {
@@ -92,6 +87,24 @@ function doubtOf(comparison: Comparison, gap: CoverageGap): { stops: Operation[]
   if (lookupsInDoubt.length > 0) block(lookupsInDoubt.map((lookup) => lookup.field), BOTH)
 
   return { stops: [...stops], affects: allFields(bindings).filter((field) => affected.has(field)) }
+}
+
+/**
+ * Give gaps as the reason `draft` reports something missing, and return the
+ * draft. A gap given this way is not reported again on its own, but only when
+ * the draft already stops every write the gap puts in doubt. The concurrency
+ * token or the identity's key out of sight stops update, and the gap behind it
+ * can stop create as well; that gap is still reported for what it alone puts
+ * in doubt, or more drift would leave a form more writable than the gap does
+ * by itself.
+ */
+export function cite<T extends Draft>(comparison: Comparison, gaps: readonly CoverageGap[], draft: T): T {
+  const stops = stopped(draft)
+  for (const gap of gaps) {
+    // A cited gap hides the root or a lookup's target, so it always concerns this form and its doubt is never `null`.
+    if (doubtOf(comparison, gap)?.stops.every((operation) => stops.includes(operation))) comparison.cited.add(gapId(gap))
+  }
+  return draft
 }
 
 function subjectOf(gap: CoverageGap): DriftSubject {

@@ -185,6 +185,34 @@ describe('diffSnapshots: access', () => {
     expect(drift(undefined, { gaps: [gap(EMPLOYEE_REF, 'columns')] }).changes).toEqual([])
   })
 
+  // A gap given as the reason something vanished was said once, on that
+  // thing, and the thing can stop less than the gap does. The concurrency
+  // token stops only update, but a gap on the root's columns means a NOT NULL
+  // column nobody can see could fail every create; a scope-wide gap on keys
+  // puts the lookup's target key in doubt as well as the identity. Said only
+  // on the token or the key, create stayed open, and more drift left the form
+  // more writable than the gap alone.
+  test('a gap that explains something gone still stops everything it puts in doubt', () => {
+    const columns = [gap(ORDER_REF, 'columns')]
+    const token = drift((objects) => dropColumn(objects, 'order', 'row_version'), { gaps: columns })
+    expect(token.writable).toEqual(drift(undefined, { gaps: columns }).writable)
+    expect(token.changes.map((change) => [change.kind, change.subject.kind, named(change), change.affects])).toEqual([
+      ['access-narrowed', 'object', '', ORDER_FIELDS],
+      ['access-narrowed', 'column', 'row_version', []],
+    ])
+
+    const keys = [gap(null, 'keys')]
+    const identity = drift((objects) => (object(objects, 'order').primaryKey = null), { gaps: keys })
+    expect(identity.writable).toEqual({ create: false, update: false })
+    expect(identity.changes.map((change) => [change.kind, change.subject.kind, named(change), change.affects])).toEqual([
+      ['access-narrowed', 'scope', '', ['id', 'customer']],
+      ['access-narrowed', 'key', 'pk_order', ['id']],
+    ])
+
+    // A change that already stops all of it speaks for the gap, which is not said twice.
+    expect(kinds(drift((objects) => dropColumn(objects, 'order', 'notes'), { gaps: columns }))).toEqual(['access-narrowed'])
+  })
+
   // A gap that disappeared means the connection sees more than it did when
   // the form was generated. Nothing breaks, so nothing is stopped.
   test('a gap that went away is noted, and stops nothing', () => {

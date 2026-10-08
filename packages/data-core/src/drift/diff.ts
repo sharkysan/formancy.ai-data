@@ -3,7 +3,7 @@ import type { MetadataSnapshot, ObjectMeta } from '../metadata.js'
 import { findObject } from '../snapshot.js'
 import { absence, gapChanges, unseen } from './access.js'
 import { columnChanges } from './columns.js'
-import { allFields, byCodepoint, type Comparison, describe, type Draft, foreignKeyIn, identityKeyIn, objectIn, type Operation, refKey } from './context.js'
+import { allFields, byCodepoint, type Comparison, describe, type Draft, foreignKeyIn, identityKeyIn, objectIn, type Operation, refKey, stopped } from './context.js'
 import { relationshipChanges } from './relationships.js'
 import type { DriftChange, DriftReport, DriftSeverity, DriftSubject } from './types.js'
 
@@ -130,7 +130,7 @@ function subjectKey(subject: DriftSubject): string {
  * column is blocking for a form that binds it and a note for one that does not.
  */
 function finish(drafts: readonly Draft[], offered: { create: boolean; update: boolean }): DriftReport {
-  const stopped = new Set<Operation>(drafts.flatMap((draft) => (draft.breaksReads ? ['create', 'update'] : draft.stops)))
+  const stops = new Set<Operation>(drafts.flatMap(stopped))
   const changes: DriftChange[] = drafts.map((draft) => ({
     kind: draft.kind,
     severity: draft.breaksReads || draft.stops.some((operation) => offered[operation]) ? 'blocking' : draft.otherwise,
@@ -148,6 +148,6 @@ function finish(drafts: readonly Draft[], offered: { create: boolean; update: bo
   return {
     changes,
     blocking: changes.some((change) => change.severity === 'blocking'),
-    writable: { create: offered.create && !stopped.has('create'), update: offered.update && !stopped.has('update') },
+    writable: { create: offered.create && !stops.has('create'), update: offered.update && !stops.has('update') },
   }
 }

@@ -10,20 +10,24 @@
   with no gap is "the table is gone", the root vanishing behind its own gap or a
   scope-wide one is an access problem, and the root outside a narrowed scope is
   a scope problem; a new gap blocks exactly what it puts in doubt, and one that
-  went away stops nothing; changes sort most severe first, by codepoint, and two
-  runs are byte-identical. `columns.test.ts` — a new nullable or defaulted column
-  is for review and a new NOT NULL one stops create and only create; a dropped
-  or retyped bound column blocks the form, a dropped unbound one is a note;
-  tightened precision, scale, length, range, nullability or default blocks writes
-  of that field and loosened is information, unless the published control can no
-  longer hold the column; the concurrency column gone or changed stops update; an
-  apparent rename is two changes and a hint; a bound column behind a gap is
-  access. `relationships.test.ts` — the foreign key, target key, target table
-  and display columns behind a lookup; the key behind the identity; constraints
-  the form does not rest on are notes; tables it does not touch are left out.
+  went away stops nothing; a gap given as the reason something vanished still
+  stops everything it puts in doubt; changes sort most severe first, by
+  codepoint, and two runs are byte-identical. `columns.test.ts` — a new
+  nullable or defaulted column is for review and a new NOT NULL one stops
+  create and only create; a dropped or retyped bound column blocks the form, a
+  dropped unbound one is a note; tightened precision, scale, length, range,
+  nullability or default blocks writes of that field and loosened is
+  information, unless the published control can no longer hold the column; the
+  concurrency column gone or changed stops update; an apparent rename is two
+  changes and a hint; a bound column behind a gap is access.
+  `relationships.test.ts` — the foreign key, target key, target table and
+  display columns behind a lookup; foreign keys and keys compared by what they
+  are, never by how they read; the key behind the identity; constraints the
+  form does not rest on are notes; tables it does not touch are left out.
   `compare.test.ts` — which way each kind of type moves. Watched failing with a
-  vanished root's gap ignored, with the outgrown-field check removed, and with
-  severity ignoring what the form offers.
+  vanished root's gap ignored, with the outgrown-field check removed, with
+  severity ignoring what the form offers, with a cited gap's own doubt dropped,
+  and with foreign keys compared as sentences.
 
 ## Context
 
@@ -71,9 +75,9 @@ blocks and what the form may still write.
   | Database starts generating a written column, or stops generating one nobody fills | stops writes, or create |
   | Concurrency column gone or changed | stops update |
   | No key covers the identity any more | stops update |
-  | Anything about the foreign key behind a lookup, the key it points at, its target or a display column | blocks the lookup |
+  | Anything about the foreign key behind a lookup, the key it points at, its target or a display column | blocks the lookup. Compared by value: schema `a.b`'s table `c` and schema `a`'s table `b.c` read alike and are different targets |
   | A column gone and one with the same definition added | the two changes, plus a `possible-rename` hint for review; names are never compared |
-  | Something gone that a gap explains, or a foreign key with no visible target | `access-narrowed`, never a deletion |
+  | Something gone that a gap explains, or a foreign key with no visible target | `access-narrowed`, never a deletion; the gap is said there once if that change stops all the gap would, and is reported beside it otherwise |
   | A new gap | stops what it puts in doubt: the root's columns, every write; its keys, update; foreign keys and a lookup target's columns or keys, the lookup. Checks, comments and default expressions: `info` |
   | A gap gone | `info` |
   | The root missing | out of scope, `scope-narrowed`; behind a gap, `access-narrowed`; otherwise `root-dropped`. All block |
@@ -100,7 +104,9 @@ because one function decides it for both.
 a person's time. Any change to a lookup's foreign key stops the lookup,
 including `ON DELETE`, which a form never exercises. A new gap on the root's
 columns stops writes even when every bound column is still visible, because a
-NOT NULL column nobody can see would make every create fail. A server upgrade
+NOT NULL column nobody can see would make every create fail; that holds when
+the gap also hides the concurrency token, so the token and the gap are two
+changes quoting the same words. A server upgrade
 that respells a type stops every form that binds it. `writable` is per
 operation, so a tightened field stops all of update, even a patch that does not
 touch it; `affects` names the field so that a runtime that refuses per field

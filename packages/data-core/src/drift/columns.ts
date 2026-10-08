@@ -82,8 +82,7 @@ function droppedColumn(comparison: Comparison, was: ColumnMeta): Draft | null {
 
   const stops: readonly Operation[] = token ? ['update'] : []
   if (gaps.length > 0) {
-    cite(comparison, gaps)
-    return { kind: 'access-narrowed', subject, affects: fields, stops, breaksReads: fields.length > 0, otherwise: 'review', message: unseen(`Column ${was.name} of ${describe(root)}`, gaps) }
+    return cite(comparison, gaps, { kind: 'access-narrowed', subject, affects: fields, stops, breaksReads: fields.length > 0, otherwise: 'review', message: unseen(`Column ${was.name} of ${describe(root)}`, gaps) })
   }
   if (token) {
     return {
