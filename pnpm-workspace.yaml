@@ -1,5 +1,8 @@
 packages:
   - "packages/*"
+  # Applications: private, never published, and built by turbo like the rest.
+  # apps/examples renders generated forms under both upstream renderers.
+  - "apps/*"
 
 # Shared dependency versions live here so the packages cannot drift apart.
 allowBuilds:
@@ -10,6 +13,13 @@ allowBuilds:
   ssh2: false
   # Only checks dependency version notation; no generated runtime artefacts.
   protobufjs: false
+  # Transitive through @angular/build, which the examples' Angular plugin
+  # compiles with. Each install script only builds a native addon from source
+  # when no prebuilt one fits; the prebuilt ones arrive as optional packages,
+  # and the examples build and test without the scripts running.
+  '@parcel/watcher': false
+  lmdb: false
+  msgpackr-extract: false
 
 catalog:
   # The TypeScript line formancy.ai compiles under: its Angular 22 declares
@@ -20,6 +30,11 @@ catalog:
 
   vitest: ^5.0.1
   "@vitest/coverage-v8": ^5.0.1
+
+  # The accessibility floor, at formancy.ai's catalog version: its rule ids are
+  # what @formancy/conformance's exclusions name, so the previews here are
+  # audited against the same rules the renderers are held to upstream.
+  axe-core: ^4.13.0
 
   tsdown: ^0.23.0
   publint: ^0.3.24

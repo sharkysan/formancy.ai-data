@@ -15,11 +15,12 @@ describe('codecov.yml', () => {
     expect(committed).toBe(codecovConfig())
   })
 
-  // Every package with a suite, by name. A generator that found
+  // Every package and app with a suite, by name. A generator that found
   // none would produce a valid file with no components, which is the silent
-  // failure in a different costume.
+  // failure in a different costume. The app's id carries its prefix, so it can
+  // never merge with a package of the same name.
   test('names every package that produces coverage', () => {
     const ids = coveredPackages().map((entry) => entry.id)
-    expect(ids).toEqual(['data-core', 'data-fixtures', 'data-postgres', 'data-server', 'data-sqlserver'])
+    expect(ids).toEqual(['data-core', 'data-fixtures', 'data-postgres', 'data-server', 'data-sqlserver', 'app-examples'])
   })
 })

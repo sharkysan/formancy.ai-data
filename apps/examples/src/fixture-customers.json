@@ -1,0 +1,15 @@
+{
+  "snapshotFingerprint": "deb1336a97eeaefa66ddf73f33582a2e620cb2c82c403bc252b2cc7b4b5f9619",
+  "rows": [
+    {
+      "tenant_id": "1",
+      "customer_no": "1001",
+      "name": "Muster AG"
+    },
+    {
+      "tenant_id": "2",
+      "customer_no": "1001",
+      "name": "Other Tenant GmbH"
+    }
+  ]
+}
