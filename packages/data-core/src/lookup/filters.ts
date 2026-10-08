@@ -1,4 +1,19 @@
-import type { RowFilter, RowFilters } from './types.js'
+import type { RowFilter } from '../policy/types.js'
+import type { RowFilterTerm, RowFilters } from './types.js'
+
+/**
+ * The lookup filters for what `lookupRowFilter` returned.
+ *
+ * The one place an empty list may become `unrestricted`: `lookupRowFilter`
+ * returns `[]` only when the policy's entry for the lookup is `[]`, which is
+ * the policy saying "every row" in so many words — a missing entry, or a
+ * missing attribute, is a refusal there and never reaches this. Anywhere
+ * else, an empty list is still refused, as `RowFilters` says.
+ */
+export function lookupFilters(filter: RowFilter): RowFilters {
+  const [first, ...rest] = filter.map(({ column, value }) => ({ column, value }))
+  return first === undefined ? { kind: 'unrestricted' } : { kind: 'restricted', equal: [first, ...rest] }
+}
 
 const NOTHING_SAID =
   "Row filters are { kind: 'unrestricted' }, or { kind: 'restricted' } with at least one equality; anything else would read as every row, so it is refused."
@@ -9,7 +24,7 @@ function hasExactly(record: Record<string, unknown>, keys: readonly string[]): b
   return present.length === keys.length && keys.every((key) => Object.hasOwn(record, key))
 }
 
-function term(entry: unknown): RowFilter {
+function term(entry: unknown): RowFilterTerm {
   if (typeof entry === 'object' && entry !== null) {
     const { column, value } = entry as Record<string, unknown>
     if (typeof column === 'string' && column !== '' && typeof value === 'string') return { column, value }
@@ -29,7 +44,7 @@ function term(entry: unknown): RowFilter {
  * every row. The terms are fresh objects, so nothing else the filters carried
  * reaches a query.
  */
-export function rowFilterTerms(filters: RowFilters): RowFilter[] {
+export function rowFilterTerms(filters: RowFilters): RowFilterTerm[] {
   const given: unknown = filters
   if (typeof given !== 'object' || given === null || Array.isArray(given)) throw new Error(NOTHING_SAID)
   const record = given as Record<string, unknown>

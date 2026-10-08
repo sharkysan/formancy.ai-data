@@ -37,7 +37,7 @@ export { buildLookupConfig, DEFAULT_MAX_PAGE_SIZE } from './lookup/config.js'
 export type { LookupOptions, LookupSortChoice } from './lookup/config.js'
 export { lookupKeys, lookupPage, rejectedTokens, resolvedRows } from './lookup/rows.js'
 export type { FoundRow } from './lookup/rows.js'
-export { rowFilterTerms } from './lookup/filters.js'
+export { lookupFilters, rowFilterTerms } from './lookup/filters.js'
 export type {
   LookupAdapter,
   LookupConfig,
@@ -50,7 +50,7 @@ export type {
   LookupRow,
   LookupSearch,
   LookupSort,
-  RowFilter,
+  RowFilterTerm,
   RowFilters,
 } from './lookup/types.js'
 

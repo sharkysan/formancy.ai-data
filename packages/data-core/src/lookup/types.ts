@@ -88,7 +88,7 @@ export interface LookupResult {
 }
 
 /** One equality from trusted context: a column of the target table, and the canonical text of the value it must hold. */
-export interface RowFilter {
+export interface RowFilterTerm {
   readonly column: string
   readonly value: string
 }
@@ -108,7 +108,7 @@ export interface RowFilter {
  * Structural on purpose: the policy that produces these is defined elsewhere,
  * and this port depends on its shape, not its type.
  */
-export type RowFilters = { readonly kind: 'unrestricted' } | { readonly kind: 'restricted'; readonly equal: readonly [RowFilter, ...RowFilter[]] }
+export type RowFilters = { readonly kind: 'unrestricted' } | { readonly kind: 'restricted'; readonly equal: readonly [RowFilterTerm, ...RowFilterTerm[]] }
 
 /**
  * The lookup half of the database port, which both adapters implement and one

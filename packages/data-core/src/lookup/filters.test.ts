@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { rowFilterTerms } from './filters.js'
+import { lookupFilters, rowFilterTerms } from './filters.js'
 import type { RowFilters } from './types.js'
 
 /** What a caller outside the type system can hand an adapter: a policy read from JSON, or JavaScript. */
@@ -47,5 +47,25 @@ describe('rowFilterTerms', () => {
     for (const entry of [{ column: '', value: '7' }, { column: 'tenant_id', value: 7 }, { column: 'tenant_id' }, null, 'tenant_id=7']) {
       expect(() => rowFilterTerms(untyped({ kind: 'restricted', equal: [entry] })), JSON.stringify(entry)).toThrow(/a column name and a text value/)
     }
+  })
+})
+
+describe('lookupFilters', () => {
+  // The policy's lookupRowFilter and the lookup port were written in parallel
+  // and meet here. Its filter terms must reach the adapter unchanged, and
+  // nothing else it carried may.
+  test('a policy filter becomes the same equalities, as fresh objects', () => {
+    const policy = [{ column: 'tenant_id', value: 'acme', extra: 'dropped' } as { column: string; value: string }]
+    const filters = lookupFilters(policy)
+    expect(filters).toEqual({ kind: 'restricted', equal: [{ column: 'tenant_id', value: 'acme' }] })
+    expect(rowFilterTerms(filters)).toEqual([{ column: 'tenant_id', value: 'acme' }])
+  })
+
+  // An empty policy filter reaches this only when the policy's entry for the
+  // lookup was [] — the policy saying "every row" in so many words. A missing
+  // entry or attribute is refused before. So here, and only here, [] is unrestricted.
+  test('an empty policy filter is unrestricted, and rowFilterTerms reads it as no equalities', () => {
+    expect(lookupFilters([])).toEqual({ kind: 'unrestricted' })
+    expect(rowFilterTerms(lookupFilters([]))).toEqual([])
   })
 })
