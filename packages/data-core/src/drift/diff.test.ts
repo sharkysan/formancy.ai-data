@@ -83,6 +83,11 @@ describe('diffSnapshots: what is compared, and the root', () => {
     expect(doctored((copy) => (lookup(copy).target.table = { schema: 'sales', name: 'nope' }))).toThrow(/sales\.nope, which the base snapshot does not have/)
     expect(doctored((copy) => (copy.concurrency = { kind: 'rowversion', column: 'nope', confirmed: true }))).toThrow(/column nope of sales\.order/)
     expect(doctored((copy) => (copy.identity = ['order_date']))).toThrow(/identity \(order_date\), which no key of the base snapshot covers/)
+    // The same doctored bindings against an unchanged database: a fingerprint
+    // match says the database did not change, not that these bindings fit it.
+    const ghost = JSON.parse(JSON.stringify(bindings)) as FormBindings
+    ghost.fields.push({ kind: 'column', field: 'ghost', column: 'ghost', type: INT32, nullable: true, writable: true })
+    expect(() => diffSnapshots(base, base, ghost)).toThrow(/column ghost of sales\.order/)
   })
 
   // The table really is gone: no gap says the connection lost sight of it,

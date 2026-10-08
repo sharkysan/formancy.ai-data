@@ -27,13 +27,17 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
   if (bindings.snapshotFingerprint !== base.fingerprint) {
     throw new Error(`the bindings were generated from snapshot ${bindings.snapshotFingerprint}, not from the base snapshot ${base.fingerprint}`)
   }
+  // Checked before the fast path, not after it: a fingerprint match says the
+  // database did not change, and nothing about whether these bindings could
+  // ever have come from it. Found in review: doctored bindings were accepted
+  // whenever the two snapshots happened to be equal.
+  const before = assertBindingsMatch(base, bindings)
   const offered = { ...bindings.operations }
   if (current.fingerprint === base.fingerprint) return { changes: [], blocking: false, writable: offered }
   if (current.kind !== base.kind) {
     throw new Error(`a ${base.kind} snapshot cannot be compared with a ${current.kind} one: a form's bindings belong to one engine`)
   }
 
-  const before = assertBindingsMatch(base, bindings)
   const after = findObject(current, bindings.root)
   if (after === undefined) return finish([rootMissing(current, bindings)], offered)
 
