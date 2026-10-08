@@ -21,6 +21,7 @@ RUN npm install -g corepack@latest && corepack enable pnpm
 # here AND copied in full below; src/dockerfile.test.ts derives that list from
 # the dependency graph and fails when this file forgets one.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/data-core/package.json packages/data-core/
 COPY packages/data-server/package.json packages/data-server/
 
 # --ignore-scripts: nothing the server needs runs a postinstall, and a build
@@ -31,6 +32,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts \
 
 COPY LICENSE.md NOTICE tsconfig.base.json ./
 COPY scripts/ scripts/
+COPY packages/data-core/ packages/data-core/
 COPY packages/data-server/ packages/data-server/
 
 RUN pnpm --filter @formancy/data-server... build && node scripts/sync-licenses.mjs
