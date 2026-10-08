@@ -20,6 +20,14 @@ existed would be documented and inert.
   returns exactly the identity the server derived from the host's token so a
   wrong issuer, audience or claim mapping shows before any form depends on it.
 
+- **`validateBundle(document)`** — a published version is the form, its
+  bindings, its policy and the snapshot they came from, checked on publish and
+  on every read: a hand-edited file is refused, not served
+  ([0019](../../docs/decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)).
+- **`parseConnections` and `createConnectionRegistry`** — the allowlist of
+  databases a form may bind to, with secret references for passwords, opened
+  lazily through driver factories the composition root supplies.
+
 ## Running it
 
 ```bash
