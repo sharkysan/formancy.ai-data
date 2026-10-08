@@ -43,6 +43,35 @@ Exact decimals and integers past 2^53 become text fields with an exact pattern,
 never JavaScript numbers. Update is offered only with a proven concurrency
 token. See [0009](../../docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md).
 
+## Access policy
+
+A `FormPolicy` says, per published form, which roles may read, create and
+update, which may read and write each field, and which root columns must equal
+an attribute of the trusted `PolicyContext` — tenant isolation — with the same
+for each lookup's target table. The host builds the context after verifying the
+caller's identity; it is never built from request input.
+
+```ts
+import { checkSubmittedFields, forcedValues, rowFilter } from '@formancy/data-core'
+
+const context = { actor: { id: 'u-17', roles: ['clerk'] }, attributes: { tenant: '42' } }
+
+checkSubmittedFields(policy, context, bindings, 'create', ['tenant_id', 'name'])
+// { ok: false, code: 'over-posting', message: 'tenant_id is pinned by a row filter: …' }
+rowFilter(policy, context) // { ok: true, filter: [{ column: 'tenant_id', value: '42' }] }
+forcedValues(policy, context) // the same columns, written from the context on create
+```
+
+Deny by default: a field the policy does not name is readable and writable by
+nobody, and a lookup it does not name offers nothing. A missing attribute is a
+refusal, never an empty filter, because an empty filter is every tenant's rows.
+Every function answers `{ ok: true, … }` or a refusal with a stable `code`, and
+none of them reads the form document: a hidden or disabled field is
+presentation, not authorisation. `validatePolicy(policy, bindings)` refuses a
+policy that does not fit its form. Nothing runs these yet; the record
+operations that will are still to come. See
+[0011](../../docs/decisions/0011-every-operation-carries-a-trusted-policy-context.md).
+
 ## Licence
 
 Source-available, not open source. See [`LICENSE.md`](./LICENSE.md): free to

@@ -31,3 +31,20 @@ export type {
 export { codecFor } from './codecs/codec.js'
 export type { ApiValue, Codec, CodecOutcome } from './codecs/codec.js'
 export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
+export { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter } from './policy/evaluate.js'
+export { validatePolicy } from './policy/validate.js'
+export type {
+  FieldPolicy,
+  ForcedValues,
+  FormPolicy,
+  PolicyContext,
+  PolicyDecision,
+  PolicyOperation,
+  PolicyRefusal,
+  PolicyRefusalCode,
+  PolicyValidation,
+  ReadableFields,
+  RowFilter,
+  RowFilterResult,
+  RowFilterRule,
+} from './policy/types.js'
