@@ -4,7 +4,7 @@ import type { ColumnMeta, MetadataSnapshot, ObjectMeta, ObjectRef } from '@forma
 import { findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
 import { FIXTURE_SCOPE, restrictedDisagreements, snapshotDisagreements, startSqlServerFixture } from '@formancy/data-fixtures'
-import { discoverSqlServer } from './index.js'
+import { createSqlServerAdapter, discoverSqlServer } from './index.js'
 
 /**
  * Discovery against REAL SQL Server, as the fixture's owner and as
@@ -511,5 +511,19 @@ describe('discovery as the restricted reader', () => {
     } finally {
       await denied.close()
     }
+  })
+})
+
+describe('discovery through the adapter port', () => {
+  // The server will only ever hold a DatabaseAdapter. Discovery reached
+  // through it must be the same discovery, with the same fingerprint, and the
+  // version a snapshot records must be the one a ping reports.
+  test('the port discovers exactly what discoverSqlServer does', async () => {
+    const adapter = createSqlServerAdapter(owner)
+    const direct = await discoverSqlServer(owner, FIXTURE_SCOPE)
+    const through = await adapter.discover(FIXTURE_SCOPE)
+    expect(snapshotDisagreements(through)).toEqual([])
+    expect(through.fingerprint).toBe(direct.fingerprint)
+    expect(through.serverVersion).toBe((await adapter.ping()).version)
   })
 })

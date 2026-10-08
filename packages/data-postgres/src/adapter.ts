@@ -1,5 +1,6 @@
 import type { DatabaseAdapter, ServerIdentity } from '@formancy/data-core'
 import type { Sql } from 'postgres'
+import { discoverPostgres } from './discovery/discover.js'
 
 /**
  * PostgreSQL, through a driver the composition root connected.
@@ -27,6 +28,8 @@ export function createPostgresAdapter(sql: Sql): DatabaseAdapter {
       if (row === undefined) throw new Error('PostgreSQL answered the ping with no row')
       return { kind: 'postgres', version: row.version }
     },
+
+    discover: (scope) => discoverPostgres(sql, scope),
 
     async close(): Promise<void> {
       // `end()` resolves at once on a driver that has already ended, which is

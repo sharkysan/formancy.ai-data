@@ -74,3 +74,17 @@ export type {
   RowFilterResult,
   RowFilterRule,
 } from './policy/types.js'
+export type {
+  InsertRequest,
+  ReadRequest,
+  RecordAdapter,
+  RecordColumn,
+  RecordConcurrency,
+  RecordFailure,
+  RecordFailureCode,
+  RecordOutcome,
+  RecordRead,
+  RecordTarget,
+  RecordValue,
+  UpdateRequest,
+} from './records/types.js'

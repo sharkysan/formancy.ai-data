@@ -314,3 +314,15 @@ describe('the fingerprint', () => {
     expect(restored.fingerprint).toBe(before.fingerprint)
   })
 })
+
+describe('discovery through the adapter port', () => {
+  // The server will only ever hold a DatabaseAdapter. Discovery reached
+  // through it must be the same discovery, with the same fingerprint, or drift
+  // review would compare two different readings of one database.
+  test('the port discovers exactly what discoverPostgres does', async () => {
+    const direct = await discoverPostgres(owner, FIXTURE_SCOPE)
+    const through = await createPostgresAdapter(owner).discover(FIXTURE_SCOPE)
+    expect(snapshotDisagreements(through)).toEqual([])
+    expect(through.fingerprint).toBe(direct.fingerprint)
+  })
+})
