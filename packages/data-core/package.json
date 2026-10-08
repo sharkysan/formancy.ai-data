@@ -1,7 +1,7 @@
 {
   "name": "@formancy/data-core",
   "version": "0.1.0",
-  "description": "The Formancy Data core: the database-neutral adapter port, and what every adapter has to agree on. No driver, no HTTP, no Node.",
+  "description": "The Formancy Data core: the database-neutral adapter port and metadata contract. No driver, no HTTP, no Node.",
   "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",
   "sideEffects": false,
@@ -22,6 +22,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "check:pkg": "publint && attw --pack . --profile esm-only"
+  },
+  "dependencies": {
+    "@formancy/spec": "0.3.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",
