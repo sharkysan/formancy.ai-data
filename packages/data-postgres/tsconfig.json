@@ -2,7 +2,16 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // The integration tests import the shared fixture (0005). This package does
+    // not declare @formancy/data-fixtures as a devDependency yet, and under
+    // node-linker=isolated an undeclared package does not resolve, so the
+    // tests reach its BUILT declarations here and its built module through the
+    // alias in vitest.config.ts -- the files the devDependency would resolve
+    // to. Remove both once package.json declares it.
+    "paths": {
+      "@formancy/data-fixtures": ["../data-fixtures/dist/index.d.mts"]
+    }
   },
   "include": ["src/**/*.ts"]
 }
