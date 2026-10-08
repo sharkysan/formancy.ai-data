@@ -117,3 +117,54 @@ jobs:
       - run: pnpm build
 
       - run: pnpm test:e2e:install
+
+  # The image is the product for a self-hoster, and nothing else here touches
+  # it. src/dockerfile.test.ts catches a workspace package the COPY list forgot;
+  # this catches everything it cannot -- a file the runtime stage drops, a
+  # module that resolves in the workspace and not in the deployed tree. formancy's
+  # image once built cleanly, passed every test, and exited on startup with
+  # ERR_MODULE_NOT_FOUND; this job exists so that is found here instead.
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the server image
+        run: docker build -f packages/data-server/Dockerfile -t formancy/data-server:ci .
+
+      - name: Unconfigured, it refuses with a sentence rather than starting
+        run: |
+          output=$(docker run --rm formancy/data-server:ci 2>&1 || true)
+          echo "$output"
+          if echo "$output" | grep -q 'ERR_MODULE_NOT_FOUND\|Cannot find module'; then
+            echo "::error::The image is missing a module at runtime. The build said nothing."
+            exit 1
+          fi
+          if ! echo "$output" | grep -q 'FORMANCY_DATA_IDENTITY_SECRET'; then
+            echo "::error::An unconfigured server did not name the setting it needs."
+            exit 1
+          fi
+
+      - name: Configured, it serves health and refuses an unauthenticated request
+        run: |
+          docker run -d --name data-server -p 127.0.0.1:4390:4390 \
+            -e FORMANCY_DATA_ISSUER=https://host.example \
+            -e FORMANCY_DATA_AUDIENCE=formancy-data \
+            -e FORMANCY_DATA_IDENTITY_SECRET=env:HOST_SECRET \
+            -e HOST_SECRET=a-shared-secret-of-at-least-thirty-two-bytes \
+            formancy/data-server:ci
+          for attempt in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4390/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:4390/health || { docker logs data-server; exit 1; }
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4390/v1/whoami)
+          if [ "$status" != "401" ]; then
+            echo "::error::whoami without a token answered $status, expected 401"
+            exit 1
+          fi
+          # Unprivileged, and carrying its licence.
+          test "$(docker exec data-server id -un)" = "node"
+          docker exec data-server test -f /app/LICENSE.md
+          docker rm -f data-server

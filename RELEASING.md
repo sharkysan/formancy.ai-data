@@ -45,9 +45,11 @@ workflow's job.
 6. **Signs the SBOM with cosign**, keylessly.
 7. **Creates the GitHub release** with both attached.
 
-There is no container image yet, because there is no server. When
-`@formancy/data-server` lands, its image is built, signed and attested by this
-workflow the way formancy.ai's is.
+The server image is built by this workflow at the tagged commit, pushed to
+`ghcr.io/<owner>/formancy-data-server:<tag>` with build provenance, signed with
+cosign **by digest**, and carries the SBOM as an attestation. There is no
+`latest` tag. CI builds the same image on every pull request and proves it
+starts, refuses when unconfigured, and runs unprivileged.
 
 ## Provenance
 
