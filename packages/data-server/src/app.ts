@@ -1,7 +1,10 @@
 import rateLimit from '@fastify/rate-limit'
 import Fastify from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
+import type { ConfigurationStore } from './config-store.js'
+import type { ConnectionRegistry } from './connections.js'
 import type { HostIdentity, IdentityVerifier } from './identity.js'
+import { adminRoutes } from './routes/admin.js'
 
 export interface DataServerOptions {
   verifyIdentity: IdentityVerifier
@@ -17,6 +20,12 @@ export interface DataServerOptions {
    * tokens at the verifier as fast as the network allows.
    */
   rateLimit?: { max: number; timeWindowMs: number }
+  /**
+   * The administrator's plane: connections, discovery, proposals, publication
+   * and drift. Absent, none of those routes exist — a server without a store
+   * answers 404 for them rather than pretending.
+   */
+  admin?: { registry: ConnectionRegistry; store: ConfigurationStore; adminRoles: readonly string[] }
 }
 
 /**
@@ -42,10 +51,11 @@ function bearer(request: FastifyRequest): string | undefined {
 /**
  * The HTTP surface, as far as it exists.
  *
- * Two routes today, and on purpose no more: a route that answered before the
- * adapters behind it could would be a documented-but-inert endpoint, which is
- * the failure this repository refuses. The record, lookup and publication
- * routes arrive with the operations they call.
+ * The administrator's plane is registered when the server is given a store,
+ * a connection registry and the roles that administer. The record and lookup
+ * routes arrive with the operations they call: a route that answered before
+ * the adapters behind it could would be a documented-but-inert endpoint, which
+ * is the failure this repository refuses.
  *
  * `GET /v1/whoami` is for the person wiring a host application in: it returns
  * exactly the identity the server derived from the host's token, so a wrong
@@ -83,6 +93,10 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
     }
     return identity
   })
+
+  if (options.admin !== undefined) {
+    await app.register(adminRoutes, { ...options.admin, authenticate })
+  }
 
   return app
 }
