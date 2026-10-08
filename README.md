@@ -44,10 +44,11 @@ project, and why in a repository of its own, is decision
 | `@formancy/data-core` | The database-neutral port and metadata contract: what discovery returns, including what it could not see. No driver, no HTTP, no Node. |
 | `@formancy/data-postgres` | The PostgreSQL adapter, on the `postgres` driver. |
 | `@formancy/data-sqlserver` | The SQL Server adapter, on `mssql` over `tedious` — pure JavaScript, no ODBC. |
+| `@formancy/data-server` | The server: configuration store, host identity, and the HTTP surface the adapters will sit behind. Fastify, like formancy's. |
 | `@formancy/data-fixtures` | Private test support: one business model for both engines, a restricted reader, and the comparator both adapters answer to. Never published. |
 
-Planned and not here: `@formancy/data-server` (the authenticated HTTP API,
-connection pools and publication), the studio for connecting a database and
+Planned and not here: the record, lookup and publication routes of the
+server, the studio for connecting a database and
 reviewing a generated form, and the Angular and React integration examples.
 
 ## How it relates to formancy.ai

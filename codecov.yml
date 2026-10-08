@@ -58,6 +58,10 @@ component_management:
       name: packages/data-postgres
       paths:
         - packages/data-postgres/**
+    - component_id: data-server
+      name: packages/data-server
+      paths:
+        - packages/data-server/**
     - component_id: data-sqlserver
       name: packages/data-sqlserver
       paths:
