@@ -44,6 +44,19 @@ describe('sourceNameFor', () => {
     expect(sourceNameFor('1st', { schema: 'S', name: 'T' }, 'F')).toBe('s-1st-s-t-f')
   })
 
+  // A table name is input somebody else chose, so building a name from it must
+  // stay linear however hostile it is. This held before the change too —
+  // separators were collapsed to one hyphen before any anchored pattern ran —
+  // and it is pinned now so it keeps holding if that order ever changes.
+  test('a name made of separators is linear and still valid', () => {
+    const hostile = `${'-'.repeat(50_000)}x${'-'.repeat(50_000)}`
+    const started = Date.now()
+    const name = sourceNameFor(hostile, { schema: hostile, name: hostile }, hostile)
+    expect(Date.now() - started).toBeLessThan(500)
+    expect(name).toMatch(/^[a-z][a-z0-9-]*$/)
+    expect(name.length).toBeLessThanOrEqual(64)
+  })
+
   // Two long names with a shared prefix must not collapse into one source.
   test('a name too long keeps its start and ends in a hash of the whole', () => {
     const a = sourceNameFor('erp', { schema: 'sales', name: 'x'.repeat(60) }, 'fk_a')

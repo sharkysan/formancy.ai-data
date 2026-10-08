@@ -79,14 +79,28 @@ const SOURCE_LENGTH = 64
  */
 export function sourceNameFor(connection: string, root: ObjectRef, foreignKey: string): string {
   const raw = `${connection}-${root.schema}-${root.name}-${foreignKey}`
-  let name = raw
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '')
+  let name = trimHyphens(raw.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-'))
   if (!/^[a-z]/.test(name)) name = `s-${name}`
   if (name.length <= SOURCE_LENGTH) return name
   const hash = schemaHash(raw).slice(0, 8)
-  return `${name.slice(0, SOURCE_LENGTH - hash.length - 1).replace(/-+$/, '')}-${hash}`
+  return `${trimHyphens(name.slice(0, SOURCE_LENGTH - hash.length - 1))}-${hash}`
+}
+
+/**
+ * Hyphens off both ends, by walking the string rather than with `/-+$/`.
+ *
+ * CodeQL flagged the anchored pattern this replaced (js/polynomial-redos):
+ * `-+$` backtracks quadratically on a long run of hyphens that does not end the
+ * string, and the input is a table name somebody else chose. It was not slow in
+ * practice, because separators were already collapsed to one hyphen first; a
+ * loop makes that ordering irrelevant instead of load-bearing.
+ */
+function trimHyphens(text: string): string {
+  let start = 0
+  let end = text.length
+  while (start < end && text[start] === '-') start += 1
+  while (end > start && text[end - 1] === '-') end -= 1
+  return text.slice(start, end)
 }
 
 /**
