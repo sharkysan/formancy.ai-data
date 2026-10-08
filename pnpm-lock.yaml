@@ -295,6 +295,9 @@ importers:
       '@arethetypeswrong/cli':
         specifier: 'catalog:'
         version: 0.18.5
+      '@formancy/data-fixtures':
+        specifier: workspace:*
+        version: link:../data-fixtures
       '@testcontainers/postgresql':
         specifier: 'catalog:'
         version: 12.2.0(supports-color@7.2.0)
@@ -375,6 +378,9 @@ importers:
       '@arethetypeswrong/cli':
         specifier: 'catalog:'
         version: 0.18.5
+      '@formancy/data-fixtures':
+        specifier: workspace:*
+        version: link:../data-fixtures
       '@testcontainers/mssqlserver':
         specifier: 'catalog:'
         version: 12.2.0(supports-color@7.2.0)

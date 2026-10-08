@@ -108,6 +108,22 @@ describe('snapshotDisagreements', () => {
     expect(found).toContainEqual(expect.stringMatching(/fk_order_customer pairs with \[customer_no, tenant_id\]/))
   })
 
+  // PostgreSQL files a stored generated column's expression in pg_attrdef,
+  // where defaults live. An adapter that read it as a default would make the
+  // generator treat a computed column as one the database fills on insert —
+  // found by the PostgreSQL discovery spike, and pinned here for both engines.
+  test('notices a computed or identity column reported as having a default', () => {
+    const wrong = snapshot('postgres', (objects) => {
+      const total = object(objects, 'order_line').columns.find((entry) => entry.name === 'line_total')
+      if (total !== undefined) total.hasDefault = true
+      const id = object(objects, 'order').columns.find((entry) => entry.name === 'id')
+      if (id !== undefined) id.hasDefault = true
+    })
+    const found = snapshotDisagreements(wrong)
+    expect(found).toContainEqual(expect.stringMatching(/order_line\.line_total hasDefault is true, expected false/))
+    expect(found).toContainEqual(expect.stringMatching(/sales\.order\.id hasDefault is true, expected false/))
+  })
+
   // A NOT VALID constraint reported as validated is a claim about existing rows
   // that is false — employee 3 has a manager that does not exist.
   test('notices an unvalidated foreign key reported as validated, and a dropped one', () => {

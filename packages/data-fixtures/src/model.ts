@@ -73,7 +73,9 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
     ref: sales('country'),
     kind: 'table',
     columns: [
-      { name: 'id', type: INT32, nullable: false, generated: 'identity' },
+      // An identity has no default: the database generates it. Pinned because a
+      // reader of pg_attrdef would see an expression there and call it one.
+      { name: 'id', type: INT32, nullable: false, generated: 'identity', hasDefault: false },
       { name: 'iso_code', type: text(2, true), nullable: false },
       { name: 'name', type: text(100), nullable: false },
       { name: 'flag', type: { kind: 'binary', maxLength: null }, nullable: true },
@@ -147,7 +149,7 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
     ref: sales('order'),
     kind: 'table',
     columns: [
-      { name: 'id', type: INT64, nullable: false, generated: 'identity' },
+      { name: 'id', type: INT64, nullable: false, generated: 'identity', hasDefault: false },
       { name: 'tenant_id', type: INT32, nullable: false },
       { name: 'customer_no', type: INT32, nullable: false },
       { name: 'order_date', type: { kind: 'date' }, nullable: false },
@@ -206,7 +208,10 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
       { name: 'quantity', type: INT32, nullable: false },
       { name: 'unit_price', type: decimal(12, 2), nullable: false },
       // Computed on both; the precision each engine derives for it differs, so only the kind is pinned.
-      { name: 'line_total', type: { kind: 'decimal' }, generated: 'computed' },
+      // PostgreSQL files a stored generated column's expression in pg_attrdef,
+      // where defaults live; a naive reader would report it as a default. It is not
+      // one, and the model says so for both engines.
+      { name: 'line_total', type: { kind: 'decimal' }, generated: 'computed', hasDefault: false },
     ],
     primaryKey: ['order_id', 'line_no'],
     uniqueKeys: {},

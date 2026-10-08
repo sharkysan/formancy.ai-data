@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",
+    "@formancy/data-fixtures": "workspace:*",
     "@testcontainers/mssqlserver": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
