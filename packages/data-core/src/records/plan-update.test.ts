@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest'
+import { generateForm } from '../generate/generate.js'
 import { buildLookupConfig } from '../lookup/config.js'
-import { planUpdate } from './plan.js'
+import type { FormPolicy } from '../policy/types.js'
+import { validatePolicy } from '../policy/validate.js'
+import { planRead, planUpdate } from './plan.js'
 import {
   actor,
   AUDITOR,
@@ -8,6 +11,7 @@ import {
   CLERK,
   CLERK_COLUMNS,
   CLERK_FIELDS,
+  CLERK_RW,
   CUSTOMER_POLICY,
   customerForm,
   customerSource,
@@ -23,6 +27,8 @@ import {
   orderForm,
   PG,
   PG_ORDER,
+  sales,
+  TENANT,
   TENANT_ONE,
   text,
   value,
@@ -144,6 +150,36 @@ describe('planUpdate', () => {
     expect(planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', { tenant_id: '1' })).toMatchObject({ ok: false, code: 'over-posting' })
     const country = planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', { country: 'k1:CH' })
     expect(country).toMatchObject({ ok: true, memberships: [{ field: 'country', tokens: ['k1:CH'], filters: { kind: 'unrestricted' } }] })
+  })
+
+  // The update increments its version column in the statement the row filter
+  // guards (0015). An employee table versioned by its tenant column, as an
+  // administrator may confirm — a non-nullable integer that is neither key
+  // nor field — under a policy that pins that column to the actor's tenant:
+  // the save would run `SET tenant_id = tenant_id + 1 WHERE tenant_id = 1`
+  // and move the employee into tenant 2. The policy fits the form, and a read
+  // moves nothing, so the read is planned and the update refused.
+  test('refuses an update whose row filter pins the version column', () => {
+    const { bindings } = generateForm(PG, { connection: 'erp', root: sales('employee'), formId: 'sales-employee', title: 'Employee', lookups: [], versionColumn: 'tenant_id' })
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: [], update: ['clerk'] },
+      fields: { id: { read: ['clerk'], write: [] }, name: CLERK_RW, manager_id: CLERK_RW },
+      rowFilters: TENANT,
+      lookups: {},
+    }
+    expect(validatePolicy(policy, bindings)).toEqual({ ok: true })
+    expect(planRead(PG, bindings, policy, CLERK, 'k1:5')).toMatchObject({ ok: true, request: { filters: TENANT_ONE } })
+    expect(planUpdate(PG, bindings, policy, CLERK, 'k1:5', '1', { name: 'Muster' })).toMatchObject({
+      ok: false,
+      code: 'invalid-policy',
+      message: expect.stringContaining('tenant_id is the version column') as unknown as string,
+    })
+    // The same form unfiltered: the version column alone is no reason to refuse.
+    expect(planUpdate(PG, bindings, { ...policy, rowFilters: [] }, CLERK, 'k1:5', '1', { name: 'Muster' })).toMatchObject({
+      ok: true,
+      request: { target: { concurrency: { kind: 'version-column', column: 'tenant_id' } }, filters: { kind: 'unrestricted' } },
+    })
   })
 
   // An update that would set nothing has no statement both engines write

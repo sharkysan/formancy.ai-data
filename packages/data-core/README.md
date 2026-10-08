@@ -159,7 +159,9 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   reporting every bad field at once. The tenant is written from the context;
   an omitted field lets a default apply on create and is unchanged on update;
   the key and the pinned columns are never set; update needs a confirmed
-  concurrency token.
+  concurrency token. A version column, which every update increments, is
+  never the key, a field's column or a generated one, and never pinned by a
+  row filter.
 - **Membership is the database's.** A lookup token whose key carries the tenant
   is refused when the tenant is not the context's; one that does not — a
   surrogate id — cannot be judged without a query. Every selection comes back

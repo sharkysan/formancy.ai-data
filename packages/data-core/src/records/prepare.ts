@@ -1,4 +1,5 @@
 import { canonicalize } from '@formancy/spec'
+import { versionColumnProblem } from '../generate/generate.js'
 import type { FieldBinding, FormBindings } from '../generate/types.js'
 import { lookupFilters } from '../lookup/filters.js'
 import type { RowFilters } from '../lookup/types.js'
@@ -69,15 +70,22 @@ function identityProblem(root: ObjectMeta, identity: readonly string[] | null): 
   return keys.some((key) => sameList(key.columns, identity)) ? null : `the identity (${identity.join(', ')}) is not a key of the table`
 }
 
-/** A rowversion is the engine's; a version column is a non-nullable integer every writer through this module increments. */
-function concurrencyProblem(columns: ReadonlyMap<string, ColumnMeta>, bindings: FormBindings): string | null {
+/**
+ * A rowversion is the engine's. A version column is one every writer through
+ * this module increments, held to the rule the generator confirms one by —
+ * never the key, a field's column or a generated one — so an update cannot
+ * move the record's address or its tenant. `bound` is every column a field is
+ * bound to.
+ */
+function concurrencyProblem(columns: ReadonlyMap<string, ColumnMeta>, bindings: FormBindings, bound: ReadonlySet<string>): string | null {
   const concurrency = bindings.concurrency
   if (concurrency === null) return null
   const column = columns.get(concurrency.column)
-  const fits =
-    column !== undefined &&
-    (concurrency.kind === 'rowversion' ? column.type.kind === 'rowversion' : column.type.kind === 'integer' && !column.nullable)
-  return fits ? null : `${concurrency.column} cannot be a ${concurrency.kind}`
+  let problem: string | null
+  if (column === undefined) problem = 'the table does not have it'
+  else if (concurrency.kind === 'rowversion') problem = column.type.kind === 'rowversion' ? null : `it is ${column.databaseType}`
+  else problem = versionColumnProblem(column, bindings.identity ?? [], bound)
+  return problem === null ? null : `${concurrency.column} cannot be a ${concurrency.kind}: ${problem}`
 }
 
 function bindingsProblem(root: ObjectMeta, columns: ReadonlyMap<string, ColumnMeta>, bindings: FormBindings): string | null {
@@ -93,7 +101,7 @@ function bindingsProblem(root: ObjectMeta, columns: ReadonlyMap<string, ColumnMe
     }
   }
   for (const name of bindings.identity ?? []) if (!columns.has(name)) return `the identity names ${name}, which the table does not have`
-  return identityProblem(root, bindings.identity) ?? concurrencyProblem(columns, bindings)
+  return identityProblem(root, bindings.identity) ?? concurrencyProblem(columns, bindings, bound)
 }
 
 /**

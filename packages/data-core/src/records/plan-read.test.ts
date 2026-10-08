@@ -220,6 +220,12 @@ describe('planRead', () => {
         },
       ],
       [
+        'gone cannot be a version-column: the table does not have it',
+        (draft) => {
+          if (draft.concurrency !== null) draft.concurrency.column = 'gone'
+        },
+      ],
+      [
         'id describes id as something other',
         (draft) => {
           draft.root = sales('employee')
@@ -278,6 +284,42 @@ describe('planRead', () => {
       ok: false,
       code: 'invalid-bindings',
       message: expect.stringContaining('row_version cannot be a version-column') as unknown as string,
+    })
+  })
+
+  // The adapter increments a version column in the same UPDATE that checks it
+  // (0015), so it moves whatever else the column is. As the record's key,
+  // every save would change the address its token names — and with tenant_id
+  // in the key, move the record into the next tenant. As a column a field is
+  // bound to, the one statement could set it twice; as one the database
+  // computes, no update could ever run. Each is refused before anything is
+  // planned, read included, because the bindings say something untrue.
+  test('refuses a version column that is the key, a field or generated', () => {
+    const customers = customerSource()
+    const asKey = edited(customerForm(customers).bindings, (draft) => {
+      draft.concurrency = { kind: 'version-column', column: 'tenant_id', confirmed: true }
+    })
+    expect(planRead(customers, asKey, CUSTOMER_POLICY, CLERK, 'k1:1,1001')).toMatchObject({
+      ok: false,
+      code: 'invalid-bindings',
+      message: expect.stringContaining("tenant_id cannot be a version-column: it is part of the record's key") as unknown as string,
+    })
+    // The order's tenant is no key, and the customer lookup writes it.
+    const asField = edited(PG_ORDER, (draft) => {
+      if (draft.concurrency !== null) draft.concurrency.column = 'tenant_id'
+    })
+    expect(planUpdate(PG, asField, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({
+      ok: false,
+      code: 'invalid-bindings',
+      message: expect.stringContaining('tenant_id cannot be a version-column: a field is bound to it') as unknown as string,
+    })
+    const generated = edited(PG_ORDER, (draft) => {
+      if (draft.concurrency !== null) draft.concurrency.column = 'id'
+    })
+    expect(planRead(PG, generated, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({
+      ok: false,
+      code: 'invalid-bindings',
+      message: expect.stringContaining('id cannot be a version-column: the database generates it') as unknown as string,
     })
   })
 })

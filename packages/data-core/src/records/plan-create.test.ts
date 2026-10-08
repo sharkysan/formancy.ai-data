@@ -85,6 +85,22 @@ describe('planCreate', () => {
     if (pg.ok && ms.ok) expect(ms.request.values).toEqual(pg.request.values)
   })
 
+  // A table with no key is create-only, and can still carry a version column
+  // an administrator confirmed: with no key there is nothing for the column to
+  // be part of. A version check that read the missing identity as a problem,
+  // or threw on it, would refuse every create of such a table, though nothing
+  // is ever updated through it.
+  test('plans a create for a keyless table with a confirmed version column', () => {
+    const keyless = snapshot('postgres', (objects) => {
+      const order = objects.find((object) => object.ref.name === 'order')
+      if (order !== undefined) order.primaryKey = null
+    })
+    const { bindings } = orderForm(keyless)
+    expect(bindings).toMatchObject({ identity: null, concurrency: { kind: 'version-column', column: 'row_version', confirmed: true } })
+    const createOnly = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, update: [] } }
+    expect(planCreate(keyless, bindings, createOnly, CLERK, ANSWERS)).toMatchObject({ ok: true, request: { target: { identity: [], concurrency: { column: 'row_version' } } } })
+  })
+
   // Over-posting. The tenant is the context's: on the order form it is not a
   // field at all, on the customer form it is a pinned one; an identity or a
   // version column is the database's. Each is refused before a value is read.

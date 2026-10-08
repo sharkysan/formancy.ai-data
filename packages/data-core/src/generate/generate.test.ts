@@ -226,6 +226,40 @@ describe('generateForm', () => {
     expect(() => generateForm(fixtureLike('postgres'), { ...ORDER, versionColumn: 'notes' })).toThrow(/cannot be a version column/)
   })
 
+  // Every update increments a version column (0015), so confirming one moves
+  // whatever else it is. The key: every save would change the record's
+  // address. A lookup's column: the lookup would be dropped without a word,
+  // and a tenant in it would move with each save. These are the planner's
+  // refusals too, made here so a confirmed column is never one the planner
+  // turns away; the plan tests prove the planner's half.
+  test('refuses to confirm a version column that is the key or a lookup’s column', () => {
+    const employee = { ...ORDER, root: { schema: 'sales', name: 'employee' }, lookups: [] }
+    expect(() => generateForm(fixtureLike('postgres'), { ...employee, versionColumn: 'id' })).toThrow(/id cannot be a version column: it is part of the record's key/)
+    expect(() => generateForm(fixtureLike('postgres'), { ...employee, versionColumn: 'gone' })).toThrow(/gone cannot be a version column: employee has no such column/)
+    expect(() => generateForm(fixtureLike('postgres'), { ...ORDER, versionColumn: 'tenant_id' })).toThrow(/tenant_id cannot be a version column: a field is bound to it/)
+    // The same column with no lookup over it is neither, and can be confirmed.
+    expect(generateForm(fixtureLike('postgres'), { ...ORDER, lookups: [], versionColumn: 'tenant_id' }).bindings.concurrency).toEqual({
+      kind: 'version-column',
+      column: 'tenant_id',
+      confirmed: true,
+    })
+  })
+
+  // A versioned-document table keys each revision by (id, version). The name
+  // says version column; the key says otherwise. Suggested, it would be taken
+  // out of the form and could never be confirmed; it stays a field instead.
+  test('does not suggest a key column as a version column, however it is named', () => {
+    const revisions = fixtureLike('postgres', (objects) => {
+      objects.push(table('document', [col('id', INT32), col('version', INT32), col('body', { kind: 'text', maxLength: null, fixedLength: false })], {
+        primaryKey: { name: 'pk_document', columns: ['id', 'version'] },
+      }))
+    })
+    const { bindings } = generateForm(revisions, { ...ORDER, root: { schema: 'sales', name: 'document' }, lookups: [] })
+    expect(bindings.concurrency).toBeNull()
+    expect(bindings.fields.map((binding) => binding.field)).toEqual(['id', 'version', 'body'])
+    expect(bindings.operations).toEqual({ create: true, update: false })
+  })
+
   // With no way to detect a stale save, an update could overwrite somebody
   // else's change silently. The form is then create-only, and says why.
   test('without a concurrency token, update is not offered and the reason is written down', () => {

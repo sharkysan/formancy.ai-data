@@ -281,6 +281,11 @@ export function planUpdate(
   if (!submitted.ok) return submitted
   const filters = filtersFor(prepared, policy, context, 'update')
   if (!filters.ok) return filters
+  // The update increments its version column under this filter (0015); pinned
+  // by it, the record would leave the rows the filter admits — its tenant.
+  if (filters.filter.some((term) => term.column === concurrency.column)) {
+    return refuse('invalid-policy', `rowFilters: ${concurrency.column} is the version column, which every update changes; a row filter cannot pin it.`)
+  }
   const allowed = checkSubmittedFields(policy, context, bindings, 'update', [...submitted.answers.keys()])
   if (!allowed.ok) return allowed
   const key = decodeRecordKey(prepared.target.identity, recordToken)

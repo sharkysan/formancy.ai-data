@@ -13,7 +13,9 @@
   tenant filter; a malformed token, a trusted tenant not spelled as its column
   holds it (`042`), a policy that does not fit the form, a filter on a boolean,
   drift, a form with no addressable key, and each way a bindings file can
-  contradict its own snapshot are refused, each pinned to its own reason.
+  contradict its own snapshot — a version column that is the key, a column a
+  field is bound to or a generated one among them — are refused, each pinned
+  to its own reason.
   `plan-create.test.ts` — the whole insert for every kind of answer, the same
   on both engines but for the version; an over-posted tenant, key or version;
   a decimal sent as a number; forged tokens and another tenant's customer get
@@ -22,10 +24,14 @@
   actor's filters; the three-state radio; a checkbox answered with text; an
   omitted required field and an omitted defaulted one; a create-only actor gets
   back only the key; a token the codec would respell; a lookup over the pinned
-  tenant alone. `plan-update.test.ts` — a patch sets exactly what was submitted
+  tenant alone; a keyless table with a confirmed version column.
+  `plan-update.test.ts` — a patch sets exactly what was submitted
   and never the tenant or the key; clearing a NOT NULL column, a changed key,
   an unconfirmed or withheld update, a version the target could never have
-  returned and an empty patch are refused. `answers.test.ts` — each answer in
+  returned, a row filter that pins the version column and an empty patch are
+  refused. `generate.test.ts` — the generator refuses to confirm a version
+  column that is the key or a lookup's column, and does not suggest a key
+  column named like one. `answers.test.ts` — each answer in
   its control's shape; a reference with a NULL column is null, one no token can
   carry is left out; a record with no address has no token; a non-canonical
   record throws; and answers → `planCreate` → the stored row →
@@ -104,7 +110,13 @@ can answer is returned for the caller to ask.
   `drift`. Then every column a binding names must exist and, for a column
   field, have the snapshot's type and nullability; no column may be bound
   twice; the identity must be the primary key or a unique key; a concurrency
-  column must be a rowversion or a non-nullable integer. Every type in a
+  column must be a rowversion, or a non-nullable integer that the database
+  does not generate, that is not part of the identity and that no field is
+  bound to. The adapter increments a version column in every update (0015):
+  as the key it would move the record's address — with the tenant in the key,
+  into the next tenant — and as a field's column the statement could set it
+  twice. The generator confirms and suggests a version column by the same
+  function, so a form it makes is never refused for it here. Every type in a
   request is the snapshot's.
 - **Trusted values are spelled as their columns hold them.** A filter value or
   a pinned value its column cannot hold in that spelling is `invalid-context`;
@@ -136,8 +148,10 @@ can answer is returned for the caller to ask.
   addressable key. A patch: an omitted field is unchanged, an explicit null
   clears where the column allows it. The key and the pinned columns are never
   set; a key field equal to the token's is accepted and dropped, a different
-  one refused. The version must be one the target could have returned. A patch
-  that sets nothing is refused here, once.
+  one refused. A row filter that pins the version column is `invalid-policy`:
+  the increment would move the record out of the rows the filter admits. The
+  version must be one the target could have returned. A patch that sets
+  nothing is refused here, once.
 - **What is read back is what the actor may see**: the key, when a token can
   carry it, and the columns of the readable fields. An actor who may create
   and not read gets the key and nothing else.
@@ -179,7 +193,12 @@ leave it out of what it plans, or a presentation override has to drop
 `required`. A server must keep the snapshot each published form was generated
 from, because every plan reads it. The planner settles the spelling of a
 filter value, and an adapter still binds it without a type, because the port
-carries none. Every request is checked against its snapshot from scratch,
+carries none. A table whose only version column is part of its key cannot be
+updated through this module, and a column a lookup writes can be confirmed
+only by leaving that lookup out of the form. `validatePolicy` still
+accepts a row filter on the version column, because a read and a create are
+sound under it, so that mistake shows at the first save and not at
+publication. Every request is checked against its snapshot from scratch,
 which costs a pass over the bindings per request and has not been measured.
 
 **What it forecloses.** An adapter that reads a request body, a planner that
