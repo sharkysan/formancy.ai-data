@@ -41,9 +41,10 @@ project, and why in a repository of its own, is decision
 
 | Package | What it is |
 | --- | --- |
-| `@formancy/data-core` | The database-neutral port and what every adapter has to agree on. No driver, no HTTP, no Node. |
+| `@formancy/data-core` | The database-neutral port and metadata contract: what discovery returns, including what it could not see. No driver, no HTTP, no Node. |
 | `@formancy/data-postgres` | The PostgreSQL adapter, on the `postgres` driver. |
 | `@formancy/data-sqlserver` | The SQL Server adapter, on `mssql` over `tedious` — pure JavaScript, no ODBC. |
+| `@formancy/data-fixtures` | Private test support: one business model for both engines, a restricted reader, and the comparator both adapters answer to. Never published. |
 
 Planned and not here: `@formancy/data-server` (the authenticated HTTP API,
 connection pools and publication), the studio for connecting a database and

@@ -10,6 +10,10 @@ later.
 
 ## Unreleased
 
+**The metadata contract exists, and so does the database both adapters will be held to.** `@formancy/data-core` now describes what discovery returns: objects as schema and name, columns with a normalised type beside the database's own spelling, ordered primary, unique and foreign keys, checks, comments — and **gaps**, the things the connection could not establish. A catalog filtered by permissions looks exactly like a complete one with fewer things in it, so a foreign key whose target an account cannot see is reported with an unknown target and a gap, never dropped ([0004](docs/decisions/0004-a-snapshot-says-what-it-could-not-see.md)). Every snapshot is made by `createSnapshot`, which sorts by codepoint, refuses structures no catalog could produce, and fingerprints with `@formancy/spec`'s canonical hash — the first upstream dependency, at exactly 0.3.0.
+
+**`@formancy/data-fixtures`** is one business model written for both engines — a composite key, a foreign key to a unique key, a reserved word as a table and a column, a self-reference added over a row that breaks it, an exact decimal at its limit, an integer past 2^53, an identity, a computed column, a view and a type nobody supports — plus a restricted reader who may read `sales.order` only, the containers that load it, and a comparator that reports every way a snapshot differs from the expected model ([0005](docs/decisions/0005-one-fixture-written-twice.md)). The one place the engines are deliberately different, the version column, is written down per engine. Private, never published.
+
 **The repository exists, with the pipeline formancy.ai runs and nothing that
 generates a form yet.** Three packages: `@formancy/data-core` holds the adapter
 port; `@formancy/data-postgres` and `@formancy/data-sqlserver` each implement

@@ -1,0 +1,112 @@
+-- The Formancy Data fixture, PostgreSQL edition.
+--
+-- One business model, written twice: this file and sqlserver.sql describe the
+-- same tables, keys and edge cases in each engine's own dialect, and the
+-- expected model in src/model.ts is the database-neutral truth both adapters
+-- are compared against. A change here without the same change there is a
+-- conformance failure on one engine, which is the point.
+--
+-- Every constraint is named explicitly, identically in both files, so the two
+-- snapshots can be compared by name. Every identifier is lower case, because
+-- PostgreSQL folds unquoted names and SQL Server does not.
+--
+-- What each table is for:
+--   country       a foreign key target that is a UNIQUE key, not the primary key;
+--                 a binary column; a type nobody supports (point)
+--   employee      a self-reference, added NOT VALID over a row that breaks it
+--   customer      a composite primary key; a boolean; a timestamp with a zone;
+--                 an exact decimal; a table comment
+--   order         a reserved word as a table name and as a column name; a
+--                 composite foreign key; two foreign keys to one table; a check;
+--                 a bigint identity; an application-maintained version column
+--   order_line    a cascading foreign key; a computed column
+--   customer_summary  a view
+
+create schema sales;
+
+create table sales.country (
+  id integer generated always as identity constraint pk_country primary key,
+  iso_code char(2) not null constraint uq_country_iso_code unique,
+  name varchar(100) not null,
+  flag bytea,
+  shape point
+);
+
+create table sales.employee (
+  id integer not null constraint pk_employee primary key,
+  name varchar(200) not null,
+  manager_id integer
+);
+
+create table sales.customer (
+  tenant_id integer not null,
+  customer_no integer not null,
+  name varchar(200) not null,
+  country_code char(2) constraint fk_customer_country references sales.country (iso_code),
+  credit_limit numeric(14, 2),
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  constraint pk_customer primary key (tenant_id, customer_no)
+);
+comment on table sales.customer is 'A buyer, numbered within its tenant.';
+
+create table sales."order" (
+  id bigint generated always as identity constraint pk_order primary key,
+  tenant_id integer not null,
+  customer_no integer not null,
+  order_date date not null,
+  status varchar(20) not null default 'draft'
+    constraint ck_order_status check (status in ('draft', 'placed', 'shipped')),
+  amount numeric(18, 4) not null,
+  notes text,
+  "group" varchar(50),
+  created_by integer constraint fk_order_created_by references sales.employee (id),
+  approved_by integer constraint fk_order_approved_by references sales.employee (id),
+  -- PostgreSQL has no rowversion. The plan's answer for both engines is an
+  -- application-maintained version column; SQL Server's file uses rowversion,
+  -- and src/model.ts writes that difference down rather than smoothing it.
+  row_version bigint not null default 1,
+  constraint fk_order_customer foreign key (tenant_id, customer_no)
+    references sales.customer (tenant_id, customer_no)
+);
+
+create table sales.order_line (
+  order_id bigint not null
+    constraint fk_order_line_order references sales."order" (id) on delete cascade,
+  line_no integer not null,
+  quantity integer not null,
+  unit_price numeric(12, 2) not null,
+  line_total numeric(14, 2) generated always as (quantity * unit_price) stored,
+  constraint pk_order_line primary key (order_id, line_no)
+);
+
+create view sales.customer_summary as
+  select c.tenant_id, c.customer_no, c.name, count(o.id) as order_count
+  from sales.customer c
+  left join sales."order" o on o.tenant_id = c.tenant_id and o.customer_no = c.customer_no
+  group by c.tenant_id, c.customer_no, c.name;
+
+-- Values at the edges. src/values.ts names each one, so a codec test can ask
+-- for "the largest amount" rather than retyping the digits.
+
+insert into sales.country (iso_code, name) values ('CH', 'Switzerland'), ('DE', 'Germany');
+
+-- Employee 3 names a manager that does not exist. The self-reference is added
+-- afterwards and NOT VALID, so it is enforced for new rows and was never
+-- checked against this one -- which is what `validated: false` means.
+insert into sales.employee (id, name, manager_id) values (1, 'Ada', null), (2, 'Grace', 1), (3, 'Orphan', 99);
+alter table sales.employee
+  add constraint fk_employee_manager foreign key (manager_id) references sales.employee (id) not valid;
+
+insert into sales.customer (tenant_id, customer_no, name, country_code, credit_limit, active)
+values (1, 1001, 'Muster AG', 'CH', 999999999999.99, true),
+       (2, 1001, 'Other Tenant GmbH', 'DE', 0.01, false);
+
+-- 2^53 + 1: the first integer a JavaScript number cannot hold. A driver or a
+-- codec that goes through Number reads it back as 9007199254740992.
+insert into sales."order" (id, tenant_id, customer_no, order_date, status, amount, notes, "group", created_by)
+overriding system value
+values (9007199254740993, 1, 1001, '2026-10-08', 'placed', 99999999999999.9999, null, 'A', 1);
+
+insert into sales.order_line (order_id, line_no, quantity, unit_price)
+values (9007199254740993, 1, 3, 0.10);

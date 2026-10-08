@@ -50,6 +50,10 @@ component_management:
       name: packages/data-core
       paths:
         - packages/data-core/**
+    - component_id: data-fixtures
+      name: packages/data-fixtures
+      paths:
+        - packages/data-fixtures/**
     - component_id: data-postgres
       name: packages/data-postgres
       paths:
