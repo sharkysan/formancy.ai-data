@@ -40,6 +40,19 @@ describe('the data server', () => {
     }
   })
 
+  // Every token presented is a signature check. Without a limit, a client can
+  // replay forgeries at the verifier as fast as the network allows. /health is
+  // exempt, because an orchestrator polling it must not see a busy server as dead.
+  test('limits requests per client, except health', async () => {
+    const app = await createDataServer({ verifyIdentity, rateLimit: { max: 2, timeWindowMs: 60_000 } })
+    const statuses: number[] = []
+    for (let n = 0; n < 3; n += 1) {
+      statuses.push((await app.inject({ method: 'GET', url: '/v1/whoami', headers: { authorization: 'Bearer bad' } })).statusCode)
+    }
+    expect(statuses).toEqual([401, 401, 429])
+    for (let n = 0; n < 5; n += 1) expect((await app.inject({ method: 'GET', url: '/health' })).statusCode).toBe(200)
+  })
+
   // The routes the plan describes and this release does not have must not
   // answer as if they did.
   test('a route that does not exist yet is a 404, not a placeholder', async () => {

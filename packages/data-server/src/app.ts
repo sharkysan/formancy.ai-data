@@ -1,3 +1,4 @@
+import rateLimit from '@fastify/rate-limit'
 import Fastify from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { HostIdentity, IdentityVerifier } from './identity.js'
@@ -6,6 +7,16 @@ export interface DataServerOptions {
   verifyIdentity: IdentityVerifier
   /** Fastify's logger. Off by default in tests; the composition root turns it on. */
   logger?: boolean
+  /**
+   * Requests per client address per window, on every route but `/health`.
+   *
+   * Default 600 a minute. Generous on purpose: a lookup is a request per pause
+   * in typing, and a host's reverse proxy can put a whole office behind one
+   * address — an operator behind a proxy sets Fastify's `trustProxy` and a
+   * limit to match. What it is for is the other case: somebody replaying
+   * tokens at the verifier as fast as the network allows.
+   */
+  rateLimit?: { max: number; timeWindowMs: number }
 }
 
 /**
@@ -43,6 +54,12 @@ function bearer(request: FastifyRequest): string | undefined {
 export async function createDataServer(options: DataServerOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: BODY_LIMIT })
 
+  // Global, unlike formancy's server, where the management plane is
+  // authenticated by its own sessions: every route here except /health is
+  // reachable by anybody holding a browser and does work before refusing.
+  const limit = options.rateLimit ?? { max: 600, timeWindowMs: 60_000 }
+  await app.register(rateLimit, { global: true, max: limit.max, timeWindow: limit.timeWindowMs })
+
   const authenticate = async (request: FastifyRequest): Promise<HostIdentity | undefined> => {
     const token = bearer(request)
     if (token === undefined) return undefined
@@ -55,7 +72,9 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
     return outcome.identity
   }
 
-  app.get('/health', async () => ({ status: 'ok' }))
+  // An orchestrator polls this every few seconds; limiting it would mark a
+  // healthy server unhealthy exactly when it is busiest.
+  app.get('/health', { config: { rateLimit: false } }, async () => ({ status: 'ok' }))
 
   app.get('/v1/whoami', async (request, reply) => {
     const identity = await authenticate(request)
