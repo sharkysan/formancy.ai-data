@@ -10,8 +10,9 @@ import { discoverPostgres } from './index.js'
 /**
  * Catalog shapes the shared fixture does not have and real databases do:
  * unique indexes that are not constraints, every referential action, a
- * foreign key whose triggers were disabled, partitioning, materialized views,
- * foreign tables. Each is declared here and read back from the catalog.
+ * foreign key whose triggers were disabled -- on the table or on one
+ * partition of either side -- partitioning, materialized views, foreign
+ * tables. Each is declared here and read back from the catalog.
  *
  * Like the types suite, these live in a schema of this suite's own because
  * `@formancy/data-fixtures` does not describe them yet.
@@ -70,6 +71,7 @@ beforeAll(async () => {
     create table shapes.ledger (
       id integer not null,
       region integer not null,
+      target_id integer constraint fk_ledger_target references shapes.target,
       constraint pk_ledger primary key (id, region)
     ) partition by list (region);
     create table shapes.ledger_east partition of shapes.ledger for values in (1);
@@ -80,6 +82,40 @@ beforeAll(async () => {
       region integer,
       constraint fk_posting_ledger foreign key (ledger_id, region) references shapes.ledger (id, region)
     );
+
+    -- A partitioned table's foreign key is checked by triggers on its leaf
+    -- partitions, and each belongs to that partition's clone of the
+    -- constraint, not to the one declared. The leaf here is two levels down,
+    -- so its clone's parent is itself a clone.
+    create table shapes.entry (
+      id integer not null,
+      region integer not null,
+      year integer not null,
+      target_id integer constraint fk_entry_target references shapes.target
+    ) partition by list (region);
+    create table shapes.entry_east partition of shapes.entry for values in (1) partition by list (year);
+    create table shapes.entry_east_2026 partition of shapes.entry_east for values in (2026);
+    create table shapes.entry_west partition of shapes.entry for values in (2);
+    alter table shapes.entry_east_2026 disable trigger all;
+
+    -- A foreign key to a partitioned table is acted on by triggers on each
+    -- partition, which belong to the clone made for that partition.
+    create table shapes.archive (
+      id integer not null,
+      region integer not null,
+      constraint pk_archive primary key (id, region)
+    ) partition by list (region);
+    create table shapes.archive_east partition of shapes.archive for values in (1);
+    create table shapes.archive_west partition of shapes.archive for values in (2);
+    create table shapes.citation (
+      id integer constraint pk_citation primary key,
+      archive_id integer,
+      region integer,
+      constraint fk_citation_archive foreign key (archive_id, region) references shapes.archive (id, region)
+    );
+    insert into shapes.archive values (1, 1);
+    insert into shapes.citation values (1, 1, 1);
+    alter table shapes.archive_east disable trigger all;
 
     -- NOT VALID inside CREATE TABLE is ignored: an empty table is valid. It
     -- takes a row that breaks the check and an ALTER, as in the fixture.
@@ -180,6 +216,34 @@ describe('foreign keys', () => {
     expect(foreignKey('actions', 'fk_actions_a').enforced).toBe(true)
   })
 
+  // Disabling one partition's triggers is what a bulk load into that
+  // partition does, and pg_trigger files them under the partition's clone of
+  // the constraint, which is not the row discovery reports. Read from the
+  // declared constraint alone, entry's key would be reported enforced while
+  // the database accepts an orphan through entry_east_2026; the clone's
+  // parent being another clone is what a one-level look would miss. Ledger,
+  // partitioned with every trigger on, stays enforced: walking the clones
+  // must not make every partitioned table's key read as unchecked.
+  test('a foreign key from a partitioned table is not enforced when one partition does not check it', async () => {
+    await owner`insert into shapes.entry values (1, 1, 2026, 999)`
+    expect(foreignKey('entry', 'fk_entry_target').enforced).toBe(false)
+    expect(foreignKey('ledger', 'fk_ledger_target').enforced).toBe(true)
+  })
+
+  // The other side: a partition of the referenced table carries the
+  // triggers that refuse, or cascade, a delete of a row still referenced.
+  // Disabled, a delete from that partition orphans the referencing rows, and
+  // a key reported enforced would promise a relationship the database no
+  // longer keeps.
+  test('a foreign key to a partitioned table is not enforced when one partition does not act on it', async () => {
+    await owner`delete from shapes.archive_east`
+    const [orphans] = await owner<{ count: string }[]>`
+      select count(*) as count from shapes.citation c
+      where not exists (select from shapes.archive a where a.id = c.archive_id and a.region = c.region)`
+    expect(orphans?.count).toBe('1')
+    expect(foreignKey('citation', 'fk_citation_archive').enforced).toBe(false)
+  })
+
   // A foreign key to a partitioned table is one constraint to the person who
   // wrote it, and one pg_constraint row per partition besides, all on the
   // referencing table. Read naively, posting has three foreign keys.
@@ -237,7 +301,10 @@ describe('objects', () => {
       'table account',
       'view account_count',
       'table actions',
+      'table archive',
       'table bare',
+      'table citation',
+      'table entry',
       'table ledger',
       'table measure',
       'table membership',

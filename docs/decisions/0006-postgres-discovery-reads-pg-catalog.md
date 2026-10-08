@@ -16,10 +16,11 @@
   fingerprint and turns the object into a gap*, and *a schema name carrying a
   quote and SQL is bound*. `packages/data-postgres/src/discovery-shapes.integration.test.ts`
   holds the catalog details below: unique indexes as keys, one foreign key per
-  declaration to a partitioned table, enforcement read from triggers, a
-  foreign table as a gap. That no discovery query reads `information_schema`
-  is held by those behaviours, not by a search of the source: a query moved
-  to it fails the reader tests above.
+  declaration to a partitioned table, enforcement read from triggers
+  including those of a partition on either side, a foreign table as a gap.
+  That no discovery query reads `information_schema` is held by those
+  behaviours, not by a search of the source: a query moved to it fails the
+  reader tests above.
 
 ## Context
 
@@ -51,7 +52,10 @@ wrong answer that still looks plausible:
   `pg_constraint` row per partition, on the same referencing table;
 - `ALTER TABLE ... DISABLE TRIGGER ALL` stops a foreign key being checked and
   leaves `pg_constraint` exactly as it was — PostgreSQL 17 has no `NOT
-  ENFORCED` foreign key, so this is the only way one stops being enforced;
+  ENFORCED` foreign key, so this is the only way one stops being enforced —
+  and when either side is partitioned, the triggers that matter sit on the
+  partitions and belong to each partition's clone of the constraint, not to
+  the one declared;
 - `CREATE UNIQUE INDEX`, which most migration tools emit, is a key PostgreSQL
   accepts as a foreign key's target and is absent from `pg_constraint`.
 

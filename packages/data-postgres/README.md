@@ -78,8 +78,10 @@ Unique keys include unique indexes that are not constraints, when they are
 valid, not partial and over plain columns. A foreign key to a partitioned table
 is reported once, not once per partition. A foreign key is `enforced` unless
 its triggers were disabled, which is the only way one stops being checked on
-PostgreSQL 17. Partitions are described through their parent, materialized
-views as views, and foreign tables are gaps.
+PostgreSQL 17 — on the table, or on any partition of either side, whose
+triggers belong to that partition's clone of the constraint. Partitions are
+described through their parent, materialized views as views, and foreign tables
+are gaps.
 
 ### What the phase-1 spike found, kept as tests
 

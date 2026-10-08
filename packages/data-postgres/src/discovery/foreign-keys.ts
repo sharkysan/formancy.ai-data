@@ -49,8 +49,11 @@ function action(code: string, constraint: string): ReferentialAction {
  *
  * `conparentid <> 0` marks a constraint PostgreSQL made itself: a foreign key
  * that references a partitioned table gets one such clone per partition, on
- * the same referencing table. They are the partitions' plumbing, not keys
- * anyone declared, and reporting them would triple a relationship.
+ * the same referencing table, and a partitioned referencing table gives each
+ * of its partitions a clone of its own. They are the partitions' plumbing,
+ * not keys anyone declared, and reporting them would triple a relationship.
+ * They are also where the triggers are, which is why enforcement is read
+ * over the declared constraint and every clone descended from it.
  */
 export async function readForeignKeys(sql: TransactionSql, schemas: readonly string[]): Promise<Map<number, ForeignKeyMeta[]>> {
   const rows = await sql<ForeignKeyRow[]>`
@@ -61,10 +64,21 @@ export async function readForeignKeys(sql: TransactionSql, schemas: readonly str
       k.confdeltype as on_delete,
       k.convalidated as validated,
       -- A trigger fires in an ordinary session when it is enabled for origin
-      -- (O) or always (A). Disabled (D) or replica-only (R), it does not.
+      -- (O) or always (A). Disabled (D) or replica-only (R), it does not. The
+      -- triggers of a partitioned side belong to each partition's clone, and
+      -- a sub-partition's clone is a clone's clone, so the family is walked
+      -- down conparentid to the leaves.
       not exists (
+        with recursive family(oid) as (
+          select k.oid
+          union all
+          select clone.oid
+          from pg_catalog.pg_constraint clone
+          join family on clone.conparentid = family.oid
+        )
         select from pg_catalog.pg_trigger t
-        where t.tgconstraint = k.oid and t.tgenabled not in ('O', 'A')
+        join family on t.tgconstraint = family.oid
+        where t.tgenabled not in ('O', 'A')
       ) as triggers_enabled,
       tn.nspname as target_schema,
       tc.relname as target_name,
@@ -97,8 +111,10 @@ export async function readForeignKeys(sql: TransactionSql, schemas: readonly str
         // PostgreSQL 17 has no NOT ENFORCED foreign keys (18 adds them, with
         // pg_constraint.conenforced). On 17 a key stops being checked only
         // when its triggers are disabled -- ALTER TABLE ... DISABLE TRIGGER
-        // ALL, as a bulk load does -- and pg_constraint does not change when
-        // that happens, so enforcement is read from pg_trigger.
+        // ALL, as a bulk load does, on the table or on one partition -- and
+        // pg_constraint does not change when that happens, so enforcement is
+        // read from pg_trigger. A key that one partition, on either side, no
+        // longer checks or acts on is not enforced: some writes get past it.
         enforced: row.triggers_enabled,
         validated: row.validated,
       }
