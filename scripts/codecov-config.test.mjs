@@ -20,6 +20,6 @@ describe('codecov.yml', () => {
   // failure in a different costume.
   test('names every package that produces coverage', () => {
     const ids = coveredPackages().map((entry) => entry.id)
-    expect(ids).toEqual(['data-core', 'data-fixtures', 'data-postgres', 'data-sqlserver'])
+    expect(ids).toEqual(['data-core', 'data-fixtures', 'data-postgres', 'data-server', 'data-sqlserver'])
   })
 })
