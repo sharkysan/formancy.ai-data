@@ -1,6 +1,7 @@
 import { formatLabel } from './label.js'
 import { decodeKeyToken, encodeKeyToken } from './token.js'
 import type { LookupConfig, LookupResult, LookupRow } from './types.js'
+import { isKeyValue } from './values.js'
 
 /**
  * A row as an adapter read it: what each answer is built from.
@@ -10,7 +11,12 @@ import type { LookupConfig, LookupResult, LookupRow } from './types.js'
  * made here once. An adapter only queries and converts values with its codecs.
  */
 export interface FoundRow {
-  /** Each target column's canonical API string, in `targetColumns` order, as the row actually holds it. */
+  /**
+   * Each target column's canonical API string, in `targetColumns` order, as
+   * the row actually holds it: an integer without leading zeros, a decimal
+   * padded to its scale, a UUID in lower case, a date as `YYYY-MM-DD`. Spelled
+   * otherwise, a row would be offered under a token `lookupKeys` never asks about.
+   */
   key: readonly string[]
   /** Each display column's canonical API string in `display` order, or `null` for SQL NULL. */
   display: ReadonlyArray<string | null>
@@ -21,13 +27,22 @@ function tokenFor(key: readonly string[]): string | undefined {
   return encoded.ok ? encoded.token : undefined
 }
 
+/** Whether decoded values are a key of this lookup: one value per key column, each spelled as that column holds it. */
+function fitsKey(config: LookupConfig, values: readonly string[]): boolean {
+  if (values.length !== config.targetColumns.length) return false
+  // The lengths are equal, so every index has a value.
+  return config.targetColumns.every((column, index) => isKeyValue(column.type, values[index] as string))
+}
+
 /**
  * The keys an adapter puts in its `IN` clause, from the tokens it was handed:
- * each distinct one that decodes to a key of this lookup's arity, in the order
- * it came.
+ * each distinct one that decodes to a key of this lookup, in the order it came.
  *
- * A token that does not decode, or has the wrong number of columns, cannot
- * name a row, so it is not asked about; `rejectedTokens` rejects it. An empty
+ * A token that does not decode, has the wrong number of columns, or holds a
+ * value its column cannot hold in that spelling — `abc` or `1e3` for an
+ * integer — cannot name a row, so it is not asked about and `rejectedTokens`
+ * rejects it. Binding it instead would be a conversion error on one engine and
+ * a quiet non-match on the other, and an error fails the whole query. An empty
  * result means: ask the database nothing — `IN ()` is a syntax error in both
  * engines. Decoding is canonical, so distinct tokens are distinct keys.
  */
@@ -35,7 +50,7 @@ export function lookupKeys(config: LookupConfig, tokens: readonly string[]): str
   const keys: string[][] = []
   for (const token of new Set(tokens)) {
     const decoded = decodeKeyToken(token)
-    if (decoded.ok && decoded.values.length === config.targetColumns.length) keys.push(decoded.values)
+    if (decoded.ok && fitsKey(config, decoded.values)) keys.push(decoded.values)
   }
   return keys
 }

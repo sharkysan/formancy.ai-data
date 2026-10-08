@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import type { ColumnMeta, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta } from '../metadata.js'
 import { createSnapshot } from '../snapshot.js'
 import { generateForm } from '../generate/generate.js'
-import type { FormBindings, LookupChoice } from '../generate/types.js'
+import type { FieldBinding, FormBindings, LookupChoice } from '../generate/types.js'
 import { buildLookupConfig, DEFAULT_MAX_PAGE_SIZE } from './config.js'
 import { validateLookupQuery } from './query.js'
 
@@ -72,25 +72,47 @@ function copyOf(bindings: FormBindings): FormBindings {
   return JSON.parse(JSON.stringify(bindings)) as FormBindings
 }
 
+type LookupBinding = Extract<FieldBinding, { kind: 'lookup' }>
+
+/** The bindings with the customer lookup edited, as a stored file can be. */
+function editedLookup(bindings: FormBindings, edit: (lookup: LookupBinding) => void): FormBindings {
+  const copy = copyOf(bindings)
+  for (const field of copy.fields) if (field.kind === 'lookup' && field.field === 'customer') edit(field)
+  return copy
+}
+
+/** The snapshot with order's foreign key to customer edited. */
+function withCustomerKey(edit: (key: ForeignKeyMeta) => void): MetadataSnapshot {
+  return snapshot((objects) => {
+    const key = objects.find((object) => object.ref.name === 'order')?.foreignKeys.find((candidate) => candidate.name === 'fk_order_customer')
+    if (key !== undefined) edit(key)
+  })
+}
+
 describe('buildLookupConfig', () => {
   // The config is everything an adapter is allowed to know about the lookup.
   // A key column out of order would put each value of a token in the wrong
-  // column, and a sort without the key would let a page boundary fall between
-  // two rows with the same name, showing one twice and the other never.
-  test('derives the lookup from generated bindings: the key in order, and an order that is total', () => {
+  // column, a key without its type would leave each adapter to decide what a
+  // value of it looks like, and a sort without the key would let a page
+  // boundary fall between two rows with the same name, showing one twice and
+  // the other never.
+  test('derives the lookup from generated bindings: the key in order with its types, and an order that is total', () => {
     const source = snapshot()
     expect(buildLookupConfig(bindingsFor(source, ['name', 'city']), 'customer', { snapshot: source })).toEqual({
       source: 'erp-sales-order-fk-order-customer',
       foreignKey: 'fk_order_customer',
       target: { schema: 'sales', name: 'customer' },
-      targetColumns: ['tenant_id', 'customer_no'],
+      targetColumns: [
+        { name: 'tenant_id', type: INT32 },
+        { name: 'customer_no', type: INT32 },
+      ],
       display: ['name', 'city'],
       search: ['name', 'city'],
       sort: [
-        { column: 'name', direction: 'asc' },
-        { column: 'city', direction: 'asc' },
-        { column: 'tenant_id', direction: 'asc' },
-        { column: 'customer_no', direction: 'asc' },
+        { column: 'name', direction: 'asc', nulls: 'last' },
+        { column: 'city', direction: 'asc', nulls: 'last' },
+        { column: 'tenant_id', direction: 'asc', nulls: 'last' },
+        { column: 'customer_no', direction: 'asc', nulls: 'last' },
       ],
       maxPageSize: DEFAULT_MAX_PAGE_SIZE,
     })
@@ -112,14 +134,37 @@ describe('buildLookupConfig', () => {
     const source = snapshot()
     const bindings = bindingsFor(source, ['name'])
     expect(buildLookupConfig(bindings, 'customer', { snapshot: source, sort: [{ column: 'since', direction: 'desc' }] }).sort).toEqual([
-      { column: 'since', direction: 'desc' },
-      { column: 'tenant_id', direction: 'asc' },
-      { column: 'customer_no', direction: 'asc' },
+      { column: 'since', direction: 'desc', nulls: 'last' },
+      { column: 'tenant_id', direction: 'asc', nulls: 'last' },
+      { column: 'customer_no', direction: 'asc', nulls: 'last' },
     ])
     expect(buildLookupConfig(bindings, 'customer', { snapshot: source, sort: [{ column: 'customer_no', direction: 'desc' }] }).sort).toEqual([
-      { column: 'customer_no', direction: 'desc' },
-      { column: 'tenant_id', direction: 'asc' },
+      { column: 'customer_no', direction: 'desc', nulls: 'last' },
+      { column: 'tenant_id', direction: 'asc', nulls: 'last' },
     ])
+  })
+
+  // PostgreSQL puts NULLs last in an ascending order and SQL Server puts them
+  // first, so an order over a nullable column that left it to the engine would
+  // show a different first page on each. Every column of the order says where
+  // NULLs go — last unless the administrator chose otherwise, in either
+  // direction — and each adapter spells that, so neither engine decides it.
+  test('says where NULLs go in every column of the order', () => {
+    const source = snapshot()
+    const bindings = bindingsFor(source, ['name', 'city'])
+    expect(buildLookupConfig(bindings, 'customer', { snapshot: source, sort: [{ column: 'city', direction: 'desc' }] }).sort[0]).toEqual({
+      column: 'city',
+      direction: 'desc',
+      nulls: 'last',
+    })
+    expect(buildLookupConfig(bindings, 'customer', { snapshot: source, sort: [{ column: 'city', direction: 'asc', nulls: 'first' }] }).sort[0]).toEqual({
+      column: 'city',
+      direction: 'asc',
+      nulls: 'first',
+    })
+    expect(() => buildLookupConfig(bindings, 'customer', { snapshot: source, sort: [{ column: 'city', direction: 'asc', nulls: 'middle' as 'first' }] })).toThrow(
+      /city puts NULLs first or last/,
+    )
   })
 
   // formancy narrows a list by its label and nothing else, because matching
@@ -158,6 +203,36 @@ describe('buildLookupConfig', () => {
     )
   })
 
+  // lookupKeys asks the database only about values spelled as the key column
+  // holds them, so that a value one engine reads and the other refuses is
+  // never bound. For a boolean, a time or a timestamp no such spelling is
+  // settled — the engines read many spellings of each and round fractional
+  // seconds to their own precision — so a key of one is refused here, naming
+  // the column, rather than asked about in a spelling the engines read apart.
+  test('refuses a key whose values have no settled spelling, and carries the type of one that has', () => {
+    const keyedBy = (type: NormalizedType, databaseType: string): MetadataSnapshot =>
+      snapshot((objects) => {
+        const factor = objects.find((object) => object.ref.name === 'rate')?.columns[0]
+        if (factor !== undefined) Object.assign(factor, { type, databaseType })
+      })
+    const unsettled: Array<[NormalizedType, string]> = [
+      [{ kind: 'boolean' }, 'boolean'],
+      [{ kind: 'time', precision: 6 }, 'time'],
+      [{ kind: 'timestamp', withTimeZone: true, precision: 6 }, 'timestamptz'],
+    ]
+    for (const [type, databaseType] of unsettled) {
+      const keyed = keyedBy(type, databaseType)
+      const bindings = bindingsFor(keyed, ['name'], [{ foreignKey: 'fk_order_rate', display: ['label'] }])
+      expect(() => buildLookupConfig(bindings, 'rate', { snapshot: keyed }), databaseType).toThrow(
+        new RegExp(`key column factor is ${databaseType}; a lookup has no settled spelling for its values`),
+      )
+    }
+
+    const dated = keyedBy({ kind: 'date' }, 'date')
+    const bindings = bindingsFor(dated, ['name'], [{ foreignKey: 'fk_order_rate', display: ['label'] }])
+    expect(buildLookupConfig(bindings, 'rate', { snapshot: dated }).targetColumns).toEqual([{ name: 'factor', type: { kind: 'date' } }])
+  })
+
   // Bindings are stored, and a stored file can be stale or edited. A config
   // built from bindings that do not match the snapshot would quote column names
   // the database may not have.
@@ -167,14 +242,50 @@ describe('buildLookupConfig', () => {
     const changed = snapshot((objects) => objects[0]?.columns.push(col('vip', 8, { kind: 'boolean' })))
     expect(() => buildLookupConfig(bindings, 'customer', { snapshot: changed })).toThrow(/different snapshot/)
 
-    const retarget = (edit: (target: { table: { schema: string; name: string }; columns: string[] }) => void): FormBindings => {
-      const copy = copyOf(bindings)
-      for (const field of copy.fields) if (field.kind === 'lookup') edit(field.target)
-      return copy
-    }
-    expect(() => buildLookupConfig(retarget((target) => (target.table.name = 'nope')), 'customer', { snapshot: source })).toThrow(/sales\.nope is outside the snapshot/)
-    expect(() => buildLookupConfig(retarget((target) => (target.columns = ['tenant_id', 'nope'])), 'customer', { snapshot: source })).toThrow(/has no column nope/)
+    // A foreign key may reach a table outside the discovered scope; bindings
+    // that say so honestly still name a table the snapshot cannot vouch for.
+    const outside = withCustomerKey((key) => {
+      if (key.references !== null) key.references.table.name = 'elsewhere'
+    })
+    const elsewhere = editedLookup(bindings, (lookup) => (lookup.target.table.name = 'elsewhere'))
+    elsewhere.snapshotFingerprint = outside.fingerprint
+    expect(() => buildLookupConfig(elsewhere, 'customer', { snapshot: outside })).toThrow(/sales\.elsewhere is outside the snapshot/)
+
+    expect(() => buildLookupConfig(editedLookup(bindings, (lookup) => (lookup.display = ['nope'])), 'customer', { snapshot: source })).toThrow(/has no column nope/)
     expect(() => buildLookupConfig({ ...bindings, version: 2 as 1 }, 'customer', { snapshot: source })).toThrow(/version 2/)
+  })
+
+  // The fingerprint is the snapshot's, not the bindings': an edited file keeps
+  // it. A lookup aimed anywhere but where its foreign key points — another
+  // table, or columns of this one that are not the referenced key — would
+  // offer rows the column was never meant to hold, under a "key" nothing makes
+  // unique, so the order would not be total and one token could name several
+  // rows. The foreign key in the snapshot is the authority, and the bindings
+  // have to say exactly what it says, column order included.
+  test('refuses a lookup that is not what its foreign key references', () => {
+    const source = snapshot()
+    const bindings = bindingsFor(source, ['name'])
+    const build = (edited: FormBindings) => () => buildLookupConfig(edited, 'customer', { snapshot: source })
+    const mismatch = /the bindings do not say what fk_order_customer does: it goes from \(tenant_id, customer_no\) to sales\.customer \(tenant_id, customer_no\)/
+
+    const anotherTable = editedLookup(bindings, (lookup) => {
+      lookup.target = { table: { schema: 'sales', name: 'rate' }, columns: ['label'] }
+      lookup.display = ['label']
+    })
+    expect(build(anotherTable)).toThrow(mismatch)
+    expect(build(editedLookup(bindings, (lookup) => (lookup.target.columns = ['name', 'city'])))).toThrow(mismatch)
+    expect(build(editedLookup(bindings, (lookup) => (lookup.target.columns = ['customer_no', 'tenant_id'])))).toThrow(mismatch)
+    expect(build(editedLookup(bindings, (lookup) => (lookup.target.columns = ['tenant_id'])))).toThrow(mismatch)
+    expect(build(editedLookup(bindings, (lookup) => (lookup.columns = ['customer_no', 'tenant_id'])))).toThrow(mismatch)
+    expect(build(editedLookup(bindings, (lookup) => (lookup.target.table.schema = 'other')))).toThrow(/do not say what fk_order_customer does/)
+    expect(build(editedLookup(bindings, (lookup) => (lookup.foreignKey = 'fk_order_rate')))).toThrow(/do not say what fk_order_rate does/)
+    expect(build(editedLookup(bindings, (lookup) => (lookup.foreignKey = 'fk_nope')))).toThrow(/sales\.order has no foreign key fk_nope/)
+    expect(build({ ...copyOf(bindings), root: { schema: 'sales', name: 'nope' } })).toThrow(/the form's table sales\.nope is outside the snapshot/)
+
+    // A permission revoked since: the key is still there, and where it points is not.
+    const hidden = withCustomerKey((key) => (key.references = null))
+    const unseen = { ...copyOf(bindings), snapshotFingerprint: hidden.fingerprint }
+    expect(() => buildLookupConfig(unseen, 'customer', { snapshot: hidden })).toThrow(/this connection cannot see what fk_order_customer references/)
   })
 
   // Each of these is a configuration that cannot mean what it says.

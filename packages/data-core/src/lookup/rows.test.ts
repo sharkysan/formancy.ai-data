@@ -3,19 +3,24 @@ import { describe, expect, test } from 'vitest'
 import { lookupKeys, lookupPage, rejectedTokens, resolvedRows } from './rows.js'
 import type { FoundRow } from './rows.js'
 import { encodeKeyToken } from './token.js'
-import type { LookupConfig } from './types.js'
+import type { LookupConfig, LookupKeyType } from './types.js'
+
+const INT32: LookupKeyType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 
 const CUSTOMER: LookupConfig = {
   source: 'erp-sales-order-fk-order-customer',
   foreignKey: 'fk_order_customer',
   target: { schema: 'sales', name: 'customer' },
-  targetColumns: ['tenant_id', 'customer_no'],
+  targetColumns: [
+    { name: 'tenant_id', type: INT32 },
+    { name: 'customer_no', type: INT32 },
+  ],
   display: ['name'],
   search: ['name'],
   sort: [
-    { column: 'name', direction: 'asc' },
-    { column: 'tenant_id', direction: 'asc' },
-    { column: 'customer_no', direction: 'asc' },
+    { column: 'name', direction: 'asc', nulls: 'last' },
+    { column: 'tenant_id', direction: 'asc', nulls: 'last' },
+    { column: 'customer_no', direction: 'asc', nulls: 'last' },
   ],
   maxPageSize: 50,
 }
@@ -51,6 +56,59 @@ describe('lookupKeys', () => {
   test('is empty when nothing can be asked', () => {
     expect(lookupKeys(CUSTOMER, [])).toEqual([])
     expect(lookupKeys(CUSTOMER, ['k1:', 'x'])).toEqual([])
+  })
+
+  // A token decodes to strings, and the adapter binds them to the key's
+  // columns. A well-formed token can still hold `abc` for an integer key, or
+  // `1e3`, which PostgreSQL reads as a numeric and SQL Server refuses to
+  // convert. Binding it fails the whole query on one engine — so `resolve`
+  // throws where one unknown token is meant to be left out, and `rejects`
+  // reports a source that cannot answer instead of one non-member — and is a
+  // quiet non-match on the other. Only a value spelled as the column holds it
+  // can be a member, so nothing else is asked about.
+  test('asks only about values spelled as the key column holds them', () => {
+    const asked = (type: LookupKeyType, values: string[]): string[] =>
+      lookupKeys({ ...CUSTOMER, targetColumns: [{ name: 'id', type }] }, values.map((value) => tokenOf([value]))).map(([value]) => value ?? '')
+
+    expect(asked(INT32, ['7', '0', '-2147483648', '2147483647', 'abc', '99999999999999999999', '1e3', '2147483648', '-2147483649', '-0', '007', '+5', ' 5', '5 ', '1.0', ''])).toEqual(
+      ['7', '0', '-2147483648', '2147483647'],
+    )
+    expect(asked({ kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' }, ['9223372036854775807', '9223372036854775808'])).toEqual([
+      '9223372036854775807',
+    ])
+
+    // numeric(5,2): read back with exactly two fraction digits and at most three whole ones.
+    const money: LookupKeyType = { kind: 'decimal', precision: 5, scale: 2 }
+    expect(asked(money, ['123.45', '0.50', '-1.00', '0.00', '1e3', '1.5', '1', '1234.00', '-0.00', '00.50', '.50', '1.', '1.505', 'NaN', 'Infinity'])).toEqual([
+      '123.45',
+      '0.50',
+      '-1.00',
+      '0.00',
+    ])
+    expect(asked({ kind: 'decimal', precision: 4, scale: 0 }, ['1234', '12345', '1.0', '-0'])).toEqual(['1234'])
+    expect(asked({ kind: 'decimal', precision: 2, scale: 2 }, ['0.12', '1.00'])).toEqual(['0.12'])
+    // PostgreSQL's unconstrained numeric keeps the scale it was given, so any fraction is a spelling a row can hold.
+    expect(asked({ kind: 'decimal', precision: null, scale: null }, ['1.5', '1.50', '1000', '1e3', '01', '-0.0'])).toEqual(['1.5', '1.50', '1000'])
+    // A precision with no scale reported still bounds the whole digits, and leaves the fraction as given.
+    expect(asked({ kind: 'decimal', precision: 3, scale: null }, ['123.5', '1234'])).toEqual(['123.5'])
+
+    const uuid = '0f8fad5b-d9cb-469f-a165-70867728950e'
+    expect(asked({ kind: 'uuid' }, [uuid, uuid.toUpperCase(), `{${uuid}}`, uuid.replaceAll('-', ''), 'abc'])).toEqual([uuid])
+
+    // PostgreSQL refuses a NUL in a text parameter outright, and SQL Server binds it.
+    expect(asked({ kind: 'text', maxLength: 3, fixedLength: false }, ['abc', 'a c', 'abcd', 'a\u0000'])).toEqual(['abc', 'a c'])
+    expect(asked({ kind: 'text', maxLength: null, fixedLength: false }, ['x'.repeat(39), ''])).toEqual(['x'.repeat(39), ''])
+
+    expect(
+      asked({ kind: 'date' }, ['2024-02-29', '0001-01-01', '9999-12-31', '2023-02-29', '2026-13-01', '2026-00-10', '2026-04-31', '2026-04-00', '0000-01-01', '2026-1-01', '20260101', '2026-01-01T00:00:00Z']),
+    ).toEqual([
+      '2024-02-29',
+      '0001-01-01',
+      '9999-12-31',
+    ])
+
+    // A composite key is asked about only when every one of its values fits.
+    expect(lookupKeys(CUSTOMER, [tokenOf(['7', 'abc']), tokenOf(['7', '1e3']), tokenOf(['7', '1001'])])).toEqual([['7', '1001']])
   })
 })
 

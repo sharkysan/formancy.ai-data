@@ -55,16 +55,22 @@ No adapter implements the port yet.
   `decodeKeyToken` refuses every other spelling. A key whose token would exceed
   the 200 characters formancy stores is refused, never truncated.
 - **`buildLookupConfig(bindings, field, { snapshot })`** derives what an adapter
-  may know: the target, the key columns in order, display, search and sort
-  columns, and the page size. It refuses bindings from another snapshot, a
-  float or binary key, and a search over a column the label does not show.
+  may know: the target, the key columns in order with their types, display,
+  search and sort columns, and the page size. Every sort column says where
+  NULLs go, last by default, because the engines disagree. It refuses bindings
+  from another snapshot, bindings that are not what the root's foreign key
+  references, a float, binary, boolean, time or timestamp key, and a search
+  over a column the label does not show.
 - **`validateLookupQuery`** is the boundary for a search request: exactly a
   search, an offset and a limit, trimmed and bounded.
 - **`LookupAdapter`** is the port: `search`, `resolve` and `rejects`, each with
-  the actor's trusted row filters. `rejects` is the shape formancy's
-  server-side `members` port asks for. `lookupKeys`, `lookupPage`,
-  `resolvedRows` and `rejectedTokens` build its answers, so a token is a member
-  only when a row found under those filters re-encodes to it exactly.
+  the actor's trusted row filters, read with `rowFilterTerms`. "Every row" is
+  `{ kind: 'unrestricted' }`, written on purpose; an empty list is refused.
+  `rejects` is the shape formancy's server-side `members` port asks for.
+  `lookupKeys`, `lookupPage`, `resolvedRows` and `rejectedTokens` build its
+  answers: a token is asked about only when each value is spelled as its key
+  column holds it, and is a member only when a row found under those filters
+  re-encodes to it exactly.
 
 A token is a reference, not a permission: it says which row was meant, and the
 server decides again, every time, whether this actor may name it. See

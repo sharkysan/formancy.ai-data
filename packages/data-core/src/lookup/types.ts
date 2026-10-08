@@ -1,9 +1,31 @@
-import type { ObjectRef } from '../metadata.js'
+import type { NormalizedType, ObjectRef } from '../metadata.js'
+
+/**
+ * The kinds a lookup's key may have: those whose values have one spelling,
+ * which `lookupKeys` can check before anything is bound. A boolean, a time or
+ * a timestamp has no settled one, and a float is not equal to its own
+ * decimal spelling, so `buildLookupConfig` refuses a key of any other kind.
+ */
+export type LookupKeyType = Extract<NormalizedType, { kind: 'text' | 'integer' | 'decimal' | 'uuid' | 'date' }>
+
+/** One column of the referenced key. */
+export interface LookupKeyColumn {
+  name: string
+  type: LookupKeyType
+}
 
 /** One column of the order rows are offered in. */
 export interface LookupSort {
   column: string
   direction: 'asc' | 'desc'
+  /**
+   * Where a NULL goes, whichever the direction. Stated rather than left to the
+   * engine, because PostgreSQL puts NULLs last in an ascending order and SQL
+   * Server puts them first. PostgreSQL spells it `NULLS FIRST` or `NULLS LAST`;
+   * SQL Server has no such clause, so it orders by
+   * `CASE WHEN column IS NULL THEN … END` before the column.
+   */
+  nulls: 'first' | 'last'
 }
 
 /**
@@ -17,17 +39,24 @@ export interface LookupSort {
 export interface LookupConfig {
   /** The option-source name the form document carries, which the deployment resolves to this. */
   source: string
-  /** The root's foreign key this lookup stands for. */
+  /** The root's foreign key this lookup stands for, and whose target the snapshot confirms. */
   foreignKey: string
   /** The table the foreign key references. */
   target: ObjectRef
-  /** The referenced columns, in the foreign key's order: the order of a token's values. */
-  targetColumns: readonly string[]
+  /**
+   * The columns the foreign key references — a primary or unique key of the
+   * target, which the database itself requires — with their types, in the
+   * foreign key's order: the order of a token's values.
+   */
+  targetColumns: readonly LookupKeyColumn[]
   /** The columns a label is made of, in order. */
   display: readonly string[]
   /** Display columns a typed search may match. Empty: the lookup lists but cannot be searched. */
   search: readonly string[]
-  /** A total order: the key columns always end it, so paging never repeats or skips a row. */
+  /**
+   * A total order: the key columns always end it, so paging never repeats or
+   * skips a row, and every column says where its NULLs go.
+   */
   sort: readonly LookupSort[]
   maxPageSize: number
 }
@@ -58,28 +87,40 @@ export interface LookupResult {
   omitted: number
 }
 
+/** One equality from trusted context: a column of the target table, and the canonical text of the value it must hold. */
+export interface RowFilter {
+  readonly column: string
+  readonly value: string
+}
+
 /**
- * A row restriction from trusted context — the actor's tenant, a record
- * policy — as an equality on a column of the target table. Several are all
- * required.
+ * Which rows of the target table this actor may see, from trusted context —
+ * the actor's tenant, a record policy — and never from a token or a request.
+ * A token names a row; these decide whether this actor may name it.
+ *
+ * `restricted` holds one or more equalities, all required. `unrestricted` is
+ * the only way to say "every row", and somebody has to write it: an empty
+ * list is what `policy?.filters ?? []` produces when there is no policy, so
+ * it cannot also be the spelling of "no restriction". An adapter reads these
+ * with `rowFilterTerms`, which refuses every other shape at run time, where a
+ * caller in JavaScript or a policy read from JSON is not held to this type.
  *
  * Structural on purpose: the policy that produces these is defined elsewhere,
- * and this port depends on its shape, not its type. They are never read from a
- * token or a request; a token names a row, and these decide whether this actor
- * may name it. An empty list means the policy restricts no rows; it is never
- * the default for a missing policy.
+ * and this port depends on its shape, not its type.
  */
-export type RowFilters = ReadonlyArray<{ readonly column: string; readonly value: string }>
+export type RowFilters = { readonly kind: 'unrestricted' } | { readonly kind: 'restricted'; readonly equal: readonly [RowFilter, ...RowFilter[]] }
 
 /**
  * The lookup half of the database port, which both adapters implement and one
  * conformance suite holds them to.
  *
- * Every method takes the trusted filters, and applies them as part of the same
- * query: a row outside them does not exist for this call. A row whose key holds
- * a NULL is never offered, because no foreign key value can reference it. The
- * order of text — and of UUIDs on SQL Server — is each engine's own; that is a
- * real difference between the engines and the adapters say so rather than hide it.
+ * Every method takes the trusted filters, reads them with `rowFilterTerms`, and
+ * applies them as part of the same query: a row outside them does not exist
+ * for this call. A row whose key holds a NULL is never offered, because no
+ * foreign key value can reference it. Where NULLs sort is the config's, and
+ * each adapter spells it. The order of text — and of UUIDs on SQL Server — is
+ * each engine's own; that is a real difference between the engines and the
+ * adapters say so rather than hide it.
  */
 export interface LookupAdapter {
   /**

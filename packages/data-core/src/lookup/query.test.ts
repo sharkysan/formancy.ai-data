@@ -7,13 +7,16 @@ const CONFIG: LookupConfig = {
   source: 'erp-sales-order-fk-order-customer',
   foreignKey: 'fk_order_customer',
   target: { schema: 'sales', name: 'customer' },
-  targetColumns: ['tenant_id', 'customer_no'],
+  targetColumns: [
+    { name: 'tenant_id', type: { kind: 'integer', min: '-2147483648', max: '2147483647' } },
+    { name: 'customer_no', type: { kind: 'integer', min: '-2147483648', max: '2147483647' } },
+  ],
   display: ['name'],
   search: ['name'],
   sort: [
-    { column: 'name', direction: 'asc' },
-    { column: 'tenant_id', direction: 'asc' },
-    { column: 'customer_no', direction: 'asc' },
+    { column: 'name', direction: 'asc', nulls: 'last' },
+    { column: 'tenant_id', direction: 'asc', nulls: 'last' },
+    { column: 'customer_no', direction: 'asc', nulls: 'last' },
   ],
   maxPageSize: 50,
 }

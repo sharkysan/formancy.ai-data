@@ -15,16 +15,28 @@
   was not found under the actor's filters is rejected (applying the filters
   in the query is the adapter's half, and is not tested here); a token the
   database matched under another spelling (case, a trailing space) is
-  rejected while the exact spelling is not; a page reads one extra row for
-  `hasMore` and counts a row it cannot offer; every page passes
-  `acceptRemoteOptions`. `packages/data-core/src/lookup/query.test.ts` — an
+  rejected while the exact spelling is not; a token holding a value its key
+  column cannot hold in that spelling — `abc`, `1e3` or an out-of-range
+  number for an integer, a decimal not padded to its scale, an upper-case
+  UUID, a NUL in text, a day that does not exist — is never asked about; a
+  page reads one extra row for `hasMore` and counts a row it cannot offer;
+  every page passes `acceptRemoteOptions`.
+  `packages/data-core/src/lookup/filters.test.ts` — an empty list, an empty
+  restriction and a missing policy are each refused, and only an explicit
+  `unrestricted` restricts nothing. `packages/data-core/src/lookup/query.test.ts` — an
   empty or whitespace search is no filter exactly where formancy's
   `narrowOptionsByLabel` says so; limits, offsets, lengths and control
   characters are bounded. `packages/data-core/src/lookup/config.test.ts` — a
-  config derived from bindings the real generator made has a total order; the
+  config derived from bindings the real generator made has a total order in
+  which every column says where NULLs go, and carries the key's types; the
   default page size accepts the page formancy's control asks for; search is
-  limited to displayed text and integer columns; float and binary keys and
-  bindings from another snapshot are refused. Every test file was first run
+  limited to displayed text and integer columns; float, binary, boolean, time
+  and timestamp keys, bindings from another snapshot, and bindings aimed
+  anywhere but where their foreign key points — another table, columns that
+  are not the referenced key, the key in another order — are refused. The
+  value, filter, NULL and foreign-key cases came from review, and each was
+  run against the code before its fix and watched failing on its assertion.
+  Every test file was first run
   against a deliberately naive implementation — a comma join, a pass-through
   query, a comma-joined label, membership that rejects everything, a default
   page of 20 — and every case failed on its assertion before the real code
@@ -34,7 +46,8 @@
   a binary key, was found unreached by the coverage report and its test was
   written after the code. **Not mechanically
   enforced:** that an adapter builds its answers with these helpers rather
-  than comparing values itself, and that a deployment wires `rejects` into
+  than comparing values itself, reads its filters with `rowFilterTerms`,
+  spells each column's NULL placement, and that a deployment wires `rejects` into
   formancy's `members` for every database-backed source. The first is held by
   the adapters' conformance suite when they implement the port; the second
   belongs to the server that composes them.
@@ -88,22 +101,41 @@ truncated.
 
 **A token is a member only when a row found under the actor's filters
 re-encodes to it exactly** (`rejectedTokens`). The database's own match is
-not trusted for this, because of collations.
+not trusted for this, because of collations. **And a token is asked about
+only when each of its values is spelled as its key column holds it**
+(`lookupKeys`): an integer without leading zeros or an exponent and within
+the column's range, a decimal padded to its scale, a UUID in lower case, text
+within its length and without a NUL, a real day as `YYYY-MM-DD`. Nothing else
+can be a member, and binding it would be a conversion error on one engine and
+a quiet non-match on the other — `1e3` is a numeric to PostgreSQL and an error
+to SQL Server — where an error fails the whole query for one bad token.
 
 **The configuration an adapter answers with is derived, not written**
 (`buildLookupConfig`), from the form's bindings and the snapshot they were
 generated from, checked by fingerprint, so every identifier an adapter quotes
-is approved metadata. Search is limited to displayed text and integer columns,
-the two kinds both engines spell alike as text. The order always ends with the
-key, so it is total. The default page is fifty rows, which is what formancy's
+is approved metadata. The fingerprint covers the snapshot and not the
+bindings, so the bindings are also held to the root's foreign key in that
+snapshot: from the same columns, to the same table and the same referenced
+columns, in the same order. A key is therefore what the database lets a
+foreign key reference, a primary or unique key, and the config carries each
+key column's type. A key of a kind with no settled spelling — a boolean, a
+time, a timestamp — is refused along with float and binary keys. Search is
+limited to displayed text and integer columns, the two kinds both engines
+spell alike as text. The order always ends with the key, so it is total, and
+every column of it says where NULLs go, last unless an administrator chose
+otherwise, because PostgreSQL puts them last in an ascending order and SQL
+Server first. The default page is fifty rows, which is what formancy's
 control asks for by default. Row filters are not part of it: they are the
-actor's, and arrive with each call, as `ReadonlyArray<{ column, value }>`, so
-this port depends on the shape of a policy and not on its type.
+actor's, and arrive with each call, as `{ kind: 'restricted', equal: [{ column,
+value }, …] }` or `{ kind: 'unrestricted' }`, so this port depends on the shape
+of a policy and not on its type. "Every row" has to be written: an empty list
+is what a missing policy defaults to, so `rowFilterTerms`, which every adapter
+reads the filters with, refuses it.
 
 **One port, three questions**: `search`, `resolve` and `rejects`, each taking
 the config and the filters. The pieces that are the same on both engines —
-which tokens to ask about, `hasMore` from one extra row, the label, membership
-— are functions here, made once.
+which tokens to ask about, which rows the filters allow, `hasMore` from one
+extra row, the label, membership — are functions here, made once.
 
 ## Consequences
 
@@ -113,8 +145,10 @@ encodes to it. There is no secret to leak, rotate or revoke, because the token
 grants nothing. A composite key travels as one string without ambiguity, reads
 as itself in a log when it is an integer, a decimal, a UUID or a plain code,
 and cannot hide an invisible character or a bidi control in an archive view.
-The two adapters cannot disagree about a token's spelling, a page boundary or
-what counts as a member, because neither of them decides it.
+The two adapters cannot disagree about a token's spelling, which values are
+asked about, where NULLs sort, how a page knows there is more, or what counts
+as a member, because neither of them decides it. They can disagree about the
+order of text, which is each engine's collation, below.
 
 **What it costs.** Escaping is expensive outside ASCII: a UTF-16 unit costs
 five characters, so a text key of forty non-ASCII characters, or twenty emoji,
@@ -127,7 +161,12 @@ must select the key columns rather than count, and a value the database calls
 equal but spells differently is refused — a person whose saved answer names a
 key that has since been re-cased by a cascade is refused on the next save,
 which is 0077's "membership now, never membership then" with one more way to
-happen. A person who sees a date in a label cannot search for it. Offset
+happen. A foreign key onto a boolean, a time or a timestamp key cannot be
+offered as a lookup until a spelling for its values is settled and tested on
+both engines. The key-value spellings above restate, for keys, the canonical
+values the column codecs produce; until one module holds both, nothing fails
+if the two drift apart. An actor the policy leaves unrestricted has to be passed
+as one, deliberately. A person who sees a date in a label cannot search for it. Offset
 paging costs a scan up to the offset on both engines; keyset paging would not,
 and is not offered while formancy's control asks only for a first page. The
 order of text, and of UUIDs on SQL Server, is each engine's collation, so a
