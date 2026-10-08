@@ -28,7 +28,11 @@
   clerk, an unknown lookup gave `[]`, an inherited `constructor` was used as an
   attribute value; and, found in review, an actor with field grants and no
   read grant was given a filter and a column list, and a customer lookup whose
-  target was not pinned offered every tenant's customers. That the host builds
+  target was not pinned offered every tenant's customers. Watched failing
+  against the finished code too, on the three guards the naive version could
+  not show: with a field that has no entry made readable, with roles matched
+  by case and prefix, and with an unknown field accepted by `validatePolicy`,
+  each of its tests fails. That the host builds
   the context from a verified identity is
   **not mechanically enforced** and cannot be from a pure function; that every
   record operation calls these is not enforced yet either, because no record
