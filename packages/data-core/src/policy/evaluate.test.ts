@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import type { FieldBinding, FormBindings } from '../generate/types.js'
 import { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter } from './evaluate.js'
 import type { FormPolicy, PolicyContext } from './types.js'
+import { validatePolicy } from './validate.js'
 
 /*
  * Bindings shaped like what generateForm produces for the fixture's
@@ -148,9 +149,55 @@ describe('an actor with no roles', () => {
     for (const operation of ['read', 'create', 'update'] as const) {
       expect(authorizeOperation(ORDER_POLICY, NOBODY, operation)).toMatchObject({ ok: false, code: 'operation-denied' })
     }
-    expect(readableFields(ORDER_POLICY, NOBODY, ORDER)).toEqual({ ok: true, fields: [] })
+    expect(readableFields(ORDER_POLICY, NOBODY, ORDER)).toMatchObject({ ok: false, code: 'operation-denied' })
+    expect(rowFilter(ORDER_POLICY, NOBODY, 'read')).toMatchObject({ ok: false, code: 'operation-denied' })
     expect(checkSubmittedFields(ORDER_POLICY, NOBODY, ORDER, 'create', [])).toMatchObject({ ok: false, code: 'operation-denied' })
-    expect(lookupRowFilter(ORDER_POLICY, NOBODY, 'customer')).toMatchObject({ ok: false, code: 'field-denied' })
+    expect(lookupRowFilter(ORDER_POLICY, NOBODY, ORDER, 'create', 'customer')).toMatchObject({ ok: false, code: 'operation-denied' })
+  })
+})
+
+describe('a function that returns data', () => {
+  /*
+   * validatePolicy accepts a role that holds field grants and no operation
+   * grant. authorizeOperation refuses such an actor, but it returns no data,
+   * and the functions that do return everything a read endpoint needs: a WHERE
+   * clause from rowFilter, a column list from readableFields. A caller that
+   * skipped the gate would run the query with them. So each one authorises the
+   * operation it serves itself, as checkSubmittedFields does for a write.
+   */
+  const AUDITED = edited(ORDER_POLICY, (draft) => {
+    for (const entry of Object.values(draft.fields)) entry.read.push('auditor')
+    draft.fields['customer']?.write.push('auditor')
+  })
+  const AUDITOR: PolicyContext = { actor: { id: 'u-8', roles: ['auditor'] }, attributes: { tenant: '42' } }
+
+  test('refuses an actor whose roles hold field grants and no operation grant', () => {
+    expect(validatePolicy(AUDITED, ORDER)).toEqual({ ok: true })
+    for (const result of [
+      readableFields(AUDITED, AUDITOR, ORDER),
+      rowFilter(AUDITED, AUDITOR, 'read'),
+      lookupRowFilter(AUDITED, AUDITOR, ORDER, 'read', 'customer'),
+      lookupRowFilter(AUDITED, AUDITOR, ORDER, 'create', 'customer'),
+      forcedValues(AUDITED, AUDITOR),
+      checkSubmittedFields(AUDITED, AUDITOR, ORDER, 'create', ['customer']),
+    ]) {
+      expect(result).toMatchObject({ ok: false, code: 'operation-denied' })
+    }
+  })
+
+  // A grant is per operation, so holding one is not holding another. A clerk
+  // may create orders and not update them: the filter and the options an
+  // update would run with are not theirs. A manager may not create, so gets
+  // no values to create with. A role that may create and not read is shown no
+  // field of a record, however many it may write.
+  test('authorises the operation it serves, not any operation', () => {
+    expect(rowFilter(ORDER_POLICY, CLERK, 'update')).toMatchObject({ ok: false, code: 'operation-denied' })
+    expect(lookupRowFilter(ORDER_POLICY, CLERK, ORDER, 'update', 'customer')).toMatchObject({ ok: false, code: 'operation-denied' })
+    expect(forcedValues(ORDER_POLICY, MANAGER)).toMatchObject({ ok: false, code: 'operation-denied' })
+    const writeOnly = edited(ORDER_POLICY, (draft) => {
+      draft.operations.read = ['manager']
+    })
+    expect(readableFields(writeOnly, CLERK, ORDER)).toMatchObject({ ok: false, code: 'operation-denied' })
   })
 })
 
@@ -295,7 +342,7 @@ describe('rowFilter', () => {
   // The tenant column equals the context's tenant, and the value is the
   // context's, as a string the adapter binds as a parameter.
   test("pins the tenant column to the context's attribute", () => {
-    expect(rowFilter(ORDER_POLICY, CLERK)).toEqual({ ok: true, filter: [{ column: 'tenant_id', value: '42' }] })
+    expect(rowFilter(ORDER_POLICY, CLERK, 'read')).toEqual({ ok: true, filter: [{ column: 'tenant_id', value: '42' }] })
   })
 
   // The failure this module exists to prevent. A host that forgot to set the
@@ -303,7 +350,7 @@ describe('rowFilter', () => {
   // over every tenant's rows.
   test('refuses, rather than returning an empty filter, when the attribute is missing or empty', () => {
     for (const attributes of [{}, { region: 'eu' }, { tenant: '' }]) {
-      expect(rowFilter(ORDER_POLICY, { ...CLERK, attributes })).toMatchObject({
+      expect(rowFilter(ORDER_POLICY, { ...CLERK, attributes }, 'read')).toMatchObject({
         ok: false,
         code: 'missing-attribute',
         message: expect.stringMatching(/^rowFilters: tenant_id must equal the context's tenant/),
@@ -318,19 +365,19 @@ describe('rowFilter', () => {
     const odd = edited(ORDER_POLICY, (draft) => {
       draft.rowFilters = [{ column: 'tenant_id', attribute: 'constructor' }]
     })
-    expect(rowFilter(odd, CLERK)).toMatchObject({ ok: false, code: 'missing-attribute' })
+    expect(rowFilter(odd, CLERK, 'read')).toMatchObject({ ok: false, code: 'missing-attribute' })
     const inherited = Object.create({ tenant: '42' }) as Record<string, string>
-    expect(rowFilter(ORDER_POLICY, { ...CLERK, attributes: inherited })).toMatchObject({ ok: false, code: 'missing-attribute' })
+    expect(rowFilter(ORDER_POLICY, { ...CLERK, attributes: inherited }, 'read')).toMatchObject({ ok: false, code: 'missing-attribute' })
   })
 
   // An empty filter is the policy's own statement — a table that is not per
   // tenant says `rowFilters: []` — and never the absence of one.
   test('is empty only when the policy says so in as many words', () => {
-    expect(rowFilter({ ...ORDER_POLICY, rowFilters: [] }, CLERK)).toEqual({ ok: true, filter: [] })
+    expect(rowFilter({ ...ORDER_POLICY, rowFilters: [] }, CLERK, 'read')).toEqual({ ok: true, filter: [] })
     const silent = edited(ORDER_POLICY, (draft) => {
       delete (draft as Partial<FormPolicy>).rowFilters
     })
-    expect(rowFilter(silent, CLERK)).toMatchObject({ ok: false, code: 'invalid-policy', message: 'rowFilters is not a list of row filters' })
+    expect(rowFilter(silent, CLERK, 'read')).toMatchObject({ ok: false, code: 'invalid-policy', message: 'rowFilters is not a list of row filters' })
   })
 })
 
@@ -338,40 +385,71 @@ describe('lookupRowFilter', () => {
   // A lookup token is a reference, not a permission (plan section 9). The
   // options offered, and the selection rechecked on save, are this tenant's.
   test("pins the target's tenant column to the context's attribute", () => {
-    expect(lookupRowFilter(ORDER_POLICY, CLERK, 'customer')).toEqual({ ok: true, filter: [{ column: 'tenant_id', value: '42' }] })
+    expect(lookupRowFilter(ORDER_POLICY, CLERK, ORDER, 'create', 'customer')).toEqual({ ok: true, filter: [{ column: 'tenant_id', value: '42' }] })
   })
 
   // Saying nothing about a lookup is not saying "every row": it offers
   // nothing. `[]` is how a policy says a target is shared by every tenant.
   test('refuses a lookup the policy says nothing about; [] is the explicit "every row"', () => {
     for (const field of ['approved_by', 'constructor']) {
-      expect(lookupRowFilter(ORDER_POLICY, MANAGER, field)).toEqual({
+      expect(lookupRowFilter(ORDER_POLICY, MANAGER, ORDER, 'update', field)).toEqual({
         ok: false,
         code: 'unknown-lookup',
         message: `the policy says nothing about which rows ${field} may offer, so it offers none`,
       })
     }
-    expect(lookupRowFilter(CUSTOMER_POLICY, CLERK, 'country')).toEqual({ ok: true, filter: [] })
+    expect(lookupRowFilter(CUSTOMER_POLICY, CLERK, CUSTOMER, 'create', 'country')).toEqual({ ok: true, filter: [] })
   })
 
   // The same rule as the root's filter: a missing tenant is a refusal, not a
-  // search across every tenant's customers.
-  test('refuses when the attribute is missing', () => {
-    expect(lookupRowFilter(ORDER_POLICY, { ...CLERK, attributes: {} }, 'customer')).toMatchObject({
+  // search across every tenant's customers. The root is scoped first, so on
+  // the order form the refusal names the root's filter; where the root is
+  // shared and only the lookup's target is per tenant, it names the lookup's.
+  test("refuses when the attribute is missing, for the root's filter or the target's", () => {
+    const tenantless = { ...CLERK, attributes: {} }
+    expect(lookupRowFilter(ORDER_POLICY, tenantless, ORDER, 'create', 'customer')).toMatchObject({
+      ok: false,
+      code: 'missing-attribute',
+      message: expect.stringMatching(/^rowFilters: tenant_id must equal the context's tenant/),
+    })
+    expect(lookupRowFilter({ ...ORDER_POLICY, rowFilters: [] }, tenantless, ORDER, 'create', 'customer')).toMatchObject({
       ok: false,
       code: 'missing-attribute',
       message: expect.stringMatching(/^lookups\.customer: tenant_id must equal the context's tenant/),
     })
   })
 
+  // The write check refuses a policy whose customer lookup sets tenant_id
+  // without pinning its target to the tenant. The options are searched before
+  // anything is saved, so a check of the policy's shape alone would list every
+  // tenant's customers first, and refusing the save afterwards would not take
+  // that back.
+  test('refuses a policy that does not fit the form, as the write check does', () => {
+    const unpinned = edited(ORDER_POLICY, (draft) => {
+      draft.lookups['customer'] = []
+    })
+    expect(lookupRowFilter(unpinned, CLERK, ORDER, 'create', 'customer')).toMatchObject({
+      ok: false,
+      code: 'invalid-policy',
+      message: expect.stringMatching(/lookups\.customer must pin sales\.customer\.tenant_id to tenant/),
+    })
+  })
+
   // Searching a lookup reads its target table — employee names, here. An
-  // actor who may neither read nor write the field has no business seeing them.
+  // actor who may neither read nor write the field has no business seeing them,
+  // and being granted the operation does not change that: a clerk who may
+  // create orders but is granted nothing on the customer field would otherwise
+  // search every customer of the tenant through it.
   test('refuses an actor who may neither read nor write the field', () => {
-    expect(lookupRowFilter(ORDER_POLICY, MANAGER, 'created_by')).toEqual({
+    expect(lookupRowFilter(ORDER_POLICY, MANAGER, ORDER, 'update', 'created_by')).toEqual({
       ok: false,
       code: 'field-denied',
       message: 'this actor may neither read nor write created_by, so its options are not theirs to search',
     })
+    const managersOnly = edited(ORDER_POLICY, (draft) => {
+      draft.fields['customer'] = { read: ['manager'], write: ['manager'] }
+    })
+    expect(lookupRowFilter(managersOnly, CLERK, ORDER, 'create', 'customer')).toMatchObject({ ok: false, code: 'field-denied' })
   })
 })
 
@@ -382,7 +460,7 @@ describe('forcedValues', () => {
   test('pins on create exactly what the row filter pins on read', () => {
     const forced = forcedValues(CUSTOMER_POLICY, CLERK)
     expect(forced).toEqual({ ok: true, values: [{ column: 'tenant_id', value: '42' }] })
-    const filter = rowFilter(CUSTOMER_POLICY, CLERK)
+    const filter = rowFilter(CUSTOMER_POLICY, CLERK, 'read')
     expect(filter.ok && filter.filter).toEqual(forced.ok && forced.values)
   })
 
@@ -422,8 +500,8 @@ describe('a forged context', () => {
       authorizeOperation(ORDER_POLICY, context, 'read'),
       readableFields(ORDER_POLICY, context, ORDER),
       checkSubmittedFields(ORDER_POLICY, context, ORDER, 'create', ['notes']),
-      rowFilter(ORDER_POLICY, context),
-      lookupRowFilter(ORDER_POLICY, context, 'customer'),
+      rowFilter(ORDER_POLICY, context, 'read'),
+      lookupRowFilter(ORDER_POLICY, context, ORDER, 'create', 'customer'),
       forcedValues(ORDER_POLICY, context),
     ]) {
       expect(result).toMatchObject({ ok: false, code: 'invalid-context' })

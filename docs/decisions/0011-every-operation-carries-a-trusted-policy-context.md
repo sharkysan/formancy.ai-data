@@ -9,10 +9,15 @@
   an empty filter; forged context shapes, among them a role list that is one
   string and a tenant that is a number or a list, are refused by every
   function; an actor with no roles may do nothing, see nothing and search
-  nothing; a field with no entry is readable by nobody; the tenant column is
-  refused as over-posting on create and on update, and by its column name on a
-  form that has no field for it; a lookup the policy does not name offers
-  nothing; a field or attribute called `constructor` is not found on
+  nothing; an actor whose roles hold field grants and no operation grant is
+  refused by `readableFields`, `rowFilter`, `lookupRowFilter`, `forcedValues`
+  and `checkSubmittedFields`, and each authorises the operation it serves
+  rather than any; a field with no entry is readable by nobody; the tenant
+  column is refused as over-posting on create and on update, and by its column
+  name on a form that has no field for it; a lookup the policy does not name
+  offers nothing; `lookupRowFilter` refuses a lookup over the tenant column
+  whose target is not pinned, as the write check does; a field or attribute
+  called `constructor` is not found on
   `Object.prototype`. `packages/data-core/src/policy/validate.test.ts` — a
   policy that lists a field the bindings do not have is refused, as are a write
   grant on a field the form never writes or on a pinned column, an operation
@@ -21,7 +26,10 @@
   failing against a first, naive implementation: a missing tenant gave
   `filter: []`, a role list given as the string `'superclerk'` authorised a
   clerk, an unknown lookup gave `[]`, an inherited `constructor` was used as an
-  attribute value. That the host builds the context from a verified identity is
+  attribute value; and, found in review, an actor with field grants and no
+  read grant was given a filter and a column list, and a customer lookup whose
+  target was not pinned offered every tenant's customers. That the host builds
+  the context from a verified identity is
   **not mechanically enforced** and cannot be from a pure function; that every
   record operation calls these is not enforced yet either, because no record
   operation exists.
@@ -78,9 +86,14 @@ for each lookup's target table.
   tenant's rows.
 - **Every function reads both inputs at runtime**, copying them into Sets and
   Maps before deciding, and answers `{ ok: true, … }` or a refusal with a
-  stable code. `authorizeOperation` refuses an operation it cannot scope;
-  `checkSubmittedFields` authorises the operation before looking at a key; a
-  lookup is searchable only by an actor who may read or write its field.
+  stable code. `authorizeOperation` refuses an operation it cannot scope, and
+  it is not the only gate: `readableFields`, `rowFilter`, `lookupRowFilter`
+  and `forcedValues` authorise and scope the operation they serve before
+  returning anything, as `checkSubmittedFields` does before looking at a key,
+  because a field grant is not an operation grant and a caller can skip a
+  gate. A lookup is searchable only by an actor who may read or write its
+  field, under a policy fitted to the form, so its options are never listed
+  under a policy its save would refuse.
 - **Nothing reads the form document.** Decisions come from the policy and the
   bindings alone.
 - **`validatePolicy(policy, bindings)` refuses a policy that does not fit its

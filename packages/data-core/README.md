@@ -58,7 +58,7 @@ const context = { actor: { id: 'u-17', roles: ['clerk'] }, attributes: { tenant:
 
 checkSubmittedFields(policy, context, bindings, 'create', ['tenant_id', 'name'])
 // { ok: false, code: 'over-posting', message: 'tenant_id is pinned by a row filter: …' }
-rowFilter(policy, context) // { ok: true, filter: [{ column: 'tenant_id', value: '42' }] }
+rowFilter(policy, context, 'read') // { ok: true, filter: [{ column: 'tenant_id', value: '42' }] }
 forcedValues(policy, context) // the same columns, written from the context on create
 ```
 
@@ -67,9 +67,14 @@ nobody, and a lookup it does not name offers nothing. A missing attribute is a
 refusal, never an empty filter, because an empty filter is every tenant's rows.
 Every function answers `{ ok: true, … }` or a refusal with a stable `code`, and
 none of them reads the form document: a hidden or disabled field is
-presentation, not authorisation. `validatePolicy(policy, bindings)` refuses a
-policy that does not fit its form. Nothing runs these yet; the record
-operations that will are still to come. See
+presentation, not authorisation. Each one that returns fields, a filter or
+values first authorises the operation it serves, so an actor whose roles hold
+field grants and no operation grant gets nothing from any of them.
+`validatePolicy(policy, bindings)` refuses a policy that does not fit its
+form, and every function given the bindings refuses it too — the lookup
+filter among them, so an options search cannot run under a policy the save
+would refuse. Nothing runs these yet; the record operations that will are
+still to come. See
 [0011](../../docs/decisions/0011-every-operation-carries-a-trusted-policy-context.md).
 
 ## Licence

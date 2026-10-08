@@ -19,6 +19,12 @@ import { fitPolicy } from './validate.js'
  * every function reads the context and the policy before deciding anything,
  * and answers with a refusal rather than a weaker answer.
  *
+ * Every function that returns data — fields, a filter, values — authorises
+ * and scopes the operation it serves before returning any, as the write check
+ * does. `authorizeOperation` is the gate a caller is meant to pass first, but
+ * a field grant does not imply an operation grant, and a caller that skipped
+ * the gate must not be handed a WHERE clause and a column list regardless.
+ *
  * Nothing here reads the form document. A hidden or disabled field is
  * presentation, not authorisation (plan section 11): the browser decides what
  * it shows, and a request can carry any key it likes, so every decision is
@@ -66,14 +72,16 @@ function resolve(rules: readonly RowFilterRule[], actor: TrustedContext, where: 
   return { ok: true, filter }
 }
 
-/** Whether the actor may perform the operation, and whether the context can scope it. */
-function operationRefusal(policy: ParsedPolicy, actor: TrustedContext, operation: PolicyOperation): PolicyRefusal | null {
+/**
+ * The root's filter for an operation the actor may perform, or why they may
+ * not: no role of theirs is granted it, or the context cannot scope it.
+ */
+function authorise(policy: ParsedPolicy, actor: TrustedContext, operation: PolicyOperation): RowFilterResult {
   // `operation` is typed, but a host may pass it on from a route name; a
   // string that is not an operation must not reach a property lookup.
   if (!OPERATIONS.includes(operation)) return refuse('operation-denied', `${String(operation)} is not an operation this release has`)
   if (!holds(policy.operations[operation], actor)) return refuse('operation-denied', `no role of this actor may ${operation} with this form`)
-  const scoped = resolve(policy.rowFilters, actor, 'rowFilters')
-  return scoped.ok ? null : scoped
+  return resolve(policy.rowFilters, actor, 'rowFilters')
 }
 
 /**
@@ -86,20 +94,23 @@ function operationRefusal(policy: ParsedPolicy, actor: TrustedContext, operation
 export function authorizeOperation(policy: FormPolicy, context: PolicyContext, operation: PolicyOperation): PolicyDecision {
   const prepared = prepare(policy, context)
   if (!prepared.ok) return prepared
-  return operationRefusal(prepared.policy, prepared.actor, operation) ?? { ok: true }
+  const scoped = authorise(prepared.policy, prepared.actor, operation)
+  return scoped.ok ? { ok: true } : scoped
 }
 
 /**
  * The field keys whose values the actor may see, in the form's order.
  *
  * Deny by default: a field the policy has no entry for is readable by nobody.
- * Whether a record may be returned at all is `authorizeOperation`'s question;
- * this answers which of its values.
+ * An actor who may not read — whatever fields their roles are granted — is
+ * refused rather than given a column list to query with.
  */
 export function readableFields(policy: FormPolicy, context: PolicyContext, bindings: FormBindings): ReadableFields {
   const prepared = prepare(policy, context, bindings)
   if (!prepared.ok) return prepared
   const { policy: parsed, actor } = prepared
+  const scoped = authorise(parsed, actor, 'read')
+  if (!scoped.ok) return scoped
   const fields = bindings.fields.filter((binding) => {
     const entry = parsed.fields.get(binding.field)
     return entry !== undefined && holds(entry.read, actor)
@@ -142,8 +153,8 @@ export function checkSubmittedFields(
   if (!prepared.ok) return prepared
   const { policy: parsed, actor } = prepared
   if (operation !== 'create' && operation !== 'update') return refuse('operation-denied', `${String(operation)} submits no values`)
-  const denied = operationRefusal(parsed, actor, operation)
-  if (denied !== null) return denied
+  const scoped = authorise(parsed, actor, operation)
+  if (!scoped.ok) return scoped
 
   const pinned = new Set(parsed.rowFilters.map((rule) => rule.column))
   const reasons: string[] = []
@@ -156,29 +167,49 @@ export function checkSubmittedFields(
 }
 
 /**
- * The root table's filter for this actor: every pinned column equal to the
- * context's value. Empty only when the policy says `rowFilters: []`; a
- * missing attribute is a refusal, never a shorter filter.
+ * The root table's filter for an operation this actor may perform: every
+ * pinned column equal to the context's value. On read and update it is the
+ * WHERE clause; on create, the values `forcedValues` writes.
+ *
+ * Empty only when the policy says `rowFilters: []`; a missing attribute is a
+ * refusal, never a shorter filter. An actor not granted the operation is
+ * refused, so a filter is never the only thing standing between a caller and
+ * a query it was not allowed to run.
  */
-export function rowFilter(policy: FormPolicy, context: PolicyContext): RowFilterResult {
+export function rowFilter(policy: FormPolicy, context: PolicyContext, operation: PolicyOperation): RowFilterResult {
   const prepared = prepare(policy, context)
   if (!prepared.ok) return prepared
-  return resolve(prepared.policy.rowFilters, prepared.actor, 'rowFilters')
+  return authorise(prepared.policy, prepared.actor, operation)
 }
 
 /**
- * The filter on a lookup's TARGET table: the options it offers, and the
- * membership a selection is rechecked against on save. A lookup token is a
- * reference, not a permission (plan section 9).
+ * The filter on a lookup's TARGET table, for the operation whose form offers
+ * it: the options it lists, and the membership a selection is rechecked
+ * against on save. A lookup token is a reference, not a permission (plan
+ * section 9).
+ *
+ * The operation is authorised and the root scoped first. The policy is fitted
+ * to the form, as for the write check, because whether a target must be
+ * pinned depends on which root columns the lookup sets: the options are
+ * listed before anything is saved, and a save refused afterwards would not
+ * take back a list of every tenant's rows.
  *
  * A lookup the policy has no entry for offers nothing; `[]` is how a policy
  * says its target is shared. Searching a lookup reads the target's rows, so
  * an actor who may neither read nor write the field is refused.
  */
-export function lookupRowFilter(policy: FormPolicy, context: PolicyContext, lookupField: string): RowFilterResult {
-  const prepared = prepare(policy, context)
+export function lookupRowFilter(
+  policy: FormPolicy,
+  context: PolicyContext,
+  bindings: FormBindings,
+  operation: PolicyOperation,
+  lookupField: string,
+): RowFilterResult {
+  const prepared = prepare(policy, context, bindings)
   if (!prepared.ok) return prepared
   const { policy: parsed, actor } = prepared
+  const scoped = authorise(parsed, actor, operation)
+  if (!scoped.ok) return scoped
   const rules = parsed.lookups.get(lookupField)
   if (rules === undefined) return refuse('unknown-lookup', `the policy says nothing about which rows ${lookupField} may offer, so it offers none`)
   const entry = parsed.fields.get(lookupField)
@@ -192,9 +223,10 @@ export function lookupRowFilter(policy: FormPolicy, context: PolicyContext, look
  * The root columns a create writes from the context: every column a row
  * filter pins, with the context's value. The same rules as `rowFilter`,
  * resolved the same way, so a record a person creates is one they can read.
- * A submitted value for one of these columns is over-posting.
+ * A submitted value for one of these columns is over-posting. An actor who
+ * may not create is refused.
  */
 export function forcedValues(policy: FormPolicy, context: PolicyContext): ForcedValues {
-  const filter = rowFilter(policy, context)
+  const filter = rowFilter(policy, context, 'create')
   return filter.ok ? { ok: true, values: filter.filter } : filter
 }
