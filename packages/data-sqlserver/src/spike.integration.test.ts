@@ -1,9 +1,7 @@
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-// By path to the fixture package's build, for the reason
-// discovery.integration.test.ts gives.
-import type { SqlServerFixture } from '../../data-fixtures/dist/index.mjs'
-import { EDGE_VALUES, startSqlServerFixture } from '../../data-fixtures/dist/index.mjs'
+import type { SqlServerFixture } from '@formancy/data-fixtures'
+import { EDGE_VALUES, startSqlServerFixture } from '@formancy/data-fixtures'
 
 /**
  * The SQL Server half of the phase-1 spike, kept as tests: what the driver does

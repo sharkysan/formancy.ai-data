@@ -12,16 +12,18 @@
   hidden alias type is reported by its base type with a gap; a schema the
   reader holds nothing in gets a gap and a schema that does not exist does
   not; `VIEW DEFINITION` on the schema alone sees everything the owner sees; a
-  table denied `VIEW DEFINITION` under that grant produces a gap; every type
-  named below normalises as stated; the scope is bound as parameters, matched
-  by collation, and an empty one reads nothing.
+  table denied `VIEW DEFINITION` under that grant produces a gap, whether the
+  `DENY` is made to the account or to a role it is in, and so does a table
+  denied `CONTROL`; every type named below normalises as stated; the scope is
+  bound as parameters, matched by collation, and an empty one reads nothing.
   `packages/data-sqlserver/src/spike.integration.test.ts` — what the driver
   returns for `bigint`, `decimal(18,4)` and `date` by default, the lossless
   read, the id binding, what a text length counts, and `rowversion`
   concurrency between two connections. The gaps, the left joins, the key
-  orderings, the scope binding and matching, and the token in the update were
-  each reverted once and their tests watched fail. That every snapshot is
-  built through `createSnapshot` is held by review, as in 0004.
+  orderings, the scope binding and matching, the role and `CONTROL` terms of
+  the denied-object count, and the token in the update were each reverted once
+  and their tests watched fail. That every snapshot is built through
+  `createSnapshot` is held by review, as in 0004.
 
 ## Context
 
@@ -56,8 +58,9 @@ are visible with their object. `HAS_PERMS_BY_NAME` parses the name it is given
 and returns `NULL` for `it's [odd]` unless it is quoted. And `VIEW DEFINITION`
 on the schema lifts all of it without any data access — except that a
 `DENY VIEW DEFINITION` on one table removes that table from `sys.objects` while
-`HAS_PERMS_BY_NAME` on the schema still says 1. The account can read its own
-`DENY` rows, but not the denied object's name or schema.
+`HAS_PERMS_BY_NAME` on the schema still says 1. So does a `DENY CONTROL`, which
+implies it. The account can read its own `DENY` rows and those made to a role
+it is in, but not the denied object's name or schema.
 
 **What the catalog says about types**, in bytes and synonyms: `nvarchar(200)`
 is 400 and `nvarchar(max)` is -1; `float(24)` is catalogued as `real`;
@@ -136,9 +139,7 @@ read the same, `validated: false`, because the contract's check has no
 `enforced`. Discovery is seven queries side by side, not one consistent read:
 a concurrent `ALTER` can tear it. Everything here was found on SQL Server
 2022, and the supported matrix is that image; the queries name catalog columns
-an older release may not have. And the tests reach the fixture harness through its build
-by relative path, because this package does not declare
-`@formancy/data-fixtures`, so `pnpm build` must run before they do.
+an older release may not have.
 
 **What it forecloses.** `INFORMATION_SCHEMA` for discovery, and inner joins to
 anything an account might not see. Splicing a schema name into catalog SQL.

@@ -2,18 +2,8 @@ import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ColumnMeta, MetadataSnapshot, ObjectMeta, ObjectRef } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
-// The shared fixture harness, by path to its build: this package does not yet
-// declare @formancy/data-fixtures as a devDependency, and the install is
-// strict (node-linker=isolated), so the bare name does not resolve here. The
-// source path would pull data-fixtures' files under this package's rootDir.
-// The dependency line is the fix; see the package README.
-import type { SqlServerFixture } from '../../data-fixtures/dist/index.mjs'
-import {
-  FIXTURE_SCOPE,
-  restrictedDisagreements,
-  snapshotDisagreements,
-  startSqlServerFixture,
-} from '../../data-fixtures/dist/index.mjs'
+import type { SqlServerFixture } from '@formancy/data-fixtures'
+import { FIXTURE_SCOPE, restrictedDisagreements, snapshotDisagreements, startSqlServerFixture } from '@formancy/data-fixtures'
 import { discoverSqlServer } from './index.js'
 
 /**
@@ -487,12 +477,29 @@ describe('discovery as the restricted reader', () => {
   // says the account may view every definition in it. The table is gone
   // without trace -- except that an account can read its own DENY rows, whose
   // object names are NULL to it. Those are counted, and become a gap.
-  test('a table denied VIEW DEFINITION under a schema grant is missing, and a gap says so', async () => {
-    const denied = await connectAs(
-      'formancy_denied',
-      'grant view definition on schema::sales to formancy_denied',
-      'deny view definition on sales.employee to formancy_denied',
-    )
+  //
+  // Each way of making that DENY is a different row, and a count that missed
+  // one would report no gap for a table that is gone: the silent answer 0004
+  // forbids.
+  test.each([
+    // Made to the account itself.
+    ['a table denied VIEW DEFINITION', 'formancy_denied', ['deny view definition on sales.employee to formancy_denied']],
+    // Made to a role the account is in, which is how a DBA usually denies. The
+    // row names the role, so a count of the account's own rows finds none.
+    [
+      'a table denied VIEW DEFINITION to a role the account is in',
+      'formancy_role_denied',
+      [
+        'create role formancy_deniers',
+        'alter role formancy_deniers add member formancy_role_denied',
+        'deny view definition on sales.employee to formancy_deniers',
+      ],
+    ],
+    // CONTROL, which denies VIEW DEFINITION by implication. The row says
+    // CONTROL, so a count of VIEW DEFINITION rows finds none.
+    ['a table denied CONTROL', 'formancy_control_denied', ['deny control on sales.employee to formancy_control_denied']],
+  ])('%s under a schema grant is missing, and a gap says so', async (_title, login, denials) => {
+    const denied = await connectAs(login, `grant view definition on schema::sales to ${login}`, ...denials)
     try {
       const snapshot = await discoverSqlServer(denied, FIXTURE_SCOPE)
       expect(findObject(snapshot, { schema: 'sales', name: 'employee' })).toBeUndefined()

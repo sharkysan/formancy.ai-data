@@ -46,9 +46,9 @@ nothing else: no `SELECT`, no data access. With it, discovery sees what the
 owner sees. Without it, SQL Server lists only the objects the account holds a
 permission on and returns `NULL` for every default and check definition, and
 the snapshot says so per object and per schema rather than looking complete.
-A table someone has denied `VIEW DEFINITION` on vanishes even under that grant;
-the account can count those denials, though not place them, and the snapshot
-says that too.
+A table someone has denied `VIEW DEFINITION` or `CONTROL` on, whether to the
+account or to a role it is in, vanishes even under that grant; the account can
+count those denials, though not place them, and the snapshot says that too.
 
 The adapter and discovery take a connected pool rather than a connection
 string: opening the connection is where a secret is handled, and that happens
@@ -86,13 +86,6 @@ upgrade that changes any of this fails by name:
 testcontainers and runs the suite against it. It needs Docker and, the first
 time, a pull of about a gigabyte and a half. There is no mocked driver to fall
 back to — database semantics are what this package is for (0003).
-
-The discovery and spike suites start the shared fixture from
-`@formancy/data-fixtures`. This package does not declare it as a
-devDependency yet, and the install is strict, so the tests import the fixture
-package's build by relative path; `pnpm build` must have run first, which CI
-does before it tests. Declaring `"@formancy/data-fixtures": "workspace:*"` is
-the fix, and removes the path.
 
 ## Licence
 
