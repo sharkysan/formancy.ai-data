@@ -28,6 +28,9 @@ export type {
   GenerationRequest,
   LookupChoice,
 } from './generate/types.js'
+export { diffSnapshots } from './drift/diff.js'
+export type { DriftChange, DriftKind, DriftReport, DriftSeverity, DriftSubject } from './drift/types.js'
+
 export { decodeKeyToken, encodeKeyToken, KEY_TOKEN_MAX_LENGTH } from './lookup/token.js'
 export type { KeyTokenDecoding, KeyTokenEncoding, KeyTokenErrorCode, KeyTokenRefusal } from './lookup/token.js'
 export { MAX_SEARCH_LENGTH, validateLookupQuery } from './lookup/query.js'

@@ -43,6 +43,25 @@ Exact decimals and integers past 2^53 become text fields with an exact pattern,
 never JavaScript numbers. Update is offered only with a proven concurrency
 token. See [0009](../../docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md).
 
+## Drift review
+
+`diffSnapshots(base, current, bindings)` compares the snapshot a form was
+generated from with the database as it is now, through that form's bindings.
+Each change says what it means for that form, `blocking`, `review` or `info`,
+and which fields it touches; the report says what the form may still write.
+
+```ts
+import { diffSnapshots } from '@formancy/data-core'
+
+const { changes, blocking, writable } = diffSnapshots(published, rescanned, bindings)
+```
+
+Something the connection can no longer see is an access problem, never a
+deletion: the snapshot's gaps say which. An apparent rename is a dropped
+column, a new one and a hint, never inferred. Tables the form neither binds nor
+looks up are left out, so an empty report means nothing this form rests on
+changed. See [0010](../../docs/decisions/0010-drift-is-classified-against-the-bindings.md).
+
 ## Lookups
 
 The database-neutral half of a foreign-key lookup: what a `select` stores, what
