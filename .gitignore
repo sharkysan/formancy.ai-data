@@ -1,0 +1,26 @@
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+.vitest-reports/
+test-results/
+.idea/
+.pnpm-store/
+
+# Copied into each package at build time by scripts/sync-licenses.mjs so the
+# tarballs carry them. The root LICENSE.md and NOTICE are the only real ones.
+packages/*/LICENSE.md
+packages/*/NOTICE
+
+/.claude
+
+# The delivery plan this repository started from. Kept locally for reference,
+# never committed: it is a working document, not a record.
+docs/plan.md
