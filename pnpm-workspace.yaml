@@ -1,0 +1,33 @@
+packages:
+  - "packages/*"
+
+# Shared dependency versions live here so the packages cannot drift apart.
+allowBuilds:
+  esbuild: true
+  # Transitive through testcontainers. Optional SSH acceleration used by its
+  # Docker client; the JavaScript fallbacks suffice, as they do upstream.
+  cpu-features: false
+  ssh2: false
+  # Only checks dependency version notation; no generated runtime artefacts.
+  protobufjs: false
+
+catalog:
+  # The TypeScript line formancy.ai compiles under: its Angular 22 declares
+  # `typescript: ">=6.0 <6.1"`. The declarations this repository consumes from
+  # @formancy/* were emitted by 6.0.x, and the Angular example coming here will
+  # need the same line, so there is one version across both repositories.
+  typescript: ~6.0.3
+
+  vitest: ^5.0.1
+  "@vitest/coverage-v8": ^5.0.1
+
+  tsdown: ^0.23.0
+  publint: ^0.3.24
+  "@arethetypeswrong/cli": ^0.18.5
+  "@types/node": ^22.10.0
+
+  # Database behaviour is proved against real servers, never mocks (0003).
+  # One version for the family, so the two adapters start containers the same way.
+  testcontainers: ^12.1.0
+  "@testcontainers/postgresql": ^12.1.0
+  "@testcontainers/mssqlserver": ^12.1.0

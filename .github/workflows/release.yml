@@ -1,0 +1,156 @@
+name: Release
+
+# Publishing happens here and nowhere else. A release cut from a laptop cannot
+# carry provenance -- the attestation is a statement by GitHub about which
+# workflow, at which commit, produced the tarball, and only the workflow can
+# make it.
+on:
+  push:
+    tags: ['v*']
+
+# Third-party actions are pinned to commit hashes, with the tag in a comment.
+#
+# This workflow holds an npm token and an OIDC identity that can sign on the
+# project's behalf. A tag is a mutable pointer: whoever controls an action's
+# repository can move `v3` to different code, and that code would run here with
+# both. Updating one means reading what changed and writing a new hash. That is
+# the cost, and it is also the point.
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # OIDC, for npm provenance and keyless signing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the tag's history, so the release notes can reference it
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: corepack enable pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Before anything expensive. A token problem discovered after eight
+      # minutes of build and test is the same token problem, found later.
+      - name: The npm token must work, and must not want an OTP
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "::error::NPM_TOKEN is not set on this repository"
+            exit 1
+          fi
+          WHO=$(npm whoami 2>&1) || {
+            echo "::error::npm rejected the token: ${WHO}"
+            exit 1
+          }
+          echo "Authenticated as ${WHO}"
+          # A classic "Publish" token on an account set to auth-and-writes
+          # demands a one-time password for every publish, and CI has no
+          # terminal to type one into -- it fails AFTER the whole gate has run.
+          if npm profile get 2>/dev/null | grep -q "auth-and-writes"; then
+            echo "::warning::Account enforces 2FA on writes. The token must be an \
+          Automation or Granular Access token, or publish will fail. See RELEASING.md."
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # The tag is the claim; this checks the repository agrees with it. A tag
+      # that says v0.1.0 on a tree that says 0.2.0 would publish the wrong
+      # version under the right name, which is unfixable after the fact.
+      - name: The tag and the manifests must agree
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./packages/data-core/package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag is $TAG but the packages say $PKG"
+            exit 1
+          fi
+          echo "Releasing $PKG"
+
+      # The same gates CI runs. A release must not be the first time they run
+      # against this tree.
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm check:pkg
+      - run: pnpm test:repo
+
+      # Every tarball carries the source-available terms and the NOTICE for its
+      # Apache-2.0 dependencies, and declares the right licence field. A
+      # commercial package published under the scope's Apache-2.0 declaration
+      # cannot be unpublished into not having happened.
+      - name: Every tarball carries its licence
+        run: node scripts/verify-licenses.mjs
+
+      # `--access public` is about the registry's visibility of a scoped
+      # package, not about the terms: the packages are public to install and
+      # LICENSE.md says what may be done with them.
+      - name: Publish to npm with provenance
+        run: pnpm publish -r --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # A bill of materials for what actually ships, so a customer -- or an
+      # auditor -- can answer "what is in this" without resolving it themselves.
+      # --required-only because an SBOM for a released artefact should describe
+      # the artefact, not the workbench.
+      - name: Generate a CycloneDX SBOM
+        run: |
+          npx --yes @cyclonedx/cdxgen@12.8.4 \
+            --type javascript \
+            --required-only \
+            --output "formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json" \
+            --project-name formancy-data \
+            --project-version "${GITHUB_REF_NAME#v}" \
+            .
+          node -e "
+            const s = require('./formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json');
+            const purls = (s.components ?? []).map((c) => c.purl ?? '').join('\n');
+            // The drivers are what talks to a customer's database. An SBOM
+            // that omitted them would be worse than none, so the release stops here.
+            for (const driver of ['pkg:npm/postgres@', 'pkg:npm/mssql@']) {
+              if (!purls.includes(driver)) {
+                console.error('::error::SBOM is missing ' + driver);
+                process.exit(1);
+              }
+            }
+            console.log('SBOM: ' + String((s.components ?? []).length) + ' components');
+          "
+
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+
+      # Keyless: the signature is bound to this workflow's OIDC identity rather
+      # than to a private key somebody has to keep.
+      - name: Sign the SBOM
+        run: |
+          cosign sign-blob --yes \
+            --bundle "formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json.sigstore" \
+            "formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json"
+
+      # No container image yet: there is no server in this repository. When
+      # @formancy/data-server lands, its image is built, signed and attested
+      # here the way formancy.ai's is, and not carried between jobs.
+
+      # The body is this version's section, not the whole changelog. GitHub
+      # refuses a release body over 125,000 characters, and it refuses it HERE
+      # -- after the packages are on npm. The extractor throws when the version
+      # has no section, so an empty body fails loudly rather than quietly.
+      - name: The release body is this version's entry
+        run: node scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" RELEASE_NOTES.md
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          body_path: RELEASE_NOTES.md
+          files: |
+            formancy-data-*-sbom.cdx.json
+            formancy-data-*-sbom.cdx.json.sigstore
+          fail_on_unmatched_files: true

@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only, for every job. Nothing in this workflow writes to the repository:
+# the coverage upload authenticates with its own token and the caches are the
+# runner's. Without this the default token carries whatever the repository's
+# default is, and CodeQL says so, as a missing-workflow-permissions alert per
+# job.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # Longer than formancy.ai's twenty minutes, for one reason: the suites start
+    # a real SQL Server, and its image is close to a gigabyte and a half. The
+    # pull is cached by Docker between steps but not between runs.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      # corepack reads the packageManager field, so CI runs the exact pnpm
+      # version the repo pins rather than whatever the runner image ships.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+      - run: pnpm typecheck
+
+      # Runs the adapters against real PostgreSQL and real SQL Server, through
+      # testcontainers on the runner's Docker. There is no mocked driver in this
+      # repository and there is not going to be one (0003): database semantics
+      # are the product, and a suite that passed without a database would be
+      # proving the mock.
+      - run: pnpm test:coverage
+      # Skipped, visibly, while the repository has no CODECOV_TOKEN -- a new
+      # repository should not be red for a reason unrelated to its code. Once
+      # the secret exists the upload runs and a failed upload fails the job, as
+      # upstream: a report that silently did not arrive is a number nobody can
+      # read. A secret cannot be tested in `if:` directly, so it goes through
+      # the environment.
+      - name: Upload coverage to Codecov
+        if: env.CODECOV_TOKEN != ''
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+
+      # Packaging correctness (publint + attw) is a release gate, not a nicety:
+      # broken exports maps are the top cause of "doesn't work in my app".
+      - run: pnpm check:pkg
+
+      # Every tarball carries LICENSE.md and NOTICE and declares the
+      # source-available terms rather than the scope's Apache-2.0. On the pull
+      # request rather than only at release, which is the last possible moment
+      # to find out.
+      - run: node scripts/verify-licenses.mjs
+
+      # The repository's own guards: codecov.yml matches its generator, every
+      # CLA signature names the current text, upstream is depended on at exact
+      # versions. A guard that is not a gate is a comment.
+      - run: pnpm test:repo
+
+  # Every job above runs inside the workspace, against the tree it built from --
+  # and a workspace sibling resolves a package through a symlink to its SOURCE
+  # directory. So an exports map that is wrong for a real consumer can be right
+  # for every test in the repository. This packs the tarballs, installs them
+  # into a plain npm project, type-checks it with skipLibCheck OFF and runs it
+  # under Node. Its own job so that `verify` stays the fast signal and a red
+  # "install" says what is wrong.
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      # The tarballs are built output, so there is nothing to pack without this.
+      - run: pnpm build
+
+      - run: pnpm test:e2e:install

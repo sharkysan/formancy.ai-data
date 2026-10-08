@@ -1,0 +1,45 @@
+{
+  "name": "@formancy/data-core",
+  "version": "0.1.0",
+  "description": "The Formancy Data core: the database-neutral adapter port, and what every adapter has to agree on. No driver, no HTTP, no Node.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "test:coverage": "vitest run --coverage",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check:pkg": "publint && attw --pack . --profile esm-only"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "publint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "unrun": "^0.3.1",
+    "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sharkysan/formancy.ai-data.git",
+    "directory": "packages/data-core"
+  },
+  "homepage": "https://github.com/sharkysan/formancy.ai-data",
+  "bugs": "https://github.com/sharkysan/formancy.ai-data/issues"
+}
