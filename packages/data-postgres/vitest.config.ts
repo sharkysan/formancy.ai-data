@@ -1,15 +1,7 @@
-import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import { coverage } from '../../vitest.coverage'
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      // The built fixture, as a devDependency would resolve it. See tsconfig.json
-      // for why this is an alias today, and remove both together.
-      '@formancy/data-fixtures': fileURLToPath(new URL('../data-fixtures/dist/index.mjs', import.meta.url)),
-    },
-  },
   test: {
     coverage,
     include: ['src/**/*.test.ts'],
