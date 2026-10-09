@@ -16,8 +16,10 @@ operates without any AI dependency.
 > from a snapshot; values are checked exactly; access policy, lookup tokens and
 > the record port are defined. A page renders generated forms in React and
 > Angular side by side, and its suite holds the two to the same fields and
-> errors. Not yet: the adapters' record and lookup operations, the HTTP routes
-> that call them, and the studio. `CHANGELOG.md` says what each step found.
+> errors. Both adapters answer lookups and records; the server publishes forms
+> and serves them over HTTP, asking the policy every time and auditing every
+> request; and one suite runs that whole journey on both engines. Not yet: the
+> studio. `CHANGELOG.md` says what each step found.
 
 ## Licence, in one table
 

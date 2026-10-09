@@ -446,6 +446,12 @@ importers:
       '@formancy/data-core':
         specifier: workspace:*
         version: link:../data-core
+      '@formancy/data-postgres':
+        specifier: workspace:*
+        version: link:../data-postgres
+      '@formancy/data-sqlserver':
+        specifier: workspace:*
+        version: link:../data-sqlserver
       '@formancy/spec':
         specifier: 0.3.0
         version: 0.3.0
@@ -459,6 +465,9 @@ importers:
       '@arethetypeswrong/cli':
         specifier: 'catalog:'
         version: 0.18.5
+      '@formancy/data-fixtures':
+        specifier: workspace:*
+        version: link:../data-fixtures
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.5

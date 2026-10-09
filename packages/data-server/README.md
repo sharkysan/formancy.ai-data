@@ -24,6 +24,10 @@ existed would be documented and inert.
   bindings, its policy and the snapshot they came from, checked on publish and
   on every read: a hand-edited file is refused, not served
   ([0019](../../docs/decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)).
+- **`DRIVER_FACTORIES`** — one connection factory per engine, opening every
+  connection through the adapter package's own `connect…` function, so a host
+  embedding the server never builds a pool from another copy of a driver
+  ([0025](../../docs/decisions/0025-each-adapter-owns-its-driver.md)).
 - **`parseConnections` and `createConnectionRegistry`** — the allowlist of
   databases a form may bind to, with secret references for passwords, opened
   lazily through driver factories the composition root supplies.
@@ -53,7 +57,17 @@ FORMANCY_DATA_ATTRIBUTES=tenant=tid \
 node dist/main.mjs
 ```
 
-Every missing setting stops the process with a sentence naming it.
+Every missing setting stops the process with a sentence naming it. The planes
+are turned on by configuration:
+
+| Variable | Turns on |
+| --- | --- |
+| `FORMANCY_DATA_STORE_DIR` and `FORMANCY_DATA_CONNECTIONS` | The runtime plane: published forms, records, lookups. The connections file is the allowlist (JSON); passwords in it are `env:` or `file:` references. |
+| `FORMANCY_DATA_ADMIN_ROLES` | The administrator's plane, for tokens holding one of these comma-separated roles. Needs the two above. |
+| `FORMANCY_DATA_AUDIT_KEY` | Records named in the audit trail by a keyed hash. A secret reference. Without it, no record is named. |
+
+Without the store and the allowlist the server verifies tokens and nothing
+else, which is how a host is wired in before any form exists.
 
 ## Licence
 

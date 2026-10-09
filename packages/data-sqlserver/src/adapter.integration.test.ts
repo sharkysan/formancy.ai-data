@@ -4,6 +4,7 @@ import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { DatabaseAdapter } from '@formancy/data-core'
 import { createSqlServerAdapter } from './adapter.js'
+import { connectSqlServer } from './connect.js'
 
 /**
  * Against REAL SQL Server. There is no mocked driver here and there is not
@@ -53,5 +54,32 @@ describe('the SQL Server adapter', () => {
   test('close is safe to call twice', async () => {
     await adapter.close()
     await expect(adapter.close()).resolves.toBeUndefined()
+  })
+})
+
+describe('connectSqlServer', () => {
+  // The pool this package opens and the parameter types it binds must come
+  // from one copy of mssql; a pool from another copy refuses every parameter.
+  // Discovery binds parameters, so a discovery through a pool opened here is
+  // the proof.
+  test('opens a pool its own adapters can bind parameters on', async () => {
+    const { startSqlServerFixture } = await import('@formancy/data-fixtures')
+    const fixture = await startSqlServerFixture()
+    try {
+      const pool = await connectSqlServer({
+        host: String(fixture.admin.server),
+        port: Number(fixture.admin.port),
+        database: String(fixture.admin.database),
+        user: String(fixture.admin.user),
+        password: String(fixture.admin.password),
+        encrypt: false,
+        trustServerCertificate: true,
+      })
+      const snapshot = await createSqlServerAdapter(pool).discover({ schemas: ['sales'] })
+      expect(snapshot.objects.length).toBeGreaterThan(0)
+      await pool.close()
+    } finally {
+      await fixture.stop()
+    }
   })
 })

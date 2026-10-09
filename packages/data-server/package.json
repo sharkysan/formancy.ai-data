@@ -25,12 +25,15 @@
   "dependencies": {
     "@fastify/rate-limit": "^11.2.0",
     "@formancy/data-core": "workspace:*",
+    "@formancy/data-postgres": "workspace:*",
+    "@formancy/data-sqlserver": "workspace:*",
     "@formancy/spec": "0.3.0",
     "fastify": "^5.12.5",
     "jose": "^6.2.12"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",
+    "@formancy/data-fixtures": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "publint": "catalog:",
