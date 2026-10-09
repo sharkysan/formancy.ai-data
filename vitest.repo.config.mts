@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config'
+import { reporters } from './vitest.results'
 
 /**
  * The repository's own guards: checks on the files that describe the repository
@@ -11,6 +12,7 @@ import { defineConfig } from 'vitest/config'
  */
 export default defineConfig({
   test: {
+    reporters,
     include: ['scripts/**/*.test.mjs'],
   },
 })

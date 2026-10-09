@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ColumnAccess, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { accessDisagreements, FIXTURE_SCOPE, renamedColumn, startSqlServerFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
+import { accessDisagreements, covers, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startSqlServerFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
 import { discoverSqlServer } from './index.js'
 
 /**
@@ -172,7 +172,7 @@ describe('what a snapshot says an account may do', () => {
   // gap: the role-held database grant lists every policy, so customer's
   // APPLIES and the rest are established as none. A privilege that counted
   // only grants made to the user itself would report nothing here.
-  test('the writer agrees with WRITER_ACCESS, with no gap, through a role', async () => {
+  test('the writer agrees with WRITER_ACCESS, with no gap, through a role', covers('sqlserver', MODEL_CASES.writerAccess), async () => {
     const writer = await connect(fixture.writer)
     const snapshot = await discoverSqlServer(writer, FIXTURE_SCOPE)
     expect(accessDisagreements(snapshot, WRITER_ACCESS)).toEqual([])

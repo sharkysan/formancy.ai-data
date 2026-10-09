@@ -16,7 +16,7 @@ import type {
   UpdateRequest,
 } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { DISPLAY_PARITY, FILTER_PARITY, PARITY_SCOPE, REFUSAL_PARITY, startPostgresFixture } from '@formancy/data-fixtures'
+import { covers, DISPLAY_PARITY, displayCase, FILTER_PARITY, filterCase, PARITY_SCOPE, REFUSAL_PARITY, refusalCase, startPostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -127,7 +127,7 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
       // would ignore the space and select all four rows; refused, no SQL is
       // built. And a term that reaches the adapter by hand is thrown before
       // anything is sent.
-      test(`${entry.column} = '${entry.value}' is refused before any SQL is built`, async () => {
+      test(`${entry.column} = '${entry.value}' is refused before any SQL is built`, covers('postgres', filterCase(entry)), async () => {
         const scoping = scopeRowFilters(objectOf('tenant_item'), [{ column: entry.column, value: entry.value }], 'parity')
         expect(scoping).toMatchObject({ ok: false, code: entry.refused })
         const forged = { kind: 'restricted', equal: [{ column: entry.column, type: col('tenant_item', entry.column).type, value: entry.value }] } as unknown as RowFilters
@@ -144,7 +144,7 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
     // Server, comparing differently, disagreed. Every path a filter scopes is
     // run: the lookup's page, its resolve and its membership, a read and an
     // update.
-    test(`${entry.column} = '${entry.value}' selects exactly ${String(entry.keys.length)} named row(s), in every operation`, async () => {
+    test(`${entry.column} = '${entry.value}' selects exactly ${String(entry.keys.length)} named row(s), in every operation`, covers('postgres', filterCase(entry)), async () => {
       const filters = scoped(entry.column, entry.value)
       const expected = new Set(entry.keys.map((key) => tokenOf(...key)))
       const named = NAMED.map((key) => tokenOf(...key))
@@ -324,7 +324,7 @@ describe('a label is spelled once, from the canonical value (DISPLAY_PARITY)', (
   // the real 1234567.875 reads 1.23457e+06 at 0. The setting is a string:
   // postgres.js drops a startup parameter whose value is falsy, so `0` as a
   // number never reached the server, and the session is asked what it has.
-  test('every kind reads as the shared label, whatever TimeZone, DateStyle and float digits the session has', async () => {
+  test('every kind reads as the shared label, whatever TimeZone, DateStyle and float digits the session has', covers('postgres', ...Object.keys(DISPLAY_PARITY).map(displayCase)), async () => {
     const configured = postgres(fixture.admin, {
       onnotice: () => {},
       connection: { TimeZone: 'America/New_York', extra_float_digits: '0', DateStyle: 'SQL, DMY' },
@@ -361,7 +361,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
   // A trigger's RAISE was `check-violation`, which claims a constraint the
   // form could have checked and names none. It is the database refusing by a
   // rule of its own, and the same request will be refused again.
-  test("a trigger's own error is refused, on insert and on update, and nothing is written", async () => {
+  test("a trigger's own error is refused, on insert and on update, and nothing is written", covers('postgres', refusalCase('guardedInsert'), refusalCase('guardedUpdate')), async () => {
     expect(failed(await insertGuarded(owner, '1', 'refuse')).code).toBe(REFUSAL_PARITY.guardedInsert)
     expect(await guardedRows(1)).toEqual([])
     await owner`insert into parity.guarded (id, note) values (2, 'fine')`
@@ -380,7 +380,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
   // SQLSTATE 38000 has no meaning this adapter knows (C11). It was
   // `unavailable`, which invites the person to try again; it will be
   // refused again.
-  test('an error the adapter does not recognise is refused, not unavailable', async () => {
+  test('an error the adapter does not recognise is refused, not unavailable', covers('postgres', refusalCase('oddInsert')), async () => {
     const outcome = failed(await insertGuarded(owner, '3', 'odd'))
     expect(outcome.code).toBe(REFUSAL_PARITY.oddInsert)
     // The SQLSTATE is named; the trigger's own message, which could quote a value, is not.
@@ -391,7 +391,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
 
   // INSERT 0 0 with no error: taken as success it was a save that never
   // happened; as `check-violation` it claimed a constraint.
-  test('an insert a trigger declines without an error is refused, and nothing is written', async () => {
+  test('an insert a trigger declines without an error is refused, and nothing is written', covers('postgres', refusalCase('declinedInsert')), async () => {
     const outcome = await createPostgresRecords(owner).insert({
       target: { table: { schema: 'parity', name: 'declined' }, identity: [col('declined', 'id')], concurrency: null },
       values: [val('declined', 'id', '1'), val('declined', 'note', 'never written')],
@@ -403,7 +403,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
 
   // 428C9: the column has become generated since the bindings were made,
   // which is drift, as SQL Server's 544 is.
-  test('an insert naming a generated identity is schema-changed', async () => {
+  test('an insert naming a generated identity is schema-changed', covers('postgres', refusalCase('generatedInsert')), async () => {
     const outcome = await createPostgresRecords(owner).insert({
       target: { table: { schema: 'parity', name: 'generated' }, identity: [col('generated', 'id')], concurrency: null },
       values: [val('generated', 'id', '1'), val('generated', 'note', 'named the identity')],
@@ -419,7 +419,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
   // victim every time; and the holder asks for row 1 only once the adapter's
   // update is seen blocked on row 2, never after a timer, which raced on SQL
   // Server.
-  test('a deadlock victim is unavailable, and its row is unchanged', async () => {
+  test('a deadlock victim is unavailable, and its row is unchanged', covers('postgres', refusalCase('deadlockVictim')), async () => {
     const holder = postgres(fixture.admin, { max: 1, onnotice: () => {}, connection: { deadlock_timeout: '10s' } })
     const CONTENDED = versioned('contended', ['id'])
     try {

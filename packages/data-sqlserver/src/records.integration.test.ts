@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ApiValue, MetadataSnapshot, ObjectMeta, ObjectRef, RecordAdapter, RecordColumn, RecordOutcome, RecordTarget, RecordValue, RowFilters, RowFilterType, UpdateRequest } from '@formancy/data-core'
 import { codecFor, findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT, startSqlServerFixture } from '@formancy/data-fixtures'
+import { covers, EDGE_VALUES, edgeCase, FIRST_SHIPMENT, SECOND_SHIPMENT, shipmentCase, startSqlServerFixture } from '@formancy/data-fixtures'
 import { createSqlServerRecords, discoverSqlServer } from './index.js'
 
 /**
@@ -227,7 +227,7 @@ describe('reading a record', () => {
   // binary floating point would make 0.30000000000000004. Read through the
   // driver's own parsing, the amount becomes 100000000000000 and the date
   // midnight UTC (the spike); converted to text by the server, none moves.
-  test('every edge value reads back exactly, as its codec spells it', async () => {
+  test('every edge value reads back exactly, as its codec spells it', covers('sqlserver', edgeCase('beyondSafeInteger'), edgeCase('largestAmount'), edgeCase('orderDate'), edgeCase('largestCreditLimit'), edgeCase('smallestCreditLimit'), edgeCase('computedLineTotal')), async () => {
     const records = createSqlServerRecords(owner)
     const order = ok(await readOrder(records))
     expect(order.values).toEqual({
@@ -807,7 +807,7 @@ describe('the column facts the engines disagree on', () => {
   // first shipment's dispatched_at as '…56', its half second cut off, and its
   // temperature as 0.10000000149011612, the double its 32 bits are, where
   // PostgreSQL reads '…56.5' and 0.1: the same row, two answers.
-  test('the shipments read back exactly as both adapters must return them', async () => {
+  test('the shipments read back exactly as both adapters must return them', covers('sqlserver', shipmentCase('first'), shipmentCase('second'), edgeCase('largestSmallint'), edgeCase('localTimestamp'), edgeCase('localTimestampWholeSecond')), async () => {
     const records = createSqlServerRecords(owner)
     const read = async (id: string) =>
       ok(await records.read({ target: target(SHIPMENT), key: [valueOf(SHIPMENT, 'id', id)], columns: readable(SHIPMENT), filters: tenant('1') }))

@@ -1,6 +1,6 @@
 # 0032 — A clean install is the composed stack behind one proxy, and CI runs its guide
 
-- **Status:** accepted
+- **Status:** accepted; its CI jobs -- `getting-started`, and `container`, which checks the store's directory -- run in `gates.yml`, which `ci.yml` and `release.yml` both call, before the release's `check` and `publish` jobs, and `getting-started` records what each composed database answered for the release report, extended by [0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md)
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

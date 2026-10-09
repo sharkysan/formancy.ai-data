@@ -1,7 +1,7 @@
 import { buildLookupConfig, encodeKeyToken, generateForm } from '@formancy/data-core'
 import type { LookupConfig, LookupOptions, LookupQuery, MetadataSnapshot, ObjectRef, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { EDGE_VALUES, startPostgresFixture } from '@formancy/data-fixtures'
+import { covers, EDGE_VALUES, edgeCase, startPostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -334,7 +334,7 @@ describe('membership', () => {
   // The fixture's order id is 2^53 + 1. A key that went through a JavaScript
   // number would be 2^53 and name no row, or the neighbouring one. This one
   // runs as the restricted reader, who may read sales.order.
-  test('offers, resolves and accepts a bigint key past 2^53 exactly, as the restricted reader', async () => {
+  test('offers, resolves and accepts a bigint key past 2^53 exactly, as the restricted reader', covers('postgres', edgeCase('beyondSafeInteger'), edgeCase('orderDate')), async () => {
     const config = lookupOver(sales, { schema: 'sales', name: 'order_line' }, 'fk_order_line_order', ['order_date'])
     const lookups = createPostgresLookups(reader)
     const token = tokenOf(EDGE_VALUES.beyondSafeInteger)

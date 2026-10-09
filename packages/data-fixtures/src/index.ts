@@ -1,7 +1,19 @@
 export { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
 export type { ExpectedAccess, ExpectedCapability, ExpectedObjectAccess, ExpectedObjectFacts } from './access.js'
-export { POSTGRES_IMAGE, READER, SQLSERVER_DATABASE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
-export type { PostgresFixture, SqlServerFixture } from './containers.js'
+export { displayCase, edgeCase, filterCase, covers, MODEL_CASES, refusalCase, sharedCases, shipmentCase } from './cases.js'
+export {
+  DEFAULT_IMAGES,
+  POSTGRES_IMAGE,
+  READER,
+  SQLSERVER_DATABASE,
+  SQLSERVER_IMAGE,
+  startPostgresContainer,
+  startPostgresFixture,
+  startSqlServerContainer,
+  startSqlServerFixture,
+  WRITER,
+} from './containers.js'
+export type { PostgresFixture, SqlServerFixture, StartedServer } from './containers.js'
 export { restrictedDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'
 export { readFixture, splitBatches } from './load.js'
 export type { FixtureFile } from './load.js'
@@ -21,3 +33,9 @@ export { renamedColumn } from './rename.js'
 export { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 export { answerBytes, startTcpHop } from './tcp-hop.js'
 export type { LostAnswer, TcpHop } from './tcp-hop.js'
+export type { ServerAnswer, ServerRecord } from './servers.js'
+// For a suite that starts its own container through startPostgresContainer or
+// startSqlServerContainer and keeps it in a typed variable, without declaring
+// testcontainers itself (0035).
+export type { StartedMSSQLServerContainer } from '@testcontainers/mssqlserver'
+export type { StartedPostgreSqlContainer } from '@testcontainers/postgresql'

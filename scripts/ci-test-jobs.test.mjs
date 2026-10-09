@@ -3,25 +3,16 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import { coveredPackages } from './codecov-config.mjs'
+import { readWorkflow, testMatrix } from './release-report/workflows.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /**
- * The `test` job's matrix as `.github/workflows/ci.yml` writes it: one
- * flow-style line of quoted names, `package: ['@formancy/a', '@formancy/b']` --
- * quoted because YAML cannot start a plain value with `@`. Read as text because
- * the repository has no YAML parser and the line is kept that shape for this
- * guard; a second such line, or none, is a failure rather than a guess.
+ * The `test` job's matrix as `.github/workflows/gates.yml` lists it, which
+ * ci.yml and release.yml both run (0035), read with `yaml` as the report reads
+ * it: the list the report expects a results artefact per package from.
  */
-function matrix() {
-  const ci = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8')
-  const lines = [...ci.matchAll(/^\s+package: \[([^\]]*)\]\s*$/gm)]
-  if (lines.length !== 1) throw new Error(`ci.yml has ${String(lines.length)} "package: [...]" matrix lines; the guard reads exactly one`)
-  return lines[0][1]
-    .split(',')
-    .map((name) => name.trim().replace(/^'(.*)'$/, '$1'))
-    .filter((name) => name !== '')
-}
+const matrix = () => testMatrix(readWorkflow(root))
 
 /** Every workspace package with a coverage suite, by its npm name. */
 function packagesWithSuites() {

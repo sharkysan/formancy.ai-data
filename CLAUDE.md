@@ -370,17 +370,36 @@ the built server's code. The dev servers and the snapshot captures are in
 
 ## Checks before pushing
 
-CI runs `pnpm build`, `pnpm typecheck`, `pnpm check:pkg`,
+The gates are `.github/workflows/gates.yml`, which `ci.yml` calls on every
+pull request and `release.yml` calls before it publishes, so a release passes
+exactly what CI does. It runs `pnpm build`, `pnpm typecheck`, `pnpm check:pkg`,
 `node scripts/verify-licenses.mjs` and `pnpm test:repo` in one job; each
 package's `test:coverage` in a job of its own, on its own runner, because nine
 suites sharing one runner timed out a test that takes two seconds alone
 (`scripts/ci-test-jobs.test.mjs` fails when that list and the workspace
-disagree); in jobs of their own `pnpm test:e2e:install` and
-`pnpm test:browser`; and `pnpm test:getting-started` in the
+disagree); in jobs of their own `pnpm test:e2e:install`, `pnpm test:browser`
+and the server image; and `pnpm test:getting-started` in the
 `getting-started` job, run once with the runner's Compose and once with the
-oldest release `docs/getting-started.md` names, which `release.yml` runs too
-before it publishes. Locally `pnpm test:coverage` still runs every package's
-suite. Run the ones for what you changed.
+oldest release `docs/getting-started.md` names. The last job, `report`,
+builds the release report from what every other job found
+([0035](docs/decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md))
+and fails the run when a job ended other than success or left no results, a
+test or a file was skipped or failed, a shared case passed through one
+adapter only, an engine's default image never answered, or two builds of one
+package differ; `scripts/release-report/workflows.test.mjs` holds the three
+workflows to that shape. Locally `pnpm test:coverage` still runs every
+package's suite. Run the ones for what you changed.
+
+Two things `pnpm test:repo` fails on until you do them. After a dependency
+or an image changes, `node scripts/release-report/readme.mjs --write`, so the
+README's *What it is tested on* blocks say what is installed. A new decision
+record needs its entry in `docs/release/limitations.json` -- the costs a user,
+integrator or operator meets, or why it has none -- and an edited one, a
+Status line naming a later record included, a re-read and
+`node scripts/release-report/limitations.mjs --stamp NNNN`. And a test that
+asserts a shared case declares it with `covers()`, or the report fails the
+run with that case missing on that engine. [`docs/release/`](docs/release/README.md)
+says how, and how to build a report on one machine.
 
 `test:getting-started` runs `docs/getting-started.md` as written -- its own
 `docker compose` commands, from the checkout, with Node and Docker and

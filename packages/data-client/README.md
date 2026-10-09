@@ -93,8 +93,8 @@ handlers are checked against the same declarations.
   page, when the connection it reused closed before any answer; the server
   answers that copy with the first one's answer instead of applying it
   twice (0031). The client itself still never sends anything again.
-- **Field problems are sentences.** The 0.3.0 renderers print an error entry
-  as it is, beside the field and in the error summary, so `fieldProblems`
+- **Field problems are sentences.** The 0.3.0 renderers, as observed on
+  2026-10-09, print an error entry as it is, beside the field and in the error summary, so `fieldProblems`
   hands them the server's sentence, which never echoes a value. The code
   stays on the refusal for a program.
 
@@ -160,7 +160,7 @@ to update asks under update's filter without a new application.
   write id, in its process only: a copy that reaches another replica is
   applied again.
 - **`hasMore` and `omitted` do not reach the person.** A renderer's 0.3.0
-  option contract is a list of `{ value, label }`, so a list of exactly one
+  option contract, as read on 2026-10-09, is a list of `{ value, label }`, so a list of exactly one
   page looks complete. A typeahead keeps narrowing; a plain select does not.
 - **Records are addressed by token only.** The definition does not name the
   identity columns, so a host keeps the tokens that create, read and lookups

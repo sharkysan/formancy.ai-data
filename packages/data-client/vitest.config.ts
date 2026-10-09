@@ -1,8 +1,10 @@
 import { defineConfig } from 'vitest/config'
 import { coverage } from '../../vitest.coverage'
+import { reporters } from '../../vitest.results'
 
 export default defineConfig({
   test: {
+    reporters,
     // The test plane is support, not the package: it is never built, and
     // counting it would report the harness's coverage as the client's.
     coverage: { ...coverage, exclude: [...(coverage.exclude ?? []), 'src/test-*.ts'] },

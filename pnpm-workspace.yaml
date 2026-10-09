@@ -49,6 +49,11 @@ catalog:
   "@arethetypeswrong/cli": ^0.18.5
   "@types/node": ^22.10.0
 
+  # The repository's guards and the release report read YAML: the workflows,
+  # compose.yaml's services and CI's setup-node versions (0035). Already in
+  # the lockfile through vite.
+  yaml: ^2.9.1
+
   # Database behaviour is proved against real servers, never mocks (0003).
   # One version for the family, so the two adapters start containers the same way.
   testcontainers: ^12.1.0

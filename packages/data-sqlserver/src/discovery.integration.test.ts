@@ -5,8 +5,10 @@ import { findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
 import {
   accessDisagreements,
+  covers,
   FIXTURE_MODEL,
   FIXTURE_SCOPE,
+  MODEL_CASES,
   READER_ACCESS,
   restrictedDisagreements,
   snapshotDisagreements,
@@ -93,7 +95,7 @@ describe('discovery as the owner', () => {
   // on every column, and row security that APPLIES to customer: SQL Server
   // exempts nobody from an enabled policy, dbo included, so an adapter that
   // reasoned "the owner sees everything" would miss the one that binds it.
-  test('reports the fixture exactly as the model says, with nothing hidden', async () => {
+  test('reports the fixture exactly as the model says, with nothing hidden', covers('sqlserver', MODEL_CASES.owner), async () => {
     const snapshot = await discoverSqlServer(owner, FIXTURE_SCOPE)
     expect(snapshotDisagreements(snapshot)).toEqual([])
     expect(object(snapshot, 'sales', 'customer').rowSecurity).toBe('applies')
@@ -477,7 +479,7 @@ describe('discovery as the restricted reader', () => {
   // may be hidden), the schema's object list, and sales.order's definitions.
   // The schema gap is about the schema, not the scope: a drift review placing
   // a missing table needs to know which schema could not be listed (0027).
-  test('says what it could not see, and nothing else is missing', async () => {
+  test('says what it could not see, and nothing else is missing', covers('sqlserver', MODEL_CASES.restricted, MODEL_CASES.readerAccess), async () => {
     const snapshot = await discoverSqlServer(reader, FIXTURE_SCOPE)
     expect(restrictedDisagreements(snapshot)).toEqual([])
     expect(accessDisagreements(snapshot, READER_ACCESS)).toEqual([])
@@ -595,7 +597,7 @@ describe('discovery as the restricted reader', () => {
   // are unknown, behind one scope gap -- never "none", which is what 0007's
   // schema-level minimum would report for a table a policy it cannot see
   // filters (B10b).
-  test('VIEW DEFINITION on the schema, without SELECT, describes every object and cannot settle row security', async () => {
+  test('VIEW DEFINITION on the schema, without SELECT, describes every object and cannot settle row security', covers('sqlserver', MODEL_CASES.structure), async () => {
     const viewer = await connectAs('formancy_viewer', 'grant view definition on schema::sales to formancy_viewer')
     try {
       const snapshot = await discoverSqlServer(viewer, FIXTURE_SCOPE)
@@ -618,7 +620,7 @@ describe('discovery as the restricted reader', () => {
   // If it were not enough, every customer following the documentation would
   // get gaps; if SELECT were also needed, the documentation would be asking
   // for more than discovery uses.
-  test('VIEW DEFINITION on the database, without SELECT, sees everything the owner sees and settles row security', async () => {
+  test('VIEW DEFINITION on the database, without SELECT, sees everything the owner sees and settles row security', covers('sqlserver', MODEL_CASES.structure), async () => {
     const viewer = await connectAs('formancy_db_viewer', 'grant view definition to formancy_db_viewer')
     try {
       const snapshot = await discoverSqlServer(viewer, FIXTURE_SCOPE)

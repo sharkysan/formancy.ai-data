@@ -1,0 +1,546 @@
+name: Gates
+
+# The gates every change and every release passes, in one place (0035):
+# ci.yml calls this on every pull request and every push to main, and
+# release.yml calls it before anything is published, so a release's gate is
+# CI's by construction and its report describes its own run. Every job but
+# the last ends by collecting what it found into one results file and
+# uploading it as `release-results-<key>`; the `report` job builds the
+# release report from all of them and fails the run on anything its
+# `problems` list (scripts/release-report/report.mjs).
+#
+# A release runs code from here with its own permissions, so third-party
+# actions are pinned to commit hashes, with the tag in a comment, under
+# release.yml's rule; scripts/release-report/workflows.test.mjs fails on one
+# that is not.
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: "'' for CI, the tag for a release, dry-run for a rehearsal"
+        type: string
+        default: ''
+    secrets:
+      # Passed by ci.yml and never by release.yml, so a release never uploads
+      # coverage and holds no secret while it runs the gates.
+      CODECOV_TOKEN:
+        required: false
+
+# Read-only, for every job. Nothing in this workflow writes to the repository:
+# the coverage upload authenticates with its own token, the caches are CI's
+# alone and the artefacts the run's. Without this the default token carries
+# whatever the repository's default is, and CodeQL says so, as a
+# missing-workflow-permissions alert per job.
+permissions:
+  contents: read
+
+jobs:
+  # Build, types, packaging, licences and the repository's own guards: the
+  # fast signal. The suites run in the `test` job below, one package per runner.
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # corepack reads the packageManager field, so CI runs the exact pnpm
+      # version the repo pins rather than whatever the runner image ships.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      # CI only. A tag's run may restore a cache a main-branch run saved, and
+      # a cache holds whatever code that job ran left in the store; a release
+      # or a rehearsal installs from the registry against the lockfile
+      # instead, in every job here (workflows.test.mjs).
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+      - run: pnpm typecheck
+
+      # Packaging correctness (publint + attw) is a release gate, not a nicety:
+      # broken exports maps are the top cause of "doesn't work in my app".
+      - run: pnpm check:pkg
+
+      # Every tarball carries LICENSE.md and NOTICE and declares the
+      # source-available terms rather than the scope's Apache-2.0. On the pull
+      # request rather than only at release, which is the last possible moment
+      # to find out.
+      - run: node scripts/verify-licenses.mjs
+
+      # The repository's own guards: codecov.yml matches its generator, every
+      # CLA signature names the current text, upstream is depended on at exact
+      # versions, no source file is past the 600-line budget, the `test`
+      # job's matrix names every package with a suite, these workflows keep
+      # the shape the release depends on, and the release report's registers
+      # hold. A guard that is not a gate is a comment.
+      - run: pnpm test:repo
+
+      # What this job found, for the report: the guards' results and the
+      # dist/ of every published package it built. Even when a step above
+      # failed, so the report says what failed rather than that nothing came.
+      # Every upload here overwrites: a job run again replaces its own earlier
+      # attempt's artefact, which v4 would otherwise refuse by name, and no two
+      # jobs share a key (workflows.test.mjs), so it never replaces another's.
+      - name: Keep what this job found, for the report
+        id: collect
+        if: ${{ !cancelled() }}
+        run: node scripts/release-report/collect.mjs --job verify
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: release-results-${{ steps.collect.outputs.key }}
+          path: release-results/
+          if-no-files-found: error
+          overwrite: true
+
+  # Every package's suite, each in a job of its own on its own runner. They
+  # ran as one `pnpm test:coverage` in `verify` until nine suites at once --
+  # five of them starting PostgreSQL and SQL Server, three mounting Angular and
+  # React into jsdom -- shared one four-CPU runner: on main (run 37940021594)
+  # data-core's pure suite took 51 s, the studio's 235 s, and a studio test
+  # that runs in 2 s locally passed its 60 s limit. Raising limits one test at
+  # a time was chasing the contention; a runner per suite removes it.
+  # scripts/ci-test-jobs.test.mjs fails when this list and the workspace's
+  # packages with a `test:coverage` script disagree, so a new package cannot
+  # go untested in CI by being left off it.
+  #
+  # The suites run the adapters against real PostgreSQL and real SQL Server,
+  # through testcontainers on the runner's Docker. There is no mocked driver in
+  # this repository and there is not going to be one (0003): database
+  # semantics are the product, and a suite that passed without a database
+  # would be proving the mock.
+  test:
+    name: test (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    # The suites start a real SQL Server, and its image is close to a gigabyte
+    # and a half; the pull is not cached between runs.
+    timeout-minutes: 25
+    strategy:
+      # Every suite reports, rather than the first failure cancelling the rest.
+      fail-fast: false
+      matrix:
+        package: ['@formancy/data-core', '@formancy/data-fixtures', '@formancy/data-postgres', '@formancy/data-sqlserver', '@formancy/data-server', '@formancy/data-client', '@formancy/data-examples', '@formancy/data-studio', '@formancy/data-host']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      # turbo builds what the package depends on first (`^build`), then runs
+      # its suite and nothing else's. `--force` makes "this job did not replay
+      # a cached result" a property of the command rather than an accident of
+      # a fresh runner; `--summarize` writes the task's own start and end,
+      # which the report shows as its wall time. The package reaches the
+      # command through the environment, never through `${{ }}` in the script.
+      - run: pnpm exec turbo run test:coverage --filter="$PACKAGE" --force --summarize
+        env:
+          PACKAGE: ${{ matrix.package }}
+      # Skipped, visibly, while the repository has no CODECOV_TOKEN -- a new
+      # repository should not be red for a reason unrelated to its code -- and
+      # in every release, which passes no secret. Once the secret exists the
+      # upload runs and a failed upload fails the job, as upstream: a report
+      # that silently did not arrive is a number nobody can read. Each job
+      # uploads its own package's report; Codecov merges them by commit. A
+      # secret cannot be tested in `if:` directly, so it goes through the
+      # environment.
+      - name: Upload coverage to Codecov
+        if: env.CODECOV_TOKEN != ''
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        # The commit v7 named when it was pinned, read from the action's repository on 2026-10-09.
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+
+      - name: Keep what this job found, for the report
+        id: collect
+        if: ${{ !cancelled() }}
+        run: node scripts/release-report/collect.mjs --job test --package "$PACKAGE"
+        env:
+          PACKAGE: ${{ matrix.package }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: release-results-${{ steps.collect.outputs.key }}
+          path: release-results/
+          if-no-files-found: error
+          overwrite: true
+
+  # What jsdom cannot see on the examples page, in the studio and on the host
+  # page, measured in Chromium: no sideways scroll down to 320px, the keyboard
+  # path through the skip link, colour contrast and target size -- on the
+  # examples clean and after a failed submit (0021), in the studio at every
+  # step of the journey against the real server, with the preview's paper kept
+  # free of the studio's rules (0024), and on the host page at every state of a
+  # load, a save, a stale save and a refused selection, with the focus where
+  # each leaves it and both papers free of the host's rules (0029). jsdom
+  # applies no CSS and performs no layout, so every one of those was a hand
+  # check until this job.
+  #
+  # The host page's gate starts PostgreSQL through testcontainers on the
+  # runner's Docker, which ubuntu-latest has: what the page shows after a save
+  # is the database's answer, and there is no mocked driver (0003). PostgreSQL
+  # only -- layout, focus and colour do not depend on the engine.
+  #
+  # Its own job, as formancy.ai's is: "browser" says what is wrong, where a red
+  # "verify" sends the reader into a twenty-minute log to find out.
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      # Cached by the lockfile, which pins the playwright version the browser
+      # revision is tied to; in CI only, as the store is.
+      - name: Cache the Chromium download
+        uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      # No `--with-deps`, for upstream's reason: it runs apt-get for libraries
+      # the hosted runner already ships, and on formancy.ai that once sat for
+      # nineteen minutes until the job timed out. If a library is ever missing,
+      # Chromium fails to launch and the gate prints the command to run. The
+      # step timeout is the backstop.
+      - run: pnpm --filter @formancy/data-examples exec playwright install chromium
+        timeout-minutes: 5
+
+      # Builds the page first (turbo's `dependsOn`), then measures it.
+      - run: pnpm test:browser
+
+      - name: Keep what this job found, for the report
+        id: collect
+        if: ${{ !cancelled() }}
+        run: node scripts/release-report/collect.mjs --job browser
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: release-results-${{ steps.collect.outputs.key }}
+          path: release-results/
+          if-no-files-found: error
+          overwrite: true
+
+  # Every job above runs inside the workspace, against the tree it built from --
+  # and a workspace sibling resolves a package through a symlink to its SOURCE
+  # directory. So an exports map that is wrong for a real consumer can be right
+  # for every test in the repository. This packs the tarballs, installs them
+  # into a plain npm project, type-checks it with skipLibCheck OFF and runs it
+  # under Node. Its own job so that `verify` stays the fast signal and a red
+  # "install" says what is wrong.
+  #
+  # The tarballs it packed, installed and ran are kept as the artefact
+  # `release-tarballs`: they are what a release publishes, byte for byte
+  # (0035), so npm never receives a tarball no gate installed.
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      # The tarballs are built output, so there is nothing to pack without this.
+      - run: pnpm build
+
+      - run: node scripts/install-test.mjs --keep-tarballs release-tarballs
+
+      - name: Keep what this job found, for the report
+        id: collect
+        if: ${{ !cancelled() }}
+        run: node scripts/release-report/collect.mjs --job install
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: release-results-${{ steps.collect.outputs.key }}
+          path: release-results/
+          if-no-files-found: error
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-tarballs
+          path: release-tarballs/
+          if-no-files-found: error
+          overwrite: true
+
+  # The image is the product for a self-hoster, and nothing else here touches
+  # it. src/dockerfile.test.ts catches a workspace package the COPY list forgot;
+  # this catches everything it cannot -- a file the runtime stage drops, a
+  # module that resolves in the workspace and not in the deployed tree. formancy's
+  # image once built cleanly, passed every test, and exited on startup with
+  # ERR_MODULE_NOT_FOUND; this job exists so that is found here instead.
+  #
+  # Node and nothing else installed, for the collect step: what the report
+  # says of this image is labelled as the gate's image, never the published
+  # one, which the release builds again and names by digest.
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build the server image
+        run: docker build -f packages/data-server/Dockerfile -t formancy/data-server:ci .
+
+      - name: Unconfigured, it refuses with a sentence rather than starting
+        run: |
+          output=$(docker run --rm formancy/data-server:ci 2>&1 || true)
+          echo "$output"
+          if echo "$output" | grep -q 'ERR_MODULE_NOT_FOUND\|Cannot find module'; then
+            echo "::error::The image is missing a module at runtime. The build said nothing."
+            exit 1
+          fi
+          if ! echo "$output" | grep -q 'FORMANCY_DATA_IDENTITY_SECRET'; then
+            echo "::error::An unconfigured server did not name the setting it needs."
+            exit 1
+          fi
+
+      - name: Configured, it serves health and refuses an unauthenticated request
+        run: |
+          docker run -d --name data-server -p 127.0.0.1:4390:4390 \
+            -e FORMANCY_DATA_ISSUER=https://host.example \
+            -e FORMANCY_DATA_AUDIENCE=formancy-data \
+            -e FORMANCY_DATA_IDENTITY_SECRET=env:HOST_SECRET \
+            -e HOST_SECRET=a-shared-secret-of-at-least-thirty-two-bytes \
+            formancy/data-server:ci
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4390/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:4390/health || { docker logs data-server; exit 1; }
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4390/v1/whoami)
+          if [ "$status" != "401" ]; then
+            echo "::error::whoami without a token answered $status, expected 401"
+            exit 1
+          fi
+          # Unprivileged, and carrying its licence.
+          test "$(docker exec data-server id -un)" = "node"
+          docker exec data-server test -f /app/LICENSE.md
+          # The store's directory is the server's own to write. Docker gives a
+          # new named volume the owner of the image directory it is mounted
+          # on, so without the Dockerfile's mkdir and chown a composed
+          # stack's first publish fails (0032).
+          docker exec data-server test -w /var/lib/formancy-data || {
+            echo "::error::/var/lib/formancy-data is not writable by the server's user"
+            exit 1
+          }
+          docker rm -f data-server
+
+      - name: Keep what this job found, for the report
+        id: collect
+        if: ${{ !cancelled() }}
+        run: node scripts/release-report/collect.mjs --job container --image formancy/data-server:ci
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: release-results-${{ steps.collect.outputs.key }}
+          path: release-results/
+          if-no-files-found: error
+          overwrite: true
+
+  # docs/getting-started.md, run as written (0032): its own commands, in order,
+  # from this clean checkout, then propose, publish, lookup, create, a create
+  # sent again, update, a stale update and another tenant's refusal over HTTP
+  # through the composed stack's one origin, on PostgreSQL and SQL Server; and
+  # it fails if a secret or a token reaches a log, compose's configuration or
+  # a container's inspect. Release gate 9 asked for clean-install
+  # documentation that works, and a guide nothing runs is a claim nobody
+  # checked. Each database's version, as the server's own adapter reports it,
+  # is recorded for the report beside every suite's (0035).
+  #
+  # Node and nothing else: no corepack, no pnpm install. The guide's reader
+  # has Docker and git, and the gate runs on Node's built-ins, so the
+  # checkout is as clean as theirs; so does the collect step. The step table
+  # and the image sizes go in the job summary, which is where 0032's
+  # measurements come from. The limit is the gate's twenty minutes for the
+  # first start -- two image builds and SQL Server's pull -- with the journey
+  # and the teardown after it.
+  #
+  # Twice: with the runner's own Compose, and with the oldest release the
+  # guide's section 0 says works, so that sentence fails here the day
+  # compose.yaml needs a newer one. It is 2.20 because 2.19.1 refuses
+  # compose.yaml outright (the web healthcheck's start_interval), measured on
+  # 2026-10-09; steps.test.mjs fails when the guide and this pin disagree.
+  getting-started:
+    name: getting-started (Compose ${{ matrix.compose }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compose: runner
+          - compose: 2.20.3
+            # The release's own docker-compose-linux-x86_64.sha256.
+            sha256: f45e4cb687df8b48a57f656097ce7175fa8e8bef70be407b011e29ff663f475f
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The user's plugin directory comes before the system's, so this
+      # Compose is the one every `docker compose` in the job runs.
+      - name: Compose ${{ matrix.compose }}
+        if: matrix.compose != 'runner'
+        env:
+          COMPOSE: ${{ matrix.compose }}
+          COMPOSE_SHA256: ${{ matrix.sha256 }}
+        run: |
+          mkdir -p ~/.docker/cli-plugins
+          curl -fsSL -o ~/.docker/cli-plugins/docker-compose "https://github.com/docker/compose/releases/download/v${COMPOSE}/docker-compose-linux-x86_64"
+          echo "${COMPOSE_SHA256}  $HOME/.docker/cli-plugins/docker-compose" | sha256sum -c
+          chmod +x ~/.docker/cli-plugins/docker-compose
+          test "$(docker compose version --short)" = "${COMPOSE}"
+
+      - run: node scripts/getting-started.mjs
+
+      - name: Keep what this job found, for the report
+        id: collect
+        if: ${{ !cancelled() }}
+        run: node scripts/release-report/collect.mjs --job getting-started --variant "$COMPOSE"
+        env:
+          COMPOSE: ${{ matrix.compose }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: release-results-${{ steps.collect.outputs.key }}
+          path: release-results/
+          if-no-files-found: error
+          overwrite: true
+
+  # The release report (0035), built from what every job above found: what
+  # this run was tested on, every package's results, every shared case on
+  # both engines, the build identity of what a release publishes, the release
+  # gates and the known limitations. It fails the run on anything in its
+  # problems -- a job that ended other than success, an artefact missing,
+  # twice or another run's, a test skipped or failed, a shared case on one
+  # engine only, two builds of one package that differ -- and writes the
+  # report either way, into the job summary and the `release-report`
+  # artefact. For a release or a rehearsal it also writes the release body,
+  # and fails here, before anything is published, when the body has no
+  # changelog section or is longer than GitHub accepts.
+  #
+  # The limit is not measured on CI yet: it is verify's, whose install and
+  # build this job shares, until three green runs give a slowest time to
+  # triple (0035 says so). The checkout keeps the whole history, for a
+  # document's last change when a gate's evidence is a document.
+  report:
+    needs: [verify, test, browser, install, container, getting-started]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      # DATABASE_KINDS, DEFAULT_IMAGES and sharedCases(), from the built code
+      # that uses them.
+      - run: pnpm exec turbo run build --filter=@formancy/data-fixtures
+
+      # One directory per artefact, never merged: two jobs that wrote one key
+      # stay two, and the report says so.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-results-*
+          path: release-results
+
+      - name: The report, from what every job found
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          RELEASE: ${{ inputs.release }}
+        run: node scripts/release-report/report.mjs --results release-results --out release-report
+
+      - name: The report, in the run's summary
+        if: ${{ !cancelled() }}
+        run: cat release-report/release-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: release-report
+          path: release-report/
+          if-no-files-found: error
+          overwrite: true

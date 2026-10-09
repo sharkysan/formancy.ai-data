@@ -1,6 +1,6 @@
 import { findObject } from '@formancy/data-core'
-import { PostgreSqlContainer } from '@testcontainers/postgresql'
-import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql'
+import { startPostgresContainer } from '@formancy/data-fixtures'
+import type { StartedPostgreSqlContainer } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, expect, test } from 'vitest'
@@ -24,7 +24,9 @@ let container: StartedPostgreSqlContainer
 let sql: Sql
 
 beforeAll(async () => {
-  container = await new PostgreSqlContainer(POSTGRES_18_IMAGE).start()
+  // Through the harness, so the release report names this file beside the
+  // image it ran on (0035).
+  ;({ container } = await startPostgresContainer(POSTGRES_18_IMAGE))
   sql = postgres(container.getConnectionUri(), { onnotice: () => {} })
   await sql.unsafe(`
     create schema eighteen;

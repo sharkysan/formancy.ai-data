@@ -29,6 +29,7 @@ import { createRequire } from 'node:module'
 import { dirname, extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
+import { recorded } from '../../../scripts/release-report/gate-results.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(app, 'dist')
@@ -206,6 +207,7 @@ async function audit(page, target) {
     const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags } })
     const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
     return {
+      axe: window.axe.version,
       violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
       measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
       undecided: nodes(results.incomplete, 'color-contrast').map((node) => node.html.slice(0, 60)).slice(0, 4),
@@ -229,7 +231,8 @@ async function failSubmit(page) {
   )
 }
 
-async function run() {
+/** The gate, reporting through `gate` (scripts/release-report/gate-results.mjs), which keeps what it found for the release report. */
+async function run(gate) {
   if (!existsSync(join(dist, 'index.html'))) {
     throw new Error('no built page at apps/examples/dist: run `pnpm build` first')
   }
@@ -251,21 +254,15 @@ async function run() {
     server.close()
     throw new Error(`could not launch Chromium (${String(error)}).\nRun \`pnpm exec playwright install chromium\`.`)
   }
+  gate.launched(chromium, browser)
 
-  const failures = []
-  const check = (name, problem) => {
-    if (problem === null) {
-      console.log(`  ok    ${name}`)
-    } else {
-      console.log(`  FAIL  ${name}\n          ${problem}`)
-      failures.push(`${name}: ${problem}`)
-    }
-  }
+  const { check } = gate
   const sideways = (state, measured) => {
     check(`${state}, the page does not scroll sideways`, measured.overflow > 0 ? `${String(measured.overflow)}px of horizontal overflow` : null)
     check(`${state}, no element is past either edge`, measured.past.length === 0 ? null : measured.past.join('; '))
   }
   const audited = (state, result, expected = ['color-contrast', 'target-size']) => {
+    gate.axe(result.axe)
     check(`${state}, axe finds nothing at WCAG 2.2 AA`, result.violations.length === 0 ? null : result.violations.join('; '))
     check(
       `${state}, and measured ${expected.join(' and ')}, over something`,
@@ -277,6 +274,7 @@ async function run() {
   try {
     const list = widths()
     for (const { label, width, refuseFonts = false } of list) {
+      gate.width(width)
       const page = await browser.newPage({ viewport: { width, height: 900 } })
       if (refuseFonts) await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort())
       await page.goto(url, { waitUntil: 'load' })
@@ -326,6 +324,7 @@ async function run() {
     }
 
     console.log('')
+    const failures = gate.failures()
     if (failures.length > 0) {
       throw new Error(`${String(failures.length)} browser check(s) failed:\n  ${failures.join('\n  ')}`)
     }
@@ -339,4 +338,4 @@ async function run() {
   }
 }
 
-await run()
+await recorded('apps/examples', run)

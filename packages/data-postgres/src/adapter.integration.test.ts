@@ -1,10 +1,8 @@
-import { PostgreSqlContainer } from '@testcontainers/postgresql'
-import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import postgres from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { DatabaseAdapter } from '@formancy/data-core'
-import { startTcpHop } from '@formancy/data-fixtures'
-import type { TcpHop } from '@formancy/data-fixtures'
+import { startPostgresContainer, startTcpHop } from '@formancy/data-fixtures'
+import type { ServerRecord, StartedPostgreSqlContainer, TcpHop } from '@formancy/data-fixtures'
 import type { Sql } from 'postgres'
 import { createPostgresAdapter } from './adapter.js'
 import { connectPostgres } from './connect.js'
@@ -16,10 +14,12 @@ import { connectPostgres } from './connect.js'
  * mock.
  */
 let container: StartedPostgreSqlContainer
+let server: ServerRecord
 let adapter: DatabaseAdapter
 
 beforeAll(async () => {
-  container = await new PostgreSqlContainer('postgres:17-alpine').start()
+  // The default image, through the harness that records what answered (0035).
+  ;({ container, server } = await startPostgresContainer())
   adapter = createPostgresAdapter(postgres(container.getConnectionUri()))
 })
 
@@ -30,12 +30,15 @@ afterAll(async () => {
 
 describe('the PostgreSQL adapter', () => {
   // A ping that answered from the driver's configuration would pass against a
-  // server that is not there. The version asserted is the one the container
-  // runs, so the answer has to have come from it.
+  // server that is not there, and one that reported a version other than the
+  // server's would put a wrong one in every snapshot. The version asserted is
+  // what the server told the harness when it started, asked its own way, so
+  // the adapter's answer has to have come from it -- and if the two queries
+  // ever disagree, this is how anybody finds out.
   test('ping reports the server that answered', async () => {
     const identity = await adapter.ping()
     expect(identity.kind).toBe('postgres')
-    expect(identity.version).toMatch(/^17\./)
+    expect(identity.version).toBe(server.version)
   })
 
   // A composition root closes on shutdown and again on an error path. The

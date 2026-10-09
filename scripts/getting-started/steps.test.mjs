@@ -6,6 +6,7 @@ import { fillFromOperations } from '../../apps/studio/src/policy-model.ts'
 import { EMPTY_PRESENTATION, fieldsFromOperations } from './journey.mjs'
 import { extractSteps, generatedRegions, GUIDE, inlineCommands, plan, readJourney, render } from './steps.mjs'
 import { guideNames, HOST, STUDIO, STUDIO_STEPS } from './walk.mjs'
+import { readWorkflow } from '../release-report/workflows.mjs'
 
 /**
  * docs/getting-started.md against what the gate runs and sends (0032),
@@ -200,14 +201,15 @@ describe("the guide's names for the studio's and the host page's controls", () =
 })
 
 describe("the guide's Compose", () => {
-  /** The releases a workflow's getting-started job pins in its matrix, beside the runner's own. */
-  function pinned(file) {
-    const text = readFileSync(join(repo, '.github', 'workflows', file), 'utf8').replaceAll('\r\n', '\n')
-    const start = text.indexOf('\n  getting-started:\n')
-    if (start === -1) return []
-    const next = text.slice(start + 1).search(/\n {2}[a-z][\w-]*:\n/)
-    const job = next === -1 ? text.slice(start) : text.slice(start, start + 1 + next)
-    return [...job.matchAll(/^\s+- compose: (\d+\.\d+\.\d+)$/gm)].map((match) => match[1])
+  /**
+   * The releases the getting-started job pins in its matrix, beside the
+   * runner's own. The job is in gates.yml, which ci.yml and release.yml both
+   * run (0035), so one pin is CI's and the release's;
+   * scripts/release-report/workflows.test.mjs holds that both run it.
+   */
+  function pinned() {
+    const include = readWorkflow(repo).jobs['getting-started']?.strategy?.matrix?.include ?? []
+    return include.map((entry) => String(entry.compose)).filter((compose) => /^\d+\.\d+\.\d+$/.test(compose))
   }
 
   // Section 0 says which Compose the guide works with. The getting-started
@@ -215,10 +217,9 @@ describe("the guide's Compose", () => {
   // that needs a newer one fails there; this fails when the sentence and the
   // pin disagree, so neither moves without the other.
   test('is the oldest release CI and the release run the guide with', () => {
-    const [ci, release] = [pinned('ci.yml'), pinned('release.yml')]
-    expect(ci).toHaveLength(1)
-    expect(release).toEqual(ci)
-    const [major, minor] = ci[0].split('.')
+    const releases = pinned()
+    expect(releases).toHaveLength(1)
+    const [major, minor] = releases[0].split('.')
     expect(section(guide, '0.', '1.')).toContain(`Compose ${major}.${minor} or later`)
   })
 })
