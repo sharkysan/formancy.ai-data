@@ -28,6 +28,63 @@ The regulatory documentation set (IEC 62304, SOUP, safety analysis) lives in
 formancy.ai and describes **that** software. This repository does not claim one
 yet. If it ever does, the claim is a decision record first.
 
+## How the pieces fit
+
+One path runs through the packages, and most changes touch one step of it.
+`data-core` decides; an adapter only translates.
+
+1. **Discover.** An adapter's `discover(scope)` reads the catalog as the
+   connected account and returns a `MetadataSnapshot`, made only through
+   `data-core`'s `createSnapshot`, with a gap for whatever that account could
+   not see (0004, 0027).
+2. **Generate.** `generateForm` (`data-core/src/generate/`) turns a snapshot
+   and a `GenerationRequest` into a formancy form, its `FormBindings` — field
+   to column — and notes saying what it inferred and what it refused (0009).
+3. **Govern and arrange.** A `FormPolicy` (`policy/`) says who may read,
+   create and update which fields and which rows. A presentation
+   (`presentation/`) is a patch over the generated base, rebased by what each
+   field stands for when the base is regenerated (0030).
+4. **Publish.** The administrator plane stores a bundle — snapshot, request,
+   base, presentation, bindings, policy — in the file configuration store,
+   where compare-and-swap is a hard link (0013). `validateBundle` checks it on
+   publish and on every read (0019).
+5. **Run.** The runtime plane serves a published form's records and lookups.
+   `data-core/src/records/plan.ts` is the one place a browser's request meets
+   the policy, the codecs, the tokens and the bindings and becomes a typed
+   request to an adapter (0018, 0022). The adapter runs it as one guarded
+   statement and never retries it (0015).
+6. **Review drift.** `diffSnapshots` (`drift/`) classifies a fresh snapshot
+   against what a published form's bindings and lookups rest on (0010).
+
+The ports, each implemented by `data-postgres` and `data-sqlserver`:
+`DatabaseAdapter` (ping, discover), `RecordAdapter` (read, insert, update) and
+`LookupAdapter` (search, resolve, rejects). Each adapter package exports
+`connect…`, `create…Adapter`, `create…Records` and `create…Lookups` and owns
+its driver (0025); `data-server/src/drivers.ts` is the one place the server
+meets them. Inside an adapter, `discovery/` holds one catalog concern per file,
+`sql/` the quoting, binding and statement building, and `records/` and
+`lookups/` the operations.
+
+`data-server` is Fastify. `createDataServer` registers the administrator
+plane (`routes/admin*.ts`) only when given a connection registry, a store and
+administrator roles, and the runtime plane (`routes/runtime.ts`) only when
+given a registry and a store. Both planes audit through the one set of hooks
+in `audit.ts` (0023, 0033). `main.ts` is the composition root: every setting
+is read there, and a secret reference it names is resolved by `secrets.ts`.
+`data-client` is the browser's side of the runtime plane. `data-fixtures` is test support: one business model
+(`model.ts`) loaded into both engines through testcontainers, the comparator
+each adapter's discovery answers to (`conformance.ts`), and the one
+expectation per case both parity suites share (`parity.ts`) (0005, 0028).
+
+Of the apps, `examples` has no server and generates in the browser from a
+captured snapshot, `studio` speaks only the administrator plane, and `host`
+only the runtime plane, through `data-client`. `compose.yaml` and `deploy/`
+put the server image, both databases and one nginx serving both apps on the
+origin of `/v1` together, as `docs/getting-started.md` walks through (0032).
+
+Nothing fails when this map goes stale. It names files rather than counting
+them, so a rename is the edit to make here.
+
 ## Every change keeps the documentation true
 
 A change is not done until the documents that describe it say so. Update them
@@ -288,6 +345,28 @@ seams that will work here: one catalog concern per file in an adapter, one
 operation family per file in the core. The same applies below the file, held
 by review: a function past about 60 lines, a `switch` growing a case per
 feature, a class whose name needs "and" to describe it.
+
+## Running one thing
+
+Packages import each other through `dist/`: every `exports` map points there
+and nothing aliases a workspace package to its source. A change in
+`data-core` is invisible to an adapter's tests until `data-core` is built
+again, so either run `pnpm build` or let turbo build the dependencies first:
+
+```bash
+pnpm exec turbo run test --filter=@formancy/data-postgres                  # dependencies built, then that suite
+pnpm --filter @formancy/data-postgres test                                 # that suite, against dist/ as it stands
+pnpm --filter @formancy/data-core exec vitest run src/lookup/token.test.ts # one file
+pnpm --filter @formancy/data-core exec vitest run -t "a test's name"       # one case
+```
+
+In the packages, a file that starts containers is named
+`*.integration.test.ts`. `data-client` and `apps/host` start both databases
+once per run in a vitest `globalSetup` instead, so every file there needs
+Docker. `data-core`, `apps/examples` and `apps/studio` need none. `pnpm
+test:repo` needs `pnpm build` first too: `scripts/mint-token.test.mjs` runs
+the built server's code. The dev servers and the snapshot captures are in
+`README.md`.
 
 ## Checks before pushing
 
