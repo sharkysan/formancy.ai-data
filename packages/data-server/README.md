@@ -29,6 +29,9 @@ existed would be documented and inert.
   while the form offers create, a root filter on a column it may not
   `INSERT`, which every create writes
   ([0027](../../docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).
+  A row filter on a column a filter cannot compare — a boolean, a float, a
+  time or a timestamp — or one the table lacks is refused the same way
+  ([0028](../../docs/decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)).
 - **`DRIVER_FACTORIES`** — one connection factory per engine, opening every
   connection through the adapter package's own `connect…` function, so a host
   embedding the server never builds a pool from another copy of a driver
@@ -45,7 +48,13 @@ existed would be documented and inert.
 - **The runtime plane** — a published form, its records and its lookups, for
   the host application's people, each request asking the policy
   ([0022](../../docs/decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)).
-  Registered only when the server is given a registry and a store.
+  Registered only when the server is given a registry and a store. A lookup's
+  filter is scoped as a record request's is, so a trusted value its column
+  does not hold in that spelling is 403 `invalid-context` for both. A write
+  the database refused for a reason with no code of its own — a trigger's
+  error, a declined write — is 422 `refused`, which says sending it again
+  will be refused the same way; 503 `unavailable` is kept for what passes
+  (0028).
 
 - **An operational audit trail** — one event per runtime request, never a
   value, records named by a keyed hash

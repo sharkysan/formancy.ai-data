@@ -1,11 +1,11 @@
-import type { LookupConfig, LookupKeyColumn, LookupQuery, LookupSort, RowFilterTerm } from '@formancy/data-core'
+import type { LookupConfig, LookupKeyColumn, LookupQuery, LookupSearchColumn, LookupSort, RowFilterTerm } from '@formancy/data-core'
 import { op } from '../sql/catalog.js'
 import { filterSql } from '../sql/filters.js'
 import { quoteIdentifier, quoteTable } from '../sql/identifiers.js'
 import { Statement } from '../sql/statement.js'
 import type { Param } from '../sql/statement.js'
 import { sqlTypeOf } from '../sql/types.js'
-import { canonicalText, displayText } from '../sql/values.js'
+import { canonicalText } from '../sql/values.js'
 
 /** A statement ready to run: its text, and the parameters its placeholders name. */
 export interface LookupStatement {
@@ -50,11 +50,15 @@ export function containsPattern(search: string): string {
 /**
  * The key columns as canonical text, in key order, then the display columns.
  * The key is read exactly as `rejectedTokens` and `lookupPage` re-encode it:
- * as the row holds it, never as the token spelled it.
+ * as the row holds it, never as the token spelled it. A display column is
+ * read by the record reader too, by its type, and `displayText` in the core
+ * spells the label (0028): no session setting reaches it. `to_jsonb`, which
+ * this used before, wrote an instant in the session's TimeZone and a float
+ * by `extra_float_digits` (C6-pg).
  */
 function selectList(config: LookupConfig, withDisplay: boolean): string {
   const keys = config.targetColumns.map((key) => canonicalText(key.type, column(key.name)))
-  const display = withDisplay ? config.display.map((name) => displayText(column(name))) : []
+  const display = withDisplay ? config.display.map((entry) => canonicalText(entry.type, column(entry.name))) : []
   return [...keys, ...display].join(', ')
 }
 
@@ -73,6 +77,10 @@ function orderBy(sort: readonly LookupSort[]): string {
 /**
  * Whether a search column contains the pattern, case folded.
  *
+ * The column is read as its canonical text, the text its label shows: text
+ * as itself, an integer as its digits (0028), never through another
+ * conversion.
+ *
  * Through the database's default collation: PostgreSQL 17 refuses LIKE and
  * ILIKE outright on a column whose collation is nondeterministic (0A000), and
  * the default collation is always deterministic. ILIKE folds case as that
@@ -82,8 +90,8 @@ function orderBy(sort: readonly LookupSort[]): string {
  * Spelled as what `ilike … escape` stands for, `~~*` against `like_escape`,
  * because the keyword names its operator without a schema (`sql/catalog.ts`).
  */
-function contains(name: string, pattern: string): string {
-  return `(${column(name)}::pg_catalog.text collate pg_catalog."default") ${op('~~*')} pg_catalog.like_escape(${pattern}, '${ESCAPE}')`
+function contains(search: LookupSearchColumn, pattern: string): string {
+  return `(${canonicalText(search.type, column(search.name))} collate pg_catalog."default") ${op('~~*')} pg_catalog.like_escape(${pattern}, '${ESCAPE}')`
 }
 
 /** A lookup query. `where` is never empty: a search excludes NULL keys, and a key query has its keys. */
@@ -104,7 +112,7 @@ export function searchStatement(config: LookupConfig, query: LookupQuery, terms:
   const where = [...filterSql(statement, ROW, terms), ...config.targetColumns.map((key) => `${column(key.name)} is not null`)]
   if (query.search !== '') {
     const pattern = statement.text(containsPattern(query.search))
-    where.push(`(${config.search.map((name) => contains(name, pattern)).join(' or ')})`)
+    where.push(`(${config.search.map((entry) => contains(entry, pattern)).join(' or ')})`)
   }
   const limit = statement.as(String(query.limit + 1), 'pg_catalog.int8')
   const offset = statement.as(String(query.offset), 'pg_catalog.int8')

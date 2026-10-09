@@ -1,5 +1,5 @@
-import { bindingsVersionProblem, createSnapshot, findObject, validatePolicy } from '@formancy/data-core'
-import type { FormBindings, FormPolicy, MetadataSnapshot, ObjectMeta, ObjectRef } from '@formancy/data-core'
+import { bindingsVersionProblem, createSnapshot, findObject, rowFilterColumnProblem, validatePolicy } from '@formancy/data-core'
+import type { FormBindings, FormPolicy, MetadataSnapshot, ObjectRef } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { validateSchema } from '@formancy/spec/validate'
 
@@ -45,8 +45,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * - every bound field must exist in the form, and the policy must fit the
  *   bindings (`validatePolicy`), so a rule nobody enforces cannot be published;
  * - every column a row filter compares — the root's, and each lookup's on its
- *   target — must be one the snapshot's account may read (0027), or every
- *   request the filter scopes fails with permission-denied.
+ *   target — must be one a filter can compare: present, readable by the
+ *   snapshot's account (0027), and of a kind with one spelling on both
+ *   engines (0028). Otherwise every request the filter scopes is refused.
  */
 export function validateBundle(document: unknown): BundleValidation {
   if (!isRecord(document)) return { ok: false, problems: ['a bundle is an object'] }
@@ -97,7 +98,7 @@ export function validateBundle(document: unknown): BundleValidation {
 
   const fitted = validatePolicy(policy, bindings)
   if (!fitted.ok) problems.push(...fitted.problems.map((problem) => `policy: ${problem}`))
-  if (wellFormed) problems.push(...unreadableFilters(snapshot, bindings, policy))
+  if (wellFormed) problems.push(...unfilterableColumns(snapshot, bindings, policy))
 
   return problems.length === 0 ? { ok: true, bundle: document as unknown as PublishedBundle } : { ok: false, problems }
 }
@@ -108,25 +109,28 @@ function rulesOf(value: unknown): Array<{ column: string }> {
 }
 
 /**
- * Row filters on columns the snapshot's account may not read (0027). The
- * root's filter is the WHERE of every read and update and is written on every
- * create; a lookup's is the WHERE of every search on its target. Either way
- * the database refuses the statement, so the policy cannot be applied by this
- * connection, and saying so at publish is cheaper than at every request. A
- * root filter column the account may not INSERT refuses every create in the
- * same way, so it is a problem while the form offers create.
+ * Row filter columns a filter cannot compare, as `rowFilterColumnProblem`
+ * names them: absent, not readable by the snapshot's account (0027), or of a
+ * kind with no spelling both engines compare alike — a boolean, a float, a
+ * time or a timestamp (0028). The root's filter is the WHERE of every read
+ * and update and is written on every create; a lookup's is the WHERE of every
+ * search on its target. Either way the planner refuses every request it
+ * scopes, so saying so at publish is cheaper than at every request. A root
+ * filter column the account may not INSERT refuses every create in the same
+ * way, so it is a problem while the form offers create.
  */
-function unreadableFilters(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy): string[] {
+function unfilterableColumns(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy): string[] {
   const problems: string[] = []
-  const unreadable = (where: string, ref: ObjectRef, rules: Array<{ column: string }>) => {
-    const object: ObjectMeta | undefined = findObject(snapshot, ref)
+  const unfilterable = (where: string, ref: ObjectRef, rules: Array<{ column: string }>) => {
+    const object = findObject(snapshot, ref)
+    // A table outside the snapshot is the bindings' problem, reported as such.
+    if (object === undefined) return
     for (const { column } of rules) {
-      if (object?.columns.find((candidate) => candidate.name === column)?.access.select === false) {
-        problems.push(`policy: ${where} ${column} is a column this connection's account may not read`)
-      }
+      const problem = rowFilterColumnProblem(object, column)
+      if (problem !== null) problems.push(`policy: ${where} ${problem}`)
     }
   }
-  unreadable('rowFilters', bindings.root, rulesOf(policy.rowFilters))
+  unfilterable('rowFilters', bindings.root, rulesOf(policy.rowFilters))
   // The planner writes every root filter column from the context on create.
   if (isRecord(bindings.operations) && bindings.operations.create === true) {
     const root = findObject(snapshot, bindings.root)
@@ -138,7 +142,7 @@ function unreadableFilters(snapshot: MetadataSnapshot, bindings: FormBindings, p
   }
   const lookups: Record<string, unknown> = isRecord(policy.lookups) ? policy.lookups : {}
   for (const binding of Array.isArray(bindings.fields) ? bindings.fields : []) {
-    if (binding.kind === 'lookup') unreadable(`lookups.${binding.field}`, binding.target.table, rulesOf(lookups[binding.field]))
+    if (binding.kind === 'lookup') unfilterable(`lookups.${binding.field}`, binding.target.table, rulesOf(lookups[binding.field]))
   }
   return problems
 }

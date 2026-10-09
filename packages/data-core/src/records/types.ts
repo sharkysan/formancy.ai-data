@@ -112,9 +112,15 @@ export interface RecordRead {
  * - `permission-denied` — the connection's own grants refused it, or row
  *   security did: a PostgreSQL policy's WITH CHECK (42501), a SQL Server
  *   block predicate (33504).
- * - `schema-changed` — a column or table the binding names is gone.
- * - `unavailable` — the database could not be reached; nothing was sent, or
- *   what was sent certainly did not commit.
+ * - `schema-changed` — a column or table the binding names is gone, or no
+ *   longer takes what the binding writes: a generated column written (0028).
+ * - `refused` — the database refused the statement for a reason this port has no code for:
+ *   a trigger's own error, a write it declined without one, an INSTEAD OF trigger this
+ *   adapter cannot verify, an error it does not recognise. Nothing was written. The same
+ *   request is expected to be refused again, so it is not a reason to retry (0028).
+ * - `unavailable` — the database could not answer now: unreachable, no connection free, or a
+ *   refusal the engine documents as passing (a deadlock it chose this statement to lose, a
+ *   lock or resource it could not get in time). Nothing was sent, or it certainly did not commit.
  * - `unknown-outcome` — the connection failed after a write was sent and
  *   before its result arrived. It may have committed. Never retried
  *   automatically (plan section 12): the host reconciles.
@@ -130,6 +136,7 @@ export type RecordFailureCode =
   | 'out-of-range'
   | 'permission-denied'
   | 'schema-changed'
+  | 'refused'
   | 'unavailable'
   | 'unknown-outcome'
 

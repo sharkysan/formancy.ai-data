@@ -187,7 +187,10 @@ export const INTAKE = actor(['intake'])
 
 export const column = (name: string, type: NormalizedType): RecordColumn => ({ name, type })
 export const value = (name: string, type: NormalizedType, held: RecordValue['value']): RecordValue => ({ name, type, value: held })
-export const TENANT_ONE = { kind: 'restricted', equal: [{ column: 'tenant_id', value: '1' }] } as const
+/** A typed equality, as `scopeRowFilters` makes one from a policy rule and the column it names (0028). */
+export const term = (columnName: string, type: NormalizedType, held: string) => ({ column: columnName, type, value: held })
+/** Tenant 1, typed as every fixture table's tenant_id is: what a request and a membership check carry. */
+export const TENANT_ONE = { kind: 'restricted', equal: [term('tenant_id', INT32, '1')] } as const
 
 /** Every order column a clerk may see, in catalog order: the key, then the columns of every field the policy lets them read. */
 export const CLERK_COLUMNS = [

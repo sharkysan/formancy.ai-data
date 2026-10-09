@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
-import { findObject } from '@formancy/data-core'
+import { findObject, rowFilterColumnProblem } from '@formancy/data-core'
 import type { FormPolicy, MetadataSnapshot, RowFilterRule } from '@formancy/data-core'
 import { describeRef } from './choice.js'
 import { useFocusAfterRender } from './focus.js'
@@ -189,7 +189,9 @@ export function LookupFilters({
     <>
       {lookups.map((binding) => {
         const target = describeRef(binding.target.table)
-        const columns = findObject(snapshot, binding.target.table)?.columns.map((column) => column.name) ?? [...binding.target.columns]
+        // Only what a filter can compare (0028); a rule already on another column stays listed, and publish names it.
+        const table = findObject(snapshot, binding.target.table)
+        const columns = table?.columns.map((column) => column.name).filter((name) => rowFilterColumnProblem(table, name) === null) ?? [...binding.target.columns]
         const rules = Object.hasOwn(policy.lookups, binding.field) ? policy.lookups[binding.field] : undefined
         const label = labels[binding.field] ?? binding.field
         const add = `lookup-${binding.field}-add`

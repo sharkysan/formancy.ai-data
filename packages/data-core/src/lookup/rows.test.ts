@@ -3,9 +3,10 @@ import { describe, expect, test } from 'vitest'
 import { lookupKeys, lookupPage, rejectedTokens, resolvedRows } from './rows.js'
 import type { FoundRow } from './rows.js'
 import { encodeKeyToken } from './token.js'
-import type { LookupConfig, LookupKeyType } from './types.js'
+import type { LookupConfig, LookupKeyType, LookupSearchType } from './types.js'
 
 const INT32: LookupKeyType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
+const NAME: LookupSearchType = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }
 
 const CUSTOMER: LookupConfig = {
   source: 'erp-sales-order-fk-order-customer',
@@ -15,8 +16,8 @@ const CUSTOMER: LookupConfig = {
     { name: 'tenant_id', type: INT32 },
     { name: 'customer_no', type: INT32 },
   ],
-  display: ['name'],
-  search: ['name'],
+  display: [{ name: 'name', type: NAME }],
+  search: [{ name: 'name', type: NAME }],
   sort: [
     { column: 'name', direction: 'asc', nulls: 'last' },
     { column: 'tenant_id', direction: 'asc', nulls: 'last' },
@@ -117,7 +118,7 @@ describe('lookupPage', () => {
   // one row more than the page tells whether there is more for the price of a row.
   test('reads one row past the page as "there is more", and does not show it', () => {
     const fetched = [row('7', '1', 'Acme'), row('7', '2', 'Beta'), row('7', '3', 'Gamma')]
-    expect(lookupPage(fetched, 2)).toEqual({
+    expect(lookupPage(CUSTOMER, fetched, 2)).toEqual({
       rows: [
         { token: 'k1:7,1', label: 'Acme' },
         { token: 'k1:7,2', label: 'Beta' },
@@ -125,14 +126,14 @@ describe('lookupPage', () => {
       hasMore: true,
       omitted: 0,
     })
-    expect(lookupPage(fetched, 3)).toMatchObject({ hasMore: false })
-    expect(lookupPage([], 10)).toEqual({ rows: [], hasMore: false, omitted: 0 })
+    expect(lookupPage(CUSTOMER, fetched, 3)).toMatchObject({ hasMore: false })
+    expect(lookupPage(CUSTOMER, [], 10)).toEqual({ rows: [], hasMore: false, omitted: 0 })
   })
 
   // A row whose key does not fit a token cannot be chosen. Dropping it silently
   // would look exactly like a table that does not have it, so it is counted.
   test('counts a row it cannot offer instead of dropping it silently', () => {
-    const page = lookupPage([row('7', '1', 'Acme'), { key: UNREPRESENTABLE, display: ['Too long'] }], 5)
+    const page = lookupPage(CUSTOMER, [row('7', '1', 'Acme'), { key: UNREPRESENTABLE, display: ['Too long'] }], 5)
     expect(page.rows.map((entry) => entry.label)).toEqual(['Acme'])
     expect(page.omitted).toBe(1)
   })
@@ -141,15 +142,43 @@ describe('lookupPage', () => {
   // twice is an adapter that joined wrongly, and it is refused here, where the
   // message can name it, rather than as an empty control in the browser.
   test('refuses a page that holds one key twice', () => {
-    expect(() => lookupPage([row('7', '1', 'Acme'), row('7', '1', 'Acme again')], 5)).toThrow(/k1:7,1 appears twice/)
+    expect(() => lookupPage(CUSTOMER, [row('7', '1', 'Acme'), row('7', '1', 'Acme again')], 5)).toThrow(/k1:7,1 appears twice/)
   })
 
   // What the browser receives has to pass formancy's own check, or the whole
   // list is refused there: NULL names, blank names and awkward keys included.
   test('every page passes formancy\'s check on a remote list', () => {
     const fetched = [row('7', '1', 'Acme'), row('7', '2', null), row('7', '3', '   '), row('', 'a,b', 'Comma'), row('7', 'Zürich', 'Ü')]
-    const page = lookupPage(fetched, 10)
+    const page = lookupPage(CUSTOMER, fetched, 10)
     expect(acceptRemoteOptions(page.rows.map((entry) => ({ value: entry.token, label: entry.label })))).toHaveLength(fetched.length)
+  })
+})
+
+describe('labels', () => {
+  // A label is spelled by displayText from each display column's type, never
+  // by the adapter (0028): PostgreSQL's to_jsonb wrote an instant in the
+  // session's zone, SQL Server's style 126 a bit as 1. The adapter hands over
+  // the values its record reader decoded; the person reads one spelling.
+  test('come from displayText per display type, on a page and on a resolve', () => {
+    const config: LookupConfig = {
+      ...CUSTOMER,
+      display: [
+        { name: 'name', type: NAME },
+        { name: 'active', type: { kind: 'boolean' } },
+        { name: 'changed_at', type: { kind: 'timestamp', withTimeZone: true, precision: 6 } },
+      ],
+    }
+    const found: FoundRow[] = [{ key: ['7', '1'], display: ['Acme', true, '2026-10-08T08:34:56.789Z'] }]
+    expect(lookupPage(config, found, 5).rows).toEqual([{ token: 'k1:7,1', label: 'Acme · true · 2026-10-08T08:34:56Z' }])
+    expect(resolvedRows(config, [tokenOf(['7', '1'])], found)).toEqual([{ token: 'k1:7,1', label: 'Acme · true · 2026-10-08T08:34:56Z' }])
+  })
+
+  // Each value is spelled by the type at its position, so a row with more or
+  // fewer values than the lookup shows would be spelled by the wrong types —
+  // an adapter that selected its columns out of step with the config.
+  test('refuse a row whose display values do not line up with the display columns', () => {
+    expect(() => lookupPage(CUSTOMER, [{ key: ['7', '1'], display: ['Acme', 'extra'] }], 5)).toThrow(/2 display values and the lookup shows 1/)
+    expect(() => resolvedRows(CUSTOMER, [tokenOf(['7', '1'])], [{ key: ['7', '1'], display: [] }])).toThrow(/0 display values/)
   })
 })
 
@@ -194,11 +223,11 @@ describe('resolvedRows', () => {
   test('labels the tokens a found row encodes to exactly, each once, in the order they came', () => {
     const found = [row('7', '2', 'Beta'), row('7', '1', 'Acme'), row('7', '3', null), { key: UNREPRESENTABLE, display: ['Too long'] }]
     const tokens = [tokenOf(['7', '1']), tokenOf(['7', '9']), tokenOf(['7', '2']), tokenOf(['7', '1']), tokenOf(['7', '3'])]
-    expect(resolvedRows(tokens, found)).toEqual([
+    expect(resolvedRows(CUSTOMER, tokens, found)).toEqual([
       { token: 'k1:7,1', label: 'Acme' },
       { token: 'k1:7,2', label: 'Beta' },
       { token: 'k1:7,3', label: '7 · 3' },
     ])
-    expect(resolvedRows([tokenOf(['acme'])], [{ key: ['ACME'], display: ['Acme'] }])).toEqual([])
+    expect(resolvedRows(CUSTOMER, [tokenOf(['acme'])], [{ key: ['ACME'], display: ['Acme'] }])).toEqual([])
   })
 })

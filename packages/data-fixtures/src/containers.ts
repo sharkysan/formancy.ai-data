@@ -57,7 +57,8 @@ export interface SqlServerFixture {
 }
 
 /**
- * A PostgreSQL container with the fixture loaded and the reader created.
+ * A PostgreSQL container with the fixture loaded, the restricted principals
+ * created, and the parity schema (0028) beside it.
  *
  * One harness for every suite, so the two adapters, the codecs and anything
  * later all start from byte-identical databases. A suite that built its own
@@ -71,6 +72,8 @@ export async function startPostgresFixture(): Promise<PostgresFixture> {
     // Simple-query protocol: the file is several statements and has no parameters.
     await sql.unsafe(readFixture('postgres.sql'))
     await sql.unsafe(readFixture('postgres.restricted.sql'))
+    // The parity schema (0028), outside FIXTURE_SCOPE: last, so nothing above can depend on it.
+    await sql.unsafe(readFixture('postgres.parity.sql'))
   } finally {
     await sql.end()
   }
@@ -95,8 +98,8 @@ export async function startPostgresFixture(): Promise<PostgresFixture> {
 }
 
 /**
- * A SQL Server container with the fixture loaded into its own database and the
- * reader created.
+ * A SQL Server container with the fixture loaded into its own database, the
+ * restricted principals created, and the parity schema (0028) beside it.
  *
  * The container's certificate is self-signed, so `trustServerCertificate` is
  * set here, in the test harness, and nowhere in a package a customer runs.
@@ -127,6 +130,7 @@ export async function startSqlServerFixture(): Promise<SqlServerFixture> {
   try {
     for (const batch of splitBatches(readFixture('sqlserver.sql'))) await pool.request().batch(batch)
     for (const batch of splitBatches(readFixture('sqlserver.restricted.sql'))) await pool.request().batch(batch)
+    for (const batch of splitBatches(readFixture('sqlserver.parity.sql'))) await pool.request().batch(batch)
   } finally {
     await pool.close()
   }

@@ -1,9 +1,10 @@
-import type { LookupConfig, LookupQuery, RowFilterTerm } from '@formancy/data-core'
+import type { LookupConfig, LookupQuery, LookupSearchColumn, RowFilterTerm } from '@formancy/data-core'
 import mssql from 'mssql'
 import { quoteName, quoteTable } from '../sql/quote.js'
 import { Parameters } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
-import { bindFilterValue, bindValue, canonicalText } from '../sql/values.js'
+import { filterPredicate } from '../sql/filters.js'
+import { bindValue, canonicalText } from '../sql/values.js'
 
 /**
  * The parameters one statement may bind. SQL Server's message says "a maximum
@@ -27,15 +28,14 @@ function keySelect(config: LookupConfig): string[] {
 }
 
 /**
- * The display columns as text, `[d0]`, `[d1]`, … The configuration names
- * them without their types — it carries types for the key alone — so they
- * are spelled by SQL Server's ISO style 126, which is exact for text,
- * integers, decimals and dates and is not the canonical spelling of a bit, a
- * uuid or a timestamp (0017). A label is for recognising a row; the token
- * identifies it.
+ * The display columns, `[d0]`, `[d1]`, …, read as a record read reads them:
+ * the canonical text of each, by the type the configuration carries, which
+ * `fromCanonicalText` decodes and `displayText` spells (0028). Not SQL
+ * Server's own style 126, which spelled a bit `1`, a uuid in upper case, a
+ * float in scientific notation and an instant in its stored offset (C6).
  */
 function displaySelect(config: LookupConfig): string[] {
-  return config.display.map((name, index) => `convert(nvarchar(max), ${column(name)}, 126) as [d${String(index)}]`)
+  return config.display.map((display, index) => `${canonicalText(display.type, column(display.name))} as [d${String(index)}]`)
 }
 
 /** A row whose key holds a NULL cannot be referenced by any foreign key value, so it is never offered. */
@@ -43,9 +43,22 @@ function keysPresent(config: LookupConfig): string[] {
   return config.targetColumns.map((key) => `${column(key.name)} is not null`)
 }
 
-/** The actor's trusted filters, in the same WHERE as everything else: a row outside them does not exist for this call. */
+/**
+ * The actor's trusted filters, in the same WHERE as everything else: a row
+ * outside them does not exist for this call. Each compares exactly (0028).
+ */
 function filtered(parameters: Parameters, terms: readonly RowFilterTerm[]): string[] {
-  return terms.map((term) => `${column(term.column)} = ${bindFilterValue(parameters, term.value)}`)
+  return terms.map((term) => filterPredicate(parameters, column(term.column), term))
+}
+
+/**
+ * What a search column is matched as: text as itself, so the column's
+ * collation folds case and accents as it does in an index; an integer as its
+ * canonical text, the digits its label shows, converted explicitly rather
+ * than by LIKE's implicit conversion (0028).
+ */
+function searched(search: LookupSearchColumn): string {
+  return search.type.kind === 'integer' ? canonicalText(search.type, column(search.name)) : column(search.name)
 }
 
 /**
@@ -85,8 +98,7 @@ function orderBy(config: LookupConfig): string {
 /**
  * One page: up to `limit + 1` rows, so `lookupPage` can tell whether there is
  * more without a COUNT. The search is one parameter, matched against each
- * search column with LIKE; an integer column is converted by the server to
- * the same decimal text a label shows.
+ * search column with LIKE.
  */
 export function pageStatement(config: LookupConfig, query: LookupQuery, terms: readonly RowFilterTerm[]): Statement {
   const parameters = new Parameters()
@@ -94,7 +106,7 @@ export function pageStatement(config: LookupConfig, query: LookupQuery, terms: r
   if (query.search !== '') {
     if (config.search.length === 0) throw new Error(`${config.source} has no searchable column`)
     const pattern = parameters.add(mssql.NVarChar(mssql.MAX), containsPattern(query.search))
-    where.push(`(${config.search.map((name) => `${column(name)} like ${pattern} escape N'\\'`).join(' or ')})`)
+    where.push(`(${config.search.map((search) => `${searched(search)} like ${pattern} escape N'\\'`).join(' or ')})`)
   }
   const offset = parameters.add(mssql.BigInt, query.offset)
   const fetch = parameters.add(mssql.Int, query.limit + 1)

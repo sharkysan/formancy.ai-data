@@ -1,6 +1,6 @@
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { ApiValue, MetadataSnapshot, ObjectRef, RecordAdapter, RecordColumn, RecordOutcome, RecordTarget, RecordValue, RowFilters, UpdateRequest } from '@formancy/data-core'
+import type { ApiValue, MetadataSnapshot, ObjectRef, RecordAdapter, RecordColumn, RecordOutcome, RecordTarget, RecordValue, RowFilters, RowFilterType, UpdateRequest } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
 import { EDGE_VALUES, startSqlServerFixture } from '@formancy/data-fixtures'
@@ -105,7 +105,7 @@ function columnOf(ref: ObjectRef, name: string): RecordColumn {
 }
 
 const valueOf = (ref: ObjectRef, name: string, value: ApiValue): RecordValue => ({ ...columnOf(ref, name), value })
-const tenant = (value: string): RowFilters => ({ kind: 'restricted', equal: [{ column: 'tenant_id', value }] })
+const tenant = (value: string): RowFilters => ({ kind: 'restricted', equal: [{ column: 'tenant_id', type: columnOf(ORDER, 'tenant_id').type as RowFilterType, value }] })
 const EVERY_ROW: RowFilters = { kind: 'unrestricted' }
 
 function target(ref: ObjectRef, versionColumn: string | null = null): RecordTarget {
@@ -229,10 +229,11 @@ describe('each constraint the fixture can be made to break', () => {
   })
 
   // What the codec accepts and the column cannot hold: money is described as
-  // decimal(19,4), whose upper part it does not reach (0007); a version column
-  // at its type's largest value cannot be incremented; and a trusted filter
-  // value that is not the column's type cannot match a row and is not a
-  // missing one either.
+  // decimal(19,4), whose upper part it does not reach (0007), and a version
+  // column at its type's largest value cannot be incremented. A trusted
+  // filter value its column cannot hold in that spelling never reaches the
+  // server any more (0028): scopeRowFilters refuses it as invalid-context,
+  // and a term that skipped it is thrown before anything is sent.
   test('a value its column cannot hold is out-of-range, and nothing is written', async () => {
     const records = createSqlServerRecords(owner)
     expect(await records.update(versioned(WALLET, [valueOf(WALLET, 'm', '999999999999999.9999')], '0'))).toMatchObject({ ok: false, code: 'out-of-range' })
@@ -245,39 +246,39 @@ describe('each constraint the fixture can be made to break', () => {
     ])
 
     for (const tenantId of ['acme', '99999999999']) {
-      const read = await records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', FIXTURE_ORDER)], columns: [columnOf(ORDER, 'status')], filters: tenant(tenantId) })
-      expect(read).toMatchObject({ ok: false, code: 'out-of-range' })
+      const read = records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', FIXTURE_ORDER)], columns: [columnOf(ORDER, 'status')], filters: tenant(tenantId) })
+      await expect(read).rejects.toThrow(/not spelled as its column holds it/)
     }
   })
 
-  // A refusal with a number the adapter has no code for — here 544, an
-  // identity written by hand, which bindings never do — was still reported for
-  // the statement, so nothing was written: `unavailable`, with the number to
-  // find it by. Never thrown, never unknown-outcome. A customer's trigger that
-  // throws the number the adapter's own check uses is the customer's error,
-  // not a character the column could not store.
-  test('a refusal the adapter does not recognise is unavailable, naming its number', async () => {
+  // An identity written by hand — 544, which bindings write only when the
+  // column became an identity after discovery — is schema-changed, as
+  // PostgreSQL's 428C9 is (0028). A customer's trigger that throws the number
+  // the adapter's own check uses is the customer's error, not a character the
+  // column could not store: `refused`, with the number to find it by, because
+  // the same write would be refused again. Never thrown, never unknown-outcome.
+  test("a generated column written is schema-changed, and a trigger's own number is refused", async () => {
     const records = createSqlServerRecords(owner)
     const outcome = await insertOrder(records, [valueOf(ORDER, 'id', '5'), ...newOrder()])
-    expect(outcome).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringContaining('544') })
+    expect(outcome).toMatchObject({ ok: false, code: 'schema-changed', message: expect.stringContaining('544') })
     const thrower: ObjectRef = { schema: 'ops', name: 'thrower' }
     const thrown = await records.insert({ target: target(thrower), values: [valueOf(thrower, 'id', '1')], returning: [] })
-    expect(thrown).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringContaining('51701') })
+    expect(thrown).toMatchObject({ ok: false, code: 'refused', message: expect.stringContaining('51701') })
   })
 
   // RAISERROR, unlike THROW, does not end the batch even under xact_abort: a
   // trigger that raises one as a "warning" and does not roll back lets the
   // statement and the commit run, and the driver still reports the error. Were
-  // that `unavailable` — which promises nothing committed — over a write that
-  // did commit, a host retrying the insert would store the record twice. Any
+  // that `refused` — which promises nothing was written — over a write that
+  // did commit, a person would be told a record was not saved that was. Any
   // error the batch is told of rolls it back, so the refusal is true.
-  test("a trigger's RAISERROR without a rollback is unavailable, and nothing is written", async () => {
+  test("a trigger's RAISERROR without a rollback is refused, and nothing is written", async () => {
     const records = createSqlServerRecords(owner)
     const warned: ObjectRef = { schema: 'ops', name: 'warned' }
     const inserted = await records.insert({ target: target(warned), values: [valueOf(warned, 'id', '2'), valueOf(warned, 'note', 'new')], returning: [] })
-    expect(inserted).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringContaining('50000') })
+    expect(inserted).toMatchObject({ ok: false, code: 'refused', message: expect.stringContaining('50000') })
     const updated = await records.update(versioned(warned, [valueOf(warned, 'note', 'after')], '0'))
-    expect(updated).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringContaining('50000') })
+    expect(updated).toMatchObject({ ok: false, code: 'refused', message: expect.stringContaining('50000') })
     const rows = await owner.request().query<{ id: number; note: string; version: number }>('select id, note, version from ops.warned order by id')
     expect(rows.recordset).toEqual([{ id: 1, note: 'before', version: 0 }])
   })
@@ -458,12 +459,13 @@ describe('a trigger that decides what a write stores', () => {
   // gave an insert and an update `ok: true` over an unchanged table, and one
   // that inserts the row itself, changed, gave the identity 0 and the values
   // before it changed them. Nothing the batch reads tells what such a trigger
-  // stored, so the write is refused and rolled back rather than reported done.
+  // stored, so the write is refused and rolled back rather than reported done:
+  // `refused`, not `unavailable`, because it would be refused again (0028).
   test('an enabled INSTEAD OF trigger for the operation refuses the write, and nothing is stored', async () => {
     const records = createSqlServerRecords(owner)
     const ignored: ObjectRef = { schema: 'ops', name: 'ignored' }
     const rewritten: ObjectRef = { schema: 'ops', name: 'rewritten' }
-    const refused = { ok: false, code: 'unavailable', message: expect.stringContaining('INSTEAD OF') }
+    const refused = { ok: false, code: 'refused', message: expect.stringContaining('INSTEAD OF') }
     expect(await records.insert({ target: target(ignored), values: [valueOf(ignored, 'note', 'new')], returning: [columnOf(ignored, 'id')] })).toMatchObject(refused)
     expect(await records.update(versioned(ignored, [valueOf(ignored, 'note', 'changed')], '0'))).toMatchObject(refused)
     expect(
@@ -503,7 +505,7 @@ describe('a trigger that decides what a write stores', () => {
     try {
       const ignored: ObjectRef = { schema: 'ops', name: 'ignored' }
       const outcome = await createSqlServerRecords(blind).insert({ target: target(ignored), values: [valueOf(ignored, 'note', 'unseen')], returning: [] })
-      expect(outcome).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringContaining('INSTEAD OF') })
+      expect(outcome).toMatchObject({ ok: false, code: 'refused', message: expect.stringContaining('INSTEAD OF') })
     } finally {
       await blind.close()
     }

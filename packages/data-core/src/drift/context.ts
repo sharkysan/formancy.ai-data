@@ -1,5 +1,6 @@
 import type { FieldBinding, FormBindings } from '../generate/types.js'
 import type { ForeignKeyMeta, KeyMeta, MetadataSnapshot, ObjectMeta, ObjectRef } from '../metadata.js'
+import type { FormPolicy } from '../policy/types.js'
 import type { DriftKind, DriftSubject } from './types.js'
 
 /** A write the published form may offer. */
@@ -27,11 +28,17 @@ export function stopped(draft: Draft): readonly Operation[] {
   return draft.breaksReads ? ['create', 'update'] : draft.stops
 }
 
-/** One review: the two snapshots, the form, and its root in each. */
+/** One review: the two snapshots, the form, its policy's lookup filters, and its root in each. */
 export interface Comparison {
   base: MetadataSnapshot
   current: MetadataSnapshot
   bindings: FormBindings
+  /**
+   * The published policy's lookup filters: the target columns each lookup's
+   * searches compare, which the bindings do not record (0028). The root's
+   * filter columns are bound columns (`validatePolicy`), compared as such.
+   */
+  policy: Pick<FormPolicy, 'lookups'>
   before: ObjectMeta
   after: ObjectMeta
   /**

@@ -4,7 +4,7 @@
 import { describe, expect, test } from 'vitest'
 import { createSnapshot, findObject } from '@formancy/data-core'
 import type { ForeignKeyMeta, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
-import { formIdFor, lookupBlocker, titleFor } from './choice.js'
+import { formIdFor, lookupBlocker, pinCandidates, titleFor } from './choice.js'
 import { OWNER_SNAPSHOT, WRITER_SNAPSHOT } from './test-server.js'
 
 /**
@@ -78,5 +78,20 @@ describe('the defaults a root suggests', () => {
     expect(formIdFor({ schema: '_x', name: 'y' })).toBe('x-y')
     expect(titleFor({ schema: 'sales', name: 'order_line' })).toBe('Order line')
     expect(titleFor({ schema: 'sales', name: '__' })).toBe('__')
+  })
+})
+
+describe('the columns a policy can pin', () => {
+  // A pinned column is a root row filter, and a filter compares a column's
+  // canonical value exactly: a boolean or a timestamp has no spelling both
+  // engines compare alike, and the server refuses a filter on one at publish
+  // (0028). The customer's active and created_at are written by a person and
+  // still not offered; its tenant is.
+  test('offers only columns a row filter can compare', () => {
+    const offered = pinCandidates(rootOf(OWNER_SNAPSHOT, 'customer')).map((column) => column.name)
+    expect(offered).toContain('tenant_id')
+    expect(offered).toContain('name')
+    expect(offered).not.toContain('active')
+    expect(offered).not.toContain('created_at')
   })
 })

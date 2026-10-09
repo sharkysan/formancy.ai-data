@@ -7,6 +7,7 @@ import {
   drift,
   kinds,
   named,
+  NO_FILTERS,
   object,
   only,
   ORDER,
@@ -220,6 +221,6 @@ describe('diffSnapshots: row security and the account', () => {
   test('the fast path holds only for the same principal', () => {
     const base = snapshot()
     const { bindings } = generateForm(base, ORDER)
-    expect(diffSnapshots(base, snapshot(undefined, { account: { user: 'clerk', login: 'owner' } }), bindings).changes).toHaveLength(1)
+    expect(diffSnapshots(base, snapshot(undefined, { account: { user: 'clerk', login: 'owner' } }), bindings, NO_FILTERS).changes).toHaveLength(1)
   })
 })

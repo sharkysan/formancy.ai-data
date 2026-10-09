@@ -2,11 +2,8 @@ import { canonicalize } from '@formancy/spec'
 import { versionColumnProblem } from '../generate/generate.js'
 import type { FieldBinding, FormBindings } from '../generate/types.js'
 import { bindingsVersionProblem } from '../generate/version.js'
-import { lookupFilters } from '../lookup/filters.js'
-import type { RowFilters } from '../lookup/types.js'
-import { isKeyValue, isLookupKeyType } from '../lookup/values.js'
+import { isLookupKeyType } from '../lookup/values.js'
 import type { ColumnMeta, MetadataSnapshot, ObjectMeta } from '../metadata.js'
-import type { RowFilter } from '../policy/types.js'
 import { findObject } from '../snapshot.js'
 import type { PlanRefusal, PlanRefusalCode } from './plan-types.js'
 import type { RecordColumn, RecordConcurrency, RecordTarget } from './types.js'
@@ -166,28 +163,4 @@ export function prepare(snapshot: MetadataSnapshot, bindings: FormBindings): { o
 /** The named columns of the root, in catalog order: one order for every column list a request carries, however it was assembled. */
 export function inCatalogOrder(root: ObjectMeta, names: ReadonlySet<string>): RecordColumn[] {
   return root.columns.filter((column) => names.has(column.name)).map((column) => ({ name: column.name, type: column.type }))
-}
-
-/**
- * Row filters for a request, each value spelled exactly as its column holds
- * it, as a key value is (0012).
- *
- * A filter term carries no type, so an adapter binds its text and each engine
- * converts it: a tenant of `'042'` is 42 to both, `'acme'` an error on both,
- * and neither is the context the host meant. A trusted value its column
- * cannot hold in that spelling is refused, and a filter on a column with no
- * settled spelling — a float, a timestamp — is a policy that cannot be applied.
- */
-export function scopedFilters(object: ObjectMeta, filter: RowFilter, where: string): { ok: true; filters: RowFilters } | PlanRefusal {
-  for (const term of filter) {
-    const column = object.columns.find((candidate) => candidate.name === term.column)
-    if (column === undefined) return refuse('invalid-policy', `${where}: ${object.ref.name} has no column ${term.column}.`)
-    if (!isLookupKeyType(column.type)) {
-      return refuse('invalid-policy', `${where}: ${term.column} is ${column.databaseType}, which a row filter cannot compare as text.`)
-    }
-    if (!isKeyValue(column.type, term.value)) {
-      return refuse('invalid-context', `${where}: the trusted value for ${term.column} is not spelled as the column holds it; refusing rather than letting each engine convert it.`)
-    }
-  }
-  return { ok: true, filters: lookupFilters(filter) }
 }

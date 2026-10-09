@@ -69,7 +69,12 @@ function noValue(type: NormalizedType): Error {
  * SQL that reads `expression` as the text of its canonical API value.
  *
  * - text: itself, as nvarchar(max), so a `varchar` is decoded by the server's
- *   code page and not by the driver's.
+ *   code page and not by the driver's. A char(n) or nchar(n) without its
+ *   padding: SQL Server keeps it through the conversion (`AB ` for a char(3)
+ *   holding AB, C1) and PostgreSQL's bpchar drops it, so a fixed-length key
+ *   would otherwise have one token per engine (0028). `rtrim` removes U+0020
+ *   and nothing else — a no-break space or a tab stays (C1b) — which is
+ *   exactly the padding. Measured on SQL Server 2022 (16.0.4295) on 2026-10-09.
  * - integer: the decimal string, whatever its width.
  * - decimal: every digit the column holds, padded to its scale, in style 2 —
  *   which a decimal ignores, and which gives `money` its four places where
@@ -96,7 +101,7 @@ function noValue(type: NormalizedType): Error {
 export function canonicalText(type: NormalizedType, expression: string): string {
   switch (type.kind) {
     case 'text':
-      return `convert(nvarchar(max), ${expression})`
+      return type.fixedLength ? `rtrim(convert(nvarchar(max), ${expression}))` : `convert(nvarchar(max), ${expression})`
     case 'integer':
       return `convert(nvarchar(20), ${expression})`
     case 'decimal':
@@ -249,26 +254,4 @@ export function bindValue(parameters: Parameters, type: NormalizedType, value: A
     case 'unsupported':
       throw noValue(type)
   }
-}
-
-/**
- * A collation that compares code point by code point, so a case- or
- * accent-insensitive column collation cannot call two different strings
- * equal. Trailing spaces still compare equal, as they do under every SQL
- * Server collation, which is also what lets a char(n) pad what it stores.
- */
-export const EXACT_COLLATION = 'Latin1_General_100_BIN2'
-
-/**
- * Binds a row filter's value, which is trusted text from the policy context.
- * The filter names a column and not its type, so the server converts the text
- * to a non-text column's type. Against a text column it compares exactly, not
- * by the column's collation: under a case-insensitive one, the tenant `acme`
- * would otherwise read the rows of `ACME`, which an application may hold to be
- * another tenant. Narrower is the side to fail on, and it is what PostgreSQL's
- * default collation does. The cost is that an index on a text filter column
- * is not used for a seek unless its collation is binary (0017).
- */
-export function bindFilterValue(parameters: Parameters, value: string): string {
-  return `${asText(parameters, value)} collate ${EXACT_COLLATION}`
 }

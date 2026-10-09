@@ -22,8 +22,10 @@ let reader: Sql
 let sales: MetadataSnapshot
 let lk: MetadataSnapshot
 
-const TENANT_1: RowFilters = { kind: 'restricted', equal: [{ column: 'tenant_id', value: '1' }] }
-const TENANT_2: RowFilters = { kind: 'restricted', equal: [{ column: 'tenant_id', value: '2' }] }
+/** sales.customer's and lk.contact's tenant_id, an integer, as the snapshot types it and `scopeRowFilters` would. */
+const TENANT_ID = { kind: 'integer', min: '-2147483648', max: '2147483647' } as const
+const TENANT_1: RowFilters = { kind: 'restricted', equal: [{ column: 'tenant_id', type: TENANT_ID, value: '1' }] }
+const TENANT_2: RowFilters = { kind: 'restricted', equal: [{ column: 'tenant_id', type: TENANT_ID, value: '2' }] }
 const EVERY_ROW: RowFilters = { kind: 'unrestricted' }
 const FIRST_PAGE: LookupQuery = { search: '', offset: 0, limit: 50 }
 
@@ -200,7 +202,7 @@ describe('the search', () => {
     const lookups = createPostgresLookups(owner)
     const byName = lookupOver(sales, ORDER, 'fk_order_customer', ['name', 'country_code'], { search: ['name'] })
     const both = lookupOver(sales, ORDER, 'fk_order_customer', ['name', 'country_code'])
-    expect(both.search).toEqual(['name', 'country_code'])
+    expect(both.search.map((column) => column.name)).toEqual(['name', 'country_code'])
     expect((await lookups.search(byName, { search: 'CH', offset: 0, limit: 50 }, TENANT_1)).rows).toEqual([])
     expect((await lookups.search(both, { search: 'CH', offset: 0, limit: 50 }, TENANT_1)).rows.map((row) => row.label)).toEqual([
       'Muster AG · CH',
@@ -362,15 +364,25 @@ describe('membership', () => {
 })
 
 describe('what the composition root configured', () => {
-  // postgres.js serialises an untyped parameter through the serializer of the
-  // type the server inferred for it, and its boolean serializer turns any
-  // value that is not `true` into 'f'. A trusted filter of 'true' bound that
-  // way selects the rows where the column is FALSE.
-  test('a filter on a boolean column selects the rows it names', async () => {
+  // A boolean has no spelling both engines compare alike, and postgres.js
+  // once bound a filter of 'true' through its boolean serializer, which
+  // writes 'f' for anything but the JavaScript `true`, so the filter selected
+  // the FALSE rows. A boolean filter is refused (0028): `scopeRowFilters`
+  // never makes one, and one that reaches the adapter by hand is thrown
+  // before anything is sent — on a driver pointed at nothing, so a statement
+  // that was sent would fail as unreachable instead.
+  test('a boolean filter throws before anything is sent', async () => {
     const config = lookupOver(lk, { schema: 'lk', name: 'flagged_use' }, 'fk_flagged_use_flagged', ['name'])
-    const on: RowFilters = { kind: 'restricted', equal: [{ column: 'active', value: 'true' }] }
-    const page = await createPostgresLookups(owner).search(config, FIRST_PAGE, on)
-    expect(page.rows).toEqual([{ token: tokenOf('1'), label: 'Switched on' }])
+    const on = { kind: 'restricted', equal: [{ column: 'active', type: { kind: 'boolean' }, value: 'true' }] } as unknown as RowFilters
+    const nowhere = postgres({ host: '127.0.0.1', port: 1, connect_timeout: 1, onnotice: () => {} })
+    try {
+      const lookups = createPostgresLookups(nowhere)
+      await expect(lookups.search(config, FIRST_PAGE, on)).rejects.toThrow(/carries its column's type/)
+      await expect(lookups.resolve(config, [tokenOf('1')], on)).rejects.toThrow(/carries its column's type/)
+      await expect(lookups.rejects(config, [tokenOf('1')], on)).rejects.toThrow(/carries its column's type/)
+    } finally {
+      await nowhere.end()
+    }
   })
 
   // The adapter is handed a connected driver, and every one of these is the

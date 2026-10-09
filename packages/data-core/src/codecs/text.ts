@@ -50,8 +50,20 @@ function tooLong(maxLength: number, unit: TextLengthUnit): string {
   }
 }
 
+/**
+ * Without the padding a fixed-length column adds and ignores: U+0020 only, as
+ * PostgreSQL's bpchar and SQL Server's rtrim (C1b). By hand rather than with
+ * `/ +$/`, which backtracks quadratically over a long run of spaces that ends
+ * in something else, and this runs before the length is checked.
+ */
+function withoutPadding(value: string): string {
+  let end = value.length
+  while (end > 0 && value.charCodeAt(end - 1) === 0x20) end -= 1
+  return value.slice(0, end)
+}
+
 /** A UTF-16 surrogate without its pair. In `u` mode a paired one is a single astral code point and does not match. */
-const LONE_SURROGATE = /\p{Cs}/u
+export const LONE_SURROGATE = /\p{Cs}/u
 
 /**
  * A text value for this column, counted in the unit the column counts.
@@ -61,7 +73,11 @@ const LONE_SURROGATE = /\p{Cs}/u
  * surrogate is refused for the same reason (0026): PostgreSQL stores U+FFFD in
  * its place and reports success, SQL Server's nvarchar keeps it, and its UTF-8
  * varchar stores U+FFFD, which the adapter refuses as not stored — one value,
- * three outcomes. The lookup token and search refuse it already.
+ * three outcomes. The lookup token and search refuse it too, and so does a
+ * key or row filter value (`isKeyValue`, 0028), with this expression.
+ *
+ * A fixed-length value's trailing spaces are dropped first, and the result
+ * is the canonical value: what both engines read back (0028).
  *
  * The length is checked in `lengthUnit`, so a UTF-8 varchar's overflow is a
  * field error here rather than SQL Server's 2628, and PostgreSQL takes the
@@ -71,7 +87,11 @@ const LONE_SURROGATE = /\p{Cs}/u
  * which stores `?` or a best fit without an error — by the adapter's check
  * that the text was stored as sent.
  */
-export function parseText(type: TextType, value: string): TextOutcome {
+export function parseText(type: TextType, given: string): TextOutcome {
+  // Both engines pad a fixed-length column with U+0020 and read it back
+  // without it (0028): kept, 'AB ' would be written and read as 'AB', a
+  // change on every save (0008). Dropped before measuring, as the database does.
+  const value = type.fixedLength ? withoutPadding(given) : given
   if (value.includes('\u0000')) return { ok: false, code: 'invalid-character', message: 'Text cannot contain a NUL character.' }
   if (LONE_SURROGATE.test(value)) {
     return { ok: false, code: 'invalid-character', message: 'Text cannot contain an unpaired UTF-16 surrogate, which UTF-8 cannot carry.' }

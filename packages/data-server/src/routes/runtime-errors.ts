@@ -53,7 +53,9 @@ function fieldOf(bindings: FormBindings, column: string | undefined): string | u
  * A database's refusal as an HTTP answer (0015).
  *
  * Constraint failures become a field error where the engine names a column the
- * form binds, so a person sees the message beside the field. `unknown-outcome`
+ * form binds, so a person sees the message beside the field. `refused` is
+ * 422, because sending it again will be refused the same way; `unavailable`
+ * is 503, because it may not be. `unknown-outcome`
  * is 502 and says so in words: the write may have happened, and nothing here
  * retries it.
  */
@@ -84,8 +86,13 @@ export function recordFailure(bindings: FormBindings, failure: RecordFailure): H
       return { status: 403, body: { code: 'permission-denied', message: 'The database connection is not allowed to do this.' } }
     case 'schema-changed':
       return { status: 409, body: { code: 'schema-changed', message: 'The database changed since this form was published.' } }
+    case 'refused':
+      // A trigger's own error, a write declined, an error the adapter does not
+      // know: it will be refused again, so the person is not invited to retry (0028).
+      return withField(422, 'refused', 'The database refused this request, and nothing was saved. Sending it again will be refused the same way.')
     case 'unavailable':
-      return { status: 503, body: { code: 'unavailable', message: 'The database cannot be reached. Nothing was saved.' } }
+      // Unreachable, or a refusal the engine documents as passing: a deadlock, a lock timeout.
+      return { status: 503, body: { code: 'unavailable', message: 'The database could not complete this now. Nothing was saved.' } }
     case 'unknown-outcome':
       return {
         status: 502,

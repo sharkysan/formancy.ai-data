@@ -73,11 +73,33 @@ in short:
   is `$n::pg_catalog.text`, then cast to the column's exact type. postgres.js
   would otherwise serialise an untyped parameter through its serializer for
   the type the server inferred, and its boolean serializer turns the text
-  `'true'` into false. A row filter term, which carries no type, is a
-  parameter declared `unknown`: the server types it from the column it is
-  compared with and parses it with that type's input function, and the
-  driver sends the text as written. A domain that refuses NULL elsewhere in
-  the table does not get in the way.
+  `'true'` into false. A row filter term carries its column's type, so it is
+  bound the same way.
+- **A row filter compares the canonical value exactly**
+  ([0028](../../docs/decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)):
+  case, accents and trailing spaces all count, and the column's collation is
+  not consulted. Text is compared twice from one parameter — `"c" = $n::text`
+  (`::bpchar` for `char(n)`) in the column's own type and collation, which
+  keeps its index, and `("c"::text collate "C") = ($n::text collate "C")`,
+  which is exact; the collation and `bpchar` are named in `pg_catalog`, and
+  the parity suite plants a case-blind `public."C"` and a `public.bpchar` to
+  hold that. On the parity schema, sized so that a scan would show, the
+  lookup reads `pk_tenant_item` with the first as its index condition and the
+  second as a filter, which `parity.integration.test.ts` reads from EXPLAIN.
+  A `numeric` with no scale — PostgreSQL's alone — keeps the scale each value
+  was given, and numeric equality calls `12.5` and `12.50` equal, so it is
+  compared twice too: as a number, and as its text under `"C"`.
+  Before, a term was a parameter declared `unknown`, compared in the
+  column's collation: under a case-insensitive one, tenant `acme` read
+  `ACME`'s rows.
+  A boolean, float, time or timestamp filter, and a value not spelled as the
+  column holds it (`'042'`, `'AB '` for `char(3)`), is thrown before
+  anything is sent.
+- **A label is spelled once, in the core.** A display column is read by the
+  record reader above and decoded by its type, and `displayText` spells it:
+  `true`, an instant in UTC to the second, a time to the minute. Not
+  `to_jsonb`, which this used before and which follows the session's
+  TimeZone and `extra_float_digits`.
 - **Every name is PostgreSQL's own.** Each function, operator
   (`operator(pg_catalog.=)`), type and collation the SQL names is qualified
   with `pg_catalog`, so nothing a role creates in a schema on the search
@@ -89,7 +111,8 @@ in short:
   `sql(name)`, which splits on dots. A name over 63 bytes is refused: the
   server would truncate it and address another table.
 - **The search is literal**: `ILIKE` with `%`, `_` and the escape character
-  escaped, over the configured search columns only, through the database's
+  escaped, over the configured search columns only — text as itself, an
+  integer as its digits — through the database's
   default collation — PostgreSQL 17 refuses ILIKE on a nondeterministic
   collation outright. It folds case as that collation does and **does not fold
   accents**: `uber` does not find `Über`, where formancy's own narrowing would.
@@ -106,14 +129,23 @@ in short:
   `not-found`, inside the same filters, so another tenant's record is
   `not-found` too. A record still at the version sent was declined by the
   database itself — a BEFORE trigger returning NULL, a rule, a row security
-  policy — and is `check-violation`, not `stale`; so is an insert the server
+  policy — and is `refused`, not `stale`; so is an insert the server
   completed as `INSERT 0 0`.
 - **Errors are values.** By SQLSTATE: 23505 and 23P01 `unique-violation`,
-  23503 `foreign-key-violation`, 23502 `not-null-violation`, 23514 and a
-  trigger's `RAISE` `check-violation`, 22001 and 54000 `too-long`, other class
-  22 `out-of-range`, 42501 `permission-denied`, a missing table or column or
-  one whose type changed `schema-changed`; anything else the server refuses is
-  `unavailable`, because it certainly rolled back. A connection that fails
+  23503 `foreign-key-violation`, 23502 `not-null-violation`, other class 23
+  `check-violation`, 22001 and 54000 `too-long`, other class 22
+  `out-of-range`, 42501 `permission-denied`, a missing table or column, one
+  whose type changed, or a generated column named in a write (428C9)
+  `schema-changed`. What passes is `unavailable`, an allowlist: classes 08,
+  40, 53, 57, 58 and 28, and 55P03, 55006, 25006 and 3D000. The suites
+  provoke 40P01, 57014, 55P03 and 25006; the rest are by PostgreSQL's
+  documentation. Of class 57 only 57014, a cancelled or timed-out statement,
+  arrives as a SQLSTATE: a terminated backend, a shutdown and a
+  `transaction_timeout` (25P04) are FATAL, close the connection, and reach
+  the adapter as postgres.js's CONNECTION_CLOSED — `unknown-outcome` for a
+  write, as the parity suite shows by terminating one mid-write. Anything else the server refuses — a trigger's `RAISE`, an
+  error code only a function knows (38000) — is `refused`: it certainly rolled
+  back, and the same request will be refused again. A connection that fails
   before a statement is sent is `unavailable`; after a write was sent it is
   `unknown-outcome` — the tests show such a write committing after the client
   gave up — and it is never retried. A malformed request, filters that say
@@ -276,6 +308,15 @@ built output, so run `pnpm build` first.
   filters, literal search, order, NULL and unrepresentable keys, membership,
   the restricted reader, a driver configured every way it can be, and
   objects planted on the search path.
+- `parity.integration.test.ts` — the cases 0028 holds both engines to, from
+  `@formancy/data-fixtures`, over its `parity` schema: every row filter in a
+  lookup's page, resolve and membership, a read and an update; the filter
+  served by the primary key, and unchanged by a planted `public."C"` and
+  `public.bpchar`; an unconstrained `numeric` filter; every label under an
+  unusual TimeZone, DateStyle and float digits, which the test reads back
+  from the session first — postgres.js drops a startup parameter whose value
+  is falsy, and `extra_float_digits: 0` had never arrived; and every refusal, a
+  deadlock victim, the timeouts and a terminated backend included.
 - `records.integration.test.ts` — the record port over the fixture: every
   edge value and every kind, the shared shipment rows and the column facts
   both engines are held to (a length in characters, a `real`'s canonical

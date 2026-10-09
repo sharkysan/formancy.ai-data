@@ -84,6 +84,18 @@ function typeChange(before: ColumnMeta, after: ColumnMeta): string {
   return `its type changed from ${before.databaseType} to ${after.databaseType}`
 }
 
+/**
+ * Why a column's type is not the one it was, in any direction, or `null` when
+ * the normalised type and the database's spelling of it are both unchanged.
+ * For a column read by its published type, where wider is as different as
+ * narrower.
+ */
+export function typeDifference(before: ColumnMeta, after: ColumnMeta): string | null {
+  const verdict = compareTypes(before.type, after.type)
+  if (verdict === 'same' && before.databaseType === after.databaseType) return null
+  return verdict === 'changed' ? typeChange(before, after) : `its type changed from ${before.databaseType} to ${after.databaseType}`
+}
+
 /** Why the way the database generates a column is different, named both ways. */
 function generationChange(before: ColumnMeta, after: ColumnMeta): string {
   if (after.generated === 'none') return `the database no longer generates it (it was ${before.generated})`

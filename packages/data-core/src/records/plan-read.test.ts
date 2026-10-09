@@ -99,10 +99,10 @@ describe('planRead', () => {
     expect(planRead(PG, PG_ORDER, ORDER_POLICY, actor(['clerk'], {}), ORDER_TOKEN)).toMatchObject({ ok: false, code: 'missing-attribute' })
   })
 
-  // A filter's term carries no type (RowFilterTerm is a column and text), so
-  // an adapter binds it untyped and each engine converts: '042' is 42 to both,
-  // 'acme' is an error on both. The trusted value must be spelled as the
-  // column holds it, or nothing is asked.
+  // A filter's term carries its column's type and the value as the column
+  // holds it (0028): bound otherwise, each engine would convert it — '042' is
+  // 42 to both, 'acme' is an error on both. The trusted value must be spelled
+  // as the column holds it, or nothing is asked.
   test('refuses a trusted tenant not spelled as the column holds it, rather than letting each engine convert it', () => {
     for (const tenant of ['042', 'acme', ' 1', '1.0']) {
       expect(planRead(PG, PG_ORDER, ORDER_POLICY, actor(['clerk'], { tenant }), ORDER_TOKEN), tenant).toMatchObject({ ok: false, code: 'invalid-context' })
@@ -117,15 +117,15 @@ describe('planRead', () => {
     expect(planRead(PG, PG_ORDER, misfit, CLERK, ORDER_TOKEN)).toMatchObject({ ok: false, code: 'invalid-policy', message: expect.stringContaining('fields.total') as unknown as string })
   })
 
-  // A filter compares a column with text. A boolean has many spellings and a
-  // timestamp a precision per engine, so a filter on one is a policy that
-  // cannot be applied the same way twice.
+  // A filter compares a column's canonical value exactly. A boolean has many
+  // spellings and a timestamp a precision per engine, so a filter on one is a
+  // policy that cannot be applied the same way twice: refused, in lookups too.
   test('refuses a row filter on a column whose values have no settled spelling', () => {
     const onFlag: FormPolicy = { ...ORDER_POLICY, rowFilters: [{ column: 'paid', attribute: 'tenant' }] }
     expect(planRead(PG, PG_ORDER, onFlag, CLERK, ORDER_TOKEN)).toMatchObject({
       ok: false,
       code: 'invalid-policy',
-      message: expect.stringContaining('paid is boolean, which a row filter cannot compare as text') as unknown as string,
+      message: expect.stringContaining('paid is boolean, which a row filter cannot compare') as unknown as string,
     })
   })
 

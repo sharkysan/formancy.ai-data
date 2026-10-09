@@ -54,7 +54,7 @@ export type DriftKind =
   | 'concurrency-changed'
   /** No primary or unique key covers the columns that identify a record any more. */
   | 'identity-key-changed'
-  /** The foreign key behind a lookup, the candidate key it points at, the target, or a display column changed. */
+  /** The foreign key behind a lookup, the candidate key it points at, the target, a display or row filter column, or the type of a column the lookup reads, changed. */
   | 'lookup-changed'
   /** A primary or unique key of the root that the identity does not rest on. */
   | 'key-changed'

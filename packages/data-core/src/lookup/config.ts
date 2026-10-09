@@ -2,7 +2,7 @@ import type { FieldBinding, FormBindings } from '../generate/types.js'
 import { bindingsVersionProblem } from '../generate/version.js'
 import type { ColumnMeta, MetadataSnapshot, NormalizedTypeKind, ObjectMeta, ObjectRef } from '../metadata.js'
 import { findObject } from '../snapshot.js'
-import type { LookupConfig, LookupKeyColumn, LookupSort } from './types.js'
+import type { LookupConfig, LookupDisplayColumn, LookupDisplayType, LookupKeyColumn, LookupSearchColumn, LookupSearchType, LookupSort } from './types.js'
 import { isLookupKeyType } from './values.js'
 
 /**
@@ -128,12 +128,14 @@ function checkKey(target: ObjectMeta, where: string, columns: readonly string[])
   })
 }
 
-function checkDisplay(target: ObjectMeta, where: string, display: readonly string[]): void {
+/** Each display column with its type, which the adapter reads it by and `displayText` spells it by. */
+function checkDisplay(target: ObjectMeta, where: string, display: readonly string[]): LookupDisplayColumn[] {
   if (display.length === 0) throw new Error(`${where} needs at least one display column`)
-  for (const name of display) {
+  return display.map((name) => {
     const column = readableOf(target, where, name, 'display column ')
     if (NO_TEXT.has(column.type.kind)) throw new Error(`${where}: display column ${name} is ${column.databaseType}, which has no text form for a label`)
-  }
+    return { name, type: column.type as LookupDisplayType }
+  })
 }
 
 /**
@@ -141,19 +143,26 @@ function checkDisplay(target: ObjectMeta, where: string, display: readonly strin
  * matches the label and nothing else — so only displayed columns, and only
  * those both engines spell alike as text. A date searched as text would match
  * PostgreSQL's spelling of it, which depends on the session's `DateStyle`.
+ * Each comes with its type: an adapter matches an integer as its canonical
+ * text, never through an implicit conversion (0028).
  */
-function searchFor(target: ObjectMeta, where: string, display: readonly string[], requested: readonly string[] | undefined): string[] {
-  if (requested === undefined) return [...new Set(display)].filter((name) => SEARCHABLE.has(columnOf(target, where, name).type.kind))
+function searchFor(display: readonly LookupDisplayColumn[], where: string, requested: readonly string[] | undefined, target: ObjectMeta): LookupSearchColumn[] {
+  const searchable = (column: LookupDisplayColumn): column is { name: string; type: LookupSearchType } => SEARCHABLE.has(column.type.kind)
+  if (requested === undefined) {
+    const seen = new Set<string>()
+    return display.filter((column) => searchable(column) && !seen.has(column.name) && seen.add(column.name) !== undefined).map((column) => ({ name: column.name, type: column.type as LookupSearchType }))
+  }
   const seen = new Set<string>()
-  for (const name of requested) {
+  return requested.map((name) => {
     once(seen, where, name)
-    if (!display.includes(name)) throw new Error(`${where}: ${name} is not displayed, and a search matches only what the person can see`)
+    const shown = display.find((column) => column.name === name)
+    if (shown === undefined) throw new Error(`${where}: ${name} is not displayed, and a search matches only what the person can see`)
     const column = readableOf(target, where, name, '')
-    if (!SEARCHABLE.has(column.type.kind)) {
+    if (!searchable(shown)) {
       throw new Error(`${where}: ${name} is ${column.databaseType}; only text and integer columns are searched, because the engines spell other types differently`)
     }
-  }
-  return [...requested]
+    return { name, type: shown.type }
+  })
 }
 
 /**
@@ -213,7 +222,7 @@ export function buildLookupConfig(bindings: FormBindings, field: string, options
   const target = findObject(snapshot, binding.target.table)
   if (target === undefined) throw new Error(`${where}: ${nameOf(binding.target.table)} is outside the snapshot`)
   const targetColumns = checkKey(target, where, binding.target.columns)
-  checkDisplay(target, where, binding.display)
+  const display = checkDisplay(target, where, binding.display)
 
   const maxPageSize = options.maxPageSize ?? DEFAULT_MAX_PAGE_SIZE
   if (!Number.isSafeInteger(maxPageSize) || maxPageSize < 1) throw new Error(`${where}: the page size is a whole number of at least 1`)
@@ -223,8 +232,8 @@ export function buildLookupConfig(bindings: FormBindings, field: string, options
     foreignKey: binding.foreignKey,
     target: { ...target.ref },
     targetColumns,
-    display: [...binding.display],
-    search: searchFor(target, where, binding.display, options.search),
+    display,
+    search: searchFor(display, where, options.search, target),
     sort: sortFor(target, where, binding, options.sort),
     maxPageSize,
   }
