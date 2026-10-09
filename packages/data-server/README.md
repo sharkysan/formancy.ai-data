@@ -38,6 +38,11 @@ existed would be documented and inert.
   ([0022](../../docs/decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)).
   Registered only when the server is given a registry and a store.
 
+- **An operational audit trail** — one event per runtime request, never a
+  value, records named by a keyed hash
+  ([0023](../../docs/decisions/0023-the-audit-trail-is-operational-not-evidence.md)).
+  Not evidence, and the record says why.
+
 ## Running it
 
 ```bash
