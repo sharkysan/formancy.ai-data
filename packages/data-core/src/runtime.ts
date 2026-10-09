@@ -8,11 +8,12 @@ import type { FieldError } from './records/plan-types.js'
  * core, declared once so that the server that sends them and the client that
  * reads them compile against the same shape (0029). A record is `FormRecord`
  * and a search is `LookupResult`, which the planner and the adapters already
- * return; these are the three the server used to build by hand.
+ * return; these are the ones the server used to build by hand.
  *
- * Shapes only. Nothing here checks a reply: the client reads what arrives as
- * `unknown` and the server's handlers are annotated with these, so a change on
- * either side is a type error on the other before it is a blank form.
+ * Shapes, and the one header name both sides use. Nothing here checks a
+ * reply: the client reads what arrives as `unknown` and the server's handlers
+ * are annotated with these, so a change on either side is a type error on the
+ * other before it is a blank form.
  */
 
 /**
@@ -44,6 +45,31 @@ export interface RuntimeRefusal {
   message: string
   fieldErrors?: FieldError[]
 }
+
+/**
+ * 502: the write was sent and its answer lost; it may have committed. Nothing
+ * in this module retries it (0031). The sentence never names a value (0011):
+ * what was addressed travels in `record` and `version`, for the host to
+ * reconcile with.
+ */
+export interface UnknownOutcome extends RuntimeRefusal {
+  code: 'unknown-outcome'
+  operation: 'create' | 'update'
+  /** Update: the token sent. Create: `intendedRecord(...)`, or null when the database numbers the key. */
+  record: string | null
+  /** Update: the version sent -- saving again with exactly it is stored at most once. Create: null. */
+  version: string | null
+}
+
+/**
+ * The request header that names one sending of a write (0031). The client
+ * makes a new one for every create and update it is asked to send; a request
+ * that arrives again with it -- Chromium resends a request whose reused
+ * connection closed before any answer, below the page -- is answered with the
+ * first one's answer and not applied again. Declared here, the one place the
+ * server that reads it and the client that sends it both import.
+ */
+export const WRITE_ID_HEADER = 'formancy-write-id'
 
 /**
  * `POST /v1/forms/:id/lookups/:source/resolve`: the labels of the tokens asked

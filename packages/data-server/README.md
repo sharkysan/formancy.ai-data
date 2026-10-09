@@ -81,12 +81,45 @@ existed would be documented and inert.
   the database refused for a reason with no code of its own — a trigger's
   error, a declined write — is 422 `refused`, which says sending it again
   will be refused the same way; 503 `unavailable` is kept for what passes
-  (0028).
+  (0028). A write sent to the database whose answer was lost is 502
+  `unknown-outcome` with `operation`, `record` and `version`: an update's
+  token and version as sent, a create's token when the insert names its key
+  -- a key the person types, a tenant pinned from the token -- and `null` when
+  the database numbers it. Each sentence says what is safe next, and the
+  route asks the adapter once and never again
+  ([0031](../../docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
+  A read never answers one; an adapter that reported one for a read is a 500.
+  `e2e-lost-answer.integration.test.ts` drops the database's answer after the
+  commit, on both engines, and fails if the write crosses to the database a
+  second time.
+
+  A write that arrives again is answered, not applied. Chromium resends a
+  request -- a POST too -- when the connection it reused closed before any
+  answer, below the page, so a create whose answer the network lost after
+  the commit used to be stored twice behind one "Created" (measured, 0031).
+  `@formancy/data-client` sends a new `formancy-write-id` with every create
+  and update; a request that arrives with an id this process has already
+  acted on, for the same person, form and operation, gets the first
+  sending's answer -- awaited, if it is still with the database -- and the
+  database is not asked again. The same id with another body is 400
+  `invalid-request`, and so is an id that is not one. Answers are kept for
+  ten minutes, at most 10,000 of them and 32 MiB, oldest dropped first. A
+  resend was measured arriving within 6 ms of the close, and a create's
+  answer at about 236 bytes (2026-10-09, the host page's browser gate);
+  ten minutes is a margin over that, not a measurement. Held in this process only: a resend that reaches
+  another replica behind a balancer, or this one after a restart, is
+  applied again, and a request without an id is a write of its own every
+  time. The host page's browser gate measures the resend at the socket and
+  fails if the order is stored twice.
 
 - **An operational audit trail** — one event per runtime request, never a
   value, records named by a keyed hash
   ([0023](../../docs/decisions/0023-the-audit-trail-is-operational-not-evidence.md)).
-  Not evidence, and the record says why.
+  Not evidence, and the record says why. A create whose answer was lost is
+  named by the record it would have made, when the insert names its key; one
+  the database numbers names none. A write answered with an earlier
+  sending's answer is audited as `repeated`, with the record that answer
+  names, so a resend is not counted as a second write (0031).
 
 ## Running it
 

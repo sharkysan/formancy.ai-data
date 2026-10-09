@@ -2,9 +2,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleName } from 'dom-accessibility-api'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
-import { answer, answerable, chooseCustomer, load, mount, notice, openForm, pane, paper, RENDERERS, said, save, shows, signIn } from './test-host.js'
-import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
+import { answer, answerable, chooseCustomer, load, mount, notice, openForm, pane, paper, rendered, RENDERERS, said, save, shows, signIn, unknownNotice } from './test-host.js'
+import { EDGES, ENGINES, losingWrites, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
+import { CHANGED_SINCE_UNKNOWN } from './session.js'
 
 /*
  * The page around the forms: that it opens what the server publishes, says
@@ -35,6 +36,18 @@ async function floor(state: string): Promise<{ state: string; axe: string[]; unn
 }
 
 const CLEAN = (state: string) => ({ state, axe: [], unnamed: [] })
+
+/** A fresh order of tenant 1's, made beside the page: the case is what happens to it, not how it was made. */
+async function freshOrder(formId: string): Promise<string> {
+  const definition = await plane.clerk.form(formId)
+  if (!definition.ok) throw new Error(definition.message)
+  const name = definition.value.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
+  const found = await plane.clerk.query(formId, name, { operation: 'create', search: 'Muster' })
+  if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
+  const created = await plane.clerk.create(formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '1' })
+  if (!created.ok || created.value.record === null) throw new Error('the order was not created')
+  return created.value.record
+}
 
 // Signed out is the same page whatever database is behind it: one form, two
 // fields and a button, and the first thing a keyboard meets after the skip
@@ -137,6 +150,166 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
     await answer(user, 'Angular', 'Amount', '2')
     await save(user, 'Angular')
     await said('Angular', /^Created record k1:\S+\.$/)
+  })
+
+  // A save whose answer was lost is not "Not saved" (0031): it may have been,
+  // and the page says so, in the client's words, in a region the keyboard is
+  // taken to. The create holds the form: a press sends nothing and says why.
+  // An order's key is numbered by the database, so checking says nobody here
+  // can tell, and one more create goes through only after the person has
+  // confirmed it -- and the notice holds the floor in each of those states.
+  test('a save whose answer is lost says it may have been saved, holds the create, and passes the floor', async () => {
+    const losing = losingWrites(plane.fetch, { when: 'after' })
+    const user = mount(losing.fetch)
+    await signIn(user, TOKENS.clerk, formId)
+    await rendered()
+    const notes = `lost on the page ${connection} ${String(Date.now())}`
+    await chooseCustomer(user, 'React', 'Muster', 'Muster AG')
+    await answer(user, 'React', 'Order date', EDGES.orderDate)
+    await answer(user, 'React', 'Amount', '31')
+    await answer(user, 'React', 'Notes', notes)
+    await save(user, 'React')
+
+    await waitFor(() => expect(unknownNotice('React')).not.toBeNull())
+    const lost = unknownNotice('React') as HTMLElement
+    expect(paragraphs(lost)[0]).toBe('The answer to this save was lost between this page and the data server. It may have been saved.')
+    await waitFor(() => expect(focusedName()).toBe('React It may have been saved'))
+    expect(notice('React')).toBeNull()
+    expect(within(pane('React')).queryByRole('alert')).toBeNull()
+    expect(await floor('unknown notice')).toEqual(CLEAN('unknown notice'))
+
+    await save(user, 'React')
+    await said('React', /^Nothing was sent: the last save may have been stored\. Check whether it was saved first\.$/)
+    expect(await plane.db.countOrders(connection, notes)).toBe(1)
+
+    await user.click(within(lost).getByRole('button', { name: 'Check whether it was saved' }))
+    await said('React', /^This form cannot tell: the answer was lost before the server could say which record it made\./)
+    // Asked once more, with the keyboard on the answer; Cancel takes it back.
+    await user.click(within(lost).getByRole('button', { name: 'Enter it again anyway' }))
+    await waitFor(() => expect(focusedName()).toBe('Allow saving it again'))
+    await user.click(within(lost).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(focusedName()).toBe('Enter it again anyway'))
+    expect(within(lost).queryByRole('group')).toBeNull()
+    await user.click(within(lost).getByRole('button', { name: 'Enter it again anyway' }))
+    const confirm = within(lost).getByRole('group', { name: /entering it again may store it twice\.$/ })
+    await waitFor(() => expect(focusedName()).toBe('Allow saving it again'))
+    expect(await floor('unknown notice, confirming')).toEqual(CLEAN('unknown notice, confirming'))
+
+    await user.click(within(confirm).getByRole('button', { name: 'Allow saving it again' }))
+    await said('React', /^Press Save to enter it again\.$/)
+    await save(user, 'React')
+    await said('React', /^Created record k1:\S+\.$/)
+    expect(await plane.db.countOrders(connection, notes)).toBe(2)
+  })
+
+  // A second save into a notice that is already open is a new unknown save,
+  // and the notice must start again for it: kept, it went on saying "Press
+  // Save to enter it again." over a create that holds again, with the
+  // confirmation gone for good -- the only way out was to throw the draft
+  // away. And the keyboard follows "Enter it again anyway" every time it is
+  // pressed, a check in between included, rather than falling to the page.
+  test('a second unknown save starts the notice again, and the keyboard follows each "Enter it again anyway"', async () => {
+    const losing = losingWrites(plane.fetch, { when: 'after', times: 2 })
+    const user = mount(losing.fetch)
+    await signIn(user, TOKENS.clerk, formId)
+    await rendered()
+    const notes = `lost twice on the page ${connection} ${String(Date.now())}`
+    await chooseCustomer(user, 'React', 'Muster', 'Muster AG')
+    await answer(user, 'React', 'Order date', EDGES.orderDate)
+    await answer(user, 'React', 'Amount', '32')
+    await answer(user, 'React', 'Notes', notes)
+    await save(user, 'React')
+    await waitFor(() => expect(unknownNotice('React')).not.toBeNull())
+    let lost = unknownNotice('React') as HTMLElement
+
+    await user.click(within(lost).getByRole('button', { name: 'Check whether it was saved' }))
+    await user.click(await within(lost).findByRole('button', { name: 'Enter it again anyway' }))
+    await waitFor(() => expect(focusedName()).toBe('Allow saving it again'))
+    await user.keyboard('{Shift>}{Tab}{/Shift}')
+    expect(focusedName()).toBe('Check whether it was saved')
+    await user.keyboard('{Enter}')
+    await user.click(await within(lost).findByRole('button', { name: 'Enter it again anyway' }))
+    await waitFor(() => expect(focusedName()).toBe('Allow saving it again'))
+
+    await user.click(within(lost).getByRole('button', { name: 'Allow saving it again' }))
+    await said('React', /^Press Save to enter it again\.$/)
+    await save(user, 'React')
+    await waitFor(() => expect(losing.lost).toHaveLength(2))
+    await waitFor(() => expect(focusedName()).toBe('React It may have been saved'))
+    lost = unknownNotice('React') as HTMLElement
+    expect(within(lost).getByRole('status').textContent).toBe('')
+    await save(user, 'React')
+    await said('React', /^Nothing was sent: the last save may have been stored\./)
+    await user.click(within(lost).getByRole('button', { name: 'Check whether it was saved' }))
+    await within(lost).findByRole('button', { name: 'Enter it again anyway' })
+    expect(await plane.db.countOrders(connection, notes)).toBe(2)
+  })
+
+  // An update protects itself, so nothing is held. Lost after the server
+  // stored it, a Save with the version it sent is stale by its own doing and
+  // still unknown; the check finds the record moved on, and "Load the saved
+  // record" replaces the draft with it, says so on the pane's line and
+  // leaves the keyboard on the pane's heading, as after a stale save.
+  test('an update whose answer is lost checks as changed, and loads the saved record', async () => {
+    const record = await freshOrder(formId)
+    const losing = losingWrites(plane.fetch, { when: 'after' })
+    const user = mount(losing.fetch)
+    await signIn(user, TOKENS.clerk, formId)
+    await rendered()
+    await load(user, record)
+    await shows('React', 'Amount', '1.0000')
+    const notes = `lost update on the page ${connection} ${String(Date.now())}`
+    await answer(user, 'React', 'Notes', notes)
+    await save(user, 'React')
+    await waitFor(() => expect(unknownNotice('React')).not.toBeNull())
+    let lost = unknownNotice('React') as HTMLElement
+
+    // Saved again as the 502 invites, and stale by its own doing: still the
+    // unknown notice, never a "Not saved" over a change that is stored.
+    await save(user, 'React')
+    await waitFor(() => expect(paragraphs(unknownNotice('React') as HTMLElement)[0]).toBe(CHANGED_SINCE_UNKNOWN))
+    expect(notice('React')).toBeNull()
+    lost = unknownNotice('React') as HTMLElement
+
+    await user.click(within(lost).getByRole('button', { name: 'Check whether it was saved' }))
+    await said('React', /^The record has changed since it was read, by this save or by someone else\.$/)
+    await user.click(within(lost).getByRole('button', { name: 'Load the saved record' }))
+    await shows('React', 'Notes', notes)
+    await said('React', /^Loaded the saved record\. Your changes were discarded\.$/)
+    expect(unknownNotice('React')).toBeNull()
+    await waitFor(() => expect(focusedName()).toBe('React'))
+  })
+
+  // Lost before it reached the server: a check that cannot read says so and
+  // that the outcome is still unknown -- never "absent" or "not saved" --
+  // and once the database answers, the record is still at the version sent,
+  // so pressing Save sends it again with that version, and it is saved.
+  test('an update lost before it was sent checks as unchanged, a failed check says it is still unknown, and Save then saves', async () => {
+    const record = await freshOrder(formId)
+    const losing = losingWrites(plane.fetch, { when: 'before' })
+    const user = mount(losing.fetch)
+    await signIn(user, TOKENS.clerk, formId)
+    await rendered()
+    await load(user, record)
+    await shows('React', 'Amount', '1.0000')
+    await answer(user, 'React', 'Amount', '7')
+    await save(user, 'React')
+    await waitFor(() => expect(unknownNotice('React')).not.toBeNull())
+    const lost = unknownNotice('React') as HTMLElement
+
+    plane.unreachable.add(connection)
+    try {
+      await user.click(within(lost).getByRole('button', { name: 'Check whether it was saved' }))
+      await said('React', /^It could not be checked: The database cannot be reached\. Nothing was saved\. Whether the save was stored is still unknown\.$/)
+    } finally {
+      plane.unreachable.delete(connection)
+    }
+    await user.click(within(lost).getByRole('button', { name: 'Check whether it was saved' }))
+    await said('React', /^Not in the record yet\. Saving again is safe: press Save; it is stored at most once\.$/)
+    await save(user, 'React')
+    await said('React', /^Saved\.$/)
+    const stored = await plane.clerk.read(formId, record)
+    expect(stored.ok && stored.value.answers['amount']).toBe('7.0000')
   })
 
   // Signing out forgets the client, and the token with it: the page is back

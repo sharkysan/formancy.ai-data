@@ -6,6 +6,8 @@ import {
   NOT_ONE_ROW_MESSAGE,
   TEXT_NOT_STORED,
   TEXT_NOT_STORED_MESSAGE,
+  TRANSACTION_ENDED,
+  TRANSACTION_ENDED_MESSAGE,
   TRANSACTION_REPLACED,
   TRANSACTION_REPLACED_MESSAGE,
 } from './statements.js'
@@ -149,7 +151,9 @@ const ENDED_BY_TRIGGER = 'it may have committed, and it is not retried.'
  *   `schema-changed`, which would claim a binding names something gone, and
  *   send someone to a drift review that cannot show a trigger (0017).
  * - A transaction a trigger replaced is `unknown-outcome`: it may have
- *   committed the write before beginning another.
+ *   committed the write before beginning another. So is one a trigger ended
+ *   and then raised an error in: the error is not a refusal of a write the
+ *   COMMIT stored (0031).
  */
 function ownError(error: ServerError, written: readonly RecordValue[]): RecordFailure | undefined {
   if (error.number === NOT_ONE_ROW && error.message === NOT_ONE_ROW_MESSAGE) {
@@ -165,6 +169,9 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
   if (error.number === TRANSACTION_REPLACED && error.message === TRANSACTION_REPLACED_MESSAGE) {
     return failure('unknown-outcome', `A trigger ended the transaction of the write and began another; ${ENDED_BY_TRIGGER}`)
   }
+  if (error.number === TRANSACTION_ENDED && error.message === TRANSACTION_ENDED_MESSAGE) {
+    return failure('unknown-outcome', `A trigger ended the transaction of the write and then raised an error; ${ENDED_BY_TRIGGER}`)
+  }
   const index = error.number === TEXT_NOT_STORED ? TEXT_NOT_STORED_MESSAGE.exec(error.message)?.[1] : undefined
   if (index === undefined) return undefined
   return failure('out-of-range', 'SQL Server did not store this text as sent: its code page lacks a character, or the column drops trailing spaces, and the write was rolled back.', {
@@ -179,8 +186,9 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
  * does (statements.ts). Except 3609: a trigger ended the write's transaction
  * itself, and SQL Server raises it alike after a COMMIT, which stored the
  * write, and after a ROLLBACK, which did not. A trigger that commits and then
- * raises an error of its own is reported as that refusal though it stored
- * the write, which the batch cannot see (0017).
+ * raises an error of its own never reaches here as that error: the batch's
+ * CATCH sees its transaction gone and raises its own instead (statements.ts,
+ * 0031).
  */
 function refusal(error: ServerError, written: readonly RecordValue[]): RecordFailure {
   const own = ownError(error, written)
@@ -235,7 +243,18 @@ function refusal(error: ServerError, written: readonly RecordValue[]): RecordFai
   }
 }
 
-/** A refusal SQL Server reported for the statement, with the connection still alive — severity 20 and above end the session. */
+/**
+ * A refusal SQL Server reported for the statement, with the connection still
+ * alive — severity 20 and above end the session.
+ *
+ * `typeof number === 'number'` is the test, not `number !== undefined`: when
+ * the driver's error has no `info` — a socket that closed, a request that
+ * timed out — mssql's lib/error/request-error.js copies its `code` into
+ * `number`, so a lost answer is a `RequestError` whose number is the string
+ * `'ECONNRESET'` or `'ETIMEOUT'`. Read as a number, it would be a refusal,
+ * `refused`, a claim that nothing was written over a write that may have
+ * committed. records-lost-answer.integration.test.ts pins both (0031).
+ */
 function serverError(error: Error): ServerError | undefined {
   const { number, class: severity } = error as Error & { number?: unknown; class?: unknown }
   if (error.name !== 'RequestError' || typeof number !== 'number') return undefined

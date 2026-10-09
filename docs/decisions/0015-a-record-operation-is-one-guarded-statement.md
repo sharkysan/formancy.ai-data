@@ -1,6 +1,6 @@
 # 0015 — A record operation is one guarded statement, canonical in and out, never retried
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): a lost answer is carried to the host as unknown, and a test on both engines fails if anything replays it
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** both adapters' record and lookup suites, against real

@@ -20,7 +20,8 @@ Apache-2.0 `@formancy/spec` for types only.
 ## What it exports
 
 ```ts
-createDataClient({ token, base?, fetch? }) // → { form, read, create, update, query, resolve }
+createDataClient({ token, base?, fetch? }) // → { form, read, create, update, reconcile, query, resolve }
+isUnknownWrite(outcome) // → whether a create or update's outcome is an UnknownWrite
 lookupSources(client, formId, form, operation | () => operation) // → { [source]: { resolve } }
 sourceNames(form)       // → every optionsSource the document names, once each, in document order
 fieldProblems(refusal)  // → { [field]: [sentence, …] }, for engine.applyServerErrors
@@ -29,6 +30,8 @@ fieldProblems(refusal)  // → { [field]: [sentence, …] }, for engine.applySer
 Every client function resolves to an `Outcome`: `{ ok: true, value }` or a
 `Refusal` — `{ ok: false, status, code, message, fieldErrors? }`. It rejects
 only for an abort the caller asked for, with the AbortError it raised.
+`create` and `update` resolve to a `WriteOutcome`, which is that or an
+`UnknownWrite` — see below.
 
 | Function | Route |
 |---|---|
@@ -36,6 +39,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 | `read(formId, record)` | `POST /v1/forms/:id/records/read` |
 | `create(formId, answers)` | `POST /v1/forms/:id/records/create` |
 | `update(formId, { record, version, answers })` | `POST /v1/forms/:id/records/update` |
+| `reconcile(formId, unknown)` | `POST /v1/forms/:id/records/read`, or nothing when there is no token |
 | `query(formId, source, { operation, search, offset?, limit? }, signal?)` | `POST /v1/forms/:id/lookups/:source/query` |
 | `resolve(formId, source, { operation, tokens }, signal?)` | `POST /v1/forms/:id/lookups/:source/resolve` |
 
@@ -65,6 +69,30 @@ handlers are checked against the same declarations.
   `unexpected` when what answered was not the data server's shape — a proxy's
   HTML page, a redirect, a captive portal's `200`. A refusal with a sentence
   and no code is `http-<status>`.
+- **A write is known only when the data server says what happened**
+  ([0031](../../docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
+  A record, the server's 502 `unknown-outcome`, a 4xx with a sentence, or a
+  503 `unavailable`. Anything else — a rejected `fetch`, a body that cannot be
+  read or is not JSON, a proxy's 502 or 504, a 500, a 2xx that is not a
+  record — may have reached the database, so it is an `UnknownWrite`:
+  `{ ok: false, status, code: 'unknown-outcome', message, operation, record,
+  version, origin }`, `origin` being `database` (the server's 502, whose
+  `record` and `version` it carries) or `transport` (the update's own, or
+  `null` for a create). `ok` is false, so a host that checks only `ok` fails
+  closed. Nothing is ever sent again. `reconcile(formId, unknown)` reads what
+  it addressed and says `unchanged` (an update's record still at the version
+  sent: saving again with it is stored at most once), `changed`, `present`,
+  `absent` (the read's 404, through this person's read filter: not proof the
+  row is not stored, but creating again is safe, because the key stops a
+  second row) or `unverifiable` (no token, and no request) — or passes on
+  the read's own refusal. On a read, 0029's rules stand: a proxy's page is
+  `unexpected`.
+- **Every write carries a write id of its own**, in the `formancy-write-id`
+  header: 128 random bits from `crypto.getRandomValues`, new for every
+  `create` and `update` call. Chromium sends a request again, below the
+  page, when the connection it reused closed before any answer; the server
+  answers that copy with the first one's answer instead of applying it
+  twice (0031). The client itself still never sends anything again.
 - **Field problems are sentences.** The 0.3.0 renderers print an error entry
   as it is, beside the field and in the error summary, so `fieldProblems`
   hands them the server's sentence, which never echoes a value. The code
@@ -75,7 +103,7 @@ handlers are checked against the same declarations.
 ```tsx
 import { createFormEngine } from '@formancy/core'
 import { ErrorSummary, FormancyForm, FormancyProvider, OptionsSourcesProvider } from '@formancy/react'
-import { createDataClient, fieldProblems, lookupSources } from '@formancy/data-client'
+import { createDataClient, fieldProblems, isUnknownWrite, lookupSources } from '@formancy/data-client'
 
 const client = createDataClient({ token: () => session.token() })
 const published = await client.form('order')            // check .ok
@@ -89,6 +117,7 @@ async function save(outcome) {
   const saved = held.record === undefined
     ? await client.create('order', outcome.data)
     : await client.update('order', { record: held.record, version: held.version, answers: outcome.data })
+  if (isUnknownWrite(saved)) return showUnknown(saved)  // it may have been saved: client.reconcile, never a resend
   if (!saved.ok) {
     engine.applyServerErrors(fieldProblems(saved))       // {} when the refusal concerns no field
     return show(saved.message)                           // 409 stale: keep the draft and say so
@@ -127,6 +156,9 @@ to update asks under update's filter without a new application.
   and a write whose outcome is unknown — `502 unknown-outcome`, "may have been
   saved" — is the host's to reconcile, never the client's to send again
   ([0015](../../docs/decisions/0015-a-record-operation-is-one-guarded-statement.md)).
+  What the browser sends again on its own is answered by the server once per
+  write id, in its process only: a copy that reaches another replica is
+  applied again.
 - **`hasMore` and `omitted` do not reach the person.** A renderer's 0.3.0
   option contract is a list of `{ value, label }`, so a list of exactly one
   page looks complete. A typeahead keeps narrowing; a plain select does not.

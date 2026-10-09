@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactElement } from 'react'
 import type { FormEngine } from '@formancy/core'
+import type { FormRecord } from '@formancy/data-client'
 import { AngularForm } from './angular-mount.js'
 import { ReactForm } from './react-form.js'
 import type { SaveResult, Session, Submitted } from './session.js'
+import { UnknownNotice } from './unknown-notice.js'
 
 /** How a renderer is written for a person. */
 const NAMES = { react: 'React', angular: 'Angular' } as const
@@ -17,7 +19,8 @@ export const SAVING = 'Saving…'
 /** What the saved line says once "Load the saved record" has replaced the draft. */
 export const DISCARDED = 'Loaded the saved record. Your changes were discarded.'
 
-type Notice = { kind: 'stale' | 'refused'; message: string }
+/** What a save opened, and the how-manyth notice it is: a new one is drawn afresh, never over the last one's state. */
+type Notice = { kind: 'stale' | 'refused' | 'unknown'; message: string; n: number }
 
 /**
  * One renderer's half of the page: a region named by its heading, the saved
@@ -53,6 +56,12 @@ export function Pane({ session, title }: { session: Session; title: string }): R
     if (reloaded === generation) heading.current?.focus()
   }, [reloaded, generation])
 
+  /** The stored record replaces the draft: said on the line, and the keyboard on the heading. */
+  const loaded = useCallback(() => {
+    setReloaded(session.opened().generation)
+    say(DISCARDED)
+  }, [session, say])
+
   return (
     <section className="pane" aria-labelledby={headingId}>
       <h2 id={headingId} className="pane-heading" tabIndex={-1} ref={heading}>
@@ -71,11 +80,12 @@ export function Pane({ session, title }: { session: Session; title: string }): R
         say={say}
         onReload={async () => {
           const problem = await session.reload()
-          if (problem === null) {
-            setReloaded(session.opened().generation)
-            say(DISCARDED)
-          }
+          if (problem === null) loaded()
           return problem
+        }}
+        onLoad={(record) => {
+          session.open(record)
+          loaded()
         }}
       />
     </section>
@@ -90,6 +100,7 @@ function PaneBody({
   headingId,
   say,
   onReload,
+  onLoad,
 }: {
   session: Session
   engine: FormEngine
@@ -98,8 +109,14 @@ function PaneBody({
   headingId: string
   say: (text: string) => void
   onReload: () => Promise<string | null>
+  onLoad: (record: FormRecord) => void
 }): ReactElement {
   const [notice, setNotice] = useState<Notice | null>(null)
+  const opened = useRef(0)
+  const open = (kind: Notice['kind'], message: string): void => {
+    opened.current += 1
+    setNotice({ kind, message, n: opened.current })
+  }
   const [sheet, setSheet] = useState<HTMLFormElement | null>(null)
   const noticeRef = useRef<HTMLDivElement>(null)
   const noticeId = `${headingId}-notice`
@@ -117,14 +134,14 @@ function PaneBody({
    * pane's line is still there to say it.
    */
   function show(result: SaveResult | null): void {
-    if (result?.kind === 'busy' || result?.kind === 'replaced') {
+    if (result?.kind === 'busy' || result?.kind === 'replaced' || result?.kind === 'held') {
       // About another press, or another form: the notice, if any, is still this form's.
       say(result.message)
       return
     }
-    if (result?.kind === 'stale' || result?.kind === 'refused') {
+    if (result?.kind === 'stale' || result?.kind === 'refused' || result?.kind === 'unknown') {
       say('')
-      setNotice({ kind: result.kind, message: result.message })
+      open(result.kind, result.message)
       return
     }
     setNotice(null)
@@ -143,12 +160,16 @@ function PaneBody({
 
   async function reload(): Promise<void> {
     const problem = await onReload()
-    if (problem !== null) setNotice({ kind: 'refused', message: problem })
+    if (problem !== null) open('refused', problem)
   }
 
   return (
     <>
-      {notice === null ? null : (
+      {notice?.kind === 'unknown' ? (
+        // Keyed by the notice: a second unknown save is another save, whose
+        // check, confirmation and focus start again rather than inherit the first's.
+        <UnknownNotice key={notice.n} session={session} message={notice.message} label={`${headingId} ${noticeId}`} noticeId={noticeId} noticeRef={noticeRef} onLoad={onLoad} />
+      ) : notice === null ? null : (
         <div role="region" aria-labelledby={`${headingId} ${noticeId}`} tabIndex={-1} ref={noticeRef} className="notice" data-kind={notice.kind}>
           <h3 id={noticeId} className="notice-heading">
             Not saved

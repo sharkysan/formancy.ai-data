@@ -70,6 +70,15 @@ const POLICY: FormPolicy = {
   lookups: { country: [] },
 }
 
+/** A country has no version to guard an update with, so its form offers read and create. */
+const COUNTRY_POLICY: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk'], create: ['clerk'], update: [] },
+  fields: { id: { read: ['clerk'], write: [] }, iso_code: RW, name: RW },
+  rowFilters: [],
+  lookups: {},
+}
+
 const verifyIdentity: IdentityVerifier = async (token) =>
   token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '1' } } }
     : token === 'clerk-042' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '042' } } }
@@ -83,6 +92,10 @@ const VERSION = '00000000000007d1'
 /** What the fake ports were asked, and what they answer. Each test sets what it needs. */
 let calls: { inserts: InsertRequest[]; updates: UpdateRequest[]; rejects: string[][]; lookups: number }
 let writeOutcome: RecordOutcome
+/** What a fake insert waits for before it answers: settled, unless a case holds it. */
+let insertGate: Promise<void>
+/** What the fake read answers; undefined is the stored customer. */
+let readOutcome: RecordOutcome | undefined
 let rejected: string[]
 let rejectsFails: boolean
 let root: string
@@ -90,9 +103,10 @@ let app: FastifyInstance
 
 function registry(): ConnectionRegistry {
   const records: RecordAdapter = {
-    read: async () => ({ ok: true, values: { ...STORED }, version: VERSION }),
+    read: async () => readOutcome ?? { ok: true, values: { ...STORED }, version: VERSION },
     insert: async (request) => {
       calls.inserts.push(request)
+      await insertGate
       return writeOutcome
     },
     update: async (request) => {
@@ -122,6 +136,8 @@ function registry(): ConnectionRegistry {
 beforeEach(async () => {
   calls = { inserts: [], updates: [], rejects: [], lookups: 0 }
   writeOutcome = { ok: true, values: { ...STORED }, version: VERSION }
+  insertGate = Promise.resolve()
+  readOutcome = undefined
   rejected = []
   rejectsFails = false
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-'))
@@ -138,6 +154,9 @@ beforeEach(async () => {
     lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }], pinned: ['tenant_id'],
   })
   await store.publish('scoped', null, { ...bundle, form: scoped.form, bindings: scoped.bindings, policy: { ...POLICY, lookups: { country: [{ column: 'id', attribute: 'tenant' }] } } })
+  // A country, whose key the database numbers: a create names no key of its own.
+  const country = generateForm(SNAPSHOT, { connection: 'erp', root: ref('country'), formId: 'country', title: 'Country', lookups: [] })
+  await store.publish('country', null, { ...bundle, form: country.form, bindings: country.bindings, policy: COUNTRY_POLICY })
   app = await createDataServer({ verifyIdentity, runtime: { registry: registry(), store } })
 })
 
@@ -324,6 +343,167 @@ describe('the runtime plane', () => {
   })
 })
 
+describe('a write whose answer was lost (0031)', () => {
+  const LOST: RecordOutcome = { ok: false, code: 'unknown-outcome', message: 'write CONNECTION_CLOSED 10.0.0.5:5432' }
+
+  // The customer's key is the tenant, pinned from the context, and a number
+  // the clerk typed: the 502 names the record the create would have made, so
+  // the host can read it before offering to enter it again. And the adapter
+  // was asked once: a route that tried again would make the second copy this
+  // answer exists to prevent.
+  test('a create names the record it would have made, and is sent to the database once', async () => {
+    writeOutcome = LOST
+    const response = await post('/v1/forms/customer/records/create', { answers: NEW })
+    expect(response.statusCode).toBe(502)
+    expect(response.json()).toEqual({
+      code: 'unknown-outcome',
+      message: 'The connection to the database failed after the record was sent. It may have been saved: read it before entering it again.',
+      operation: 'create',
+      record: 'k1:1,8',
+      version: null,
+    })
+    expect(calls.inserts).toHaveLength(1)
+    expect(response.body).not.toContain('10.0.0.5')
+  })
+
+  // A key the database numbers is not in the insert, so nothing here can say
+  // which record it would be: null, and a sentence that says only the
+  // person's own search can tell -- never a token for a row that may not exist.
+  test('a create whose key the database numbers names no record, and says why', async () => {
+    writeOutcome = LOST
+    const response = await post('/v1/forms/country/records/create', { answers: { id: null, iso_code: 'CH', name: 'Schweiz' } })
+    expect(response.statusCode, response.body).toBe(502)
+    expect(response.json()).toEqual({
+      code: 'unknown-outcome',
+      message: 'The connection to the database failed after the record was sent. It may have been saved, and the database numbers new records, so only a search of your own can tell.',
+      operation: 'create',
+      record: null,
+      version: null,
+    })
+    expect(calls.inserts).toHaveLength(1)
+  })
+
+  // An update carries its own protection: the version sent is in the one
+  // guarded statement (0015), so saving again with exactly it is stored at
+  // most once. The 502 hands both back for the host to reconcile with.
+  test('an update names the record and the version it sent, and is sent to the database once', async () => {
+    writeOutcome = LOST
+    const answers = { tenant_id: 1, customer_no: 7, name: 'Neuer Name', country: 'k1:CH', created_at: '2026-10-08T00:00:00Z' }
+    const response = await post('/v1/forms/customer/records/update', { record: RECORD, version: VERSION, answers })
+    expect(response.statusCode).toBe(502)
+    expect(response.json()).toEqual({
+      code: 'unknown-outcome',
+      message: 'The connection to the database failed after the change was sent. It may have been saved. Saving again with the same version is safe: it is stored at most once.',
+      operation: 'update',
+      record: RECORD,
+      version: VERSION,
+    })
+    expect(calls.updates).toHaveLength(1)
+  })
+
+  // Only a write can have an unknown outcome. A read that reported one would
+  // be an adapter's bug; answered as a 502 "may have been saved", it would
+  // tell a person something was saved when nothing was asked to be.
+  test('a read that reports an unknown outcome is a server error, not a 502', async () => {
+    readOutcome = LOST
+    const response = await post('/v1/forms/customer/records/read', { record: RECORD })
+    expect(response.statusCode).toBe(500)
+    expect(response.body).not.toContain('may have been saved')
+  })
+})
+
+describe('a write sent again (0031)', () => {
+  const ID = '0123456789abcdef0123456789abcdef'
+  const sending = (url: string, payload: unknown, id: string = ID) =>
+    app.inject({ method: 'POST', url, headers: { ...as('clerk'), 'formancy-write-id': id }, payload: payload as Record<string, unknown> })
+  const UPDATE = { record: RECORD, version: VERSION, answers: { tenant_id: 1, customer_no: 7, name: 'Neuer Name', country: 'k1:CH', created_at: '2026-10-08T00:00:00Z' } }
+
+  // Chromium resends a request whose reused connection closed before any
+  // answer, on its own, below the page (measured, 0031). Arriving with the
+  // same write id, it is answered with what the first sending got, and the
+  // database is asked once: without this, a create whose answer the network
+  // lost after the commit is stored twice behind one "Created".
+  test('a create that arrives again with its write id is answered with the first answer, and stored once', async () => {
+    const first = await sending('/v1/forms/customer/records/create', { answers: NEW })
+    const again = await sending('/v1/forms/customer/records/create', { answers: NEW })
+    expect([first.statusCode, again.statusCode]).toEqual([201, 201])
+    expect(again.json()).toEqual(first.json())
+    expect(calls.inserts).toHaveLength(1)
+  })
+
+  // The resend can arrive while the first sending still waits on the
+  // database -- a connection reset during a lock wait. It waits for that
+  // answer rather than racing it to a second row.
+  test('a sending that arrives while the first is in flight waits for its answer', async () => {
+    let release = (): void => {}
+    insertGate = new Promise<void>((resolve) => (release = resolve))
+    const first = sending('/v1/forms/customer/records/create', { answers: NEW })
+    const again = sending('/v1/forms/customer/records/create', { answers: NEW })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(calls.inserts).toHaveLength(1)
+    release()
+    const answers = await Promise.all([first, again])
+    expect(answers.map((answer) => answer.statusCode)).toEqual([201, 201])
+    expect(answers[1]?.json()).toEqual(answers[0]?.json())
+    expect(calls.inserts).toHaveLength(1)
+  })
+
+  // A first sending whose answer the database lost is repeated as that: the
+  // resend is not the moment to find out, by writing again.
+  test('an unknown outcome is answered again as unknown, and the database is asked once', async () => {
+    writeOutcome = { ok: false, code: 'unknown-outcome', message: 'CONNECTION_CLOSED' }
+    const first = await sending('/v1/forms/customer/records/create', { answers: NEW })
+    const again = await sending('/v1/forms/customer/records/create', { answers: NEW })
+    expect([first.statusCode, again.statusCode]).toEqual([502, 502])
+    expect(again.json()).toEqual(first.json())
+    expect(calls.inserts).toHaveLength(1)
+  })
+
+  // An update is protected by its version already, but its resend would be
+  // answered 409 "the record changed" -- changed by itself. The first answer
+  // is the true one.
+  test('an update that arrives again is answered with the first answer, and sent once', async () => {
+    const first = await sending('/v1/forms/customer/records/update', UPDATE)
+    const again = await sending('/v1/forms/customer/records/update', UPDATE)
+    expect([first.statusCode, again.statusCode]).toEqual([200, 200])
+    expect(again.json()).toEqual(first.json())
+    expect(calls.updates).toHaveLength(1)
+  })
+
+  // The id names one sending of one write, by one person, to one form: the
+  // same id elsewhere is another write. A request without one is a write of
+  // its own every time, as before.
+  test('another form, or no write id, is another write', async () => {
+    await sending('/v1/forms/customer/records/create', { answers: NEW })
+    await sending('/v1/forms/scoped/records/create', { answers: NEW })
+    await post('/v1/forms/customer/records/create', { answers: NEW })
+    await post('/v1/forms/customer/records/create', { answers: NEW })
+    expect(calls.inserts).toHaveLength(4)
+  })
+
+  // An id that comes back with a different write is a client's bug or
+  // somebody's guess: answering it with the first write's answer would say
+  // "Created" about something never sent. Refused, and nothing is asked.
+  test('the same write id with a different write is refused, and nothing is sent', async () => {
+    await sending('/v1/forms/customer/records/create', { answers: NEW })
+    const other = await sending('/v1/forms/customer/records/create', { answers: { ...NEW, customer_no: 9 } })
+    expect(other.statusCode).toBe(400)
+    expect(other.json()).toMatchObject({ code: 'invalid-request' })
+    expect(calls.inserts).toHaveLength(1)
+  })
+
+  // An id that is not one is refused before anything is read or written,
+  // rather than ignored, which would quietly switch the guard off.
+  test('a write id that is not one is refused before anything is asked', async () => {
+    for (const id of ['', 'short', 'x'.repeat(65), 'has space in it 0123456789abcdef']) {
+      const response = await sending('/v1/forms/customer/records/create', { answers: NEW }, id)
+      expect({ id, status: response.statusCode }).toEqual({ id, status: 400 })
+    }
+    expect(calls.inserts).toHaveLength(0)
+    expect(calls.rejects).toHaveLength(0)
+  })
+})
+
 describe('the operational audit trail', () => {
   const KEY = 'an-audit-key-the-operator-keeps-secret'
 
@@ -346,6 +526,35 @@ describe('the operational audit trail', () => {
     ])
     expect(JSON.stringify(events)).not.toContain('Neu GmbH')
     expect(JSON.stringify(events)).not.toContain('k1:')
+  })
+
+  // An unknown create names the record it would have made, by the same keyed
+  // hash as everything else: an operator reconciling the trail can match it
+  // to the read that settles it. Without it the event says only "a create
+  // went wrong", about no record.
+  test('records an unknown create with the record it would have made', async () => {
+    const events: AuditEvent[] = []
+    const server = await audited((event) => events.push(event))
+    writeOutcome = { ok: false, code: 'unknown-outcome', message: 'ECONNRESET' }
+    await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: NEW } })
+    expect(events.map(({ status, outcome, record }) => ({ status, outcome, record }))).toEqual([
+      { status: 502, outcome: 'unknown-outcome', record: recordReference(KEY, 'k1:1,8') },
+    ])
+  })
+
+  // A sending answered with an earlier one's answer asked nothing of the
+  // database: the trail says so, rather than a second "ok" create that an
+  // operator would count as a second record.
+  test('records a write that arrived again as repeated', async () => {
+    const events: AuditEvent[] = []
+    const server = await audited((event) => events.push(event))
+    for (let n = 0; n < 2; n += 1) {
+      await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: { ...as('clerk'), 'formancy-write-id': '0123456789abcdef0123456789abcdef' }, payload: { answers: NEW } })
+    }
+    expect(events.map(({ status, outcome, record }) => ({ status, outcome, record }))).toEqual([
+      { status: 201, outcome: 'ok', record: recordReference(KEY, 'k1:1,7') },
+      { status: 201, outcome: 'repeated', record: recordReference(KEY, 'k1:1,7') },
+    ])
   })
 
   // Refusals are audited too, by the stable code the response carried, and a

@@ -1,4 +1,4 @@
-import type { FormBindings, PlanRefusalCode, RecordFailure, RuntimeRefusal } from '@formancy/data-core'
+import type { FormBindings, PlanRefusalCode, RecordFailure, RuntimeRefusal, UnknownOutcome } from '@formancy/data-core'
 
 export interface HttpRefusal {
   status: number
@@ -56,9 +56,11 @@ function fieldOf(bindings: FormBindings, column: string | undefined): string | u
  * Constraint failures become a field error where the engine names a column the
  * form binds, so a person sees the message beside the field. `refused` is
  * 422, because sending it again will be refused the same way; `unavailable`
- * is 503, because it may not be. `unknown-outcome`
- * is 502 and says so in words: the write may have happened, and nothing here
- * retries it.
+ * is 503, because it may not be. `unknown-outcome` is not answered here: only
+ * a write has one, and the write routes answer it with `unknownOutcome`, which
+ * names what was addressed. A read that reported one would be an adapter's
+ * bug, and is thrown -- a 500 -- rather than told to a person as "may have
+ * been saved" (0031).
  */
 export function recordFailure(bindings: FormBindings, failure: RecordFailure): HttpRefusal {
   const field = fieldOf(bindings, failure.column)
@@ -95,9 +97,29 @@ export function recordFailure(bindings: FormBindings, failure: RecordFailure): H
       // Unreachable, or a refusal the engine documents as passing: a deadlock, a lock timeout.
       return { status: 503, body: { code: 'unavailable', message: 'The database could not complete this now. Nothing was saved.' } }
     case 'unknown-outcome':
-      return {
-        status: 502,
-        body: { code: 'unknown-outcome', message: 'The connection failed after the change was sent. It may have been saved: reload before trying again.' },
-      }
+      throw new Error('only a write has an unknown outcome; the write routes answer it with unknownOutcome')
   }
+}
+
+/**
+ * A write that was sent and whose answer was lost, as an HTTP answer (0031):
+ * 502, because something between this server and the database failed, and in
+ * words that say it may have been saved. Nothing here sends it again.
+ *
+ * The sentence never names a value (0011): what was addressed travels in
+ * `record` and `version`, for the host to reconcile with. Each sentence says
+ * what is safe next. An update is protected by its version (0015). A create
+ * whose key the insert named can be read by it. A create whose key the
+ * database numbers cannot be found by anything here.
+ */
+export function unknownOutcome(operation: 'create' | 'update', record: string | null, version: string | null): { status: 502; body: UnknownOutcome } {
+  let message: string
+  if (operation === 'update') {
+    message = 'The connection to the database failed after the change was sent. It may have been saved. Saving again with the same version is safe: it is stored at most once.'
+  } else if (record !== null) {
+    message = 'The connection to the database failed after the record was sent. It may have been saved: read it before entering it again.'
+  } else {
+    message = 'The connection to the database failed after the record was sent. It may have been saved, and the database numbers new records, so only a search of your own can tell.'
+  }
+  return { status: 502, body: { code: 'unknown-outcome', message, operation, record, version } }
 }
