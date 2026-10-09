@@ -26,12 +26,15 @@ export default mergeConfig(
       include: ['src/**/*.test.{ts,tsx}'],
       environment: 'jsdom',
       // Both renderers mount into jsdom, and Angular bootstraps a whole
-      // application per preview. Measured on 2026-10-09 on a Windows 11
-      // workstation: the slowest case, tabbing through all four previews, took
-      // 2.8 seconds, and the default of five is less than twice that -- too
-      // little margin for a loaded CI runner. The waits inside the tests allow
-      // ten seconds for Angular to arrive, so this is above them.
-      testTimeout: 20_000,
+      // application per preview. Measured on 2026-10-09: on a Windows 11
+      // workstation the slowest case, tabbing through all four previews, took
+      // 2.8 s, and 3.8 s under coverage; on CI's hosted runner, once the
+      // client's and the host page's suites and their databases ran beside it,
+      // it passed 20 s and timed out (PR #30), a spread the studio's suite
+      // showed too (PR #27). Sixty leaves room for that spread without hiding a
+      // test that hangs, and stays above the ten seconds the waits inside
+      // allow for Angular to arrive.
+      testTimeout: 60_000,
     },
   }),
 )
