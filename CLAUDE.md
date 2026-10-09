@@ -220,6 +220,12 @@ Not a generated name: the branch is what a reviewer sees first.
 No stacked pull requests. Branch from `main`, target `main`, and where a branch
 replaces another say "supersedes #N" in the description rather than stacking.
 
+**A merged branch is deleted by the merge.** GitHub deletes the head branch
+when the pull request merges, a repository setting that nothing here can
+check ([0036](docs/decisions/0036-a-merged-branch-is-deleted-by-the-merge.md)).
+Never delete a remote branch by hand. Remove the local branch and its
+worktree once `gh pr view N --json state` says `MERGED`, and not before.
+
 **Commit as `Daniel Bacher <dbacher@gmail.com>`**, never
 `daniel.bacher@ergon.ch`. The CLA record names that address, and the check
 reads commit authors.
