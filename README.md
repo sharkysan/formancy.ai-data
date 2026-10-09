@@ -213,10 +213,10 @@ run pulls the SQL Server image, which is about a gigabyte and a half.
 `docker compose up -d` gives you both databases on loopback for a shell or a
 client; the tests do not use it. See `.env.example`.
 
-The gates CI runs, in order: `pnpm build`, `pnpm typecheck`,
-`pnpm test:coverage`, `pnpm check:pkg`, `node scripts/verify-licenses.mjs`,
-`pnpm test:repo`, and in jobs of their own `pnpm test:e2e:install` and
-`pnpm test:browser`.
+The gates CI runs: `pnpm build`, `pnpm typecheck`, `pnpm check:pkg`,
+`node scripts/verify-licenses.mjs` and `pnpm test:repo` in one job; each
+package's `test:coverage` in a job of its own; and in jobs of their own
+`pnpm test:e2e:install` and `pnpm test:browser`.
 [`CLAUDE.md`](./CLAUDE.md) says what each is for and what the bar is.
 
 ## Documents
