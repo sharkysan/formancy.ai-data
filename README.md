@@ -35,7 +35,11 @@ operates without any AI dependency.
 > drops the database's answer after the commit and fails if anything sends the
 > write again. Chromium sends such a write again on its own, and the server
 > answers that copy with the first one's answer, within one process; the
-> browser gate measures it.
+> browser gate measures it. From an empty machine with Docker and git,
+> `docker compose --profile stack up` runs both databases with the sample
+> fixture, the server, and the studio and the host page behind one proxy,
+> and a CI job runs [the guide](./docs/getting-started.md) that says how, as
+> written, on both engines.
 > `CHANGELOG.md` says what each step found.
 
 ## Licence, in one table
@@ -135,8 +139,12 @@ FORMANCY_DATA_SERVER=http://127.0.0.1:4390 pnpm --filter @formancy/data-studio d
 
 The server sends no CORS headers, so the studio is served from the server's
 origin: in development Vite proxies `/v1` to `FORMANCY_DATA_SERVER`, and in a
-deployment one reverse proxy serves `apps/studio/dist` and `/v1` together. The
-token is held in the tab's memory only; reloading the page signs out. The
+deployment one reverse proxy serves `apps/studio/dist` and `/v1` together. In
+the composed stack that proxy is [`deploy/web/nginx.conf`](./deploy/web/nginx.conf),
+which serves the studio at `/studio/`, built with that base, and is the shape
+a deployment's own proxy copies; [the getting-started guide](./docs/getting-started.md)
+runs it ([0032](./docs/decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
+The token is held in the tab's memory only; reloading the page signs out. The
 server needs its administrator plane turned on — a store, an allowlist and
 `FORMANCY_DATA_ADMIN_ROLES`, as
 [its README](./packages/data-server/README.md) says; against a server without
@@ -180,7 +188,9 @@ answer that arrives after Load or New is said on the pane's line.
 In a real host the application's own session supplies the token; the page asks
 for one because it has none, holds it in memory only, and forgets it on a
 reload. As with the studio, the page is served from the server's origin: in
-development Vite proxies `/v1`.
+development Vite proxies `/v1`, and in the composed stack the same
+`deploy/web/nginx.conf` serves it at `/host/`, which the getting-started
+guide's section 5 uses.
 
 Its suites run the real server against PostgreSQL and SQL Server through the
 real drivers, with literal tokens and a `fetch` that goes through
@@ -212,16 +222,28 @@ against real servers or it is not proved
 run pulls the SQL Server image, which is about a gigabyte and a half.
 
 `docker compose up -d` gives you both databases on loopback for a shell or a
-client; the tests do not use it. See `.env.example`.
+client; the tests do not use it. Their passwords are generated into a Docker
+volume on the first start, not typed into a `.env`: read one with
+`docker compose exec sqlserver cat /run/formancy-secrets/mssql-sa-password`
+(or `postgres-owner-password` on `postgres`). `.env.example` lists the port
+overrides, which are all a `.env` may still hold. A database volume made
+before the secrets volume existed holds the old password and needs
+`docker compose down -v`. `compose.yaml` needs the Compose release the
+guide's section 0 names. With `--profile stack` the same file runs the whole
+product, as [`docs/getting-started.md`](./docs/getting-started.md) walks
+through.
 
 The gates CI runs: `pnpm build`, `pnpm typecheck`, `pnpm check:pkg`,
 `node scripts/verify-licenses.mjs` and `pnpm test:repo` in one job; each
-package's `test:coverage` in a job of its own; and in jobs of their own
-`pnpm test:e2e:install` and `pnpm test:browser`.
+package's `test:coverage` in a job of its own; in jobs of their own
+`pnpm test:e2e:install` and `pnpm test:browser`; and `pnpm test:getting-started`,
+which runs the guide from a clean checkout with Node and Docker alone, in a
+job run with the runner's Compose and again with the oldest the guide names.
 [`CLAUDE.md`](./CLAUDE.md) says what each is for and what the bar is.
 
 ## Documents
 
+- [`docs/getting-started.md`](./docs/getting-started.md) — from an empty machine with Docker and git to a published form on both engines; CI runs it as written.
 - [`docs/decisions/`](./docs/decisions/README.md) — every decision somebody could helpfully undo, with what verifies it.
 - [`CHANGELOG.md`](./CHANGELOG.md) — what changed and why.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) and [`CLA.md`](./CLA.md) — contributions are taken under a CLA, checked on every pull request.

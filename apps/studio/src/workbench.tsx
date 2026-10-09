@@ -95,6 +95,14 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     drift: null,
   }
 
+  function discovering(): void {
+    // A discovery on its way: until it answers, nothing offers to choose a
+    // root -- neither Connect's button nor the Steps list -- or Choose would
+    // open on the last connection and switch under the operator, emptying
+    // what they typed, when this one answered. A refusal leaves nothing.
+    setDiscovered(null)
+  }
+
   function discoveredNow(connection: string, snapshot: MetadataSnapshot): void {
     // Discovering is looking, and the Connect step invites comparing what
     // each connection can see. What was chosen, generated and granted on the
@@ -187,7 +195,16 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   function body(): ReactElement | null {
     switch (current) {
       case 'connect':
-        return <ConnectStep client={client} connections={connections} discovered={discovered} onDiscovered={discoveredNow} onChoose={() => setCurrent('choose')} />
+        return (
+          <ConnectStep
+            client={client}
+            connections={connections}
+            discovered={discovered}
+            onDiscovering={discovering}
+            onDiscovered={discoveredNow}
+            onChoose={() => setCurrent('choose')}
+          />
+        )
       case 'drift':
         return <DriftStep client={client} formId={publishedId ?? generated?.request.formId ?? ''} onRegenerated={takeUp} />
       case 'choose':

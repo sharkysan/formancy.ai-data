@@ -20,12 +20,15 @@ export function ConnectStep({
   client,
   connections,
   discovered,
+  onDiscovering,
   onDiscovered,
   onChoose,
 }: {
   client: AdminClient
   connections: readonly string[]
   discovered: { connection: string; snapshot: MetadataSnapshot } | null
+  /** A discovery is on its way: what was discovered before is no longer what Choose would open on. */
+  onDiscovering: () => void
   onDiscovered: (connection: string, snapshot: MetadataSnapshot) => void
   onChoose: () => void
 }): ReactElement {
@@ -46,6 +49,7 @@ export function ConnectStep({
     if (discovering !== null) return
     setDiscovering(connection)
     setRefused(null)
+    onDiscovering()
     const outcome = await client.metadata(connection)
     setDiscovering(null)
     if (outcome.ok) onDiscovered(connection, outcome.value)

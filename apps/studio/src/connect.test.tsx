@@ -144,6 +144,38 @@ describe('connecting', () => {
     expect(plane.requests.filter((request) => request.path.endsWith('/metadata'))).toHaveLength(1)
   })
 
+  // Discovering a second connection with the first one's discovery on
+  // screen. Until the second answers, nothing may offer to choose a root:
+  // Choose would open on the first connection, and when the second answered
+  // it would switch under the operator and empty what they had typed -- which
+  // is what an operator going down the getting-started guide twice met.
+  test('offers no root to choose while another connection is being discovered', async () => {
+    const user = await signIn(plane)
+    await discover(user, 'fixture')
+    const slow = plane.hold(/\/metadata$/)
+    const reader = within(step('Connect')).getByRole('group', { name: 'fixture-reader' })
+    await user.click(within(reader).getByRole('button', { name: 'Discover fixture-reader' }))
+    expect(within(step('Connect')).queryByRole('button', { name: 'Choose a root' })).toBeNull()
+    expect(within(step('Connect')).queryByRole('region', { name: 'What fixture can see' })).toBeNull()
+    expect(within(screen.getByRole('navigation', { name: 'Steps' })).getByRole('button', { name: '2. Choose' })).toHaveProperty('disabled', true)
+    slow.release()
+    await screen.findByRole('region', { name: 'What fixture-reader can see' })
+    await user.click(within(step('Connect')).getByRole('button', { name: 'Choose a root' }))
+    expect(paragraphs(step('Choose')).join(' ')).toContain('One table or view of fixture-reader becomes the form.')
+  })
+
+  // A discovery refused leaves nothing of the one before it to choose from:
+  // the step shows what it knows, and what it knows is the refusal.
+  test('offers no root to choose after a discovery is refused', async () => {
+    const user = await signIn(plane)
+    await discover(user, 'fixture')
+    plane.unreachable.add('fixture-reader')
+    const reader = within(step('Connect')).getByRole('group', { name: 'fixture-reader' })
+    await user.click(within(reader).getByRole('button', { name: 'Discover fixture-reader' }))
+    await within(reader).findByRole('alert')
+    expect(within(step('Connect')).queryByRole('button', { name: 'Choose a root' })).toBeNull()
+  })
+
   // Discovering reads like looking, and the step invites comparing what each
   // connection can see. Looking at another one after a form is generated
   // must not throw the form, its presentation and its policy away: they stay

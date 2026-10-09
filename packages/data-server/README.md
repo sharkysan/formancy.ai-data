@@ -181,6 +181,24 @@ because those are whatever a caller typed, token or none
 a 404 is logged with no route. `src/server-log.test.ts` fails when a line
 holds what was sent.
 
+The image (`packages/data-server/Dockerfile`) runs as `node` and owns
+`/var/lib/formancy-data`, the directory to mount the store's volume on and to
+name in `FORMANCY_DATA_STORE_DIR`. Docker gives a new named volume the owner
+of the directory it is mounted on, so a volume there is the server's to
+write; without that directory the first publish fails with `EACCES`, and the
+CI container job fails if `node` cannot write it. The image declares no
+`VOLUME`: mount one, or the published forms go with the container.
+
+`compose.yaml`'s `stack` profile runs the image that way -- both planes, the
+allowlist in `deploy/connections.json`, an audit key, and every secret a
+`file:` reference into a volume -- behind one nginx that serves the studio
+and the host page on the same origin as `/v1`, with a token minter beside it
+for the demo. [`docs/getting-started.md`](../../docs/getting-started.md) walks
+through it, and CI runs that guide as written
+([0032](../../docs/decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
+It is an evaluation stack, not a deployment: the guide's section 8 says what
+a deployment changes.
+
 ## Licence
 
 Source-available, not open source. See [`LICENSE.md`](./LICENSE.md).

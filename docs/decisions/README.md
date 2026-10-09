@@ -78,12 +78,13 @@ only enforcement is "we remember" says so plainly.
 | [0021](0021-generated-forms-preview-in-both-frameworks.md) | Generated forms are previewed in both frameworks, generated in the browser from a captured snapshot | accepted; narrowed by 0029 |
 | [0022](0022-the-runtime-plane-asks-the-policy-every-time.md) | The runtime plane asks the policy on every request, and removes only the echo it can prove | accepted; narrowed by 0031 |
 | [0023](0023-the-audit-trail-is-operational-not-evidence.md) | The audit trail is operational, never holds a value, and is not evidence | accepted; extended by 0031, 0033 |
-| [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030 |
+| [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032 |
 | [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted |
 | [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted |
 | [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted |
 | [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md) | Row filters, labels and refusals mean the same on both engines | accepted |
-| [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031 |
+| [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031; extended by 0032 |
 | [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033 |
 | [0031](0031-an-answer-lost-after-a-write-is-unknown.md) | An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here | accepted |
+| [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md) | A clean install is the composed stack behind one proxy, and CI runs its guide | accepted |
 | [0033](0033-the-administrator-plane-is-audited.md) | The administrator's plane is audited like the runtime, one event per request | accepted |
