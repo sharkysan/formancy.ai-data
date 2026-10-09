@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
+import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { createAdminClient } from './api.js'
 import type { Proposal, ProposalRequest } from './api.js'
 import { NOTE_KINDS } from './generate.js'
@@ -151,12 +152,15 @@ describe('choosing', () => {
 
   // Another root is another form: what was generated, pinned and granted for
   // the order means nothing for the customer, so it goes, and the steps that
-  // needed it wait again.
-  test('starts afresh when the root changes', async () => {
+  // needed it wait again. The root says so before it is changed: a policy
+  // vanishing with no word is work lost.
+  test('starts afresh when the root changes, and says so first', async () => {
     const user = await signIn(plane)
     await generateOrder(user)
     const choose = await goToChoose(user)
-    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.customer')
+    const root = within(choose).getByLabelText('Root table or view')
+    expect(computeAccessibleDescription(root)).toBe('Choosing another root replaces the form generated from sales.order, and its policy.')
+    await user.selectOptions(root, 'sales.customer')
     expect(within(choose).getByRole('checkbox', { name: 'Pin tenant_id' })).toHaveProperty('checked', false)
     const steps = screen.getByRole('navigation', { name: 'Steps' })
     expect(within(steps).getByRole('button', { name: '4. Policy' })).toHaveProperty('disabled', true)

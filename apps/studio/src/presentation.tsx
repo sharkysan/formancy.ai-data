@@ -4,6 +4,7 @@ import { isLayoutContainer } from '@formancy/builder-core'
 import type { BuilderSession, CommandOutcome } from '@formancy/builder-core'
 import type { LayoutNode } from '@formancy/spec'
 import { labelOf, useDocument } from './document.js'
+import { useFocusAfterRender } from './focus.js'
 
 type Said = { ok: boolean; message: string }
 
@@ -66,16 +67,8 @@ function LabelInput({ id, label, value, commit }: { id: string; label: ReactElem
 export function PresentationStep({ session }: { session: BuilderSession }): ReactElement {
   const document = useDocument(session)
   const [said, setSaid] = useState<Said | null>(null)
-  const [focusNext, setFocusNext] = useState<string | null>(null)
+  const focusAfter = useFocusAfterRender()
   const layout = document.layouts?.[0]
-
-  useEffect(() => {
-    // A move that reaches the end disables the button just pressed; focus goes
-    // to its partner rather than falling to the page.
-    if (focusNext === null) return
-    window.document.getElementById(focusNext)?.focus()
-    setFocusNext(null)
-  }, [focusNext])
 
   function report(outcome: CommandOutcome, done: string): CommandOutcome {
     setSaid(outcome.ok ? { ok: true, message: done } : { ok: false, message: outcome.message })
@@ -91,8 +84,10 @@ export function PresentationStep({ session }: { session: BuilderSession }): Reac
     const id = `presentation-${key}`
     const move = (by: -1 | 1) => {
       const outcome = report(session.moveLayoutNode(address, { layout: address.layout, parent, index: at + by }), `Moved ${label} ${by < 0 ? 'up' : 'down'}.`)
+      // A move that reaches the end disables the button just pressed; focus
+      // goes to its partner rather than falling to the page.
       const end = by < 0 ? at + by === 0 : at + by === siblings - 1
-      if (outcome.ok && end) setFocusNext(`${id}-${by < 0 ? 'down' : 'up'}`)
+      if (outcome.ok && end) focusAfter(`${id}-${by < 0 ? 'down' : 'up'}`)
     }
     return (
       <li key={key} className="placed">

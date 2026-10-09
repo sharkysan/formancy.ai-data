@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { findObject } from '@formancy/data-core'
 import type { ForeignKeyMeta, MetadataSnapshot, ObjectMeta, RowFilterRule } from '@formancy/data-core'
-import type { Failure } from './api.js'
+import type { Failure, ProposalRequest } from './api.js'
 import type { Choice } from './choice.js'
 import {
   choiceFor,
@@ -203,8 +203,9 @@ export function ChooseStep({
   onChoice: (next: Choice) => void
   rowFilters: readonly RowFilterRule[]
   onRowFilters: (next: RowFilterRule[]) => void
-  generated: boolean
-  onGenerate: (request: ReturnType<typeof proposalFor>) => Promise<Failure | null>
+  /** What the form already generated was generated from, which choosing another root replaces. */
+  generated: Pick<ProposalRequest, 'connection' | 'root'> | null
+  onGenerate: (request: ProposalRequest) => Promise<Failure | null>
 }): ReactElement {
   const [pending, setPending] = useState(false)
   const [problems, setProblems] = useState<string[]>([])
@@ -212,6 +213,14 @@ export function ChooseStep({
   const tables = snapshot.objects.filter((object) => object.kind === 'table')
   const views = snapshot.objects.filter((object) => object.kind === 'view')
   const selected = root === undefined ? '' : String(snapshot.objects.indexOf(root))
+  // Choosing a root is what discards a generated form and its policy, here or
+  // on another connection; said on the choice, before it is made.
+  const replaces =
+    generated === null
+      ? null
+      : generated.connection === connection
+        ? `Choosing another root replaces the form generated from ${describeRef(generated.root)}, and its policy.`
+        : `Choosing a root on ${connection} replaces the form generated from ${describeRef(generated.root)} on ${generated.connection}, and its policy.`
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
@@ -244,6 +253,7 @@ export function ChooseStep({
         <label htmlFor="root-object">Root table or view</label>
         <select
           id="root-object"
+          aria-describedby={replaces === null ? undefined : 'root-object-replaces'}
           value={selected}
           onChange={(event) => {
             const object = snapshot.objects[Number(event.target.value)]
@@ -256,6 +266,11 @@ export function ChooseStep({
           {tables.length === 0 ? null : <optgroup label="Tables">{tables.map(option)}</optgroup>}
           {views.length === 0 ? null : <optgroup label="Views">{views.map(option)}</optgroup>}
         </select>
+        {replaces === null ? null : (
+          <p id="root-object-replaces" className="hint">
+            {replaces}
+          </p>
+        )}
       </div>
       {choice === null || root === undefined ? null : (
         <>
@@ -282,7 +297,7 @@ export function ChooseStep({
               </ul>
             </div>
           )}
-          {generated ? (
+          {generated !== null ? (
             <p className="hint">
               A form is already generated. Generating again replaces it and starts its presentation afresh; the policy is
               kept, and checked against the new form.

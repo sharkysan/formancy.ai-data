@@ -6,6 +6,10 @@ import type { FormPolicy } from '@formancy/data-core'
 import type { AdminClient, Bundle, Proposal, Published } from './api.js'
 import { describeRef } from './choice.js'
 import { useDocument } from './document.js'
+import { useFocusAfterRender } from './focus.js'
+
+/** The publish button's id, for the keyboard to return to. */
+const PUBLISH = 'publish'
 
 /** What the studio knows about the newest published version, which is the base a publish names. */
 type Base =
@@ -62,6 +66,7 @@ export function PublishStep({
   const [base, setBase] = useState<Base>({ state: 'reading' })
   const [result, setResult] = useState<Result | null>(null)
   const [pending, setPending] = useState(false)
+  const focusAfter = useFocusAfterRender()
 
   useEffect(() => {
     let current = true
@@ -111,6 +116,9 @@ export function PublishStep({
   function rebase(current: number | null): void {
     setBase({ state: 'known', version: current })
     setResult(null)
+    // The conflict closes, and the button pressed with it; what is left to
+    // do is publish, on top of the version just rebased onto.
+    focusAfter(PUBLISH)
   }
 
   return (
@@ -142,6 +150,7 @@ export function PublishStep({
       <p className="next">
         <button
           type="button"
+          id={PUBLISH}
           className="primary"
           disabled={base.state === 'reading' || blockers.length > 0}
           aria-describedby={blockers.length === 0 ? undefined : 'publish-blockers'}

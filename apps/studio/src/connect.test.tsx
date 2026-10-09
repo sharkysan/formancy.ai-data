@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
+import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { createSnapshot } from '@formancy/data-core'
-import { audit, discover, paragraphs, signIn, step } from './test-studio.js'
+import { audit, discover, generateOrder, goTo, paragraphs, signIn, step, writeOrderPolicy } from './test-studio.js'
 import { CONNECTIONS, OWNER_SNAPSHOT, READER_SNAPSHOT, startPlane } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
@@ -105,6 +106,43 @@ describe('connecting', () => {
     slow.release()
     await screen.findByRole('region', { name: 'What fixture can see' })
     expect(plane.requests.filter((request) => request.path.endsWith('/metadata'))).toHaveLength(1)
+  })
+
+  // Discovering reads like looking, and the step invites comparing what each
+  // connection can see. Looking at another one after a form is generated
+  // must not throw the form, its presentation and its policy away: they stay
+  // until a root is chosen on the other connection, and the Choose step says
+  // so on that choice before it is made.
+  test('keeps the generated form and its policy while another connection is looked at', async () => {
+    const user = await signIn(plane)
+    await generateOrder(user)
+    await writeOrderPolicy(user)
+    await goTo(user, 'Connect')
+    await discover(user, 'fixture-reader')
+    const steps = screen.getByRole('navigation', { name: 'Steps' })
+    expect(within(steps).getByRole('button', { name: '4. Policy' })).toHaveProperty('disabled', false)
+    const policy = await goTo(user, 'Policy')
+    expect((within(policy).getByLabelText('Roles that may read') as HTMLInputElement).value).toBe('clerk')
+    expect(paragraphs(await goTo(user, 'Publish')).join(' ')).toContain('its bindings to sales.order on fixture,')
+
+    // The other connection's Choose step starts empty, and the root says what choosing one replaces.
+    const choose = await goTo(user, 'Choose')
+    const root = within(choose).getByLabelText('Root table or view')
+    expect((root as HTMLSelectElement).value).toBe('')
+    expect(computeAccessibleDescription(root)).toBe('Choosing a root on fixture-reader replaces the form generated from sales.order on fixture, and its policy.')
+    expect(await audit()).toEqual([])
+
+    // Back on the first connection, its choice is as it was left.
+    await goTo(user, 'Connect')
+    await discover(user, 'fixture')
+    const again = await goTo(user, 'Choose')
+    expect(within(again).getByRole('checkbox', { name: 'Pin tenant_id' })).toHaveProperty('checked', true)
+
+    // Choosing on the other connection is what starts afresh.
+    await goTo(user, 'Connect')
+    await discover(user, 'fixture-reader')
+    await user.selectOptions(within(await goTo(user, 'Choose')).getByLabelText('Root table or view'), 'sales.order')
+    expect(within(steps).getByRole('button', { name: '4. Policy' })).toHaveProperty('disabled', true)
   })
 
   // "No foreign key" and "cannot tell" for one table: SQL Server hides the

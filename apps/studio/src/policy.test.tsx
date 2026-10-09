@@ -1,10 +1,15 @@
+import { useState } from 'react'
+import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
+import { createBuilderSession } from '@formancy/builder-core'
 import { validatePolicy } from '@formancy/data-core'
 import type { FormPolicy } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Proposal } from './api.js'
-import { audit, generateOrder, goTo, signIn, step, writeOrderPolicy } from './test-studio.js'
+import { PolicyStep } from './policy.js'
+import { audit, focusedName, generateOrder, goTo, pressEnter, servedDocument, signIn, step, writeOrderPolicy } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
@@ -161,9 +166,12 @@ describe('what the editor writes', () => {
     await screen.findByRole('main', { name: 'Generate' })
     const policy = await goTo(user, 'Policy')
     expect(check(policy).problems).toEqual(['lookups has no entry for customer: say which rows of sales.customer it may offer, or [] for every row'])
-    await user.click(within(policy).getByRole('button', { name: 'Offer every row of sales.customer' }))
+    await pressEnter(user, within(policy).getByRole('button', { name: 'Offer every row of sales.customer' }))
     expect(check(policy).problems).toEqual([])
     expect(within(policy).getByText('Every row of sales.customer is offered.')).toBeTruthy()
+    // The decision made, the button that made it is gone. The keyboard goes
+    // to what is left to do with the list, not to the top of the page.
+    expect(focusedName()).toBe('Add a filter to the Customer list')
   })
 
   // A field's roles, typed one field at a time, are the published policy's:
@@ -211,6 +219,77 @@ describe('a policy kept across a regeneration', () => {
     await user.click(within(policy).getByRole('button', { name: 'Remove the customer lookup filter' }))
     expect(check(policy)).toEqual({ summary: 'The policy fits this form.', problems: [] })
     expect(await audit()).toEqual([])
+  })
+})
+
+/**
+ * The policy step alone, over the order's bindings, holding the policy it is
+ * given and every change it makes: a policy no journey through the studio
+ * produces -- two stale field entries, two stray lookup filters -- can then be
+ * edited as one would be.
+ */
+function PolicyOf({ proposal, initial }: { proposal: Proposal; initial: FormPolicy }): ReactElement {
+  const [policy, setPolicy] = useState(initial)
+  const [session] = useState(() => createBuilderSession(proposal.form))
+  return (
+    <main aria-label="Policy">
+      <PolicyStep bindings={proposal.bindings} snapshot={proposal.snapshot} session={session} policy={policy} onPolicy={setPolicy} stale={false} onRegenerate={() => Promise.resolve(null)} />
+    </main>
+  )
+}
+
+describe('where the keyboard goes when a removal takes its button', () => {
+  // Removing a filter takes its row out of the page, and the button pressed
+  // with it, and the browser drops the focus to the top of the document. A
+  // keyboard user would start the step again from the top. The focus goes to
+  // the rule that took the removed one's place, and after the last one to
+  // the button that adds a rule to the same list.
+  test('a filter removed: the next rule, else the list’s Add', async () => {
+    const user = await signIn(plane)
+    await generateOrder(user)
+    const policy = await writeOrderPolicy(user)
+    await pressEnter(user, within(policy).getByRole('button', { name: 'Remove Customer filter 1' }))
+    expect(focusedName()).toBe('Add a filter to the Customer list')
+
+    await user.click(within(policy).getByRole('button', { name: 'Add a row filter' }))
+    await user.click(within(policy).getByRole('button', { name: 'Add a row filter' }))
+    await pressEnter(user, within(policy).getByRole('button', { name: 'Remove row filter 3' }))
+    expect(focusedName()).toBe('Add a row filter')
+    const second = (within(policy).getByLabelText('Column of row filter 2') as HTMLSelectElement).value
+    await pressEnter(user, within(policy).getByRole('button', { name: 'Remove row filter 1' }))
+    expect(focusedName()).toBe('Remove row filter 1')
+    expect((within(policy).getByLabelText('Column of row filter 1') as HTMLSelectElement).value).toBe(second)
+  })
+
+  // An entry the form no longer has is removed from a note that closes with
+  // its last entry. The focus goes to the next entry's Remove, else the one
+  // before; and when the note closes, to the policy check -- the verdict the
+  // removals were made to change, which says whether the policy fits now.
+  test('a stale entry removed: its neighbour, else the policy check', async () => {
+    servedDocument()
+    const proposal = await orderProposal()
+    const user = userEvent.setup()
+    const initial: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+      fields: { left_over: { read: ['clerk'], write: [] }, also_left: { read: ['clerk'], write: [] } },
+      rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+      lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }], gone: [], also_gone: [] },
+    }
+    render(<PolicyOf proposal={proposal} initial={initial} />)
+    const policy = screen.getByRole('main', { name: 'Policy' })
+    const verdict = within(policy).getByRole('region', { name: 'Policy check' })
+
+    await pressEnter(user, within(policy).getByRole('button', { name: 'Remove also_left' }))
+    expect(focusedName()).toBe('Remove left_over')
+    await pressEnter(user, within(policy).getByRole('button', { name: 'Remove left_over' }))
+    expect(document.activeElement).toBe(verdict)
+
+    await pressEnter(user, within(policy).getByRole('button', { name: 'Remove the gone lookup filter' }))
+    expect(focusedName()).toBe('Remove the also_gone lookup filter')
+    await pressEnter(user, within(policy).getByRole('button', { name: 'Remove the also_gone lookup filter' }))
+    expect(document.activeElement).toBe(verdict)
+    expect(within(verdict).getByRole('status').textContent).toBe('The policy fits this form.')
   })
 })
 

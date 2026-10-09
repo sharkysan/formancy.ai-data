@@ -57,6 +57,10 @@ describe('presentation', () => {
   // Moving is a button, so it is a keystroke. The field keeps focus as it
   // moves, and at the end of the list -- where the button just pressed is
   // disabled -- focus goes to its partner rather than falling to the page.
+  // Moving down, React takes the row holding the focused button out and puts
+  // it back further on; jsdom and Chromium both drop the focus of a node
+  // taken out, and React gives it back after the commit. The browser gate
+  // presses Move down in Chromium too.
   test('moves a field by keyboard, and keeps the keyboard on it', async () => {
     const user = await signIn(plane)
     await generateOrder(user)

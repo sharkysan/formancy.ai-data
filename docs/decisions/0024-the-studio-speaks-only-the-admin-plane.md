@@ -32,7 +32,13 @@
   as a bare failure); a refused bundle shows every reason.
   `apps/studio/src/connect.test.tsx`, `choose.test.tsx`, `drift.test.tsx` and
   `preview.test.tsx` for the steps between, gaps before tables among them
-  (watched failing with the order swapped).
+  (watched failing with the order swapped); discovering another connection
+  keeps the generated form and its policy until a root is chosen on it, and
+  the root says what choosing one replaces (watched failing when discovering
+  discarded them).
+  The removals in `policy.test.tsx` and the rebase in `publish.test.tsx` leave
+  the keyboard on a deliberate control, not on the page (watched failing
+  before it was moved there).
   `apps/studio/src/fixtures.test.ts` — the three captured snapshots hash to
   their fingerprints and agree with the shared fixture model.
   `apps/studio/scripts/browser-test.mjs` (`pnpm test:browser`, the existing CI
@@ -43,7 +49,11 @@
   the token and in the workbench on the skip link and then into the step, and
   axe's colour-contrast and target-size rules in every state that adds colour
   (watched failing with a muted colour darkened, the connection grid wider
-  than a phone and the skip link kept off screen).
+  than a phone and the skip link kept off screen); Enter on Move down, on a
+  filter's Remove and on Rebase leaves the focus on a deliberate control
+  (watched failing with the rows keyed by position, and before the removals
+  moved it); and no rule of `studio.css` selects an element on the preview's
+  paper (watched failing with the element rules unscoped).
   `scripts/upstream-deps.mjs` refuses a range in the studio's manifest,
   watched failing with `@formancy/builder-core` at `^0.3.0`.
 

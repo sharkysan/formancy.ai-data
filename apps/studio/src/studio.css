@@ -12,8 +12,14 @@
  *
  * The preview is not the studio: it is what the people filling the form in
  * will see, so it is white paper in the Blueprint theme from
- * @formancy/themes. Nothing here styles a field; a rule that reached into
- * `.sheet` would make the preview show something the published form does not.
+ * @formancy/themes. A rule that reached into `.sheet` would make the preview
+ * show something the published form does not -- a label's size where the
+ * theme sets only its weight, a fieldset's margin where the theme sets none.
+ * So every rule that names an element rather than a class of the studio's
+ * own ends in `:where(:not(.sheet *))`: off the paper, and, being `:where`,
+ * no heavier than it was. The browser gate fails when any rule of this file
+ * selects an element on the paper; what the paper inherits -- the font, the
+ * line height -- it would inherit from any host page.
  */
 
 :root {
@@ -40,7 +46,7 @@
   color-scheme: dark;
 }
 
-* {
+*:where(:not(.sheet *)) {
   box-sizing: border-box;
 }
 
@@ -75,16 +81,16 @@ body::before {
   mask-image: linear-gradient(black, transparent 85%);
 }
 
-::selection {
+:where(:not(.sheet *))::selection {
   background: color-mix(in srgb, var(--client) 45%, transparent);
 }
 
-:focus-visible {
+:where(:not(.sheet *)):focus-visible {
   outline: 2px solid var(--server);
   outline-offset: 2px;
 }
 
-code {
+code:where(:not(.sheet *)) {
   font-family: var(--mono);
   font-size: 0.875em;
   /* An identifier is one long word, and a phone is narrow. */
@@ -123,12 +129,12 @@ code {
 
 /* ------------------------------------------------------------- controls */
 
-button {
+button:where(:not(.sheet *)) {
   font: inherit;
   cursor: pointer;
 }
 
-button:disabled {
+button:where(:not(.sheet *)):disabled {
   cursor: not-allowed;
 }
 
@@ -174,8 +180,8 @@ button:disabled {
   box-shadow: none;
 }
 
-input:not([type='checkbox']),
-select {
+input:not([type='checkbox']):where(:not(.sheet *)),
+select:where(:not(.sheet *)) {
   width: 100%;
   min-width: 0;
   min-height: 2.5rem;
@@ -188,18 +194,18 @@ select {
   font-size: 0.9375rem;
 }
 
-input:not([type='checkbox']):focus-visible,
-select:focus-visible {
+input:not([type='checkbox']):where(:not(.sheet *)):focus-visible,
+select:where(:not(.sheet *)):focus-visible {
   outline: none;
   border-color: var(--client);
   box-shadow: 0 0 0 4px rgb(139 123 255 / 22%);
 }
 
-input[aria-invalid='true'] {
+input[aria-invalid='true']:where(:not(.sheet *)) {
   border-color: var(--invalid);
 }
 
-input[type='checkbox'] {
+input[type='checkbox']:where(:not(.sheet *)) {
   flex: none;
   width: 1.5rem;
   height: 1.5rem;
@@ -207,7 +213,7 @@ input[type='checkbox'] {
   accent-color: var(--client);
 }
 
-label {
+label:where(:not(.sheet *)) {
   font-size: 0.875rem;
   font-weight: 500;
 }
@@ -240,7 +246,7 @@ label {
   margin: 0.5rem 0 0;
 }
 
-fieldset {
+fieldset:where(:not(.sheet *)) {
   min-width: 0;
   margin: 1rem 0;
   padding: 0.75rem 1rem 1rem;
@@ -249,7 +255,7 @@ fieldset {
   background: rgb(255 255 255 / 2%);
 }
 
-legend {
+legend:where(:not(.sheet *)) {
   padding: 0 0.375rem;
   font-family: var(--display);
   font-weight: 650;
@@ -521,11 +527,11 @@ fieldset.nested {
 
 /* The heading takes focus only so the next Tab starts there. */
 .step:focus,
-.step h2:focus {
+.step h2:where(:not(.sheet *)):focus {
   outline: none;
 }
 
-.step h2 {
+.step h2:where(:not(.sheet *)) {
   margin: 0 0 0.5rem;
   font-family: var(--display);
   font-size: 1.5rem;
@@ -533,19 +539,19 @@ fieldset.nested {
   letter-spacing: -0.02em;
 }
 
-.step h3 {
+.step h3:where(:not(.sheet *)) {
   margin: 1.25rem 0 0.5rem;
   font-family: var(--display);
   font-size: 1.0625rem;
   font-weight: 700;
 }
 
-.step h4 {
+.step h4:where(:not(.sheet *)) {
   margin: 1rem 0 0.25rem;
   font-size: 0.9375rem;
 }
 
-.step h5 {
+.step h5:where(:not(.sheet *)) {
   margin: 0.75rem 0 0.25rem;
   color: var(--muted);
   font-family: var(--mono);
@@ -556,8 +562,8 @@ fieldset.nested {
 }
 
 /* Lists the studio draws are rows with a rule at the start, not bullets. */
-.step ul,
-.step ol {
+.step ul:where(:not(.sheet *)),
+.step ol:where(:not(.sheet *)) {
   display: grid;
   gap: 0.375rem;
   margin: 0.25rem 0;
@@ -565,7 +571,7 @@ fieldset.nested {
   list-style: none;
 }
 
-.step li {
+.step li:where(:not(.sheet *)) {
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -1019,7 +1025,7 @@ fieldset.nested {
     display: none;
   }
 
-  fieldset {
+  fieldset:where(:not(.sheet *)) {
     padding: 0.5rem 0.75rem 0.75rem;
   }
 

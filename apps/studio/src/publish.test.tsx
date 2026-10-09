@@ -8,7 +8,7 @@ import type { FormPolicy } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { AdminClient, Bundle, Proposal } from './api.js'
 import { PublishStep } from './publish.js'
-import { audit, generateOrder, goTo, paragraphs, servedDocument, signIn, writeOrderPolicy } from './test-studio.js'
+import { audit, focusedName, generateOrder, goTo, paragraphs, pressEnter, servedDocument, signIn, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
@@ -83,7 +83,11 @@ describe('publishing', () => {
       `Version 1: “Their order”, ${String((await proposal()).form.model.fields.length)} fields, bound to sales.order on fixture.`,
     ])
     expect(await audit()).toEqual([])
-    await user.click(within(alert).getByRole('button', { name: 'Rebase on version 1' }))
+    await pressEnter(user, within(alert).getByRole('button', { name: 'Rebase on version 1' }))
+    // Rebasing closes the conflict, and the button pressed with it. The
+    // keyboard goes to what there is left to do -- publish, on top -- rather
+    // than falling to the top of the page.
+    expect(focusedName()).toBe('Publish version 2')
     await user.click(within(publish).getByRole('button', { name: 'Publish version 2' }))
     await within(publish).findByText('Published version 2 of sales-order.')
     const first = await plane.store.read('sales-order', 1)

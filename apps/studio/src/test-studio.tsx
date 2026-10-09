@@ -133,6 +133,21 @@ export function unnamed(): string[] {
     .map((element) => element.outerHTML.slice(0, 100))
 }
 
+/**
+ * Enter on `button`, as a keyboard user presses it: focused first, so where
+ * the focus goes afterwards is the studio's doing and not the pointer's.
+ */
+export async function pressEnter(user: User, button: HTMLElement): Promise<void> {
+  button.focus()
+  await user.keyboard('{Enter}')
+}
+
+/** The accessible name of what has the keyboard's focus; the page itself when nothing does. */
+export function focusedName(): string {
+  const element = document.activeElement
+  return element === null || element === document.body ? 'the page itself' : computeAccessibleName(element)
+}
+
 /** What the paragraphs in `container` say, in order: prose has a role and no name. */
 export function paragraphs(container: HTMLElement): string[] {
   return within(container)

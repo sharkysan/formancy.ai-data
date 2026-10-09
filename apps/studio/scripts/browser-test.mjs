@@ -3,13 +3,17 @@
 // The examples page's gate (apps/examples/scripts/browser-test.mjs), applied
 // to the studio as CLAUDE.md asks of every UI here. The suite in src/ runs in
 // jsdom, which applies no CSS, resolves no media queries and performs no
-// layout, so three claims the studio makes could only be checked by hand:
+// layout, so these claims the studio makes could only be checked by hand:
 //
 //   - nothing scrolls sideways and nothing is past either edge, on every
 //     step of the journey, down to a 320px phone;
 //   - the keyboard path: the first Tab on the sign-in screen reaches the
 //     token, and in the workbench the skip link comes on screen and leads
-//     into the step;
+//     into the step; and where Enter moves or removes the button it was
+//     pressed on -- a field moved down, a filter removed, a conflict rebased
+//     -- the keyboard is somewhere deliberate afterwards, not on the page;
+//   - the preview's paper is the theme's: no rule of studio.css selects
+//     anything on it, so the preview shows what the published form will;
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules jsdom cannot measure -- on every step, including the states
 //     that add colour: gaps, a refused policy, a failed preview, a conflict,
@@ -157,8 +161,69 @@ async function audit(page, target) {
   }, [...ACCESSIBILITY_TAGS])
 }
 
-/** The journey, step by step: each entry brings the studio to a state and names it. */
-function journey(plane) {
+/** What has the keyboard's focus, said so that a failure names it. */
+function describeFocus(page) {
+  return page.evaluate(() => {
+    const element = document.activeElement
+    if (element === null || element === document.body) return 'the page itself'
+    return `${element.tagName.toLowerCase()}${element.id === '' ? '' : `#${element.id}`} "${(element.textContent ?? '').trim().slice(0, 40)}"`
+  })
+}
+
+/**
+ * Enter on `pressed`, as a keyboard user presses it; then, once `settled`
+ * says the studio has answered, whether `expected` has the focus.
+ *
+ * In Chromium because what happens to the focus of an element React moves
+ * or unmounts is the browser's to say, and jsdom has an answer of its own.
+ */
+async function focusAfterEnter(page, pressed, settled, expected) {
+  await pressed.focus()
+  await page.keyboard.press('Enter')
+  await settled()
+  return (await expected.evaluate((element) => element === document.activeElement)) ? null : `the focus is on ${await describeFocus(page)}`
+}
+
+/**
+ * Every rule of studio.css that selects an element on the preview's paper.
+ *
+ * The stylesheet is read from the source and parsed by Chromium, so a rule
+ * added to it is checked without anybody listing it here. A rule is matched
+ * for every moment, not this one: a state the pointer or the keyboard puts an
+ * element in (`:hover`, `:focus-visible`) comes off the selector first, and a
+ * pseudo-element is matched as the element it hangs off. What the paper
+ * inherits -- the font, the line height -- it would inherit from any host
+ * page; that is not a rule selecting it.
+ */
+function rulesOnThePaper(page) {
+  const css = readFileSync(join(app, 'src', 'studio.css'), 'utf8')
+  return page.locator('form.sheet').evaluate((paper, text) => {
+    const stylesheet = new CSSStyleSheet()
+    stylesheet.replaceSync(text)
+    const selectors = []
+    const walk = (rules) => {
+      for (const rule of rules) {
+        if (rule instanceof CSSStyleRule) selectors.push(rule.selectorText)
+        else if ('cssRules' in rule) walk(rule.cssRules)
+      }
+    }
+    walk(stylesheet.cssRules)
+    const elements = [...paper.querySelectorAll('*')]
+    const reached = []
+    for (const selector of selectors) {
+      const always = selector.replace(/::[\w-]+(\([^)]*\))?/g, '').replace(/:(?:focus-visible|focus-within|focus|hover|active)(?![\w-])/g, '')
+      const hit = elements.find((element) => element.matches(always.trim() === '' ? '*' : always))
+      if (hit !== undefined) reached.push(`${selector} selects ${hit.outerHTML.slice(0, 60)}`)
+    }
+    return { rules: selectors.length, tags: [...new Set(elements.map((element) => element.tagName.toLowerCase()))], reached }
+  }, css)
+}
+
+/**
+ * The journey, step by step: each entry brings the studio to a state and
+ * names it, checking on the way what only that moment can show.
+ */
+function journey(plane, check) {
   const step = (page, name) => page.getByRole('main', { name })
   const nav = (page, name) => page.getByRole('navigation', { name: 'Steps' }).getByRole('button', { name: new RegExp(`^\\d+\\. ${name}$`) })
   return [
@@ -182,7 +247,14 @@ function journey(plane) {
     }],
     ['Policy, refused', async (page) => {
       await nav(page, 'Policy').click()
-      await step(page, 'Policy').getByRole('button', { name: 'Remove Customer filter 1' }).click()
+      // The Customer list's only filter: removing it takes its row, and the
+      // button pressed, with it.
+      const policy = step(page, 'Policy')
+      const remove = policy.getByRole('button', { name: 'Remove Customer filter 1' })
+      check(
+        'removing the last Customer filter leaves the keyboard on Add a filter',
+        await focusAfterEnter(page, remove, () => remove.waitFor({ state: 'detached' }), policy.getByRole('button', { name: 'Add a filter to the Customer list' })),
+      )
     }],
     ['Policy, fitting', async (page) => {
       const policy = step(page, 'Policy')
@@ -191,8 +263,17 @@ function journey(plane) {
       await policy.getByRole('button', { name: 'Fill every field from the operations' }).click()
       await policy.getByText('The policy fits this form.').waitFor()
     }],
-    ['Presentation, a label refused', async (page) => {
+    ['Presentation, a field moved down by keyboard', async (page) => {
       await nav(page, 'Presentation').click()
+      // React moves the row that holds the button pressed, and Chromium
+      // drops the focus of an element taken out of the document, even to be
+      // put back; React then gives it back. Watched failing with the rows
+      // keyed by position, which remounts the row instead of moving it.
+      const presentation = step(page, 'Presentation')
+      const down = presentation.getByRole('button', { name: 'Move down Customer' })
+      check('Move down keeps the keyboard on the button pressed', await focusAfterEnter(page, down, () => presentation.getByText('Moved Customer down.').waitFor(), down))
+    }],
+    ['Presentation, a label refused', async (page) => {
       await step(page, 'Presentation').getByLabel('Label of notes').fill('')
     }],
     ['Preview, after a failed submit', async (page) => {
@@ -200,6 +281,11 @@ function journey(plane) {
       await nav(page, 'Preview').click()
       await step(page, 'Preview').getByRole('button', { name: 'Validate' }).click()
       await page.waitForFunction(() => document.querySelector('form.sheet [aria-invalid="true"]') !== null, undefined, { timeout: 10_000 })
+      const paper = await rulesOnThePaper(page)
+      check('the preview: no rule of studio.css selects anything on the paper', paper.reached.length === 0 ? null : paper.reached.slice(0, 6).join('; '))
+      // A guard on the guard: real rules, matched against a whole form.
+      const missing = ['label', 'input', 'button'].filter((tag) => !paper.tags.includes(tag))
+      check('which matched studio.css against a whole form', paper.rules > 0 && missing.length === 0 ? null : `${String(paper.rules)} rules, and no ${missing.join(', ')} on the paper`)
     }],
     ['Publish, published', async (page) => {
       await nav(page, 'Publish').click()
@@ -212,6 +298,14 @@ function journey(plane) {
       await plane.server.inject({ method: 'POST', url: '/v1/forms/sales-order/versions', headers: { authorization: `Bearer ${TOKEN}` }, payload: { expectedBase: 1, bundle: latest.bundle } })
       await step(page, 'Publish').getByRole('button', { name: 'Publish version 2' }).click()
       await page.getByRole('button', { name: 'Rebase on version 2' }).waitFor()
+    }],
+    ['Publish, rebased by keyboard', async (page) => {
+      // Rebasing closes the conflict the button sits in. What is left to do
+      // is publish, on top of the version just rebased onto.
+      const publish = step(page, 'Publish')
+      const rebase = publish.getByRole('button', { name: 'Rebase on version 2' })
+      const again = publish.getByRole('button', { name: 'Publish version 3' })
+      check('rebasing leaves the keyboard on Publish', await focusAfterEnter(page, rebase, () => again.waitFor(), again))
     }],
     ['Drift, blocking', async (page) => {
       const { fingerprint: _, ...contents } = structuredClone(plane.databases.get('fixture'))
@@ -301,7 +395,7 @@ async function run() {
         check('and through it the next Tab reaches the first control of the step', into ? null : 'focus is elsewhere')
         await measured(page, 'Connect')
 
-        for (const [state, act] of journey(plane)) {
+        for (const [state, act] of journey(plane, check)) {
           await act(page)
           await measured(page, state)
         }

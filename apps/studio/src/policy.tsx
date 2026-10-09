@@ -5,6 +5,7 @@ import { validatePolicy } from '@formancy/data-core'
 import type { FormBindings, FormPolicy, MetadataSnapshot } from '@formancy/data-core'
 import { describeRef } from './choice.js'
 import { labelOf, useDocument } from './document.js'
+import { useFocusAfterRender } from './focus.js'
 import { LookupFilters, RowFilters } from './policy-filters.js'
 import { boundColumns, fillFromOperations, formatRoles, lookupBindings, orphanFields, orphanLookups, parseRoles, withFieldRoles } from './policy-model.js'
 
@@ -41,6 +42,24 @@ function RolesInput({ id, label, roles, onRoles }: { id: string; label: ReactEle
 
 const OPERATIONS = ['read', 'create', 'update'] as const
 
+/** The policy check's id: where the keyboard goes when a removal closes the note it was made from. */
+const CHECK = 'policy-check'
+
+/**
+ * Where the keyboard goes when `key` is removed from `list`: the Remove of
+ * the entry after it, else of the one before. With neither, the note closes,
+ * and the focus goes to the policy check -- the verdict the removals were
+ * made to change.
+ */
+function afterRemoving(list: readonly string[], key: string, removeOf: (key: string) => string): string {
+  const at = list.indexOf(key)
+  const neighbour = list[at + 1] ?? list[at - 1]
+  return neighbour === undefined ? CHECK : removeOf(neighbour)
+}
+
+const orphanRemove = (key: string) => `orphan-${key}-remove`
+const strayRemove = (key: string) => `stray-lookup-${key}-remove`
+
 /**
  * Whether the policy fits the form, in the words `validatePolicy` uses -- the
  * function the server runs on publish (0019) -- recomputed on every change.
@@ -48,7 +67,7 @@ const OPERATIONS = ['read', 'create', 'update'] as const
  */
 function PolicyCheck({ problems }: { problems: readonly string[] }): ReactElement {
   return (
-    <section className="policy-check" aria-labelledby="check-heading" data-ok={problems.length === 0}>
+    <section id={CHECK} tabIndex={-1} className="policy-check" aria-labelledby="check-heading" data-ok={problems.length === 0}>
       <h3 id="check-heading">Policy check</h3>
       <p role="status">
         {problems.length === 0
@@ -99,6 +118,19 @@ export function PolicyStep({
   const pinned = new Set(policy.rowFilters.map((rule) => rule.column))
   const orphans = orphanFields(policy, bindings)
   const strayLookups = orphanLookups(policy, bindings)
+  const focusAfter = useFocusAfterRender()
+
+  function removeOrphan(key: string): void {
+    onPolicy(withFieldRoles(policy, key, [], []))
+    focusAfter(afterRemoving(orphans, key, orphanRemove))
+  }
+
+  function removeStrayLookup(key: string): void {
+    const lookups = { ...policy.lookups }
+    delete lookups[key]
+    onPolicy({ ...policy, lookups })
+    focusAfter(afterRemoving(strayLookups, key, strayRemove))
+  }
 
   return (
     <>
@@ -177,7 +209,7 @@ export function PolicyStep({
               {orphans.map((key) => (
                 <li key={key}>
                   <code>{key}</code>{' '}
-                  <button type="button" className="button" onClick={() => onPolicy(withFieldRoles(policy, key, [], []))}>
+                  <button type="button" id={orphanRemove(key)} className="button" onClick={() => removeOrphan(key)}>
                     Remove{' '}<span className="visually-hidden">{key}</span>
                   </button>
                 </li>
@@ -203,15 +235,7 @@ export function PolicyStep({
             {strayLookups.map((key) => (
               <li key={key}>
                 <code>{key}</code>{' '}
-                <button
-                  type="button"
-                  className="button"
-                  onClick={() => {
-                    const lookups = { ...policy.lookups }
-                    delete lookups[key]
-                    onPolicy({ ...policy, lookups })
-                  }}
-                >
+                <button type="button" id={strayRemove(key)} className="button" onClick={() => removeStrayLookup(key)}>
                   Remove{' '}<span className="visually-hidden">the {key} lookup filter</span>
                 </button>
               </li>

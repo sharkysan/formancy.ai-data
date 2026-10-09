@@ -37,6 +37,12 @@ interface Discovered {
   snapshot: MetadataSnapshot
 }
 
+/** A choice, and the connection it was made on: on another database it names nothing. */
+interface Chosen {
+  connection: string
+  choice: Choice
+}
+
 /** A proposal, the request that produced it, and the session its presentation is edited in. */
 interface Generated {
   request: ProposalRequest
@@ -57,7 +63,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   const { client, identity, connections } = signedIn
   const [current, setCurrent] = useState<StepId>('connect')
   const [discovered, setDiscovered] = useState<Discovered | null>(null)
-  const [choice, setChoice] = useState<Choice | null>(null)
+  const [chosen, setChosen] = useState<Chosen | null>(null)
   const [policy, setPolicy] = useState<FormPolicy>(EMPTY_POLICY)
   const [generated, setGenerated] = useState<Generated | null>(null)
   const [publishedId, setPublishedId] = useState<string | null>(null)
@@ -82,22 +88,21 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   }
 
   function discoveredNow(connection: string, snapshot: MetadataSnapshot): void {
-    if (discovered?.connection !== connection) {
-      // Another database: nothing chosen for the last one applies to it.
-      setChoice(null)
-      setGenerated(null)
-      setPolicy(EMPTY_POLICY)
-    }
+    // Discovering is looking, and the Connect step invites comparing what
+    // each connection can see. What was chosen, generated and granted on the
+    // last database stays until a root is chosen on this one.
     setDiscovered({ connection, snapshot })
   }
 
-  function chose(next: Choice): void {
-    if (choice !== null && !sameRef(choice.root, next.root)) {
-      // Another root: the form, its pins and its policy were about the old one.
+  function chose(connection: string, next: Choice): void {
+    if (chosen !== null && (chosen.connection !== connection || !sameRef(chosen.choice.root, next.root))) {
+      // Another root, or a root on another database: the form, its pins and
+      // its policy were about the old one. The Choose step says so on the
+      // root, before it is chosen.
       setGenerated(null)
       setPolicy(EMPTY_POLICY)
     }
-    setChoice(next)
+    setChosen({ connection, choice: next })
   }
 
   async function generate(request: ProposalRequest): Promise<Failure | null> {
@@ -123,11 +128,11 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
           <ChooseStep
             snapshot={discovered.snapshot}
             connection={discovered.connection}
-            choice={choice}
-            onChoice={chose}
+            choice={chosen?.connection === discovered.connection ? chosen.choice : null}
+            onChoice={(next) => chose(discovered.connection, next)}
             rowFilters={policy.rowFilters}
             onRowFilters={(rowFilters) => setPolicy((previous) => ({ ...previous, rowFilters }))}
-            generated={generated !== null}
+            generated={generated?.request ?? null}
             onGenerate={generate}
           />
         )
@@ -147,8 +152,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             onPolicy={setPolicy}
             stale={stale}
             onRegenerate={async () => {
-              if (choice === null) return 'nothing is chosen to generate from.'
-              const failure = await generate(proposalFor(request.connection, choice, policy.rowFilters))
+              if (chosen === null) return 'nothing is chosen to generate from.'
+              const failure = await generate(proposalFor(request.connection, chosen.choice, policy.rowFilters))
               return failure?.message ?? null
             }}
           />

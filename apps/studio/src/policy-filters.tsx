@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 import { findObject } from '@formancy/data-core'
 import type { FormPolicy, MetadataSnapshot, RowFilterRule } from '@formancy/data-core'
 import { describeRef } from './choice.js'
+import { useFocusAfterRender } from './focus.js'
 import type { LookupBinding } from './policy-model.js'
 
 /** The attribute a new rule starts with until somebody types another. */
@@ -13,9 +14,33 @@ const DEFAULT_ATTRIBUTE = 'tenant'
  * attribute. Equality with a value from the verified context and nothing more
  * expressive, on purpose (0011): there is no operator to choose, because a
  * second one would be SQL somebody wrote.
+ *
+ * Removing a rule removes the button pressed. The keyboard goes to the
+ * Remove of the rule that takes its place, and after the last rule to `add`,
+ * the id of the button that adds one to the same list.
  */
-function RuleList({ prefix, what, rules, columns, onRules }: { prefix: string; what: string; rules: readonly RowFilterRule[]; columns: readonly string[]; onRules: (next: RowFilterRule[]) => void }): ReactElement {
+function RuleList({
+  prefix,
+  what,
+  rules,
+  columns,
+  onRules,
+  add,
+  focusAfter,
+}: {
+  prefix: string
+  what: string
+  rules: readonly RowFilterRule[]
+  columns: readonly string[]
+  onRules: (next: RowFilterRule[]) => void
+  add: string
+  focusAfter: (id: string) => void
+}): ReactElement {
   const replace = (at: number, rule: RowFilterRule) => onRules(rules.map((entry, index) => (index === at ? rule : entry)))
+  const remove = (at: number) => {
+    onRules(rules.filter((_, index) => index !== at))
+    focusAfter(at < rules.length - 1 ? `${prefix}-${String(at)}-remove` : add)
+  }
   return (
     <ol className="rules">
       {rules.map((rule, index) => {
@@ -45,7 +70,7 @@ function RuleList({ prefix, what, rules, columns, onRules }: { prefix: string; w
               </label>
               <input id={`${id}-attribute`} value={rule.attribute} spellCheck={false} onChange={(event) => replace(index, { ...rule, attribute: event.target.value })} />
             </div>
-            <button type="button" className="button" onClick={() => onRules(rules.filter((_, at) => at !== index))}>
+            <button type="button" id={`${id}-remove`} className="button" onClick={() => remove(index)}>
               Remove{' '}<span className="visually-hidden">{name}</span>
             </button>
           </li>
@@ -83,6 +108,7 @@ export function RowFilters({
   onRegenerate: () => Promise<string | null>
 }): ReactElement {
   const [refused, setRefused] = useState<string | null>(null)
+  const focusAfter = useFocusAfterRender()
   return (
     <fieldset>
       <legend>Row filters on {root}</legend>
@@ -96,10 +122,10 @@ export function RowFilters({
           makes; a table kept per tenant needs one.
         </p>
       ) : (
-        <RuleList prefix="row-filter" what="row filter" rules={rules} columns={columns} onRules={onRules} />
+        <RuleList prefix="row-filter" what="row filter" rules={rules} columns={columns} onRules={onRules} add="row-filter-add" focusAfter={focusAfter} />
       )}
       <p>
-        <button type="button" className="button" onClick={() => onRules([...rules, nextRule(rules, columns)])}>
+        <button type="button" id="row-filter-add" className="button" onClick={() => onRules([...rules, nextRule(rules, columns)])}>
           Add a row filter
         </button>
       </p>
@@ -142,6 +168,7 @@ export function LookupFilters({
   policy: FormPolicy
   onLookups: (next: FormPolicy['lookups']) => void
 }): ReactElement | null {
+  const focusAfter = useFocusAfterRender()
   if (lookups.length === 0) return null
   const set = (field: string, rules: RowFilterRule[] | undefined) => {
     const next = { ...policy.lookups }
@@ -156,6 +183,7 @@ export function LookupFilters({
         const columns = findObject(snapshot, binding.target.table)?.columns.map((column) => column.name) ?? [...binding.target.columns]
         const rules = Object.hasOwn(policy.lookups, binding.field) ? policy.lookups[binding.field] : undefined
         const label = labels[binding.field] ?? binding.field
+        const add = `lookup-${binding.field}-add`
         return (
           <fieldset key={binding.field}>
             <legend>
@@ -170,15 +198,31 @@ export function LookupFilters({
             ) : rules.length === 0 ? (
               <p className="none">Every row of {target} is offered.</p>
             ) : (
-              <RuleList prefix={`lookup-${binding.field}`} what={`${label} filter`} rules={rules} columns={columns} onRules={(next) => set(binding.field, next)} />
+              <RuleList
+                prefix={`lookup-${binding.field}`}
+                what={`${label} filter`}
+                rules={rules}
+                columns={columns}
+                onRules={(next) => set(binding.field, next)}
+                add={add}
+                focusAfter={focusAfter}
+              />
             )}
             <p className="actions">
               {rules === undefined ? (
-                <button type="button" className="button" onClick={() => set(binding.field, [])}>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => {
+                    // Decided, the choice is gone and the button with it.
+                    set(binding.field, [])
+                    focusAfter(add)
+                  }}
+                >
                   Offer every row{' '}<span className="visually-hidden">of {target}</span>
                 </button>
               ) : null}
-              <button type="button" className="button" onClick={() => set(binding.field, [...(rules ?? []), nextRule(rules ?? [], columns)])}>
+              <button type="button" id={add} className="button" onClick={() => set(binding.field, [...(rules ?? []), nextRule(rules ?? [], columns)])}>
                 Add a filter{' '}<span className="visually-hidden">to the {label} list</span>
               </button>
             </p>
