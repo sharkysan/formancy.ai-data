@@ -130,6 +130,24 @@ describe('the administrator plane', () => {
     expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, pinned: 'name' } })).statusCode).toBe(400)
   })
 
+  // The store takes a form id of up to 128 characters, and Fastify's router
+  // answers any path parameter past 100 with a 404 before a route runs. A
+  // form with a long id could then be proposed and never published or read —
+  // found by the studio, which put ids of every length to the real server.
+  test('a form id as long as the store allows is published and read back', async () => {
+    const formId = `e${'x'.repeat(127)}`
+    const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, formId } })).json()
+    const bundle = { format: 1, connection: 'erp', form: proposal.form, bindings: proposal.bindings, policy: POLICY, snapshot: proposal.snapshot }
+    const published = await app.inject({ method: 'POST', url: `/v1/forms/${formId}/versions`, headers: as('admin'), payload: { expectedBase: null, bundle } })
+    expect(published.statusCode, published.body).toBe(201)
+    const latest = await app.inject({ method: 'GET', url: `/v1/forms/${formId}/versions/latest`, headers: as('admin') })
+    expect(latest.statusCode).toBe(200)
+    expect(latest.json().version).toBe(1)
+    // One past the rule is still refused, by the router, as too long.
+    const tooLong = await app.inject({ method: 'GET', url: `/v1/forms/${formId}x/versions/latest`, headers: as('admin') })
+    expect(tooLong.statusCode).toBe(414)
+  })
+
   // Publication is compare-and-swap: the first publish names no base, a second
   // from a stale base is a conflict that names the current version.
   test('publishes a reviewed proposal, and refuses a stale base', async () => {

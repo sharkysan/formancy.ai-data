@@ -1,0 +1,773 @@
+{
+  "kind": "sqlserver",
+  "serverVersion": "16.0.4295.3",
+  "scope": {
+    "schemas": [
+      "sales"
+    ]
+  },
+  "objects": [
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "country"
+      },
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "identity",
+          "comment": null
+        },
+        {
+          "name": "iso_code",
+          "ordinal": 2,
+          "databaseType": "char(2)",
+          "type": {
+            "kind": "text",
+            "maxLength": 2,
+            "fixedLength": true
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "name",
+          "ordinal": 3,
+          "databaseType": "nvarchar(100)",
+          "type": {
+            "kind": "text",
+            "maxLength": 100,
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "flag",
+          "ordinal": 4,
+          "databaseType": "varbinary(max)",
+          "type": {
+            "kind": "binary",
+            "maxLength": null
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "shape",
+          "ordinal": 5,
+          "databaseType": "geography",
+          "type": {
+            "kind": "unsupported"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_country",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniqueKeys": [
+        {
+          "name": "uq_country_iso_code",
+          "columns": [
+            "iso_code"
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "checks": []
+    },
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "customer"
+      },
+      "kind": "table",
+      "comment": "A buyer, numbered within its tenant.",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "ordinal": 1,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "customer_no",
+          "ordinal": 2,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "name",
+          "ordinal": 3,
+          "databaseType": "nvarchar(200)",
+          "type": {
+            "kind": "text",
+            "maxLength": 200,
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "country_code",
+          "ordinal": 4,
+          "databaseType": "char(2)",
+          "type": {
+            "kind": "text",
+            "maxLength": 2,
+            "fixedLength": true
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "credit_limit",
+          "ordinal": 5,
+          "databaseType": "decimal(14,2)",
+          "type": {
+            "kind": "decimal",
+            "precision": 14,
+            "scale": 2
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "active",
+          "ordinal": 6,
+          "databaseType": "bit",
+          "type": {
+            "kind": "boolean"
+          },
+          "nullable": false,
+          "hasDefault": true,
+          "defaultExpression": "((1))",
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "created_at",
+          "ordinal": 7,
+          "databaseType": "datetimeoffset(7)",
+          "type": {
+            "kind": "timestamp",
+            "withTimeZone": true,
+            "precision": 7
+          },
+          "nullable": false,
+          "hasDefault": true,
+          "defaultExpression": "(sysdatetimeoffset())",
+          "generated": "none",
+          "comment": null
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_customer",
+        "columns": [
+          "tenant_id",
+          "customer_no"
+        ]
+      },
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "name": "fk_customer_country",
+          "columns": [
+            "country_code"
+          ],
+          "references": {
+            "table": {
+              "schema": "sales",
+              "name": "country"
+            },
+            "columns": [
+              "iso_code"
+            ]
+          },
+          "onUpdate": "no-action",
+          "onDelete": "no-action",
+          "enforced": true,
+          "validated": true
+        }
+      ],
+      "checks": []
+    },
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "customer_summary"
+      },
+      "kind": "view",
+      "comment": null,
+      "columns": [
+        {
+          "name": "tenant_id",
+          "ordinal": 1,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "customer_no",
+          "ordinal": 2,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "name",
+          "ordinal": 3,
+          "databaseType": "nvarchar(200)",
+          "type": {
+            "kind": "text",
+            "maxLength": 200,
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "order_count",
+          "ordinal": 4,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        }
+      ],
+      "primaryKey": null,
+      "uniqueKeys": [],
+      "foreignKeys": [],
+      "checks": []
+    },
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "employee"
+      },
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "name",
+          "ordinal": 2,
+          "databaseType": "nvarchar(200)",
+          "type": {
+            "kind": "text",
+            "maxLength": 200,
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "manager_id",
+          "ordinal": 3,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_employee",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "name": "fk_employee_manager",
+          "columns": [
+            "manager_id"
+          ],
+          "references": {
+            "table": {
+              "schema": "sales",
+              "name": "employee"
+            },
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "no-action",
+          "onDelete": "no-action",
+          "enforced": true,
+          "validated": false
+        }
+      ],
+      "checks": []
+    },
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "order"
+      },
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "databaseType": "bigint",
+          "type": {
+            "kind": "integer",
+            "min": "-9223372036854775808",
+            "max": "9223372036854775807"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "identity",
+          "comment": null
+        },
+        {
+          "name": "tenant_id",
+          "ordinal": 2,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "customer_no",
+          "ordinal": 3,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "order_date",
+          "ordinal": 4,
+          "databaseType": "date",
+          "type": {
+            "kind": "date"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "status",
+          "ordinal": 5,
+          "databaseType": "varchar(20)",
+          "type": {
+            "kind": "text",
+            "maxLength": 20,
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": true,
+          "defaultExpression": "('draft')",
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "amount",
+          "ordinal": 6,
+          "databaseType": "decimal(18,4)",
+          "type": {
+            "kind": "decimal",
+            "precision": 18,
+            "scale": 4
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "notes",
+          "ordinal": 7,
+          "databaseType": "nvarchar(max)",
+          "type": {
+            "kind": "text",
+            "maxLength": null,
+            "fixedLength": false
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "group",
+          "ordinal": 8,
+          "databaseType": "nvarchar(50)",
+          "type": {
+            "kind": "text",
+            "maxLength": 50,
+            "fixedLength": false
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "created_by",
+          "ordinal": 9,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "approved_by",
+          "ordinal": 10,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "row_version",
+          "ordinal": 11,
+          "databaseType": "rowversion",
+          "type": {
+            "kind": "rowversion"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "rowversion",
+          "comment": null
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_order",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "name": "fk_order_approved_by",
+          "columns": [
+            "approved_by"
+          ],
+          "references": {
+            "table": {
+              "schema": "sales",
+              "name": "employee"
+            },
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "no-action",
+          "onDelete": "no-action",
+          "enforced": true,
+          "validated": true
+        },
+        {
+          "name": "fk_order_created_by",
+          "columns": [
+            "created_by"
+          ],
+          "references": {
+            "table": {
+              "schema": "sales",
+              "name": "employee"
+            },
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "no-action",
+          "onDelete": "no-action",
+          "enforced": true,
+          "validated": true
+        },
+        {
+          "name": "fk_order_customer",
+          "columns": [
+            "tenant_id",
+            "customer_no"
+          ],
+          "references": {
+            "table": {
+              "schema": "sales",
+              "name": "customer"
+            },
+            "columns": [
+              "tenant_id",
+              "customer_no"
+            ]
+          },
+          "onUpdate": "no-action",
+          "onDelete": "no-action",
+          "enforced": true,
+          "validated": true
+        }
+      ],
+      "checks": [
+        {
+          "name": "ck_order_status",
+          "expression": "([status]='shipped' OR [status]='placed' OR [status]='draft')",
+          "validated": true
+        }
+      ]
+    },
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "order_line"
+      },
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "order_id",
+          "ordinal": 1,
+          "databaseType": "bigint",
+          "type": {
+            "kind": "integer",
+            "min": "-9223372036854775808",
+            "max": "9223372036854775807"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "line_no",
+          "ordinal": 2,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "quantity",
+          "ordinal": 3,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "unit_price",
+          "ordinal": 4,
+          "databaseType": "decimal(12,2)",
+          "type": {
+            "kind": "decimal",
+            "precision": 12,
+            "scale": 2
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "line_total",
+          "ordinal": 5,
+          "databaseType": "decimal(23,2)",
+          "type": {
+            "kind": "decimal",
+            "precision": 23,
+            "scale": 2
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "computed",
+          "comment": null
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_order_line",
+        "columns": [
+          "order_id",
+          "line_no"
+        ]
+      },
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "name": "fk_order_line_order",
+          "columns": [
+            "order_id"
+          ],
+          "references": {
+            "table": {
+              "schema": "sales",
+              "name": "order"
+            },
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "no-action",
+          "onDelete": "cascade",
+          "enforced": true,
+          "validated": true
+        }
+      ],
+      "checks": []
+    }
+  ],
+  "gaps": [],
+  "fingerprint": "891e7ab796e8f77e9b4586eb882029a09841fa32d4d8b3b0f31b8a36902b21a3"
+}

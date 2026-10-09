@@ -1,0 +1,36 @@
+/*
+ * The studio's chrome: formancy.ai's admin, extended with connection,
+ * discovery, mapping and drift panes -- not a palette of its own.
+ *
+ * The same room as formancy.ai's admin, playground and site: a dark bench,
+ * glass panels, violet for what a person acts on and teal for what the server
+ * did. The variables in styles/room.css are copied from formancy.ai's
+ * apps/admin/src/admin.css, unchanged, because an application's stylesheet is
+ * not a package this repository could depend on. When the admin's palette
+ * moves, that file moves with it, by hand. The studio uses none of the
+ * builder's panes (0024), so it loads no workbench.css and sets no --wb-*.
+ *
+ * The preview is not the studio: it is what the people filling the form in
+ * will see, so it is white paper in the Blueprint theme from
+ * @formancy/themes. A rule that reached into `.sheet` would make the preview
+ * show something the published form does not -- a label's size where the
+ * theme sets only its weight, a fieldset's margin where the theme sets none.
+ * So every rule that names an element rather than a class of the studio's
+ * own ends in `:where(:not(.sheet *))`: off the paper, and, being `:where`,
+ * no heavier than it was. The browser gate fails when any rule of these files
+ * selects an element on the paper; what the paper inherits -- the font, the
+ * line height -- it would inherit from any host page.
+ */
+
+/*
+ * In cascade order, one file per reason to change: the room, the controls,
+ * prose, the shell (sign-in and the workbench), the steps' panes, and narrow
+ * screens last so their rules win. Vite inlines each import into one
+ * stylesheet; the browser gate inlines them the same way before it parses.
+ */
+@import './styles/room.css';
+@import './styles/controls.css';
+@import './styles/prose.css';
+@import './styles/shell.css';
+@import './styles/steps.css';
+@import './styles/narrow.css';

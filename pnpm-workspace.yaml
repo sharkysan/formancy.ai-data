@@ -1,7 +1,9 @@
 packages:
   - "packages/*"
   # Applications: private, never published, and built by turbo like the rest.
-  # apps/examples renders generated forms under both upstream renderers.
+  # apps/examples renders generated forms under both upstream renderers;
+  # apps/studio is the administrator's application over the server's
+  # administrator plane.
   - "apps/*"
 
 # Shared dependency versions live here so the packages cannot drift apart.

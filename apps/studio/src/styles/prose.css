@@ -1,0 +1,92 @@
+/* -------------------------------------------------------------- prose */
+
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lede {
+  max-width: 72ch;
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+
+.lede code,
+.lede strong {
+  color: var(--text);
+}
+
+.hint,
+.none,
+.means {
+  margin: 0.25rem 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.none {
+  font-style: italic;
+}
+
+/* "Cannot tell" is not "none": the warm colour of something to look at, and
+   the words say which. */
+.cannot-tell {
+  margin: 0.25rem 0 0.5rem;
+  color: var(--warn);
+  font-size: 0.8125rem;
+}
+
+.problem-box,
+.field-problem {
+  margin: 0.75rem 0 0;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid color-mix(in srgb, var(--invalid) 45%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--invalid) 10%, transparent);
+  color: #ffc2ca;
+  font-size: 0.875rem;
+}
+
+.field-problem {
+  margin: 0;
+  padding: 0.375rem 0.625rem;
+}
+
+.problem-box p,
+.problem-box ul {
+  margin: 0.25rem 0;
+}
+
+.notice {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  font-size: 0.875rem;
+}
+
+.notice p,
+.notice ul {
+  margin: 0.25rem 0;
+}
+
+/* What the server did: teal. */
+.answered,
+.done {
+  margin: 0.5rem 0 0;
+  color: var(--server);
+  font-size: 0.875rem;
+}
+
+.done p {
+  margin: 0 0 0.5rem;
+}
+
+.next {
+  margin: 1.25rem 0 0;
+}

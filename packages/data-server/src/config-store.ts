@@ -43,7 +43,8 @@ export interface ConfigurationStore {
  * return the other's bundle. Found by this suite on Windows; Linux CI would
  * never have shown it.
  */
-const ID = /^[a-z0-9][a-z0-9._-]{0,127}$/
+export const CONFIGURATION_ID_MAX_LENGTH = 128
+const ID = new RegExp(`^[a-z0-9][a-z0-9._-]{0,${String(CONFIGURATION_ID_MAX_LENGTH - 1)}}$`)
 const VERSION_FILE = /^([1-9][0-9]*)\.json$/
 
 function assertId(id: string): void {

@@ -119,9 +119,12 @@ not. A suite that passed without a database would be proving the mock.
 
 The first UI here is `apps/examples`, the page that previews a generated form
 under both renderers
-([0021](docs/decisions/0021-generated-forms-preview-in-both-frameworks.md)).
-It, and the Studio and the landing page when they arrive, are formancy.ai's
-concept applied, not a new one:
+([0021](docs/decisions/0021-generated-forms-preview-in-both-frameworks.md));
+the second is `apps/studio`, the administrator's application over the
+server's administrator plane
+([0024](docs/decisions/0024-the-studio-speaks-only-the-admin-plane.md)). Both,
+and the landing page when it arrives, are formancy.ai's concept applied, not a
+new one:
 
 - **The same room.** The admin, the playground and the site upstream share one
   look: a dark bench, glass panels, violet for what the person acts on and teal
@@ -129,7 +132,10 @@ concept applied, not a new one:
   recoloured only through its `--wb-*` variables and not one rule overridden
   for colour. The Studio is that admin extended with connection, discovery,
   mapping and drift panes. It wears `admin.css`'s variables, not a palette of
-  its own, so the tool stays one tool in two places.
+  its own, so the tool stays one tool in two places. It edits presentation
+  with controls of its own over `@formancy/builder-core`'s session, not the
+  builder's panes, which cannot be held to edits that keep the bindings
+  (0024); so it loads no `workbench.css` and sets no `--wb-*`.
 - **Form previews on white paper, in Blueprint.** An administrator previews
   what the people filling in the form will see, not the admin. A generated form
   renders through `@formancy/react` or `@formancy/angular` with a shipped theme.
@@ -152,21 +158,32 @@ What holds this section, brought with the first UI from upstream's guards for
 the same promises:
 
 - **The size budget**, `scripts/source-size.test.mjs` in `pnpm test:repo`:
-  no source file past the 600 lines below.
+  no source file past the 600 lines below, stylesheets included.
 - **The starter-demo test**, `apps/examples/src/examples.test.ts`: every
   document the page shows is one the released spec accepts, places every field
   in the layout both previews draw, and has what the page says it shows.
-- **The browser gate**, `apps/examples/scripts/browser-test.mjs`, run as
-  `pnpm test:browser` in its own CI job, for what jsdom cannot see: in
-  Chromium, no sideways scroll and nothing past either edge down to 320 pixels,
-  the first Tab on the skip link and the next on the first preview's first
-  control, and axe's colour-contrast and target-size rules, clean and after a
-  failed submit.
+- **The studio's journey and presentation tests**,
+  `apps/studio/src/journey.test.tsx` and `presentation.test.tsx`, against the
+  real server behind a fake `fetch`: every request the studio makes is one of
+  the administrator plane's routes; axe and a name on every control at every
+  step; and nothing the presentation step offers can remove, rename or retype
+  a bound field, while what it produces publishes.
+- **The browser gates**, `apps/examples/scripts/browser-test.mjs` and
+  `apps/studio/scripts/browser-test.mjs`, run as `pnpm test:browser` in their
+  own CI job, for what jsdom cannot see: in Chromium, no sideways scroll and
+  nothing past either edge down to 320 pixels, the first Tab on the skip link
+  and the next into the content, and axe's colour-contrast and target-size
+  rules — for the examples clean and after a failed submit, for the studio at
+  every step of the journey against the real server on its own origin, where
+  it also fails when any rule of the studio's stylesheet selects an element on
+  the preview's paper.
 
-What nothing holds yet, said: the palette is copied from `admin.css` by hand
-and nothing fails when upstream's moves; that `app.css` never reaches into a
-preview's paper is held by review; and the one-shell bullet has nothing to
-hold until the `formancy.ai/data` page exists.
+What nothing holds yet, said: the palette is copied from `admin.css` by hand,
+into `app.css` and the studio's `styles/room.css`, and nothing fails when
+upstream's moves; that the examples' `app.css` never reaches into a preview's
+paper is held by review; and the
+one-shell bullet has nothing to hold until the `formancy.ai/data` page
+exists.
 
 ## Branch names
 
