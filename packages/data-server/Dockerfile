@@ -22,6 +22,8 @@ RUN npm install -g corepack@latest && corepack enable pnpm
 # the dependency graph and fails when this file forgets one.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/data-core/package.json packages/data-core/
+COPY packages/data-postgres/package.json packages/data-postgres/
+COPY packages/data-sqlserver/package.json packages/data-sqlserver/
 COPY packages/data-server/package.json packages/data-server/
 
 # --ignore-scripts: nothing the server needs runs a postinstall, and a build
@@ -33,6 +35,8 @@ RUN pnpm install --frozen-lockfile --ignore-scripts \
 COPY LICENSE.md NOTICE tsconfig.base.json ./
 COPY scripts/ scripts/
 COPY packages/data-core/ packages/data-core/
+COPY packages/data-postgres/ packages/data-postgres/
+COPY packages/data-sqlserver/ packages/data-sqlserver/
 COPY packages/data-server/ packages/data-server/
 
 RUN pnpm --filter @formancy/data-server... build && node scripts/sync-licenses.mjs

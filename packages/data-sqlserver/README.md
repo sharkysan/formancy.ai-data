@@ -12,14 +12,21 @@ ODBC to install.
 An adapter that reaches a real server and says which version answered:
 
 ```ts
-import mssql from 'mssql'
-import { createSqlServerAdapter } from '@formancy/data-sqlserver'
+import { connectSqlServer, createSqlServerAdapter } from '@formancy/data-sqlserver'
 
-const pool = await new mssql.ConnectionPool(config).connect()
+const pool = await connectSqlServer({ host, port, database, user, password, encrypt: true, trustServerCertificate: false })
 const adapter = createSqlServerAdapter(pool)
 await adapter.ping() // { kind: 'sqlserver', version: '16.0.4205.1' }
 await adapter.close()
 ```
+
+Open the pool with `connectSqlServer`, not with an `mssql` you imported
+yourself. This package binds every value with `mssql.NVarChar` and friends from
+its own copy of mssql, and tedious checks those by identity: a pool from
+another copy refuses every parameter with "type.validate is not a function".
+pnpm produced exactly that for the server, two installs of the same mssql
+version, and only the end-to-end suite saw it
+([0025](../../docs/decisions/0025-each-adapter-owns-its-driver.md)).
 
 And discovery: what a connection can see of the tables and views in an
 approved scope, as a `MetadataSnapshot` built by `@formancy/data-core`'s

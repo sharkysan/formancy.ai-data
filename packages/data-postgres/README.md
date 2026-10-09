@@ -13,10 +13,9 @@ discovery of the schemas an administrator approved, and both halves of the
 operations port: lookups and records.
 
 ```ts
-import postgres from 'postgres'
-import { createPostgresAdapter, createPostgresLookups, createPostgresRecords } from '@formancy/data-postgres'
+import { connectPostgres, createPostgresAdapter, createPostgresLookups, createPostgresRecords } from '@formancy/data-postgres'
 
-const sql = postgres(process.env.DATABASE_URL)
+const sql = connectPostgres({ host, port, database, user, password, tls: { enabled: true, rejectUnauthorized: true } })
 const adapter = createPostgresAdapter(sql)
 await adapter.ping() // { kind: 'postgres', version: '17.6' }
 
@@ -35,6 +34,13 @@ connection is where a secret is handled, and that happens once, in the
 composition root. Nothing in this package reads configuration, and nothing
 assumes how the driver was configured (below). `discoverPostgres(sql, scope)`
 is the same discovery as a function of its own.
+
+`connectPostgres` opens the client from this package's own copy of
+postgres.js, and is how `@formancy/data-server` opens every connection: a
+driver object built by one copy of a driver and used by another is a defect no
+unit test sees
+([0025](../../docs/decisions/0025-each-adapter-owns-its-driver.md)). A client
+built elsewhere still works, as long as it is the same copy.
 
 ### Lookups and records: what the server converts, and what the driver never touches
 

@@ -1,5 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { createDataServer } from './app.js'
+import type { DataServerOptions } from './app.js'
+import { logAuditSink } from './audit.js'
+import { createFileConfigurationStore } from './config-store.js'
+import { createConnectionRegistry, parseConnections } from './connections.js'
+import type { ConnectionRegistry } from './connections.js'
+import { DRIVER_FACTORIES } from './drivers.js'
 import { createIdentityVerifier } from './identity.js'
 import type { IdentityOptions } from './identity.js'
 import { resolveSecret } from './secrets.js'
@@ -63,5 +69,59 @@ const verifyIdentity = await createIdentityVerifier({
   attributes: attributeMap(process.env['FORMANCY_DATA_ATTRIBUTES']),
 })
 
-const app = await createDataServer({ verifyIdentity, logger: true })
+/**
+ * The two planes, each on only when its configuration is present:
+ *
+ *   FORMANCY_DATA_STORE_DIR     the configuration store's volume (0013)
+ *   FORMANCY_DATA_CONNECTIONS   the allowlist file, JSON (0019)
+ *   FORMANCY_DATA_ADMIN_ROLES   comma-separated roles that administer (0020)
+ *   FORMANCY_DATA_AUDIT_KEY     a secret reference naming records in the audit trail (0023)
+ *
+ * The store and the allowlist turn on the runtime plane; admin roles as well
+ * turn on the administrator's plane. Without them the server verifies tokens
+ * and nothing else, which is how a host is wired in before any form exists.
+ */
+const storeDirectory = process.env['FORMANCY_DATA_STORE_DIR']
+const connectionsFile = process.env['FORMANCY_DATA_CONNECTIONS']
+const adminRoles = (process.env['FORMANCY_DATA_ADMIN_ROLES'] ?? '').split(',').map((role) => role.trim()).filter((role) => role !== '')
+
+let registry: ConnectionRegistry | undefined
+let planes: Pick<DataServerOptions, 'admin' | 'runtime'> = {}
+if ((storeDirectory === undefined) !== (connectionsFile === undefined)) {
+  console.error('Set both FORMANCY_DATA_STORE_DIR and FORMANCY_DATA_CONNECTIONS, or neither.')
+  process.exit(1)
+}
+if (storeDirectory !== undefined && connectionsFile !== undefined) {
+  const parsed = parseConnections(JSON.parse(await readFile(connectionsFile, 'utf8')) as unknown)
+  if (!parsed.ok) {
+    console.error(`${connectionsFile}:\n  ${parsed.problems.join('\n  ')}`)
+    process.exit(1)
+  }
+  registry = createConnectionRegistry(parsed.connections, DRIVER_FACTORIES)
+  const store = createFileConfigurationStore(storeDirectory)
+  const auditReference = process.env['FORMANCY_DATA_AUDIT_KEY']
+  const auditKey = auditReference === undefined ? undefined : await resolveSecret(auditReference)
+  planes = {
+    // The server's own logger, looked up when an event fires: the server does
+    // not exist yet while its options are being built.
+    runtime: { registry, store, audit: { sink: (event) => logAuditSink(app.log)(event), ...(auditKey === undefined ? {} : { key: auditKey }) } },
+    ...(adminRoles.length === 0 ? {} : { admin: { registry, store, adminRoles } }),
+  }
+}
+
+const app = await createDataServer({ verifyIdentity, logger: true, ...planes })
+app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, connections: registry?.ids() ?? [] }, 'planes')
+
+// On SIGTERM a container stops taking requests, finishes the ones in flight,
+// and closes every database pool, so a rolling deploy leaves no half-open sessions.
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(signal, () => {
+    void (async () => {
+      await app.close()
+      await registry?.close()
+      process.exit(0)
+    })()
+  })
+}
+
 await app.listen({ host: '0.0.0.0', port: Number(process.env['PORT'] ?? 4390) })
