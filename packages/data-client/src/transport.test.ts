@@ -160,4 +160,18 @@ describe('when the data server is not what answers', () => {
       globalThis.fetch = original
     }
   })
+
+  // A base written with a trailing slash, or several, still names the same
+  // server: the path is joined once, never as `//v1`, which a proxy may route
+  // elsewhere or refuse. The trim is a loop, not `/\/+$/`, which CodeQL
+  // flagged as polynomial on a base of many slashes (js/polynomial-redos).
+  test('a base ending in slashes joins the path once', async () => {
+    const { base, asked } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ rows: [] }))
+    })
+    const outcome = await createDataClient({ token: () => 't', base: `${base}///` }).resolve('pg-order', 'order.customer', { operation: 'read', tokens: ['k1:1'] })
+    expect(outcome).toEqual({ ok: true, value: [] })
+    expect(asked).toEqual(['POST /v1/forms/pg-order/lookups/order.customer/resolve Bearer t'])
+  })
 })

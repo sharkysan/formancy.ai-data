@@ -130,12 +130,23 @@ interface Call<T> {
 }
 
 /**
+ * The base without the slashes it ends in, by walking back from the end.
+ * `/\/+$/` did the same and CodeQL flagged it (js/polynomial-redos): on a
+ * base of many slashes not at the end, the anchored pattern backtracks.
+ */
+function withoutTrailingSlashes(base: string): string {
+  let end = base.length
+  while (end > 0 && base[end - 1] === '/') end -= 1
+  return base.slice(0, end)
+}
+
+/**
  * A client of one data server's runtime plane. Every function resolves to an
  * Outcome and never rejects for an answer -- only for an abort the caller
  * asked for, which reaches it as the AbortError it raised.
  */
 export function createDataClient(options: DataClientOptions) {
-  const base = (options.base ?? '').replace(/\/+$/, '')
+  const base = withoutTrailingSlashes(options.base ?? '')
   const send = options.fetch ?? globalThis.fetch.bind(globalThis)
 
   async function call<T>(request: Call<T>): Promise<Outcome<T>> {
