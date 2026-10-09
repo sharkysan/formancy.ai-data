@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
@@ -35,14 +35,17 @@ const NOT_SOURCE = /\.(test|spec)\.[cm]?[jt]sx?$|\.d\.[cm]?ts$/
 function sources() {
   const found = []
   const walk = (directory) => {
-    for (const entry of readdirSync(directory)) {
-      if (SKIP.has(entry) || entry.startsWith('.')) continue
-      const full = join(directory, entry)
-      if (statSync(full).isDirectory()) {
+    // The directory listing says what each entry is, so nothing is stat'ed and
+    // then opened: CodeQL flags that pair (js/file-system-race), and a listing
+    // that already knows has no gap between the check and the use.
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (SKIP.has(entry.name) || entry.name.startsWith('.')) continue
+      const full = join(directory, entry.name)
+      if (entry.isDirectory()) {
         walk(full)
         continue
       }
-      if (!SOURCE.test(entry) || NOT_SOURCE.test(entry)) continue
+      if (!entry.isFile() || !SOURCE.test(entry.name) || NOT_SOURCE.test(entry.name)) continue
       const text = readFileSync(full, 'utf8')
       const lines = text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
       found.push({ path: relative(repo, full).replaceAll('\\', '/'), lines })
