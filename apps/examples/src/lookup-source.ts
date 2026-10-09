@@ -38,13 +38,14 @@ function keyOf(binding: LookupBinding, row: CapturedRow): string[] {
 /**
  * An option source over rows held in memory, for one generated lookup.
  *
- * **In memory until the server's lookup route exists.** Then the same name
- * resolves to a request the server answers under the host's authorisation
- * (0011, 0012), and these rows are not involved. What this already does the
- * way the server will: each option's value is the token `encodeKeyToken`
+ * **In memory, because this page has no server.** A host resolves the same
+ * name through the runtime plane's lookup routes, which `@formancy/data-client`
+ * calls under the host's authorisation (0011, 0012, 0029), and apps/host
+ * shows; these rows are not involved there. What this does the way the
+ * server does: each option's value is the token `encodeKeyToken`
  * makes of the referenced key, in the foreign key's column order, and its
  * label is `formatLabel` over the display columns the bindings name. So the
- * answers a person stores here are the answers the server will decode.
+ * answers a person stores here are the answers the server decodes.
  *
  * The narrowing is the source's job, not the control's (formancy.ai 0077), so
  * a search filters by label here and the control shows what it is given.

@@ -1,8 +1,9 @@
-import type { FieldError, FormBindings, PlanRefusalCode, RecordFailure } from '@formancy/data-core'
+import type { FormBindings, PlanRefusalCode, RecordFailure, RuntimeRefusal } from '@formancy/data-core'
 
 export interface HttpRefusal {
   status: number
-  body: { code: string; message: string; fieldErrors?: FieldError[] }
+  /** The body every runtime refusal has, declared once in data-core so the client reads the shape sent here. */
+  body: RuntimeRefusal
 }
 
 /**

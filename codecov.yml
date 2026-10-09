@@ -46,6 +46,10 @@ component_management:
       - type: project
         informational: true
   individual_components:
+    - component_id: data-client
+      name: packages/data-client
+      paths:
+        - packages/data-client/**
     - component_id: data-core
       name: packages/data-core
       paths:
@@ -70,6 +74,10 @@ component_management:
       name: apps/examples
       paths:
         - apps/examples/**
+    - component_id: app-host
+      name: apps/host
+      paths:
+        - apps/host/**
     - component_id: app-studio
       name: apps/studio
       paths:

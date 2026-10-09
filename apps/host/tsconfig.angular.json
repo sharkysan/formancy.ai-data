@@ -1,0 +1,27 @@
+{
+  "//": [
+    "The tsconfig Vite's Angular plugin compiles with, and nothing else uses: the",
+    "examples page's, for its reason. tsconfig.json is a React app's, `noEmit: true`",
+    "and `module: preserve`, and the Angular compiler has to EMIT -- given a no-emit",
+    "program it produces nothing, which surfaces as a MISSING_EXPORT for the",
+    "component rather than as a compiler error.",
+    "",
+    "`include` names only the Angular files and the plain files they import, so the",
+    "program the compiler builds does not contain a single .tsx."
+  ],
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "experimentalDecorators": false,
+    "useDefineForClassFields": false,
+    "noEmit": false,
+    "outDir": "out-tsc"
+  },
+  "include": ["src/angular-form.ts", "src/angular-save.ts", "src/angular-bootstrap.ts", "src/labels.ts"]
+}

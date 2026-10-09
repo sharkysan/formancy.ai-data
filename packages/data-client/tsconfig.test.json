@@ -1,0 +1,12 @@
+{
+  // The suites start the real server and databases, which is Node's business:
+  // they get Node's types; the package's source does not.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": []
+}

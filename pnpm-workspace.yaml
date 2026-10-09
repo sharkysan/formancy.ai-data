@@ -3,7 +3,8 @@ packages:
   # Applications: private, never published, and built by turbo like the rest.
   # apps/examples renders generated forms under both upstream renderers;
   # apps/studio is the administrator's application over the server's
-  # administrator plane.
+  # administrator plane; apps/host is a host application's page over its
+  # runtime plane, one published form under both renderers.
   - "apps/*"
 
 # Shared dependency versions live here so the packages cannot drift apart.

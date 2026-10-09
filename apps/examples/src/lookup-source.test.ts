@@ -33,10 +33,10 @@ const request = {
 }
 
 describe('the in-memory customer source', () => {
-  // A select stores the option's value, and the server will decode it as the
+  // A select stores the option's value, and the server decodes it as the
   // referenced key (0012). A value that was the label, or the key in the wrong
-  // column order, would be stored by the browser and refused -- or worse,
-  // resolved to another row -- once the lookup route exists.
+  // column order, would be stored by the browser and refused by the server --
+  // or worse, resolved to another row.
   test("offers each captured customer under the token of its key, in the foreign key's column order", async () => {
     const binding = customerLookup()
     expect(binding.target.columns).toEqual(['tenant_id', 'customer_no'])

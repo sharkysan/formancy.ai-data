@@ -70,9 +70,9 @@ let failed = false
 
 try {
   const packages = publishable()
-  // Three today. A walk that finds fewer has gone wrong, and a test over zero
+  // Five today. A walk that finds fewer has gone wrong, and a test over zero
   // packages passes by having nothing to check.
-  if (packages.length < 3) {
+  if (packages.length < 5) {
     throw new Error(`only found ${String(packages.length)} publishable packages; the walk is wrong`)
   }
 
