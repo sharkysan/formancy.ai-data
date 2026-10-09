@@ -3,14 +3,20 @@
 - **Status:** accepted
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
-- **Verified by:** The contract is types in `packages/data-core/src/records/types.ts`;
-  nothing implements it yet, so nothing yet fails when an adapter breaks it.
-  The adapter suites that implement `RecordAdapter` are where each rule below
-  becomes a test, against both real servers, and this record is updated to
-  name them when they land. What is verified today is the port it sits beside:
-  `discovery.integration.test.ts` in both adapters checks that discovery
-  through `DatabaseAdapter.discover` is the same snapshot, by fingerprint, as
-  calling the adapter's discovery directly.
+- **Verified by:** both adapters' record and lookup suites, against real
+  servers: `packages/data-postgres/src/records.integration.test.ts` and
+  `lookups.integration.test.ts` (0016), and
+  `packages/data-sqlserver/src/records.integration.test.ts`,
+  `records-failures.integration.test.ts` and `lookups.integration.test.ts`
+  (0017). Each reads every fixture edge value back exactly, runs two concurrent
+  updates with one expected version and gets one winner and one `stale`,
+  returns `not-found` for another tenant's record exactly as for a missing
+  one, translates each constraint the fixture can provoke, and never retries
+  a write whose outcome is unknown. `discovery.integration.test.ts` in both
+  checks that discovery through `DatabaseAdapter.discover` is the same
+  snapshot, by fingerprint, as calling discovery directly. This line was
+  written when the contract had no implementation and said it would be
+  updated when the suites landed; it now is.
 
 ## Context
 

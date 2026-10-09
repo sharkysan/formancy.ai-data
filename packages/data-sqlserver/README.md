@@ -50,17 +50,115 @@ A table someone has denied `VIEW DEFINITION` or `CONTROL` on, whether to the
 account or to a role it is in, vanishes even under that grant; the account can
 count those denials, though not place them, and the snapshot says that too.
 
-The adapter and discovery take a connected pool rather than a connection
-string: opening the connection is where a secret is handled, and that happens
-once, in the composition root. Nothing in this package reads configuration.
-`discoverSqlServer` is a function beside the adapter, not a method on the
-`DatabaseAdapter` port, until the PostgreSQL adapter has its counterpart and
-the port can be shaped by both.
+Every function here takes a connected pool rather than a connection string:
+opening the connection is where a secret is handled, and that happens once, in
+the composition root. Nothing in this package reads configuration.
+`adapter.discover(scope)` is the same discovery through the `DatabaseAdapter`
+port.
 
 `@types/mssql` is a dependency rather than a devDependency because the pool is
-in both functions' signatures. A consumer type-checking against the published
+in every function's signature. A consumer type-checking against the published
 declarations needs it, and `skipLibCheck` would not save them, since the import
 is in this package's own declaration file. The install gate checks exactly this.
+
+### Lookups
+
+`createSqlServerLookups(pool)` answers formancy's option sources for the
+foreign keys a form offers as lookups — a page of a search, labels for tokens a
+form holds, and which submitted tokens are not members — under the actor's
+trusted row filters, in the same statement
+([0012](../../docs/decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md),
+[0017](../../docs/decisions/0017-sqlserver-operations.md)):
+
+```ts
+import { buildLookupConfig } from '@formancy/data-core'
+import { createSqlServerLookups } from '@formancy/data-sqlserver'
+
+const lookups = createSqlServerLookups(pool)
+const config = buildLookupConfig(bindings, 'customer', { snapshot })
+const tenant = { kind: 'restricted', equal: [{ column: 'tenant_id', value: '1' }] } as const
+await lookups.search(config, { search: 'muster', offset: 0, limit: 50 }, tenant)
+// { rows: [{ token: 'k1:1,1001', label: 'Muster AG' }], hasMore: false, omitted: 0 }
+await lookups.rejects(config, ['k1:1,1001', 'k1:2,1001'], tenant) // ['k1:2,1001']: another tenant's
+```
+
+A search is a literal: `%`, `_` and `[` match themselves. How it matches case
+and accents, and how text is ordered, is the column's collation — on a
+case-insensitive database `muster` finds `Muster AG` and `apple` sorts before
+`Banana` — which is SQL Server's rule and not code-point order. NULLs sort
+where the configuration says, though SQL Server has no `NULLS LAST`. A row
+whose key holds a NULL is never offered. A filter compares its trusted value
+exactly, not by collation. Membership is the re-encoded row's, because
+SQL Server's `=` finds `CH` for `ch` and `A` for `A `. Tokens are asked about
+in groups of 2098 parameters, which is what one statement can bind. A display
+column is spelled by SQL Server's ISO style 126, because the configuration
+does not carry its type. A database error is thrown, which formancy turns into
+a refused submission.
+
+### Records
+
+`createSqlServerRecords(pool)` reads, inserts and updates one record
+([0015](../../docs/decisions/0015-a-record-operation-is-one-guarded-statement.md),
+[0017](../../docs/decisions/0017-sqlserver-operations.md)):
+
+```ts
+import { createSqlServerRecords } from '@formancy/data-sqlserver'
+
+const records = createSqlServerRecords(pool)
+const read = await records.read({ target, key, columns, filters })
+// { ok: true, values: { id: '9007199254740993', amount: '99999999999999.9999', … }, version: '00000000000007d1' }
+const saved = await records.update({ target, key, set, expectedVersion: read.version, filters, returning })
+// or { ok: false, code: 'stale' | 'not-found' | 'unique-violation' | …, message }
+```
+
+- **Values leave as text the server produced**, exactly what
+  `codecFor(column).parse` returns: decimals padded to their scale (money to
+  four places), integers as decimal strings, dates `YYYY-MM-DD`, times
+  `HH:MM`, instants in UTC to the second, UUIDs in lower case. A time's
+  seconds and an instant's fraction are cut off, because formancy's shapes
+  cannot hold them; update only the fields a person changed. Text and
+  decimals are read by the column's own type, not the snapshot's, so a
+  column widened since discovery reads what it holds.
+- **Values arrive as text the server converts**, never through the driver's
+  typed parameters, whose decimal goes through a JavaScript number.
+- **A write is one batch**: the guarded statement, a check that every text
+  column stored the text it was sent — SQL Server turns `ŁA` into `LA` in a
+  single-byte varchar without an error, and the adapter refuses it as
+  `out-of-range` — and the commit. Any error rolls it back, a trigger's
+  `RAISERROR` included, which on its own would not stop the commit. It works
+  on a table with triggers: `returning` is the row as the statement wrote it,
+  before an AFTER trigger, and the version is the row's after one, read back
+  by its key, so a trigger that touches the row does not make the next save
+  stale.
+- **A trigger that decides what is stored is refused.** An INSTEAD OF
+  trigger runs in place of the statement, and what SQL Server returns is the
+  row as if it had not: a write to a table with an enabled one for that
+  operation — a view made writable by one included — is rolled back as
+  `unavailable`, and so is a write by an account that cannot see the table's
+  triggers. A trigger that ends the write's transaction itself, by COMMIT or
+  ROLLBACK, is `unknown-outcome`, because the batch cannot tell which. An
+  AFTER trigger that deletes the row it fired for, or that commits and then
+  raises an error, still misleads; [0017](../../docs/decisions/0017-sqlserver-operations.md)
+  says how.
+- **An update is one statement** naming the key, the filters and the
+  expected version, incrementing a version column in the same SET. A record
+  outside the filters is `not-found`, like one that does not exist.
+- **A refusal is a code**, by its error number, with a sentence of the
+  adapter's own that never repeats a value. A constraint or column is named
+  when the message is English, which it is unless `options.language` was set.
+  A pool that hands out no connection — closed, or none free within
+  `acquireTimeoutMillis` — is `unavailable`, because nothing was sent.
+  A connection lost after a write was sent is `unknown-outcome`, and nothing
+  is retried.
+
+**What an account needs.** `SELECT` on what a form reads and a lookup offers,
+and `INSERT` and `UPDATE` on what a form writes — with `SELECT` on it too: a
+write reads back through `OUTPUT` the columns it returns, the text it checks
+and the key it finds the row by again, and SQL Server asks `SELECT` for
+every column `OUTPUT` names, refusing an INSERT-only grant with 229. A grant
+it lacks is `permission-denied` for a record and a thrown error for a
+lookup. An account denied `VIEW DEFINITION` on a table it writes is refused
+the write, because whether a trigger decides it cannot be seen.
 
 ## What the spike found about the driver
 
@@ -80,10 +178,20 @@ upgrade that changes any of this fails by name:
   connections: the update that names the current 8-byte token wins, and the
   stale one changes no rows.
 
+The operations suites added more of the same, each a test that fails by name
+if it changes: a `Decimal(18,4)` parameter stores `1234567890123.4567` as
+`1234567890123.4568`; a request binds 2098 parameters, not the 2100 the
+message names; `OUTPUT` without `INTO` is refused on a table with a trigger
+(334); nvarchar into a single-byte varchar takes a "best fit" or `?` without an
+error; and a German session gets error 547 with its `FOREIGN KEY` and `CHECK`
+keywords untranslated. That all 34 languages on the 2022 image keep them was
+checked once, by hand, on 2026-10-09, and is not a test.
+
 ## Tests
 
 `pnpm test` starts `mcr.microsoft.com/mssql/server:2022-latest` through
-testcontainers and runs the suite against it. It needs Docker and, the first
+testcontainers, once per test file, and runs the suite against it: discovery,
+the spike, lookups, records, and the ways a record operation fails. It needs Docker and, the first
 time, a pull of about a gigabyte and a half. There is no mocked driver to fall
 back to — database semantics are what this package is for (0003).
 
