@@ -63,6 +63,11 @@ export interface DatabaseAdapter {
    * What this connection can see in the approved schemas, and — as gaps —
    * what it cannot (0004). Built through `createSnapshot` only, so the two
    * adapters cannot disagree about order or fingerprint.
+   *
+   * It answers as the connected account (0027): which principal that is, what
+   * that principal may SELECT, INSERT and UPDATE column by column, and whether
+   * row security applies to it. Another account on the same database gets
+   * another snapshot, with another fingerprint.
    */
   discover(scope: DiscoveryScope): Promise<MetadataSnapshot>
 

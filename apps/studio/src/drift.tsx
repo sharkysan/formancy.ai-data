@@ -16,6 +16,7 @@ const SEVERITIES: ReadonlyArray<{ severity: DriftSeverity; heading: string; bloc
 
 function describeSubject(subject: DriftSubject): string {
   if (subject.kind === 'scope') return 'the discovery scope'
+  if (subject.kind === 'schema') return `schema ${subject.schema}`
   if (subject.kind === 'object') return describeRef(subject.object)
   return `${describeRef(subject.object)}, ${subject.kind} ${subject.name}`
 }

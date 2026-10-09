@@ -3,7 +3,8 @@ import { cleanup, screen, within } from '@testing-library/react'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { createSnapshot } from '@formancy/data-core'
 import { audit, discover, generateOrder, goTo, paragraphs, signIn, step, writeOrderPolicy } from './test-studio.js'
-import { CONNECTIONS, OWNER_SNAPSHOT, READER_SNAPSHOT, startPlane } from './test-server.js'
+import type { CoverageGap } from '@formancy/data-core'
+import { CONNECTIONS, OWNER_SNAPSHOT, READER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT, startPlane } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
 /**
@@ -21,6 +22,13 @@ afterEach(async () => {
   cleanup()
   await plane.close()
 })
+
+/** Where a gap is, as the studio writes it: the scope, a schema, or an object (0027). */
+function place(gap: CoverageGap): string {
+  const subject = gap.subject
+  if (subject.kind === 'scope') return 'The whole scope'
+  return subject.kind === 'schema' ? `Schema ${subject.schema}` : `${subject.object.schema}.${subject.object.name}`
+}
 
 function seen(connection: string): HTMLElement {
   return screen.getByRole('region', { name: `What ${connection} can see` })
@@ -60,26 +68,54 @@ describe('connecting', () => {
     expect(document.body.textContent).not.toContain('10.0.0.5')
   })
 
-  // The restricted reader sees sales.order and nothing it points at. Its gaps
-  // come before the tables, each named, and the foreign keys into what it
-  // cannot see say so -- rather than the snapshot reading as a database with
-  // one table and no relationships.
+  // SQL Server's reader sees sales.order and nothing it points at: its
+  // catalog hides the rest, and since 0027 it is the connection that shows
+  // gaps. They come before the tables, each named by scope, schema or object,
+  // and the foreign keys into what it cannot see say so -- rather than the
+  // snapshot reading as a database with one table and no relationships.
   test('shows what a restricted connection could not see, before what it could', async () => {
     const user = await signIn(plane)
-    await discover(user, 'fixture-reader')
-    const region = seen('fixture-reader')
+    await discover(user, 'fixture-sqlserver-reader')
+    const region = seen('fixture-sqlserver-reader')
     const gaps = within(region).getByRole('region', { name: 'What this connection could not see' })
-    expect(items(gaps, 'What this connection could not see')).toEqual(
-      READER_SNAPSHOT.gaps.map((gap) => `${gap.object === null ? 'The whole scope' : `${gap.object.schema}.${gap.object.name}`} ${gap.aspect} ${gap.detail}`),
-    )
+    expect(SQLSERVER_READER_SNAPSHOT.gaps.length).toBeGreaterThan(0)
+    expect(items(gaps, 'What this connection could not see')).toEqual(SQLSERVER_READER_SNAPSHOT.gaps.map((gap) => `${place(gap)} ${gap.aspect} ${gap.detail}`))
     expect(paragraphs(gaps).join(' ')).toMatch(/cannot tell, not does not exist/)
     // Prominent: the gaps precede every table in reading order.
     const objects = within(region).getByRole('heading', { name: 'Tables and views' })
     expect(gaps.compareDocumentPosition(objects) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(items(region, 'Foreign keys')).toContain(
-      'fk_order_customer (tenant_id, customer_no) → sales.customer (tenant_id, customer_no), which this connection cannot see: this account holds no privilege on it that a form could read or write with',
-    )
+    expect(items(region, 'Foreign keys sales.order')).toContainEqual(expect.stringMatching(/^fk_order_customer \(tenant_id, customer_no\) → .*cannot see/))
+    // Whether row security applies could not be told, and the order says so.
+    expect(paragraphs(region)).toContain('Cannot tell whether row-level security applies.')
     expect(await audit()).toEqual([])
+  })
+
+  // PostgreSQL's catalog answers every role, so its reader describes every
+  // table -- including the ones it may not read, which before 0027 vanished
+  // behind a gap. Each says, column by column, that this connection may not
+  // read it; a studio that showed the table bare would offer what the
+  // generator refuses.
+  test('shows a table the account may not read as described, with what it may not do, and no gap', async () => {
+    const user = await signIn(plane)
+    await discover(user, 'fixture-reader')
+    const region = seen('fixture-reader')
+    expect(READER_SNAPSHOT.gaps).toEqual([])
+    const gaps = within(region).getByRole('region', { name: 'What this connection could not see' })
+    expect(within(gaps).queryAllByRole('listitem')).toEqual([])
+    const customer = READER_SNAPSHOT.objects.find((object) => object.ref.name === 'customer')
+    expect(customer).toBeDefined()
+    const columns = items(region, 'Columns sales.customer')
+    expect(columns).toHaveLength(customer?.columns.length ?? 0)
+    expect(columns.filter((line) => line.endsWith('this connection may not read it'))).toEqual(columns)
+    expect(paragraphs(region)).toContain('Row-level security applies to this connection.')
+  })
+
+  // Whose snapshot this is decides what it says (0027): the header names the
+  // principal the database answered for, and the login when it is another.
+  test('names the account the connection discovered as', async () => {
+    const user = await signIn(plane)
+    await discover(user, 'fixture-reader')
+    expect(paragraphs(seen('fixture-reader')).join(' ')).toContain(`Discovered as ${READER_SNAPSHOT.account.user}.`)
   })
 
   // The owner sees everything, and that is said as the adapter's finding --
@@ -145,12 +181,30 @@ describe('connecting', () => {
     expect(within(steps).getByRole('button', { name: '4. Policy' })).toHaveProperty('disabled', true)
   })
 
+  // A target the snapshot does not describe is "cannot see" whenever a gap
+  // could hide it -- one about the target, or one about its schema's or the
+  // scope's objects (0027). Read only the target's own gaps, and a table hidden
+  // by a schema-wide gap is said to be outside the approved schemas: a claim
+  // about the scope the connection cannot make.
+  test('says a target hidden by a schema-wide gap cannot be seen, not that it is out of scope', async () => {
+    const { fingerprint: _, ...contents } = structuredClone(OWNER_SNAPSHOT)
+    contents.objects = contents.objects.filter((object) => !(object.ref.schema === 'sales' && object.ref.name === 'customer'))
+    contents.gaps.push({ subject: { kind: 'schema', schema: 'sales' }, aspect: 'objects', detail: 'objects of sales this account may not see are left out' })
+    plane.databases.set('fixture', createSnapshot(contents))
+    const user = await signIn(plane)
+    await discover(user, 'fixture')
+    const lines = items(seen('fixture'), 'Foreign keys sales.order')
+    const line = lines.find((text) => text.startsWith('fk_order_customer '))
+    expect(line).toMatch(/which this connection cannot see: objects of sales this account may not see are left out$/)
+    expect(line).not.toMatch(/outside the approved schemas/)
+  })
+
   // "No foreign key" and "cannot tell" for one table: SQL Server hides the
   // foreign keys of a table the account has no permission on, and the adapter
   // writes a gap for it (0007). The table must not then read as having none.
   test('tells a table with no foreign key from one whose foreign keys it cannot see', async () => {
     const { fingerprint: _, ...contents } = structuredClone(OWNER_SNAPSHOT)
-    contents.gaps.push({ object: { schema: 'sales', name: 'country' }, aspect: 'foreign-keys', detail: 'the account has no VIEW DEFINITION on sales.country' })
+    contents.gaps.push({ subject: { kind: 'object', object: { schema: 'sales', name: 'country' } }, aspect: 'foreign-keys', detail: 'the account has no VIEW DEFINITION on sales.country' })
     plane.databases.set('fixture', createSnapshot(contents))
     const user = await signIn(plane)
     await discover(user, 'fixture')

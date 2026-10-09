@@ -1,9 +1,11 @@
 import type { FieldDef, FormSchema, LayoutNode, LogicRule } from '@formancy/spec'
 import type { ColumnMeta, ForeignKeyMeta, Generation, MetadataSnapshot, ObjectMeta } from '../metadata.js'
 import { findObject } from '../snapshot.js'
+import { assertReadableLookup, assertReadableRoot, identityFor, rowSecurityNotes, UNREADABLE, uninsertablePins, versionAccessProblem, writesFor } from './access.js'
 import { controlFor } from './controls.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, sourceNameFor } from './names.js'
 import type { ConcurrencyBinding, FieldBinding, FormBindings, GeneratedForm, GenerationNote, GenerationRequest, LookupChoice } from './types.js'
+import { BINDINGS_VERSION } from './version.js'
 
 /** formancy's form id rule. */
 const FORM_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
@@ -18,6 +20,15 @@ interface Planned {
   binding: FieldBinding
   system: boolean
   multiline: boolean
+  /** Written on some operation but for privilege: what update is blocked by when no field the form writes may be updated. */
+  privilegeOnly: boolean
+}
+
+/** A lookup the request asked for: its choice, its foreign key, and the table it reaches. */
+interface ResolvedLookup {
+  choice: LookupChoice
+  foreignKey: ForeignKeyMeta
+  target: ObjectMeta
 }
 
 /**
@@ -28,27 +39,31 @@ interface Planned {
  * what the database changed. No model, no clock, no randomness.
  *
  * It throws on a request that cannot be honoured — an unknown root, a lookup
- * over a foreign key whose target this connection cannot see — rather than
- * generating a form that quietly lacks what was asked for.
+ * over a foreign key whose target this connection cannot see, a root or a
+ * lookup column the account may not read — rather than generating a form that
+ * quietly lacks what was asked for. What the account may do decides what the
+ * form offers (0027): see `access.ts`.
  */
 export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequest): GeneratedForm {
   if (!FORM_ID.test(request.formId)) throw new Error(`form id ${JSON.stringify(request.formId)} is not one formancy accepts`)
   const root = findObject(snapshot, request.root)
   if (root === undefined) throw new Error(`${request.root.schema}.${request.root.name} is not in the snapshot`)
+  assertReadableRoot(root)
 
   const notes: GenerationNote[] = []
   const isView = root.kind === 'view'
   const allocate = createKeyAllocator()
 
   const lookups = resolveLookups(snapshot, root, request.lookups)
-  const lookupByColumn = new Map<string, { choice: LookupChoice; foreignKey: ForeignKeyMeta }>()
+  const lookupByColumn = new Map<string, ResolvedLookup>()
   for (const entry of lookups) for (const column of entry.foreignKey.columns) lookupByColumn.set(column, entry)
 
-  const identity = identityFor(root)
+  const identity = identityFor(root, notes)
   const pinned = new Set(request.pinned ?? [])
   for (const name of pinned) {
     if (!root.columns.some((column) => column.name === name)) throw new Error(`${root.ref.name} has no column ${name} to pin`)
   }
+  const fixedOut = uninsertablePins(root, pinned)
   const lookupColumns = new Set(lookups.flatMap((entry) => entry.foreignKey.columns))
   // A pinned column is written from context, so it can no more be the version
   // column than a lookup's column can.
@@ -67,9 +82,10 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     if (plan !== null) planned.push(plan)
   }
 
-  const operations = operationsFor(root, identity, concurrency, planned, pinned, notes)
+  const operations = operationsFor(root, identity, concurrency, planned, { pinned, fixedOut }, notes)
+  rowSecurityNotes(snapshot, [root, ...lookups.map((entry) => entry.target)], notes)
   const rules: LogicRule[] = planned
-    .filter((entry) => !entry.binding.writable)
+    .filter((entry) => !entry.binding.writes.create && !entry.binding.writes.update)
     .map((entry) => ({ target: entry.field.key, kind: 'disabled', cel: 'true' }))
 
   const form: FormSchema = {
@@ -82,7 +98,7 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
   }
 
   const bindings: FormBindings = {
-    version: 1,
+    version: BINDINGS_VERSION,
     root: { ...root.ref },
     rootKind: root.kind,
     identity,
@@ -95,11 +111,7 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
   return { form, bindings, notes }
 }
 
-function resolveLookups(
-  snapshot: MetadataSnapshot,
-  root: ObjectMeta,
-  choices: readonly LookupChoice[],
-): Array<{ choice: LookupChoice; foreignKey: ForeignKeyMeta }> {
+function resolveLookups(snapshot: MetadataSnapshot, root: ObjectMeta, choices: readonly LookupChoice[]): ResolvedLookup[] {
   const seen = new Map<string, string>()
   return choices.map((choice) => {
     const foreignKey = root.foreignKeys.find((candidate) => candidate.name === choice.foreignKey)
@@ -117,6 +129,7 @@ function resolveLookups(
         throw new Error(`${choice.foreignKey}: ${target.ref.name} has no column ${name} to display`)
       }
     }
+    assertReadableLookup(root, foreignKey, target, choice.display)
     // One column bound through two lookups would take two values from two
     // selections, and a save would have to pick one. Refused until the
     // product can say which wins.
@@ -125,13 +138,13 @@ function resolveLookups(
       if (other !== undefined) throw new Error(`${column} belongs to both ${other} and ${choice.foreignKey}; offer one of them`)
       seen.set(column, choice.foreignKey)
     }
-    return { choice, foreignKey }
+    return { choice, foreignKey, target }
   })
 }
 
 function planLookup(
   root: ObjectMeta,
-  lookup: { choice: LookupChoice; foreignKey: ForeignKeyMeta },
+  lookup: ResolvedLookup,
   request: GenerationRequest,
   allocate: (wanted: string) => string,
   isView: boolean,
@@ -140,10 +153,9 @@ function planLookup(
   const { choice, foreignKey } = lookup
   const target = foreignKey.references
   if (target === null) throw new Error('unreachable: resolveLookups refused an unknown target')
-  const columns = foreignKey.columns.map((name) => root.columns.find((column) => column.name === name))
-  const nullable = columns.some((column) => column?.nullable === true)
-  const writable = !isView && columns.every((column) => column !== undefined && column.generated === 'none')
-  const required = writable && columns.every((column) => column !== undefined && !column.nullable && !column.hasDefault)
+  // The snapshot refused a foreign key over a column the table does not have.
+  const columns = foreignKey.columns.map((name) => root.columns.find((column) => column.name === name) as ColumnMeta)
+  const nullable = columns.some((column) => column.nullable)
   const key = allocate(fieldKeyFor(target.table.name))
   const source = sourceNameFor(request.connection, root.ref, foreignKey.name)
 
@@ -152,6 +164,9 @@ function planLookup(
     kind: 'inferred',
     message: `A lookup over ${foreignKey.name} (${foreignKey.columns.join(', ')}), showing ${choice.display.join(', ')} of ${target.table.name}; label from the table name.`,
   })
+  const possible = !isView && columns.every((column) => column.generated === 'none')
+  const writes = writesFor(columns, possible, key, notes)
+  const required = writes.create && columns.every((column) => !column.nullable && !column.hasDefault)
 
   return {
     ordinal: columns[0]?.ordinal ?? 0,
@@ -165,10 +180,11 @@ function planLookup(
       display: [...choice.display],
       source,
       nullable,
-      writable,
+      writes,
     },
     system: false,
     multiline: false,
+    privilegeOnly: possible,
   }
 }
 
@@ -199,6 +215,10 @@ function planColumn(
   pinned: boolean,
   notes: GenerationNote[],
 ): Planned | null {
+  if (!column.access.select) {
+    notes.push({ subject: column.name, kind: 'excluded', message: UNREADABLE })
+    return null
+  }
   const control = controlFor(column.type, column.nullable)
   if ('exclude' in control) {
     notes.push({ subject: column.name, kind: 'excluded', message: `${column.databaseType}: ${control.exclude}.` })
@@ -207,8 +227,7 @@ function planColumn(
 
   const key = allocate(fieldKeyFor(column.name))
   const generated = column.generated !== 'none'
-  const writable = !isView && !generated && !pinned && control.readOnly === undefined
-  const required = writable && !column.nullable && !column.hasDefault
+  const possible = !isView && !generated && !pinned && control.readOnly === undefined
 
   notes.push({ subject: key, kind: 'inferred', message: `${labelFor(control.describe)} from ${column.databaseType}; label from the column name.` })
   if (control.caveat !== undefined) notes.push({ subject: key, kind: 'inferred', message: control.caveat })
@@ -216,13 +235,16 @@ function planColumn(
   if (control.readOnly !== undefined) notes.push({ subject: key, kind: 'read-only', message: `Shown, never written: ${control.readOnly}.` })
   if (isView) notes.push({ subject: key, kind: 'read-only', message: `${root.ref.name} is a view.` })
   if (pinned) notes.push({ subject: key, kind: 'read-only', message: 'Pinned by the policy: its value comes from the trusted context, never from the person filling the form.' })
+  const writes = writesFor([column], possible, key, notes)
+  const required = writes.create && !column.nullable && !column.hasDefault
 
   return {
     ordinal: column.ordinal,
     field: { key, label: labelFor(column.name), ...control.field, ...(required ? { required: true } : {}) },
-    binding: { kind: 'column', field: key, column: column.name, type: column.type, nullable: column.nullable, writable },
+    binding: { kind: 'column', field: key, column: column.name, type: column.type, nullable: column.nullable, writes },
     system: generated,
     multiline: control.field.type === 'textarea',
+    privilegeOnly: possible,
   }
 }
 
@@ -233,13 +255,17 @@ function planColumn(
  * (0015), so it must be an integer that statement may write and that means
  * nothing else: not computed by the database, which refuses the write; not
  * part of the key, which is the record's address and, with a tenant in it, its
- * tenant; not bound to a field, which could set it twice. The generator
- * holds a column to this before confirming or suggesting it, and the planner
- * holds a bindings file to it, so a form the one makes the other never refuses.
+ * tenant; not bound to a field, which could set it twice. And the account
+ * must be allowed to read it and to UPDATE it (0027), or every save fails.
+ * The generator holds a column to this before confirming or suggesting it,
+ * and the planner holds a bindings file to it, so a form the one makes the
+ * other never refuses.
  */
 export function versionColumnProblem(column: ColumnMeta, identity: readonly string[], bound: ReadonlySet<string>): string | null {
   if (column.type.kind !== 'integer' || column.nullable) return 'it must be a non-nullable integer'
   if (column.generated !== 'none') return `the database generates it (${column.generated})`
+  const access = versionAccessProblem(column)
+  if (access !== null) return access
   if (identity.includes(column.name)) return "it is part of the record's key"
   if (bound.has(column.name)) return 'a field is bound to it'
   return null
@@ -254,6 +280,15 @@ function concurrencyFor(
   notes: GenerationNote[],
 ): ConcurrencyBinding | null {
   const rowversion = root.columns.find((column) => column.type.kind === 'rowversion')
+  if (rowversion !== undefined && !rowversion.access.select) {
+    // Not a field either: a rowversion never is, and this one cannot even be shown.
+    notes.push({
+      subject: root.ref.name,
+      kind: 'blocked',
+      message: `Update is not offered: this connection's account may not read ${rowversion.name}, the rowversion a stale save is detected by.`,
+    })
+    return null
+  }
   if (rowversion !== undefined) return { kind: 'rowversion', column: rowversion.name, confirmed: true }
 
   if (confirmed !== undefined) {
@@ -273,10 +308,34 @@ function concurrencyFor(
   return { kind: 'version-column', column: candidate.name, confirmed: false }
 }
 
-function identityFor(root: ObjectMeta): string[] | null {
-  if (root.primaryKey !== null) return [...root.primaryKey.columns]
-  const unique = root.uniqueKeys[0]
-  return unique === undefined ? null : [...unique.columns]
+/** The pinned columns, and those of them the account may not INSERT, which a create could never write from context. */
+interface Pins {
+  pinned: ReadonlySet<string>
+  fixedOut: readonly ColumnMeta[]
+}
+
+function createFor(root: ObjectMeta, planned: readonly Planned[], { pinned, fixedOut }: Pins, notes: GenerationNote[]): boolean {
+  const blocked = (message: string) => notes.push({ subject: root.ref.name, kind: 'blocked', message })
+  if (!root.columns.some((column) => column.access.insert)) {
+    blocked(`Create is not offered: this connection's account may INSERT none of the columns of ${root.ref.schema}.${root.ref.name}.`)
+    return false
+  }
+  for (const column of fixedOut) {
+    blocked(`Create is not offered: ${column.name} is pinned by the policy and written from the trusted context, and this connection's account may not INSERT it.`)
+  }
+
+  // A create needs a value for every column that has neither a default nor a
+  // generator. One with no field written on create — excluded for its type,
+  // unreadable, or not insertable — cannot get one. A pinned column gets its
+  // value from context, so it is never one nobody can fill; one the account
+  // may not insert was said above.
+  const bound = new Set([
+    ...pinned,
+    ...planned.flatMap((entry) => (entry.binding.writes.create ? (entry.binding.kind === 'lookup' ? entry.binding.columns : [entry.binding.column]) : [])),
+  ])
+  const unreachable = root.columns.filter((column) => !column.nullable && !column.hasDefault && column.generated === 'none' && !bound.has(column.name))
+  if (unreachable.length > 0) blocked(`Create is not offered: ${unreachable.map((column) => column.name).join(', ')} must be given a value and no field can give one.`)
+  return unreachable.length === 0 && fixedOut.length === 0
 }
 
 function operationsFor(
@@ -284,7 +343,7 @@ function operationsFor(
   identity: string[] | null,
   concurrency: ConcurrencyBinding | null,
   planned: readonly Planned[],
-  pinned: ReadonlySet<string>,
+  pins: Pins,
   notes: GenerationNote[],
 ): FormBindings['operations'] {
   if (root.kind === 'view') {
@@ -292,30 +351,17 @@ function operationsFor(
     return { create: false, update: false }
   }
 
-  // A create needs a value for every column that has neither a default nor a
-  // generator. One with no writable field — excluded for its type — cannot get one.
-  // A pinned column gets its value from context, so it is never one nobody can fill.
-  const bound = new Set([
-    ...pinned,
-    ...planned.flatMap((entry) =>
-      entry.binding.writable ? (entry.binding.kind === 'lookup' ? entry.binding.columns : [entry.binding.column]) : [],
-    ),
-  ])
-  const unreachable = root.columns.filter(
-    (column) => !column.nullable && !column.hasDefault && column.generated === 'none' && !bound.has(column.name),
-  )
-  if (unreachable.length > 0) {
-    notes.push({
-      subject: root.ref.name,
-      kind: 'blocked',
-      message: `Create is not offered: ${unreachable.map((column) => column.name).join(', ')} must be given a value and no field can give one.`,
-    })
-  }
-
+  const create = createFor(root, planned, pins, notes)
   let update = true
   if (identity === null) {
+    // identityFor noted a key the account cannot read; only a table with no key at all is said here.
     update = false
-    notes.push({ subject: root.ref.name, kind: 'blocked', message: 'Update is not offered: no primary or unique key identifies a record.' })
+    if (root.primaryKey === null && root.uniqueKeys.length === 0) {
+      notes.push({ subject: root.ref.name, kind: 'blocked', message: 'Update is not offered: no primary or unique key identifies a record.' })
+    }
+  } else if (concurrency === null && root.columns.some((column) => column.type.kind === 'rowversion')) {
+    // concurrencyFor noted the rowversion the account cannot read.
+    update = false
   } else if (concurrency === null || !concurrency.confirmed) {
     update = false
     notes.push({
@@ -326,9 +372,15 @@ function operationsFor(
           ? 'Update is not offered: no rowversion and no confirmed version column, so a stale save could not be detected.'
           : `Update is not offered until ${concurrency.column} is confirmed as a version column.`,
     })
+  } else if (planned.some((entry) => entry.privilegeOnly) && !planned.some((entry) => entry.binding.writes.update)) {
+    // Something would be written on update but for privilege, and nothing is:
+    // the database would refuse every save. A form that writes nothing for
+    // other reasons keeps the behaviour it had before 0027.
+    update = false
+    notes.push({ subject: root.ref.name, kind: 'blocked', message: "Update is not offered: this connection's account may UPDATE none of the columns this form writes." })
   }
 
-  return { create: unreachable.length === 0, update }
+  return { create, update }
 }
 
 function layoutFor(root: ObjectMeta, planned: readonly Planned[]): LayoutNode[] {

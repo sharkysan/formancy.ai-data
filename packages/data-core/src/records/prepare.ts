@@ -1,6 +1,7 @@
 import { canonicalize } from '@formancy/spec'
 import { versionColumnProblem } from '../generate/generate.js'
 import type { FieldBinding, FormBindings } from '../generate/types.js'
+import { bindingsVersionProblem } from '../generate/version.js'
 import { lookupFilters } from '../lookup/filters.js'
 import type { RowFilters } from '../lookup/types.js'
 import { isKeyValue, isLookupKeyType } from '../lookup/values.js'
@@ -42,9 +43,27 @@ export function columnsOf(binding: FieldBinding): readonly string[] {
   return binding.kind === 'lookup' ? binding.columns : [binding.column]
 }
 
+/**
+ * Why a field's columns claim more than the account may do with them, or
+ * `null` (0027): each must be readable, and each written on an operation must
+ * be one the account may INSERT, or UPDATE. The generator never writes such a
+ * file; a hand edit can, and the database would refuse what it plans.
+ */
+function accessProblem(columns: ReadonlyMap<string, ColumnMeta>, binding: FieldBinding): string | null {
+  for (const name of columnsOf(binding)) {
+    const access = (columns.get(name) as ColumnMeta).access
+    if (!access.select) return `${binding.field} is bound to ${name}, which this connection's account may not read`
+    if (binding.writes.create && !access.insert) return `${binding.field} is written on create, and this connection's account may not INSERT ${name}`
+    if (binding.writes.update && !access.update) return `${binding.field} is written on update, and this connection's account may not UPDATE ${name}`
+  }
+  return null
+}
+
 /** Why a field binding does not fit the root, or `null`. A lookup's target is checked when a selection of it is planned. */
 function fieldProblem(root: ObjectMeta, columns: ReadonlyMap<string, ColumnMeta>, binding: FieldBinding): string | null {
   for (const name of columnsOf(binding)) if (!columns.has(name)) return `${binding.field} is bound to ${name}, which the table does not have`
+  const access = accessProblem(columns, binding)
+  if (access !== null) return access
   if (binding.kind === 'lookup') {
     const foreignKey = root.foreignKeys.find((candidate) => candidate.name === binding.foreignKey)
     if (foreignKey === undefined || !sameList(foreignKey.columns, binding.columns)) {
@@ -83,7 +102,10 @@ function concurrencyProblem(columns: ReadonlyMap<string, ColumnMeta>, bindings: 
   const column = columns.get(concurrency.column)
   let problem: string | null
   if (column === undefined) problem = 'the table does not have it'
-  else if (concurrency.kind === 'rowversion') problem = column.type.kind === 'rowversion' ? null : `it is ${column.databaseType}`
+  else if (concurrency.kind === 'rowversion') {
+    if (column.type.kind !== 'rowversion') problem = `it is ${column.databaseType}`
+    else problem = column.access.select ? null : "this connection's account may not read it"
+  }
   else problem = versionColumnProblem(column, bindings.identity ?? [], bound)
   return problem === null ? null : `${concurrency.column} cannot be a ${concurrency.kind}: ${problem}`
 }
@@ -100,7 +122,12 @@ function bindingsProblem(root: ObjectMeta, columns: ReadonlyMap<string, ColumnMe
       bound.add(name)
     }
   }
-  for (const name of bindings.identity ?? []) if (!columns.has(name)) return `the identity names ${name}, which the table does not have`
+  for (const name of bindings.identity ?? []) {
+    const column = columns.get(name)
+    if (column === undefined) return `the identity names ${name}, which the table does not have`
+    // A key the account cannot read cannot be read back into a token: it addresses nothing.
+    if (!column.access.select) return `the identity names ${name}, which this connection's account may not read`
+  }
   return identityProblem(root, bindings.identity) ?? concurrencyProblem(columns, bindings, bound)
 }
 
@@ -110,7 +137,8 @@ function bindingsProblem(root: ObjectMeta, columns: ReadonlyMap<string, ColumnMe
  * says something its own snapshot does not (`invalid-bindings`).
  */
 export function prepare(snapshot: MetadataSnapshot, bindings: FormBindings): { ok: true; prepared: Prepared } | PlanRefusal {
-  if (bindings.version !== 1) return refuse('invalid-bindings', `Bindings version ${String(bindings.version)} is not one this release reads.`)
+  const version = bindingsVersionProblem(bindings.version)
+  if (version !== null) return refuse('invalid-bindings', `${version}.`)
   if (snapshot.fingerprint !== bindings.snapshotFingerprint) {
     return refuse('drift', 'These bindings were generated from a different snapshot; review the drift before planning a request from them.')
   }

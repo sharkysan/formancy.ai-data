@@ -24,6 +24,11 @@ existed would be documented and inert.
   bindings, its policy and the snapshot they came from, checked on publish and
   on every read: a hand-edited file is refused, not served
   ([0019](../../docs/decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)).
+  A version published before bindings version 2 is refused with "republish",
+  and so is a row filter on a column the snapshot's account may not read, or,
+  while the form offers create, a root filter on a column it may not
+  `INSERT`, which every create writes
+  ([0027](../../docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).
 - **`DRIVER_FACTORIES`** — one connection factory per engine, opening every
   connection through the adapter package's own `connect…` function, so a host
   embedding the server never builds a pool from another copy of a driver

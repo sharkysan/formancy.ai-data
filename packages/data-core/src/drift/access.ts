@@ -1,5 +1,6 @@
-import type { CoverageAspect, CoverageGap, MetadataSnapshot, ObjectRef } from '../metadata.js'
-import { allFields, type Comparison, describe, type Draft, fieldsOver, lookups, type Operation, refKey, sameRef, stopped } from './context.js'
+import type { CoverageAspect, CoverageGap, CoverageSubject, MetadataSnapshot, ObjectRef } from '../metadata.js'
+import { gapCovers } from '../snapshot.js'
+import { allFields, type Comparison, describe, type Draft, fieldsOver, lookups, type Operation, refKey, stopped } from './context.js'
 import type { DriftSubject } from './types.js'
 
 /*
@@ -11,19 +12,29 @@ import type { DriftSubject } from './types.js'
  * told apart from a dropped table.
  */
 
+/** What a subject is, as one string: scope, a schema, or an object. */
+function subjectId(subject: CoverageSubject): string {
+  if (subject.kind === 'scope') return 'scope'
+  return subject.kind === 'schema' ? `schema\u0000${subject.schema}` : `object\u0000${refKey(subject.object)}`
+}
+
 /** A gap's identity across two snapshots: what it is about, never how an adapter worded it. */
 function gapId(gap: CoverageGap): string {
-  return `${refKey(gap.object)}\u0000${gap.aspect}`
+  return `${subjectId(gap.subject)}\u0000${gap.aspect}`
 }
 
-/** Gaps that could hide `aspect` of `object`: about that object, or about every object in scope. */
+/** Gaps that could hide `aspect` of `object`: about that object, its schema, or every object in scope. */
 export function hiding(gaps: readonly CoverageGap[], object: ObjectRef, aspect: CoverageAspect): CoverageGap[] {
-  return gaps.filter((gap) => gap.aspect === aspect && (gap.object === null || sameRef(gap.object, object)))
+  return gaps.filter((gap) => gap.aspect === aspect && gapCovers(gap, object))
 }
 
-/** Gaps that could hide `object` itself: any gap about it, or one about the scope's objects. */
+/**
+ * Gaps that could hide `object` itself: any gap about it, or one about the
+ * objects of its schema or of the whole scope. A gap on another schema hides
+ * nothing here, so a root missing behind it is gone, not out of sight.
+ */
 export function hidingObject(gaps: readonly CoverageGap[], object: ObjectRef): CoverageGap[] {
-  return gaps.filter((gap) => (gap.object === null ? gap.aspect === 'objects' : sameRef(gap.object, object)))
+  return gaps.filter((gap) => gapCovers(gap, object) && (gap.subject.kind === 'object' || gap.aspect === 'objects'))
 }
 
 function quote(gaps: readonly CoverageGap[]): string {
@@ -67,12 +78,18 @@ const TARGET_ASPECTS: ReadonlySet<CoverageAspect> = new Set(['objects', 'columns
  * identity, which only update uses. Its foreign keys are the lookups', and so
  * are their targets' columns and keys. Checks, comments and default
  * expressions are nothing the form relies on: generation reads none of them.
+ * Row security that cannot be established on the root or a target is for a
+ * person to review and stops nothing (0027): neither adapter reports a write
+ * done that the table does not hold.
  */
-function doubtOf(comparison: Comparison, gap: CoverageGap): { stops: Operation[]; affects: string[] } | null {
+function doubtOf(comparison: Comparison, gap: CoverageGap): { stops: Operation[]; affects: string[]; otherwise?: 'review' } | null {
   const { bindings } = comparison
-  const onRoot = gap.object === null || sameRef(gap.object, bindings.root)
-  const targeted = lookups(bindings).filter((lookup) => gap.object === null || sameRef(gap.object, lookup.target.table))
+  const onRoot = gapCovers(gap, bindings.root)
+  const targeted = lookups(bindings).filter((lookup) => gapCovers(gap, lookup.target.table))
   if (!onRoot && targeted.length === 0) return null
+  if (gap.aspect === 'row-security') {
+    return { stops: [], affects: allFields(bindings).filter((field) => onRoot || targeted.some((lookup) => lookup.field === field)), otherwise: 'review' }
+  }
 
   const affected = new Set<string>()
   const stops = new Set<Operation>()
@@ -108,11 +125,15 @@ export function cite<T extends Draft>(comparison: Comparison, gaps: readonly Cov
 }
 
 function subjectOf(gap: CoverageGap): DriftSubject {
-  return gap.object === null ? { kind: 'scope' } : { kind: 'object', object: gap.object }
+  const subject = gap.subject
+  if (subject.kind === 'object') return { kind: 'object', object: subject.object }
+  return subject.kind === 'schema' ? { kind: 'schema', schema: subject.schema } : { kind: 'scope' }
 }
 
 function phrase(gap: CoverageGap): string {
-  return `the ${gap.aspect.replace('-', ' ')} of ${gap.object === null ? 'anything in scope' : describe(gap.object)}`
+  const subject = gap.subject
+  const where = subject.kind === 'scope' ? 'anything in scope' : subject.kind === 'schema' ? `anything in schema ${subject.schema}` : describe(subject.object)
+  return `the ${gap.aspect.replace('-', ' ')} of ${where}`
 }
 
 type Group = [CoverageGap, ...CoverageGap[]]
@@ -152,9 +173,13 @@ export function gapChanges(comparison: Comparison): Draft[] {
       affects: doubt.affects,
       stops: doubt.stops,
       breaksReads: false,
-      otherwise: doubt.stops.length > 0 ? 'review' : 'info',
+      otherwise: doubt.otherwise ?? (doubt.stops.length > 0 ? 'review' : 'info'),
       message: `This connection can no longer establish ${phrase(first)}: ${quote(gaps)}. It could when the form was generated, so this is an access problem, not a schema change; ${
-        doubt.stops.length > 0 ? 'the writes that rest on it are blocked until access is restored or the form is reviewed' : 'nothing this form does rests on it'
+        doubt.stops.length > 0
+          ? 'the writes that rest on it are blocked until access is restored or the form is reviewed'
+          : doubt.otherwise === 'review'
+            ? 'which rows this form shows may differ from what was reviewed, and nothing is stopped'
+            : 'nothing this form does rests on it'
       }.`,
     })
   }

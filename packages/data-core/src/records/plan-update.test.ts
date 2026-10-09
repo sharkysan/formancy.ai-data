@@ -3,7 +3,7 @@ import { generateForm } from '../generate/generate.js'
 import { buildLookupConfig } from '../lookup/config.js'
 import type { FormPolicy } from '../policy/types.js'
 import { validatePolicy } from '../policy/validate.js'
-import { planRead, planUpdate } from './plan.js'
+import { planCreate, planRead, planUpdate } from './plan.js'
 import {
   actor,
   AUDITOR,
@@ -16,6 +16,7 @@ import {
   customerForm,
   customerSource,
   edited,
+  fieldOf,
   INT32,
   INT64,
   MS,
@@ -27,7 +28,9 @@ import {
   orderForm,
   PG,
   PG_ORDER,
+  restrict,
   sales,
+  snapshot,
   TENANT,
   TENANT_ONE,
   text,
@@ -209,5 +212,80 @@ describe('planUpdate', () => {
     expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, actor(['clerk'], { tenant: 'acme' }), ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({ ok: false, code: 'invalid-context' })
     // No body, no keys to check for over-posting.
     expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', null)).toMatchObject({ ok: false, code: 'invalid-request' })
+  })
+})
+
+describe('bindings that claim more than the account may do (0027)', () => {
+  // The fingerprint covers the snapshot, not the bindings, which are a stored
+  // file. A file edited to write a column the snapshot says the account may
+  // not UPDATE would plan a statement the database refuses, after the policy
+  // and the codecs had passed it; refused here instead, naming the column.
+  test('a bindings file claiming update writes on a column the account may not update is invalid-bindings', () => {
+    const narrowed = snapshot('postgres', (objects) => restrict(objects, 'order', 'amount', { update: false }))
+    const bindings = orderForm(narrowed).bindings
+    expect(fieldOf(bindings, 'amount').writes).toEqual({ create: true, update: false })
+    expect(planUpdate(narrowed, bindings, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({ ok: true })
+    const claimed = edited(bindings, (draft) => {
+      fieldOf(draft, 'amount').writes.update = true
+    })
+    expect(planUpdate(narrowed, claimed, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' })).toEqual({
+      ok: false,
+      code: 'invalid-bindings',
+      message: "The bindings do not fit their snapshot: amount is written on update, and this connection's account may not UPDATE amount.",
+    })
+    const inserted = edited(orderForm(snapshot('postgres', (objects) => restrict(objects, 'order', 'notes', { insert: false }))).bindings, (draft) => {
+      fieldOf(draft, 'notes').writes.create = true
+    })
+    expect(planCreate(snapshot('postgres', (objects) => restrict(objects, 'order', 'notes', { insert: false })), inserted, ORDER_POLICY, CLERK, {})).toMatchObject({
+      ok: false,
+      code: 'invalid-bindings',
+      message: expect.stringContaining("notes is written on create, and this connection's account may not INSERT notes") as unknown as string,
+    })
+  })
+
+  // A field over a column the account may not read, an identity it may not
+  // read back, or a rowversion it may not compare would each fail at the
+  // database with permission-denied on every request.
+  test('a bound column, an identity column or a rowversion the account may not read is invalid-bindings', () => {
+    const hiddenNotes = snapshot('postgres', (objects) => restrict(objects, 'order', 'notes', { select: false }))
+    const withNotes = edited(orderForm(hiddenNotes).bindings, (draft) => {
+      draft.fields.push({ kind: 'column', field: 'notes', column: 'notes', type: text(null), nullable: true, writes: { create: true, update: true } })
+    })
+    expect(planRead(hiddenNotes, withNotes, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({
+      code: 'invalid-bindings',
+      message: expect.stringContaining("notes is bound to notes, which this connection's account may not read") as unknown as string,
+    })
+
+    const hiddenKey = snapshot('postgres', (objects) => restrict(objects, 'order', 'id', { select: false }))
+    const keyed = edited(orderForm(hiddenKey).bindings, (draft) => {
+      draft.identity = ['id']
+    })
+    expect(planRead(hiddenKey, keyed, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({
+      code: 'invalid-bindings',
+      message: expect.stringContaining("the identity names id, which this connection's account may not read") as unknown as string,
+    })
+
+    const hiddenVersion = snapshot('sqlserver', (objects) => restrict(objects, 'order', 'row_version', { select: false }))
+    const versioned = edited(orderForm(hiddenVersion).bindings, (draft) => {
+      draft.concurrency = { kind: 'rowversion', column: 'row_version', confirmed: true }
+    })
+    expect(planRead(hiddenVersion, versioned, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({
+      code: 'invalid-bindings',
+      message: expect.stringContaining("row_version cannot be a rowversion: this connection's account may not read it") as unknown as string,
+    })
+  })
+
+  // A version-1 file says one flag for both operations, so it cannot tell a
+  // create-only field from one written on both; read as version 2 by guessing,
+  // it could write what the account may not. Refused, and the remedy named.
+  test('version 1 bindings are refused with "republish"', () => {
+    const old = edited(PG_ORDER, (draft) => {
+      ;(draft as { version: number }).version = 1
+    })
+    expect(planRead(PG, old, ORDER_POLICY, CLERK, ORDER_TOKEN)).toEqual({
+      ok: false,
+      code: 'invalid-bindings',
+      message: 'bindings version 1 were published before 0027 (per-operation writes); republish the form.',
+    })
   })
 })

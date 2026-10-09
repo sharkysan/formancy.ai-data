@@ -258,9 +258,9 @@ describe('planRead', () => {
         },
       ],
       [
-        'Bindings version 2',
+        'Bindings version 3',
         (draft) => {
-          ;(draft as { version: number }).version = 2
+          ;(draft as { version: number }).version = 3
         },
       ],
     ]

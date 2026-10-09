@@ -63,7 +63,8 @@ function fitProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
       continue
     }
     if (entry.write.size === 0) continue
-    if (!binding.writable) problems.push(`fields.${key} grants write, and the form never writes ${key}`)
+    // Written on one operation is written: a grant on a create-only field means something on create (0027).
+    if (!binding.writes.create && !binding.writes.update) problems.push(`fields.${key} grants write, and the form never writes ${key}`)
     else if (binding.kind === 'column' && pinned.has(binding.column)) {
       problems.push(`fields.${key} grants write, and ${binding.column} is pinned by a row filter: its value comes from the context`)
     }

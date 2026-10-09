@@ -8,13 +8,22 @@ import { validateBundle } from './bundle.js'
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 
 function column(name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
-  return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, ...extra }
+  return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra }
 }
 
-function snapshot(): MetadataSnapshot {
+/** The employee table as discovered; `edit` narrows it as a revoked grant would. */
+function snapshot(edit: (columns: ColumnMeta[]) => void = () => {}): MetadataSnapshot {
+  const columns = [
+    column('id', 1, INT32),
+    column('tenant_id', 2, INT32),
+    column('name', 3, { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }),
+    column('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
+  ]
+  edit(columns)
   return createSnapshot({
     kind: 'sqlserver',
     serverVersion: '16.0',
+    account: { user: 'dbo', login: 'sa' },
     scope: { schemas: ['sales'] },
     gaps: [],
     objects: [
@@ -22,24 +31,19 @@ function snapshot(): MetadataSnapshot {
         ref: { schema: 'sales', name: 'employee' },
         kind: 'table',
         comment: null,
-        columns: [
-          column('id', 1, INT32),
-          column('tenant_id', 2, INT32),
-          column('name', 3, { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }),
-          column('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
-        ],
+        columns,
         primaryKey: { name: 'pk_employee', columns: ['id'] },
         uniqueKeys: [],
         foreignKeys: [],
         checks: [],
+        rowSecurity: 'none',
       },
     ],
   })
 }
 
 /** A bundle that is right in every way; each test breaks one thing. */
-function good(): PublishedBundle {
-  const taken = snapshot()
+function good(taken: MetadataSnapshot = snapshot()): PublishedBundle {
   const { form, bindings } = generateForm(taken, {
     connection: 'erp',
     root: { schema: 'sales', name: 'employee' },
@@ -87,13 +91,86 @@ describe('validateBundle', () => {
     const name = old.snapshot.objects[0]?.columns.find((entry) => entry.name === 'name')
     if (name?.type.kind === 'text') delete (name.type as { lengthUnit?: unknown }).lengthUnit
     const { fingerprint: _stale, ...rest } = old.snapshot
-    // Rehashed as contract v1 hashed it, so only the shape is wrong.
-    old.snapshot.fingerprint = schemaHash({ kind: rest.kind, objects: rest.objects, gaps: rest.gaps })
+    // Rehashed as the contract hashes it, so only the shape is wrong.
+    old.snapshot.fingerprint = schemaHash({ kind: rest.kind, account: rest.account.user, objects: rest.objects, gaps: rest.gaps })
     old.bindings.snapshotFingerprint = old.snapshot.fingerprint
     expect(validateBundle(old)).toEqual({
       ok: false,
       problems: ['the snapshot is not one a catalog could produce: sales.employee: column name has no text length unit'],
     })
+  })
+
+  // A bundle published before 0027 has version-1 bindings, whose one
+  // `writable` flag cannot say which operation a field is written on, and a
+  // snapshot with no account and no privileges. Its own fingerprint still
+  // matches, so only the shape gives it away. Served, the runtime would read
+  // `writes` that are not there; refused, with what the operator does about it.
+  test('a bundle published before 0027 is refused with "republish", and its policy is not read against bindings it cannot fit', () => {
+    const old = copy(good()) as unknown as {
+      bindings: { version: number; fields: Array<Record<string, unknown>>; snapshotFingerprint: string }
+      snapshot: { account?: unknown; fingerprint: string; objects: Array<{ rowSecurity?: unknown; columns: Array<{ access?: unknown }> }>; kind: string; gaps: unknown[] }
+    }
+    old.bindings.version = 1
+    for (const field of old.bindings.fields) {
+      field['writable'] = (field['writes'] as { create: boolean }).create
+      delete field['writes']
+    }
+    delete old.snapshot.account
+    for (const object of old.snapshot.objects) {
+      delete object.rowSecurity
+      for (const entry of object.columns) delete entry.access
+    }
+    old.snapshot.fingerprint = schemaHash({ kind: old.snapshot.kind, objects: old.snapshot.objects, gaps: old.snapshot.gaps })
+    old.bindings.snapshotFingerprint = old.snapshot.fingerprint
+    expect(validateBundle(old)).toEqual({
+      ok: false,
+      problems: [
+        'the snapshot is not one a catalog could produce: sales.employee: column id has no access; it was taken before 0027',
+        'bindings version 1 were published before 0027 (per-operation writes); republish the form',
+      ],
+    })
+    // Bindings alone, from a current snapshot: the same remedy.
+    const versionOne = copy(good())
+    ;(versionOne.bindings as { version: number }).version = 1
+    expect(validateBundle(versionOne)).toEqual({ ok: false, problems: ['bindings version 1 were published before 0027 (per-operation writes); republish the form'] })
+  })
+
+  // A tenant filter on a column the account may not read turns every request
+  // into permission-denied once published; refused at publish, where the
+  // administrator can still change the policy or the grant (0027). The same
+  // for a lookup's filter on its target.
+  test('a row filter on a column the account may not read is refused at publish', () => {
+    const blind = good(
+      snapshot((columns) => {
+        const tenant = columns.find((entry) => entry.name === 'tenant_id')
+        if (tenant !== undefined) tenant.access = { select: false, insert: true, update: true }
+      }),
+    )
+    const outcome = validateBundle(blind)
+    expect(outcome.ok ? [] : outcome.problems).toContainEqual("policy: rowFilters tenant_id is a column this connection's account may not read")
+  })
+
+  // The root's row filter is written from the trusted context on every
+  // create (the planner's pinned values), so a filter on a column the account
+  // may read and not INSERT turns every create into permission-denied. The
+  // generator blocks create for a pin it was told of; a bundle posted
+  // directly names its policy only here. A form that offers no create is
+  // unaffected.
+  test('a row filter on a column the account may not insert is refused while the form offers create', () => {
+    const uninsertable = snapshot((columns) => {
+      const tenant = columns.find((entry) => entry.name === 'tenant_id')
+      // A default keeps create offered by the generator, which was not told the column is pinned.
+      if (tenant !== undefined) Object.assign(tenant, { hasDefault: true, defaultExpression: '1', access: { select: true, insert: false, update: true } })
+    })
+    const offered = good(uninsertable)
+    expect(offered.bindings.operations.create).toBe(true)
+    const outcome = validateBundle(offered)
+    expect(outcome.ok ? [] : outcome.problems).toEqual(["policy: rowFilters tenant_id is a column this connection's account may not insert, and every create writes it"])
+
+    const readOnly = copy(offered)
+    readOnly.bindings.operations.create = false
+    readOnly.policy.operations.create = []
+    expect(validateBundle(readOnly)).toMatchObject({ ok: true })
   })
 
   // Bindings from one snapshot over another describe columns that may not exist.

@@ -18,8 +18,13 @@ browser.
   first day.
 - **The metadata contract**: `MetadataSnapshot` and what it holds, made only
   through `createSnapshot`, which sorts, checks and fingerprints. A snapshot
-  carries **gaps** — what the connection could not see — so a
-  permission-filtered catalog is never mistaken for a complete one.
+  carries **gaps** — what the connection could not see, about the scope, a
+  schema or an object — so a permission-filtered catalog is never mistaken
+  for a complete one. It names the **account** it was taken as, whose user is
+  in the fingerprint, and says what that account may SELECT, INSERT and
+  UPDATE, column by column, and whether row-level security applies to it, per
+  table — `none`, `applies`, or `unknown` with the gap that says why
+  ([0027](../../docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).
 - **Form generation**: `generateForm(snapshot, request)` returns a spec 3
   formancy document, its `FormBindings`, and a note on every choice it made.
 - **Codecs**: `codecFor(column)` checks and canonicalises one API value for a
@@ -50,6 +55,14 @@ const { form, bindings, notes } = generateForm(snapshot, {
 Pass the columns the form's policy pins as `pinned`: they become read-only
 fields filled from trusted context, never required fields the policy refuses.
 
+The form offers what the snapshot's account may do and nothing else: no field
+over a column it may not read, a field written per operation — `writes:
+{ create, update }`, bindings version 2 — so a column it may INSERT and not
+UPDATE is written on create and read-only on update, and no operation the
+database would refuse on every request. Row-level security that applies is an
+`access` note. Bindings of version 1 are refused everywhere with "republish"
+([0027](../../docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).
+
 Exact decimals and integers past 2^53 become text fields with an exact pattern,
 never JavaScript numbers. Update is offered only with a proven concurrency
 token. See [0009](../../docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md).
@@ -68,7 +81,12 @@ const { changes, blocking, writable } = diffSnapshots(published, rescanned, bind
 ```
 
 Something the connection can no longer see is an access problem, never a
-deletion: the snapshot's gaps say which. An apparent rename is a dropped
+deletion: the snapshot's gaps say which. A privilege the account lost is a
+`privilege-narrowed` change that stops exactly the writes resting on it, or
+blocks the form when a read rests on it — a bound or identity column, or the
+confirmed concurrency token, which every read and every create names; row
+security that changed is for review; a snapshot taken as another user is
+`account-changed`, blocking while row security is in play. An apparent rename is a dropped
 column, a new one and a hint, never inferred. Tables the form neither binds nor
 looks up are left out, so an empty report means nothing this form rests on
 changed. See [0010](../../docs/decisions/0010-drift-is-classified-against-the-bindings.md).

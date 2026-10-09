@@ -9,7 +9,14 @@
 --
 -- Batches are separated by GO on a line of its own, as sqlcmd and SSMS expect.
 -- The loader splits on it, because a driver sends one batch at a time and
--- CREATE SCHEMA and CREATE VIEW must each be the first statement in theirs.
+-- CREATE SCHEMA, CREATE VIEW and CREATE FUNCTION must each be the first
+-- statement in theirs.
+--
+-- The security policy on customer is postgres.sql's row-level security in
+-- T-SQL: the writer (sqlserver.restricted.sql) sees tenant 1 only. SQL Server
+-- exempts nobody from an enabled policy, dbo included, so this one passes
+-- every account but the writer -- and its existence is what the owner's
+-- snapshot reports as row security that applies (0027).
 
 create schema sales;
 GO
@@ -128,4 +135,19 @@ values (1, 'A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11', 32767, N'Zürich-01', '09:30'
 alter table sales.shipment with nocheck add constraint ck_shipment_carrier check (carrier_code > 0);
 -- Disabled: not checked for new rows, and SQL Server marks it untrusted too.
 alter table sales.shipment nocheck constraint ck_shipment_reference;
+GO
+
+-- Row-level security that binds one account, as in postgres.sql (0027). A
+-- filter predicate hides rows from reads, updates and deletes; it does not
+-- stop an insert, and foreign-key checks are not filtered (B11).
+-- SCHEMABINDING, so no reader needs EXECUTE on the function; it also blocks
+-- an ALTER of customer.tenant_id, which nothing in the suites does.
+create function sales.fn_customer_tenant(@tenant_id int)
+returns table with schemabinding
+as return select 1 as visible where user_name() <> N'formancy_writer' or @tenant_id = 1;
+GO
+
+create security policy sales.customer_tenant
+  add filter predicate sales.fn_customer_tenant(tenant_id) on sales.customer
+  with (state = on);
 GO

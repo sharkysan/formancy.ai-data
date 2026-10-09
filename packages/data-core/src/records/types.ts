@@ -109,7 +109,9 @@ export interface RecordRead {
  *   names the one, when the engine says which.
  * - `too-long`, `out-of-range` — a value the codec accepted and the column
  *   did not: a single-byte `varchar`, a UTF-8 one counting bytes (0007).
- * - `permission-denied` — the connection's own grants refused it.
+ * - `permission-denied` — the connection's own grants refused it, or row
+ *   security did: a PostgreSQL policy's WITH CHECK (42501), a SQL Server
+ *   block predicate (33504).
  * - `schema-changed` — a column or table the binding names is gone.
  * - `unavailable` — the database could not be reached; nothing was sent, or
  *   what was sent certainly did not commit.

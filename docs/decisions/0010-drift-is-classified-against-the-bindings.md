@@ -1,6 +1,6 @@
 # 0010 — Drift is classified against one form's bindings, and what cannot be seen is never called gone
 
-- **Status:** accepted; the retyped row narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md): a different length unit or fixed length is a retyping
+- **Status:** accepted; the retyped row narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md): a different length unit or fixed length is a retyping; the new drift kinds and per-operation stops, and the concurrency column gone, which now blocks the form, narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/drift/diff.test.ts` — identical

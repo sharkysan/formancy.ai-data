@@ -3,7 +3,16 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ColumnMeta, MetadataSnapshot, ObjectMeta, ObjectRef, TextLengthUnit } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { FIXTURE_SCOPE, restrictedDisagreements, snapshotDisagreements, startSqlServerFixture } from '@formancy/data-fixtures'
+import {
+  accessDisagreements,
+  FIXTURE_MODEL,
+  FIXTURE_SCOPE,
+  READER_ACCESS,
+  restrictedDisagreements,
+  snapshotDisagreements,
+  startSqlServerFixture,
+  structuralDisagreements,
+} from '@formancy/data-fixtures'
 import { createSqlServerAdapter, discoverSqlServer } from './index.js'
 
 /**
@@ -44,6 +53,16 @@ function column(meta: ObjectMeta, name: string): ColumnMeta {
   return found
 }
 
+/** Each object's row security, by name. */
+function rowSecurities(snapshot: MetadataSnapshot): Record<string, string> {
+  return Object.fromEntries(snapshot.objects.map((entry) => [entry.ref.name, entry.rowSecurity]))
+}
+
+/** The fixture's: the policy on customer applies, and every other object is `otherwise`. */
+function expectedRowSecurities(otherwise: 'none' | 'unknown'): Record<string, string> {
+  return Object.fromEntries(FIXTURE_MODEL.map((entry) => [entry.ref.name, entry.ref.name === 'customer' ? 'applies' : otherwise]))
+}
+
 /** Batches the owner runs to set up a test's own schema; constants, never input. */
 async function asOwner(...batches: string[]): Promise<void> {
   for (const batch of batches) await owner.request().batch(batch)
@@ -70,10 +89,17 @@ describe('discovery as the owner', () => {
   // The baseline every other test leans on. An adapter that misread one
   // catalog view -- nvarchar lengths left in bytes, a WITH NOCHECK key
   // reported as trusted, a cascade reported as no-action -- is named here by
-  // the comparator both adapters answer to.
+  // the comparator both adapters answer to. And since 0027, every privilege
+  // on every column, and row security that APPLIES to customer: SQL Server
+  // exempts nobody from an enabled policy, dbo included, so an adapter that
+  // reasoned "the owner sees everything" would miss the one that binds it.
   test('reports the fixture exactly as the model says, with nothing hidden', async () => {
     const snapshot = await discoverSqlServer(owner, FIXTURE_SCOPE)
     expect(snapshotDisagreements(snapshot)).toEqual([])
+    expect(object(snapshot, 'sales', 'customer').rowSecurity).toBe('applies')
+    // sa connects, and in a database it does not own by name is dbo.
+    expect(snapshot.account).toEqual({ user: 'dbo', login: 'sa' })
+    expect(snapshot.account).toEqual(fixture.owner)
     expect(snapshot.kind).toBe('sqlserver')
     // As ping reports it: SQL Server 2022 is version 16.
     expect(snapshot.serverVersion).toMatch(/^16\./)
@@ -371,11 +397,14 @@ describe('discovery as the owner', () => {
   // An administrator who has approved nothing gets nothing, and an answer:
   // `in ()` is a syntax error in T-SQL, so an empty scope that reached a
   // catalog query would throw instead of reporting the empty set it approved.
-  test('an empty scope reads nothing and still says which server answered', async () => {
+  // And as whom: createSnapshot refuses a snapshot without an account, so an
+  // account read after the early return would make an empty scope throw.
+  test('an empty scope reads nothing and still says which server answered, and as whom', async () => {
     const snapshot = await discoverSqlServer(owner, { schemas: [] })
     expect(snapshot.objects).toEqual([])
     expect(snapshot.gaps).toEqual([])
     expect(snapshot.serverVersion).toMatch(/^16\./)
+    expect(snapshot.account).toEqual(fixture.owner)
   })
 
   // An administrator approved a scope. An object outside it -- even one that
@@ -405,6 +434,21 @@ describe('discovery as the owner', () => {
     expect(new Set(snapshot.objects.map((entry) => entry.ref.schema))).toEqual(new Set(['sales']))
   })
 
+  // The same for what an account cannot see: the reader, without VIEW
+  // DEFINITION on the schema, gets a gap about it, and the gap names the
+  // schema as the catalog spells it, like the objects beside it. A gap in
+  // the scope's spelling would not cover `sales.order` -- a subject is
+  // compared by spelling -- so the objects it is about would read as
+  // established. createSnapshot accepts either spelling (0027), so only this
+  // holds it.
+  test("a schema gap for a scope spelled otherwise names the catalog's spelling", async () => {
+    const snapshot = await discoverSqlServer(reader, { schemas: ['SALES'] })
+    expect(findObject(snapshot, ORDER)).toBeDefined()
+    expect(snapshot.gaps.filter((gap) => gap.subject.kind === 'schema')).toEqual([
+      { subject: { kind: 'schema', schema: 'sales' }, aspect: 'objects', detail: expect.stringMatching(/VIEW DEFINITION on schema sales/) },
+    ])
+  })
+
   // Drift review compares fingerprints. One that moved between two readings of
   // an unchanged database would report drift nobody made; one that did not
   // move after an ALTER would miss the drift that matters. Undoing the change
@@ -428,20 +472,33 @@ describe('discovery as the owner', () => {
 describe('discovery as the restricted reader', () => {
   // The rule both adapters answer to: for every foreign key of sales.order,
   // the right target or a gap -- never silence. And the exact blind spots, so
-  // that a server upgrade that changes what a reader sees fails here by name.
+  // that a server upgrade that changes what a reader sees fails here by name:
+  // the scope's row security (no VIEW DEFINITION on the database, so a policy
+  // may be hidden), the schema's object list, and sales.order's definitions.
+  // The schema gap is about the schema, not the scope: a drift review placing
+  // a missing table needs to know which schema could not be listed (0027).
   test('says what it could not see, and nothing else is missing', async () => {
     const snapshot = await discoverSqlServer(reader, FIXTURE_SCOPE)
     expect(restrictedDisagreements(snapshot)).toEqual([])
+    expect(accessDisagreements(snapshot, READER_ACCESS)).toEqual([])
     // Only what the reader holds a permission on is listed at all.
     expect(snapshot.objects.map((entry) => entry.ref)).toEqual([ORDER])
+    const on = { kind: 'object', object: ORDER }
     expect(snapshot.gaps).toEqual([
-      { object: null, aspect: 'objects', detail: expect.stringMatching(/^schema sales: .*VIEW DEFINITION/) },
-      { object: ORDER, aspect: 'checks', detail: expect.stringMatching(/^ck_order_status: /) },
-      { object: ORDER, aspect: 'defaults', detail: expect.stringMatching(/^status: .*df_order_status/) },
-      { object: ORDER, aspect: 'foreign-keys', detail: expect.stringMatching(/^fk_order_approved_by references a table this account cannot see/) },
-      { object: ORDER, aspect: 'foreign-keys', detail: expect.stringMatching(/^fk_order_created_by references a table this account cannot see/) },
-      { object: ORDER, aspect: 'foreign-keys', detail: expect.stringMatching(/^fk_order_customer references a table this account cannot see/) },
+      { subject: { kind: 'scope' }, aspect: 'row-security', detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database/) },
+      { subject: { kind: 'schema', schema: 'sales' }, aspect: 'objects', detail: expect.stringMatching(/VIEW DEFINITION on schema sales/) },
+      { subject: on, aspect: 'checks', detail: expect.stringMatching(/^ck_order_status: /) },
+      { subject: on, aspect: 'defaults', detail: expect.stringMatching(/^status: .*df_order_status/) },
+      { subject: on, aspect: 'foreign-keys', detail: expect.stringMatching(/^fk_order_approved_by references a table this account cannot see/) },
+      { subject: on, aspect: 'foreign-keys', detail: expect.stringMatching(/^fk_order_created_by references a table this account cannot see/) },
+      { subject: on, aspect: 'foreign-keys', detail: expect.stringMatching(/^fk_order_customer references a table this account cannot see/) },
     ])
+    // Select-only, and it cannot tell whether a policy filters the order: one
+    // in a schema it cannot view would not be listed to it.
+    const order = object(snapshot, 'sales', 'order')
+    expect(order.columns.filter((entry) => !(entry.access.select && !entry.access.insert && !entry.access.update))).toEqual([])
+    expect(order.rowSecurity).toBe('unknown')
+    expect(snapshot.account).toEqual({ user: 'formancy_reader', login: 'formancy_reader' })
   })
 
   // What SQL Server shows of a foreign key whose target the reader cannot
@@ -476,7 +533,8 @@ describe('discovery as the restricted reader', () => {
     await asOwner('create schema elsewhere', 'create table elsewhere.t (id int not null constraint pk_elsewhere primary key)')
     const unseen = await discoverSqlServer(reader, { schemas: ['elsewhere'] })
     expect(unseen.objects).toEqual([])
-    expect(unseen.gaps).toEqual([{ object: null, aspect: 'objects', detail: expect.stringMatching(/^schema elsewhere: /) }])
+    // Nothing is described, so there is no row security to be unsure of.
+    expect(unseen.gaps).toEqual([{ subject: { kind: 'schema', schema: 'elsewhere' }, aspect: 'objects', detail: expect.stringMatching(/schema elsewhere/) }])
 
     const absent = await discoverSqlServer(reader, { schemas: ['no_such_schema'] })
     expect(absent.objects).toEqual([])
@@ -503,17 +561,17 @@ describe('discovery as the restricted reader', () => {
     expect(total.databaseType).toBe('decimal(18,4)')
     expect(total.type).toEqual({ kind: 'decimal', precision: 18, scale: 4 })
     expect(snapshot.gaps).toContainEqual({
-      object: { schema: 'aliased', name: 'priced' },
+      subject: { kind: 'object', object: { schema: 'aliased', name: 'priced' } },
       aspect: 'columns',
       detail: expect.stringMatching(/^total: /),
     })
   })
 
-  // The opposite of a gap: nothing about the column is hidden, and that is the
-  // trap. sys.columns lists every column of a table the account can see,
-  // including one it is denied SELECT on, so discovery cannot tell a column
-  // the reader may read from one it may not. The read finds out, with 230.
-  test('lists a column the account is denied SELECT on, which only a read reveals', async () => {
+  // sys.columns lists every column of a table the account can see, including
+  // one it is denied SELECT on. Before 0027 only the first read found that
+  // out, with 230; now the column says so, and a form generator leaves it out
+  // instead of binding a field that fails on every read.
+  test('describes a column the account is denied SELECT on as one it may not read, as a read confirms', async () => {
     await asOwner(
       'create schema columnar',
       'create table columnar.t (id int not null constraint pk_columnar primary key, secret int null)',
@@ -521,18 +579,52 @@ describe('discovery as the restricted reader', () => {
       'deny select on columnar.t (secret) to formancy_reader',
     )
     const snapshot = await discoverSqlServer(reader, { schemas: ['columnar'] })
-    expect(object(snapshot, 'columnar', 't').columns.map((entry) => entry.name)).toEqual(['id', 'secret'])
+    expect(object(snapshot, 'columnar', 't').columns.map((entry) => [entry.name, entry.access.select])).toEqual([
+      ['id', true],
+      ['secret', false],
+    ])
+    await expect(reader.request().query('select id from columnar.t')).resolves.toBeDefined()
     await expect(reader.request().query('select secret from columnar.t')).rejects.toMatchObject({ number: 230 })
   })
 
-  // The documented minimum privilege for complete discovery: VIEW DEFINITION
-  // on the schema, and no data access at all. If it were not enough, every
-  // customer following the documentation would get gaps; if SELECT were also
-  // needed, the documentation would be asking for more than discovery uses.
-  test('VIEW DEFINITION on the schema, without SELECT, sees everything the owner sees', async () => {
+  // VIEW DEFINITION on the schema, and no data access: every table and view
+  // is described as the owner's snapshot describes it, with no privilege on
+  // any column. What it cannot settle is row security. The fixture's policy
+  // lives in sales, so the schema grant shows it and customer APPLIES; a
+  // policy in another schema could filter any other table unseen, so the rest
+  // are unknown, behind one scope gap -- never "none", which is what 0007's
+  // schema-level minimum would report for a table a policy it cannot see
+  // filters (B10b).
+  test('VIEW DEFINITION on the schema, without SELECT, describes every object and cannot settle row security', async () => {
     const viewer = await connectAs('formancy_viewer', 'grant view definition on schema::sales to formancy_viewer')
     try {
-      expect(snapshotDisagreements(await discoverSqlServer(viewer, FIXTURE_SCOPE))).toEqual([])
+      const snapshot = await discoverSqlServer(viewer, FIXTURE_SCOPE)
+      expect(structuralDisagreements(snapshot)).toEqual([])
+      const granted = snapshot.objects.flatMap((entry) => entry.columns).filter(({ access }) => access.select || access.insert || access.update)
+      expect(granted).toEqual([])
+      expect(rowSecurities(snapshot)).toEqual(expectedRowSecurities('unknown'))
+      expect(snapshot.gaps).toEqual([
+        { subject: { kind: 'scope' }, aspect: 'row-security', detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database/) },
+      ])
+      await expect(viewer.request().query('select * from sales.customer')).rejects.toMatchObject({ number: 229 })
+    } finally {
+      await viewer.close()
+    }
+  })
+
+  // The documented minimum for a snapshot with no gap at all (0027): VIEW
+  // DEFINITION on the database, and still no data access. Every policy is
+  // listed to it, so "none" is established where no policy targets a table.
+  // If it were not enough, every customer following the documentation would
+  // get gaps; if SELECT were also needed, the documentation would be asking
+  // for more than discovery uses.
+  test('VIEW DEFINITION on the database, without SELECT, sees everything the owner sees and settles row security', async () => {
+    const viewer = await connectAs('formancy_db_viewer', 'grant view definition to formancy_db_viewer')
+    try {
+      const snapshot = await discoverSqlServer(viewer, FIXTURE_SCOPE)
+      expect(structuralDisagreements(snapshot)).toEqual([])
+      expect(snapshot.gaps).toEqual([])
+      expect(rowSecurities(snapshot)).toEqual(expectedRowSecurities('none'))
       await expect(viewer.request().query('select * from sales.customer')).rejects.toMatchObject({ number: 229 })
     } finally {
       await viewer.close()
@@ -547,7 +639,8 @@ describe('discovery as the restricted reader', () => {
   //
   // Each way of making that DENY is a different row, and a count that missed
   // one would report no gap for a table that is gone: the silent answer 0004
-  // forbids.
+  // forbids. Row security is unknown, behind a scope gap that counts the same
+  // denial: the hidden object may be a security policy.
   test.each([
     // Made to the account itself.
     ['a table denied VIEW DEFINITION', 'formancy_denied', ['deny view definition on sales.employee to formancy_denied']],
@@ -570,11 +663,14 @@ describe('discovery as the restricted reader', () => {
     try {
       const snapshot = await discoverSqlServer(denied, FIXTURE_SCOPE)
       expect(findObject(snapshot, { schema: 'sales', name: 'employee' })).toBeUndefined()
+      const on = { kind: 'object', object: ORDER }
       expect(snapshot.gaps).toEqual([
-        { object: null, aspect: 'objects', detail: expect.stringMatching(/^this account is denied VIEW DEFINITION on 1 object/) },
-        { object: ORDER, aspect: 'foreign-keys', detail: expect.stringMatching(/^fk_order_approved_by references a table this account cannot see/) },
-        { object: ORDER, aspect: 'foreign-keys', detail: expect.stringMatching(/^fk_order_created_by references a table this account cannot see/) },
+        { subject: { kind: 'scope' }, aspect: 'objects', detail: expect.stringMatching(/^this account is denied VIEW DEFINITION on 1 object/) },
+        { subject: { kind: 'scope' }, aspect: 'row-security', detail: expect.stringMatching(/denied VIEW DEFINITION or CONTROL on 1 object/) },
+        { subject: on, aspect: 'foreign-keys', detail: expect.stringMatching(/^fk_order_approved_by references a table this account cannot see/) },
+        { subject: on, aspect: 'foreign-keys', detail: expect.stringMatching(/^fk_order_created_by references a table this account cannot see/) },
       ])
+      expect(object(snapshot, 'sales', 'order').rowSecurity).toBe('unknown')
     } finally {
       await denied.close()
     }

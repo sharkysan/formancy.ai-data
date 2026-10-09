@@ -16,6 +16,7 @@ import {
   only,
   ORDER,
   ORDER_REF,
+  restrict,
   retype,
   snapshot,
   SUMMARY,
@@ -125,6 +126,19 @@ describe('diffSnapshots: columns', () => {
 
   // Narrowing a column cannot break a field that never writes it: every value
   // it shows was valid before and still is.
+  // A field the account may INSERT and not UPDATE is in every INSERT and no
+  // UPDATE (0027): a tightened column refuses what create writes, and an
+  // update that never names it is unaffected.
+  test('a tightened column written on create only stops create and not update', () => {
+    const createOnly = (objects: ObjectMeta[]) => restrict(objects, 'order', 'status', { update: false })
+    const report = drift((objects) => {
+      createOnly(objects)
+      retype(objects, 'order', 'status', 'nvarchar(10)', text(10))
+    }, {}, ORDER, snapshot(createOnly))
+    expect(only(report)).toMatchObject({ kind: 'column-tightened', severity: 'blocking', affects: ['status'] })
+    expect(report.writable).toEqual({ create: false, update: true })
+  })
+
   test('a tightened column the form only shows stops nothing', () => {
     const report = drift((objects) => retype(objects, 'order', 'id', 'int', INT32))
     expect(only(report)).toMatchObject({ kind: 'column-tightened', severity: 'info', affects: ['id'] })
@@ -197,13 +211,22 @@ describe('diffSnapshots: columns', () => {
     expect(report.writable).toEqual({ create: false, update: false })
   })
 
-  // The concurrency token is how a stale update is detected (0009). Gone or
-  // different, an update could silently overwrite somebody else's change. A
-  // create never used it.
-  test('the concurrency column gone or changed blocks update', () => {
+  // The concurrency token is how a stale update is detected (0009).
+  // Different, an update could silently overwrite somebody else's change, and
+  // a create, which never compares it, goes on. Gone, it is worse: both
+  // adapters name a confirmed token in every read and in every create's
+  // RETURNING or OUTPUT (0027), so every one of them fails. Reported as
+  // stopping update only, create stayed offered over a statement naming a
+  // column that is not there.
+  test('the concurrency column changed blocks update, and gone blocks the form', () => {
     const gone = drift((objects) => dropColumn(objects, 'order', 'row_version'))
-    expect(only(gone)).toMatchObject({ kind: 'concurrency-changed', severity: 'blocking', subject: { kind: 'column', object: ORDER_REF, name: 'row_version' }, affects: [] })
-    expect(gone.writable).toEqual({ create: true, update: false })
+    expect(only(gone)).toMatchObject({
+      kind: 'concurrency-changed',
+      severity: 'blocking',
+      subject: { kind: 'column', object: ORDER_REF, name: 'row_version' },
+      message: expect.stringMatching(/every read and every create names it/),
+    })
+    expect(gone.writable).toEqual({ create: false, update: false })
 
     // A confirmed PostgreSQL version column that may now be null: a null
     // version matches nothing and proves nothing.

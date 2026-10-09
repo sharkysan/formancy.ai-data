@@ -405,6 +405,53 @@ describe("the account's own grants", () => {
   })
 })
 
+describe('a security policy that blocks a write', () => {
+  // A block predicate refuses a write whose row it does not allow, with
+  // 33504, for every principal -- SQL Server exempts nobody, dbo included.
+  // It is the counterpart of PostgreSQL's row-level security WITH CHECK,
+  // which refuses with 42501 and is permission-denied there (0027, B17), and
+  // discovery reports both as row security that `applies`. Left unmapped, it
+  // was `unavailable` -- "the database could not be reached" -- for a
+  // refusal the policy made, and the two engines disagreed.
+  test('a write a block predicate refuses is permission-denied, on insert and on update', async () => {
+    await owner.request().batch('create schema blk')
+    await owner.request().batch(`
+      create table blk.kept (id int not null constraint pk_kept primary key, tenant_id int not null,
+        version int not null constraint df_kept_version default 0);
+      insert into blk.kept (id, tenant_id) values (1, 1)`)
+    await owner.request().batch('create function blk.fn_tenant_one(@tenant_id int) returns table with schemabinding as return select 1 as allowed where @tenant_id = 1')
+    await owner.request().batch(`
+      create security policy blk.tenant_one
+        add block predicate blk.fn_tenant_one(tenant_id) on blk.kept after insert,
+        add block predicate blk.fn_tenant_one(tenant_id) on blk.kept after update
+        with (state = on)`)
+    const INT32 = { kind: 'integer', min: '-2147483648', max: '2147483647' } as const
+    const column = (name: string, value: string): RecordValue => ({ name, type: INT32, value })
+    const kept: RecordTarget = { table: { schema: 'blk', name: 'kept' }, identity: [{ name: 'id', type: INT32 }], concurrency: null }
+    const records = createSqlServerRecords(owner)
+
+    expect(await records.insert({ target: kept, values: [column('id', '2'), column('tenant_id', '1')], returning: [] })).toMatchObject({ ok: true })
+    expect(await records.insert({ target: kept, values: [column('id', '3'), column('tenant_id', '2')], returning: [] })).toMatchObject({
+      ok: false,
+      code: 'permission-denied',
+    })
+    const update = await records.update({
+      target: { ...kept, concurrency: { kind: 'version-column', column: 'version' } },
+      key: [column('id', '1')],
+      set: [column('tenant_id', '2')],
+      expectedVersion: '0',
+      filters: EVERY_ROW,
+      returning: [],
+    })
+    expect(update).toMatchObject({ ok: false, code: 'permission-denied' })
+    const stored = await owner.request().query<{ id: number; tenant_id: number }>('select id, tenant_id from blk.kept order by id')
+    expect(stored.recordset).toEqual([
+      { id: 1, tenant_id: 1 },
+      { id: 2, tenant_id: 1 },
+    ])
+  })
+})
+
 describe('a trigger that decides what a write stores', () => {
   // An INSTEAD OF trigger runs in place of the statement, and OUTPUT returns
   // the row as if the statement had run. Measured: a trigger that does nothing

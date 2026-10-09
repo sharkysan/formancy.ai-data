@@ -10,7 +10,7 @@ const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '21474
 const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({ kind: 'text', maxLength, lengthUnit, fixedLength })
 
 function col(name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
-  return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, ...extra }
+  return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra }
 }
 
 function fk(name: string, columns: string[], target: string, targetColumns: string[]): ForeignKeyMeta {
@@ -26,7 +26,7 @@ function fk(name: string, columns: string[], target: string, targetColumns: stri
 }
 
 function table(name: string, columns: ColumnMeta[], extra: Partial<ObjectMeta>): ObjectMeta {
-  return { ref: { schema: 'sales', name }, kind: 'table', comment: null, columns, primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], ...extra }
+  return { ref: { schema: 'sales', name }, kind: 'table', comment: null, columns, primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none', ...extra }
 }
 
 /** A customer with a composite key and columns of every kind a lookup treats differently; a rate keyed by a float. */
@@ -58,7 +58,7 @@ function snapshot(edit: (objects: ObjectMeta[]) => void = () => {}): MetadataSna
     ),
   ]
   edit(objects)
-  return createSnapshot({ kind: 'postgres', serverVersion: '17.6', scope: { schemas: ['sales'] }, objects, gaps: [] })
+  return createSnapshot({ kind: 'postgres', serverVersion: '17.6', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, objects, gaps: [] })
 }
 
 /** Bindings exactly as the generator makes them, for a customer lookup showing `display`. */
@@ -252,7 +252,32 @@ describe('buildLookupConfig', () => {
     expect(() => buildLookupConfig(elsewhere, 'customer', { snapshot: outside })).toThrow(/sales\.elsewhere is outside the snapshot/)
 
     expect(() => buildLookupConfig(editedLookup(bindings, (lookup) => (lookup.display = ['nope'])), 'customer', { snapshot: source })).toThrow(/has no column nope/)
-    expect(() => buildLookupConfig({ ...bindings, version: 2 as 1 }, 'customer', { snapshot: source })).toThrow(/version 2/)
+    expect(() => buildLookupConfig({ ...bindings, version: 3 as 2 }, 'customer', { snapshot: source })).toThrow(/version 3/)
+    // A version-1 file says one write flag for both operations (0027): republished, not guessed at.
+    expect(() => buildLookupConfig({ ...bindings, version: 1 as 2 }, 'customer', { snapshot: source })).toThrow(/version 1 were published before 0027.*republish the form/)
+  })
+
+  // Every column the config names is read on every search: the key to make a
+  // token, the display columns for a label, the search and sort columns in
+  // its WHERE and ORDER BY. One the account may not read fails each search
+  // with permission-denied (0027), after the form was published. A bindings
+  // file is edited by hand, so the generator having refused it proves nothing.
+  test('refuses a key, display, search or sort column the account may not read', () => {
+    const narrowed = (column: string) => snapshot((objects) => {
+      const found = objects.find((object) => object.ref.name === 'customer')?.columns.find((candidate) => candidate.name === column)
+      if (found !== undefined) found.access = { ...found.access, select: false }
+    })
+    const bindings = bindingsFor(snapshot(), ['name', 'city'])
+    const against = (source: MetadataSnapshot, options: Partial<Parameters<typeof buildLookupConfig>[2]> = {}) => () =>
+      buildLookupConfig({ ...copyOf(bindings), snapshotFingerprint: source.fingerprint }, 'customer', { snapshot: source, ...options })
+
+    expect(against(narrowed('tenant_id'))).toThrow(/fk_order_customer \(sales\.customer\): key column tenant_id is a column this connection's account may not read/)
+    expect(against(narrowed('city'))).toThrow(/display column city is a column this connection's account may not read/)
+    const hiddenSince = narrowed('since')
+    expect(against(hiddenSince, { sort: [{ column: 'since', direction: 'desc' }] })).toThrow(/since is a column this connection's account may not read, so a lookup cannot sort by it/)
+    // Search is over displayed columns only, so an unreadable one is refused as a display column first; the search check guards the same rule for a file that slipped one past.
+    expect(against(narrowed('city'), { search: ['city'] })).toThrow(/city is a column this connection's account may not read/)
+    expect(against(hiddenSince)).not.toThrow()
   })
 
   // The fingerprint is the snapshot's, not the bindings': an edited file keeps

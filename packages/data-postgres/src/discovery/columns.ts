@@ -16,8 +16,8 @@ interface ColumnRow {
   default_expression: string | null
 }
 
-/** A column before its comment is attached; comments are their own concern. */
-export type UncommentedColumn = Omit<ColumnMeta, 'comment'>
+/** A column before its comment and its access are attached; each is its own concern. */
+export type UncommentedColumn = Omit<ColumnMeta, 'comment' | 'access'>
 
 /**
  * The columns of every table and view in scope, by the oid of their relation.

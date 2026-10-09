@@ -1,5 +1,5 @@
-import type { ColumnMeta, MetadataSnapshot, ObjectMeta, ObjectRef } from '@formancy/data-core'
-import { findObject } from '@formancy/data-core'
+import type { ColumnMeta, CoverageGap, MetadataSnapshot, ObjectMeta, ObjectRef } from '@formancy/data-core'
+import { findObject, gapCovers } from '@formancy/data-core'
 import type { ExpectedCheck, ExpectedCheckFacts, ExpectedColumn, ExpectedColumnFacts, ExpectedObject } from './model.js'
 import { FIXTURE_MODEL } from './model.js'
 
@@ -12,8 +12,33 @@ import { FIXTURE_MODEL } from './model.js'
  * Each adapter's suite asserts that the list is empty; the same list from both
  * engines is how "both adapters pass the same mandatory behaviour suite" is
  * made checkable.
+ *
+ * Discovered as the owner, every column grants every privilege and each
+ * object's row security is the model's (0027).
  */
 export function snapshotDisagreements(snapshot: MetadataSnapshot, model: readonly ExpectedObject[] = FIXTURE_MODEL): string[] {
+  return disagreements(snapshot, model, true)
+}
+
+/**
+ * The structure only — objects, columns, keys, constraints, and no gap but
+ * one about row security — ignoring what the account may do and whether row
+ * security applies to it. For an account that sees every catalog entry and is
+ * not the owner: the PostgreSQL reader, a SQL Server account with database
+ * VIEW DEFINITION (0027).
+ */
+export function structuralDisagreements(snapshot: MetadataSnapshot, model: readonly ExpectedObject[] = FIXTURE_MODEL): string[] {
+  return disagreements(snapshot, model, false)
+}
+
+/** Where a gap is, for a sentence: the scope, a schema, or an object. */
+function placeOf(gap: CoverageGap): string {
+  const subject = gap.subject
+  if (subject.kind === 'scope') return 'the scope'
+  return subject.kind === 'schema' ? `schema ${subject.schema}` : name(subject.object)
+}
+
+function disagreements(snapshot: MetadataSnapshot, model: readonly ExpectedObject[], asOwner: boolean): string[] {
   const out: string[] = []
   const expected = new Set(model.map((object) => key(object.ref)))
 
@@ -27,12 +52,31 @@ export function snapshotDisagreements(snapshot: MetadataSnapshot, model: readonl
       continue
     }
     out.push(...objectDisagreements(actual, entry, snapshot.kind))
+    if (asOwner) out.push(...ownerDisagreements(actual, entry, snapshot.kind))
   }
   // Discovered as the owner, the fixture is fully visible. A gap here is an
-  // adapter that failed to read something it could have.
+  // adapter that failed to read something it could have. Structurally, only
+  // whether row security applies may be beyond the account.
   for (const gap of snapshot.gaps) {
-    out.push(`unexpected gap on ${gap.object === null ? 'the scope' : name(gap.object)} (${gap.aspect}): ${gap.detail}`)
+    if (!asOwner && gap.aspect === 'row-security') continue
+    out.push(`unexpected gap on ${placeOf(gap)} (${gap.aspect}): ${gap.detail}`)
   }
+  return out
+}
+
+/** What only the owner's snapshot says: every privilege on every column, and the model's row security. */
+function ownerDisagreements(actual: ObjectMeta, entry: ExpectedObject, kind: MetadataSnapshot['kind']): string[] {
+  const out: string[] = []
+  const where = name(entry.ref)
+  for (const column of actual.columns) {
+    const { select, insert, update } = column.access
+    if (!(select && insert && update)) {
+      const said = (capability: string, held: boolean) => `${held ? '' : 'not '}${capability}`
+      out.push(`${where}.${column.name} access is ${said('select', select)}, ${said('insert', insert)} and ${said('update', update)}, expected every privilege`)
+    }
+  }
+  const rowSecurity = typeof entry.rowSecurity === 'string' ? entry.rowSecurity : entry.rowSecurity[kind]
+  if (actual.rowSecurity !== rowSecurity) out.push(`${where} row security is ${actual.rowSecurity}, expected ${rowSecurity}`)
   return out
 }
 
@@ -57,9 +101,7 @@ export function restrictedDisagreements(snapshot: MetadataSnapshot, model: reado
   const wanted = entry.columns.map((column) => column.name)
   if (columns.join() !== wanted.join()) out.push(`sales.order columns are [${columns.join(', ')}], expected [${wanted.join(', ')}]`)
 
-  const admitsGap = snapshot.gaps.some(
-    (gap) => gap.aspect === 'foreign-keys' && gap.object !== null && key(gap.object) === key(entry.ref),
-  )
+  const admitsGap = snapshot.gaps.some((gap) => gap.aspect === 'foreign-keys' && gapCovers(gap, entry.ref))
   for (const foreignKey of entry.foreignKeys) {
     const reported = actual.foreignKeys.find((candidate) => candidate.name === foreignKey.name)
     if (reported === undefined) {

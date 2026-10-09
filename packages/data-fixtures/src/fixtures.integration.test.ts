@@ -2,7 +2,7 @@ import mssql from 'mssql'
 import postgres from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { PostgresFixture, SqlServerFixture } from './containers.js'
-import { startPostgresFixture, startSqlServerFixture } from './containers.js'
+import { startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
 import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 
 /**
@@ -90,6 +90,44 @@ describe('the PostgreSQL fixture', () => {
       await sql.end()
     }
   })
+
+  // The policy must bind the writer and nobody else. One that hid rows from
+  // the owner would quietly change every owner suite's data (B1); one that
+  // bound nobody would make every row-security test pass for no reason.
+  test('the owner reads both tenants of sales.customer and the writer reads tenant 1 only', async () => {
+    const owner = postgres(pg.admin)
+    const writer = postgres(pg.writer)
+    try {
+      const tenants = async (sql: postgres.Sql) => (await sql<{ tenant_id: number }[]>`select tenant_id from sales.customer order by tenant_id`).map((row) => row.tenant_id)
+      expect(await tenants(owner)).toEqual([1, 2])
+      expect(await tenants(writer)).toEqual([1])
+      const [who] = await writer<{ user: string }[]>`select current_user as "user"`
+      expect(who?.user).toBe(WRITER.user)
+    } finally {
+      await Promise.all([owner.end(), writer.end()])
+    }
+  })
+
+  // A filter policy hides rows; it does not check the foreign keys that point
+  // at them (B11). Pinned, so a block or WITH CHECK policy added later is
+  // noticed rather than discovered by a form that suddenly cannot save. The
+  // insert is rolled back: other tests count the orders.
+  test("the writer's insert of an order for tenant 2's customer is not refused by the policy", async () => {
+    const writer = postgres(pg.writer)
+    try {
+      const rolledBack = new Error('rolled back')
+      await expect(
+        writer.begin(async (tx) => {
+          const [row] = await tx<{ tenant_id: number }[]>`
+            insert into sales."order" (tenant_id, customer_no, order_date, amount) values (2, 1001, '2026-10-09', 1) returning tenant_id`
+          expect(row?.tenant_id).toBe(2)
+          throw rolledBack
+        }),
+      ).rejects.toBe(rolledBack)
+    } finally {
+      await writer.end()
+    }
+  })
 })
 
 describe('the SQL Server fixture', () => {
@@ -168,6 +206,42 @@ describe('the SQL Server fixture', () => {
       await expect(pool.request().query('select * from sales.customer')).rejects.toMatchObject({ number: 229 })
     } finally {
       await pool.close()
+    }
+  })
+
+  // As for PostgreSQL. SQL Server applies an enabled policy to dbo too, so the
+  // predicate itself must pass every account but the writer (B11).
+  test('the owner reads both tenants of sales.customer and the writer reads tenant 1 only', async () => {
+    const owner = await new mssql.ConnectionPool(ms.admin).connect()
+    const writer = await new mssql.ConnectionPool(ms.writer).connect()
+    try {
+      const tenants = async (pool: mssql.ConnectionPool) =>
+        (await pool.request().query<{ tenant_id: number }>('select tenant_id from sales.customer order by tenant_id')).recordset.map((row) => row.tenant_id)
+      expect(await tenants(owner)).toEqual([1, 2])
+      expect(await tenants(writer)).toEqual([1])
+      const who = await writer.request().query<{ user: string }>('select user_name() as [user]')
+      expect(who.recordset[0]?.user).toBe(WRITER.user)
+    } finally {
+      await Promise.all([owner.close(), writer.close()])
+    }
+  })
+
+  // A filter predicate does not stop an insert, and foreign-key checks are
+  // not filtered (B11); pinned as on PostgreSQL, and rolled back.
+  test("the writer's insert of an order for tenant 2's customer is not refused by the policy", async () => {
+    const writer = await new mssql.ConnectionPool(ms.writer).connect()
+    const transaction = new mssql.Transaction(writer)
+    let begun = false
+    try {
+      await transaction.begin()
+      begun = true
+      const inserted = await new mssql.Request(transaction).query<{ tenant_id: number }>(
+        "insert into sales.[order] (tenant_id, customer_no, order_date, amount) output inserted.tenant_id values (2, 1001, '2026-10-09', 1)",
+      )
+      expect(inserted.recordset[0]?.tenant_id).toBe(2)
+    } finally {
+      if (begun) await transaction.rollback()
+      await writer.close()
     }
   })
 })

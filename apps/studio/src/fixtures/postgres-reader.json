@@ -1,12 +1,521 @@
 {
   "kind": "postgres",
   "serverVersion": "17.11",
+  "account": {
+    "user": "formancy_reader",
+    "login": "formancy_reader"
+  },
   "scope": {
     "schemas": [
       "sales"
     ]
   },
   "objects": [
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "country"
+      },
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "identity-always",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "iso_code",
+          "ordinal": 2,
+          "databaseType": "character(2)",
+          "type": {
+            "kind": "text",
+            "maxLength": 2,
+            "lengthUnit": "code-points",
+            "fixedLength": true
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "name",
+          "ordinal": 3,
+          "databaseType": "character varying(100)",
+          "type": {
+            "kind": "text",
+            "maxLength": 100,
+            "lengthUnit": "code-points",
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "flag",
+          "ordinal": 4,
+          "databaseType": "bytea",
+          "type": {
+            "kind": "binary",
+            "maxLength": null,
+            "fixedLength": false
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "shape",
+          "ordinal": 5,
+          "databaseType": "point",
+          "type": {
+            "kind": "unsupported"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_country",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniqueKeys": [
+        {
+          "name": "uq_country_iso_code",
+          "columns": [
+            "iso_code"
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "checks": [],
+      "rowSecurity": "none"
+    },
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "customer"
+      },
+      "kind": "table",
+      "comment": "A buyer, numbered within its tenant.",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "ordinal": 1,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "customer_no",
+          "ordinal": 2,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "name",
+          "ordinal": 3,
+          "databaseType": "character varying(200)",
+          "type": {
+            "kind": "text",
+            "maxLength": 200,
+            "lengthUnit": "code-points",
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "country_code",
+          "ordinal": 4,
+          "databaseType": "character(2)",
+          "type": {
+            "kind": "text",
+            "maxLength": 2,
+            "lengthUnit": "code-points",
+            "fixedLength": true
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "credit_limit",
+          "ordinal": 5,
+          "databaseType": "numeric(14,2)",
+          "type": {
+            "kind": "decimal",
+            "precision": 14,
+            "scale": 2
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "active",
+          "ordinal": 6,
+          "databaseType": "boolean",
+          "type": {
+            "kind": "boolean"
+          },
+          "nullable": false,
+          "hasDefault": true,
+          "defaultExpression": "true",
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "created_at",
+          "ordinal": 7,
+          "databaseType": "timestamp with time zone",
+          "type": {
+            "kind": "timestamp",
+            "withTimeZone": true,
+            "precision": null
+          },
+          "nullable": false,
+          "hasDefault": true,
+          "defaultExpression": "now()",
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_customer",
+        "columns": [
+          "tenant_id",
+          "customer_no"
+        ]
+      },
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "name": "fk_customer_country",
+          "columns": [
+            "country_code"
+          ],
+          "references": {
+            "table": {
+              "schema": "sales",
+              "name": "country"
+            },
+            "columns": [
+              "iso_code"
+            ]
+          },
+          "onUpdate": "no-action",
+          "onDelete": "no-action",
+          "enforced": true,
+          "validated": true
+        }
+      ],
+      "checks": [],
+      "rowSecurity": "applies"
+    },
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "customer_summary"
+      },
+      "kind": "view",
+      "comment": null,
+      "columns": [
+        {
+          "name": "tenant_id",
+          "ordinal": 1,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "customer_no",
+          "ordinal": 2,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "name",
+          "ordinal": 3,
+          "databaseType": "character varying(200)",
+          "type": {
+            "kind": "text",
+            "maxLength": 200,
+            "lengthUnit": "code-points",
+            "fixedLength": false
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "order_count",
+          "ordinal": 4,
+          "databaseType": "bigint",
+          "type": {
+            "kind": "integer",
+            "min": "-9223372036854775808",
+            "max": "9223372036854775807"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        }
+      ],
+      "primaryKey": null,
+      "uniqueKeys": [],
+      "foreignKeys": [],
+      "checks": [],
+      "rowSecurity": "none"
+    },
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "employee"
+      },
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "name",
+          "ordinal": 2,
+          "databaseType": "character varying(200)",
+          "type": {
+            "kind": "text",
+            "maxLength": 200,
+            "lengthUnit": "code-points",
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "manager_id",
+          "ordinal": 3,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_employee",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "name": "fk_employee_manager",
+          "columns": [
+            "manager_id"
+          ],
+          "references": {
+            "table": {
+              "schema": "sales",
+              "name": "employee"
+            },
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "no-action",
+          "onDelete": "no-action",
+          "enforced": true,
+          "validated": false
+        }
+      ],
+      "checks": [],
+      "rowSecurity": "none"
+    },
     {
       "ref": {
         "schema": "sales",
@@ -28,7 +537,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "identity-always",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
         },
         {
           "name": "tenant_id",
@@ -43,7 +557,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
         },
         {
           "name": "customer_no",
@@ -58,7 +577,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
         },
         {
           "name": "order_date",
@@ -71,7 +595,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
         },
         {
           "name": "status",
@@ -87,7 +616,12 @@
           "hasDefault": true,
           "defaultExpression": "'draft'::character varying",
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
         },
         {
           "name": "amount",
@@ -102,7 +636,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
         },
         {
           "name": "notes",
@@ -118,7 +657,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
         },
         {
           "name": "group",
@@ -134,7 +678,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
         },
         {
           "name": "created_by",
@@ -149,7 +698,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
         },
         {
           "name": "approved_by",
@@ -164,7 +718,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
         },
         {
           "name": "row_version",
@@ -179,7 +738,12 @@
           "hasDefault": true,
           "defaultExpression": "1",
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
         }
       ],
       "primaryKey": {
@@ -257,58 +821,414 @@
           "enforced": true,
           "validated": true
         }
-      ]
-    }
-  ],
-  "gaps": [
-    {
-      "object": {
-        "schema": "sales",
-        "name": "country"
-      },
-      "aspect": "objects",
-      "detail": "this account holds no privilege on it that a form could read or write with"
+      ],
+      "rowSecurity": "none"
     },
     {
-      "object": {
-        "schema": "sales",
-        "name": "customer"
-      },
-      "aspect": "objects",
-      "detail": "this account holds no privilege on it that a form could read or write with"
-    },
-    {
-      "object": {
-        "schema": "sales",
-        "name": "customer_summary"
-      },
-      "aspect": "objects",
-      "detail": "this account holds no privilege on it that a form could read or write with"
-    },
-    {
-      "object": {
-        "schema": "sales",
-        "name": "employee"
-      },
-      "aspect": "objects",
-      "detail": "this account holds no privilege on it that a form could read or write with"
-    },
-    {
-      "object": {
+      "ref": {
         "schema": "sales",
         "name": "order_line"
       },
-      "aspect": "objects",
-      "detail": "this account holds no privilege on it that a form could read or write with"
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "order_id",
+          "ordinal": 1,
+          "databaseType": "bigint",
+          "type": {
+            "kind": "integer",
+            "min": "-9223372036854775808",
+            "max": "9223372036854775807"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "line_no",
+          "ordinal": 2,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "quantity",
+          "ordinal": 3,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "unit_price",
+          "ordinal": 4,
+          "databaseType": "numeric(12,2)",
+          "type": {
+            "kind": "decimal",
+            "precision": 12,
+            "scale": 2
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "line_total",
+          "ordinal": 5,
+          "databaseType": "numeric(14,2)",
+          "type": {
+            "kind": "decimal",
+            "precision": 14,
+            "scale": 2
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "computed",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_order_line",
+        "columns": [
+          "order_id",
+          "line_no"
+        ]
+      },
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "name": "fk_order_line_order",
+          "columns": [
+            "order_id"
+          ],
+          "references": {
+            "table": {
+              "schema": "sales",
+              "name": "order"
+            },
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "no-action",
+          "onDelete": "cascade",
+          "enforced": true,
+          "validated": true
+        }
+      ],
+      "checks": [],
+      "rowSecurity": "none"
     },
     {
-      "object": {
+      "ref": {
         "schema": "sales",
         "name": "shipment"
       },
-      "aspect": "objects",
-      "detail": "this account holds no privilege on it that a form could read or write with"
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "identity-by-default",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "tenant_id",
+          "ordinal": 2,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "tracking_no",
+          "ordinal": 3,
+          "databaseType": "uuid",
+          "type": {
+            "kind": "uuid"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "carrier_code",
+          "ordinal": 4,
+          "databaseType": "smallint",
+          "type": {
+            "kind": "integer",
+            "min": "-32768",
+            "max": "32767"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "reference",
+          "ordinal": 5,
+          "databaseType": "character varying(20)",
+          "type": {
+            "kind": "text",
+            "maxLength": 20,
+            "lengthUnit": "code-points",
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "pickup_time",
+          "ordinal": 6,
+          "databaseType": "time(0) without time zone",
+          "type": {
+            "kind": "time",
+            "precision": 0
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "dispatched_at",
+          "ordinal": 7,
+          "databaseType": "timestamp(3) without time zone",
+          "type": {
+            "kind": "timestamp",
+            "withTimeZone": false,
+            "precision": 3
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "weight_kg",
+          "ordinal": 8,
+          "databaseType": "double precision",
+          "type": {
+            "kind": "float",
+            "bits": 64
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "temperature_c",
+          "ordinal": 9,
+          "databaseType": "real",
+          "type": {
+            "kind": "float",
+            "bits": 32
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "manifest_hash",
+          "ordinal": 10,
+          "databaseType": "bytea",
+          "type": {
+            "kind": "binary",
+            "maxLength": null,
+            "fixedLength": false
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "signature",
+          "ordinal": 11,
+          "databaseType": "bytea",
+          "type": {
+            "kind": "binary",
+            "maxLength": null,
+            "fixedLength": false
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_shipment",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniqueKeys": [
+        {
+          "name": "uq_shipment_tracking",
+          "columns": [
+            "tenant_id",
+            "tracking_no"
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "checks": [
+        {
+          "name": "ck_shipment_carrier",
+          "expression": "(carrier_code > 0)",
+          "enforced": true,
+          "validated": false
+        },
+        {
+          "name": "ck_shipment_reference",
+          "expression": "((reference)::text <> ''::text)",
+          "enforced": true,
+          "validated": true
+        },
+        {
+          "name": "ck_shipment_weight",
+          "expression": "(weight_kg > (0)::double precision)",
+          "enforced": true,
+          "validated": true
+        }
+      ],
+      "rowSecurity": "none"
     }
   ],
-  "fingerprint": "8b3ec4cd449abe5ccd3b59d1f6d02a5ebc5feb35df55dc7abb235525c85c2513"
+  "gaps": [],
+  "fingerprint": "1bac744881090829134c8d29863c7341c87f0e35f7cc1e50815df592416f11af"
 }

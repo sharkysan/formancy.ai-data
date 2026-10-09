@@ -1,0 +1,369 @@
+{
+  "kind": "sqlserver",
+  "serverVersion": "16.0.4295.3",
+  "account": {
+    "user": "formancy_reader",
+    "login": "formancy_reader"
+  },
+  "scope": {
+    "schemas": [
+      "sales"
+    ]
+  },
+  "objects": [
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "order"
+      },
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "databaseType": "bigint",
+          "type": {
+            "kind": "integer",
+            "min": "-9223372036854775808",
+            "max": "9223372036854775807"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "identity-always",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "tenant_id",
+          "ordinal": 2,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "customer_no",
+          "ordinal": 3,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "order_date",
+          "ordinal": 4,
+          "databaseType": "date",
+          "type": {
+            "kind": "date"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "status",
+          "ordinal": 5,
+          "databaseType": "varchar(20)",
+          "type": {
+            "kind": "text",
+            "maxLength": 20,
+            "lengthUnit": "code-page-bytes",
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": true,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "amount",
+          "ordinal": 6,
+          "databaseType": "decimal(18,4)",
+          "type": {
+            "kind": "decimal",
+            "precision": 18,
+            "scale": 4
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "notes",
+          "ordinal": 7,
+          "databaseType": "nvarchar(max)",
+          "type": {
+            "kind": "text",
+            "maxLength": null,
+            "lengthUnit": "utf16-code-units",
+            "fixedLength": false
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "group",
+          "ordinal": 8,
+          "databaseType": "nvarchar(50)",
+          "type": {
+            "kind": "text",
+            "maxLength": 50,
+            "lengthUnit": "utf16-code-units",
+            "fixedLength": false
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "created_by",
+          "ordinal": 9,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "approved_by",
+          "ordinal": 10,
+          "databaseType": "int",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
+        },
+        {
+          "name": "row_version",
+          "ordinal": 11,
+          "databaseType": "rowversion",
+          "type": {
+            "kind": "rowversion"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "rowversion",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": false,
+            "update": false
+          }
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_order",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "name": "fk_order_approved_by",
+          "columns": [
+            "approved_by"
+          ],
+          "references": null,
+          "onUpdate": "no-action",
+          "onDelete": "no-action",
+          "enforced": true,
+          "validated": true
+        },
+        {
+          "name": "fk_order_created_by",
+          "columns": [
+            "created_by"
+          ],
+          "references": null,
+          "onUpdate": "no-action",
+          "onDelete": "no-action",
+          "enforced": true,
+          "validated": true
+        },
+        {
+          "name": "fk_order_customer",
+          "columns": [
+            "tenant_id",
+            "customer_no"
+          ],
+          "references": null,
+          "onUpdate": "no-action",
+          "onDelete": "no-action",
+          "enforced": true,
+          "validated": true
+        }
+      ],
+      "checks": [
+        {
+          "name": "ck_order_status",
+          "expression": null,
+          "enforced": true,
+          "validated": true
+        }
+      ],
+      "rowSecurity": "unknown"
+    }
+  ],
+  "gaps": [
+    {
+      "subject": {
+        "kind": "scope"
+      },
+      "aspect": "row-security",
+      "detail": "this account lacks VIEW DEFINITION on the database, which is what lists every security policy, so a security policy it cannot see may filter any table or view in scope"
+    },
+    {
+      "subject": {
+        "kind": "schema",
+        "schema": "sales"
+      },
+      "aspect": "objects",
+      "detail": "without VIEW DEFINITION on schema sales, the catalog lists only the tables and views this account holds a permission on, so one it cannot see is absent without trace"
+    },
+    {
+      "subject": {
+        "kind": "object",
+        "object": {
+          "schema": "sales",
+          "name": "order"
+        }
+      },
+      "aspect": "checks",
+      "detail": "ck_order_status: the expression is hidden without VIEW DEFINITION"
+    },
+    {
+      "subject": {
+        "kind": "object",
+        "object": {
+          "schema": "sales",
+          "name": "order"
+        }
+      },
+      "aspect": "defaults",
+      "detail": "status: the definition of its default df_order_status is hidden without VIEW DEFINITION"
+    },
+    {
+      "subject": {
+        "kind": "object",
+        "object": {
+          "schema": "sales",
+          "name": "order"
+        }
+      },
+      "aspect": "foreign-keys",
+      "detail": "fk_order_approved_by references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not"
+    },
+    {
+      "subject": {
+        "kind": "object",
+        "object": {
+          "schema": "sales",
+          "name": "order"
+        }
+      },
+      "aspect": "foreign-keys",
+      "detail": "fk_order_created_by references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not"
+    },
+    {
+      "subject": {
+        "kind": "object",
+        "object": {
+          "schema": "sales",
+          "name": "order"
+        }
+      },
+      "aspect": "foreign-keys",
+      "detail": "fk_order_customer references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not"
+    }
+  ],
+  "fingerprint": "a7bab9aaa43192493a62837d1bc58e64bec6fd164d6dd03482e7e4b940cc75b1"
+}

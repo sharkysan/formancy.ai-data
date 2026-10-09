@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
-import { computeAccessibleDescription } from 'dom-accessibility-api'
+import { computeAccessibleDescription, computeAccessibleName } from 'dom-accessibility-api'
 import { createAdminClient } from './api.js'
 import type { Proposal, ProposalRequest } from './api.js'
 import { NOTE_KINDS } from './generate.js'
@@ -51,18 +51,80 @@ function list(container: HTMLElement, name: string): string[] {
 
 describe('choosing', () => {
   // A relationship whose target this connection cannot see is listed and
-  // disabled with the gap that explains it. Left out, it would read as a
-  // table with no relationship to customers, which is the one wrong answer.
+  // disabled with the reason. Left out, it would read as a table with no
+  // relationship to customers, which is the one wrong answer. SQL Server's
+  // reader is the one whose catalog hides the target (0027): it sees the
+  // key's own columns and not what it references, so the reason is that.
   test('lists a lookup whose target is out of sight, disabled, with the reason', async () => {
     const user = await signIn(plane)
-    const choose = await toChoose(user, 'fixture-reader')
+    const choose = await toChoose(user, 'fixture-sqlserver-reader')
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
     const customer = within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' })
     expect(customer).toHaveProperty('disabled', true)
     expect(customer.getAttribute('aria-describedby')).not.toBeNull()
     expect(paragraphs(choose)).toContain(
-      'tenant_id, customer_no → sales.customer. sales.customer is not visible to this connection: this account holds no privilege on it that a form could read or write with.',
+      'tenant_id, customer_no → an unknown target. This connection can see that the key exists but not what it references, so it cannot be offered.',
     )
+    expect(await audit()).toEqual([])
+  })
+
+  // PostgreSQL's reader sees sales.customer and may read none of it (0027).
+  // The generator refuses a lookup whose target key it cannot read, and a
+  // root of which it may read nothing; offered anyway, both would end in a
+  // refusal after the administrator had chosen everything else.
+  test('disables a lookup over an unreadable target key, and a root the account may not read, each with its reason', async () => {
+    const user = await signIn(plane)
+    const choose = await toChoose(user, 'fixture-reader')
+    const root = within(choose).getByLabelText('Root table or view')
+    const customerRoot = within(root).getByRole('option', { name: /^sales\.customer: / })
+    expect(customerRoot).toHaveProperty('disabled', true)
+    expect(customerRoot.textContent).toBe('sales.customer: This connection cannot read it: its account may SELECT none of its columns.')
+    await user.selectOptions(root, 'sales.order')
+    const lookup = within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' })
+    expect(lookup).toHaveProperty('disabled', true)
+    expect(paragraphs(choose)).toContain('tenant_id, customer_no → sales.customer. tenant_id of sales.customer cannot be read by this connection, so its rows cannot be offered.')
+    expect(await audit()).toEqual([])
+  })
+
+  // The order form's own account (0027): row-level security binds it on
+  // customer, it may not UPDATE amount, and it may still create and update.
+  // The Generate step says each of these in its kind.
+  test('on the writer, the order says the policy on customer, amount read-only on update, and offers both operations', async () => {
+    const user = await signIn(plane)
+    const choose = await toChoose(user, 'fixture-writer')
+    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
+    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }))
+    await user.selectOptions(within(choose).getByLabelText('Version column'), 'row_version')
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    const generated = await screen.findByRole('main', { name: 'Generate' })
+    expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: offered'])
+    expect(list(generated, 'Access')).toContainEqual(expect.stringMatching(/^customer Row-level security applies to this connection on sales\.customer: /))
+    expect(list(generated, 'Read-only')).toContain("amount Read-only on update: this connection's account may not UPDATE amount.")
+    expect(await audit()).toEqual([])
+  })
+
+  // The writer may read three columns of customer (0027). The generator
+  // refuses a lookup that shows one it may not read, after everything else
+  // was chosen; the studio offers those columns disabled, with the reason
+  // in each one's description, and the suggestion is a readable one.
+  test("on the writer, a lookup's unreadable target columns are offered disabled, with the reason", async () => {
+    const user = await signIn(plane)
+    const choose = await toChoose(user, 'fixture-writer')
+    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
+    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }))
+    const shown = within(within(choose).getByRole('group', { name: 'Columns to show for fk_order_customer' })).getAllByRole('checkbox')
+    const state = shown.map((box) => `${computeAccessibleName(box)}:${(box as HTMLInputElement).disabled ? 'disabled' : 'enabled'}${(box as HTMLInputElement).checked ? ',checked' : ''}`)
+    expect(state).toEqual([
+      'tenant_id:enabled',
+      'customer_no:enabled',
+      'name:enabled,checked',
+      'country_code:disabled',
+      'credit_limit:disabled',
+      'active:disabled',
+      'created_at:disabled',
+    ])
+    const countryCode = within(choose).getByRole('checkbox', { name: 'country_code' })
+    expect(computeAccessibleDescription(countryCode)).toBe('This connection may not read it, so it cannot be shown.')
     expect(await audit()).toEqual([])
   })
 

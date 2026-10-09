@@ -1,6 +1,6 @@
 # 0009 — A form is generated deterministically, and says what it chose and what it refused
 
-- **Status:** accepted; text `maxLength` and identity notes narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md)
+- **Status:** accepted; text `maxLength` and identity notes narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md); writes per operation and the `access` note kind narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/generate/generate.test.ts` — every

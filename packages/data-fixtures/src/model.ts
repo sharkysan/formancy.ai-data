@@ -1,4 +1,4 @@
-import type { DatabaseKind, Generation, NormalizedTypeKind, ObjectRef, ReferentialAction, TextLengthUnit } from '@formancy/data-core'
+import type { DatabaseKind, Generation, NormalizedTypeKind, ObjectRef, ReferentialAction, RowSecurity, TextLengthUnit } from '@formancy/data-core'
 
 /**
  * A type, as far as the model cares about it: the kind, and whichever of that
@@ -56,6 +56,12 @@ export interface ExpectedObject {
   uniqueKeys: Record<string, string[]>
   foreignKeys: ExpectedForeignKey[]
   checks: ExpectedCheck[]
+  /**
+   * Whether row security applies to the owner, who discovers the model (0027).
+   * Required, so an object cannot be left out of it silently; per engine where
+   * the engines genuinely differ.
+   */
+  rowSecurity: RowSecurity | Record<DatabaseKind, RowSecurity>
 }
 
 const sales = (name: string): ObjectRef => ({ schema: 'sales', name })
@@ -113,6 +119,7 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
     uniqueKeys: { uq_country_iso_code: ['iso_code'] },
     foreignKeys: [],
     checks: [],
+    rowSecurity: 'none',
   },
   {
     ref: sales('customer'),
@@ -142,6 +149,10 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
       },
     ],
     checks: [],
+    // A policy binds formancy_writer to tenant 1 (0027). The PostgreSQL owner
+    // is the container's superuser, whom row-level security never applies to;
+    // SQL Server has no such exemption, and its policy applies to dbo too.
+    rowSecurity: { postgres: 'none', sqlserver: 'applies' },
   },
   {
     ref: sales('customer_summary'),
@@ -151,6 +162,7 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
     uniqueKeys: {},
     foreignKeys: [],
     checks: [],
+    rowSecurity: 'none',
   },
   {
     ref: sales('employee'),
@@ -172,6 +184,7 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
       },
     ],
     checks: [],
+    rowSecurity: 'none',
   },
   {
     ref: sales('order'),
@@ -226,6 +239,7 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
       },
     ],
     checks: [{ name: 'ck_order_status', enforced: true, validated: true }],
+    rowSecurity: 'none',
   },
   {
     ref: sales('order_line'),
@@ -253,6 +267,7 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
       },
     ],
     checks: [],
+    rowSecurity: 'none',
   },
   {
     ref: sales('shipment'),
@@ -301,6 +316,7 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
       { name: 'ck_shipment_reference', enforced: true, validated: true, byKind: { sqlserver: { enforced: false, validated: false } } },
       { name: 'ck_shipment_weight', enforced: true, validated: true },
     ],
+    rowSecurity: 'none',
   },
 ])
 

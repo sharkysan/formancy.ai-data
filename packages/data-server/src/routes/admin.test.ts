@@ -13,17 +13,18 @@ import type { IdentityVerifier } from '../identity.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, ...extra,
+  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
 })
 
-/** The database as it is "now"; a test changes it to make drift. */
+/** The database as it is "now", and who discovers it; a test changes either to make drift. */
 let columns: ColumnMeta[]
+let account: MetadataSnapshot['account']
 function snapshot(): MetadataSnapshot {
   return createSnapshot({
-    kind: 'sqlserver', serverVersion: '16.0', scope: { schemas: ['sales'] }, gaps: [],
+    kind: 'sqlserver', serverVersion: '16.0', account, scope: { schemas: ['sales'] }, gaps: [],
     objects: [{
       ref: { schema: 'sales', name: 'employee' }, kind: 'table', comment: null, columns,
-      primaryKey: { name: 'pk_employee', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [],
+      primaryKey: { name: 'pk_employee', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
     }],
   })
 }
@@ -70,6 +71,7 @@ const POLICY = {
 
 beforeEach(async () => {
   columns = [col('id', 1, INT32), col('name', 2, { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', 3, { kind: 'rowversion' }, { generated: 'rowversion' })]
+  account = { user: 'dbo', login: 'sa' }
   reachable = true
   root = await mkdtemp(join(tmpdir(), 'formancy-data-admin-'))
   store = createFileConfigurationStore(root)
@@ -126,7 +128,7 @@ describe('the administrator plane', () => {
     // The policy's pinned columns reach the generator, so the field the tenant
     // comes from is read-only rather than a required field nobody may fill.
     const pinned = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, pinned: ['name'] } })).json()
-    expect(pinned.bindings.fields.find((binding: { field: string }) => binding.field === 'name')).toMatchObject({ writable: false })
+    expect(pinned.bindings.fields.find((binding: { field: string }) => binding.field === 'name')).toMatchObject({ writes: { create: false, update: false } })
     expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, pinned: 'name' } })).statusCode).toBe(400)
   })
 
@@ -202,6 +204,17 @@ describe('the administrator plane', () => {
     expect(drift.blocking).toBe(true)
     expect(drift.changes).toContainEqual(expect.objectContaining({ kind: 'column-dropped', severity: 'blocking' }))
     expect((await app.inject({ method: 'POST', url: '/v1/forms/nope/drift', headers: as('admin') })).statusCode).toBe(404)
+  })
+
+  // The connection's credentials were rotated to another principal: grants
+  // and policies are now evaluated for somebody else (0027). With identical
+  // grants nothing else changed, and the report still says whose form it is.
+  test('drift against a discovery taken as another user reports account-changed', async () => {
+    await publish()
+    account = { user: 'forms_user', login: 'app_login_2026' }
+    const drift = (await app.inject({ method: 'POST', url: '/v1/forms/employee/drift', headers: as('admin') })).json()
+    expect(drift.changes).toEqual([expect.objectContaining({ kind: 'account-changed', severity: 'review', subject: { kind: 'scope' } })])
+    expect(drift.blocking).toBe(false)
   })
 
   // Each malformed request is refused with 400 before it reaches a database:

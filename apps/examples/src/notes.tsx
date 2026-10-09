@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import type { GeneratedForm, GenerationNote } from '@formancy/data-core'
 
 /**
- * The four kinds of note, in the order a reviewer needs them, with what each
+ * The five kinds of note, in the order a reviewer needs them, with what each
  * kind means -- the generator's own definitions (`GenerationNote`), not new
  * ones -- and what an empty kind says.
  *
@@ -11,9 +11,15 @@ import type { GeneratedForm, GenerationNote } from '@formancy/data-core'
  */
 export const NOTE_KINDS: ReadonlyArray<{ kind: GenerationNote['kind']; heading: string; means: string; none: string }> = [
   { kind: 'blocked', heading: 'Blocked', means: 'An operation the form cannot offer, and why.', none: 'No operation is blocked.' },
-  { kind: 'read-only', heading: 'Read-only', means: 'A field shown and never written.', none: 'No field is marked read-only.' },
+  { kind: 'read-only', heading: 'Read-only', means: 'A field shown and not written, on every operation or on the one named.', none: 'No field is marked read-only.' },
   { kind: 'excluded', heading: 'Excluded', means: 'A column with no field.', none: 'No column was left without a field.' },
   { kind: 'inferred', heading: 'Inferred', means: 'Decided from the metadata, and editable.', none: 'Nothing was inferred.' },
+  {
+    kind: 'access',
+    heading: 'Access',
+    means: 'What the database itself limits for this connection: row-level security.',
+    none: "The database limits no rows of this form's tables for this connection.",
+  },
 ]
 
 /**

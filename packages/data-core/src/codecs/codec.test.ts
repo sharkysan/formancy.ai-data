@@ -16,6 +16,7 @@ function column(type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMe
     defaultExpression: null,
     generated: 'none',
     comment: null,
+    access: { select: true, insert: true, update: true },
     ...extra,
   }
 }

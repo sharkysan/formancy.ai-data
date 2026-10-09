@@ -169,7 +169,17 @@ export function PolicyStep({
           {bindings.fields.map((binding) => {
             const entry = policy.fields[binding.field]
             const label = labels[binding.field] ?? binding.field
-            const why = !binding.writable ? 'Never written by this form.' : binding.kind === 'column' && pinned.has(binding.column) ? 'Pinned by a row filter.' : null
+            const { create, update } = binding.writes
+            const written = create || update
+            const why = !written
+              ? 'Never written by this form.'
+              : binding.kind === 'column' && pinned.has(binding.column)
+                ? 'Pinned by a row filter.'
+                : !update
+                  ? 'Written on create only.'
+                  : !create
+                    ? 'Written on update only.'
+                    : null
             return (
               <li key={binding.field}>
                 <p className="field-name">
@@ -185,7 +195,7 @@ export function PolicyStep({
                   roles={entry?.read ?? []}
                   onRoles={(read) => onPolicy(withFieldRoles(policy, binding.field, read, entry?.write ?? []))}
                 />
-                {binding.writable ? (
+                {written ? (
                   <RolesInput
                     id={`write-${binding.field}`}
                     label={

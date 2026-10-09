@@ -1,6 +1,6 @@
 # 0004 — A metadata snapshot says what it could not see, and is made in one place
 
-- **Status:** accepted
+- **Status:** accepted; gap shape and fingerprint contents narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/snapshot.test.ts` — the fingerprint

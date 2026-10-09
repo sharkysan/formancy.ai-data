@@ -20,9 +20,11 @@ const adapter = createPostgresAdapter(sql)
 await adapter.ping() // { kind: 'postgres', version: '17.6' }
 
 const snapshot = await adapter.discover({ schemas: ['sales'] })
-snapshot.objects // tables and views, with columns, keys, foreign keys, checks, comments
-snapshot.gaps // what this account could not establish, or may not use
-snapshot.fingerprint // changes when the structure, or this account's access, changes
+snapshot.account // { user, login }: current_user and session_user
+snapshot.objects // tables and views, with columns, keys, foreign keys, checks, comments,
+//                  what the account may do with each column, and whether row security applies to it
+snapshot.gaps // what this release could not describe: a foreign table
+snapshot.fingerprint // changes when the structure, the account's privileges, or the account changes
 
 const lookups = createPostgresLookups(sql) // LookupAdapter: search, resolve, rejects
 const records = createPostgresRecords(sql) // RecordAdapter: read, insert, update
@@ -121,23 +123,55 @@ in short:
 
 `information_schema` is filtered by privilege: an account that may only
 `SELECT` from a table sees none of that table's constraints in it. Discovery
-reads `pg_catalog` instead, which every role can read whole, and asks
-separately what the connecting account may **use**
-([0006](../../docs/decisions/0006-postgres-discovery-reads-pg-catalog.md)):
+reads `pg_catalog` instead, which every role can read whole
+([0006](../../docs/decisions/0006-postgres-discovery-reads-pg-catalog.md)),
+and asks the server what the connecting account may do
+([0027](../../docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)):
 
-- An object in scope the account holds no usable privilege on, or whose schema
-  it has no `USAGE` on, is not described. It is reported as a gap naming it,
-  so "no such table" and "not yours" stay different answers, and a revoked
-  privilege changes the fingerprint as an access change rather than as a
-  dropped table.
-- An object the account may use but not `SELECT` as a whole — a grant on some
-  columns — is described, with a `columns` gap.
+- **Every table and view in scope is described**, the ones the account may
+  not use included. A column says whether the account may `SELECT` it, name
+  it in an `INSERT`, and name it in an `UPDATE`'s `SET`, as
+  `has_column_privilege` answers — the table's grant, the column's, `PUBLIC`
+  and inherited roles all counted — and each is false without `USAGE` on the
+  schema, which every statement needs. A membership granted `WITH INHERIT
+  FALSE` counts as nothing, as it does for every statement this module runs:
+  it never issues `SET ROLE`.
+- **Row security** is `applies` when `row_security_active` says so for this
+  account — RLS enabled, and the account neither a superuser, nor a
+  `BYPASSRLS` role, nor the owner of a table without `FORCE ROW LEVEL
+  SECURITY` — and `none` otherwise. It needs no privilege on the table, so it
+  is never `unknown` here. Which rows a policy allows is not described, and a
+  view is not followed to its tables: a view owned by a superuser reads past
+  their policies, a `security_invoker` one does not.
+- **The account** is `current_user`, the principal privileges and policies
+  are evaluated for, and `session_user`, who logged in. They differ under a
+  session role (postgres.js `connection: { role }`), and only the first is
+  in the fingerprint.
 - A foreign key keeps its target even when the account cannot use the
   target: PostgreSQL's catalog names it, so a target is never unknown here.
+- The only gap a PostgreSQL snapshot carries is a **foreign table**, which
+  this release does not describe, named as the gap's subject.
+
+What a snapshot cannot say, and the operations then report as
+`permission-denied`: a `serial` or `nextval()` default needs `USAGE` on its
+sequence, which is not described, so an account may hold `INSERT` on every
+column and still fail to create a row; an identity column needs no sequence
+privilege. A view's columns say what its own grants allow, but a read
+through it also needs privileges on the tables behind it — the view owner's,
+or the reader's for a `security_invoker` view — and without them every read
+is refused while the snapshot says `SELECT` (pinned in
+`discovery-access.integration.test.ts`); the generator's note on every view
+says a read may be refused. And a privilege is what was true at discovery:
+the privilege functions and `row_security_active` read live catalog state,
+not the transaction's snapshot, so a grant or an `ALTER TABLE` committed
+mid-discovery may show in them and not in the catalog rows beside them.
 
 So a snapshot describes the database **as one account sees it**. Discover as
 the account the forms will use; an owner's snapshot and a narrow account's
-differ, and so do their fingerprints.
+differ, and so do their fingerprints. The privilege checks are not free:
+measured on 2026-10-09 (Docker Desktop, 20 CPUs), the four checks per column
+over 10,000 columns took about 200 ms, against 8 ms for the same
+`pg_attribute` read alone.
 
 Every catalog query runs in one `REPEATABLE READ`, read-only transaction, and
 every schema name is a bound parameter.
@@ -218,8 +252,15 @@ built output, so run `pnpm build` first.
 
 - `adapter.integration.test.ts` — ping and close.
 - `discovery.integration.test.ts` — the shared model as the owner, the
-  restricted reader's rule, privileges, the scope, the fingerprint, and a
-  check added NOT VALID read as enforced and not validated.
+  restricted reader's rule and its grants, privileges short of a whole
+  table, the scope, the fingerprint, and a check added NOT VALID read as
+  enforced and not validated.
+- `discovery-access.integration.test.ts` — the writer's grants through its
+  role, every reported capability checked against the statement the server
+  runs or refuses (as the owner, the reader and the writer), a session role
+  and an `INHERIT FALSE` membership, row security for the owner with and
+  without `FORCE` and for a `BYPASSRLS` role, and what the record operations
+  do with both: a `serial` create refused, a hidden row `not-found`.
 - `discovery-types.integration.test.ts` and
   `discovery-shapes.integration.test.ts` — the map from each type to the
   contract, the two identities and a sequence default, the shapes only

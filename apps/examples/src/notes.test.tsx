@@ -84,6 +84,20 @@ describe('the notes panel says what the generator said', () => {
     expect(shown(form)).toEqual(expected(form))
   })
 
+  // What the database limits for this connection is its own kind (0027). The
+  // owner's order form has nothing there, and says so rather than leaving the
+  // heading out; a view always says that its tables' row security is not
+  // followed. A panel that dropped the fifth kind would hide both.
+  test('the access kind is shown: empty with its sentence for the order, and the view note for a view', () => {
+    const order = generated('order', { lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }] })
+    const access = NOTE_KINDS.find((entry) => entry.kind === 'access')
+    expect(shown(order).kinds['access']).toBe(access?.none)
+    cleanup()
+    const view = generated('customer_summary')
+    expect(view.notes.filter((note) => note.kind === 'access').map((note) => note.subject)).toEqual(['customer_summary'])
+    expect(shown(view)).toEqual(expected(view))
+  })
+
   // An excluded column has no field, so the note is the only place a reviewer
   // learns that a binary flag and a point were left out, and why.
   test('for a table with columns no form can hold: each exclusion, with its reason', () => {

@@ -1,7 +1,15 @@
 import { findObject } from '@formancy/data-core'
-import type { CoverageGap, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
+import type { MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { FIXTURE_SCOPE, restrictedDisagreements, snapshotDisagreements, startPostgresFixture } from '@formancy/data-fixtures'
+import {
+  accessDisagreements,
+  FIXTURE_SCOPE,
+  READER_ACCESS,
+  restrictedDisagreements,
+  snapshotDisagreements,
+  startPostgresFixture,
+  structuralDisagreements,
+} from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -15,7 +23,9 @@ import { discoverPostgres } from './index.js'
  *
  * What each snapshot must say is decided by `@formancy/data-fixtures`, not
  * here: the owner's is compared with the model, the reader's with the
- * restricted reader's rule. The tests below that create their own schemas do
+ * restricted reader's rule and with what the fixture grants it (0027). What
+ * the writer may do, and whether each capability is the server's own answer,
+ * is `discovery-access.integration.test.ts`. The tests below that create their own schemas do
  * so outside `sales`, so the fixture stays exactly what the model describes.
  */
 let fixture: PostgresFixture
@@ -37,8 +47,9 @@ function names(snapshot: MetadataSnapshot): string[] {
   return snapshot.objects.map((object) => `${object.ref.schema}.${object.ref.name}`)
 }
 
-function gapsOf(snapshot: MetadataSnapshot): { object: string; aspect: CoverageGap['aspect'] }[] {
-  return snapshot.gaps.map((gap) => ({ object: gap.object === null ? '' : `${gap.object.schema}.${gap.object.name}`, aspect: gap.aspect }))
+/** What each column of an object may do, as `name:siu` with a dash for each capability it lacks. */
+function capabilities(object: ObjectMeta): string[] {
+  return object.columns.map(({ name, access }) => `${name}:${access.select ? 's' : '-'}${access.insert ? 'i' : '-'}${access.update ? 'u' : '-'}`)
 }
 
 function described(snapshot: MetadataSnapshot, schema: string, name: string): ObjectMeta {
@@ -69,6 +80,15 @@ describe('discovery as the owner', () => {
     const identity = await createPostgresAdapter(owner).ping()
     expect(snapshot.kind).toBe('postgres')
     expect(snapshot.serverVersion).toBe(identity.version)
+  })
+
+  // Whose snapshot it is (0027). The container's user is a superuser that
+  // logged in as itself, so current_user and session_user are both it. An
+  // adapter that reported no account, or another, would hash the wrong
+  // principal into the fingerprint.
+  test("names the account it discovered as: the container's owner, as user and as login", async () => {
+    const snapshot = await discoverPostgres(owner, FIXTURE_SCOPE)
+    expect(snapshot.account).toEqual(fixture.owner)
   })
 
   // PostgreSQL files a stored generated column's expression in pg_attrdef and
@@ -172,31 +192,48 @@ describe('discovery as the restricted reader', () => {
     expect(restrictedDisagreements(await discoverPostgres(reader, FIXTURE_SCOPE))).toEqual([])
   })
 
-  // The decision (0006): an object in scope the account cannot use is not
-  // described, because a form bound to it would fail at the first read, and
-  // it is not dropped either, because "not there" and "not yours" are
-  // different answers to the person reviewing the snapshot.
-  test('describes only what it may use, and names each of the rest as a gap', async () => {
+  // 0027 narrows 0006: an object in scope the account cannot use is
+  // described, with every capability false, rather than replaced by a gap.
+  // pg_catalog and the privilege functions answer every role, so nothing is
+  // left that this account cannot establish -- an unusable table returning as
+  // a gap would make "not yours" read as "cannot tell" again.
+  test('describes every object in scope with no gap, and each capability as the fixture grants it', async () => {
     const snapshot = await discoverPostgres(reader, FIXTURE_SCOPE)
-    expect(names(snapshot)).toEqual(['sales.order'])
-    expect(gapsOf(snapshot)).toEqual([
-      { object: 'sales.country', aspect: 'objects' },
-      { object: 'sales.customer', aspect: 'objects' },
-      { object: 'sales.customer_summary', aspect: 'objects' },
-      { object: 'sales.employee', aspect: 'objects' },
-      { object: 'sales.order_line', aspect: 'objects' },
-      { object: 'sales.shipment', aspect: 'objects' },
+    expect(names(snapshot)).toEqual([
+      'sales.country',
+      'sales.customer',
+      'sales.customer_summary',
+      'sales.employee',
+      'sales.order',
+      'sales.order_line',
+      'sales.shipment',
     ])
-    for (const gap of snapshot.gaps) expect(gap.detail).toMatch(/no privilege/)
+    expect(snapshot.gaps).toEqual([])
+    expect(accessDisagreements(snapshot, READER_ACCESS)).toEqual([])
+    // The reader may not read customer, and row_security_active still answers
+    // for it (B1): the policy applies to every role but the superuser owner.
+    const customer = described(snapshot, 'sales', 'customer')
+    expect(customer.rowSecurity).toBe('applies')
+    expect(capabilities(customer).every((entry) => entry.endsWith(':---'))).toBe(true)
   })
 
-  // pg_catalog is not filtered by privilege. The reader's description of the
-  // table it may read is the owner's, down to fk_order_customer's target in a
-  // table it may not read -- so on PostgreSQL the restricted rule above is met
-  // by the right answer, not by a gap.
-  test('sees sales.order exactly as the owner does, the key into sales.customer included', async () => {
+  // pg_catalog is not filtered by privilege, so the reader's snapshot has the
+  // owner's structure everywhere -- only what it may do, and whether row
+  // security applies to it, differ. A privilege-filtered read sneaking back
+  // in (information_schema, or a privilege test in a WHERE) fails here.
+  test("has the owner's structure, every object, key and constraint, apart from access", async () => {
+    expect(structuralDisagreements(await discoverPostgres(reader, FIXTURE_SCOPE))).toEqual([])
+  })
+
+  // The reader's description of the table it may read is the owner's, down
+  // to fk_order_customer's target in a table it may not read -- so on
+  // PostgreSQL the restricted rule above is met by the right answer, not by a
+  // gap. Its columns differ from the owner's only in what it may write.
+  test('sees sales.order exactly as the owner does, the key into sales.customer included, apart from access', async () => {
     const [asReader, asOwner] = await Promise.all([discoverPostgres(reader, FIXTURE_SCOPE), discoverPostgres(owner, FIXTURE_SCOPE)])
-    expect(described(asReader, 'sales', 'order')).toEqual(described(asOwner, 'sales', 'order'))
+    const withoutAccess = (object: ObjectMeta) => ({ ...object, columns: object.columns.map(({ access: _access, ...rest }) => rest) })
+    expect(withoutAccess(described(asReader, 'sales', 'order'))).toEqual(withoutAccess(described(asOwner, 'sales', 'order')))
+    expect(capabilities(described(asReader, 'sales', 'order')).every((entry) => entry.endsWith(':s--'))).toBe(true)
     expect(described(asReader, 'sales', 'order').foreignKeys.find((key) => key.name === 'fk_order_customer')?.references).toEqual({
       table: { schema: 'sales', name: 'customer' },
       columns: ['tenant_id', 'customer_no'],
@@ -222,11 +259,13 @@ describe('discovery as the restricted reader', () => {
       await owner.unsafe(`
         create schema access;
         create table access.whole (id integer primary key, secret text);
-        create table access.partial (id integer primary key, secret text);
+        create table access.partial (id integer primary key, gone text, secret text);
         create table access.none (id integer primary key);
+        alter table access.partial drop column gone;
         grant usage on schema access to formancy_reader;
         grant select on access.whole to formancy_reader;
         grant select (id) on access.partial to formancy_reader;
+        grant update (secret) on access.partial to formancy_reader;
 
         create schema sealed;
         create table sealed.inside (id integer primary key);
@@ -236,42 +275,57 @@ describe('discovery as the restricted reader', () => {
 
     // A grant on some columns is how a narrow lookup account is often set up.
     // Described as if every column were readable, a form would bind `secret`
-    // and fail at the first read; left out, the lookup the grant was made for
-    // would vanish. So it is described, and a gap says the snapshot cannot
-    // tell which columns this account may use.
-    test('a table granted column by column is described, with a columns gap', async () => {
+    // and fail at the first read; replaced by a gap that "cannot say which",
+    // the lookup the grant was made for would vanish. Each column says what
+    // it may do, an UPDATE granted without SELECT included. The dropped
+    // column leaves a hole in the attnums (id 1, secret 3): an answer matched
+    // to its column by list position, from a query that kept the dropped
+    // column's row, would give `secret` the dropped column's answer. Both
+    // queries drop that row, so a positional match over the two filtered
+    // lists still lines up and is not what this catches.
+    test('a table granted column by column reports exactly the columns it may read, and no gap', async () => {
       const snapshot = await discoverPostgres(reader, { schemas: ['access'] })
-      expect(names(snapshot)).toEqual(['access.partial', 'access.whole'])
-      expect(gapsOf(snapshot)).toEqual([
-        { object: 'access.none', aspect: 'objects' },
-        { object: 'access.partial', aspect: 'columns' },
-      ])
+      expect(names(snapshot)).toEqual(['access.none', 'access.partial', 'access.whole'])
+      expect(snapshot.gaps).toEqual([])
+      expect(capabilities(described(snapshot, 'access', 'whole'))).toEqual(['id:s--', 'secret:s--'])
+      expect(capabilities(described(snapshot, 'access', 'partial'))).toEqual(['id:s--', 'secret:--u'])
+      expect(capabilities(described(snapshot, 'access', 'none'))).toEqual(['id:---'])
     })
 
     // A table privilege is useless without USAGE on its schema: every read
-    // fails with "permission denied for schema". An adapter that checked the
-    // table alone would describe a table nothing can read.
-    test('a table in a schema the account has no USAGE on is a gap that says so', async () => {
+    // fails with "permission denied for schema" (B2). An adapter that checked
+    // the table alone would describe a column it says may be read, and a form
+    // bound to it would fail at the first request.
+    test('a table in a schema without USAGE is described with no capability, though its grant says SELECT', async () => {
       const snapshot = await discoverPostgres(reader, { schemas: ['sealed'] })
-      expect(snapshot.objects).toEqual([])
-      expect(gapsOf(snapshot)).toEqual([{ object: 'sealed.inside', aspect: 'objects' }])
-      expect(snapshot.gaps[0]?.detail).toMatch(/USAGE/)
+      expect(snapshot.gaps).toEqual([])
+      expect(capabilities(described(snapshot, 'sealed', 'inside'))).toEqual(['id:---'])
+      const [granted] = await reader<{ granted: boolean }[]>`
+        select pg_catalog.has_table_privilege(c.oid, 'SELECT') as granted
+        from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'sealed' and c.relname = 'inside'`
+      expect(granted?.granted).toBe(true)
+      await expect(reader`select id from sealed.inside`).rejects.toMatchObject({ code: '42501' })
     })
 
     // 0004 promises that a revoked permission is noticed, and noticed as an
     // access problem rather than as a dropped table. Both halves: the
-    // fingerprint moves, and the object reappears as a gap, not as nothing.
-    test('a revoked privilege changes the fingerprint and turns the object into a gap', async () => {
+    // fingerprint moves, and the object is still there, its columns saying
+    // what was lost -- which drift review reads as privilege-narrowed.
+    test('a revoked privilege changes the fingerprint and the columns it covered, not the object list', async () => {
       const before = await discoverPostgres(reader, { schemas: ['access'] })
       await owner`revoke select on access.whole from formancy_reader`
       try {
         const after = await discoverPostgres(reader, { schemas: ['access'] })
         expect(after.fingerprint).not.toBe(before.fingerprint)
-        expect(names(after)).toEqual(['access.partial'])
-        expect(gapsOf(after)).toContainEqual({ object: 'access.whole', aspect: 'objects' })
+        expect(names(after)).toEqual(names(before))
+        expect(after.gaps).toEqual([])
+        expect(capabilities(described(after, 'access', 'whole'))).toEqual(['id:---', 'secret:---'])
       } finally {
         await owner`grant select on access.whole to formancy_reader`
       }
+      // And back: the fingerprint hashes privileges, not when they were read.
+      expect((await discoverPostgres(reader, { schemas: ['access'] })).fingerprint).toBe(before.fingerprint)
     })
   })
 })

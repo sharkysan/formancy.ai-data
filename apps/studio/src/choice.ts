@@ -1,4 +1,4 @@
-import { findObject } from '@formancy/data-core'
+import { findObject, gapCovers } from '@formancy/data-core'
 import type { ColumnMeta, CoverageGap, ForeignKeyMeta, LookupChoice, MetadataSnapshot, ObjectMeta, ObjectRef, RowFilterRule } from '@formancy/data-core'
 import type { ProposalRequest } from './api.js'
 
@@ -58,28 +58,61 @@ export function choiceFor(ref: ObjectRef): Choice {
   return { root: { ...ref }, formId: formIdFor(ref), title: titleFor(ref), lookups: [], versionColumn: null }
 }
 
-/** The gaps about one object, which are what "cannot tell" is made of (0004). */
+/** The gaps about one object itself, which are what "cannot tell" is made of (0004). */
 export function gapsAbout(snapshot: MetadataSnapshot, ref: ObjectRef): CoverageGap[] {
-  return snapshot.gaps.filter((gap) => gap.object !== null && sameRef(gap.object, ref))
+  return snapshot.gaps.filter((gap) => gap.subject.kind === 'object' && sameRef(gap.subject.object, ref))
+}
+
+/**
+ * The gaps that could hide an object the snapshot does not describe: one about
+ * it, or one about the objects of its schema or of the whole scope (0027).
+ * Drift review asks the same question of the same gaps.
+ */
+export function gapsHiding(snapshot: MetadataSnapshot, ref: ObjectRef): CoverageGap[] {
+  return snapshot.gaps.filter((gap) => gapCovers(gap, ref) && (gap.subject.kind === 'object' || gap.aspect === 'objects'))
+}
+
+const readable = (column: ColumnMeta): boolean => column.access.select
+
+/**
+ * Why a table or view cannot be a form's root, or `null`: the generator
+ * refuses one of whose columns the account may SELECT none (0027), so the
+ * studio does not offer it as if it could.
+ */
+export function rootBlocker(object: ObjectMeta): string | null {
+  return object.columns.some(readable) ? null : 'This connection cannot read it: its account may SELECT none of its columns.'
 }
 
 /**
  * Whether a foreign key can be offered as a lookup, and why not.
  *
- * The generator refuses one whose target this connection cannot see; the
+ * The generator refuses one whose target this connection cannot see, or
+ * whose own columns on the root or target key it may not read (0027); the
  * studio says so before anybody asks, with the gap that explains it when
  * there is one, because "the target is not visible" and "there is no target"
- * are different findings.
+ * are different findings. The display columns are the administrator's
+ * choice, and `displayBlocker` says which of them cannot be chosen.
  */
-export function lookupBlocker(snapshot: MetadataSnapshot, foreignKey: ForeignKeyMeta): string | null {
+export function lookupBlocker(snapshot: MetadataSnapshot, root: ObjectMeta, foreignKey: ForeignKeyMeta): string | null {
+  const unreadable = foreignKey.columns.find((name) => root.columns.find((column) => column.name === name)?.access.select === false)
+  if (unreadable !== undefined) return `${unreadable} of ${describeRef(root.ref)} cannot be read by this connection, so the lookup cannot be offered.`
   if (foreignKey.references === null) {
     return 'This connection can see that the key exists but not what it references, so it cannot be offered.'
   }
   const target = foreignKey.references.table
-  if (findObject(snapshot, target) !== undefined) return null
-  const gaps = gapsAbout(snapshot, target)
+  const found = findObject(snapshot, target)
+  if (found !== undefined) {
+    const hidden = foreignKey.references.columns.find((name) => found.columns.find((column) => column.name === name)?.access.select === false)
+    return hidden === undefined ? null : `${hidden} of ${describeRef(target)} cannot be read by this connection, so its rows cannot be offered.`
+  }
+  const gaps = gapsHiding(snapshot, target)
   if (gaps.length > 0) return `${describeRef(target)} is not visible to this connection: ${gaps.map((gap) => gap.detail).join('; ')}.`
   return `${describeRef(target)} is outside the schemas this connection discovers, so its rows cannot be offered.`
+}
+
+/** Why a target column cannot be shown by a lookup, or `null`: the generator refuses a display column the account may not read (0027). */
+export function displayBlocker(column: ColumnMeta): string | null {
+  return readable(column) ? null : 'This connection may not read it, so it cannot be shown.'
 }
 
 /**
@@ -88,19 +121,24 @@ export function lookupBlocker(snapshot: MetadataSnapshot, foreignKey: ForeignKey
  * shown checked for the administrator to confirm or change (plan section 3).
  */
 export function suggestedDisplay(target: ObjectMeta, keyColumns: readonly string[]): string[] {
-  const text = target.columns.find((column) => column.type.kind === 'text' && !keyColumns.includes(column.name))
-  const first = text ?? target.columns[0]
+  // Only a column the account may read: a label of one it may not fails every search (0027).
+  const shown = target.columns.filter(readable)
+  const text = shown.find((column) => column.type.kind === 'text' && !keyColumns.includes(column.name))
+  const first = text ?? shown[0]
   return first === undefined ? [] : [first.name]
 }
 
 /**
  * Columns that could be confirmed as a version column: a non-nullable integer
- * the database does not generate, outside the key. The generator holds a
- * confirmed column to the same rule and refuses one that fails it.
+ * the database does not generate, outside the key, that the account may read
+ * and UPDATE (0027). The generator holds a confirmed column to the same rule
+ * and refuses one that fails it.
  */
 export function versionCandidates(root: ObjectMeta): ColumnMeta[] {
   const key = new Set(root.primaryKey?.columns ?? root.uniqueKeys[0]?.columns ?? [])
-  return root.columns.filter((column) => column.type.kind === 'integer' && !column.nullable && column.generated === 'none' && !key.has(column.name))
+  return root.columns.filter(
+    (column) => column.type.kind === 'integer' && !column.nullable && column.generated === 'none' && !key.has(column.name) && column.access.select && column.access.update,
+  )
 }
 
 /** The root's rowversion column, which the database maintains and nobody confirms. */
@@ -108,9 +146,13 @@ export function rowversionOf(root: ObjectMeta): ColumnMeta | undefined {
   return root.columns.find((column) => column.type.kind === 'rowversion')
 }
 
-/** Columns a policy could pin: ones the person would otherwise write. A generated column has its value already. */
+/**
+ * Columns a policy could pin: ones the person would otherwise write. A
+ * generated column has its value already, and one the account may not read
+ * would fail every read the pin filters (0027).
+ */
 export function pinCandidates(root: ObjectMeta): ColumnMeta[] {
-  return root.columns.filter((column) => column.generated === 'none')
+  return root.columns.filter((column) => column.generated === 'none' && column.access.select)
 }
 
 /**

@@ -1,6 +1,6 @@
 # 0006 — Discover PostgreSQL from pg_catalog, and ask separately what the account may use
 
-- **Status:** accepted
+- **Status:** accepted; describing only usable objects, and the `columns` gap, narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-postgres/src/discovery.integration.test.ts`

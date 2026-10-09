@@ -7,7 +7,9 @@ import { createDataServer, createFileConfigurationStore } from '@formancy/data-s
 import type { ConfigurationStore, ConnectionRegistry, IdentityVerifier } from '@formancy/data-server'
 import owner from './fixtures/postgres-owner.json'
 import reader from './fixtures/postgres-reader.json'
+import writer from './fixtures/postgres-writer.json'
 import sqlserver from './fixtures/sqlserver-owner.json'
+import sqlserverReader from './fixtures/sqlserver-reader.json'
 
 /**
  * The real data server, behind a fake `fetch`, for the studio's suite.
@@ -22,9 +24,12 @@ import sqlserver from './fixtures/sqlserver-owner.json'
  * verifier (literal tokens instead of signed ones; verification is
  * `identity.test.ts`'s), and the connection registry, whose adapters answer
  * with snapshots captured from the shared fixture by
- * `scripts/capture-snapshots.mjs`: PostgreSQL as its owner, who sees
- * everything, and as the restricted reader, who sees `sales.order` and gaps;
- * and SQL Server as its owner, whose order table keeps a rowversion.
+ * `scripts/capture-snapshots.mjs`: PostgreSQL as its owner, who may do
+ * everything; as the restricted reader, who sees every table and may read
+ * `sales.order` only; and as the order form's own account, the writer, whom
+ * row-level security on customer binds (0027). SQL Server as its owner, whose
+ * order table keeps a rowversion, and as the reader, whose catalog hides what
+ * it may not use behind gaps, the "cannot tell" the studio must show (0004).
  */
 
 /** A snapshot read from a committed file, refused if it was edited after it was captured. */
@@ -39,7 +44,9 @@ export function readSnapshot(raw: unknown): MetadataSnapshot {
 
 export const OWNER_SNAPSHOT = readSnapshot(owner)
 export const READER_SNAPSHOT = readSnapshot(reader)
+export const WRITER_SNAPSHOT = readSnapshot(writer)
 export const SQLSERVER_SNAPSHOT = readSnapshot(sqlserver)
+export const SQLSERVER_READER_SNAPSHOT = readSnapshot(sqlserverReader)
 
 /** The tokens the fake verifier accepts, and who each one is. */
 export const TOKENS = { admin: 'studio-test-administrator', clerk: 'studio-test-clerk' } as const
@@ -74,7 +81,7 @@ export interface TestPlane {
 }
 
 /** The connections the registry allows, in the order the server lists them. */
-export const CONNECTIONS = ['fixture', 'fixture-reader', 'fixture-sqlserver'] as const
+export const CONNECTIONS = ['fixture', 'fixture-reader', 'fixture-sqlserver', 'fixture-sqlserver-reader', 'fixture-writer'] as const
 
 /**
  * `administrator: false` starts the server as one started without a store, an
@@ -88,6 +95,8 @@ export async function startPlane(options: { administrator?: boolean } = {}): Pro
     ['fixture', OWNER_SNAPSHOT],
     ['fixture-reader', READER_SNAPSHOT],
     ['fixture-sqlserver', SQLSERVER_SNAPSHOT],
+    ['fixture-sqlserver-reader', SQLSERVER_READER_SNAPSHOT],
+    ['fixture-writer', WRITER_SNAPSHOT],
   ])
   const unreachable = new Set<string>()
   const removed = new Set<string>()

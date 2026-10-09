@@ -1,9 +1,11 @@
 import type { FormBindings } from '../generate/types.js'
+import { bindingsVersionProblem } from '../generate/version.js'
 import type { MetadataSnapshot, ObjectMeta } from '../metadata.js'
 import { findObject } from '../snapshot.js'
 import { absence, gapChanges, unseen } from './access.js'
 import { columnChanges } from './columns.js'
 import { allFields, byCodepoint, type Comparison, describe, type Draft, foreignKeyIn, identityKeyIn, objectIn, type Operation, refKey, stopped } from './context.js'
+import { accountChanges, privilegeChanges } from './privileges.js'
 import { relationshipChanges } from './relationships.js'
 import type { DriftChange, DriftReport, DriftSeverity, DriftSubject } from './types.js'
 
@@ -24,6 +26,10 @@ import type { DriftChange, DriftReport, DriftSeverity, DriftSubject } from './ty
  * different engines.
  */
 export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings): DriftReport {
+  // First: a version-1 file says one write flag for both operations, and
+  // every verdict below about which writes a change stops would be a guess.
+  const version = bindingsVersionProblem(bindings.version)
+  if (version !== null) throw new Error(version)
   if (bindings.snapshotFingerprint !== base.fingerprint) {
     throw new Error(`the bindings were generated from snapshot ${bindings.snapshotFingerprint}, not from the base snapshot ${base.fingerprint}`)
   }
@@ -39,7 +45,8 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
   }
 
   const after = findObject(current, bindings.root)
-  if (after === undefined) return finish([rootMissing(current, bindings)], offered)
+  // The account is said beside a missing root: under another principal it may be missing for that principal only.
+  if (after === undefined) return finish([rootMissing(current, bindings), ...accountChanges(base, current, bindings)], offered)
 
   const comparison: Comparison = { base, current, bindings, before, after, cited: new Set() }
   return finish(
@@ -47,6 +54,7 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
       ...rootKindChanges(comparison),
       ...columnChanges(comparison),
       ...relationshipChanges(comparison),
+      ...privilegeChanges(comparison),
       // Last: a gap is reported on its own only when no change above gave it as its reason.
       ...gapChanges(comparison),
     ],
@@ -121,8 +129,10 @@ function rootKindChanges({ before, after, bindings }: Comparison): Draft[] {
 
 const RANK: Record<DriftSeverity, number> = { blocking: 0, review: 1, info: 2 }
 
+/** The scope first; a schema just before its own objects; then objects and what is in them. */
 function subjectKey(subject: DriftSubject): string {
   if (subject.kind === 'scope') return ''
+  if (subject.kind === 'schema') return subject.schema
   return subject.kind === 'object' ? refKey(subject.object) : `${refKey(subject.object)}\u0000${subject.kind}\u0000${subject.name}`
 }
 

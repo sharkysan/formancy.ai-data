@@ -1,6 +1,10 @@
 {
   "kind": "sqlserver",
   "serverVersion": "16.0.4295.3",
+  "account": {
+    "user": "dbo",
+    "login": "sa"
+  },
   "scope": {
     "schemas": [
       "sales"
@@ -28,7 +32,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "identity-always",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "iso_code",
@@ -44,7 +53,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "name",
@@ -60,7 +74,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "flag",
@@ -75,7 +94,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "shape",
@@ -88,7 +112,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         }
       ],
       "primaryKey": {
@@ -106,7 +135,8 @@
         }
       ],
       "foreignKeys": [],
-      "checks": []
+      "checks": [],
+      "rowSecurity": "none"
     },
     {
       "ref": {
@@ -129,7 +159,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "customer_no",
@@ -144,7 +179,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "name",
@@ -160,7 +200,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "country_code",
@@ -176,7 +221,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "credit_limit",
@@ -191,7 +241,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "active",
@@ -204,7 +259,12 @@
           "hasDefault": true,
           "defaultExpression": "((1))",
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "created_at",
@@ -219,7 +279,12 @@
           "hasDefault": true,
           "defaultExpression": "(sysdatetimeoffset())",
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         }
       ],
       "primaryKey": {
@@ -251,7 +316,8 @@
           "validated": true
         }
       ],
-      "checks": []
+      "checks": [],
+      "rowSecurity": "applies"
     },
     {
       "ref": {
@@ -274,7 +340,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "customer_no",
@@ -289,7 +360,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "name",
@@ -305,7 +381,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "order_count",
@@ -320,13 +401,19 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         }
       ],
       "primaryKey": null,
       "uniqueKeys": [],
       "foreignKeys": [],
-      "checks": []
+      "checks": [],
+      "rowSecurity": "none"
     },
     {
       "ref": {
@@ -349,7 +436,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "name",
@@ -365,7 +457,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "manager_id",
@@ -380,7 +477,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         }
       ],
       "primaryKey": {
@@ -411,7 +513,8 @@
           "validated": false
         }
       ],
-      "checks": []
+      "checks": [],
+      "rowSecurity": "none"
     },
     {
       "ref": {
@@ -434,7 +537,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "identity-always",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "tenant_id",
@@ -449,7 +557,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "customer_no",
@@ -464,7 +577,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "order_date",
@@ -477,7 +595,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "status",
@@ -493,7 +616,12 @@
           "hasDefault": true,
           "defaultExpression": "('draft')",
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "amount",
@@ -508,7 +636,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "notes",
@@ -524,7 +657,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "group",
@@ -540,7 +678,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "created_by",
@@ -555,7 +698,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "approved_by",
@@ -570,7 +718,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "row_version",
@@ -583,7 +736,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "rowversion",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         }
       ],
       "primaryKey": {
@@ -661,7 +819,8 @@
           "enforced": true,
           "validated": true
         }
-      ]
+      ],
+      "rowSecurity": "none"
     },
     {
       "ref": {
@@ -684,7 +843,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "line_no",
@@ -699,7 +863,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "quantity",
@@ -714,7 +883,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "unit_price",
@@ -729,7 +903,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "line_total",
@@ -744,7 +923,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "computed",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         }
       ],
       "primaryKey": {
@@ -776,7 +960,8 @@
           "validated": true
         }
       ],
-      "checks": []
+      "checks": [],
+      "rowSecurity": "none"
     },
     {
       "ref": {
@@ -799,7 +984,12 @@
           "hasDefault": true,
           "defaultExpression": "(NEXT VALUE FOR [sales].[shipment_id])",
           "generated": "identity-by-default",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "tenant_id",
@@ -814,7 +1004,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "tracking_no",
@@ -827,7 +1022,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "carrier_code",
@@ -842,7 +1042,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "reference",
@@ -858,7 +1063,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "pickup_time",
@@ -872,7 +1082,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "dispatched_at",
@@ -887,7 +1102,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "weight_kg",
@@ -901,7 +1121,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "temperature_c",
@@ -915,7 +1140,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "manifest_hash",
@@ -930,7 +1160,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         },
         {
           "name": "signature",
@@ -945,7 +1180,12 @@
           "hasDefault": false,
           "defaultExpression": null,
           "generated": "none",
-          "comment": null
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         }
       ],
       "primaryKey": {
@@ -983,9 +1223,10 @@
           "enforced": true,
           "validated": true
         }
-      ]
+      ],
+      "rowSecurity": "none"
     }
   ],
   "gaps": [],
-  "fingerprint": "6e382dbff1af809a849bd9a9e4036ab91177f13137368d27e6caf045ed8590ef"
+  "fingerprint": "bd0d6a8dc0fb21b796024d87f7b055ddf69b5804a82212a38a14614266519b30"
 }
