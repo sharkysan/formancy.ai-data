@@ -5,6 +5,7 @@ import { previewEngine } from './engines.js'
 import { generateExamples } from './examples.js'
 import { AngularPane, ReactPane } from './panes.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
+import { ANGULAR_ARRIVES } from './test-timing.js'
 
 /**
  * One preview pane at a time, around the renderer rather than through it.
@@ -38,7 +39,7 @@ describe('a preview pane', () => {
     }
     render(<AngularPane tableId="t" table="sales.order" engine={broken} sources={{}} />)
 
-    const alert = await screen.findByRole('alert', {}, { timeout: 10_000 })
+    const alert = await screen.findByRole('alert', {}, ANGULAR_ARRIVES)
     expect(alert.textContent).toBe('The Angular renderer did not start: the document could not be read')
     expect(document.querySelector('formancy-data-angular-preview')).toBeNull()
   })
@@ -71,7 +72,7 @@ describe('a preview pane', () => {
     const { unmount } = render(<AngularPane tableId="t" table="sales.order" engine={watched} sources={{}} />)
     unmount()
 
-    await waitFor(() => expect(peak, 'Angular never started, so this checked nothing').toBeGreaterThan(0), { timeout: 10_000 })
+    await waitFor(() => expect(peak, 'Angular never started, so this checked nothing').toBeGreaterThan(0), ANGULAR_ARRIVES)
     await waitFor(() => expect(live).toBe(0))
   })
 
