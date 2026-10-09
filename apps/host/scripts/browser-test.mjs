@@ -38,6 +38,7 @@ import { tmpdir } from 'node:os'
 import { dirname, extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
+import { EMPTY_PRESENTATION } from '@formancy/data-core'
 import { startPostgresFixture } from '@formancy/data-fixtures'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, DRIVER_FACTORIES } from '@formancy/data-server'
 import postgres from 'postgres'
@@ -54,8 +55,9 @@ const WITHIN = { timeout: 20_000 }
 
 /**
  * The real server over the fixture on PostgreSQL, with the order form
- * published as the suites publish it: the customer lookup as a typeahead,
- * the version column confirmed, clerks of tenant 1 allowed everything. The
+ * published as the suites publish it: as the generator made it, the version
+ * column confirmed, clerks of tenant 1 allowed everything. The page draws
+ * the customer lookup as a typeahead itself (src/widgets.ts). The
  * identity verifier takes two literal tokens, as the studio's gate does.
  */
 async function startPlane() {
@@ -87,7 +89,10 @@ async function startPlane() {
     lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
     versionColumn: 'row_version',
   })
-  const form = { ...proposal.form, model: { ...proposal.form.model, fields: proposal.form.model.fields.map((field) => (field.key === 'customer' ? { ...field, widget: 'typeahead' } : field)) } }
+  // Published as the generator made it (0030 refuses anything but
+  // presentation over the generated base); the page draws its lookups as
+  // typeaheads itself.
+  const form = proposal.form
   const policy = {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
@@ -95,7 +100,7 @@ async function startPlane() {
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
     lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
   }
-  await call(TOKENS.admin, `/v1/forms/${FORM}/versions`, { expectedBase: null, bundle: { format: 1, connection: 'pg', form, bindings: proposal.bindings, policy, snapshot: proposal.snapshot } })
+  await call(TOKENS.admin, `/v1/forms/${FORM}/versions`, { expectedBase: null, bundle: { format: 2, connection: 'pg', generation: proposal.generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings: proposal.bindings, policy, snapshot: proposal.snapshot } })
   const source = form.model.fields.find((field) => field.key === 'customer').optionsSource
   const sql = postgres(fixture.admin, { onnotice: () => {} })
   return {

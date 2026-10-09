@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { FieldBinding, FormPolicy } from '@formancy/data-core'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, createIdentityVerifier, DRIVER_FACTORIES } from '@formancy/data-server'
 import type { ConnectionConfig } from '@formancy/data-server'
@@ -111,7 +112,7 @@ export async function startPlane(): Promise<Plane> {
   }
   for (const { connection, versionColumn } of ENGINES) {
     const formId = `${connection}-order`
-    const { form, bindings, snapshot } = await admin('/v1/form-proposals', {
+    const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
       connection,
       root: { schema: 'sales', name: 'order' },
       formId,
@@ -120,7 +121,7 @@ export async function startPlane(): Promise<Plane> {
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     const policy = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
-    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 1, connection, form, bindings, policy, snapshot } })
+    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
   }
 
   const sent: Sent[] = []

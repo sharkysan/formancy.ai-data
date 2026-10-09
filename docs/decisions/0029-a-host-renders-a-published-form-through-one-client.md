@@ -266,10 +266,14 @@ every run.
   the client.
 - **The sentences are the server's, in English.** A host that shows another
   language maps codes itself; the codes stay on the refusal for that.
-- **The typeahead is the test bundles' choice.** The suites publish the order
-  form with `widget: 'typeahead'` on its customer, a presentation property;
-  the generator still emits a plain select, and whether a lookup should
-  default to a typeahead is a decision not taken here.
+- **The typeahead is the host page's choice.** The generator emits a plain
+  select, and since 0030 the server publishes only the generated form with
+  presentation applied, which a widget is not. So the host page draws every
+  lookup that names no control of its own as a typeahead on its own copy of
+  the form (`apps/host/src/widgets.ts`, held by `widgets.test.ts` and the
+  journey suite, which fails without it). Every other host makes that choice
+  for itself; whether the generator should emit a typeahead for a lookup, or
+  presentation should carry a widget, is a decision not taken here.
 - **Same origin is required**, by the client's default and by the server.
 - **The verify job starts two more pairs of containers**, the client's and
   the host's suites each starting PostgreSQL and SQL Server. Measured on

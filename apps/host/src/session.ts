@@ -2,6 +2,7 @@ import { createFormEngine } from '@formancy/core'
 import type { FormEngine } from '@formancy/core'
 import { fieldProblems, lookupSources } from '@formancy/data-client'
 import type { DataClient, FormRecord, LookupOperation, Outcome, PublishedForm } from '@formancy/data-client'
+import { drawLookupsAsTypeaheads } from './widgets.js'
 
 /*
  * One pane's session: the engine that holds a person's answers, the record
@@ -103,6 +104,8 @@ function said(outcome: Outcome<FormRecord>, created: boolean): string {
 }
 
 export function createSession({ client, formId, definition, renderer }: SessionOptions) {
+  // The host's copy of the form: the published one, with its lookups drawn as typeaheads.
+  const form = drawLookupsAsTypeaheads(definition.form)
   const allows = (operation: LookupOperation): boolean => definition.operations.includes(operation)
   const operationFor = (record: string | undefined): LookupOperation =>
     record !== undefined ? (allows('update') ? 'update' : 'read') : allows('create') ? 'create' : 'read'
@@ -115,14 +118,14 @@ export function createSession({ client, formId, definition, renderer }: SessionO
   let saving: { promise: Promise<SaveResult | null>; generation: number } | undefined
 
   /** Read through a getter, so moving from create to update needs no new map -- in Angular, no new application. */
-  const sources = lookupSources(client, formId, definition.form, () => state.operation)
+  const sources = lookupSources(client, formId, form, () => state.operation)
 
   function open(record?: FormRecord): FormEngine {
     const engine = createFormEngine({
-      schema: definition.form,
+      schema: form,
       // One id namespace per renderer: two renderers of one document on one
       // page would otherwise mint every element id twice (formancy.ai 0095).
-      formId: `${definition.form.id}-${renderer}`,
+      formId: `${form.id}-${renderer}`,
       ...(record === undefined ? {} : { initialValue: record.answers }),
       capabilities: CAPABILITIES,
     })

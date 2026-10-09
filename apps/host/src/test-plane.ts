@@ -3,10 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient } from '@formancy/data-client'
+import { EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { FieldBinding, FormPolicy } from '@formancy/data-core'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, DRIVER_FACTORIES } from '@formancy/data-server'
 import type { ConnectionConfig, ConnectionRegistry, IdentityVerifier } from '@formancy/data-server'
-import type { FormSchema } from '@formancy/spec'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import { inject } from 'vitest'
@@ -88,15 +88,6 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   }
 }
 
-/**
- * The generated form with its customer drawn as a typeahead: a presentation
- * property an administrator sets and the generator does not (0029). The
- * generator's plain select lists the first page and nothing more; the client
- * suite covers that path.
- */
-function withTypeahead(form: FormSchema): FormSchema {
-  return { ...form, model: { ...form.model, fields: form.model.fields.map((field) => (field.key === 'customer' ? { ...field, widget: 'typeahead' } : field)) } }
-}
 
 /**
  * `app.inject` as a `fetch`, recording what was asked into `sent` when given a
@@ -192,7 +183,7 @@ export async function startPlane(): Promise<Plane> {
     return reply.json<Record<string, unknown>>()
   }
   for (const { connection, formId, versionColumn } of ENGINES) {
-    const { form, bindings, snapshot } = await admin('/v1/form-proposals', {
+    const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
       connection,
       root: { schema: 'sales', name: 'order' },
       formId,
@@ -201,7 +192,7 @@ export async function startPlane(): Promise<Plane> {
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     const policy = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
-    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 1, connection, form: withTypeahead(form as FormSchema), bindings, policy, snapshot } })
+    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
   }
 
   const pgAdmin = postgres({ host: pg.host, port: pg.port, database: pg.database, username: pg.user, password: pg.password, onnotice: () => {} })
