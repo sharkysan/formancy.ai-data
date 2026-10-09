@@ -1,0 +1,39 @@
+/* ------------------------------------------------------- narrow screens */
+
+@media (max-width: 64rem) {
+  .panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 40rem) {
+  .page {
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  main:where(:not(.sheet *)) {
+    gap: 0.5rem;
+  }
+
+  .masthead,
+  .card {
+    padding: 1rem;
+  }
+
+  .pane {
+    padding: 0.75rem;
+  }
+
+  .record-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .record-form .actions {
+    margin-top: 0;
+  }
+
+  .sheet {
+    padding: 0.875rem;
+  }
+}

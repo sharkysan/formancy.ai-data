@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    // The browser's globals, and only those the package uses: fetch, Response
+    // and AbortSignal. No @types/node, so a `node:` import in src is a compile
+    // error rather than a review finding -- the client runs in a host's page.
+    // The published declarations name only what Node's own types declare too,
+    // which the install gate checks with lib ES2023 and @types/node.
+    "lib": ["ES2023", "DOM"],
+    "types": []
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts", "src/test-*.ts"]
+}

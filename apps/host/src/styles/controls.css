@@ -1,0 +1,75 @@
+/* ------------------------------------------------------------- controls */
+
+button:where(:not(.sheet *)) {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* What a person acts on next to the main action: an outline, violet on hover. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--edge-strong);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 4%);
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.button:hover {
+  border-color: var(--client);
+}
+
+/* The action a part of the page is for: violet, the colour of what a person
+   acts on. Solid rather than the site's gradient, so its contrast can be
+   measured. */
+.primary {
+  min-height: 2.5rem;
+  padding: 0 1.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--client);
+  color: #06050d;
+  font-weight: 600;
+  box-shadow: 0 8px 26px -12px rgb(139 123 255 / 80%);
+}
+
+input:where(:not(.sheet *)) {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--edge-strong);
+  border-radius: 10px;
+  background: rgb(5 7 14 / 60%);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9375rem;
+}
+
+input:where(:not(.sheet *)):focus-visible {
+  outline: none;
+  border-color: var(--client);
+  box-shadow: 0 0 0 4px rgb(139 123 255 / 22%);
+}
+
+label:where(:not(.sheet *)) {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.field {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  margin: 0.5rem 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}

@@ -26,7 +26,9 @@ operates without any AI dependency.
 > the server regenerates it after a change to the database, carrying that
 > presentation by what each field stands for, and restores an older version
 > when the database still fits it — proved on both engines — and the studio
-> does both from its Drift step.
+> does both from its Drift step. A host renders, loads, saves and searches a
+> published form in both renderers through `@formancy/data-client`, and the
+> host page does so against both engines in its suite.
 > `CHANGELOG.md` says what each step found.
 
 ## Licence, in one table
@@ -54,6 +56,7 @@ project, and why in a repository of its own, is decision
 | `@formancy/data-core` | The database-neutral port and metadata contract: what discovery returns, including what it could not see. No driver, no HTTP, no Node. |
 | `@formancy/data-postgres` | The PostgreSQL adapter, on the `postgres` driver. |
 | `@formancy/data-sqlserver` | The SQL Server adapter, on `mssql` over `tedious` — pure JavaScript, no ODBC. |
+| `@formancy/data-client` | The browser's side of the runtime plane: a `fetch`-based client for a published form's definition, records and lookups, and the option sources both formancy renderers take. Source-available, framework-neutral, no Node. |
 | `@formancy/data-server` | The server: configuration store, host identity, the administrator and runtime planes over HTTP, the audit trail, and the composition root that starts them from configuration. Fastify, like formancy's. |
 | `@formancy/data-fixtures` | Private test support: one business model for both engines, a restricted reader, and the comparator both adapters answer to. Never published. |
 
@@ -82,7 +85,7 @@ size, clean and after a failed submit.
 
 ```bash
 pnpm --filter @formancy/data-examples exec playwright install chromium   # once per machine
-pnpm test:browser                                                        # builds both apps, then measures them
+pnpm test:browser                                                        # builds the apps, then measures them
 ```
 
 The snapshot is captured from a real PostgreSQL container, never written by
@@ -96,8 +99,9 @@ pnpm --filter @formancy/data-examples snapshot
 and commit `apps/examples/src/fixture-snapshot.json` and
 `fixture-customers.json`. The suite compares the committed snapshot with the
 fixture model and fails where they disagree, and refuses a snapshot edited by
-hand. The customer lookup is an in-memory source over the captured customers
-until the server's lookup route exists, and the page says so.
+hand. The customer lookup is an in-memory source over the captured customers,
+because this page has no server, and the page says so; a host gets the list
+from the runtime plane, as the host page below shows.
 
 ## Studio
 
@@ -144,6 +148,37 @@ pnpm --filter @formancy/data-studio snapshot
 ```
 
 and commit the three files under `apps/studio/src/fixtures/`.
+
+## Host example
+
+`apps/host` is a host application's page, private and never published: one
+published form, under `@formancy/react` and `@formancy/angular` side by side,
+loaded, edited, saved and searched through `@formancy/data-client`. It speaks
+only to the server's runtime plane
+([0029](./docs/decisions/0029-a-host-renders-a-published-form-through-one-client.md)).
+
+```bash
+pnpm build
+FORMANCY_DATA_SERVER=http://127.0.0.1:4390 pnpm --filter @formancy/data-host dev   # http://localhost:4393
+```
+
+Open a form with a host token and its id, load a record by its token into both
+panes or start a new one, and save from either. Each pane keeps its own draft
+and version, so loading one record in both, saving in one and then in the other
+is the stale case: the second pane keeps what was typed, says so, and offers to
+load the saved record. A selection the server refuses is said on the field.
+The form stays editable while a save is out: what is typed meanwhile is kept
+and said to be unsaved, a second press sends nothing and says so, and an
+answer that arrives after Load or New is said on the pane's line.
+In a real host the application's own session supplies the token; the page asks
+for one because it has none, holds it in memory only, and forgets it on a
+reload. As with the studio, the page is served from the server's origin: in
+development Vite proxies `/v1`.
+
+Its suites run the real server against PostgreSQL and SQL Server through the
+real drivers, with literal tokens and a `fetch` that goes through
+`app.inject`. `pnpm test:browser` measures the page in Chromium against the
+real server on PostgreSQL, which needs Docker.
 
 ## How it relates to formancy.ai
 

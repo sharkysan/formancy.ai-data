@@ -1,0 +1,78 @@
+/* ------------------------------------------------------------- the panes */
+
+/* React and Angular side by side where there is room for both, stacked on a
+   narrow screen. `minmax(0, …)`, so nothing on the paper -- a long token in
+   the customer box -- can make the page scroll sideways. */
+.panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.pane {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.pane-heading {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* What the server did with a save: teal. Empty, it takes no room. */
+.saved {
+  margin: 0;
+  color: var(--server);
+  font-size: 0.875rem;
+}
+
+.saved:empty {
+  margin-block: -0.375rem;
+}
+
+/* A save the server refused: the warm colour of something to look at. The
+   words say what happened; the colour only repeats it. */
+.notice {
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  font-size: 0.875rem;
+}
+
+.notice-heading {
+  margin: 0 0 0.25rem;
+  color: var(--warn);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.notice-text {
+  margin: 0.25rem 0;
+}
+
+.notice .button {
+  margin-top: 0.5rem;
+}
+
+/* The form: white paper on the bench, as the examples page and the studio's
+   preview have it. Only the paper itself is the host's; what is on it is the
+   renderer's markup, dressed by the Blueprint theme alone. */
+.sheet {
+  min-width: 0;
+  margin: 0;
+  padding: 1.25rem;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 12%),
+    0 30px 80px -30px rgb(139 123 255 / 45%);
+  color-scheme: light;
+}

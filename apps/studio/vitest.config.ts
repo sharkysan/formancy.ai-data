@@ -21,6 +21,7 @@ export default mergeConfig(
       },
       include: ['src/**/*.test.{ts,tsx}'],
       environment: 'jsdom',
+      setupFiles: ['src/test-setup.ts'],
       // Each journey test runs the real data server and every step of the
       // studio against it, with axe over each step. Measured on 2026-10-09:
       // on a Windows 11 workstation, under coverage, the longest -- the

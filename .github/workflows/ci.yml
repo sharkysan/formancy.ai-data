@@ -85,13 +85,21 @@ jobs:
       # not a gate is a comment.
       - run: pnpm test:repo
 
-  # What jsdom cannot see on the examples page and in the studio, measured in
-  # Chromium: no sideways scroll down to 320px, the keyboard path through the
-  # skip link, colour contrast and target size -- on the examples clean and
-  # after a failed submit (0021), in the studio at every step of the journey
-  # against the real server, with the preview's paper kept free of the
-  # studio's rules (0024). jsdom applies no CSS and performs no layout, so
-  # every one of those was a hand check until this job.
+  # What jsdom cannot see on the examples page, in the studio and on the host
+  # page, measured in Chromium: no sideways scroll down to 320px, the keyboard
+  # path through the skip link, colour contrast and target size -- on the
+  # examples clean and after a failed submit (0021), in the studio at every
+  # step of the journey against the real server, with the preview's paper kept
+  # free of the studio's rules (0024), and on the host page at every state of a
+  # load, a save, a stale save and a refused selection, with the focus where
+  # each leaves it and both papers free of the host's rules (0029). jsdom
+  # applies no CSS and performs no layout, so every one of those was a hand
+  # check until this job.
+  #
+  # The host page's gate starts PostgreSQL through testcontainers on the
+  # runner's Docker, which ubuntu-latest has: what the page shows after a save
+  # is the database's answer, and there is no mocked driver (0003). PostgreSQL
+  # only -- layout, focus and colour do not depend on the engine.
   #
   # Its own job, as formancy.ai's is: "browser" says what is wrong, where a red
   # "verify" sends the reader into a twenty-minute log to find out.

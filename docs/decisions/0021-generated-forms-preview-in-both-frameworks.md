@@ -1,6 +1,6 @@
 # 0021 — Generated forms are previewed in both frameworks, generated in the browser from a captured snapshot
 
-- **Status:** accepted
+- **Status:** accepted; its lookup bullet narrowed by [0029](0029-a-host-renders-a-published-form-through-one-client.md)
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `apps/examples/src/previews.test.tsx` — for `sales.order` and

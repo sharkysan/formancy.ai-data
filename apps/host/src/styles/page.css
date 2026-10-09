@@ -1,0 +1,142 @@
+/* ------------------------------------------------- the page around the forms */
+
+.page {
+  display: grid;
+  gap: 1rem;
+  max-width: 100rem;
+  margin-inline: auto;
+  padding: 1rem;
+}
+
+main:where(:not(.sheet *)) {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+/* The skip link's target takes focus only so the next Tab starts there. */
+main:where(:not(.sheet *)):focus {
+  outline: none;
+}
+
+.masthead,
+.card,
+.pane,
+.colophon {
+  min-width: 0;
+  border: 1px solid var(--edge-strong);
+  border-radius: 16px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 5%) inset,
+    0 30px 70px -40px rgb(0 0 0 / 90%);
+}
+
+.masthead {
+  padding: 1.5rem;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1:where(:not(.sheet *)) {
+  margin: 0.25rem 0 0.5rem;
+  font-family: var(--display);
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.lead,
+.lede {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--muted);
+}
+
+.lead code {
+  color: var(--text);
+}
+
+.card {
+  padding: 1.25rem 1.5rem;
+}
+
+.card-heading {
+  margin: 0 0 0.5rem;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.signin {
+  justify-self: center;
+  width: min(100%, 36rem);
+}
+
+.signin .primary {
+  margin-top: 0.25rem;
+}
+
+.hint {
+  margin: 0.25rem 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+/* A field and its two buttons on one line where there is room. */
+.record-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0 0.75rem;
+}
+
+.record-form .actions {
+  margin: 0.5rem 0;
+}
+
+/* What the server said the definition allows: teal, the server's colour. */
+.form-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding-block: 0.75rem;
+}
+
+.form-line p {
+  margin: 0;
+  color: var(--server);
+  font-size: 0.9375rem;
+}
+
+.problem-box {
+  margin: 0.75rem 0 0;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid color-mix(in srgb, var(--invalid) 45%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--invalid) 10%, transparent);
+  color: #ffc2ca;
+  font-size: 0.875rem;
+}
+
+.colophon {
+  padding: 1rem 1.25rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.colophon p {
+  margin: 0.25rem 0;
+}

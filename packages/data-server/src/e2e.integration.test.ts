@@ -120,7 +120,9 @@ afterAll(async () => {
   await app?.close()
   await registry?.close()
   await Promise.all([pg?.stop(), ms?.stop()])
-  await rm(root, { recursive: true, force: true })
+  // Unset when a fixture failed to start: the cause is that failure, and an
+  // rm of undefined here would report a second, misleading one.
+  if (root !== undefined) await rm(root, { recursive: true, force: true })
 })
 
 const call = (method: 'GET' | 'POST', url: string, bearer: string, payload?: unknown) =>

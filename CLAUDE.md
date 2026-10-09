@@ -122,9 +122,12 @@ under both renderers
 ([0021](docs/decisions/0021-generated-forms-preview-in-both-frameworks.md));
 the second is `apps/studio`, the administrator's application over the
 server's administrator plane
-([0024](docs/decisions/0024-the-studio-speaks-only-the-admin-plane.md)). Both,
-and the landing page when it arrives, are formancy.ai's concept applied, not a
-new one:
+([0024](docs/decisions/0024-the-studio-speaks-only-the-admin-plane.md)); the
+third is `apps/host`, a host application's page over the runtime plane, one
+published form under both renderers
+([0029](docs/decisions/0029-a-host-renders-a-published-form-through-one-client.md)).
+All three, and the landing page when it arrives, are formancy.ai's concept
+applied, not a new one:
 
 - **The same room.** The admin, the playground and the site upstream share one
   look: a dark bench, glass panels, violet for what the person acts on and teal
@@ -139,6 +142,8 @@ new one:
 - **Form previews on white paper, in Blueprint.** An administrator previews
   what the people filling in the form will see, not the admin. A generated form
   renders through `@formancy/react` or `@formancy/angular` with a shipped theme.
+  The host page draws the published form the same way: the bench around it is
+  the room, the paper is the theme's.
 - **Renderers ship no CSS; themes target `data-formancy-part`.** Nothing this
   repository adds to a form carries styling. A control, if one is ever needed,
   is operable without a theme (formancy.ai 0101) and is dressed by all four
@@ -175,22 +180,34 @@ the same promises:
   that base with presentation alone applied, so a client other than the
   studio cannot publish a binding change as a layout edit
   ([0030](docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
-- **The browser gates**, `apps/examples/scripts/browser-test.mjs` and
-  `apps/studio/scripts/browser-test.mjs`, run as `pnpm test:browser` in their
+- **The host page's suites**, `apps/host/src/*.test.tsx`, against the real
+  server on both engines behind a fake `fetch`: every request is one of the
+  runtime plane's routes and carries the token in its header only
+  (`plane.test.tsx`); axe and a name on every control in every state a person
+  reaches (`page.test.tsx`); and what a save says when the server has not
+  answered yet — typing kept, a second press that sends nothing, every
+  answer heard (`in-flight.test.tsx`).
+- **The browser gates**, `apps/examples/scripts/browser-test.mjs`,
+  `apps/studio/scripts/browser-test.mjs` and
+  `apps/host/scripts/browser-test.mjs`, run as `pnpm test:browser` in their
   own CI job, for what jsdom cannot see: in Chromium, no sideways scroll and
   nothing past either edge down to 320 pixels, the first Tab on the skip link
   and the next into the content, and axe's colour-contrast and target-size
-  rules — for the examples clean and after a failed submit, for the studio at
-  every step of the journey against the real server on its own origin, where
-  it also fails when any rule of the studio's stylesheet selects an element on
-  the preview's paper.
+  rules — for the examples clean and after a failed submit, for the studio and
+  the host page at every step of the journey against the real server on their
+  own origin, where each also fails when any rule of its stylesheet selects an
+  element on the paper. The host's gate also fails when Enter on the skip link
+  leaves the keyboard anywhere but on `<main>`.
+- **The palette guard**, `scripts/palette.test.mjs` in `pnpm test:repo`:
+  every stylesheet that copies `admin.css`'s variables says the same value for
+  each.
 
 What nothing holds yet, said: the palette is copied from `admin.css` by hand,
-into `app.css` and the studio's `styles/room.css`, and nothing fails when
-upstream's moves; that the examples' `app.css` never reaches into a preview's
-paper is held by review; and the
-one-shell bullet has nothing to hold until the `formancy.ai/data` page
-exists.
+into `app.css`, the studio's `styles/room.css` and the host's
+`styles/room.css`, and the palette guard holds them to each other but nothing
+fails when upstream's moves; that the examples' `app.css` never reaches into a
+preview's paper is held by review; and the one-shell bullet has nothing to
+hold until the `formancy.ai/data` page exists.
 
 ## Branch names
 

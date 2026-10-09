@@ -1,0 +1,31 @@
+/*
+ * The host page's chrome: formancy.ai's admin, applied, as the studio and the
+ * examples page apply it -- not a palette of its own.
+ *
+ * The same room as formancy.ai's admin, playground and site: a dark bench,
+ * glass panels, violet for what a person acts on and teal for what the server
+ * did. The variables in styles/room.css are copied from formancy.ai's
+ * apps/admin/src/admin.css, unchanged, a third time: an application's
+ * stylesheet is not a package this repository could depend on.
+ * scripts/palette.test.mjs fails when the three copies here disagree; when the
+ * admin's palette moves upstream, they move with it, by hand.
+ *
+ * The forms are not the host's: they are what the host's people fill in, so
+ * they are white paper in the Blueprint theme from @formancy/themes, and the
+ * renderers ship no CSS. Every rule here that names an element rather than a
+ * class of the page's own ends in `:where(:not(.sheet *))`: off the paper,
+ * and, being `:where`, no heavier than it was. The browser gate fails when
+ * any rule of these files selects an element on either paper.
+ */
+
+/*
+ * In cascade order, one file per reason to change: the room, the controls,
+ * the page around the forms, the panes, and narrow screens last so their
+ * rules win. Vite inlines each import into one stylesheet; the browser gate
+ * inlines them the same way before it parses.
+ */
+@import './styles/room.css';
+@import './styles/controls.css';
+@import './styles/page.css';
+@import './styles/panes.css';
+@import './styles/narrow.css';

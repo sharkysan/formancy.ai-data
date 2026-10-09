@@ -120,14 +120,15 @@ describe('the generator says what it chose, beside each form', () => {
     },
   )
 
-  // The customer list is not the server's yet, and a page that did not say so
-  // would be demonstrating a lookup that does not exist.
-  test('says the customer list is in memory until the server has a lookup route', async () => {
+  // The customer list on this page is not the server's, because this page has
+  // no server; a page that did not say so would pass its captured rows off as
+  // a lookup. The note says where a host gets the list instead (0029).
+  test('says the customer list is in memory because there is no server, and where a host gets it', async () => {
     await mounted()
     const order = EXAMPLES.find((subject) => subject.request.root.name === 'order')
     if (order === undefined) throw new Error('no order example')
     expect(within(section(order)).getByRole('note').textContent).toMatch(
-      /in memory.*until the server.s lookup route exists/i,
+      /held in memory, because this page has no server.*runtime plane through @formancy\/data-client, as apps\/host shows/i,
     )
   })
 

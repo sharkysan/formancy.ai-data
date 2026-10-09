@@ -23,8 +23,9 @@ function tableOf(example: Example): string {
 /**
  * Where a lookup's options come from, said beside the form that has one.
  *
- * The source is in memory, and a page that did not say so would be
- * demonstrating a lookup route that does not exist yet. The row count is
+ * The source is in memory, because this page has no server, and a page that
+ * did not say so would pass its captured rows off as a lookup. A host gets the
+ * list from the runtime plane, which apps/host shows (0029). The row count is
  * counted, not written.
  */
 function LookupNote({
@@ -47,9 +48,10 @@ function LookupNote({
         </>
       ) : (
         <>
-          The <strong>{String(label)}</strong> list is held in memory: {rows.length} {binding.target.table.name} rows
-          captured with the snapshot, each offered under the key token the server will decode. It stays in memory until
-          the server&rsquo;s lookup route exists.
+          The <strong>{String(label)}</strong> list is held in memory, because this page has no server:{' '}
+          {rows.length} {binding.target.table.name} rows captured with the snapshot, each offered under the key token
+          the server decodes. A host gets the list from the server&rsquo;s runtime plane through{' '}
+          <code>@formancy/data-client</code>, as apps/host shows.
         </>
       )}
     </p>

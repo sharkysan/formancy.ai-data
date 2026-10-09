@@ -13,7 +13,7 @@ import {
   toFormAnswers,
   validateLookupQuery,
 } from '@formancy/data-core'
-import type { FieldError, MembershipCheck, ObjectMeta, PolicyContext, PolicyOperation } from '@formancy/data-core'
+import type { FieldError, MembershipCheck, ObjectMeta, PolicyContext, PolicyOperation, PublishedForm, ResolvedLookup } from '@formancy/data-core'
 import { canonicalize } from '@formancy/spec'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
@@ -215,7 +215,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const allowed = (['read', 'create', 'update'] as const).filter((operation) => bundle.bindings.operations[operation as 'create' | 'update'] !== false && authorizeOperation(bundle.policy, actor, operation).ok)
     if (allowed.length === 0) return reply.code(403).send({ code: 'operation-denied', message: 'This form is not available to you.' })
     const readable = readableFields(bundle.policy, actor, bundle.bindings)
-    return { form: bundle.form, operations: allowed, readable: readable.ok ? readable.fields : [] }
+    return { form: bundle.form, operations: allowed, readable: readable.ok ? readable.fields : [] } satisfies PublishedForm
   })
 
   app.post<{ Params: { id: string } }>('/v1/forms/:id/records/read', async (request, reply) => {
@@ -362,7 +362,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const found = await lookupFor(request, reply, body['operation'])
     if (found === undefined) return reply
     try {
-      return { rows: await found.open.lookups.resolve(found.config, tokens as string[], found.filters) }
+      return { rows: await found.open.lookups.resolve(found.config, tokens as string[], found.filters) } satisfies ResolvedLookup
     } catch (error) {
       reply.log.warn({ error: (error as Error).message }, 'a lookup resolve failed')
       return reply.code(503).send({ code: 'unavailable', message: 'The selected options could not be loaded.' })
