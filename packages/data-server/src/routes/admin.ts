@@ -110,8 +110,9 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
   app.post('/v1/form-proposals', async (request, reply) => {
     const body = request.body
     if (!isRecord(body)) return refuse(reply, 400, 'invalid-request', 'Expected a JSON object.')
-    const { connection: id, root, formId, title, versionColumn } = body
+    const { connection: id, root, formId, title, versionColumn, pinned } = body
     const lookups = lookupChoices(body['lookups'])
+    const pinnedColumns = pinned === undefined ? [] : Array.isArray(pinned) && pinned.every((name) => typeof name === 'string') ? (pinned as string[]) : undefined
     if (
       typeof id !== 'string' ||
       !isRecord(root) ||
@@ -121,9 +122,10 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
       !FORM_ID.test(formId) ||
       typeof title !== 'string' ||
       lookups === undefined ||
+      pinnedColumns === undefined ||
       (versionColumn !== undefined && typeof versionColumn !== 'string')
     ) {
-      return refuse(reply, 400, 'invalid-request', 'Expected connection, root { schema, name }, a lower-case formId, title, and optional lookups and versionColumn.')
+      return refuse(reply, 400, 'invalid-request', 'Expected connection, root { schema, name }, a lower-case formId, title, and optional lookups, versionColumn and pinned columns.')
     }
     const snapshot = await discover(id, reply)
     if (snapshot === undefined) return reply
@@ -134,6 +136,7 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
         formId,
         title,
         lookups,
+        pinned: pinnedColumns,
         ...(typeof versionColumn === 'string' ? { versionColumn } : {}),
       })
       return { ...generated, snapshot }

@@ -275,22 +275,37 @@ describe('planCreate', () => {
     })
   })
 
-  // The generator does not know the policy (plan section 9 keeps them
-  // apart), so a pinned NOT NULL column with no default is a required field
-  // of the generated form. formancy's replay then demands an answer the
-  // planner refuses as over-posting (0011): no submission passes both. The
-  // host has to supply the tenant to formancy's check and leave it out of
-  // what it plans, or a presentation override has to drop `required`. This
-  // records the conflict; nothing here resolves it.
-  test('cannot accept the pinned tenant the generated customer form requires', () => {
+  // The conflict the planner found when it met the generator: a pinned NOT
+  // NULL column with no default was a required field of the generated form,
+  // formancy's replay demanded an answer for it, and the planner refused that
+  // answer as over-posting (0011) — no submission passed both. Told what the
+  // policy pins, the generator makes the field read-only and not required, so
+  // one submission passes formancy's replay AND the planner, and the tenant is
+  // the context's.
+  test('the pinned tenant is read-only in the generated form, so one submission passes both checks', () => {
     const source = customerSource()
-    const { form, bindings } = customerForm(source)
-    expect(engineErrors(form, { customer_no: 7, name: 'X' })).toEqual({ tenant_id: ['required'] })
-    expect(planCreate(source, bindings, CUSTOMER_POLICY, CLERK, { tenant_id: 1, customer_no: 7, name: 'X' })).toMatchObject({ ok: false, code: 'over-posting' })
+    const { form, bindings } = generateForm(source, {
+      connection: 'erp',
+      root: sales('customer'),
+      formId: 'sales-customer',
+      title: 'Customer',
+      lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }],
+      pinned: ['tenant_id'],
+    })
+    expect(engineErrors(form, { customer_no: 7, name: 'X' })).toEqual({})
     expect(planCreate(source, bindings, CUSTOMER_POLICY, CLERK, { customer_no: 7, name: 'X' })).toMatchObject({
       ok: true,
       request: { values: [value('tenant_id', INT32, '1'), value('customer_no', INT32, '7'), value('name', text(200), 'X')] },
     })
+    expect(planCreate(source, bindings, CUSTOMER_POLICY, CLERK, { tenant_id: 1, customer_no: 7, name: 'X' })).toMatchObject({ ok: false, code: 'over-posting' })
+  })
+
+  // Without being told, the generator cannot know, and the old conflict is
+  // still there: kept as a test so the cost of forgetting `pinned` is visible.
+  test('without pinned, the generated customer form still requires the tenant the policy refuses', () => {
+    const source = customerSource()
+    const { form } = customerForm(source)
+    expect(engineErrors(form, { customer_no: 7, name: 'X' })).toEqual({ tenant_id: ['required'] })
   })
 
   // A column that is NOT NULL, has no default and is not generated cannot be

@@ -394,3 +394,30 @@ describe('generateForm', () => {
     ).toThrow(/tenant_id belongs to both fk_order_customer and fk_order_tenant/)
   })
 })
+
+describe('pinned columns', () => {
+  // A column the policy pins comes from trusted context. As a writable,
+  // required field it would demand an answer the policy then refuses as
+  // over-posting, so it is shown and never written — and create still works,
+  // because its value is never one nobody can fill.
+  test('a pinned column is read-only, not required, and does not block create', () => {
+    const { form, bindings, notes } = generateForm(fixtureLike('postgres'), {
+      ...ORDER,
+      root: { schema: 'sales', name: 'employee' },
+      lookups: [],
+      pinned: ['name'],
+    })
+    expect(form.model.fields.find((field) => field.key === 'name')).not.toHaveProperty('required')
+    expect(bindings.fields.find((binding) => binding.field === 'name')).toMatchObject({ writable: false })
+    expect(form.logic?.rules).toContainEqual({ target: 'name', kind: 'disabled', cel: 'true' })
+    expect(notes).toContainEqual(expect.objectContaining({ subject: 'name', kind: 'read-only', message: expect.stringMatching(/Pinned by the policy/) }))
+    expect(bindings.operations.create).toBe(true)
+  })
+
+  // A pin on a column the table does not have is a policy written for another
+  // table; generating anyway would silently pin nothing.
+  test('refuses to pin a column the root does not have, and a pinned column as the version column', () => {
+    expect(() => generateForm(fixtureLike('postgres'), { ...ORDER, pinned: ['nope'] })).toThrow(/has no column nope to pin/)
+    expect(() => generateForm(fixtureLike('postgres'), { ...ORDER, pinned: ['row_version'], versionColumn: 'row_version' })).toThrow(/cannot be a version column/)
+  })
+})
