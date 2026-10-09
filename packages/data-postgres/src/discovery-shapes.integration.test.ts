@@ -286,11 +286,16 @@ describe('objects', () => {
 
   // A foreign table's rows live on another server, through a wrapper this
   // release has never tested. Leaving it out silently would read as "there
-  // is no such table"; so it is a gap.
+  // is no such table"; so it is a gap, and since 0027 the gap names it as its
+  // subject -- the only gap a PostgreSQL snapshot can carry.
   test('a foreign table is a gap, not an object', () => {
     expect(findObject(snapshot, { schema: 'shapes', name: 'remote' })).toBeUndefined()
     expect(snapshot.gaps).toEqual([
-      { object: { schema: 'shapes', name: 'remote' }, aspect: 'objects', detail: expect.stringMatching(/foreign table/) as unknown },
+      {
+        subject: { kind: 'object', object: { schema: 'shapes', name: 'remote' } },
+        aspect: 'objects',
+        detail: expect.stringMatching(/foreign table/) as unknown,
+      },
     ])
   })
 

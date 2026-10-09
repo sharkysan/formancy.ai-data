@@ -58,6 +58,8 @@ async function startPlane() {
     ['fixture', snapshot('postgres-owner.json')],
     ['fixture-reader', snapshot('postgres-reader.json')],
     ['fixture-sqlserver', snapshot('sqlserver-owner.json')],
+    ['fixture-sqlserver-reader', snapshot('sqlserver-reader.json')],
+    ['fixture-writer', snapshot('postgres-writer.json')],
   ])
   const registry = {
     ids: () => [...databases.keys()].sort(),
@@ -243,8 +245,14 @@ function journey(plane, check) {
   return [
     ['Connect, a restricted connection discovered', async (page) => {
       await page.getByRole('button', { name: 'Test fixture', exact: true }).click()
-      await page.getByRole('button', { name: 'Discover fixture-reader' }).click()
-      await page.getByRole('region', { name: 'What fixture-reader can see' }).getByText('sales.order', { exact: true }).click()
+      // The SQL Server reader: since 0027 the one whose catalog hides what it may not use behind gaps.
+      await page.getByRole('button', { name: 'Discover fixture-sqlserver-reader' }).click()
+      // Inside the list of objects: the gaps above it name sales.order too.
+      await page
+        .getByRole('region', { name: 'What fixture-sqlserver-reader can see' })
+        .getByRole('list', { name: 'Tables and views' })
+        .getByText('sales.order', { exact: true })
+        .click()
     }],
     ['Choose, the order with a lookup, a pin and a version column', async (page) => {
       await page.getByRole('button', { name: 'Discover fixture', exact: true }).click()

@@ -8,10 +8,12 @@ import {
   choiceFor,
   choiceProblems,
   describeRef,
+  displayBlocker,
   gapsAbout,
   lookupBlocker,
   pinCandidates,
   proposalFor,
+  rootBlocker,
   rowversionOf,
   suggestedDisplay,
   versionCandidates,
@@ -50,7 +52,7 @@ function LookupChoices({ snapshot, root, choice, onChoice }: { snapshot: Metadat
         </p>
       ) : (
         root.foreignKeys.map((foreignKey) => {
-          const blocker = lookupBlocker(snapshot, foreignKey)
+          const blocker = lookupBlocker(snapshot, root, foreignKey)
           const target = foreignKey.references === null ? undefined : findObject(snapshot, foreignKey.references.table)
           const chosen = choice.lookups.find((lookup) => lookup.foreignKey === foreignKey.name)
           const id = `lookup-${foreignKey.name}`
@@ -75,17 +77,29 @@ function LookupChoices({ snapshot, root, choice, onChoice }: { snapshot: Metadat
                 <fieldset className="nested">
                   <legend>Columns to show for {foreignKey.name}</legend>
                   <p className="hint">What a person recognises a {target.ref.name} by. The first text column is suggested; confirm or change it.</p>
-                  {target.columns.map((column) => (
-                    <div className="check" key={column.name}>
-                      <input
-                        type="checkbox"
-                        id={`${id}-show-${column.name}`}
-                        checked={chosen.display.includes(column.name)}
-                        onChange={(event) => setDisplay(foreignKey.name, target, column.name, event.target.checked)}
-                      />
-                      <label htmlFor={`${id}-show-${column.name}`}>{column.name}</label>
-                    </div>
-                  ))}
+                  {target.columns.map((column) => {
+                    const cannot = displayBlocker(column)
+                    const box = `${id}-show-${column.name}`
+                    return (
+                      <div className="check" key={column.name}>
+                        <input
+                          type="checkbox"
+                          id={box}
+                          checked={chosen.display.includes(column.name)}
+                          disabled={cannot !== null}
+                          aria-describedby={cannot === null ? undefined : `${box}-about`}
+                          onChange={(event) => setDisplay(foreignKey.name, target, column.name, event.target.checked)}
+                        />
+                        <label htmlFor={box}>{column.name}</label>
+                        {cannot === null ? null : (
+                          <span id={`${box}-about`} className="hint">
+                            {' '}
+                            {cannot}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
                 </fieldset>
               )}
             </div>
@@ -236,11 +250,15 @@ export function ChooseStep({
     if (failure !== null) setProblems([failure.message])
   }
 
-  const option = (object: ObjectMeta) => (
-    <option key={describeRef(object.ref)} value={String(snapshot.objects.indexOf(object))}>
-      {describeRef(object.ref)}
-    </option>
-  )
+  // A root the generator would refuse is listed, so nobody wonders where it went, and cannot be chosen (0027).
+  const option = (object: ObjectMeta) => {
+    const blocker = rootBlocker(object)
+    return (
+      <option key={describeRef(object.ref)} value={String(snapshot.objects.indexOf(object))} disabled={blocker !== null}>
+        {blocker === null ? describeRef(object.ref) : `${describeRef(object.ref)}: ${blocker}`}
+      </option>
+    )
+  }
 
   return (
     <form className="choose" onSubmit={(event) => void submit(event)} noValidate>

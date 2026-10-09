@@ -10,7 +10,7 @@ import type { FormPolicy } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Proposal } from './api.js'
 import { PolicyStep } from './policy.js'
-import { audit, focusedName, generateOrder, goTo, pressEnter, servedDocument, signIn, step, writeOrderPolicy } from './test-studio.js'
+import { audit, discover, focusedName, generateOrder, goTo, pressEnter, servedDocument, signIn, step, writeOrderPolicy } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
@@ -55,6 +55,24 @@ async function orderProposal(): Promise<Proposal> {
 }
 
 describe('the policy editor', () => {
+  // A field the account may INSERT and not UPDATE takes a write grant -- it
+  // is written on create -- and the editor says on which operation, so a
+  // grant is not read as letting a clerk change it later (0027).
+  test('says which operation a field is written on', async () => {
+    const user = await signIn(plane)
+    await discover(user, 'fixture-writer')
+    await user.click(screen.getByRole('button', { name: 'Choose a root' }))
+    const choose = step('Choose')
+    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
+    await user.selectOptions(within(choose).getByLabelText('Version column'), 'row_version')
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    const policy = await goTo(user, 'Policy')
+    const said = within(policy).getAllByText(/^Written on (create|update) only\.$|^Never written by this form\.$/).map((hint) => hint.textContent)
+    expect(said).toContain('Written on create only.')
+    expect(said).toContain('Never written by this form.')
+  })
+
   // A lookup that sets the pinned tenant column must pin the customer's
   // tenant too, or a clerk could choose another tenant's customer and write
   // its tenant into this one. Remove that filter and the editor says exactly

@@ -86,9 +86,19 @@ export function fieldsOver(bindings: FormBindings, columns: readonly string[]): 
   return bindings.fields.filter((binding) => columnsOf(binding).some((name) => columns.includes(name))).map((binding) => binding.field)
 }
 
-/** Whether a writable field gives `column` its value. */
-export function writes(bindings: FormBindings, column: string): boolean {
-  return bindings.fields.some((binding) => binding.writable && columnsOf(binding).includes(column))
+/** Whether a field gives `column` its value on `operation` (0027: a field is written per operation). */
+export function writesOn(bindings: FormBindings, column: string, operation: Operation): boolean {
+  return bindings.fields.some((binding) => binding.writes[operation] && columnsOf(binding).includes(column))
+}
+
+/** The operations on which a field gives `column` its value. */
+export function writtenOn(bindings: FormBindings, column: string): Operation[] {
+  return (['create', 'update'] as const).filter((operation) => writesOn(bindings, column, operation))
+}
+
+/** Whether a field gives `column` its value on any operation. */
+export function writesAny(bindings: FormBindings, column: string): boolean {
+  return writtenOn(bindings, column).length > 0
 }
 
 export function allFields(bindings: FormBindings): string[] {

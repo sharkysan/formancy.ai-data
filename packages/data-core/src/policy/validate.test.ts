@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { FieldBinding, FormBindings } from '../generate/types.js'
+import type { FieldBinding, FieldWrites, FormBindings } from '../generate/types.js'
 import type { FormPolicy } from './types.js'
 import { validatePolicy } from './validate.js'
 
@@ -9,8 +9,10 @@ import { validatePolicy } from './validate.js'
  * form the tenant column travels inside the composite customer lookup; on the
  * customer form it is a plain column field.
  */
-function column(field: string, writable = true): FieldBinding {
-  return { kind: 'column', field, column: field, type: { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }, nullable: true, writable }
+/** `true` writes on both operations, `false` on neither, and an object says which (0027). */
+function column(field: string, writes: boolean | FieldWrites = true): FieldBinding {
+  const both = typeof writes === 'boolean' ? { create: writes, update: writes } : writes
+  return { kind: 'column', field, column: field, type: { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }, nullable: true, writes: both }
 }
 
 function lookup(field: string, columns: string[], table: string, targetColumns: string[]): FieldBinding {
@@ -23,13 +25,13 @@ function lookup(field: string, columns: string[], table: string, targetColumns: 
     display: ['name'],
     source: `erp-sales-${field}`,
     nullable: false,
-    writable: true,
+    writes: { create: true, update: true },
   }
 }
 
 function bindings(name: string, fields: FieldBinding[], identity: string[]): FormBindings {
   return {
-    version: 1,
+    version: 2,
     root: { schema: 'sales', name },
     rootKind: 'table',
     identity,
@@ -131,6 +133,12 @@ describe('validatePolicy', () => {
       draft.fields['id'] = { read: BOTH, write: ['manager'] }
     })
     expect(problems(writesId)).toEqual(['fields.id grants write, and the form never writes id'])
+    // Written on one operation is written (0027): a grant on a field the
+    // account may INSERT and not UPDATE means something on create.
+    const createOnlyAmount = { ...ORDER, fields: ORDER.fields.map((binding) => (binding.field === 'amount' ? column('amount', { create: true, update: false }) : binding)) }
+    expect(problems(ORDER_POLICY, createOnlyAmount)).toEqual([])
+    const neither = { ...ORDER, fields: ORDER.fields.map((binding) => (binding.field === 'amount' ? column('amount', false) : binding)) }
+    expect(problems(ORDER_POLICY, neither)).toEqual(['fields.amount grants write, and the form never writes amount'])
 
     const createOnly = { ...ORDER, operations: { create: true, update: false } }
     expect(problems(ORDER_POLICY, createOnly)).toEqual(['operations.update grants roles, and this form does not offer update'])

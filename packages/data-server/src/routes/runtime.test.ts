@@ -31,17 +31,17 @@ import type { IdentityVerifier } from '../identity.js'
  */
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, ...extra,
+  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
 })
 const ref = (name: string) => ({ schema: 'sales', name })
 
 const SNAPSHOT = createSnapshot({
-  kind: 'sqlserver', serverVersion: '16.0', scope: { schemas: ['sales'] }, gaps: [],
+  kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
   objects: [
     {
       ref: ref('country'), kind: 'table', comment: null,
       columns: [col('id', 1, INT32, { generated: 'identity-always' }), col('iso_code', 2, { kind: 'text', maxLength: 2, lengthUnit: 'utf16-code-units', fixedLength: true }), col('name', 3, { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false })],
-      primaryKey: { name: 'pk_country', columns: ['id'] }, uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }], foreignKeys: [], checks: [],
+      primaryKey: { name: 'pk_country', columns: ['id'] }, uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }], foreignKeys: [], checks: [], rowSecurity: 'none',
     },
     {
       ref: ref('customer'), kind: 'table', comment: null,
@@ -56,6 +56,7 @@ const SNAPSHOT = createSnapshot({
       primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] }, uniqueKeys: [],
       foreignKeys: [{ name: 'fk_customer_country', columns: ['country_code'], references: { table: ref('country'), columns: ['iso_code'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }],
       checks: [],
+      rowSecurity: 'none',
     },
   ],
 })

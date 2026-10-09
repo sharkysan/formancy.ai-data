@@ -62,14 +62,24 @@ export type DriftKind =
   | 'foreign-key-changed'
   /** A check constraint of the root. The form does not translate checks, so the database is their only enforcer. */
   | 'check-changed'
+  /** The account may no longer SELECT, INSERT or UPDATE a column of the root or a lookup's target (0027). A grant, never a deletion. */
+  | 'privilege-narrowed'
+  /** The account may now do with a column what it could not when the form was generated. */
+  | 'privilege-widened'
+  /** Whether row security applies to the account on the root or a lookup's target changed. Which rows, nothing says. */
+  | 'row-security-changed'
+  /** The snapshot was taken as another principal: privileges and policies are evaluated for someone else now. */
+  | 'account-changed'
 
 /**
  * What a change is about. An object is two strings and never one dotted
  * string, for the reason `ObjectRef` gives.
  */
 export type DriftSubject =
-  /** A gap about the discovery scope as a whole. */
+  /** A gap about the discovery scope as a whole, or the account the snapshot was taken as. */
   | { kind: 'scope' }
+  /** A gap about one schema: SQL Server's catalog shows the account nothing in it (0027). */
+  | { kind: 'schema'; schema: string }
   | { kind: 'object'; object: ObjectRef }
   | { kind: 'column' | 'key' | 'foreign-key' | 'check'; object: ObjectRef; name: string }
 

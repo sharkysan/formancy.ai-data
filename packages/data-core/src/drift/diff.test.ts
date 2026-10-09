@@ -57,6 +57,9 @@ describe('diffSnapshots: what is compared, and the root', () => {
     const other = snapshot((objects) => object(objects, 'employee').columns.push(col('email', 'nvarchar(200)', text(200), { nullable: true, ordinal: 3 })))
     expect(() => diffSnapshots(other, other, bindings)).toThrow(/generated from snapshot/)
     expect(() => diffSnapshots(base, snapshot(undefined, { kind: 'postgres' }), bindings)).toThrow(/a sqlserver snapshot cannot be compared with a postgres one/)
+    // A version-1 file cannot say what a field writes on each operation, so
+    // every verdict about writes would be a guess (0027); the remedy is named.
+    expect(() => diffSnapshots(base, base, { ...bindings, version: 1 as 2 })).toThrow(/version 1 were published before 0027.*republish/)
   })
 
   // Bindings edited by hand to name something the base does not have would
@@ -78,7 +81,7 @@ describe('diffSnapshots: what is compared, and the root', () => {
     }
 
     expect(doctored((copy) => (copy.root = { schema: 'sales', name: 'nope' }))).toThrow(/sales\.nope, which the base snapshot does not have/)
-    expect(doctored((copy) => copy.fields.push({ kind: 'column', field: 'ghost', column: 'ghost', type: INT32, nullable: true, writable: true }))).toThrow(/column ghost of sales\.order/)
+    expect(doctored((copy) => copy.fields.push({ kind: 'column', field: 'ghost', column: 'ghost', type: INT32, nullable: true, writes: { create: true, update: true } }))).toThrow(/column ghost of sales\.order/)
     expect(doctored((copy) => (lookup(copy).foreignKey = 'fk_nope'))).toThrow(/foreign key fk_nope of sales\.order/)
     expect(doctored((copy) => (lookup(copy).target.table = { schema: 'sales', name: 'nope' }))).toThrow(/sales\.nope, which the base snapshot does not have/)
     expect(doctored((copy) => (copy.concurrency = { kind: 'rowversion', column: 'nope', confirmed: true }))).toThrow(/column nope of sales\.order/)
@@ -86,7 +89,7 @@ describe('diffSnapshots: what is compared, and the root', () => {
     // The same doctored bindings against an unchanged database: a fingerprint
     // match says the database did not change, not that these bindings fit it.
     const ghost = JSON.parse(JSON.stringify(bindings)) as FormBindings
-    ghost.fields.push({ kind: 'column', field: 'ghost', column: 'ghost', type: INT32, nullable: true, writable: true })
+    ghost.fields.push({ kind: 'column', field: 'ghost', column: 'ghost', type: INT32, nullable: true, writes: { create: true, update: true } })
     expect(() => diffSnapshots(base, base, ghost)).toThrow(/column ghost of sales\.order/)
   })
 
@@ -128,6 +131,17 @@ describe('diffSnapshots: what is compared, and the root', () => {
     expect(kinds(drift(gone, { gaps: [gap(null, 'objects', 'The catalog could not be listed.')] }))).toEqual(['access-narrowed'])
     // A scope-wide gap about checks hides no table.
     expect(kinds(drift(gone, { gaps: [gap(null, 'checks')] }))).toEqual(['root-dropped'])
+  })
+
+  // SQL Server reports a schema it may not describe as a schema gap (0027).
+  // A root missing behind one on its own schema is out of sight, and the
+  // remedy is a grant; behind a gap on another schema it is gone, and calling
+  // it access would send an administrator after a grant that finds nothing.
+  test('a root missing behind a schema gap on its schema is access; behind one on another schema it is gone', () => {
+    const gone = (objects: ObjectMeta[]) => remove(objects, 'order')
+    const own = drift(gone, { gaps: [gap({ kind: 'schema', schema: 'sales' }, 'objects', 'No VIEW DEFINITION on schema sales.')] })
+    expect(only(own)).toMatchObject({ kind: 'access-narrowed', severity: 'blocking', message: expect.stringMatching(/No VIEW DEFINITION on schema sales/) })
+    expect(kinds(drift(gone, { gaps: [gap({ kind: 'schema', schema: 'crm' }, 'objects')] }))).toEqual(['root-dropped'])
   })
 
   // Discovery was told not to look in a schema any more. Calling its tables
@@ -216,6 +230,16 @@ describe('diffSnapshots: access', () => {
 
     // A change that already stops all of it speaks for the gap, which is not said twice.
     expect(kinds(drift((objects) => dropColumn(objects, 'order', 'notes'), { gaps: columns }))).toEqual(['access-narrowed'])
+  })
+
+  // Whether a policy applies could not be established: which rows the form
+  // shows may differ, and neither adapter reports a write done that the
+  // table does not hold (B17), so a person reviews it and nothing stops.
+  test('a row-security gap that appeared is for review, not blocking', () => {
+    const report = drift(undefined, { gaps: [gap(null, 'row-security', 'No VIEW DEFINITION on the database.')] })
+    expect(only(report)).toMatchObject({ kind: 'access-narrowed', severity: 'review', subject: { kind: 'scope' }, message: expect.stringMatching(/row security of anything in scope/) })
+    expect(report.writable).toEqual({ create: true, update: true })
+    expect(only(drift(undefined, { gaps: [gap({ kind: 'schema', schema: 'crm' }, 'row-security')] }))).toMatchObject({ severity: 'review', subject: { kind: 'schema', schema: 'crm' }, affects: ['customer'] })
   })
 
   // A gap that disappeared means the connection sees more than it did when

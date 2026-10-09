@@ -3,10 +3,8 @@ import type { FormBindings } from '../generate/types.js'
 import type { ColumnMeta } from '../metadata.js'
 import { cite, hiding, unseen } from './access.js'
 import { type ColumnChangeKind, classify, sameDefinition } from './compare.js'
-import { type Comparison, describe, type Draft, fieldsOver, list, type Operation, writes } from './context.js'
+import { allFields, type Comparison, describe, type Draft, fieldsOver, list, type Operation, writesOn, writtenOn } from './context.js'
 import type { DriftKind } from './types.js'
-
-const BOTH: readonly Operation[] = ['create', 'update']
 
 /** Controls that hold the same values: a longer text becomes a textarea, and both hold any string. */
 const STRINGS: ReadonlySet<string> = new Set(['text', 'textarea'])
@@ -18,7 +16,7 @@ const CREATE_LOST = 'A create must now give it a value, and no field of this for
  * rule the generator offers create by, applied to the database as it is now.
  */
 function blocksCreate(bindings: FormBindings, column: ColumnMeta): boolean {
-  return !column.nullable && !column.hasDefault && column.generated === 'none' && !writes(bindings, column.name)
+  return !column.nullable && !column.hasDefault && column.generated === 'none' && !writesOn(bindings, column.name, 'create')
 }
 
 /**
@@ -85,14 +83,20 @@ function droppedColumn(comparison: Comparison, was: ColumnMeta): Draft | null {
     return cite(comparison, gaps, { kind: 'access-narrowed', subject, affects: fields, stops, breaksReads: fields.length > 0, otherwise: 'review', message: unseen(`Column ${was.name} of ${describe(root)}`, gaps) })
   }
   if (token) {
+    // A confirmed token is named by every read and by every create's
+    // RETURNING or OUTPUT (0027), so gone, it fails them all; a suggested
+    // one is named by nothing, and update was never offered over it.
+    const named = bindings.concurrency?.confirmed === true
     return {
       kind: 'concurrency-changed',
       subject,
-      affects: [],
+      affects: named ? allFields(bindings) : [],
       stops,
-      breaksReads: false,
+      breaksReads: named,
       otherwise: 'info',
-      message: `${was.name}, the form's concurrency token, is gone, so a stale update could not be detected. Update is blocked until the form is reviewed.`,
+      message: named
+        ? `${was.name}, the form's concurrency token, is gone, and every read and every create names it. The form is blocked until it is reviewed.`
+        : `${was.name}, the form's concurrency token, is gone, so a stale update could not be detected. Update is blocked until the form is reviewed.`,
     }
   }
   return {
@@ -114,10 +118,15 @@ interface Effect {
   consequence: string
 }
 
-/** What one classified column change means for this form. */
+/**
+ * What one classified column change means for this form. A change that makes
+ * a write unsafe stops the operations on which a field writes the column, and
+ * only those (0027): a field written on create only is in no UPDATE.
+ */
 function effectOf(bindings: FormBindings, kind: ColumnChangeKind, is: ColumnMeta): Effect {
   const fields = fieldsOver(bindings, [is.name])
-  const writable = writes(bindings, is.name)
+  const on = writtenOn(bindings, is.name)
+  const writable = on.length > 0
   const unbound = fields.length > 0 ? 'The form only shows it.' : 'No field of this form binds it.'
   const note = (consequence: string): Effect => ({ kind, stops: [], breaksReads: false, otherwise: 'info', consequence })
 
@@ -137,15 +146,15 @@ function effectOf(bindings: FormBindings, kind: ColumnChangeKind, is: ColumnMeta
     case 'column-generation-changed':
       // A by-default identity would take the value, which is worse: a number its sequence later hands out again (0026).
       if (writable && is.generated === 'identity-by-default') {
-        return { kind, stops: BOTH, breaksReads: false, otherwise: 'review', consequence: 'The form writes it, and the database now numbers it when a create leaves it out; a value written by hand would not advance that numbering, so writes are blocked until the form is reviewed.' }
+        return { kind, stops: on, breaksReads: false, otherwise: 'review', consequence: 'The form writes it, and the database now numbers it when a create leaves it out; a value written by hand would not advance that numbering, so writes are blocked until the form is reviewed.' }
       }
       if (writable && is.generated !== 'none') {
-        return { kind, stops: BOTH, breaksReads: false, otherwise: 'review', consequence: 'The form writes it, and the database refuses a value for a column it generates, so writes are blocked until the form is reviewed.' }
+        return { kind, stops: on, breaksReads: false, otherwise: 'review', consequence: 'The form writes it, and the database refuses a value for a column it generates, so writes are blocked until the form is reviewed.' }
       }
       return { ...note(unbound), otherwise: fields.length > 0 ? 'review' : 'info' }
     case 'column-tightened':
       if (writable) {
-        return { kind, stops: BOTH, breaksReads: false, otherwise: 'info', consequence: `The form would accept values the database now refuses, so writes of ${list(fields)} are blocked until its validation is reviewed.` }
+        return { kind, stops: on, breaksReads: false, otherwise: 'info', consequence: `The form would accept values the database now refuses, so writes of ${list(fields)} are blocked until its validation is reviewed.` }
       }
       return note(fields.length > 0 ? 'The form only shows it, and every value it shows still fits.' : unbound)
     case 'column-loosened': {
@@ -154,7 +163,7 @@ function effectOf(bindings: FormBindings, kind: ColumnChangeKind, is: ColumnMeta
       if (writable) {
         return {
           kind: 'column-outgrew-field',
-          stops: BOTH,
+          stops: on,
           breaksReads: false,
           otherwise: 'review',
           consequence: `The published ${control} field cannot hold every value it now can, and a save would write back what the field made of it, so writes of ${list(fields)} are blocked until the form is reviewed.`,

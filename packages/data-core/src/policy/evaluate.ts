@@ -118,10 +118,20 @@ export function readableFields(policy: FormPolicy, context: PolicyContext, bindi
   return { ok: true, fields: fields.map((binding) => binding.field) }
 }
 
-/** Why one submitted key is over-posting, or `null` when the actor may write it. */
-function overPosted(binding: FieldBinding | undefined, entry: ParsedFieldPolicy | undefined, actor: TrustedContext, pinned: ReadonlySet<string>): string | null {
+/**
+ * Why one submitted key is over-posting, or `null` when the actor may write it.
+ * A field is written per operation (0027): one the account may INSERT and not
+ * UPDATE is over-posting on update, however the renderer showed it.
+ */
+function overPosted(
+  binding: FieldBinding | undefined,
+  entry: ParsedFieldPolicy | undefined,
+  actor: TrustedContext,
+  pinned: ReadonlySet<string>,
+  operation: 'create' | 'update',
+): string | null {
   if (binding === undefined) return 'is not a field of this form'
-  if (!binding.writable) return 'is never written by this form'
+  if (!binding.writes[operation]) return `is never written by this form on ${operation}`
   // On create the column is written from the context; on update a new value
   // would move the record into another tenant. Neither is the request's.
   if (binding.kind === 'column' && pinned.has(binding.column)) {
@@ -160,7 +170,7 @@ export function checkSubmittedFields(
   const reasons: string[] = []
   for (const key of [...new Set(submittedKeys)].sort(byCodepoint)) {
     const binding = bindings.fields.find((candidate) => candidate.field === key)
-    const reason = overPosted(binding, parsed.fields.get(key), actor, pinned)
+    const reason = overPosted(binding, parsed.fields.get(key), actor, pinned, operation)
     if (reason !== null) reasons.push(`${key} ${reason}`)
   }
   return reasons.length === 0 ? { ok: true } : refuse('over-posting', reasons.join('; '))

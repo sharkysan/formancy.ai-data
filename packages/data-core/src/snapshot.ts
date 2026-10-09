@@ -1,5 +1,17 @@
 import { schemaHash } from '@formancy/spec'
-import type { ColumnMeta, CoverageGap, Generation, MetadataSnapshot, ObjectMeta, ObjectRef, TextLengthUnit } from './metadata.js'
+import type {
+  ColumnAccess,
+  ColumnMeta,
+  CoverageAspect,
+  CoverageGap,
+  CoverageSubject,
+  Generation,
+  MetadataSnapshot,
+  ObjectMeta,
+  ObjectRef,
+  RowSecurity,
+  TextLengthUnit,
+} from './metadata.js'
 
 /**
  * Codepoint order, deliberately not `localeCompare`.
@@ -13,8 +25,8 @@ function byCodepoint(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0
 }
 
-function refKey(ref: ObjectRef | null): string {
-  return ref === null ? '' : `${ref.schema}\u0000${ref.name}`
+function refKey(ref: ObjectRef): string {
+  return `${ref.schema}\u0000${ref.name}`
 }
 
 function describe(ref: ObjectRef): string {
@@ -38,6 +50,23 @@ const TEXT_LENGTH_UNITS: Readonly<Record<TextLengthUnit, true>> = {
   'code-page-bytes': true,
 }
 
+/** Every `RowSecurity`, listed for the same reason. */
+const ROW_SECURITIES: Readonly<Record<RowSecurity, true>> = { none: true, applies: true, unknown: true }
+
+/** Every `CoverageAspect`, listed for the same reason. */
+const ASPECTS: Readonly<Record<CoverageAspect, true>> = {
+  objects: true,
+  columns: true,
+  keys: true,
+  'foreign-keys': true,
+  checks: true,
+  defaults: true,
+  comments: true,
+  'row-security': true,
+}
+
+const CAPABILITIES: ReadonlyArray<keyof ColumnAccess> = ['select', 'insert', 'update']
+
 const isListed = (record: Readonly<Record<string, true>>, value: unknown): boolean =>
   typeof value === 'string' && Object.hasOwn(record, value)
 
@@ -58,6 +87,71 @@ function assertContractColumn(where: string, column: ColumnMeta): void {
   if (type.kind === 'binary' && typeof (type.fixedLength as unknown) !== 'boolean') {
     throw new Error(`${where}: column ${column.name} is binary with no fixedLength flag`)
   }
+  // 0027: a column without access is an adapter that forgot privileges, or a
+  // snapshot stored before they were read. Either way nobody knows what the
+  // account may do with it, and neither "nothing" nor "everything" is safe.
+  const access = column.access as Partial<Record<keyof ColumnAccess, unknown>> | undefined
+  if (typeof access !== 'object' || access === null) throw new Error(`${where}: column ${column.name} has no access; it was taken before 0027`)
+  for (const capability of CAPABILITIES) {
+    if (typeof access[capability] !== 'boolean') throw new Error(`${where}: column ${column.name} has an access ${capability} that is not a boolean`)
+  }
+}
+
+function subjectKey(subject: CoverageSubject): string {
+  switch (subject.kind) {
+    case 'scope':
+      return '0'
+    case 'schema':
+      return `1${subject.schema}`
+    case 'object':
+      return `2${refKey(subject.object)}`
+  }
+}
+
+/** Whether a subject is one the contract names, with no name left empty. Read back from JSON, so nothing about its shape is assumed. */
+function assertSubject(gap: CoverageGap): void {
+  const subject = gap.subject as unknown
+  if (subject === undefined) throw new Error('a gap has no subject; it was taken before 0027')
+  if (!isListed(ASPECTS, gap.aspect)) throw new Error(`a gap's aspect ${JSON.stringify(gap.aspect)} is not one the contract names`)
+  const shaped = (typeof subject === 'object' && subject !== null ? subject : {}) as Record<string, unknown>
+  if (shaped['kind'] === 'scope') return
+  if (shaped['kind'] === 'schema' && typeof shaped['schema'] === 'string') {
+    if (shaped['schema'] === '') throw new Error('a gap names an empty schema')
+    return
+  }
+  const object = shaped['object'] as Partial<ObjectRef> | undefined
+  if (shaped['kind'] === 'object' && typeof object?.schema === 'string' && object.schema !== '' && typeof object.name === 'string' && object.name !== '') return
+  throw new Error(`a gap's subject is not one the contract names: ${JSON.stringify(subject)}`)
+}
+
+/** Whether a gap is about `ref`: the whole scope, `ref`'s schema, or `ref` itself. */
+export function gapCovers(gap: CoverageGap, ref: ObjectRef): boolean {
+  const subject = gap.subject
+  if (subject.kind === 'scope') return true
+  if (subject.kind === 'schema') return subject.schema === ref.schema
+  return subject.object.schema === ref.schema && subject.object.name === ref.name
+}
+
+/**
+ * Row security is one of three answers, and "cannot tell" comes with the gap
+ * that says why — about the scope, the object's schema or the object — or it
+ * is an adapter that never looked, dressed as one that could not.
+ */
+function assertRowSecurity(object: ObjectMeta, gaps: readonly CoverageGap[]): void {
+  const where = describe(object.ref)
+  if (!isListed(ROW_SECURITIES, object.rowSecurity)) {
+    throw new Error(`${where}: row security ${JSON.stringify(object.rowSecurity)} is not one the contract names`)
+  }
+  if (object.rowSecurity === 'unknown' && !gaps.some((gap) => gap.aspect === 'row-security' && gapCovers(gap, object.ref))) {
+    throw new Error(`${where}: row security is unknown and no row-security gap covers it`)
+  }
+}
+
+function assertAccount(input: Omit<MetadataSnapshot, 'fingerprint'>): void {
+  const account = input.account as Partial<MetadataSnapshot['account']> | undefined
+  if (typeof account !== 'object' || account === null) throw new Error('the snapshot names no account; it was taken before 0027')
+  if (typeof account.user !== 'string' || account.user === '') throw new Error('the account names no user')
+  if (typeof account.login !== 'string' || account.login === '') throw new Error('the account names no login')
 }
 
 /**
@@ -113,10 +207,10 @@ function sortObject(object: ObjectMeta): ObjectMeta {
   }
 }
 
+/** Scope, then schema, then object — each by codepoint — then aspect, then detail. */
 function sortGaps(gaps: readonly CoverageGap[]): CoverageGap[] {
   return [...gaps].sort(
-    (a, b) =>
-      byCodepoint(refKey(a.object), refKey(b.object)) || byCodepoint(a.aspect, b.aspect) || byCodepoint(a.detail, b.detail),
+    (a, b) => byCodepoint(subjectKey(a.subject), subjectKey(b.subject)) || byCodepoint(a.aspect, b.aspect) || byCodepoint(a.detail, b.detail),
   )
 }
 
@@ -131,9 +225,17 @@ function sortGaps(gaps: readonly CoverageGap[]): CoverageGap[] {
  * report disagreed with itself.
  *
  * The fingerprint is `@formancy/spec`'s canonical SHA-256 — the function
- * formancy hashes a form version with — over the kind, the objects and the
- * gaps. Reused rather than rewritten, because canonical JSON is exactly the
- * kind of thing that is subtly different the second time it is written.
+ * formancy hashes a form version with — over the kind, the account's user,
+ * the objects and the gaps. Reused rather than rewritten, because canonical
+ * JSON is exactly the kind of thing that is subtly different the second time
+ * it is written. The login and the server version are carried and not hashed
+ * (0027): a login mapped to the same user is the same principal, and a patch
+ * upgrade is not drift.
+ *
+ * A schema subject is not compared with `scope.schemas`: SQL Server matches
+ * the scope by the database's collation, so `SALES` finds the schema the
+ * catalog spells `sales`, and a gap carries the catalog's spelling as an
+ * `ObjectRef` does.
  */
 export function createSnapshot(input: Omit<MetadataSnapshot, 'fingerprint'>): MetadataSnapshot {
   const seen = new Set<string>()
@@ -143,6 +245,9 @@ export function createSnapshot(input: Omit<MetadataSnapshot, 'fingerprint'>): Me
     seen.add(key)
     assertConsistent(object)
   }
+  for (const gap of input.gaps) assertSubject(gap)
+  for (const object of input.objects) assertRowSecurity(object, input.gaps)
+  assertAccount(input)
 
   const objects = input.objects
     .map(sortObject)
@@ -150,13 +255,16 @@ export function createSnapshot(input: Omit<MetadataSnapshot, 'fingerprint'>): Me
   const gaps = sortGaps(input.gaps)
   const scope = { schemas: [...new Set(input.scope.schemas)].sort(byCodepoint) }
 
+  const account = { user: input.account.user, login: input.account.login }
+
   return {
     kind: input.kind,
     serverVersion: input.serverVersion,
+    account,
     scope,
     objects,
     gaps,
-    fingerprint: schemaHash({ kind: input.kind, objects, gaps }),
+    fingerprint: schemaHash({ kind: input.kind, account: account.user, objects, gaps }),
   }
 }
 

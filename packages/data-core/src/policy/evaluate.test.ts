@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { FieldBinding, FormBindings } from '../generate/types.js'
+import type { FieldBinding, FieldWrites, FormBindings } from '../generate/types.js'
 import { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter } from './evaluate.js'
 import type { FormPolicy, PolicyContext } from './types.js'
 import { validatePolicy } from './validate.js'
@@ -10,8 +10,10 @@ import { validatePolicy } from './validate.js'
  * field: it travels inside the composite customer lookup. On the customer form
  * it is a plain column field, part of the key.
  */
-function column(field: string, writable = true): FieldBinding {
-  return { kind: 'column', field, column: field, type: { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }, nullable: true, writable }
+/** `true` writes on both operations, `false` on neither, and an object says which (0027). */
+function column(field: string, writes: boolean | FieldWrites = true): FieldBinding {
+  const both = typeof writes === 'boolean' ? { create: writes, update: writes } : writes
+  return { kind: 'column', field, column: field, type: { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }, nullable: true, writes: both }
 }
 
 function lookup(field: string, columns: string[], table: string, targetColumns: string[]): FieldBinding {
@@ -24,13 +26,13 @@ function lookup(field: string, columns: string[], table: string, targetColumns: 
     display: ['name'],
     source: `erp-sales-${field}`,
     nullable: false,
-    writable: true,
+    writes: { create: true, update: true },
   }
 }
 
 function bindings(name: string, fields: FieldBinding[], identity: string[]): FormBindings {
   return {
-    version: 1,
+    version: 2,
     root: { schema: 'sales', name },
     rootKind: 'table',
     identity,
@@ -259,8 +261,29 @@ describe('checkSubmittedFields', () => {
       ok: false,
       code: 'over-posting',
       message:
-        'amount is not writable for this actor; created_by is not writable for this actor; discount is not a field of this form; id is never written by this form',
+        'amount is not writable for this actor; created_by is not writable for this actor; discount is not a field of this form; id is never written by this form on create',
     })
+  })
+
+  // A field the account may INSERT and not UPDATE is written on create only
+  // (0027). formancy has no per-operation mode, so the renderer still shows it
+  // enabled on update and submits it: a changed value there is a write the
+  // database would refuse, and is over-posting before it is asked. The
+  // runtime asks this same function, one key and one operation at a time, to
+  // decide which echoes it may drop — so the create-only field answers no on
+  // update and yes on create, and an unchanged echo of it is removed, not refused.
+  test('a field written on create only is over-posting on update, and is not on create', () => {
+    const createOnly = { ...ORDER, fields: ORDER.fields.map((binding) => (binding.field === 'amount' ? column('amount', { create: true, update: false }) : binding)) }
+    expect(checkSubmittedFields(ORDER_POLICY, MANAGER, createOnly, 'update', ['amount', 'order_date'])).toEqual({
+      ok: false,
+      code: 'over-posting',
+      message: 'amount is never written by this form on update',
+    })
+    expect(checkSubmittedFields(ORDER_POLICY, MANAGER, createOnly, 'update', ['order_date'])).toEqual({ ok: true })
+    const clerkAmount = edited(ORDER_POLICY, (draft) => {
+      draft.fields['amount'] = { read: BOTH, write: BOTH }
+    })
+    expect(checkSubmittedFields(clerkAmount, CLERK, createOnly, 'create', ['amount', 'order_date'])).toEqual({ ok: true })
   })
 
   // The tenant column is written from the context on create and is never the

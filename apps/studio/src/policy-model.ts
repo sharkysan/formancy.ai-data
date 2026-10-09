@@ -90,7 +90,9 @@ export function fillFromOperations(policy: FormPolicy, bindings: FormBindings): 
   const fields: FormPolicy['fields'] = {}
   for (const binding of bindings.fields) {
     const pinnedColumn = binding.kind === 'column' && pinned.has(binding.column)
-    fields[binding.field] = { read: [...policy.operations.read], write: binding.writable && !pinnedColumn ? [...writers] : [] }
+    // Written on either operation is written (0027): a create-only field still takes a write grant.
+    const written = binding.writes.create || binding.writes.update
+    fields[binding.field] = { read: [...policy.operations.read], write: written && !pinnedColumn ? [...writers] : [] }
   }
   return { ...policy, fields }
 }

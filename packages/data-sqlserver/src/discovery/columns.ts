@@ -1,10 +1,12 @@
 import type { ColumnMeta, Generation } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
+import type { AccessRow } from './access.js'
+import { ACCESS_COLUMNS, toAccess } from './access.js'
 import type { Found, ObjectGap } from './catalog.js'
 import { byObjectId, groupBy, queryScope } from './catalog.js'
 import { normalizeType } from './types.js'
 
-interface ColumnRow {
+interface ColumnRow extends AccessRow {
   object_id: number
   column_id: number
   name: string
@@ -47,6 +49,9 @@ interface ColumnRow {
  * database's: a column may be declared under any collation, and the fixture's
  * UTF-8 varchar sits in a database whose default is code page 1252. It says
  * what a char or varchar length counts (0026).
+ *
+ * And what the account may do with each column, in the same statement
+ * (access.ts, 0027).
  */
 const SQL = (scoped: string): string => `
   select c.object_id, c.column_id, c.name,
@@ -57,7 +62,8 @@ const SQL = (scoped: string): string => `
     c.is_nullable, c.is_identity, c.is_computed, c.generated_always_type,
     c.default_object_id, object_name(c.default_object_id) as default_name,
     object_definition(c.default_object_id) as default_definition,
-    cast(ep.value as nvarchar(max)) as comment
+    cast(ep.value as nvarchar(max)) as comment,
+    ${ACCESS_COLUMNS}
   from sys.columns c
   left join sys.types t on t.user_type_id = c.user_type_id
   left join sys.types st on st.user_type_id = c.system_type_id
@@ -149,6 +155,7 @@ function toColumn(row: ColumnRow, gaps: ObjectGap[]): ColumnMeta {
     defaultExpression: row.default_definition,
     generated: generation(row),
     comment: row.comment,
+    access: toAccess(row),
   }
 }
 

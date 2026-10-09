@@ -120,6 +120,31 @@ export type TextLengthUnit = 'code-points' | 'utf16-code-units' | 'utf8-bytes' |
  */
 export type Generation = 'none' | 'identity-always' | 'identity-by-default' | 'computed' | 'rowversion'
 
+/**
+ * What the account that took the snapshot may do with one column, as the
+ * database's own privilege check answered at discovery (0027).
+ *
+ * What was true then, not a promise about the next request: a grant revoked
+ * afterwards still fails at runtime as `permission-denied`, and drift review
+ * reports it once a later snapshot sees it.
+ */
+export interface ColumnAccess {
+  /** It may read the column: SELECT on the object or the column; on PostgreSQL also USAGE on its schema. */
+  select: boolean
+  /**
+   * It may name the column in an INSERT. SQL Server grants INSERT on whole
+   * objects only (a column list is refused, 1020), so every column of an
+   * object it may insert into says yes.
+   */
+  insert: boolean
+  /**
+   * It may name the column in an UPDATE's SET. Reading it — in SET's
+   * right-hand side, a WHERE, a RETURNING/OUTPUT — needs `select` as well
+   * (measured on both engines).
+   */
+  update: boolean
+}
+
 export interface ColumnMeta {
   name: string
   /** The catalog's position, used for order only. Gaps are allowed: a dropped column leaves one. */
@@ -137,6 +162,12 @@ export interface ColumnMeta {
   defaultExpression: string | null
   generated: Generation
   comment: string | null
+  /**
+   * Privileges, not generation: an identity column the account may INSERT
+   * into says `insert: true`, and `generated` says the database fills it.
+   * Both are consulted; neither implies the other.
+   */
+  access: ColumnAccess
 }
 
 /** A primary or unique key. Column order is the key's order, which matters for a composite one. */
@@ -165,7 +196,15 @@ export interface ForeignKeyMeta {
   references: ForeignKeyTarget | null
   onUpdate: ReferentialAction
   onDelete: ReferentialAction
-  /** Whether new writes are checked against it. */
+  /**
+   * Whether a write from an ordinary session is checked against it.
+   *
+   * Not every session is ordinary. PostgreSQL skips foreign-key triggers when
+   * `session_replication_role = replica` (the logical-replication apply
+   * worker, `pg_restore --disable-triggers`), and SQL Server skips a NOT FOR
+   * REPLICATION key for replication agents. No catalog says which sessions do
+   * either, and this module never sets them.
+   */
   enforced: boolean
   /** Whether the rows that existed when it was added were checked. PostgreSQL `NOT VALID`; SQL Server `WITH NOCHECK`. */
   validated: boolean
@@ -189,6 +228,26 @@ export interface CheckMeta {
   validated: boolean
 }
 
+/**
+ * Whether the database itself limits which rows of this object the account may
+ * see or write, beyond its grants: PostgreSQL row-level security, SQL Server
+ * security policies (0027).
+ *
+ * - `none`: established that none of the object's own policies applies to
+ *   this account.
+ * - `applies`: some does. Which rows is the policy's; the snapshot does not
+ *   say. PostgreSQL answers for this account (an owner without FORCE, a
+ *   BYPASSRLS role or a superuser get `none`); SQL Server has no exemption, so
+ *   an enabled policy on the object applies to every account, `dbo` included.
+ * - `unknown`: this connection cannot tell; a `row-security` gap covering the
+ *   object says why.
+ *
+ * About the object's own policies only: a view is not followed to its tables,
+ * whose policies SQL Server applies through the view, and PostgreSQL does when
+ * the view is security_invoker.
+ */
+export type RowSecurity = 'none' | 'applies' | 'unknown'
+
 export interface ObjectMeta {
   ref: ObjectRef
   kind: 'table' | 'view'
@@ -198,10 +257,19 @@ export interface ObjectMeta {
   uniqueKeys: KeyMeta[]
   foreignKeys: ForeignKeyMeta[]
   checks: CheckMeta[]
+  rowSecurity: RowSecurity
 }
 
-/** The part of the catalog a gap is about. */
-export type CoverageAspect = 'objects' | 'columns' | 'keys' | 'foreign-keys' | 'checks' | 'defaults' | 'comments'
+/** The part of the catalog a gap is about. `row-security`: whether a policy applies could not be established (0027). */
+export type CoverageAspect = 'objects' | 'columns' | 'keys' | 'foreign-keys' | 'checks' | 'defaults' | 'comments' | 'row-security'
+
+/**
+ * What a gap is about: the whole scope (it cannot be placed), one schema, or
+ * one object. Schema and object names are the catalog's spelling, as
+ * ObjectRef's are — on a case-insensitive SQL Server database that may differ
+ * from how the scope spells the schema, and it is not compared with it.
+ */
+export type CoverageSubject = { kind: 'scope' } | { kind: 'schema'; schema: string } | { kind: 'object'; object: ObjectRef }
 
 /**
  * Something this connection could not establish.
@@ -214,8 +282,8 @@ export type CoverageAspect = 'objects' | 'columns' | 'keys' | 'foreign-keys' | '
  * tell" have to be different answers, so the second one is written down.
  */
 export interface CoverageGap {
-  /** The object the gap is about, or `null` when it is about the scope as a whole. */
-  object: ObjectRef | null
+  /** What the gap is about (0027): before it, `object: null` meant both "the scope" and "a schema". */
+  subject: CoverageSubject
   aspect: CoverageAspect
   /** A sentence for a person: what could not be read, and why if the adapter knows. */
   detail: string
@@ -226,18 +294,37 @@ export interface DiscoveryScope {
   schemas: string[]
 }
 
+/** Whose snapshot this is (0027). */
+export interface DiscoveryAccount {
+  /**
+   * The principal privileges and policies are evaluated for: PostgreSQL
+   * `current_user`, SQL Server `USER_NAME()`. In the fingerprint: the same
+   * connection under another principal reads other rows.
+   */
+  user: string
+  /**
+   * Who connected: PostgreSQL `session_user`, SQL Server `ORIGINAL_LOGIN()`.
+   * For a person reading the report; not in the fingerprint, because a login
+   * mapped to the same user is the same principal.
+   */
+  login: string
+}
+
 export interface MetadataSnapshot {
   kind: DatabaseKind
   /** As `DatabaseAdapter.ping` reports it. Not part of the fingerprint: a patch upgrade is not drift. */
   serverVersion: string
+  account: DiscoveryAccount
   scope: DiscoveryScope
   objects: ObjectMeta[]
   gaps: CoverageGap[]
   /**
-   * A hash of everything a form binding depends on: the kind, the objects and
-   * the gaps. A change in what this connection can SEE changes it too, so a
-   * revoked permission is noticed as a change — and reported by drift review as
-   * an access problem rather than as a dropped table.
+   * A hash of everything a form binding depends on: the kind, the account's
+   * user, the objects — their columns' privileges and row security included —
+   * and the gaps. A change in what this connection can see or do changes it
+   * too, so a revoked permission is noticed as a change — and reported by
+   * drift review as a privilege or access problem rather than as a dropped
+   * table.
    */
   fingerprint: string
 }

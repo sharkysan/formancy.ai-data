@@ -26,6 +26,11 @@
 --                 variable binary; a composite unique key; a check added
 --                 unvalidated and one SQL Server disables
 --   customer_summary  a view
+--
+-- And one row-level security policy, on customer: the writer
+-- (postgres.restricted.sql) sees tenant 1 only. The container's owner is a
+-- superuser, whom row-level security never applies to, so every owner suite
+-- still reads both tenants (0027).
 
 create schema sales;
 
@@ -141,3 +146,10 @@ insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pic
 values (1, 'A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11', 32767, 'Zürich-01', '09:30', '2026-10-08 12:34:56.5', 0.30000000000000004, 0.1, '\x01', '\x01'),
        (1, 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 0, 'B', '17:05', '2026-10-08 12:34:56', null, null, null, null);
 alter table sales.shipment add constraint ck_shipment_carrier check (carrier_code > 0) not valid;
+
+-- Row-level security that binds one account. The container's owner is a
+-- superuser and bypasses it, so every owner suite reads both tenants; the
+-- writer reads tenant 1 only (0027). The policy compares current_user, the
+-- principal a policy sees (B5), and names a role postgres.restricted.sql creates.
+alter table sales.customer enable row level security;
+create policy customer_tenant on sales.customer using (current_user <> 'formancy_writer' or tenant_id = 1);

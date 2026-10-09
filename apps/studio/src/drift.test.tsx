@@ -46,7 +46,7 @@ async function serverReport(): Promise<Drift> {
 function withNewColumn(base: MetadataSnapshot): MetadataSnapshot {
   const { fingerprint: _, ...contents } = structuredClone(base)
   const order = contents.objects.find((object) => object.ref.name === 'order')
-  order?.columns.push({ name: 'discount', ordinal: 99, databaseType: 'integer', type: { kind: 'integer', min: '-2147483648', max: '2147483647' }, nullable: true, hasDefault: false, defaultExpression: null, generated: 'none', comment: null })
+  order?.columns.push({ name: 'discount', ordinal: 99, databaseType: 'integer', type: { kind: 'integer', min: '-2147483648', max: '2147483647' }, nullable: true, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true } })
   return createSnapshot(contents)
 }
 
@@ -56,7 +56,14 @@ function items(container: HTMLElement, name: string): string[] {
 
 /** How the step writes one change, built from the server's report rather than retyped. */
 function written(change: DriftChange, labels: Record<string, string>): string {
-  const subject = change.subject.kind === 'scope' ? 'the discovery scope' : change.subject.kind === 'object' ? `${change.subject.object.schema}.${change.subject.object.name}` : `${change.subject.object.schema}.${change.subject.object.name}, ${change.subject.kind} ${change.subject.name}`
+  const subject =
+    change.subject.kind === 'scope'
+      ? 'the discovery scope'
+      : change.subject.kind === 'schema'
+        ? `schema ${change.subject.schema}`
+        : change.subject.kind === 'object'
+          ? `${change.subject.object.schema}.${change.subject.object.name}`
+          : `${change.subject.object.schema}.${change.subject.object.name}, ${change.subject.kind} ${change.subject.name}`
   const affects = change.affects.length === 0 ? 'Affects no field of this form.' : `Affects ${change.affects.map((key) => `${labels[key] ?? key} (${key})`).join(', ')}.`
   return `${change.severity} ${change.kind} on ${subject}${change.message}${affects}`
 }
@@ -108,18 +115,20 @@ describe('drift', () => {
     expect(within(report).queryByRole('list', { name: 'Blocking' })).toBeNull()
   })
 
-  // The account lost sight of the customers the lookup offers. That is an
-  // access change, never "customer was dropped" (0004).
-  test('shows lost sight of a lookup target as an access change, not a deletion', async () => {
+  // The connection now discovers as the restricted reader, who may not read
+  // the customers the lookup offers. That is another account and a revoked
+  // privilege, never "customer was dropped" (0004, 0027).
+  test('shows another account that may not read a lookup target as privilege and account changes, not a deletion', async () => {
     const user = await signIn(plane)
     const drift = await published(user)
     plane.databases.set('fixture', READER_SNAPSHOT)
     await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
     const report = await within(drift).findByRole('region', { name: 'Version 1 of sales-order, against the database now' })
     const kinds = (await serverReport()).changes.map((change) => change.kind)
-    expect(kinds).toContain('access-narrowed')
+    expect(kinds).toContain('account-changed')
+    expect(kinds).toContain('privilege-narrowed')
     expect(kinds).not.toContain('root-dropped')
-    expect(items(report, 'Blocking').join(' ')).toContain('access-narrowed')
+    expect(items(report, 'Blocking').join(' ')).toContain('privilege-narrowed')
   })
 
   // A form id nobody published is the server's 404, in its words; one that

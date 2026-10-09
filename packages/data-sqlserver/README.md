@@ -37,25 +37,54 @@ approved scope, as a `MetadataSnapshot` built by `@formancy/data-core`'s
 import { discoverSqlServer } from '@formancy/data-sqlserver'
 
 const snapshot = await discoverSqlServer(pool, { schemas: ['sales'] })
-snapshot.objects // tables and views, columns with normalised types, keys, foreign keys, checks
-snapshot.gaps // e.g. "fk_order_customer references a table this account cannot see: …"
+snapshot.objects // tables and views, columns with normalised types and access, keys, foreign keys, checks, row security
+snapshot.account // { user: 'dbo', login: 'sa' }
+snapshot.gaps // e.g. on sales.order: "fk_order_customer references a table this account cannot see: …"
 ```
 
 It reads SQL Server's catalog views, one concern per file under
-`src/discovery/`: objects, columns and their types, keys, foreign keys, checks,
+`src/discovery/`: objects, columns and their types, what the account may do
+with each column, keys, foreign keys, checks, security policies, the account,
 and what the account cannot see. The scope's schema names are bound as
 parameters and matched by the database's own collation. Discovery is not one
 consistent read: a concurrent `ALTER` can tear it, and `createSnapshot` then
-refuses what no catalog could have produced.
+refuses what no catalog could have produced. A column and its privileges are
+read in one statement, so no column lacks an answer; but the privilege check
+looks a column up by name when it runs, so a concurrent rename can answer
+"not granted" for a column that is, until the next snapshot.
 
-**What an account needs.** `VIEW DEFINITION` on each schema in scope, and
-nothing else: no `SELECT`, no data access. With it, discovery sees what the
-owner sees. Without it, SQL Server lists only the objects the account holds a
-permission on and returns `NULL` for every default and check definition, and
-the snapshot says so per object and per schema rather than looking complete.
-A table someone has denied `VIEW DEFINITION` or `CONTROL` on, whether to the
-account or to a role it is in, vanishes even under that grant; the account can
-count those denials, though not place them, and the snapshot says that too.
+**What an account needs.** For a snapshot with no gap, `VIEW DEFINITION` on
+the database, and nothing else: no `SELECT`, no data access
+([0027](../../docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).
+`VIEW DEFINITION` on each schema in scope describes every table and view the
+owner sees, but not every security policy: a policy lives in a schema of its
+own and can filter a table in any other, so row security is then `unknown`
+except where a visible policy applies, and one scope gap says why.
+`VIEW SECURITY DEFINITION` does not help; it lists no policy. Without either
+grant, SQL Server lists only the objects the account holds a permission on and
+returns `NULL` for every default and check definition, and the snapshot says so
+per object and per schema rather than looking complete. A table someone has
+denied `VIEW DEFINITION` or `CONTROL` on, whether to the account or to a role
+it is in, vanishes even under that grant; the account can count those denials,
+though not place them, and the snapshot says that too. Any such deny, on an
+object or on a schema, leaves row security `unknown` even under the database
+grant, because the hidden thing may be a policy. Only a deny the server
+applies counts: one made to `public` binds no sysadmin and no `dbo`, so the
+owner's snapshot stays complete.
+
+**What the snapshot says the account may do.** Every column carries `access`:
+whether the account may `SELECT` it, name it in an `INSERT` and in an
+`UPDATE`, as `HAS_PERMS_BY_NAME` answers for the connected user, through every
+role it is in. SQL Server grants `INSERT` on whole objects only, so every column
+of an object the account may insert into says yes. A column denied `SELECT`
+says so, where before only the first read found out. `rowSecurity` is
+`applies` where an enabled security policy targets the object — SQL Server
+exempts nobody, `dbo` included — `none` where the database grant establishes
+that none does, and `unknown` otherwise. The snapshot names its `account`:
+`USER_NAME()`, which the fingerprint carries, and `ORIGINAL_LOGIN()`, which it
+does not; `sa` and any other sysadmin are `dbo`. Each is what was true at
+discovery: a grant revoked afterwards still fails at runtime as
+`permission-denied`.
 
 **What a column is read as**
 ([0026](../../docs/decisions/0026-name-every-column-fact-the-engines-disagree-on.md)).
@@ -185,7 +214,9 @@ write reads back through `OUTPUT` the columns it returns, the text it checks
 and the key it finds the row by again, and SQL Server asks `SELECT` for
 every column `OUTPUT` names, refusing an INSERT-only grant with 229. A grant
 it lacks is `permission-denied` for a record and a thrown error for a
-lookup. An account denied `VIEW DEFINITION` on a table it writes is refused
+lookup. A row a security policy's block predicate refuses (33504) is
+`permission-denied` too, as PostgreSQL's row-level security refusal is
+there. An account denied `VIEW DEFINITION` on a table it writes is refused
 the write, because whether a trigger decides it cannot be seen.
 
 ## What the spike found about the driver

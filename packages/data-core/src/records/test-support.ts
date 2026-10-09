@@ -1,7 +1,7 @@
 import type { DatabaseKind } from '../adapter.js'
 import { generateForm } from '../generate/generate.js'
 import type { FieldBinding, FormBindings, GeneratedForm } from '../generate/types.js'
-import type { ColumnMeta, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
+import type { ColumnAccess, ColumnMeta, DiscoveryAccount, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { createSnapshot } from '../snapshot.js'
 import type { RecordColumn, RecordValue } from './types.js'
@@ -32,8 +32,18 @@ export const ORDER_TOKEN = `k1:${ORDER_ID}`
 
 export const sales = (name: string): ObjectRef => ({ schema: 'sales', name })
 
+/** Everything an owner may do: the default, so a test narrows only the privilege it is about (0027). */
+export const FULL_ACCESS: ColumnAccess = { select: true, insert: true, update: true }
+
 export function col(name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
-  return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, ...extra }
+  return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { ...FULL_ACCESS }, ...extra }
+}
+
+/** Narrow what the account may do with one column of one table, as a revoked grant would. */
+export function restrict(objects: ObjectMeta[], table: string, column: string, access: Partial<ColumnAccess>): void {
+  const found = objects.find((object) => object.ref.name === table)?.columns.find((candidate) => candidate.name === column)
+  if (found === undefined) throw new Error(`the fixture has no ${table}.${column}`)
+  found.access = { ...found.access, ...access }
 }
 
 export function fk(name: string, columns: string[], target: string, targetColumns: string[]): ForeignKeyMeta {
@@ -41,10 +51,12 @@ export function fk(name: string, columns: string[], target: string, targetColumn
 }
 
 export function table(name: string, columns: ColumnMeta[], extra: Partial<ObjectMeta> = {}): ObjectMeta {
-  return { ref: sales(name), kind: 'table', comment: null, columns, primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], ...extra }
+  return { ref: sales(name), kind: 'table', comment: null, columns, primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none', ...extra }
 }
 
-export function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}): MetadataSnapshot {
+export const OWNER: DiscoveryAccount = { user: 'owner', login: 'owner' }
+
+export function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}, account: DiscoveryAccount = OWNER): MetadataSnapshot {
   const objects: ObjectMeta[] = [
     table('country', [col('id', 1, INT32, { generated: 'identity-always' }), col('iso_code', 2, text(2, true)), col('name', 3, text(100))], {
       primaryKey: { name: 'pk_country', columns: ['id'] },
@@ -94,7 +106,7 @@ export function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => vo
     table('customer_summary', [col('tenant_id', 1, INT32), col('customer_no', 2, INT32), col('order_count', 3, INT64)], { kind: 'view' }),
   ]
   edit(objects)
-  return createSnapshot({ kind, serverVersion: 'x', scope: { schemas: ['sales'] }, objects, gaps: [] })
+  return createSnapshot({ kind, serverVersion: 'x', account, scope: { schemas: ['sales'] }, objects, gaps: [] })
 }
 
 /** The order form: the customer and the creating employee as lookups; on PostgreSQL the version column confirmed, as an administrator would. */

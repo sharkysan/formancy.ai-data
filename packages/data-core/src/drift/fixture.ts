@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import type { DatabaseKind } from '../adapter.js'
 import { generateForm } from '../generate/generate.js'
 import type { GenerationRequest } from '../generate/types.js'
-import type { ColumnMeta, CoverageAspect, CoverageGap, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
+import type { ColumnMeta, CoverageAspect, CoverageGap, CoverageSubject, DiscoveryAccount, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
 import { createSnapshot } from '../snapshot.js'
 import { diffSnapshots } from './diff.js'
 import type { DriftChange, DriftKind, DriftReport } from './types.js'
@@ -31,7 +31,7 @@ export const EMPLOYEE_REF: ObjectRef = { schema: 'sales', name: 'employee' }
 export const SUMMARY_REF: ObjectRef = { schema: 'sales', name: 'customer_summary' }
 
 export function col(name: string, databaseType: string, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
-  return { name, ordinal: 0, databaseType, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, ...extra }
+  return { name, ordinal: 0, databaseType, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra }
 }
 
 export function table(name: string, columns: ColumnMeta[], extra: Partial<ObjectMeta> = {}): ObjectMeta {
@@ -44,6 +44,7 @@ export function table(name: string, columns: ColumnMeta[], extra: Partial<Object
     uniqueKeys: [],
     foreignKeys: [],
     checks: [],
+    rowSecurity: 'none',
     ...extra,
   }
 }
@@ -91,11 +92,14 @@ function model(kind: DatabaseKind): ObjectMeta[] {
   ]
 }
 
+export const OWNER: DiscoveryAccount = { user: 'owner', login: 'owner' }
+
 export interface Options {
   gaps?: CoverageGap[]
   schemas?: string[]
   kind?: DatabaseKind
   serverVersion?: string
+  account?: DiscoveryAccount
 }
 
 export function snapshot(edit: (objects: ObjectMeta[]) => void = () => {}, options: Options = {}): MetadataSnapshot {
@@ -105,6 +109,7 @@ export function snapshot(edit: (objects: ObjectMeta[]) => void = () => {}, optio
   return createSnapshot({
     kind,
     serverVersion: options.serverVersion ?? '16.0.4125',
+    account: options.account ?? OWNER,
     scope: { schemas: options.schemas ?? ['crm', 'sales'] },
     objects,
     gaps: options.gaps ?? [],
@@ -154,8 +159,19 @@ export function retype(objects: ObjectMeta[], tableName: string, name: string, d
   Object.assign(column(objects, tableName, name), { databaseType, type })
 }
 
-export function gap(target: ObjectRef | null, aspect: CoverageAspect, detail = 'Hidden from this account.'): CoverageGap {
-  return { object: target, aspect, detail }
+/**
+ * A gap about `target`: a subject as the contract writes it, or for brevity an
+ * object (an `ObjectRef`) or the whole scope (`null`).
+ */
+export function gap(target: CoverageSubject | ObjectRef | null, aspect: CoverageAspect, detail = 'Hidden from this account.'): CoverageGap {
+  const subject: CoverageSubject = target === null ? { kind: 'scope' } : 'kind' in target ? target : { kind: 'object', object: target }
+  return { subject, aspect, detail }
+}
+
+/** Narrow what the account may do with one column, as a revoked grant would (0027). */
+export function restrict(objects: ObjectMeta[], tableName: string, name: string, access: Partial<ColumnMeta['access']>): void {
+  const found = column(objects, tableName, name)
+  found.access = { ...found.access, ...access }
 }
 
 export const ORDER: GenerationRequest = {

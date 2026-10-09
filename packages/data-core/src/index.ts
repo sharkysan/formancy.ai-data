@@ -1,11 +1,14 @@
 export { DATABASE_KINDS, isDatabaseKind } from './adapter.js'
 export type { DatabaseAdapter, DatabaseKind, ServerIdentity } from './adapter.js'
-export { createSnapshot, findObject, isComplete } from './snapshot.js'
+export { createSnapshot, findObject, gapCovers, isComplete } from './snapshot.js'
 export type {
   CheckMeta,
+  ColumnAccess,
   ColumnMeta,
   CoverageAspect,
   CoverageGap,
+  CoverageSubject,
+  DiscoveryAccount,
   DiscoveryScope,
   ForeignKeyMeta,
   ForeignKeyTarget,
@@ -17,12 +20,15 @@ export type {
   ObjectMeta,
   ObjectRef,
   ReferentialAction,
+  RowSecurity,
   TextLengthUnit,
 } from './metadata.js'
 export { generateForm } from './generate/generate.js'
+export { BINDINGS_VERSION, bindingsVersionProblem } from './generate/version.js'
 export type {
   ConcurrencyBinding,
   FieldBinding,
+  FieldWrites,
   FormBindings,
   GeneratedForm,
   GenerationNote,

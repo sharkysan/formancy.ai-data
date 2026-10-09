@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest'
-import type { ColumnMeta, DatabaseKind, MetadataSnapshot, NormalizedType, ObjectMeta } from '@formancy/data-core'
+import type { ColumnMeta, DatabaseKind, MetadataSnapshot, NormalizedType, ObjectMeta, RowSecurity } from '@formancy/data-core'
 import { createSnapshot } from '@formancy/data-core'
-import { restrictedDisagreements, snapshotDisagreements } from './conformance.js'
+import { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
+import { restrictedDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'
 import { FIXTURE_MODEL } from './model.js'
 
 /**
@@ -26,6 +27,7 @@ function perfect(kind: DatabaseKind): ObjectMeta[] {
         defaultExpression: null,
         generated: facts.generated ?? 'none',
         comment: null,
+        access: { select: true, insert: true, update: true },
       }
     }),
     // Copied, never shared: the model is frozen, and these are edited below.
@@ -44,6 +46,7 @@ function perfect(kind: DatabaseKind): ObjectMeta[] {
       const facts = { ...check, ...(check.byKind?.[kind] ?? {}) }
       return { name: check.name, expression: null, enforced: facts.enforced ?? true, validated: facts.validated ?? true }
     }),
+    rowSecurity: typeof entry.rowSecurity === 'string' ? entry.rowSecurity : (entry.rowSecurity[kind] as RowSecurity),
   }))
 }
 
@@ -56,7 +59,7 @@ function columnOf(objects: ObjectMeta[], table: string, name: string): ColumnMet
 function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}, gaps: MetadataSnapshot['gaps'] = []): MetadataSnapshot {
   const objects = perfect(kind)
   edit(objects)
-  return createSnapshot({ kind, serverVersion: 'x', scope: { schemas: ['sales'] }, objects, gaps })
+  return createSnapshot({ kind, serverVersion: 'x', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, objects, gaps })
 }
 
 function object(objects: ObjectMeta[], name: string): ObjectMeta {
@@ -230,8 +233,174 @@ describe('snapshotDisagreements', () => {
   // Discovered as the owner, nothing is hidden. A gap is an adapter that
   // failed to read what it could have.
   test('treats any gap as a disagreement when discovering as the owner', () => {
-    const gapped = snapshot('postgres', () => {}, [{ object: { schema: 'sales', name: 'order' }, aspect: 'checks', detail: 'x' }])
+    const gapped = snapshot('postgres', () => {}, [{ subject: { kind: 'object', object: { schema: 'sales', name: 'order' } }, aspect: 'checks', detail: 'x' }])
     expect(snapshotDisagreements(gapped)).toEqual([expect.stringMatching(/unexpected gap on sales\.order \(checks\)/)])
+    // A gap about a schema says which (0027): "the scope" would send a reader to the wrong place.
+    const schema = snapshot('sqlserver', () => {}, [{ subject: { kind: 'schema', schema: 'sales' }, aspect: 'objects', detail: 'no VIEW DEFINITION' }])
+    expect(snapshotDisagreements(schema)).toEqual(['unexpected gap on schema sales (objects): no VIEW DEFINITION'])
+    expect(snapshotDisagreements(snapshot('sqlserver', () => {}, [{ subject: { kind: 'scope' }, aspect: 'row-security', detail: 'x' }]))).toEqual([
+      'unexpected gap on the scope (row-security): x',
+    ])
+  })
+
+  // The owner may do everything (0027). A capability reported false for it is
+  // an adapter misreading a privilege check, and a form generated as the
+  // owner would leave out what the owner may in fact write.
+  test('an owner snapshot with one capability false is a disagreement', () => {
+    const narrowed = snapshot('postgres', (objects) => {
+      const amount = columnOf(objects, 'order', 'amount')
+      amount.access = { ...amount.access, update: false }
+    })
+    expect(snapshotDisagreements(narrowed)).toEqual(['sales.order.amount access is select, insert and not update, expected every privilege'])
+  })
+
+  // SQL Server applies an enabled policy to every account, dbo included;
+  // PostgreSQL exempts the superuser who owns the fixture. One table, two
+  // genuine answers, each held to its own engine.
+  test('customer reported with no row security on SQL Server, or with it on PostgreSQL, is a disagreement', () => {
+    const silent = snapshot('sqlserver', (objects) => {
+      object(objects, 'customer').rowSecurity = 'none'
+    })
+    expect(snapshotDisagreements(silent)).toEqual(['sales.customer row security is none, expected applies'])
+    const policed = snapshot('postgres', (objects) => {
+      object(objects, 'customer').rowSecurity = 'applies'
+    })
+    expect(snapshotDisagreements(policed)).toEqual(['sales.customer row security is applies, expected none'])
+  })
+})
+
+describe('structuralDisagreements', () => {
+  // An account that may read every catalog entry and not every table — the
+  // PostgreSQL reader, SQL Server with database VIEW DEFINITION — describes
+  // the same structure as the owner, with other privileges. Comparing
+  // structure only is how "it sees sales.order exactly as the owner does" is
+  // checked without the owner's privileges.
+  test('ignores access and row security, and nothing else', () => {
+    const reader = snapshot('postgres', (objects) => {
+      for (const entry of objects) {
+        entry.rowSecurity = 'applies'
+        for (const column of entry.columns) column.access = { select: false, insert: false, update: false }
+      }
+    })
+    expect(structuralDisagreements(reader)).toEqual([])
+    expect(snapshotDisagreements(reader)).not.toEqual([])
+    const short = snapshot('postgres', (objects) => {
+      object(objects, 'order').columns.pop()
+    })
+    expect(structuralDisagreements(short)).toEqual([expect.stringMatching(/sales\.order columns are/)])
+  })
+})
+
+/** A snapshot as `account` would take it: the model's objects with that account's privileges, `edit`ed. */
+function asAccount(kind: DatabaseKind, access: (objects: ObjectMeta[]) => void, gaps: MetadataSnapshot['gaps'] = []): MetadataSnapshot {
+  return snapshot(kind, access, gaps)
+}
+
+/** Every column of every object narrowed to what `expected` grants, the way an adapter reading the fixture's grants would. */
+function grantsOf(expected: typeof READER_ACCESS, kind: DatabaseKind) {
+  return (objects: ObjectMeta[]): void => {
+    for (const entry of objects) {
+      const granted = { ...expected[entry.ref.name], ...expected[entry.ref.name]?.byKind?.[kind] }
+      const has = (list: unknown, name: string) => list === 'all' || (Array.isArray(list) && list.includes(name))
+      for (const column of entry.columns) {
+        column.access = { select: has(granted.select, column.name), insert: has(granted.insert, column.name), update: has(granted.update, column.name) }
+      }
+      const rowSecurity = granted.rowSecurity ?? 'none'
+      entry.rowSecurity = typeof rowSecurity === 'string' ? rowSecurity : (rowSecurity[kind] ?? 'none')
+    }
+  }
+}
+
+describe('accessDisagreements', () => {
+  // The baseline: a snapshot that says exactly what the fixture grants. A
+  // comparator that complained about it would fail every adapter for a reason
+  // in the test.
+  test('a snapshot with exactly the granted privileges has no disagreements, for the reader and the writer, on either engine', () => {
+    for (const kind of ['postgres', 'sqlserver'] as const) {
+      expect(accessDisagreements(asAccount(kind, grantsOf(READER_ACCESS, kind)), READER_ACCESS), kind).toEqual([])
+      expect(accessDisagreements(asAccount(kind, grantsOf(WRITER_ACCESS, kind)), WRITER_ACCESS), kind).toEqual([])
+    }
+  })
+
+  // One privilege misread is a form that offers a write the database refuses,
+  // or leaves out one it allows. Named by column and capability.
+  test('a capability other than the one granted is a disagreement', () => {
+    const misread = asAccount('postgres', (objects) => {
+      grantsOf(WRITER_ACCESS, 'postgres')(objects)
+      const amount = columnOf(objects, 'order', 'amount')
+      amount.access = { ...amount.access, update: true }
+    })
+    expect(accessDisagreements(misread, WRITER_ACCESS)).toEqual(['sales.order.amount update is true, expected false'])
+    // SQL Server's writer may not update row_version, PostgreSQL's may: the one engine difference in the grants.
+    const sqlServer = asAccount('sqlserver', (objects) => {
+      grantsOf(WRITER_ACCESS, 'sqlserver')(objects)
+      const version = columnOf(objects, 'order', 'row_version')
+      version.access = { ...version.access, update: true }
+    })
+    expect(accessDisagreements(sqlServer, WRITER_ACCESS)).toEqual(['sales.order.row_version update is true, expected false'])
+  })
+
+  // The silent answer again: an object the account may use, missing with
+  // nothing saying why, reads as "no such table". One it may not use may be
+  // left out, provided a gap on its schema or the scope says the catalog
+  // hides things.
+  test('an object expected usable but absent with no gap is a disagreement; absent behind a schema gap with no expected access it is not', () => {
+    const without = (name: string) => (objects: ObjectMeta[]) => {
+      grantsOf(READER_ACCESS, 'sqlserver')(objects)
+      objects.splice(objects.indexOf(object(objects, name)), 1)
+    }
+    expect(accessDisagreements(asAccount('sqlserver', without('order')), READER_ACCESS)).toEqual(['sales.order is missing, though the account may use it'])
+    expect(accessDisagreements(asAccount('sqlserver', without('employee')), READER_ACCESS)).toEqual(['sales.employee is missing and no objects gap says why'])
+    const behind = asAccount('sqlserver', without('employee'), [{ subject: { kind: 'schema', schema: 'sales' }, aspect: 'objects', detail: 'no VIEW DEFINITION' }])
+    expect(accessDisagreements(behind, READER_ACCESS)).toEqual([])
+    const scoped = asAccount('sqlserver', without('employee'), [{ subject: { kind: 'scope' }, aspect: 'objects', detail: '1 object denied' }])
+    expect(accessDisagreements(scoped, READER_ACCESS)).toEqual([])
+    // A usable object is never excused by a gap.
+    expect(accessDisagreements(asAccount('sqlserver', without('order'), [{ subject: { kind: 'scope' }, aspect: 'objects', detail: 'x' }]), READER_ACCESS)).toEqual([
+      'sales.order is missing, though the account may use it',
+    ])
+  })
+
+  // The failure 0027 exists to remove: an adapter that reads a
+  // privilege-filtered catalog leaves out the columns its account may not
+  // read, and every column it does report then agrees with the grants. Only
+  // comparing the described columns with the model's notices; the writer is
+  // held by this comparison alone.
+  test('an object described without the columns its account may not read is a disagreement', () => {
+    const filtered = asAccount('postgres', (objects) => {
+      grantsOf(WRITER_ACCESS, 'postgres')(objects)
+      const customer = object(objects, 'customer')
+      customer.columns = customer.columns.filter((column) => column.access.select)
+      // What such a catalog shows of the keys over the hidden columns: nothing.
+      const shown = (columns: readonly string[]) => columns.every((name) => customer.columns.some((column) => column.name === name))
+      customer.foreignKeys = customer.foreignKeys.filter((foreignKey) => shown(foreignKey.columns))
+      customer.uniqueKeys = customer.uniqueKeys.filter((unique) => shown(unique.columns))
+    })
+    const disagreements = accessDisagreements(filtered, WRITER_ACCESS)
+    expect(disagreements).toHaveLength(1)
+    expect(disagreements[0]).toMatch(/^sales\.customer columns are \[tenant_id, customer_no, name\], expected \[tenant_id, customer_no, name, .+\]$/)
+  })
+
+  // Row security is the expectation, or "cannot tell" with the gap that says
+  // why. Unknown with no gap is the silent unknown, which createSnapshot
+  // refuses too; a snapshot read back from a file is not made by it.
+  test('row security other than expected is a disagreement, and unknown needs a covering gap', () => {
+    const silent = asAccount('postgres', (objects) => {
+      grantsOf(READER_ACCESS, 'postgres')(objects)
+      object(objects, 'customer').rowSecurity = 'none'
+    })
+    expect(accessDisagreements(silent, READER_ACCESS)).toEqual(['sales.customer row security is none, expected applies'])
+
+    const told = asAccount(
+      'sqlserver',
+      (objects) => {
+        grantsOf(READER_ACCESS, 'sqlserver')(objects)
+        object(objects, 'order').rowSecurity = 'unknown'
+      },
+      [{ subject: { kind: 'scope' }, aspect: 'row-security', detail: 'no VIEW DEFINITION on the database' }],
+    )
+    expect(accessDisagreements(told, READER_ACCESS)).toEqual([])
+    expect(accessDisagreements({ ...told, gaps: [] }, READER_ACCESS)).toEqual(['sales.order row security is unknown and no row-security gap says why'])
   })
 })
 
@@ -251,7 +420,7 @@ describe('restrictedDisagreements', () => {
 
   // "I cannot tell" is an acceptable answer, in either of its two shapes.
   test('a missing key or an unknown target is fine when a gap says so', () => {
-    const gap = [{ object: { schema: 'sales', name: 'order' }, aspect: 'foreign-keys' as const, detail: 'target not visible' }]
+    const gap = [{ subject: { kind: 'object' as const, object: { schema: 'sales', name: 'order' } }, aspect: 'foreign-keys' as const, detail: 'target not visible' }]
     expect(restrictedDisagreements(snapshot('sqlserver', withoutCustomerKey, gap))).toEqual([])
     const unknownTarget = (objects: ObjectMeta[]): void => {
       const foreignKey = object(objects, 'order').foreignKeys.find((entry) => entry.name === 'fk_order_customer')

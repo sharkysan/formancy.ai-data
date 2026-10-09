@@ -34,12 +34,13 @@ function col(name: string, type: NormalizedType, extra: Partial<ColumnMeta> = {}
     defaultExpression: null,
     generated: 'none',
     comment: null,
+    access: { select: true, insert: true, update: true },
     ...extra,
   }
 }
 
 function table(name: string, columns: ColumnMeta[], extra: Partial<ObjectMeta> = {}): ObjectMeta {
-  return { ref: { schema: 'sales', name }, kind: 'table', comment: null, columns, primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], ...extra }
+  return { ref: { schema: 'sales', name }, kind: 'table', comment: null, columns, primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none', ...extra }
 }
 
 function fixtureLike(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}): MetadataSnapshot {
@@ -112,7 +113,7 @@ function fixtureLike(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void =
     table('customer_summary', [col('tenant_id', INT32), col('customer_no', INT32), col('order_count', INT64)], { kind: 'view' }),
   ]
   edit(objects)
-  return createSnapshot({ kind, serverVersion: 'x', scope: { schemas: ['sales'] }, objects, gaps: [] })
+  return createSnapshot({ kind, serverVersion: 'x', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, objects, gaps: [] })
 }
 
 const ORDER: GenerationRequest = {
@@ -162,6 +163,25 @@ describe('generateForm', () => {
     const first = generateForm(fixtureLike('postgres'), ORDER)
     const second = generateForm(fixtureLike('postgres'), ORDER)
     expect(canonicalize(second)).toBe(canonicalize(first))
+  })
+
+  // Bindings say per operation what a field writes since 0027, which is
+  // version 2. For an account that may do everything, both operations are
+  // what the one flag used to say: capabilities change nothing the owner gets.
+  test('bindings are version 2, and with every privilege each field writes on both operations or on neither', () => {
+    const { bindings } = generateForm(fixtureLike('sqlserver'), ORDER)
+    expect(bindings.version).toBe(2)
+    expect(bindings.fields.map((binding) => [binding.field, binding.writes])).toEqual([
+      ['id', { create: false, update: false }],
+      ['customer', { create: true, update: true }],
+      ['order_date', { create: true, update: true }],
+      ['status', { create: true, update: true }],
+      ['amount', { create: true, update: true }],
+      ['notes', { create: true, update: true }],
+      ['group', { create: true, update: true }],
+      ['created_by', { create: true, update: true }],
+      ['approved_by', { create: true, update: true }],
+    ])
   })
 
   // The composite foreign key is ONE choice, not two numbers somebody has to
@@ -276,7 +296,7 @@ describe('generateForm', () => {
   // does not try to edit them.
   test('identity and computed columns are read-only, in their own section', () => {
     const { form, bindings } = generateForm(fixtureLike('sqlserver'), ORDER)
-    expect(bindings.fields.find((binding) => binding.field === 'id')).toMatchObject({ writable: false })
+    expect(bindings.fields.find((binding) => binding.field === 'id')).toMatchObject({ writes: { create: false, update: false } })
     expect(form.logic?.rules).toContainEqual({ target: 'id', kind: 'disabled', cel: 'true' })
     const sections = form.layouts?.[0]?.nodes.map((node) => ('label' in node ? node.label : undefined))
     expect(sections).toEqual(['Order', 'Record'])
@@ -293,7 +313,7 @@ describe('generateForm', () => {
     })
     const { form, bindings, notes } = generateForm(byDefault, { ...ORDER, root: { schema: 'sales', name: 'country' }, lookups: [] })
     expect(form.model.fields.find((field) => field.key === 'id')).not.toHaveProperty('required')
-    expect(bindings.fields.find((binding) => binding.field === 'id')).toMatchObject({ writable: false })
+    expect(bindings.fields.find((binding) => binding.field === 'id')).toMatchObject({ writes: { create: false, update: false } })
     expect(bindings.operations.create).toBe(true)
     expect(notes).toContainEqual({
       subject: 'id',
@@ -397,7 +417,7 @@ describe('generateForm', () => {
   test('a view generates a read-only form', () => {
     const { bindings, form } = generateForm(fixtureLike('postgres'), { ...ORDER, root: { schema: 'sales', name: 'customer_summary' }, lookups: [] })
     expect(bindings.operations).toEqual({ create: false, update: false })
-    expect(bindings.fields.every((binding) => !binding.writable)).toBe(true)
+    expect(bindings.fields.every((binding) => !binding.writes.create && !binding.writes.update)).toBe(true)
     expect(form.logic?.rules).toHaveLength(form.model.fields.length)
   })
 
@@ -457,7 +477,7 @@ describe('pinned columns', () => {
       pinned: ['name'],
     })
     expect(form.model.fields.find((field) => field.key === 'name')).not.toHaveProperty('required')
-    expect(bindings.fields.find((binding) => binding.field === 'name')).toMatchObject({ writable: false })
+    expect(bindings.fields.find((binding) => binding.field === 'name')).toMatchObject({ writes: { create: false, update: false } })
     expect(form.logic?.rules).toContainEqual({ target: 'name', kind: 'disabled', cel: 'true' })
     expect(notes).toContainEqual(expect.objectContaining({ subject: 'name', kind: 'read-only', message: expect.stringMatching(/Pinned by the policy/) }))
     expect(bindings.operations.create).toBe(true)

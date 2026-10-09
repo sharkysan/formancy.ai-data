@@ -36,6 +36,17 @@ export interface GenerationRequest {
   pinned?: string[]
 }
 
+/**
+ * Which writes give a field's columns their values (0027). The two differ when
+ * the account may INSERT a column and not UPDATE it, or the reverse: a field
+ * written on create only is shown and never written on update, and the server
+ * refuses a changed value there (0022).
+ */
+export interface FieldWrites {
+  create: boolean
+  update: boolean
+}
+
 /** How one form field reaches the database. */
 export type FieldBinding =
   | {
@@ -44,7 +55,7 @@ export type FieldBinding =
       column: string
       type: NormalizedType
       nullable: boolean
-      writable: boolean
+      writes: FieldWrites
     }
   | {
       kind: 'lookup'
@@ -57,7 +68,7 @@ export type FieldBinding =
       /** The option-source name the form document carries. */
       source: string
       nullable: boolean
-      writable: boolean
+      writes: FieldWrites
     }
 
 export interface ConcurrencyBinding {
@@ -74,7 +85,8 @@ export interface ConcurrencyBinding {
  * this is a property of one database (plan section 9: four separate concerns).
  */
 export interface FormBindings {
-  version: 1
+  /** `BINDINGS_VERSION`. 2 since 0027; a version-1 file is refused, and the form republished. */
+  version: 2
   root: ObjectRef
   rootKind: 'table' | 'view'
   /** The columns that identify one record, or `null` when nothing does. */
@@ -90,12 +102,14 @@ export interface FormBindings {
  * A choice the generator made that a person should know about.
  *
  * `inferred` — decided from metadata, and editable. `excluded` — a column with
- * no field. `read-only` — a field shown and never written. `blocked` — an
- * operation the form cannot offer, with the reason.
+ * no field. `read-only` — a field shown and not written, on every operation or
+ * on the one named. `blocked` — an operation the form cannot offer, with the
+ * reason. `access` — what the database itself limits for this connection: row
+ * security on a table the form reads, or a view it cannot follow (0027).
  */
 export interface GenerationNote {
   subject: string
-  kind: 'inferred' | 'excluded' | 'read-only' | 'blocked'
+  kind: 'inferred' | 'excluded' | 'read-only' | 'blocked' | 'access'
   message: string
 }
 

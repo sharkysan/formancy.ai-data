@@ -31,8 +31,11 @@ const SQL = (scoped: string): string => `
     on ep.class = 1 and ep.major_id = o.object_id and ep.minor_id = 0 and ep.name = N'MS_Description'
   where o.object_id in ${scoped}`
 
+/** An object before its row security is known: that is another concern's (row-security.ts). */
+export type ObjectFound = Omit<ObjectMeta, 'rowSecurity'>
+
 /** Each object in scope, by object_id, with nothing attached yet. */
-export async function readObjects(pool: ConnectionPool, schemas: readonly string[]): Promise<Map<number, ObjectMeta>> {
+export async function readObjects(pool: ConnectionPool, schemas: readonly string[]): Promise<Map<number, ObjectFound>> {
   const rows = await queryScope<ObjectRow>(pool, schemas, SQL)
   return new Map(
     rows.map((row) => [

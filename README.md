@@ -13,7 +13,9 @@ operates without any AI dependency.
 > **Status: in development, nothing released.** Both adapters discover a real
 > database, including what a restricted account cannot see, and the same model
 > checks both. A form can be generated from a snapshot; values are checked
-> exactly. Both adapters answer lookups and records; the server publishes forms
+> exactly, and a snapshot says what its account may do with every column and
+> whether row-level security applies to it, which generation and drift review
+> now read. Both adapters answer lookups and records; the server publishes forms
 > and serves them over HTTP, asking the policy every time and auditing every
 > request, and one suite runs that whole journey on both engines. A page
 > renders generated forms in React and Angular side by side, and the studio

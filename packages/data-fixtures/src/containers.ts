@@ -1,3 +1,4 @@
+import type { DiscoveryAccount } from '@formancy/data-core'
 import { MSSQLServerContainer } from '@testcontainers/mssqlserver'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import mssql from 'mssql'
@@ -20,6 +21,17 @@ export const READER = {
   sqlServerPassword: 'Reader-Fixture-Password-1',
 } as const
 
+/**
+ * The order form's account, which holds its grants through the role
+ * formancy_forms and which the fixture's row-level security shows tenant 1
+ * only (0027). Passwords as for the reader.
+ */
+export const WRITER = {
+  user: 'formancy_writer',
+  postgresPassword: 'writer-fixture-password',
+  sqlServerPassword: 'Writer-Fixture-Password-1',
+} as const
+
 /** The database the SQL Server fixture is loaded into, rather than `master`. */
 export const SQLSERVER_DATABASE = 'formancy_fixture'
 
@@ -28,12 +40,19 @@ export interface PostgresFixture {
   admin: string
   /** The same database as `formancy_reader`, who may read sales."order" only. */
   reader: string
+  /** The same database as `formancy_writer`, the order form's account. */
+  writer: string
+  /** Who `admin` discovers as: the container's superuser, as both principal and login. */
+  owner: DiscoveryAccount
   stop(): Promise<void>
 }
 
 export interface SqlServerFixture {
   admin: mssql.config
   reader: mssql.config
+  writer: mssql.config
+  /** Who `admin` discovers as: `sa` connects, and in a database it does not own by name is `dbo`. */
+  owner: DiscoveryAccount
   stop(): Promise<void>
 }
 
@@ -56,13 +75,19 @@ export async function startPostgresFixture(): Promise<PostgresFixture> {
     await sql.end()
   }
 
-  const reader = new URL(admin)
-  reader.username = READER.user
-  reader.password = READER.postgresPassword
+  const as = (user: string, password: string): string => {
+    const url = new URL(admin)
+    url.username = user
+    url.password = password
+    return url.toString()
+  }
+  const owner = container.getUsername()
 
   return {
     admin,
-    reader: reader.toString(),
+    reader: as(READER.user, READER.postgresPassword),
+    writer: as(WRITER.user, WRITER.postgresPassword),
+    owner: { user: owner, login: owner },
     stop: async () => {
       await container.stop()
     },
@@ -90,9 +115,9 @@ export async function startSqlServerFixture(): Promise<SqlServerFixture> {
   const master = await new mssql.ConnectionPool({ ...owner, database: 'master' }).connect()
   try {
     await master.request().batch(`create database ${SQLSERVER_DATABASE}`)
-    await master
-      .request()
-      .batch(`create login ${READER.user} with password = '${READER.sqlServerPassword}', check_policy = off`)
+    for (const login of [READER, WRITER]) {
+      await master.request().batch(`create login ${login.user} with password = '${login.sqlServerPassword}', check_policy = off`)
+    }
   } finally {
     await master.close()
   }
@@ -109,6 +134,8 @@ export async function startSqlServerFixture(): Promise<SqlServerFixture> {
   return {
     admin,
     reader: { ...base, user: READER.user, password: READER.sqlServerPassword, database: SQLSERVER_DATABASE },
+    writer: { ...base, user: WRITER.user, password: WRITER.sqlServerPassword, database: SQLSERVER_DATABASE },
+    owner: { user: 'dbo', login: owner.user },
     stop: async () => {
       await container.stop()
     },

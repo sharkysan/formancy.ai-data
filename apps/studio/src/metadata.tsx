@@ -1,13 +1,15 @@
 import type { ReactElement } from 'react'
 import { findObject } from '@formancy/data-core'
 import type { ColumnMeta, CoverageGap, DatabaseKind, ForeignKeyMeta, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
-import { describeRef, gapsAbout } from './choice.js'
+import { describeRef, gapsAbout, gapsHiding } from './choice.js'
 
 /** How a database kind is written for a person. */
 export const ENGINE_NAMES: Readonly<Record<DatabaseKind, string>> = { postgres: 'PostgreSQL', sqlserver: 'SQL Server' }
 
 function where(gap: CoverageGap): string {
-  return gap.object === null ? 'The whole scope' : describeRef(gap.object)
+  const subject = gap.subject
+  if (subject.kind === 'scope') return 'The whole scope'
+  return subject.kind === 'schema' ? `Schema ${subject.schema}` : describeRef(subject.object)
 }
 
 /**
@@ -49,7 +51,18 @@ function columnFacts(column: ColumnMeta): string {
   const facts = [column.databaseType, column.nullable ? 'may be null' : 'not null']
   if (column.generated !== 'none') facts.push(`generated (${column.generated})`)
   else if (column.hasDefault) facts.push('has a default')
+  // What this connection's account may do with it (0027), said only when it may not do everything.
+  const { select, insert, update } = column.access
+  if (!select) facts.push('this connection may not read it')
+  else if (!insert || !update) facts.push('may read', ...(insert ? [] : ['may not insert']), ...(update ? [] : ['may not update']))
   return facts.join(' · ')
+}
+
+/** Whether row security applies to this connection on an object, said when it does or cannot be told. */
+const ROW_SECURITY: Readonly<Record<ObjectMeta['rowSecurity'], string | null>> = {
+  none: null,
+  applies: 'Row-level security applies to this connection.',
+  unknown: 'Cannot tell whether row-level security applies.',
 }
 
 /** One foreign key, and what this connection can say about where it points. */
@@ -61,7 +74,9 @@ function foreignKeyLine(snapshot: MetadataSnapshot, foreignKey: ForeignKeyMeta):
   const flags = [foreignKey.enforced ? null : 'not enforced', foreignKey.validated ? null : 'existing rows not checked'].filter((flag) => flag !== null)
   const suffix = flags.length === 0 ? '' : `; ${flags.join(', ')}`
   if (findObject(snapshot, target) !== undefined) return `${to}${suffix}`
-  const gaps = gapsAbout(snapshot, target)
+  // Any gap that could hide it: about the target, or about its schema's or
+  // the scope's objects. Only with none is "outside the approved schemas" true.
+  const gaps = gapsHiding(snapshot, target)
   return gaps.length > 0
     ? `${to}${suffix}, which this connection cannot see: ${gaps.map((gap) => gap.detail).join('; ')}`
     : `${to}${suffix}, outside the approved schemas`
@@ -72,6 +87,11 @@ function foreignKeyLine(snapshot: MetadataSnapshot, foreignKey: ForeignKeyMeta):
  * being able to tell: a gap on the object's foreign keys means the list may be
  * incomplete, and says so instead of "No foreign key".
  */
+/** The id of the element that names an object, so its lists can be named "Columns sales.customer" and told apart. */
+function objectId(object: ObjectMeta): string {
+  return `object-${object.ref.schema}-${object.ref.name}`
+}
+
 function ForeignKeys({ snapshot, object }: { snapshot: MetadataSnapshot; object: ObjectMeta }): ReactElement {
   const hidden = gapsAbout(snapshot, object.ref).filter((gap) => gap.aspect === 'foreign-keys')
   const id = `fk-${object.ref.schema}-${object.ref.name}`
@@ -79,7 +99,8 @@ function ForeignKeys({ snapshot, object }: { snapshot: MetadataSnapshot; object:
     <>
       <h5 id={id}>Foreign keys</h5>
       {object.foreignKeys.length > 0 ? (
-        <ul aria-labelledby={id}>
+        // Named with the object too: the PostgreSQL reader describes every table, so "Foreign keys" alone names many lists.
+        <ul aria-labelledby={`${id} ${objectId(object)}`}>
           {object.foreignKeys.map((foreignKey) => (
             <li key={foreignKey.name}>{foreignKeyLine(snapshot, foreignKey)}</li>
           ))}
@@ -101,11 +122,14 @@ function ObjectDetails({ snapshot, object }: { snapshot: MetadataSnapshot; objec
   return (
     <details className="object">
       <summary>
-        <code>{name}</code> <span className="kind">{object.kind}</span>
+        <code id={objectId(object)}>{name}</code> <span className="kind">{object.kind}</span>
       </summary>
       {object.comment === null ? null : <p className="comment">{object.comment}</p>}
+      {ROW_SECURITY[object.rowSecurity] === null ? null : (
+        <p className={object.rowSecurity === 'unknown' ? 'cannot-tell' : 'row-security'}>{ROW_SECURITY[object.rowSecurity]}</p>
+      )}
       <h5 id={id}>Columns</h5>
-      <ul aria-labelledby={id}>
+      <ul aria-labelledby={`${id} ${objectId(object)}`}>
         {object.columns.map((column) => (
           <li key={column.name}>
             <code>{column.name}</code> {columnFacts(column)}
@@ -131,17 +155,23 @@ function ObjectDetails({ snapshot, object }: { snapshot: MetadataSnapshot; objec
 export function MetadataView({ connection, snapshot }: { connection: string; snapshot: MetadataSnapshot }): ReactElement {
   const tables = snapshot.objects.filter((object) => object.kind === 'table').length
   const views = snapshot.objects.length - tables
+  const { user, login } = snapshot.account
   return (
     <section className="metadata" aria-labelledby="seen-heading">
       <h3 id="seen-heading">What {connection} can see</h3>
       <p>
         {ENGINE_NAMES[snapshot.kind]} {snapshot.serverVersion}, schemas {snapshot.scope.schemas.join(', ')}: {tables}{' '}
-        {tables === 1 ? 'table' : 'tables'} and {views} {views === 1 ? 'view' : 'views'}. Fingerprint{' '}
-        <code>{snapshot.fingerprint.slice(0, 12)}</code>.
+        {tables === 1 ? 'table' : 'tables'} and {views} {views === 1 ? 'view' : 'views'}. Discovered as <code>{user}</code>
+        {login === user ? null : (
+          <>
+            , connected as <code>{login}</code>
+          </>
+        )}
+        . Fingerprint <code>{snapshot.fingerprint.slice(0, 12)}</code>.
       </p>
       <Gaps snapshot={snapshot} />
-      <h4>Tables and views</h4>
-      <ul className="objects">
+      <h4 id="objects-heading">Tables and views</h4>
+      <ul className="objects" aria-labelledby="objects-heading">
         {snapshot.objects.map((object) => (
           <li key={describeRef(object.ref)}>
             <ObjectDetails snapshot={snapshot} object={object} />

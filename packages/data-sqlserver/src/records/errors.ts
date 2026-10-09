@@ -159,6 +159,12 @@ function refusal(error: ServerError, written: readonly RecordValue[]): RecordFai
     case 229:
     case 230:
       return failure('permission-denied', `SQL Server refused this account the operation (${String(number)}).`, { column: named(DENIED_COLUMN, message) })
+    case 33504:
+      // A security policy's block predicate refused the row, for every
+      // principal: the counterpart of PostgreSQL's row-level security WITH
+      // CHECK, which is 42501 there (0027). The message names the table, and
+      // no column.
+      return failure('permission-denied', 'A security policy on this table refused the row this write would store (33504).')
     case 207:
     case 208:
       return failure('schema-changed', `A table or column the binding names is not there any more (${String(number)}).`, {

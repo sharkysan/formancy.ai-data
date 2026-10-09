@@ -422,7 +422,7 @@ describe('planCreate', () => {
       objects.find((object) => object.ref.name === 'order')?.columns.push(col('attachment', 13, { kind: 'binary', maxLength: null, fixedLength: false }, { nullable: true }))
     })
     const bindings = edited(orderForm(attached).bindings, (draft) => {
-      draft.fields.push({ kind: 'column', field: 'attachment', column: 'attachment', type: { kind: 'binary', maxLength: null, fixedLength: false }, nullable: true, writable: true })
+      draft.fields.push({ kind: 'column', field: 'attachment', column: 'attachment', type: { kind: 'binary', maxLength: null, fixedLength: false }, nullable: true, writes: { create: true, update: true } })
     })
     const policy: FormPolicy = { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, attachment: CLERK_RW } }
     expect(planCreate(attached, bindings, policy, CLERK, { ...ANSWERS, attachment: 'AAAA' })).toMatchObject({ ok: false, fieldErrors: [{ field: 'attachment', code: 'unsupported' }] })

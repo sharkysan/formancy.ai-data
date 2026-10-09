@@ -47,9 +47,10 @@ describe('the administrator plane, through the studio client', () => {
   // failure that names the route.
   test('reads every route the studio uses in the shape the server sends', async () => {
     expect(await admin.whoami()).toEqual({ ok: true, value: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } })
-    expect(await admin.connections()).toEqual({ ok: true, value: ['fixture', 'fixture-reader', 'fixture-sqlserver'] })
+    expect(await admin.connections()).toEqual({ ok: true, value: ['fixture', 'fixture-reader', 'fixture-sqlserver', 'fixture-sqlserver-reader', 'fixture-writer'] })
     expect(await admin.test('fixture')).toEqual({ ok: true, value: { kind: 'postgres', version: '17.11' } })
-    const metadata = await admin.metadata('fixture-reader')
+    // The connection whose catalog hides what it may not use, and says so as gaps (0027).
+    const metadata = await admin.metadata('fixture-sqlserver-reader')
     expect(metadata.ok && metadata.value.gaps.length).toBeGreaterThan(0)
     const proposal = await admin.propose(ORDER)
     expect(proposal.ok && proposal.value.bindings.operations).toEqual({ create: true, update: true })

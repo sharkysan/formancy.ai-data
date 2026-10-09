@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { READER, WRITER } from './containers.js'
 import { readFixture, splitBatches } from './load.js'
 
 describe('splitBatches', () => {
@@ -24,15 +25,34 @@ describe('splitBatches', () => {
 })
 
 describe('the fixture files', () => {
-  // CREATE SCHEMA and CREATE VIEW must each open a batch on SQL Server; a GO
-  // lost in an edit fails there with an error about the batch, far from here.
-  test('the SQL Server file opens a batch with each CREATE SCHEMA and CREATE VIEW', () => {
-    for (const batch of splitBatches(readFixture('sqlserver.sql'))) {
+  // CREATE SCHEMA, CREATE VIEW and CREATE FUNCTION must each open a batch on
+  // SQL Server; a GO lost in an edit fails there with an error about the
+  // batch, far from here.
+  test('the SQL Server file opens a batch with each CREATE SCHEMA, CREATE VIEW and CREATE FUNCTION', () => {
+    const batches = splitBatches(readFixture('sqlserver.sql'))
+    expect(batches.some((batch) => /\bcreate function\b/i.test(batch))).toBe(true)
+    for (const batch of batches) {
       const body = batch.replaceAll(/--.*$/gm, '').trim().toLowerCase()
-      const opensWith = body.startsWith('create schema') || body.startsWith('create view')
-      const contains = /\bcreate (schema|view)\b/.test(body)
-      expect(contains ? opensWith : true, `a batch contains CREATE SCHEMA or CREATE VIEW after its first statement:\n${batch.slice(0, 120)}`).toBe(true)
+      const opensWith = /^create (schema|view|function)\b/.test(body)
+      const contains = /\bcreate (schema|view|function)\b/.test(body)
+      expect(contains ? opensWith : true, `a batch contains CREATE SCHEMA, VIEW or FUNCTION after its first statement:\n${batch.slice(0, 120)}`).toBe(true)
     }
+  })
+
+  // The restricted principals' passwords live twice: in the PostgreSQL file
+  // that creates the roles and in src/containers.ts, which connects as them.
+  // Drifted apart, every restricted suite fails to connect, with an
+  // authentication error that names neither file. SQL Server's logins are
+  // created by containers.ts in master, from the constants themselves, so
+  // its file holds no password and is checked for the users it maps.
+  test('the restricted files create the principals containers.ts connects as, with its passwords', () => {
+    const postgres = readFixture('postgres.restricted.sql')
+    for (const { user, postgresPassword } of [READER, WRITER]) {
+      const created = new RegExp(`^create role ${user} login password '([^']*)'`, 'm').exec(postgres)
+      expect(created?.[1], user).toBe(postgresPassword)
+    }
+    const sqlServer = readFixture('sqlserver.restricted.sql')
+    for (const { user } of [READER, WRITER]) expect(sqlServer, user).toMatch(new RegExp(`^create user ${user} for login ${user};`, 'm'))
   })
 
   // The two files are one model. A constraint named in one and not the other

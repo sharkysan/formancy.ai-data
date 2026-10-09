@@ -9,7 +9,7 @@ const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLen
 const decimal = (precision: number | null, scale: number | null): NormalizedType => ({ kind: 'decimal', precision, scale })
 
 function col(name: string, databaseType: string, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
-  return { name, ordinal: 1, databaseType, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, ...extra }
+  return { name, ordinal: 1, databaseType, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra }
 }
 
 describe('compareTypes', () => {

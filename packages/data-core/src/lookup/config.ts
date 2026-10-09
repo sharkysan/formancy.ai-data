@@ -1,4 +1,5 @@
 import type { FieldBinding, FormBindings } from '../generate/types.js'
+import { bindingsVersionProblem } from '../generate/version.js'
 import type { ColumnMeta, MetadataSnapshot, NormalizedTypeKind, ObjectMeta, ObjectRef } from '../metadata.js'
 import { findObject } from '../snapshot.js'
 import type { LookupConfig, LookupKeyColumn, LookupSort } from './types.js'
@@ -89,6 +90,17 @@ function columnOf(target: ObjectMeta, where: string, name: string): ColumnMeta {
   return column
 }
 
+/**
+ * A column the lookup reads on every search, which the account must be
+ * allowed to read (0027): otherwise each search fails with permission-denied
+ * after the form was published. `role` says what the lookup reads it for.
+ */
+function readableOf(target: ObjectMeta, where: string, name: string, role: string): ColumnMeta {
+  const column = columnOf(target, where, name)
+  if (!column.access.select) throw new Error(`${where}: ${role}${name} is a column this connection's account may not read`)
+  return column
+}
+
 function once(seen: Set<string>, where: string, name: string): void {
   if (seen.has(name)) throw new Error(`${where}: ${name} is named twice`)
   seen.add(name)
@@ -105,7 +117,7 @@ function once(seen: Set<string>, where: string, name: string): void {
  */
 function checkKey(target: ObjectMeta, where: string, columns: readonly string[]): LookupKeyColumn[] {
   return columns.map((name) => {
-    const column = columnOf(target, where, name)
+    const column = readableOf(target, where, name, 'key column ')
     const type = column.type
     if (type.kind === 'float') {
       throw new Error(`${where}: key column ${name} is ${column.databaseType}; a floating-point value cannot be referenced exactly`)
@@ -119,7 +131,7 @@ function checkKey(target: ObjectMeta, where: string, columns: readonly string[])
 function checkDisplay(target: ObjectMeta, where: string, display: readonly string[]): void {
   if (display.length === 0) throw new Error(`${where} needs at least one display column`)
   for (const name of display) {
-    const column = columnOf(target, where, name)
+    const column = readableOf(target, where, name, 'display column ')
     if (NO_TEXT.has(column.type.kind)) throw new Error(`${where}: display column ${name} is ${column.databaseType}, which has no text form for a label`)
   }
 }
@@ -136,7 +148,7 @@ function searchFor(target: ObjectMeta, where: string, display: readonly string[]
   for (const name of requested) {
     once(seen, where, name)
     if (!display.includes(name)) throw new Error(`${where}: ${name} is not displayed, and a search matches only what the person can see`)
-    const column = columnOf(target, where, name)
+    const column = readableOf(target, where, name, '')
     if (!SEARCHABLE.has(column.type.kind)) {
       throw new Error(`${where}: ${name} is ${column.databaseType}; only text and integer columns are searched, because the engines spell other types differently`)
     }
@@ -164,6 +176,7 @@ function sortFor(target: ObjectMeta, where: string, binding: LookupBinding, requ
     if (nulls !== 'first' && nulls !== 'last') throw new Error(`${where}: ${entry.column} puts NULLs first or last`)
     once(seen, where, entry.column)
     const column = columnOf(target, where, entry.column)
+    if (!column.access.select) throw new Error(`${where}: ${entry.column} is a column this connection's account may not read, so a lookup cannot sort by it`)
     if (NO_TEXT.has(column.type.kind)) throw new Error(`${where}: ${entry.column} is ${column.databaseType}, which has no order a lookup can rely on`)
     sort.push({ column: entry.column, direction: entry.direction, nulls })
   }
@@ -185,7 +198,8 @@ function sortFor(target: ObjectMeta, where: string, binding: LookupBinding, requ
  */
 export function buildLookupConfig(bindings: FormBindings, field: string, options: LookupOptions): LookupConfig {
   const { snapshot } = options
-  if (bindings.version !== 1) throw new Error(`Bindings version ${String(bindings.version)} is not one this release reads`)
+  const version = bindingsVersionProblem(bindings.version)
+  if (version !== null) throw new Error(version)
   if (snapshot.fingerprint !== bindings.snapshotFingerprint) {
     throw new Error('These bindings were generated from a different snapshot; review the drift before building a lookup from them')
   }
