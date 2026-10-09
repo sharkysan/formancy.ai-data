@@ -36,6 +36,11 @@ catalog:
   # audited against the same rules the renderers are held to upstream.
   axe-core: ^4.13.0
 
+  # The browser gate for what jsdom cannot see: layout, focus and colour,
+  # measured in Chromium. formancy.ai's catalog version, so one browser
+  # revision serves both repositories on one machine.
+  playwright: ^1.63.0
+
   tsdown: ^0.23.0
   publint: ^0.3.24
   "@arethetypeswrong/cli": ^0.18.5

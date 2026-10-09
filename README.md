@@ -69,6 +69,16 @@ side by side, on white paper in the Blueprint theme, with the generator's notes
 renderers to the same fields by accessible name and the same error codes
 ([0021](./docs/decisions/0021-generated-forms-preview-in-both-frameworks.md)).
 
+What the suite cannot see, because jsdom performs no layout, a browser gate
+measures in Chromium: no sideways scroll down to 320 pixels, the keyboard path
+through the skip link into the first preview, and colour contrast and target
+size, clean and after a failed submit.
+
+```bash
+pnpm --filter @formancy/data-examples exec playwright install chromium   # once per machine
+pnpm test:browser                                                        # builds the page, then measures it
+```
+
 The snapshot is captured from a real PostgreSQL container, never written by
 hand. After a change to the fixture, with Docker running:
 
@@ -112,7 +122,8 @@ client; the tests do not use it. See `.env.example`.
 
 The gates CI runs, in order: `pnpm build`, `pnpm typecheck`,
 `pnpm test:coverage`, `pnpm check:pkg`, `node scripts/verify-licenses.mjs`,
-`pnpm test:repo`, and in a job of its own `pnpm test:e2e:install`.
+`pnpm test:repo`, and in jobs of their own `pnpm test:e2e:install` and
+`pnpm test:browser`.
 [`CLAUDE.md`](./CLAUDE.md) says what each is for and what the bar is.
 
 ## Documents

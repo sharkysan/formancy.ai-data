@@ -4,6 +4,7 @@ import { generateForm } from '@formancy/data-core'
 import type { GeneratedForm, GenerationRequest } from '@formancy/data-core'
 import { GenerationNotes, NOTE_KINDS } from './notes.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
+import { paragraphs } from './test-accessible.js'
 
 /**
  * The notes panel over generations the page does not show.
@@ -42,7 +43,10 @@ function shown(form: GeneratedForm): { operations: string[]; kinds: Record<strin
     kinds: Object.fromEntries(
       NOTE_KINDS.map(({ kind, heading, none }) => {
         const list = within(notes).queryByRole('list', { name: heading })
-        return [kind, list === null ? (within(notes).getByText(none).textContent ?? '') : text(within(list).getAllByRole('listitem'))]
+        // An empty kind has no list, and says so in a sentence: found as a
+        // paragraph, by role, since a paragraph may not be named.
+        const said = paragraphs(notes).includes(none) ? none : `no list, and no "${none}"`
+        return [kind, list === null ? said : text(within(list).getAllByRole('listitem'))]
       }),
     ),
   }

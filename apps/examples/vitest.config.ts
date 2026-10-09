@@ -17,9 +17,10 @@ export default mergeConfig(
         // The shared policy counts `.ts`; this is the one workspace member with
         // `.tsx`, and a component no test reaches is exactly what it should see.
         // `main.tsx` is the composition root the shared policy already excludes
-        // as `main.ts`, for the same reason.
+        // as `main.ts`, for the same reason. The two `test-` files are the
+        // suite's own setup and queries: test code, which is not measured.
         include: ['src/**/*.{ts,tsx}'],
-        exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts', 'src/main.tsx', 'src/test-setup.ts'],
+        exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts', 'src/main.tsx', 'src/test-setup.ts', 'src/test-accessible.ts'],
       },
       setupFiles: ['src/test-setup.ts'],
       include: ['src/**/*.test.{ts,tsx}'],

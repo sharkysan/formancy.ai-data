@@ -9,6 +9,7 @@ import { App } from './app.js'
 import { generateExamples } from './examples.js'
 import type { Example } from './examples.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
+import { answerable, paragraphs } from './test-accessible.js'
 
 /**
  * One generated document, two renderers, and the claim that they agree.
@@ -17,9 +18,17 @@ import { FIXTURE_SNAPSHOT } from './snapshot.js'
  * React", and the way that claim fails is quiet: a bootstrap that throws, a
  * provider that goes missing, a control one renderer names differently. Each
  * leaves the React half looking perfect. So every assertion below is made of
- * BOTH panes, and found by role and accessible name only (formancy.ai 0034) --
- * the markup is each package's own on purpose, so anything structural would
- * compare the wrong thing.
+ * BOTH panes, and what it looks at is found in the accessibility tree, by
+ * role and accessible name (formancy.ai 0034) -- the markup is each package's
+ * own on purpose, so anything structural would compare the wrong thing.
+ *
+ * What that means where the tree has less to offer, said rather than implied:
+ * an input ARIA gives no role -- the date and the date-time -- is found by its
+ * name alone (`answerable` says what that cannot see); a sentence is found as
+ * a paragraph, by role, since a paragraph may not be named, and its words are
+ * the assertion; an error is read as the control's accessible description. And
+ * one test reads the DOM, because what it guards is not in the tree: duplicate
+ * element ids, at the end of the file.
  *
  * The values come from the fixture's own edges, read from the snapshot rather
  * than retyped: the largest numeric(18,4) is what sales.order.amount's type
@@ -71,10 +80,13 @@ async function mounted(): Promise<void> {
   for (const subject of EXAMPLES) expect(within(pane(subject, 'Angular')).queryByRole('alert')).toBeNull()
 }
 
-/** Every form control in a pane, by its computed accessible name, sorted. */
-function controlNames(container: HTMLElement): string[] {
-  return [...container.querySelectorAll<HTMLElement>('input, select, textarea')]
-    .filter((control) => control.closest('[hidden]') === null)
+/**
+ * Every control a person answers with in one preview, by its computed
+ * accessible name, sorted -- read from the accessibility tree, so a field drawn
+ * as a widget with a role is compared exactly as a native one is.
+ */
+function controlNames(subject: Example, renderer: Renderer): string[] {
+  return answerable(pane(subject, renderer), labelsOf(subject))
     .map((control) => computeAccessibleName(control))
     .sort()
 }
@@ -99,6 +111,21 @@ function verdict(element: HTMLElement): { invalid: boolean; describedAs: string 
   }
 }
 
+/** The labels of the fields the generator made required. */
+function requiredLabels(subject: Example): string[] {
+  return subject.generated.form.model.fields.filter((field) => field.required === true).map((field) => String(field.label))
+}
+
+/** What one preview tells a person about each required field, by name. */
+function requiredVerdicts(subject: Example, renderer: Renderer): Array<{ field: string; invalid: boolean; describedAs: string }> {
+  return requiredLabels(subject).map((field) => ({ field, ...verdict(control(subject, renderer, field)) }))
+}
+
+/** Every required field invalid and described as `required`: what an empty submit must produce. */
+function allRequired(subject: Example): Array<{ field: string; invalid: boolean; describedAs: string }> {
+  return requiredLabels(subject).map((field) => ({ field, invalid: true, describedAs: 'required' }))
+}
+
 describe.each(EXAMPLES.map((subject) => [tableOf(subject), subject] as const))('%s', (_table, subject) => {
   // The founding claim at its plainest. A renderer that dropped a field type,
   // missed a label or named a control differently would make these two lists
@@ -109,7 +136,7 @@ describe.each(EXAMPLES.map((subject) => [tableOf(subject), subject] as const))('
     const expected = [...labelsOf(subject)].sort()
     expect(expected.length).toBeGreaterThan(3)
     for (const renderer of RENDERERS) {
-      expect({ renderer, names: controlNames(pane(subject, renderer)) }).toEqual({ renderer, names: expected })
+      expect({ renderer, names: controlNames(subject, renderer) }).toEqual({ renderer, names: expected })
     }
   })
 
@@ -120,17 +147,12 @@ describe.each(EXAMPLES.map((subject) => [tableOf(subject), subject] as const))('
   test('every required field left empty is "required" in both', async () => {
     await mounted()
     const user = userEvent.setup()
-    const required = subject.generated.form.model.fields.filter((field) => field.required === true)
-    expect(required.length).toBeGreaterThan(0)
+    expect(requiredLabels(subject).length).toBeGreaterThan(0)
 
     for (const renderer of RENDERERS) {
       await user.click(within(pane(subject, renderer)).getByRole('button', { name: 'Validate' }))
       await waitFor(() => {
-        const seen = required.map((field) => ({ field: field.label, ...verdict(control(subject, renderer, String(field.label))) }))
-        expect({ renderer, seen }).toEqual({
-          renderer,
-          seen: required.map((field) => ({ field: field.label, invalid: true, describedAs: 'required' })),
-        })
+        expect({ renderer, seen: requiredVerdicts(subject, renderer) }).toEqual({ renderer, seen: allRequired(subject) })
       })
     }
   })
@@ -159,8 +181,13 @@ describe.each(EXAMPLES.map((subject) => [tableOf(subject), subject] as const))('
 
     for (const renderer of RENDERERS) expect(await violations(renderer)).toEqual([])
     for (const renderer of RENDERERS) await user.click(within(pane(subject, renderer)).getByRole('button', { name: 'Validate' }))
+    // Audited once every error is on the page AND wired to its control, which
+    // is the state the second run exists for -- waited for as each control's
+    // description, not as the word appearing somewhere in the pane.
     await waitFor(() => {
-      expect(within(pane(subject, 'Angular')).getAllByText('required').length).toBeGreaterThan(0)
+      for (const renderer of RENDERERS) {
+        expect({ renderer, seen: requiredVerdicts(subject, renderer) }).toEqual({ renderer, seen: allRequired(subject) })
+      }
     })
     for (const renderer of RENDERERS) expect(await violations(renderer)).toEqual([])
   })
@@ -223,7 +250,7 @@ describe('sales.order, at the edges the fixture inserts', () => {
       await waitFor(() => {
         const offered = within(customer)
           .getAllByRole('option')
-          .map((option) => option.textContent)
+          .map((option) => computeAccessibleName(option))
         expect({ renderer, offered }).toEqual({ renderer, offered: ['', 'Muster AG', 'Other Tenant GmbH'] })
       })
       await user.selectOptions(customer, within(customer).getByRole('option', { name: 'Other Tenant GmbH' }))
@@ -242,9 +269,16 @@ describe('a lookup with no rows on this page', () => {
   // would be -- the honest fallback, and the one an Angular host that forgot
   // the provider would show. Both renderers must show it, neither an empty
   // chooser, and the note beside the form must say the same thing.
+  //
+  // The sentence is a plain paragraph in both released renderers -- not a
+  // status, not a note, and tied to no control, because there is no control
+  // for it to describe. So it is found as a paragraph, by role, and must name
+  // the source the document asked for: the one fact a host needs to fix it.
   test('is said in both renderers and in the note, never offered as an empty chooser', async () => {
     render(<App captured={[]} />)
     const order = example('order')
+    const source = order.generated.bindings.fields.find((binding) => binding.kind === 'lookup')?.source
+    if (source === undefined) throw new Error('the order has no lookup to leave without rows')
     await waitFor(
       () => {
         for (const renderer of RENDERERS) {
@@ -256,8 +290,10 @@ describe('a lookup with no rows on this page', () => {
 
     for (const renderer of RENDERERS) {
       const preview = pane(order, renderer)
-      expect(within(preview).queryByRole('combobox', { name: 'Customer' })).toBeNull()
-      expect(preview.textContent).toContain(`which this application has not provided`)
+      // No control of any role answers to the name, not only no combobox.
+      expect(controlNames(order, renderer), `${renderer} offers a Customer control`).not.toContain('Customer')
+      const said = paragraphs(preview).filter((sentence) => sentence.includes(`"${source}"`) && sentence.includes('has not provided'))
+      expect({ renderer, said: said.length }).toEqual({ renderer, said: 1 })
     }
     const section = screen.getByRole('region', { name: tableOf(order) })
     expect(within(section).getByRole('note').textContent).toMatch(/has no source on this page/)
@@ -271,6 +307,11 @@ describe('the page as a whole', () => {
   // FIRST match, so the second renderer's fields lose their names entirely
   // (formancy.ai 0095). Asserted across the whole page, the only place the
   // collision exists.
+  //
+  // The one place this file reads the DOM rather than the accessibility tree,
+  // on purpose: an id is not in the tree, and the defect is the collision
+  // itself, before any name has been computed from it. formancy.ai's
+  // two-renderers test reads ids the same way, for the same reason.
   test('no two elements share an id', async () => {
     await mounted()
     const ids = [...document.querySelectorAll('[id]')].map((element) => element.id)

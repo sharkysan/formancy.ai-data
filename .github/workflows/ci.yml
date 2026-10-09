@@ -81,8 +81,58 @@ jobs:
 
       # The repository's own guards: codecov.yml matches its generator, every
       # CLA signature names the current text, upstream is depended on at exact
-      # versions. A guard that is not a gate is a comment.
+      # versions, no source file is past the 600-line budget. A guard that is
+      # not a gate is a comment.
       - run: pnpm test:repo
+
+  # What jsdom cannot see on the examples page, measured in Chromium: no
+  # sideways scroll down to 320px, the keyboard path through the skip link into
+  # the first preview, and colour contrast and target size, clean and after a
+  # failed submit. jsdom applies no CSS and performs no layout, so every one of
+  # those was a hand check until this job (0021).
+  #
+  # Its own job, as formancy.ai's is: "browser" says what is wrong, where a red
+  # "verify" sends the reader into a twenty-minute log to find out.
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      # Cached by the lockfile, which pins the playwright version the browser
+      # revision is tied to.
+      - name: Cache the Chromium download
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      # No `--with-deps`, for upstream's reason: it runs apt-get for libraries
+      # the hosted runner already ships, and on formancy.ai that once sat for
+      # nineteen minutes until the job timed out. If a library is ever missing,
+      # Chromium fails to launch and the gate prints the command to run. The
+      # step timeout is the backstop.
+      - run: pnpm --filter @formancy/data-examples exec playwright install chromium
+        timeout-minutes: 5
+
+      # Builds the page first (turbo's `dependsOn`), then measures it.
+      - run: pnpm test:browser
 
   # Every job above runs inside the workspace, against the tree it built from --
   # and a workspace sibling resolves a package through a symlink to its SOURCE

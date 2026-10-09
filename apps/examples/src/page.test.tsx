@@ -13,6 +13,7 @@ import { generateExamples } from './examples.js'
 import type { Example } from './examples.js'
 import { NOTE_KINDS } from './notes.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
+import { ANSWERING_ROLES, answerable, paragraphs } from './test-accessible.js'
 
 /**
  * The page around the previews: what it says, and whether it can be used.
@@ -22,6 +23,11 @@ import { FIXTURE_SNAPSHOT } from './snapshot.js'
  * is the floor any page here is held to: reachable by keyboard, every control
  * named, and an audit of the whole document -- including the page-level rules
  * a form fragment is excused from, because this is a page.
+ *
+ * Everything is found in the accessibility tree, by role and accessible name
+ * (formancy.ai 0034); a sentence, which may not be named, by its role as a
+ * paragraph. What jsdom cannot show at all -- layout, the keyboard path in a
+ * real browser, colour -- is `scripts/browser-test.mjs`'s.
  */
 afterEach(cleanup)
 
@@ -47,6 +53,15 @@ beforeEach(() => {
   document.documentElement.lang = served.documentElement.lang
   document.title = served.title
 })
+
+/**
+ * What a person operates on the page, from the accessibility tree: its links
+ * and buttons, and every control in every preview.
+ */
+function operable(): HTMLElement[] {
+  const names = EXAMPLES.flatMap((subject) => subject.generated.form.model.fields.map((field) => String(field.label)))
+  return [...screen.queryAllByRole('link'), ...screen.queryAllByRole('button'), ...answerable(document.body, names)]
+}
 
 async function mounted(): Promise<void> {
   render(<App />)
@@ -78,7 +93,7 @@ describe('the generator says what it chose, beside each form', () => {
         // An empty kind is said, not omitted: "nothing was excluded" is a
         // finding, and a missing heading reads as a page that forgot.
         expect(list).toBeNull()
-        expect(within(notes).getByText(kind.none)).toBeTruthy()
+        expect(paragraphs(notes)).toContain(kind.none)
         continue
       }
       expect(list, `${kind.heading} is missing`).not.toBeNull()
@@ -131,26 +146,29 @@ describe('the page can be used without a mouse or a screen', () => {
   test('Tab reaches every enabled control on the page', async () => {
     await mounted()
     const user = userEvent.setup()
-    const operable = [...document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea')].filter(
-      (element) => !(element as HTMLInputElement).disabled && element.closest('[hidden]') === null,
-    )
-    expect(operable.length).toBeGreaterThan(20)
+    const enabled = operable().filter((element) => !(element as HTMLInputElement).disabled)
+    expect(enabled.length).toBeGreaterThan(20)
 
     const reached = new Set<Element>()
-    for (let step = 0; step < operable.length + 5; step += 1) {
+    for (let step = 0; step < enabled.length + 5; step += 1) {
       await user.tab()
       if (document.activeElement !== null) reached.add(document.activeElement)
     }
-    expect(operable.filter((element) => !reached.has(element)).map((element) => computeAccessibleName(element))).toEqual([])
+    expect(enabled.filter((element) => !reached.has(element)).map((element) => computeAccessibleName(element))).toEqual([])
   })
 
   // axe does not notice a control named by something useless, and says
   // nothing about one it thinks is named; computing every name with a real
   // implementation and refusing an empty one does.
+  //
+  // By role alone, and deliberately not through `answerable`'s names: a
+  // control found by its name is named by construction. An input ARIA gives
+  // no role and nobody named is invisible to the tree, and axe's `label` rule,
+  // in the WCAG run below, is what refuses that one.
   test('every control and link has an accessible name', async () => {
     await mounted()
-    const unnamed = [...document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea')]
-      .filter((element) => element.closest('[hidden]') === null)
+    const unnamed = (['link', 'button', ...ANSWERING_ROLES] as const)
+      .flatMap((role) => screen.queryAllByRole(role))
       .filter((element) => computeAccessibleName(element).trim() === '')
       .map((element) => element.outerHTML.slice(0, 80))
     expect(unnamed).toEqual([])

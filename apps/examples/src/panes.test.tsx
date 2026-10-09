@@ -6,6 +6,15 @@ import { generateExamples } from './examples.js'
 import { AngularPane, ReactPane } from './panes.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
 
+/**
+ * One preview pane at a time, around the renderer rather than through it.
+ *
+ * Found by role and accessible name (formancy.ai 0034), with one exception,
+ * on purpose: the host element a failed Angular start must not leave behind is
+ * an empty custom element, with no role and no name, so the accessibility tree
+ * cannot say whether it is there. That one is read from the DOM, by its tag,
+ * because the tag is the thing that must be gone.
+ */
 afterEach(cleanup)
 
 function orderEngine(renderer: 'react' | 'angular'): FormEngine {

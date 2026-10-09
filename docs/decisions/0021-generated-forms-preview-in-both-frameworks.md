@@ -11,8 +11,27 @@
   of the chosen key; a lookup with no rows is said in both and in the note; axe,
   in the configuration `@formancy/conformance` holds the renderers to, finds
   nothing in either preview, clean or after a failed submit; no two elements on
-  the page share an id. Watched failing against an empty page, and with the
-  Angular half alone denied its option sources (three cases fail).
+  the page share an id. Controls are read from the accessibility tree, by role
+  and accessible name, and the header says where the tree cannot answer.
+  Watched failing against an empty page, with the Angular half alone
+  denied its option sources (four cases fail), and with a stray `role="switch"`
+  in one preview, which a list of tags did not see.
+  `apps/examples/src/examples.test.ts`, the starter-demo test — every document
+  the page shows is one the released spec accepts and places every field in
+  the layout both previews draw, the order has the composite lookup into the
+  customer, the decimal wider than a number and the integer past 2^53, both as
+  text, and the customer a composite identity and no version column. Watched
+  failing with a stray field, a lookup removed and a table swapped.
+  `apps/examples/scripts/browser-test.mjs` (`pnpm test:browser`, its own CI
+  job), in Chromium at 320 and 360 pixels, one past each breakpoint in
+  `app.css` and 1440, and at 320 again with the web fonts refused — no
+  sideways scroll and nothing past either edge, the first Tab on the skip link
+  and on screen, the next after it on the first preview's first control, and
+  axe's colour-contrast and target-size rules with nothing switched off, clean
+  and after a failed submit. Watched failing with a minimum width, a clipped
+  paragraph, a skip link that stays hidden, a muted colour darkened, a tab
+  stop before the first preview, a link ahead of the skip link and one Angular
+  preview that does not start.
   `apps/examples/src/snapshot.test.ts` — the committed snapshot hashes to its
   fingerprint, is the canonical form `createSnapshot` makes, is refused by the
   page when edited, agrees with the shared fixture model, names a server
@@ -22,7 +41,9 @@
   the in-memory statement, Tab reaching every enabled control, a name on every
   control, and axe over the whole document including the page-structure rules.
   `scripts/upstream-deps.mjs` refuses a range in the app's manifest, watched
-  failing with `^0.3.0`.
+  failing with `^0.3.0`. `scripts/source-size.test.mjs` holds every source
+  file, the app's among them, to the 600 lines `CLAUDE.md` sets, watched
+  failing at 601.
 
 ## Context
 
@@ -98,21 +119,29 @@ screen in miniature.
 - **The admin's palette is copied, not depended on.** It is an application's
   stylesheet, not a package. When upstream's palette moves, `app.css` moves by
   hand, and nothing fails when it does not.
-- **jsdom sees no layout.** No horizontal scroll at phone width, and the
-  keyboard order in a real browser, were checked by hand on 2026-10-09 in
-  Chromium at 1440, 360 and 320 CSS pixels: the document's scroll width equal to
-  its client width, no element past the right edge, the skip link first and the
-  first control of the first preview next. No gate repeats that, and colour
-  contrast is unmeasured. The guards `CLAUDE.md` names for the first UI —
-  upstream's file-size budget, starter-demo and browser tests — do not arrive
-  with this record.
+- **jsdom sees no layout, so a browser gate does, in one browser.** The
+  guards `CLAUDE.md` names for the first UI arrive with this record: the
+  size budget, the starter-demo test and the browser gate. The gate is
+  Chromium only — Firefox and Safari lay out and expose focus their own way —
+  and axe is the floor of contrast, not a proof of it. It needs a Chromium
+  download per machine, and a CI job of its own that builds the page again.
+  320 pixels is measured with the web fonts refused as well; every other run
+  measures whichever fonts arrive, and prints which.
+- **Where the accessibility tree cannot answer.** An input ARIA gives no
+  role — the date and the date-time here — is found by the name the generator
+  gave it, so one drawn under a name nobody generated would go unseen by the
+  parity test; axe's `label` rule refuses one with no name at all. And two
+  tests read the DOM because what they guard is not in the tree: duplicate
+  element ids, and the empty host element a failed Angular start must not
+  leave behind. Each test's header says so.
 - **The notes are shown as the generator writes them**, including the way it
   currently de-snakes its own descriptions ("java script", "utc"). Fixing that is
   a generator change, not a page change.
 - **The Angular toolchain enters the lockfile** as development dependencies,
   `@angular/build` among them because the plugin compiles through it. Three of
   its transitive packages carry native-addon install scripts; they are not
-  allowed to run, and the app builds and tests without them.
+  allowed to run, and the app builds and tests without them. Playwright
+  enters with the gate, at formancy.ai's catalog version.
 - **Weight.** `vite build` on 2026-10-09: the page's script is 431 kB minified
   (132 kB gzipped) and the Angular bootstrap, loaded when the first Angular
   preview mounts, 203 kB (60 kB). Two frameworks are the point of the page.
@@ -141,6 +170,19 @@ each into its own element.
 **Copy the accessibility configuration.** Rejected: the tags and exclusions are
 `@formancy/conformance`'s public contract at 0.3.0, so the app depends on it
 rather than restating it (0002).
+
+**The page now, its guards later.** Rejected: `CLAUDE.md` asks the first UI
+to bring them, and without the gate the layout, keyboard and colour claims
+above rested on one hand check, on one day, in one browser.
+
+**Screenshots for the browser gate.** Rejected for upstream's reason: a pixel
+baseline is a file somebody updates when it goes red, and what can go wrong
+here is a number — an overflow, a focused element, a contrast ratio.
+
+**Find controls by tag and selector.** Rejected for formancy.ai 0034's
+reason, and found here: a list of `input, select, textarea` did not see a
+control drawn as a widget with a role, so a renderer could add one, or draw a
+field that way under another name, and the parity test would still pass.
 
 **Wait for the lookup route.** Rejected: a lookup is the generator's most
 consequential choice on this table, and a preview without one would show the
