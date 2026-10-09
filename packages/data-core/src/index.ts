@@ -37,6 +37,22 @@ export type {
 } from './generate/types.js'
 export { diffSnapshots } from './drift/diff.js'
 export type { DriftChange, DriftKind, DriftReport, DriftSeverity, DriftSubject } from './drift/types.js'
+export { applyPresentation, presentationShapeProblems } from './presentation/apply.js'
+export { presentationOf } from './presentation/derive.js'
+export { reassignedKeys, rebasePresentation } from './presentation/rebase.js'
+export { EMPTY_PRESENTATION, fieldAnchor, PRESENTATION_VERSION } from './presentation/types.js'
+export type {
+  FieldAnchor,
+  FieldPresentation,
+  PresentationCheck,
+  PresentationConflict,
+  PresentationOverrides,
+  PresentedForm,
+  ReassignedKey,
+  RebasedPresentation,
+  SectionAnchor,
+  SectionPresentation,
+} from './presentation/types.js'
 
 export { decodeKeyToken, encodeKeyToken, KEY_TOKEN_MAX_LENGTH } from './lookup/token.js'
 export type { KeyTokenDecoding, KeyTokenEncoding, KeyTokenErrorCode, KeyTokenRefusal } from './lookup/token.js'

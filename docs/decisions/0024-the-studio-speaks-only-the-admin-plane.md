@@ -1,6 +1,6 @@
 # 0024 — The studio speaks only the administrator plane
 
-- **Status:** accepted
+- **Status:** accepted; presentation survives regeneration, and an edit that is not presentation is refused at publish, narrowed by [0030](0030-presentation-is-a-patch-over-the-generated-base.md)
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `apps/studio/src/journey.test.tsx` — every request the

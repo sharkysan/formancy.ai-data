@@ -1,6 +1,6 @@
 # 0013 — Published configuration is files, and compare-and-swap is a hard link
 
-- **Status:** accepted
+- **Status:** accepted; `versions()` on the port, and a restore is a new version holding the old one's document, extended by [0030](0030-presentation-is-a-patch-over-the-generated-base.md)
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/config-store.test.ts` — versions

@@ -1,11 +1,15 @@
 import { diffSnapshots, generateForm } from '@formancy/data-core'
-import type { LookupChoice } from '@formancy/data-core'
+import type { MetadataSnapshot } from '@formancy/data-core'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import { generatedProblems } from '../bundle-format2.js'
 import { validateBundle } from '../bundle.js'
 import type { PublishedBundle } from '../bundle.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry, OpenConnection } from '../connections.js'
+import { readGeneration } from '../generation.js'
 import type { HostIdentity } from '../identity.js'
+import { FORM_ID, loadPublished } from '../published.js'
+import { evolutionRoutes } from './admin-evolution.js'
 
 export interface AdminOptions {
   registry: ConnectionRegistry
@@ -15,8 +19,11 @@ export interface AdminOptions {
   authenticate: (request: FastifyRequest) => Promise<HostIdentity | undefined>
 }
 
-/** A form id is a configuration id: lower case, so it means one thing on every filesystem (0013). */
-const FORM_ID = /^[a-z0-9][a-z0-9._-]{0,127}$/
+/** Sends a refusal: a stable code, a sentence, and whatever else the caller can act on. */
+export type Refuse = (reply: FastifyReply, status: number, code: string, message: string, extra?: Record<string, unknown>) => FastifyReply
+
+/** Discovers a connection's database as it is now, or sends the refusal and gives `undefined`. */
+export type Discover = (connection: string, reply: FastifyReply) => Promise<MetadataSnapshot | undefined>
 
 function refuse(reply: FastifyReply, status: number, code: string, message: string, extra: Record<string, unknown> = {}) {
   return reply.code(status).send({ code, message, ...extra })
@@ -26,23 +33,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function lookupChoices(value: unknown): LookupChoice[] | undefined {
-  if (value === undefined) return []
-  if (!Array.isArray(value)) return undefined
-  const choices: LookupChoice[] = []
-  for (const entry of value) {
-    if (!isRecord(entry) || typeof entry['foreignKey'] !== 'string') return undefined
-    const display = entry['display']
-    if (!Array.isArray(display) || !display.every((column) => typeof column === 'string')) return undefined
-    choices.push({ foreignKey: entry['foreignKey'], display: display as string[] })
-  }
-  return choices
-}
-
 /**
- * The administrator's plane: connections, discovery, proposals, publication
- * and drift (plan section 13). Every route requires a host identity holding
- * one of `adminRoles` — publishing a form and writing a business record are
+ * The administrator's plane: connections, discovery, proposals, publication,
+ * drift, and since 0030 versions, regeneration and restore (plan section 13).
+ * Every route requires a host identity holding one of `adminRoles` —
+ * publishing a form and writing a business record are
  * different permissions, and nothing here touches a record.
  *
  * A database that cannot be reached is 503 with no detail: a driver's message
@@ -77,7 +72,7 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     return open
   }
 
-  async function discover(id: string, reply: FastifyReply) {
+  async function discover(id: string, reply: FastifyReply): Promise<MetadataSnapshot | undefined> {
     const scope = registry.scope(id)
     const open = await connection(id, reply)
     if (open === undefined || scope === undefined) return undefined
@@ -110,36 +105,15 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
   app.post('/v1/form-proposals', async (request, reply) => {
     const body = request.body
     if (!isRecord(body)) return refuse(reply, 400, 'invalid-request', 'Expected a JSON object.')
-    const { connection: id, root, formId, title, versionColumn, pinned } = body
-    const lookups = lookupChoices(body['lookups'])
-    const pinnedColumns = pinned === undefined ? [] : Array.isArray(pinned) && pinned.every((name) => typeof name === 'string') ? (pinned as string[]) : undefined
-    if (
-      typeof id !== 'string' ||
-      !isRecord(root) ||
-      typeof root['schema'] !== 'string' ||
-      typeof root['name'] !== 'string' ||
-      typeof formId !== 'string' ||
-      !FORM_ID.test(formId) ||
-      typeof title !== 'string' ||
-      lookups === undefined ||
-      pinnedColumns === undefined ||
-      (versionColumn !== undefined && typeof versionColumn !== 'string')
-    ) {
+    const read = readGeneration(body)
+    if (!read.ok) {
       return refuse(reply, 400, 'invalid-request', 'Expected connection, root { schema, name }, a lower-case formId, title, and optional lookups, versionColumn and pinned columns.')
     }
-    const snapshot = await discover(id, reply)
+    const snapshot = await discover(read.generation.connection, reply)
     if (snapshot === undefined) return reply
     try {
-      const generated = generateForm(snapshot, {
-        connection: id,
-        root: { schema: root['schema'], name: root['name'] },
-        formId,
-        title,
-        lookups,
-        pinned: pinnedColumns,
-        ...(typeof versionColumn === 'string' ? { versionColumn } : {}),
-      })
-      return { ...generated, snapshot }
+      // The request as it was read is what a format-2 bundle keeps (0030), so a regeneration asks for the same form.
+      return { ...generateForm(snapshot, read.generation), snapshot, generation: read.generation }
     } catch (error) {
       // generateForm's messages name only approved metadata and the request's own words.
       return refuse(reply, 422, 'cannot-generate', (error as Error).message)
@@ -156,10 +130,16 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     const checked = validateBundle(body['bundle'])
     if (!checked.ok) return refuse(reply, 422, 'invalid-bundle', 'The bundle cannot be published.', { problems: checked.problems })
     const bundle = checked.bundle
+    if (bundle.format === 1) {
+      return refuse(reply, 422, 'invalid-bundle', 'The bundle cannot be published.', { problems: ['publish format 2: since 0030 a version keeps its generation request, generated base and presentation'] })
+    }
     if (bundle.form.id !== id) return refuse(reply, 422, 'invalid-bundle', `The form's id is ${bundle.form.id}, not ${id}.`)
     if (registry.scope(bundle.connection) === undefined) {
       return refuse(reply, 422, 'invalid-bundle', `No connection is called ${bundle.connection}.`)
     }
+    // At publish only: on read, a later generator must not make a stored version corrupt (0030).
+    const generated = generatedProblems(bundle)
+    if (generated.length > 0) return refuse(reply, 422, 'invalid-bundle', 'The bundle cannot be published.', { problems: generated })
     const outcome = await store.publish(id, body['expectedBase'] as number | null, bundle)
     if (!outcome.ok) return refuse(reply, 409, 'conflict', 'Somebody published first. Rebase on the current version and try again.', { current: outcome.current })
     return reply.code(201).send({ version: outcome.version })
@@ -167,22 +147,10 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
 
   /** The newest published bundle, re-validated, or a reply already sent. */
   async function latest(id: string, reply: FastifyReply): Promise<{ version: number; bundle: PublishedBundle } | undefined> {
-    if (!FORM_ID.test(id)) {
-      await refuse(reply, 404, 'unknown-form', `No form is called ${id}.`)
-      return undefined
-    }
-    const version = await store.latest(id)
-    if (version === null) {
-      await refuse(reply, 404, 'unknown-form', `No form is called ${id}.`)
-      return undefined
-    }
-    const checked = validateBundle(await store.read(id, version))
-    if (!checked.ok) {
-      reply.log.error({ form: id, version, problems: checked.problems }, 'a published bundle failed validation')
-      await refuse(reply, 500, 'corrupt-bundle', `Version ${String(version)} of ${id} no longer validates and is not served.`)
-      return undefined
-    }
-    return { version, bundle: checked.bundle }
+    const loaded = await loadPublished(store, id, reply.log)
+    if (loaded.ok) return { version: loaded.version, bundle: loaded.bundle }
+    await refuse(reply, loaded.status, loaded.code, loaded.message)
+    return undefined
   }
 
   app.get<{ Params: { id: string } }>('/v1/forms/:id/versions/latest', async (request, reply) => {
@@ -196,4 +164,7 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     if (current === undefined) return reply
     return { version: published.version, ...diffSnapshots(published.bundle.snapshot, current, published.bundle.bindings, published.bundle.policy) }
   })
+
+  // After the role check above, which covers every route registered on this instance.
+  evolutionRoutes(app, { store, discover, refuse })
 }

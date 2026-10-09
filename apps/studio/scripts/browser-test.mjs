@@ -10,14 +10,16 @@
 //   - the keyboard path: the first Tab on the sign-in screen reaches the
 //     token, and in the workbench the skip link comes on screen and leads
 //     into the step; and where Enter moves or removes the button it was
-//     pressed on -- a field moved down, a filter removed, a conflict rebased
-//     -- the keyboard is somewhere deliberate afterwards, not on the page;
+//     pressed on -- a field moved down, a filter removed, a conflict rebased,
+//     a restore refused, a dropped label given -- the keyboard is somewhere
+//     deliberate afterwards, not on the page;
 //   - the preview's paper is the theme's: no rule of studio.css selects
 //     anything on it, so the preview shows what the published form will;
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules jsdom cannot measure -- on every step, including the states
 //     that add colour: gaps, a refused policy, a failed preview, a conflict,
-//     a blocking drift.
+//     a blocking drift, a refused restore, a regeneration and what it
+//     carried (0030).
 //
 // Against the page `vite build` produces, served over HTTP from the same
 // origin as the real data server -- createDataServer, in this process, with
@@ -76,6 +78,14 @@ async function startPlane() {
     token === TOKEN ? { ok: true, identity: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } } : { ok: false, reason: 'ERR_JWS_INVALID' }
   const server = await createDataServer({ verifyIdentity, admin: { registry, store: createFileConfigurationStore(root), adminRoles: ['data-admin'] } })
   return { server, databases, close: async () => { await server.close(); rmSync(root, { recursive: true, force: true }) } }
+}
+
+/** The fixture's sales.order with one column renamed: to the catalog, one dropped and one added in its place. */
+function renamed(from, to) {
+  const { fingerprint: _, ...contents } = snapshot('postgres-owner.json')
+  const column = contents.objects.find((object) => object.ref.name === 'order').columns.find((candidate) => candidate.name === from)
+  column.name = to
+  return createSnapshot(contents)
 }
 
 /** The built studio and the plane, on one origin, on a port the system picks. */
@@ -337,6 +347,37 @@ function journey(plane, check) {
       await nav(page, 'Drift').click()
       await step(page, 'Drift').getByRole('button', { name: 'Check drift' }).click()
       await page.getByRole('region', { name: /^Version \d+ of sales-order, against the database now$/ }).waitFor()
+    }],
+    // 0030's answers to drift. Version 1 is bound to the dropped notes, so its
+    // restore is refused, with what blocks it; the button stays, and keeps
+    // the keyboard.
+    ['Drift, a restore refused', async (page) => {
+      const versions = step(page, 'Drift').getByRole('region', { name: 'Versions of sales-order' })
+      const restore = versions.getByRole('button', { name: 'Restore version 1' })
+      check('a refused restore leaves the keyboard on its button', await focusAfterEnter(page, restore, () => versions.getByRole('alert').waitFor(), restore))
+    }],
+    ['Drift, regenerated', async (page) => {
+      // notes renamed to memo: the label chosen for notes is dropped, and memo is a field to give it to.
+      plane.databases.set('fixture', renamed('notes', 'memo'))
+      const drift = step(page, 'Drift')
+      await drift.getByRole('button', { name: 'Regenerate, keeping your presentation' }).click()
+      await drift.getByRole('region', { name: /^Regenerated from version \d+$/ }).waitFor()
+    }],
+    ['Presentation, carried', async (page) => {
+      await step(page, 'Drift').getByRole('button', { name: 'Continue to presentation' }).click()
+      const presentation = step(page, 'Presentation')
+      const give = presentation.getByRole('region', { name: /^Carried from version \d+$/ }).getByRole('button', { name: 'Give “Remarks”' })
+      check('giving a dropped label to memo leaves the keyboard on the button pressed', await focusAfterEnter(page, give, () => presentation.getByText('Labelled memo “Remarks”.').waitFor(), give))
+    }],
+    ['Drift, restored', async (page) => {
+      // The database put back: version 1 can be served again, and is restored as the next version.
+      plane.databases.set('fixture', snapshot('postgres-owner.json'))
+      await nav(page, 'Drift').click()
+      const drift = step(page, 'Drift')
+      await drift.getByRole('button', { name: 'Check drift' }).click()
+      const versions = drift.getByRole('region', { name: 'Versions of sales-order' })
+      await versions.getByRole('button', { name: 'Restore version 1' }).click()
+      await versions.getByText(/^Restored version 1 as version \d+/).waitFor()
     }],
   ]
 }

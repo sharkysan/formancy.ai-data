@@ -1,10 +1,15 @@
 import { createSecretKey } from 'node:crypto'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { FieldBinding, FieldWrites, FormPolicy } from '@formancy/data-core'
+import { EMPTY_PRESENTATION, presentationOf } from '@formancy/data-core'
+import type { FieldBinding, FieldWrites, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, PresentationOverrides } from '@formancy/data-core'
 import { EDGE_VALUES, startPostgresFixture, startSqlServerFixture, WRITER } from '@formancy/data-fixtures'
 import type { PostgresFixture, SqlServerFixture } from '@formancy/data-fixtures'
+import { connectPostgres } from '@formancy/data-postgres'
+import { connectSqlServer } from '@formancy/data-sqlserver'
+import type { FormSchema, LayoutNode } from '@formancy/spec'
+import { canonicalize } from '@formancy/spec'
 import type { FastifyInstance } from 'fastify'
 import { SignJWT } from 'jose'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -30,6 +35,11 @@ import { createIdentityVerifier } from './identity.js'
  * Then again through the order form's own account, formancy_writer (0027):
  * what it may not UPDATE is written on create only, and the policy on
  * customer shows it tenant 1's rows only, whoever the clerk is.
+ *
+ * Last, plan section 14's demonstration step 8 (0030): the order table is
+ * altered under a published form with a presentation, the form regenerated
+ * and restored. It changes the shared sales.order, so it runs after every
+ * other journey in this file.
  */
 const SECRET = 'an-end-to-end-host-secret-of-32-bytes!'
 const ISSUER = 'https://host.example'
@@ -116,6 +126,19 @@ afterAll(async () => {
 const call = (method: 'GET' | 'POST', url: string, bearer: string, payload?: unknown) =>
   app.inject({ method, url, headers: { authorization: `Bearer ${bearer}` }, ...(payload === undefined ? {} : { payload: payload as Record<string, unknown> }) })
 
+/** A proposal as the server answers it. */
+interface Proposal {
+  form: FormSchema
+  bindings: FormBindings
+  snapshot: MetadataSnapshot
+  generation: GenerationRequest
+}
+
+/** A proposal published as proposed: format 2, nothing chosen over the generated base (0030). */
+function asProposed(connection: string, { form, bindings, snapshot, generation }: Proposal, policy: FormPolicy) {
+  return { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot }
+}
+
 /** A clerk may do everything the form offers, on the fields it writes on either operation; read-only fields are readable only. */
 function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
@@ -149,9 +172,9 @@ describe.each([
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode).toBe(200)
-    const { form, bindings, snapshot } = proposal.json()
-    expect(bindings.operations).toEqual({ create: true, update: true })
-    const bundle = { format: 1, connection, form, bindings, policy: clerkPolicy(bindings.fields), snapshot }
+    const proposed = proposal.json() as Proposal
+    expect(proposed.bindings.operations).toEqual({ create: true, update: true })
+    const bundle = asProposed(connection, proposed, clerkPolicy(proposed.bindings.fields))
     const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle })
     expect(published.statusCode, published.body).toBe(201)
   })
@@ -232,7 +255,8 @@ describe.each([
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const { form, bindings, snapshot, notes } = proposal.json()
+    const proposed = proposal.json()
+    const { bindings, snapshot, notes } = proposed
     expect(snapshot.account.user).toBe(WRITER.user)
     expect(bindings.operations).toEqual({ create: true, update: true })
     const fields = bindings.fields as FieldBinding[]
@@ -241,7 +265,7 @@ describe.each([
     expect(notes).toContainEqual(expect.objectContaining({ subject: 'customer', kind: 'access', message: expect.stringMatching(/^Row-level security applies to this connection on sales\.customer/) }))
     writerWrites.set(connection.slice(0, 2), fields.map((binding): [string, FieldWrites] => [binding.field, binding.writes]))
 
-    const bundle = { format: 1, connection, form, bindings, policy: clerkPolicy(fields), snapshot }
+    const bundle = asProposed(connection, proposed, clerkPolicy(fields))
     const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle })
     expect(published.statusCode, published.body).toBe(201)
   })
@@ -290,5 +314,197 @@ describe("the order form's own account on both engines", () => {
   test('the fields write the same on each operation on PostgreSQL and SQL Server', () => {
     expect(writerWrites.get('pg')).toBeDefined()
     expect(writerWrites.get('ms')).toEqual(writerWrites.get('pg'))
+  })
+})
+
+/**
+ * Statements on the database's owner, which is who changes a schema. The
+ * DDL is plan section 14's step 8, measured on both servers first
+ * (2026-10-09): SQL Server refuses to drop a column a foreign key uses, so
+ * the constraint goes first there; PostgreSQL drops it with the column.
+ * Neither needed a grant revoked.
+ */
+const STEP_8 = {
+  pg: {
+    compatible: [
+      'alter table sales."order" add column reference varchar(40)',
+      'alter table sales."order" alter column "group" type varchar(60)',
+      `alter table sales."order" drop constraint ck_order_status, add constraint ck_order_status check (status in ('draft', 'placed', 'shipped', 'cancelled'))`,
+    ],
+    incompatible: ['alter table sales."order" drop column approved_by'],
+  },
+  ms: {
+    compatible: [
+      'alter table sales.[order] add reference nvarchar(40) null',
+      'alter table sales.[order] alter column [group] nvarchar(60) null',
+      `alter table sales.[order] drop constraint ck_order_status; alter table sales.[order] add constraint ck_order_status check (status in ('draft', 'placed', 'shipped', 'cancelled'))`,
+    ],
+    incompatible: ['alter table sales.[order] drop constraint fk_order_approved_by', 'alter table sales.[order] drop column approved_by'],
+  },
+} as const
+
+/** Runs statements as the owner, one batch each, on a connection of its own that the suite closes. */
+async function owner(connection: 'pg' | 'ms'): Promise<{ run(statements: readonly string[]): Promise<void>; close(): Promise<void> }> {
+  if (connection === 'pg') {
+    const url = new URL(pg.admin)
+    const sql = connectPostgres({
+      host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: decodeURIComponent(url.password), tls: { enabled: false, rejectUnauthorized: false },
+    })
+    return { run: async (statements) => { for (const statement of statements) await sql.unsafe(statement) }, close: () => sql.end({ timeout: 5 }) }
+  }
+  const pool = await connectSqlServer({
+    host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true,
+  })
+  return { run: async (statements) => { for (const statement of statements) await pool.request().batch(statement) }, close: () => pool.close() }
+}
+
+type Grid = { kind: 'table'; columns: number; children: Array<{ kind: 'field'; path: string; span?: 'all' }> }
+const sectionsOf = (form: FormSchema) => (form.layouts?.[0]?.nodes ?? []) as Array<{ kind: 'section'; label: string; children: LayoutNode[] }>
+const orderOf = (form: FormSchema) => (sectionsOf(form)[0]?.children[0] as Grid).children.map((node) => node.path)
+
+describe.each([
+  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'SQL Server', connection: 'ms' as const, versionColumn: undefined },
+])('a published form through a change to its table on $engine (plan section 14, step 8)', ({ connection, versionColumn }) => {
+  const formId = `${connection}-evolve`
+  let ddl: Awaited<ReturnType<typeof owner>>
+  let proposal: Proposal
+  let edited: FormSchema
+  let presentation: PresentationOverrides
+  const file = (version: number) => readFile(join(root, formId, `${String(version)}.json`), 'utf8')
+  const versions = async () => (await call('GET', `/v1/forms/${formId}/versions`, admin)).json().versions as number[]
+
+  beforeAll(async () => {
+    ddl = await owner(connection)
+  })
+  afterAll(async () => {
+    await ddl?.close()
+  })
+
+  // Steps 1 and 2: propose with the journey's request, then the studio's
+  // four edits, made by JSON as builder-core makes them. The presentation
+  // derived holds exactly those edits.
+  test('an administrator proposes the order form and edits its presentation', async () => {
+    const response = await call('POST', '/v1/form-proposals', admin, {
+      connection, root: { schema: 'sales', name: 'order' }, formId, title: 'Order', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }], ...(versionColumn === undefined ? {} : { versionColumn }),
+    })
+    expect(response.statusCode, response.body).toBe(200)
+    proposal = response.json() as Proposal
+    expect(orderOf(proposal.form)).toEqual(['customer', 'order_date', 'status', 'amount', 'notes', 'group', 'created_by', 'approved_by'])
+
+    edited = JSON.parse(JSON.stringify(proposal.form)) as FormSchema
+    for (const [key, label] of [['notes', 'Delivery notes'], ['approved_by', 'Approver']] as const) {
+      const field = edited.model.fields.find((entry) => entry.key === key)
+      if (field !== undefined) field.label = label
+    }
+    const order = sectionsOf(edited)[0] as { label: string; children: LayoutNode[] }
+    order.label = 'Order details'
+    const nodes = (order.children[0] as Grid).children
+    nodes.splice(3, 0, ...nodes.splice(4, 1))
+    const group = nodes.find((node) => node.path === 'group')
+    if (group !== undefined) group.span = 'all'
+
+    const derived = presentationOf(proposal.form, edited, proposal.bindings)
+    expect(derived.ok, derived.ok ? '' : derived.problems.join('; ')).toBe(true)
+    presentation = (derived as { presentation: PresentationOverrides }).presentation
+    expect(presentation).toEqual({
+      version: 1,
+      fields: [
+        { field: 'notes', anchor: { kind: 'column', column: 'notes' }, label: 'Delivery notes' },
+        { field: 'group', anchor: { kind: 'column', column: 'group' }, span: 'all' },
+        { field: 'approved_by', anchor: { kind: 'column', column: 'approved_by' }, label: 'Approver' },
+      ],
+      sections: [{ anchor: { label: 'Order', occurrence: 0 }, label: 'Order details', order: ['customer', 'order_date', 'status', 'notes', 'amount', 'group', 'created_by', 'approved_by'] }],
+    })
+  })
+
+  // Step 3: published as version 1, its presentation beside its base.
+  test('publishes version 1 with that presentation', async () => {
+    const bundle = { ...asProposed(connection, proposal, clerkPolicy(proposal.bindings.fields)), presentation, form: edited }
+    const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle })
+    expect(published.statusCode, published.body).toBe(201)
+  })
+
+  // Step 4: a compatible change. Measured on both servers: a nullable
+  // column, a wider text column and a replaced check are, for this form, one
+  // thing to review and two to note — nothing it rests on stops.
+  test('a compatible change to the table is reviewed and blocks nothing', async () => {
+    await ddl.run(STEP_8[connection].compatible)
+    const drift = (await call('POST', `/v1/forms/${formId}/drift`, admin)).json()
+    expect(drift.blocking).toBe(false)
+    expect(drift.changes.map((change: { kind: string; severity: string }) => [change.kind, change.severity])).toEqual([
+      ['column-added', 'review'],
+      ['check-changed', 'info'],
+      ['column-loosened', 'info'],
+    ])
+  })
+
+  // Steps 5 and 6: regenerated, the person's four edits come through
+  // untouched, the new column goes after its generated predecessor, and
+  // the wider column is wider in the form. Published from it, the form and
+  // the database agree again.
+  test('a regeneration carries the presentation, and its publish leaves no drift', async () => {
+    const response = await call('POST', `/v1/forms/${formId}/regenerations`, admin)
+    expect(response.statusCode, response.body).toBe(200)
+    const regeneration = response.json()
+    expect(regeneration).toMatchObject({ version: 1, conflicts: [], lookupsDropped: [], keysReassigned: [], policyProblems: [] })
+    expect(canonicalize(regeneration.presentation.fields)).toBe(canonicalize(presentation.fields))
+    expect(orderOf(regeneration.form)).toEqual(['customer', 'order_date', 'status', 'notes', 'amount', 'group', 'created_by', 'approved_by', 'reference'])
+    expect(regeneration.form.model.fields.find((field: { key: string }) => field.key === 'group')).toMatchObject({ maxLength: 60, label: 'Group' })
+
+    const { version, drift: _drift, policyProblems: _problems, conflicts: _conflicts, lookupsDropped: _dropped, keysReassigned: _keys, notes: _notes, ...parts } = regeneration
+    const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: version, bundle: { format: 2, connection, ...parts } })
+    expect(published.statusCode, published.body).toBe(201)
+    expect((await call('POST', `/v1/forms/${formId}/drift`, admin)).json()).toMatchObject({ version: 2, changes: [], blocking: false })
+  })
+
+  // Step 7: version 1 still fits the database, so it may be restored, as a
+  // new version holding the same document; this store wrote version 1, so
+  // the new file holds the same bytes.
+  test('version 1 is restored, in the same bytes, as version 3', async () => {
+    const restored = await call('POST', `/v1/forms/${formId}/restorations`, admin, { version: 1, expectedBase: 2 })
+    expect(restored.statusCode, restored.body).toBe(201)
+    expect(restored.json()).toMatchObject({ version: 3, restoredFrom: 1 })
+    expect(await file(3)).toBe(await file(1))
+    expect(await versions()).toEqual([1, 2, 3])
+  })
+
+  // Steps 8 and 9: an incompatible change. Version 2 binds approved_by, so
+  // restoring it would publish a form whose writes fail: refused, with the
+  // change that blocks it, and nothing written.
+  test('after approved_by is dropped, restoring version 2 is refused as incompatible', async () => {
+    await ddl.run(STEP_8[connection].incompatible)
+    const refused = await call('POST', `/v1/forms/${formId}/restorations`, admin, { version: 2, expectedBase: 3 })
+    expect(refused.statusCode).toBe(409)
+    expect(refused.json()).toMatchObject({ code: 'incompatible', changes: [{ kind: 'column-dropped', severity: 'blocking', subject: { name: 'approved_by' } }] })
+    expect(refused.json().changes).toHaveLength(1)
+    expect(await versions()).toEqual([1, 2, 3])
+  })
+
+  // Steps 10 and 11: regenerated from version 3 — version 1's content — the
+  // label chosen for the dropped column is the one thing reported, the
+  // order loses only that field, and the published policy's grant for it
+  // is named. Published with a policy for the new fields, the clerk sees
+  // the person's labels and nothing the database no longer has.
+  test('a regeneration reports the dropped label, and the form published from it serves the presentation', async () => {
+    const regeneration = (await call('POST', `/v1/forms/${formId}/regenerations`, admin)).json()
+    expect(regeneration.version).toBe(3)
+    expect(regeneration.conflicts).toEqual([
+      { kind: 'field-gone', field: 'approved_by', anchor: { kind: 'column', column: 'approved_by' }, property: 'label', yours: 'Approver', resolution: 'dropped', message: expect.any(String) },
+    ])
+    expect(orderOf(regeneration.form)).toEqual(['customer', 'order_date', 'status', 'notes', 'amount', 'group', 'created_by', 'reference'])
+    expect(regeneration.policyProblems).toContain('policy: fields.approved_by: the form has no field approved_by')
+
+    const { version, drift: _drift, policyProblems: _problems, conflicts: _conflicts, lookupsDropped: _dropped, keysReassigned: _keys, notes: _notes, ...parts } = regeneration
+    const bundle = { format: 2, connection, ...parts, policy: clerkPolicy(regeneration.bindings.fields) }
+    const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: version, bundle })
+    expect(published.statusCode, published.body).toBe(201)
+    expect(published.json()).toEqual({ version: 4 })
+    expect((await call('POST', `/v1/forms/${formId}/drift`, admin)).json()).toMatchObject({ changes: [], blocking: false })
+
+    const served = (await call('GET', `/v1/forms/${formId}`, clerk)).json().form as FormSchema
+    expect(served.model.fields.find((field) => field.key === 'notes')?.label).toBe('Delivery notes')
+    expect(sectionsOf(served)[0]?.label).toBe('Order details')
+    expect(served.model.fields.some((field) => field.key === 'approved_by')).toBe(false)
   })
 })

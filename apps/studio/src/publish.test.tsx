@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { createBuilderSession } from '@formancy/builder-core'
-import type { FormPolicy } from '@formancy/data-core'
+import { applyPresentation, presentationOf } from '@formancy/data-core'
+import type { FormPolicy, PresentationOverrides } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { AdminClient, Bundle, Proposal } from './api.js'
 import { PublishStep } from './publish.js'
@@ -40,11 +41,25 @@ async function proposal(): Promise<Proposal> {
   return outcome.value
 }
 
+/**
+ * Their version: the generated order with notes relabelled "Their notes" --
+ * a presentation, because since 0030 that is the only thing a version may
+ * change over the generated base.
+ */
 async function publishedElsewhere(expectedBase: number | null): Promise<void> {
-  const { form, bindings, snapshot } = await proposal()
-  const bundle: Bundle = { format: 1, connection: 'fixture', form: { ...form, title: 'Their order' }, bindings, policy: POLICY, snapshot }
+  const { form: base, bindings, snapshot, generation } = await proposal()
+  const presentation: PresentationOverrides = { version: 1, fields: [{ field: 'notes', anchor: { kind: 'column', column: 'notes' }, label: 'Their notes' }], sections: [] }
+  const applied = applyPresentation(base, presentation, bindings)
+  if (!applied.ok) throw new Error(applied.problems.join('; '))
+  const bundle: Bundle = { format: 2, connection: 'fixture', generation, base, presentation, form: applied.form, bindings, policy: POLICY, snapshot }
   const outcome = await other.publish('sales-order', expectedBase, bundle)
   if (!outcome.ok) throw new Error(outcome.message)
+}
+
+/** The notes label of a version in the store, which says whose version it is. */
+async function notesLabel(version: number): Promise<unknown> {
+  const stored = (await plane.store.read('sales-order', version)) as { form: { model: { fields: Array<{ key: string; label?: unknown }> } } }
+  return stored.form.model.fields.find((field) => field.key === 'notes')?.label
 }
 
 async function toPublish(user: User): Promise<HTMLElement> {
@@ -80,7 +95,7 @@ describe('publishing', () => {
     const alert = await within(publish).findByRole('alert')
     expect(paragraphs(alert)).toEqual([
       'Somebody published version 1 while you worked. Yours was not published, and theirs is untouched.',
-      `Version 1: “Their order”, ${String((await proposal()).form.model.fields.length)} fields, bound to sales.order on fixture.`,
+      `Version 1: “Order”, ${String((await proposal()).form.model.fields.length)} fields, bound to sales.order on fixture.`,
     ])
     expect(await audit()).toEqual([])
     await pressEnter(user, within(alert).getByRole('button', { name: 'Rebase on version 1' }))
@@ -96,8 +111,8 @@ describe('publishing', () => {
     )
     await user.click(within(publish).getByRole('button', { name: 'Publish over version 1' }))
     await within(publish).findByText('Published version 2 of sales-order.')
-    const first = await plane.store.read('sales-order', 1)
-    expect((first as { form: { title: string } }).form.title).toBe('Their order')
+    expect(await notesLabel(1)).toBe('Their notes')
+    expect(await notesLabel(2)).toBe('Notes')
   })
 
   // A version edited on the server's volume is not served (0019), so the
@@ -174,6 +189,34 @@ describe('publishing', () => {
       'the bindings were not generated from this snapshot',
       'the bindings name ghost, which the form does not have',
     ])
+    expect(await audit()).toEqual([])
+  })
+
+  // builder-core accepts more than presentation -- a field made required, a
+  // numeric span -- and since 0030 the server refuses any of it at publish.
+  // The studio derives the presentation as the server will read it, and a
+  // draft that is not one waits with every reason, in presentationOf's
+  // words; a studio that sent it anyway would learn the same at the last
+  // step, with the person's work already done.
+  test('holds back a draft that is not only presentation, with every reason', async () => {
+    servedDocument()
+    const generated = await proposal()
+    const session = createBuilderSession(generated.form)
+    expect(session.setFieldProperty(['notes'], 'required', true).ok).toBe(true)
+    expect(session.setLayoutNodeProperty({ layout: 'default', path: [0, 0, 0] }, 'span', 2).ok).toBe(true)
+    const said = presentationOf(generated.form, session.exportDocument(), generated.bindings)
+    if (said.ok) throw new Error('builder-core edits that are not presentation derived as one')
+    expect(said.problems.length).toBe(2)
+    render(
+      <main aria-label="Publish">
+        <PublishStep client={other} connection="fixture" proposal={generated} session={session} policy={POLICY} stale={false} onPublished={() => {}} onDrift={() => {}} />
+      </main>,
+    )
+    const button = await screen.findByRole('button', { name: 'Publish version 1' })
+    expect(button).toHaveProperty('disabled', true)
+    const note = screen.getByRole('note')
+    expect(within(note).getAllByRole('listitem').map((item) => item.textContent)).toEqual(said.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`))
+    expect(plane.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/versions'))).toEqual([])
     expect(await audit()).toEqual([])
   })
 })

@@ -168,6 +168,13 @@ the same promises:
   the administrator plane's routes; axe and a name on every control at every
   step; and nothing the presentation step offers can remove, rename or retype
   a bound field, while what it produces publishes.
+- **The server's own check of a published form**, in
+  `packages/data-server/src/bundle.test.ts` and `routes/admin.test.ts`: a
+  bundle is published only when its generated base and bindings are exactly
+  what the generator produces from the request it carries, and the form is
+  that base with presentation alone applied, so a client other than the
+  studio cannot publish a binding change as a layout edit
+  ([0030](docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
 - **The browser gates**, `apps/examples/scripts/browser-test.mjs` and
   `apps/studio/scripts/browser-test.mjs`, run as `pnpm test:browser` in their
   own CI job, for what jsdom cannot see: in Chromium, no sideways scroll and

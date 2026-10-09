@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
 import { findObject, rowFilterColumnProblem, validatePolicy } from '@formancy/data-core'
-import type { FormBindings, FormPolicy, MetadataSnapshot } from '@formancy/data-core'
+import type { FormBindings, FormPolicy, MetadataSnapshot, ReassignedKey } from '@formancy/data-core'
 import { describeRef } from './choice.js'
 import { labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
 import { LookupFilters, RowFilters } from './policy-filters.js'
 import { boundColumns, fillFromOperations, formatRoles, lookupBindings, orphanFields, orphanLookups, parseRoles, withFieldRoles } from './policy-model.js'
+import { ReassignedKeys } from './reassigned.js'
 
 /**
  * A list of roles as text, kept as typed.
@@ -102,6 +103,8 @@ export function PolicyStep({
   onPolicy,
   stale,
   onRegenerate,
+  reassigned = [],
+  onDecided = () => {},
 }: {
   bindings: FormBindings
   snapshot: MetadataSnapshot
@@ -110,6 +113,9 @@ export function PolicyStep({
   onPolicy: (next: FormPolicy) => void
   stale: boolean
   onRegenerate: () => Promise<string | null>
+  /** Keys whose grants were written for another column or lookup (0030), not yet kept or removed. */
+  reassigned?: readonly ReassignedKey[]
+  onDecided?: (key: string) => void
 }): ReactElement {
   const document = useDocument(session)
   const checked = validatePolicy(policy, bindings)
@@ -128,6 +134,16 @@ export function PolicyStep({
     focusAfter(afterRemoving(orphans, key, orphanRemove))
   }
 
+  function decide(key: string, decision: 'keep' | 'remove'): void {
+    if (decision === 'remove') {
+      // Every grant the key carries: its field's roles and, for a lookup, its filter.
+      const lookups = { ...policy.lookups }
+      delete lookups[key]
+      onPolicy({ ...withFieldRoles(policy, key, [], []), lookups })
+    }
+    onDecided(key)
+  }
+
   function removeStrayLookup(key: string): void {
     const lookups = { ...policy.lookups }
     delete lookups[key]
@@ -142,6 +158,7 @@ export function PolicyStep({
         of each lookup it reaches. Roles are the names your host puts in its tokens, separated by commas.
       </p>
       <PolicyCheck problems={problems} />
+      <ReassignedKeys keys={reassigned} after={CHECK} onDecide={decide} />
 
       <fieldset>
         <legend>Who may do what</legend>

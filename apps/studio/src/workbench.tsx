@@ -3,7 +3,10 @@ import type { ReactElement } from 'react'
 import { createBuilderSession } from '@formancy/builder-core'
 import type { BuilderSession } from '@formancy/builder-core'
 import type { FormPolicy, MetadataSnapshot } from '@formancy/data-core'
+import type { Regeneration } from '@formancy/data-server'
 import type { Failure, Proposal, ProposalRequest } from './api.js'
+import { carriedAgain, carryDraft } from './carry.js'
+import type { Carried } from './carry.js'
 import { ChooseStep } from './choose.js'
 import type { Choice } from './choice.js'
 import { proposalFor, sameRef } from './choice.js'
@@ -43,11 +46,16 @@ interface Chosen {
   choice: Choice
 }
 
-/** A proposal, the request that produced it, and the session its presentation is edited in. */
+/**
+ * A proposal, the request that produced it, and the session its presentation
+ * is edited in; and, for a draft carried from another (0030), what came
+ * across and what did not.
+ */
 interface Generated {
   request: ProposalRequest
   proposal: Proposal
   session: BuilderSession
+  carried: Carried | null
 }
 
 /**
@@ -108,10 +116,69 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   async function generate(request: ProposalRequest): Promise<Failure | null> {
     const outcome = await client.propose(request)
     if (!outcome.ok) return outcome
-    setGenerated({ request, proposal: outcome.value, session: createBuilderSession(outcome.value.form) })
+    setGenerated({ request, proposal: outcome.value, session: createBuilderSession(outcome.value.form), carried: null })
     setPolicy((previous) => withRequiredLookupPins(previous, outcome.value.bindings))
     setCurrent('generate')
     return null
+  }
+
+  /**
+   * The Policy step's "Generate again": a new proposal with the draft's
+   * presentation carried onto it, as a regeneration carries a published one.
+   * A draft regenerated from a version keeps that version as its base, and
+   * its undecided keys.
+   */
+  async function generateAgain(previous: Generated, request: ProposalRequest): Promise<string | null> {
+    const outcome = await client.propose(request)
+    if (!outcome.ok) return outcome.message
+    const carried = carryDraft({ proposal: previous.proposal, edited: previous.session.exportDocument() }, outcome.value)
+    if (!carried.ok) return carried.message
+    setGenerated({
+      request,
+      proposal: outcome.value,
+      session: createBuilderSession(carried.form),
+      carried: carriedAgain(previous.carried, previous.proposal.bindings, carried, outcome.value.bindings),
+    })
+    setPolicy((current) => withRequiredLookupPins(current, outcome.value.bindings))
+    setCurrent('generate')
+    return null
+  }
+
+  /**
+   * A regeneration taken up as the draft: its base as the proposal, the
+   * carried form in a new session, the published policy, and the choice and
+   * discovery rebuilt from its request and snapshot, so the Choose step and
+   * "Generate again" work on it as on any draft.
+   */
+  function takeUp(regeneration: Regeneration, fresh: string[]): void {
+    const { generation, snapshot, base, bindings, notes, form, version } = regeneration
+    const { connection, root, formId, title, lookups } = generation
+    const versionColumn = generation.versionColumn ?? null
+    const request: ProposalRequest = { connection, root, formId, title, lookups, pinned: generation.pinned ?? [], ...(versionColumn === null ? {} : { versionColumn }) }
+    setDiscovered({ connection, snapshot })
+    setChosen({ connection, choice: { root, formId, title, lookups, versionColumn } })
+    setPolicy(withRequiredLookupPins(regeneration.policy, bindings))
+    setGenerated({
+      request,
+      proposal: { form: base, bindings, notes, snapshot, generation },
+      session: createBuilderSession(form),
+      carried: { from: `version ${String(version)}`, version, conflicts: regeneration.conflicts, fresh, undecided: regeneration.keysReassigned },
+    })
+    setPublishedId(formId)
+    setCurrent('presentation')
+  }
+
+  /** A reassigned key kept or removed: one fewer for the Publish step to wait on. */
+  function decided(key: string): void {
+    setGenerated((previous) =>
+      previous === null || previous.carried === null ? previous : { ...previous, carried: { ...previous.carried, undecided: previous.carried.undecided.filter((entry) => entry.field !== key) } },
+    )
+  }
+
+  /** Published: the draft's base is now whatever is newest, read when the Publish step opens again. */
+  function published(formId: string): void {
+    setPublishedId(formId)
+    setGenerated((previous) => (previous === null || previous.carried === null ? previous : { ...previous, carried: { ...previous.carried, version: null } }))
   }
 
   const title = STEPS.find((entry) => entry.id === current)?.title ?? ''
@@ -122,7 +189,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       case 'connect':
         return <ConnectStep client={client} connections={connections} discovered={discovered} onDiscovered={discoveredNow} onChoose={() => setCurrent('choose')} />
       case 'drift':
-        return <DriftStep client={client} formId={publishedId ?? generated?.request.formId ?? ''} />
+        return <DriftStep client={client} formId={publishedId ?? generated?.request.formId ?? ''} onRegenerated={takeUp} />
       case 'choose':
         return discovered === null ? null : (
           <ChooseStep
@@ -138,7 +205,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         )
     }
     if (generated === null) return null
-    const { proposal, session, request } = generated
+    const { proposal, session, request, carried } = generated
     switch (current) {
       case 'generate':
         return <GenerateStep proposal={proposal} onNext={() => setCurrent('policy')} />
@@ -153,13 +220,14 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             stale={stale}
             onRegenerate={async () => {
               if (chosen === null) return 'nothing is chosen to generate from.'
-              const failure = await generate(proposalFor(request.connection, chosen.choice, policy.rowFilters))
-              return failure?.message ?? null
+              return generateAgain(generated, proposalFor(request.connection, chosen.choice, policy.rowFilters))
             }}
+            reassigned={carried?.undecided ?? []}
+            onDecided={decided}
           />
         )
       case 'presentation':
-        return <PresentationStep session={session} />
+        return <PresentationStep session={session} carried={carried} />
       case 'preview':
         return <PreviewStep session={session} bindings={proposal.bindings} />
       case 'publish':
@@ -171,7 +239,9 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             session={session}
             policy={policy}
             stale={stale}
-            onPublished={(formId) => setPublishedId(formId)}
+            regeneratedFrom={carried?.version ?? null}
+            undecided={carried?.undecided.map((entry) => entry.field) ?? []}
+            onPublished={published}
             onDrift={() => setCurrent('drift')}
           />
         )

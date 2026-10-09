@@ -3,6 +3,8 @@ import type { ReactElement } from 'react'
 import { isLayoutContainer } from '@formancy/builder-core'
 import type { BuilderSession, CommandOutcome } from '@formancy/builder-core'
 import type { LayoutNode } from '@formancy/spec'
+import { CarriedPanel } from './carried.js'
+import type { Carried } from './carry.js'
 import { labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
 
@@ -63,8 +65,10 @@ function LabelInput({ id, label, value, commit }: { id: string; label: ReactElem
  * section's label, a field's place among its neighbours, and whether it spans
  * the row. Nothing here adds, removes, renames or retypes a field, because a
  * field is a column the bindings name, and the generator is what decides those.
+ * A draft carried from another (0030) lists what could not be carried above
+ * the controls, and what it offers is a label too.
  */
-export function PresentationStep({ session }: { session: BuilderSession }): ReactElement {
+export function PresentationStep({ session, carried = null }: { session: BuilderSession; carried?: Carried | null }): ReactElement {
   const document = useDocument(session)
   const [said, setSaid] = useState<Said | null>(null)
   const focusAfter = useFocusAfterRender()
@@ -181,6 +185,7 @@ export function PresentationStep({ session }: { session: BuilderSession }): Reac
         What a person filling the form reads, and in what order. Each field is a column the bindings name, so nothing here
         adds, removes or renames one: that is the generator&rsquo;s, from the table.
       </p>
+      {carried === null ? null : <CarriedPanel session={session} carried={carried} report={report} />}
       <div className="toolbar">
         {/* Never disabled: emptying the history would drop the keyboard's focus
             from the button just pressed. With nothing to undo, it says so. */}

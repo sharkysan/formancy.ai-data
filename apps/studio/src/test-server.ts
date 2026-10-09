@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot } from '@formancy/data-core'
-import type { DatabaseAdapter, LookupAdapter, MetadataSnapshot, RecordAdapter } from '@formancy/data-core'
+import type { ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, RecordAdapter } from '@formancy/data-core'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
 import type { ConfigurationStore, ConnectionRegistry, IdentityVerifier } from '@formancy/data-server'
 import owner from './fixtures/postgres-owner.json'
@@ -186,5 +186,20 @@ export function withoutColumn(base: MetadataSnapshot, table: string, column: str
   const object = contents.objects.find((candidate) => candidate.ref.name === table)
   if (object === undefined) throw new Error(`the snapshot has no ${table}`)
   object.columns = object.columns.filter((candidate) => candidate.name !== column)
+  return createSnapshot(contents)
+}
+
+/**
+ * A snapshot of `base` with one more column on one table, made the one way a
+ * snapshot is made: the database after `alter table ... add column`. With
+ * `withoutColumn` first, a column renamed, which a catalog shows as one
+ * dropped and one added.
+ */
+export function withColumn(base: MetadataSnapshot, table: string, column: ColumnMeta): MetadataSnapshot {
+  const { fingerprint: _, ...contents } = structuredClone(base)
+  const object = contents.objects.find((candidate) => candidate.ref.name === table)
+  if (object === undefined) throw new Error(`the snapshot has no ${table}`)
+  object.columns.push(structuredClone(column))
+  object.columns.sort((left, right) => left.ordinal - right.ordinal)
   return createSnapshot(contents)
 }
