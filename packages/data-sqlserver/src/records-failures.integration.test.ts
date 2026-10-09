@@ -50,8 +50,15 @@ beforeAll(async () => {
     insert into ops.parent (id) values (1);
     insert into ops.child (id, parent_id) values (1, 1);
     insert into ops.moving (id, note) values (1, N'here');
-    create table ops.thrower (id int not null constraint pk_thrower primary key)`)
+    create table ops.thrower (id int not null constraint pk_thrower primary key);
+    create table ops.warned (id int not null constraint pk_warned primary key, note nvarchar(20) null,
+      version int not null constraint df_warned_version default 0);
+    insert into ops.warned (id, note) values (1, N'before');
+    create table ops.drifting (id int not null constraint pk_drifting primary key, note nvarchar(50) null,
+      version int not null constraint df_drifting_version default 0);
+    insert into ops.drifting (id, note) values (1, N'here')`)
   await owner.request().batch("create trigger ops.thrower_insert on ops.thrower after insert as throw 51701, N'a rule of the customer''s own', 1;")
+  await owner.request().batch("create trigger ops.warned_write on ops.warned after insert, update as raiserror('a warning of the customer''s own', 16, 1);")
   snapshot = await discoverSqlServer(owner, { schemas: ['sales', 'ops'] })
 })
 
@@ -201,6 +208,23 @@ describe('each constraint the fixture can be made to break', () => {
     expect(thrown).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringContaining('51701') })
   })
 
+  // RAISERROR, unlike THROW, does not end the batch even under xact_abort: a
+  // trigger that raises one as a "warning" and does not roll back lets the
+  // statement and the commit run, and the driver still reports the error. Were
+  // that `unavailable` — which promises nothing committed — over a write that
+  // did commit, a host retrying the insert would store the record twice. Any
+  // error the batch is told of rolls it back, so the refusal is true.
+  test("a trigger's RAISERROR without a rollback is unavailable, and nothing is written", async () => {
+    const records = createSqlServerRecords(owner)
+    const warned: ObjectRef = { schema: 'ops', name: 'warned' }
+    const inserted = await records.insert({ target: target(warned), values: [valueOf(warned, 'id', '2'), valueOf(warned, 'note', 'new')], returning: [] })
+    expect(inserted).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringContaining('50000') })
+    const updated = await records.update(versioned(warned, [valueOf(warned, 'note', 'after')], '0'))
+    expect(updated).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringContaining('50000') })
+    const rows = await owner.request().query<{ id: number; note: string; version: number }>('select id, note, version from ops.warned order by id')
+    expect(rows.recordset).toEqual([{ id: 1, note: 'before', version: 0 }])
+  })
+
   // The server's message for a duplicate repeats the duplicate value, and for
   // a truncation the truncated one. A failure is logged; the person's values
   // must not be, so the sentence is the adapter's own.
@@ -328,6 +352,36 @@ describe('a schema that moved under the binding', () => {
     await owner.request().batch("exec sp_rename 'ops.moving', 'moved'")
     expect(await read([])).toMatchObject({ ok: false, code: 'schema-changed' })
   })
+
+  // A table that is gone when the batch compiles is resolved only when its
+  // statement runs, after `begin transaction`. Without xact_abort that 208
+  // leaves the transaction open — SQL Server then reports 266, a mismatched
+  // count, last — on a connection the pool hands to the next write, whose
+  // commit would only close the inner level and be rolled back later. The
+  // write is schema-changed, the connection holds no transaction, and the
+  // next write on it commits.
+  test('a write to a renamed table is schema-changed, and leaves no transaction on its connection', async () => {
+    const single = await new mssql.ConnectionPool({ ...fixture.admin, pool: { max: 1 } }).connect()
+    const drifting: ObjectRef = { schema: 'ops', name: 'drifting' }
+    const note = (value: string): RecordValue => valueOf(drifting, 'note', value)
+    try {
+      const records = createSqlServerRecords(single)
+      await owner.request().batch("exec sp_rename 'ops.drifting', 'drifted'")
+      expect(await records.update(versioned(drifting, [note('lost')], '0'))).toMatchObject({ ok: false, code: 'schema-changed' })
+      expect(await records.insert({ target: target(drifting), values: [valueOf(drifting, 'id', '2'), note('lost')], returning: [] })).toMatchObject({
+        ok: false,
+        code: 'schema-changed',
+      })
+      const open = await single.request().query<{ n: number }>('select @@trancount as n')
+      expect(open.recordset[0]?.n).toBe(0)
+      await owner.request().batch("exec sp_rename 'ops.drifted', 'drifting'")
+      expect(await records.update(versioned(drifting, [note('kept')], '0'))).toMatchObject({ ok: true, version: '1' })
+    } finally {
+      await single.close()
+    }
+    const stored = await owner.request().query<{ note: string; version: number }>('select note, version from ops.drifting')
+    expect(stored.recordset).toEqual([{ note: 'kept', version: 1 }])
+  })
 })
 
 describe('messages in another language', () => {
@@ -399,6 +453,29 @@ describe('when the connection fails', () => {
     const found = await owner.request().input('name', mssql.NVarChar(mssql.MAX), name).query<{ n: number }>('select count(*) as n from sales.country where name = @name')
     return found.recordset[0]?.n
   }
+
+  // A pool whose every connection is busy makes a request wait for one, and
+  // after `acquireTimeoutMillis` gives up with its own timeout — not a
+  // ConnectionError, and the same error every waiter after the first gets
+  // while the server is down. No connection was handed out, so nothing was
+  // sent: it is `unavailable`, never an exception the port promises not to throw.
+  test('a pool that hands out no connection in time is unavailable, for a write too', async () => {
+    const busy = await new mssql.ConnectionPool({ ...fixture.admin, pool: { max: 1, acquireTimeoutMillis: 500 } }).connect()
+    const holding = new mssql.Transaction(busy)
+    await holding.begin()
+    try {
+      const records = createSqlServerRecords(busy)
+      expect(await records.insert(countryInsert('Never sent'))).toMatchObject({ ok: false, code: 'unavailable' })
+      expect(await records.read({ target: target(COUNTRY), key: [valueOf(COUNTRY, 'id', '1')], columns: [columnOf(COUNTRY, 'name')], filters: EVERY_ROW })).toMatchObject({
+        ok: false,
+        code: 'unavailable',
+      })
+    } finally {
+      await holding.rollback()
+      await busy.close()
+    }
+    expect(await countries('Never sent')).toBe(0)
+  })
 
   // The plan's "connection lost around commit": the write was sent and the
   // session died before an answer came. It may have committed, so the answer

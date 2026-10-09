@@ -120,6 +120,47 @@ function asText(parameters: Parameters, value: ApiValue): string {
   return parameters.add(mssql.NVarChar(mssql.MAX), value)
 }
 
+/** The kinds a value travels as text for: every kind with a canonical value but a boolean and a float, which travel as themselves. */
+type TextBound = Kind<'text' | 'integer' | 'decimal' | 'date' | 'time' | 'timestamp' | 'uuid'>
+
+/**
+ * SQL that converts `text` — an nvarchar expression holding a canonical value
+ * — to its column's type: `convert(decimal(18, 4), @p3)`. A timestamp is an
+ * instant; a zoneless one is never written. One spelling for a value bound as
+ * text and for a key read back as text, so a record is found again exactly
+ * the way it is named.
+ */
+export function fromText(type: TextBound, text: string): string {
+  switch (type.kind) {
+    case 'text':
+      return text
+    case 'integer':
+      return `convert(${integerType(type)}, ${text})`
+    case 'decimal':
+      return `convert(${decimalType(type)}, ${text})`
+    case 'date':
+      return `convert(date, ${text}, 23)`
+    case 'time':
+      return `convert(time, ${text})`
+    case 'timestamp':
+      return `convert(datetimeoffset, ${text}, 127)`
+    case 'uuid':
+      return `convert(uniqueidentifier, ${text})`
+  }
+}
+
+/** A kind that travels as text and whose canonical text is its value exactly. */
+export type ExactKey = Kind<'text' | 'integer' | 'decimal' | 'uuid' | 'date'>
+
+/**
+ * Whether a key of this kind read back by `canonicalText` is turned by
+ * `fromText` into the very value it was read from. A time and an instant are
+ * cut short (0017); a boolean and a float do not travel as text.
+ */
+export function isExactKey(type: NormalizedType): type is ExactKey {
+  return type.kind === 'text' || type.kind === 'integer' || type.kind === 'decimal' || type.kind === 'uuid' || type.kind === 'date'
+}
+
 /**
  * Binds one canonical value and returns the SQL expression that is it, typed
  * as its column: `convert(decimal(18, 4), @p3)`. Null is bound with the same
@@ -135,35 +176,27 @@ function asText(parameters: Parameters, value: ApiValue): string {
 export function bindValue(parameters: Parameters, type: NormalizedType, value: ApiValue): string {
   const given = value === null ? null : typeof value
   switch (type.kind) {
-    case 'text':
-      requireType(given === null || given === 'string', type)
-      return asText(parameters, value)
     case 'integer':
       requireType(given === null || given === 'string' || (given === 'number' && Number.isSafeInteger(value)), type)
-      return `convert(${integerType(type)}, ${asText(parameters, value === null ? null : String(value))})`
-    case 'decimal':
-      requireType(given === null || given === 'string', type)
-      return `convert(${decimalType(type)}, ${asText(parameters, value)})`
+      return fromText(type, asText(parameters, value === null ? null : String(value)))
     case 'boolean':
       requireType(given === null || given === 'boolean', type)
       return parameters.add(mssql.Bit, value)
     case 'float':
       requireType(given === null || (given === 'number' && Number.isFinite(value)), type)
       return parameters.add(mssql.Float, value)
-    case 'date':
-      requireType(given === null || given === 'string', type)
-      return `convert(date, ${asText(parameters, value)}, 23)`
-    case 'time':
-      requireType(given === null || given === 'string', type)
-      return `convert(time, ${asText(parameters, value)})`
     case 'timestamp':
       // A zoneless timestamp is read-only: formancy's datetime is an instant (0009).
       if (!type.withTimeZone) throw noValue(type)
       requireType(given === null || given === 'string', type)
-      return `convert(datetimeoffset, ${asText(parameters, value)}, 127)`
+      return fromText(type, asText(parameters, value))
+    case 'text':
+    case 'decimal':
+    case 'date':
+    case 'time':
     case 'uuid':
       requireType(given === null || given === 'string', type)
-      return `convert(uniqueidentifier, ${asText(parameters, value)})`
+      return fromText(type, asText(parameters, value))
     case 'binary':
     case 'rowversion':
     case 'unsupported':

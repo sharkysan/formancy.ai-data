@@ -122,14 +122,20 @@ const saved = await records.update({ target, key, set, expectedVersion: read.ver
 - **A write is one batch**: the guarded statement, a check that every text
   column stored the text it was sent — SQL Server turns `ŁA` into `LA` in a
   single-byte varchar without an error, and the adapter refuses it as
-  `out-of-range` — and the commit. It works on a table with triggers, and
-  `returning` is the row as the statement wrote it, before an AFTER trigger.
+  `out-of-range` — and the commit. Any error rolls it back, a trigger's
+  `RAISERROR` included, which on its own would not stop the commit. It works
+  on a table with triggers: `returning` is the row as the statement wrote it,
+  before an AFTER trigger, and the version is the row's after one, read back
+  by its key, so a trigger that touches the row does not make the next save
+  stale.
 - **An update is one statement** naming the key, the filters and the
   expected version, incrementing a version column in the same SET. A record
   outside the filters is `not-found`, like one that does not exist.
 - **A refusal is a code**, by its error number, with a sentence of the
   adapter's own that never repeats a value. A constraint or column is named
   when the message is English, which it is unless `options.language` was set.
+  A pool that hands out no connection — closed, or none free within
+  `acquireTimeoutMillis` — is `unavailable`, because nothing was sent.
   A connection lost after a write was sent is `unknown-outcome`, and nothing
   is retried.
 

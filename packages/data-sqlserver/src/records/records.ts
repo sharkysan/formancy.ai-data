@@ -1,7 +1,7 @@
 import type { RecordAdapter, RecordColumn, RecordConcurrency, RecordFailure, RecordOutcome, RecordTarget, RecordValue } from '@formancy/data-core'
 import { decodeRowversion, encodeRowversion, rowFilterTerms } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
-import { run } from '../sql/statement.js'
+import { prepare, send } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
 import { fromCanonicalText } from '../sql/values.js'
 import { failureFor } from './errors.js'
@@ -85,10 +85,11 @@ function recordFrom(row: Row, columns: readonly RecordColumn[], concurrency: Rec
   }
 }
 
-/** Runs one statement, and turns what the driver throws into a failure. */
+/** Runs one statement, and turns what the driver rejected it with into a failure. A request it would not even take is thrown. */
 async function attempt(pool: ConnectionPool, statement: Statement, phase: Phase, written: readonly RecordValue[] = []): Promise<Row[] | RecordFailure> {
+  const request = prepare(pool, statement)
   try {
-    return await run<Row>(pool, statement)
+    return await send<Row>(request, statement)
   } catch (error) {
     return failureFor(error, phase, written)
   }
@@ -105,11 +106,13 @@ function onlyRow(rows: readonly Row[]): Row | undefined {
  *
  * Values arrive canonical and are bound as text the server converts; they
  * leave as text the server produced (`../sql/values.ts`). Each write is one
- * batch: the statement, a check that every text value was stored as sent,
- * and a commit, so a single-byte varchar cannot quietly keep `LA` for `ŁA`. A
- * database error is a `RecordFailure`, never thrown; a malformed request — a
- * key that is not the identity, a column named twice, a value no codec
- * returns — is a programming error and is.
+ * batch: the statement, a check that every text value was stored as sent, the
+ * version read back from the row once its triggers ran, and a commit, all
+ * rolled back on any error — so a single-byte varchar cannot quietly keep
+ * `LA` for `ŁA`, and a refusal is never reported over a write that
+ * committed. A database error is a `RecordFailure`, never thrown; a malformed
+ * request — a key that is not the identity, a column named twice, a value no
+ * codec returns — is a programming error and is.
  */
 export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
   return {

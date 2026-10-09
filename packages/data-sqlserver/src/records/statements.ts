@@ -1,9 +1,10 @@
-import type { InsertRequest, ObjectRef, ReadRequest, RecordColumn, RecordConcurrency, RecordValue, RowFilterTerm, UpdateRequest } from '@formancy/data-core'
+import type { InsertRequest, ObjectRef, ReadRequest, RecordColumn, RecordConcurrency, RecordTarget, RecordValue, RowFilterTerm, UpdateRequest } from '@formancy/data-core'
 import mssql from 'mssql'
 import { quoteName, quoteTable } from '../sql/quote.js'
 import { Parameters } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
-import { bindFilterValue, bindValue, canonicalText, EXACT_COLLATION } from '../sql/values.js'
+import { bindFilterValue, bindValue, canonicalText, EXACT_COLLATION, fromText, isExactKey } from '../sql/values.js'
+import type { ExactKey } from '../sql/values.js'
 
 /**
  * The SQL of each record operation. Every statement selects the same shape —
@@ -45,15 +46,15 @@ function selection(columns: readonly RecordColumn[], concurrency: RecordConcurre
   columns.forEach((column, index) => {
     selected.push({ name: `[c${String(index)}]`, declared: 'nvarchar(max)', expression: canonicalText(column.type, `${source}${quoteName(column.name)}`) })
   })
-  if (concurrency !== null) {
-    const column = `${source}${quoteName(concurrency.column)}`
-    selected.push(
-      concurrency.kind === 'rowversion'
-        ? { name: '[version]', declared: 'binary(8)', expression: column }
-        : { name: '[version]', declared: 'nvarchar(20)', expression: `convert(nvarchar(20), ${column})` },
-    )
-  }
+  if (concurrency !== null) selected.push(versionOf(concurrency, source))
   return selected
+}
+
+function versionOf(concurrency: RecordConcurrency, source: string): Selected {
+  const column = `${source}${quoteName(concurrency.column)}`
+  return concurrency.kind === 'rowversion'
+    ? { name: '[version]', declared: 'binary(8)', expression: column }
+    : { name: '[version]', declared: 'nvarchar(20)', expression: `convert(nvarchar(20), ${column})` }
 }
 
 function keyPredicates(parameters: Parameters, key: readonly RecordValue[]): string[] {
@@ -85,31 +86,76 @@ interface Assigned {
   sql: string
 }
 
+/** What reads a written row's version back: the key it captures, the variables it holds it in, and the statements. */
+interface Refind {
+  captured: Selected[]
+  declared: string[]
+  statements: string[]
+}
+
+/**
+ * Reads the version back from the row itself, after the statement and its
+ * AFTER triggers and before the commit. OUTPUT saw the row before a trigger
+ * that touches it — an audit column, a version the application's own trigger
+ * moves — changed its version again; a token taken from OUTPUT would be stale
+ * before anyone held it, and refuse the next save.
+ *
+ * The row is found by its identity as the statement wrote it, a generated one
+ * included, captured as canonical text and converted back as a bound key is,
+ * so it is found exactly as a later save names it. The text goes through
+ * variables rather than a join on the table variable, whose column would
+ * bring the database's collation into the comparison and conflict with a key
+ * column's own (468). A target with no identity, or with a key column of
+ * another kind — a time or an instant, whose text is cut short, a boolean or
+ * a float, which do not travel as text — keeps the version the statement saw.
+ */
+function versionAfterTriggers(target: RecordTarget): Refind {
+  const keys = target.identity.map((column, index) => ({ column: quoteName(column.name), type: column.type, variable: `@i${String(index)}`, name: `[i${String(index)}]` }))
+  const exact = (key: (typeof keys)[number]): key is (typeof keys)[number] & { type: ExactKey } => isExactKey(key.type)
+  if (target.concurrency === null || keys.length === 0 || !keys.every(exact)) return { captured: [], declared: [], statements: [] }
+  const where = keys.map((key) => `[stored].${key.column} = ${fromText(key.type, key.variable)}`)
+  const version = versionOf(target.concurrency, '[stored].')
+  return {
+    captured: keys.map((key) => ({ name: key.name, declared: 'nvarchar(max)', expression: canonicalText(key.type, `inserted.${key.column}`) })),
+    declared: [`declare ${keys.map((key) => `${key.variable} nvarchar(max)`).join(', ')};`],
+    statements: [
+      `select ${keys.map((key) => `${key.variable} = ${key.name}`).join(', ')} from @written;`,
+      `update [written] set [version] = ${version.expression} from @written as [written] cross join ${quoteTable(target.table)} as [stored] where ${where.join(' and ')};`,
+    ],
+  }
+}
+
 /**
  * The batch every write runs in, so that what it stored is checked before it
- * commits:
+ * commits, and nothing it did outlives an error:
  *
  * - `OUTPUT … INTO` a table variable, never a bare `OUTPUT`, which SQL Server
  *   refuses (334) on a table with an enabled trigger. The output is the row as
- *   the statement wrote it, before any AFTER trigger changed it.
+ *   the statement wrote it, before any AFTER trigger changed it; the version
+ *   is read back from the row afterwards (`versionAfterTriggers`).
  * - Every text value is compared with what its column stored, and a
  *   difference rolls the write back: SQL Server converts nvarchar to a
  *   single-byte varchar without an error, a character its code page lacks
  *   becoming its "best fit" or `?` (0017).
- * - `xact_abort`, so any error — a constraint, a THROW, a name that is gone —
- *   rolls the transaction back rather than leaving it open on a pooled
- *   connection. The setting does not stay on the pooled connection after the
- *   request, which the records suite checks for a batch with no parameters,
- *   the one that does not run inside `sp_executesql`.
+ * - TRY…CATCH rolls back on every error it catches, then rethrows it as it
+ *   was. xact_abort alone does not: a trigger's RAISERROR, unlike THROW, ends
+ *   nothing, so the statement and the commit would run and the driver would
+ *   still report the error — a refusal over a write that committed.
+ * - `xact_abort`, for what CATCH cannot catch in its own scope: a table
+ *   missing when the batch compiles is resolved only when its statement
+ *   runs, after `begin transaction`, and without xact_abort its 208 leaves
+ *   the transaction open on the pooled connection. Both settings end with the
+ *   request, which runs inside `sp_executesql` (../sql/statement.ts).
  */
-function writeBatch(write: (output: string) => string, assigned: readonly Assigned[], returned: Selected[], afterWrite: readonly string[]): string {
+function writeBatch(target: RecordTarget, write: (output: string) => string, assigned: readonly Assigned[], returned: Selected[], afterWrite: readonly string[]): string {
   const guarded = assigned.flatMap(({ value, sql }, index) => (value.type.kind === 'text' && value.value !== null ? [{ value, sql, index }] : []))
   const stored = guarded.map(({ value }, position) => ({
     name: `[w${String(position)}]`,
     declared: 'nvarchar(max)',
     expression: canonicalText(value.type, `inserted.${quoteName(value.name)}`),
   }))
-  const captured = [...returned, ...stored]
+  const refind = versionAfterTriggers(target)
+  const captured = [...returned, ...stored, ...refind.captured]
   const output = `output ${captured.map((column) => column.expression).join(', ')} into @written (${captured.map((column) => column.name).join(', ')})`
   const checks = guarded.map(
     ({ sql, index }, position) =>
@@ -120,11 +166,19 @@ function writeBatch(write: (output: string) => string, assigned: readonly Assign
     'set nocount on;',
     'set xact_abort on;',
     `declare @written table (${captured.map((column) => `${column.name} ${column.declared}`).join(', ')});`,
+    ...refind.declared,
+    'begin try',
     'begin transaction;',
     `${write(output)};`,
     ...afterWrite,
     ...checks,
+    ...refind.statements,
     'commit transaction;',
+    'end try',
+    'begin catch',
+    'if @@trancount > 0 rollback transaction;',
+    'throw;',
+    'end catch;',
     `select ${returned.map((column) => column.name).join(', ')} from @written;`,
   ].join('\n')
 }
@@ -138,6 +192,7 @@ export function insertStatement(request: InsertRequest): Statement {
   const values = assigned.map(({ sql }) => sql).join(', ')
   const returned = selection(request.returning, request.target.concurrency, 'inserted.')
   const sql = writeBatch(
+    request.target,
     (output) => (assigned.length === 0 ? `insert into ${table} ${output} default values` : `insert into ${table} (${columns}) ${output} values (${values})`),
     assigned,
     returned,
@@ -169,6 +224,7 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
   )
   const returned = selection(request.returning, target.concurrency, 'inserted.')
   const sql = writeBatch(
+    target,
     (output) => `update ${quoteTable(target.table)} set ${set.join(', ')} ${output} where ${where.join(' and ')}`,
     assigned,
     returned,

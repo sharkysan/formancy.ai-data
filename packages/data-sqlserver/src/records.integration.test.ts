@@ -59,6 +59,26 @@ beforeAll(async () => {
     insert into ops.heap (tenant_id, note) values (1, N'one'), (1, N'two')`)
   await owner.request().batch(`create table ops.tenanted (id int not null constraint pk_tenanted primary key, tenant nvarchar(20) not null, note nvarchar(50) null);
     insert into ops.tenanted (id, tenant, note) values (1, N'ACME', N'upper'), (2, N'acme', N'lower')`)
+  // Rows an AFTER trigger touches again: an audit count beside a rowversion,
+  // keyed by an identity and by text under a collation that is not the
+  // database's, and a version column the application's own trigger moves too.
+  await owner.request().batch(`
+    create table ops.stamped (id int identity(1, 1) not null constraint pk_stamped primary key, note nvarchar(50) null,
+      touched int not null constraint df_stamped_touched default 0, row_version rowversion not null);
+    create table ops.coded (code varchar(10) collate Latin1_General_100_BIN2 not null constraint pk_coded primary key, note nvarchar(50) null,
+      touched int not null constraint df_coded_touched default 0, row_version rowversion not null);
+    create table ops.counted (id int not null constraint pk_counted primary key, note nvarchar(50) null,
+      version int not null constraint df_counted_version default 0);
+    insert into ops.counted (id, note) values (1, N'start');
+    create table ops.timed (at time(0) not null constraint df_timed_at default '09:30:15' constraint pk_timed primary key,
+      note nvarchar(20) null, row_version rowversion not null);
+    insert into ops.timed (at, note) values ('09:30:00', N'whole minute')`)
+  await owner.request().batch(`create trigger ops.stamped_touch on ops.stamped after insert, update as
+    begin set nocount on; update s set touched = s.touched + 1 from ops.stamped as s join inserted as i on i.id = s.id; end`)
+  await owner.request().batch(`create trigger ops.coded_touch on ops.coded after insert, update as
+    begin set nocount on; update c set touched = c.touched + 1 from ops.coded as c join inserted as i on i.code = c.code; end`)
+  await owner.request().batch(`create trigger ops.counted_version on ops.counted after update as
+    begin set nocount on; update c set version = c.version + 1 from ops.counted as c join inserted as i on i.id = c.id; end`)
   snapshot = await discoverSqlServer(owner, { schemas: ['sales', 'ops'] })
 })
 
@@ -356,11 +376,12 @@ describe('writing every kind', () => {
   })
 
   // An insert of no values is DEFAULT VALUES: every column takes its default
-  // or its identity, which is what a form with nothing to say asks for. With
-  // no parameter it is sent as a plain batch, whose `SET xact_abort` and
-  // `SET nocount` would stay on the session — so the next request on the same
-  // connection must see neither. Inside one transaction the pool does not
-  // reset the session, which shows the probe can see a setting that stayed.
+  // or its identity, which is what a form with nothing to say asks for. Its
+  // batch sets `xact_abort` and `nocount`, and the next request on the same
+  // connection must see neither, or every later request on it would fail
+  // differently. Even with no parameter it is sent as `sp_executesql`, whose
+  // settings end with it; a plain batch's stay on the session, which the
+  // control shows the probe can see.
   test('an insert of no values takes every default, and leaves no setting on the connection', async () => {
     const single = await new mssql.ConnectionPool({ ...fixture.admin, pool: { max: 1 } }).connect()
     const settings = async (request: mssql.Request) =>
@@ -533,6 +554,79 @@ describe('updating a record', () => {
     }
     expect(await update('elsewhere', '1', tenant('2'))).toMatchObject({ ok: false, code: 'not-found' })
     expect(await update('two', '1')).toEqual({ ok: true, values: { note: 'two' }, version: '2' })
+  })
+
+  // An AFTER trigger that touches the row it fired for — an audit column, as
+  // legacy schemas often have — moves its rowversion again after the
+  // statement's OUTPUT saw it. A token taken from OUTPUT is stale before anyone
+  // holds it, and every save after the first is refused. Read back from the
+  // row before the commit, found by its key as a later save will find it —
+  // an identity the insert generated, text under a binary collation — it is
+  // the version that save must name.
+  test('the version returned is the row’s after its AFTER triggers, so the next save is not stale', async () => {
+    const records = createSqlServerRecords(owner)
+    const stamped: ObjectRef = { schema: 'ops', name: 'stamped' }
+    const coded: ObjectRef = { schema: 'ops', name: 'coded' }
+    const cases = [
+      { ref: stamped, values: [valueOf(stamped, 'note', 'new')], key: [valueOf(stamped, 'id', '1')] },
+      { ref: coded, values: [valueOf(coded, 'code', 'Ab'), valueOf(coded, 'note', 'new')], key: [valueOf(coded, 'code', 'Ab')] },
+    ]
+    for (const { ref, values, key } of cases) {
+      const rowTarget = target(ref)
+      const { concurrency } = rowTarget
+      if (concurrency === null) throw new Error(`${ref.name} has a rowversion`)
+      const read = async () => ok(await records.read({ target: rowTarget, key, columns: [columnOf(ref, 'note'), columnOf(ref, 'touched')], filters: EVERY_ROW }))
+      const save = (note: string, expectedVersion: string | null) =>
+        records.update({ target: { ...rowTarget, concurrency }, key, set: [valueOf(ref, 'note', note)], expectedVersion: expectedVersion ?? '', filters: EVERY_ROW, returning: [] })
+
+      const inserted = ok(await records.insert({ target: rowTarget, values, returning: [] }))
+      const afterInsert = await read()
+      expect(afterInsert.values).toEqual({ note: 'new', touched: '1' })
+      expect(inserted.version).toBe(afterInsert.version)
+      const first = ok(await save('first', inserted.version))
+      expect(first.version).toBe((await read()).version)
+      const second = ok(await save('second', first.version))
+      expect(await read()).toEqual({ ok: true, values: { note: 'second', touched: '3' }, version: second.version })
+    }
+
+    // The same for a version column the application's own trigger also moves:
+    // the adapter's increment and the trigger's make two, and the token says so.
+    const counted: ObjectRef = { schema: 'ops', name: 'counted' }
+    const countedTarget = target(counted, 'version')
+    const update = (note: string, expectedVersion: string) =>
+      records.update({
+        target: { ...countedTarget, concurrency: { kind: 'version-column', column: 'version' } },
+        key: [valueOf(counted, 'id', '1')],
+        set: [valueOf(counted, 'note', note)],
+        expectedVersion,
+        filters: EVERY_ROW,
+        returning: [columnOf(counted, 'note')],
+      })
+    expect(await update('one', '0')).toEqual({ ok: true, values: { note: 'one' }, version: '2' })
+    expect(await update('two', '2')).toEqual({ ok: true, values: { note: 'two' }, version: '4' })
+  })
+
+  // Only a key whose text is its value exactly finds its row again. A time
+  // reads to the minute, so the row keyed 09:30:15 reads as '09:30' — which
+  // is another row's key — and a version read back by it would be that row's.
+  // Such a target, and one with no identity to look by, keeps the version
+  // its statement saw, and is still written.
+  test('a row whose key text is not exact, or which has no identity, keeps the version its statement saw', async () => {
+    const records = createSqlServerRecords(owner)
+    const timed: ObjectRef = { schema: 'ops', name: 'timed' }
+    const versionAt = async (at: string) =>
+      (
+        await owner
+          .request()
+          .input('at', mssql.NVarChar(mssql.MAX), at)
+          .query<{ v: string }>('select lower(convert(char(16), convert(binary(8), row_version), 2)) as v from ops.timed where at = convert(time, @at)')
+      ).recordset[0]?.v
+    const defaulted = ok(await records.insert({ target: target(timed), values: [valueOf(timed, 'note', 'with seconds')], returning: [columnOf(timed, 'at')] }))
+    expect(defaulted.values).toEqual({ at: '09:30' })
+    expect(defaulted.version).toBe(await versionAt('09:30:15'))
+    expect(defaulted.version).not.toBe(await versionAt('09:30:00'))
+    const keyless = ok(await records.insert({ target: { ...target(timed), identity: [] }, values: [valueOf(timed, 'at', '10:00'), valueOf(timed, 'note', 'no key')], returning: [] }))
+    expect(keyless.version).toBe(await versionAt('10:00:00'))
   })
 
   // An identity that is not unique — bindings that named the wrong columns —

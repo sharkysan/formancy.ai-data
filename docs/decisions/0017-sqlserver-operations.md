@@ -26,20 +26,31 @@
   a transaction where one stays; two concurrent updates with one version give
   one winner and one `stale`; a malformed or upper-case token is `stale`; an
   update outside the tenant filter is `not-found`; a version column is
-  compared and incremented in one statement; an identity that is not a key
-  changes nothing and throws; a request no codec could produce throws before
-  anything is sent. `records-failures.integration.test.ts` — SQL Server
-  stores `ŁA` as `LA`, and the adapter refuses it on insert and `drąft` on
-  update; unique (2627 and 2601), foreign key, check, not null, too long (2628, and
-  8152 at compatibility level 140), out of range, permission (229 and 230) and
+  compared and incremented in one statement; the version an insert and an
+  update return, on rows an AFTER trigger touches again — keyed by a
+  generated identity and by text under a binary collation — and on a version
+  column a trigger also moves, is the one the next save names; a row keyed
+  by a time that reads as another row's key, and one inserted with no
+  identity, keep the version their statement saw; an identity that is not a
+  key changes nothing and throws; a request no codec could produce throws
+  before anything is sent.
+  `records-failures.integration.test.ts` — SQL Server stores `ŁA` as `LA`,
+  and the adapter refuses it on insert and `drąft` on update; unique (2627
+  and 2601), foreign key, check, not null, too long (2628, and 8152 at
+  compatibility level 140), out of range, permission (229 and 230) and
   schema-changed (207, 208) each map to their code; a refusal it does not
   know, and a trigger's THROW of the adapter's own number, are `unavailable`;
-  no failure message repeats a value; a German session gets the same codes;
-  a closed pool is `unavailable` even for a write; a write whose session is
-  killed while it waits, or which times out, is `unknown-outcome` and is not
-  retried. Each suite was first run against a naive variant — driver-parsed
-  reads, no filters, no escaping, no NULL placement, no grouping, no stored-text
-  check, no version in the WHERE, no error translation — and failed on each
+  a trigger's RAISERROR without a rollback is `unavailable` and its insert
+  and update write nothing; no failure message repeats a value; a German
+  session gets the same codes; a write to a renamed table is
+  `schema-changed`, leaves no transaction on its one connection, and the
+  next write on it commits; a closed pool, and one with no connection free
+  within `acquireTimeoutMillis`, are `unavailable` even for a write; a write
+  whose session is killed while it waits, or which times out, is
+  `unknown-outcome` and is not retried. Each suite was first run against a
+  naive variant — driver-parsed reads, no filters, no escaping, no NULL
+  placement, no grouping, no stored-text check, no version in the WHERE, no
+  error translation — and failed on each
   case whose guard the variant lacked. Then each guard was reverted on its own and its
   test watched failing: the LIKE escape, the NULL CASE, `is not null`, the
   filters in the lookup and in the update, the 2098 limit (at 2100, 8003),
@@ -50,10 +61,16 @@
   DEFAULT VALUES, the key check, the 547 keyword, the `ConnectionError`
   branch, the severity-20 branch, the adapter's own messages, 8152, the
   unique-index name, the out-of-range, schema and permission numbers, the
-  exact filter collation, and the message check on the adapter's own error
-  number. **Not mechanically enforced:** that a host updates only the fields a
-  person changed, which the minute and second spellings below rely on to lose
-  nothing stored.
+  exact filter collation, the message check on the adapter's own error
+  number, the TRY…CATCH (the RAISERROR insert and update committed), the
+  xact_abort (266, and the write left open), the version read back (a token
+  stale on return), the key compared through variables (468), the exact-key
+  check (another row's version), the no-identity check (102), and the pool's
+  own timeout (thrown). **Not mechanically enforced:** that a host updates
+  only the fields a person changed, which the minute and second spellings
+  below rely on to lose nothing stored; and that `mssql` turns every failure
+  after it handed out a connection into a `RequestError`, which was read in
+  its source, not tested.
 
 ## Context
 
@@ -98,10 +115,22 @@ languages `sys.syslanguages` lists on the 2022 image — checked by hand on
 8152, which names no column. The messages repeat values: "The duplicate key
 value is (CH)", "Truncated value: 'AB'".
 
+**An error is not a rollback.** A trigger's `RAISERROR`, unlike `THROW`,
+does not end the batch even under `xact_abort`: the statement and the commit
+ran, and `mssql` still rejected the request with 50000. A table missing when
+the batch compiles — renamed since the bindings were approved — is resolved
+only when its statement runs, inside the transaction; `xact_abort` rolls that
+208 back, and without it the transaction stays open on the connection and
+266 is reported last. An AFTER
+trigger that updates the row it fired for moves its rowversion past the one
+`OUTPUT` returned.
+
 **A connection can fail on either side of a write.** A closed pool raises
-`ConnectionError` before anything is sent. A session killed while its write
-waits on a lock gets 596 at severity 21; a request timeout gets `ETIMEOUT`
-with no number.
+`ConnectionError` before anything is sent. A pool with no connection free
+within `acquireTimeoutMillis` rejects with tarn's `TimeoutError`, which
+`mssql` passes on unwrapped and whose name is `Error`. A session killed while
+its write waits on a lock gets 596 at severity 21; a request timeout gets
+`ETIMEOUT` with no number.
 
 ## Decision
 
@@ -125,12 +154,17 @@ thrown before anything is sent.
 **Every write is one batch:** `xact_abort`, a transaction, the one guarded
 statement with `OUTPUT … INTO` a table variable, a check that each text column
 stored exactly the text it was sent (compared under `Latin1_General_100_BIN2`),
-for an update a rollback if more than one row matched, and the commit. A
-difference in stored text is `out-of-range`, naming the column. An update's
-WHERE holds the key, the trusted filters and the expected version, and a
-version column is incremented in the same SET; nothing matched is followed by
-one query that tells `stale` from `not-found`. A token that is not what a read
-returns — upper-case hex, `01` — is never bound and gets the same answer.
+for an update a rollback if more than one row matched, the version read back
+from the row by its identity as the statement wrote it, and the commit — all
+inside TRY…CATCH, which rolls back on any error and rethrows it unchanged,
+while `xact_abort` covers the 208 that CATCH cannot catch in its own scope.
+The identity is captured as canonical text and compared through variables as
+a bound key is. A difference in stored text is `out-of-range`, naming the
+column. An update's WHERE holds the key, the trusted filters and the
+expected version, and a version column is incremented in the same SET;
+nothing matched is followed by one query that tells `stale` from
+`not-found`. A token that is not what a read returns — upper-case hex, `01`
+— is never bound and gets the same answer.
 
 **Row filters compare exactly**, under the binary collation, not the column's:
 the tenant `acme` does not read `ACME`'s rows.
@@ -147,10 +181,12 @@ else with `@formancy/data-core`'s helpers.
 numbers `out-of-range`, 229/230 `permission-denied`, 207/208
 `schema-changed`. A constraint or column is named from an English message
 only. Every message is the adapter's own sentence. A number it does not know
-is `unavailable`. A `ConnectionError` is `unavailable` even for a write; any
-other driver failure, or a refusal at severity 20 or more, is
+is `unavailable`. Whatever the pool rejected with before it handed out a
+connection — anything but a `RequestError` — is `unavailable` even for a
+write; any other driver failure, or a refusal at severity 20 or more, is
 `unknown-outcome` after a write and `unavailable` after a read, and is never
-retried.
+retried. A request is bound before it is sent, so an error in binding it is
+thrown rather than taken for the pool's.
 
 ## Consequences
 
@@ -178,7 +214,15 @@ double its 32 bits are, so `0.1` written comes back `0.10000000149011612`. A
 zoneless timestamp has no codec, so its spelling is this adapter's alone; a
 display column that is a bit, a uuid or a timestamp is labelled in style 126,
 not canonically. `returning` is the row as the statement wrote it, before an
-AFTER trigger changed it. Keys asked about in groups are several reads, not
+AFTER trigger changed it; only the version is read back after one, which is a
+key lookup more per write. A record with no identity, or with a key column
+that is not text, an integer, a decimal, a uuid or a date — a time or an
+instant, whose text is cut short, a boolean or a float, which do not travel
+as text — is not found that way and keeps the version the statement saw. A trigger's `RAISERROR` refuses the write here even where the
+customer's own application lets it commit as a warning. Whether a rejection
+came before a connection was handed out is read from the error's class,
+which holds for `mssql` 12 by its source and would have to be read again on
+an upgrade. Keys asked about in groups are several reads, not
 one. An unknown refusal reported as `unavailable` invites a retry that will be
 refused again. A constraint or column is named only in English, and in a
 translated session a 547 whose constraint name holds the other kind's keyword

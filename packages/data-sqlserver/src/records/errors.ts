@@ -93,7 +93,12 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
   })
 }
 
-/** A refusal the server reported for this statement, which therefore did not commit: the batch runs with xact_abort. */
+/**
+ * A refusal the server reported for this statement, which therefore did not
+ * commit: the write batch rolls back on every error it is told of, a
+ * trigger's RAISERROR included, and on the errors it cannot catch xact_abort
+ * does (statements.ts).
+ */
 function refusal(error: ServerError, written: readonly RecordValue[]): RecordFailure {
   const own = ownError(error, written)
   if (own !== undefined) return own
@@ -126,7 +131,7 @@ function refusal(error: ServerError, written: readonly RecordValue[]): RecordFai
     default:
       if (OUT_OF_RANGE.has(number)) return failure('out-of-range', `SQL Server could not hold a value in its column's type (${String(number)}).`)
       // A refusal this adapter does not recognise. It was reported for the
-      // statement, so the statement did not commit, which is what
+      // statement, and the batch rolled back on it, which is what
       // `unavailable` promises; the number is the lead for whoever reads the log.
       return failure('unavailable', `SQL Server refused the statement with error ${String(number)}, and nothing was written.`)
   }
@@ -141,23 +146,28 @@ function serverError(error: Error): ServerError | undefined {
 }
 
 /**
- * The failure for what the driver threw while running one statement.
+ * The failure for what the driver rejected one statement with.
  *
- * - The pool could not hand out a connection (`ConnectionError`): nothing was
- *   sent, so even a write is `unavailable`.
+ * - Anything but a `RequestError` is the pool's, from before it handed out a
+ *   connection: `mssql` turns every failure after that into a `RequestError`
+ *   (lib/tedious/request.js), and before it passes on what the pool rejected
+ *   with — its own `ConnectionError` for a pool that is closed or cannot
+ *   connect, and tarn's `TimeoutError`, unwrapped, when no connection came
+ *   free within `acquireTimeoutMillis`. Nothing was sent, so even a write is
+ *   `unavailable`.
  * - The server refused the statement: the code for its error number.
- * - Anything else from the driver — a timeout, a socket that closed, a session
+ * - Any other `RequestError` — a timeout, a socket that closed, a session
  *   killed (596, severity 21) — after a write was sent is `unknown-outcome`: it
  *   may have committed, and it is never retried (plan section 12). After a
  *   read it is `unavailable`, because a read changed nothing.
  *
- * What did not come from the driver is a programming error and is thrown.
- * `written` is the values the statement assigned, in its order, so a text
- * value that was not stored can be named.
+ * A request the driver would not take is thrown before it is sent, and never
+ * reaches this. `written` is the values the statement assigned, in its order,
+ * so a text value that was not stored can be named.
  */
 export function failureFor(error: unknown, phase: Phase, written: readonly RecordValue[] = []): RecordFailure {
-  if (!(error instanceof Error) || (error.name !== 'RequestError' && error.name !== 'ConnectionError')) throw error
-  if (error.name === 'ConnectionError') return failure('unavailable', 'SQL Server could not be reached, and nothing was sent.')
+  if (!(error instanceof Error)) throw error
+  if (error.name !== 'RequestError') return failure('unavailable', 'SQL Server could not be reached, or no connection came free in time, and nothing was sent.')
   const server = serverError(error)
   if (server !== undefined) return refusal(server, written)
   return phase === 'write'
