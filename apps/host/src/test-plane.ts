@@ -73,6 +73,8 @@ export interface Plane {
     /** A customer of tenant 1, written through the database's owner, as another application would. */
     insertCustomer(connection: Engine['connection'], no: number, name: string): Promise<void>
     deleteCustomer(connection: Engine['connection'], no: number): Promise<void>
+    /** How many orders have exactly these notes, asked of the database's owner. */
+    countOrders(connection: Engine['connection'], notes: string): Promise<number>
   }
   close(): Promise<void>
 }
@@ -157,6 +159,38 @@ export function holdingWrites(fetch: typeof globalThis.fetch): Holding {
   }
 }
 
+/** A `fetch` that loses the answers to writes: see `losingWrites`. */
+export interface Losing {
+  fetch: typeof fetch
+  /** The path of every write whose answer it lost: `times` at most. */
+  lost: string[]
+}
+
+/**
+ * `fetch` that loses the answer to the next create or update, as a network
+ * between the page and the data server does (0031), and passes everything
+ * else through. `after`: the request reaches the real server, which stores
+ * it and answers, and the page is told the fetch failed -- what the browser
+ * says when the connection drops after sending. `before`: it fails without
+ * reaching the server, which the page cannot tell apart from `after`. Either
+ * way the rejection is the browser's own `TypeError`, so the client sees
+ * exactly what it would see in a page. Once, unless `times` says more: what
+ * the page does next is what is under test, and it must reach the server.
+ */
+export function losingWrites(fetch: typeof globalThis.fetch, { when, times = 1 }: { when: 'after' | 'before'; times?: number }): Losing {
+  const lost: string[] = []
+  return {
+    lost,
+    fetch: async (input, init) => {
+      const path = new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname
+      if (lost.length >= times || !/\/records\/(create|update)$/.test(path)) return fetch(input, init)
+      lost.push(path)
+      if (when === 'after') await fetch(input, init)
+      throw new TypeError('Failed to fetch')
+    },
+  }
+}
+
 /** Starts the server and publishes `pg-order` and `ms-order` through the administrator's plane. */
 export async function startPlane(): Promise<Plane> {
   const { pg, ms } = inject('databases')
@@ -220,6 +254,11 @@ export async function startPlane(): Promise<Plane> {
       deleteCustomer: async (connection, no) => {
         if (connection === 'pg') await pgAdmin`delete from sales.customer where tenant_id = 1 and customer_no = ${no}`
         else await msAdmin.request().input('no', mssql.Int, no).query('delete from sales.customer where tenant_id = 1 and customer_no = @no')
+      },
+      countOrders: async (connection, notes) => {
+        if (connection === 'pg') return (await pgAdmin<Array<{ n: number }>>`select count(*)::int as n from sales."order" where notes = ${notes}`)[0]?.n ?? 0
+        const result = await msAdmin.request().input('notes', mssql.NVarChar(mssql.MAX), notes).query<{ n: number }>('select count(*) as n from sales.[order] where notes = @notes')
+        return result.recordset[0]?.n ?? 0
       },
     },
     close: async () => {

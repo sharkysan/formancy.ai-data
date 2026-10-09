@@ -53,6 +53,38 @@ read in one statement, so no column lacks an answer; but the privilege check
 looks a column up by name when it runs, so a concurrent rename can answer
 "not granted" for a column that is, until the next snapshot.
 
+**An answer lost after a write.** `records-lost-answer.integration.test.ts`
+puts a TCP hop in front of the server that drops its answer, so every byte is
+tedious's and the server's and only the network fails (0031). What it proves
+on SQL Server 2022, with mssql 12.7.4 and tedious 20.3.3:
+
+- **An insert or an update whose answer is lost after it committed** is
+  `unknown-outcome`. The write crossed the hop once and is stored once; an
+  update's change is stored and its rowversion has moved past the one sent,
+  so saving again with that version is `stale`, not a second write.
+- **A request timeout after the commit** is `unknown-outcome` too, and the
+  row is stored: tedious gives up at `requestTimeout`, and again at
+  `cancelTimeout` when the answer to its cancel is lost as well. The suite's
+  `requestTimeout` is five seconds, against a commit whose answer reached the
+  hop 40 ms after the send, because an attention that reached the server
+  before the commit would cancel the batch and prove nothing. On
+  PostgreSQL a server-side `statement_timeout` rolls back and is
+  `unavailable`; here the timeout is the client's, and says nothing about the
+  commit.
+- **A socket cut while the write waits on a lock** is `unknown-outcome`,
+  which over-reports: SQL Server ends a session whose client went away, the
+  session is gone shortly after, and once the lock is released nothing was
+  stored. PostgreSQL does the opposite, and an orphaned write there commits
+  after the release.
+- **What the driver rejects a lost answer with** is a `RequestError` whose
+  `number` is the string `'ECONNRESET'` for a cut socket and `'ETIMEOUT'` for
+  a timeout, with no `class`: mssql copies a driver error's `code` into
+  `number` when it has no `info`. That every failure after a connection is
+  handed out is a `RequestError` was read in mssql's source for
+  [0017](../../docs/decisions/0017-sqlserver-operations.md); it is now tested,
+  for a socket and a timeout. It is why `serverError` asks `typeof number ===
+  'number'`: a lost answer read as the server's refusal would be `refused`.
+
 **What an account needs.** For a snapshot with no gap, `VIEW DEFINITION` on
 the database, and nothing else: no `SELECT`, no data access
 ([0027](../../docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).
@@ -219,10 +251,14 @@ const saved = await records.update({ target, key, set, expectedVersion: read.ver
   operation — a view made writable by one included — is rolled back as
   `refused`, and so is a write by an account that cannot see the table's
   triggers. A trigger that ends the write's transaction itself, by COMMIT or
-  ROLLBACK, is `unknown-outcome`, because the batch cannot tell which. An
-  AFTER trigger that deletes the row it fired for, or that commits and then
-  raises an error, still misleads; [0017](../../docs/decisions/0017-sqlserver-operations.md)
-  says how.
+  ROLLBACK, is `unknown-outcome`, because the batch cannot tell which --
+  whether or not it then raises an error of its own: the batch's CATCH sees
+  that its transaction is gone, so a COMMIT followed by RAISERROR is no
+  longer reported as the refusal it raised over a stored row, and a ROLLBACK
+  followed by one is over-reported as unknown
+  ([0031](../../docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
+  An AFTER trigger that deletes the row it fired for still misleads;
+  [0017](../../docs/decisions/0017-sqlserver-operations.md) says how.
 - **An update is one statement** naming the key, the filters and the
   expected version, incrementing a version column in the same SET. A record
   outside the filters is `not-found`, like one that does not exist.
@@ -232,13 +268,15 @@ const saved = await records.update({ target, key, set, expectedVersion: read.ver
   A pool that hands out no connection — closed, or none free within
   `acquireTimeoutMillis` — is `unavailable`, because nothing was sent.
   A connection lost after a write was sent is `unknown-outcome`, and nothing
-  is retried. The numbers without a code of their own (0028):
+  is retried ([0031](../../docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md));
+  see *An answer lost after a write* below. The numbers without a code of
+  their own (0028):
 
   | Error | Code |
   |---|---|
   | 544, 8102 (an identity), 271 (a computed column), 273, 272 (a rowversion), 13536, 13537 (a GENERATED ALWAYS column, such as a system-versioning period's) | `schema-changed`, as PostgreSQL's 428C9 |
   | 1205, 1222, 1204, 701, 8645, 8651, 9002, 1105, 3960, 3906 (a read-only database, PostgreSQL's 25006), 976, 983 (an availability replica not accessible now) | `unavailable`: SQL Server documents each as passing |
-  | 50000 and above — a trigger's THROW or RAISERROR — and any other number | `refused`: nothing was written, and the same request would be refused again |
+  | 50000 and above — a trigger's THROW or RAISERROR — and any other number | `refused`: nothing was written, and the same request would be refused again; unless a trigger ended the write's transaction before it, which is `unknown-outcome` (0031) |
 
   Of the `unavailable` numbers 1205, a deadlock victim, and 3906, a database
   switched to read-only, are provoked by a test; the others are by
@@ -296,9 +334,10 @@ checked once, by hand, on 2026-10-09, and is not a test.
 
 `pnpm test` starts `mcr.microsoft.com/mssql/server:2022-latest` through
 testcontainers, once per test file, and runs the suite against it: discovery,
-the spike, lookups, records, and the ways a record operation fails. It needs Docker and, the first
-time, a pull of about a gigabyte and a half. There is no mocked driver to fall
-back to — database semantics are what this package is for (0003).
+the spike, lookups, records, the ways a record operation fails, and a write
+whose answer is lost on the way back. It needs Docker and, the first time, a
+pull of about a gigabyte and a half. There is no mocked driver to fall back
+to — database semantics are what this package is for (0003).
 
 ## Licence
 

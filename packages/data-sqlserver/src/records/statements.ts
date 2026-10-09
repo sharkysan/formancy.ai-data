@@ -30,6 +30,9 @@ export const DECIDED_BY_TRIGGER_MESSAGE = 'formancy: an INSTEAD OF trigger decid
 /** Raised when a trigger ended the write's transaction and began another. */
 export const TRANSACTION_REPLACED = 51704
 export const TRANSACTION_REPLACED_MESSAGE = 'formancy: a trigger ended the transaction of the write and began another'
+/** Raised from CATCH when the error came after a trigger had ended the write's transaction: it may have committed (0031). */
+export const TRANSACTION_ENDED = 51705
+export const TRANSACTION_ENDED_MESSAGE = 'formancy: a trigger ended the transaction of the write and then raised an error'
 
 /** A version as it is compared: the 8 bytes of a rowversion, or a version column's decimal string. */
 export type ExpectedVersion = { kind: 'rowversion'; bytes: Buffer } | { kind: 'version-column'; value: string }
@@ -177,7 +180,15 @@ interface Write {
  *   and begins another leaves `@@trancount` as it was, so nothing is raised,
  *   and the commit would commit an empty transaction over a write that is
  *   gone; one that commits it and begins another has stored the write. The
- *   batch cannot tell the two apart, and says so (errors.ts).
+ *   batch cannot tell the two apart, and says so (errors.ts). CATCH asks the
+ *   same question: a trigger that committed and then raised an error of its
+ *   own has stored the write, and its error is not the refusal it looks
+ *   like. Measured (0031): in CATCH the transaction is no longer the one the
+ *   batch began after a trigger's COMMIT, its COMMIT and BEGIN, and its
+ *   ROLLBACK, and still is after a constraint's error or a trigger that only
+ *   raises. So the error is replaced by one that says the transaction ended
+ *   -- unknown-outcome, over-reported for the ROLLBACK -- unless it is 3609
+ *   or the batch's own replaced-transaction error, which already say so.
  * - No INSTEAD OF trigger decided what was stored (`insteadOfGuard`).
  * - Every text value is compared with what its column stored, exactly, and a
  *   difference rolls the write back: SQL Server converts nvarchar to a
@@ -216,7 +227,7 @@ function writeBatch(parameters: Parameters, { target, operation, statement, assi
     'set nocount on;',
     'set xact_abort on;',
     `declare @written table (${captured.map((column) => `${column.name} ${column.declared}`).join(', ')});`,
-    'declare @transaction bigint, @rows int;',
+    'declare @transaction bigint, @rows int, @ended bit;',
     ...refind.declared,
     'begin try',
     'begin transaction;',
@@ -231,7 +242,10 @@ function writeBatch(parameters: Parameters, { target, operation, statement, assi
     'commit transaction;',
     'end try',
     'begin catch',
+    'set @ended = case when coalesce(current_transaction_id(), 0) <> @transaction and error_number() <> 3609 ' +
+      `and not (error_number() = ${String(TRANSACTION_REPLACED)} and error_message() = N'${TRANSACTION_REPLACED_MESSAGE}') then 1 else 0 end;`,
     'if @@trancount > 0 rollback transaction;',
+    `if @ended = 1 throw ${String(TRANSACTION_ENDED)}, N'${TRANSACTION_ENDED_MESSAGE}', 1;`,
     'throw;',
     'end catch;',
     `select ${returned.map((column) => column.name).join(', ')} from @written;`,

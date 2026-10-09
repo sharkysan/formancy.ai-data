@@ -1,8 +1,13 @@
 import { describe, expect, test } from 'vitest'
+import { generateForm } from '../generate/generate.js'
 import { encodeKeyToken } from '../lookup/token.js'
 import type { NormalizedType } from '../metadata.js'
-import { decodeRecordKey, recordToken } from './token.js'
-import type { RecordColumn } from './types.js'
+import type { FormPolicy } from '../policy/types.js'
+import { toFormAnswers } from './answers.js'
+import { planCreate } from './plan.js'
+import { CLERK, CLERK_RW, CUSTOMER_POLICY, customerSource, sales, snapshot, text } from './test-support.js'
+import { decodeRecordKey, intendedRecord, recordToken } from './token.js'
+import type { InsertRequest, RecordColumn, RecordValue } from './types.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const INT64: NormalizedType = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' }
@@ -117,3 +122,77 @@ describe('decodeRecordKey', () => {
     if (!outcome.ok) expect(outcome.message).not.toContain('secret')
   })
 })
+
+describe('intendedRecord', () => {
+  const insert = (identity: readonly RecordColumn[], values: readonly RecordValue[]): InsertRequest => ({
+    target: { table: { schema: 'sales', name: 'customer' }, identity, concurrency: null },
+    values,
+    returning: [],
+  })
+  const tenant = { name: 'tenant_id', type: INT32, value: '1' }
+  const number = { name: 'customer_no', type: INT32, value: '8' }
+
+  // A customer is named by its tenant, pinned from the context, and a number
+  // the person types: the insert names the whole key, so the host is told
+  // which record a lost answer was about and can read it. Returning null here
+  // would report a create the host could check as one nobody can.
+  test('is the token of the key the insert names: a typed number and a pinned tenant', () => {
+    expect(intendedRecord(insert(CUSTOMER, [tenant, number, { name: 'name', type: text(200), value: 'Neu GmbH' }]))).toBe('k1:1,8')
+  })
+
+  // Each of these would promise a token the stored row may not have. The
+  // database numbers the order (the key is not in the insert); a NULL key
+  // value addresses nothing (recordToken refuses it); a timestamp key has no
+  // spelling both engines read alike; a number may already have been
+  // rounded; and a key too long for a token is not shortened into another.
+  test('is null when the database supplies the key, a value is NULL or not text, or the key has no settled spelling', () => {
+    expect(intendedRecord(insert(ORDER, [tenant, { name: 'notes', type: text(null), value: 'x' }]))).toBeNull()
+    expect(intendedRecord(insert(CUSTOMER, [tenant, { ...number, value: null }]))).toBeNull()
+    expect(intendedRecord(insert(CUSTOMER, [tenant, { ...number, value: 8 as unknown as string }]))).toBeNull()
+    const at: NormalizedType = { kind: 'timestamp', withTimeZone: true, precision: 6 }
+    expect(intendedRecord(insert([{ name: 'at', type: at }], [{ name: 'at', type: at, value: '2026-10-09T12:00:00Z' }]))).toBeNull()
+    const code = text(null)
+    expect(intendedRecord(insert([{ name: 'code', type: code }], [{ name: 'code', type: code, value: 'é'.repeat(40) }]))).toBeNull()
+    expect(intendedRecord(insert([], [tenant]))).toBeNull()
+  })
+
+  // The reconciling read looks the record up by this token, and the read
+  // names the stored row by toFormAnswers' token: if the two spelled one key
+  // differently -- a char(n) padded on one side (0028), a composite key in
+  // another order -- the read would miss a row that is there, and the host
+  // would offer to enter it again.
+  test('equals the token toFormAnswers gives the stored row, for a composite key and a char(n) key', () => {
+    const customers = customerSource()
+    const customer = generateForm(customers, { connection: 'erp', root: sales('customer'), formId: 'c', title: 'Customer', lookups: [], pinned: ['tenant_id'] })
+    const { country: _country, ...fields } = CUSTOMER_POLICY.fields
+    const customerPolicy: FormPolicy = { ...CUSTOMER_POLICY, fields: { ...fields, country_code: CLERK_RW }, lookups: {} }
+    expectSameToken(planCreate(customers, customer.bindings, customerPolicy, CLERK, { customer_no: 8, name: 'Neu GmbH' }), customer.bindings, 'k1:1,8')
+
+    const coded = snapshot('postgres', (objects) => {
+      const country = objects.find((object) => object.ref.name === 'country')
+      if (country === undefined) throw new Error('the test snapshot has no country')
+      country.primaryKey = { name: 'pk_country', columns: ['iso_code'] }
+      country.uniqueKeys = []
+    })
+    const country = generateForm(coded, { connection: 'erp', root: sales('country'), formId: 'k', title: 'Country', lookups: [] })
+    const countryPolicy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: [] },
+      fields: { id: { read: ['clerk'], write: [] }, iso_code: { read: ['clerk'], write: ['clerk'] }, name: { read: ['clerk'], write: ['clerk'] } },
+      rowFilters: [],
+      lookups: {},
+    }
+    // One letter in a char(2): stored padded, read back without the pad on both engines.
+    expectSameToken(planCreate(coded, country.bindings, countryPolicy, CLERK, { iso_code: 'C', name: 'Cee' }), country.bindings, 'k1:C')
+  })
+})
+
+/** The planned insert's intended token, and the token of the row it would store, read back as an adapter reads it. */
+function expectSameToken(plan: ReturnType<typeof planCreate>, bindings: Parameters<typeof toFormAnswers>[0], token: string): void {
+  if (!plan.ok) throw new Error(`the create was not planned: ${plan.message}`)
+  // What was written comes back as written; a column the insert left to the database comes back NULL here, which no key is.
+  const written = new Map(plan.request.values.map((entry) => [entry.name, entry.value]))
+  const stored = Object.fromEntries(plan.request.returning.map((column) => [column.name, written.get(column.name) ?? null]))
+  const read = toFormAnswers(bindings, plan.fields, { ok: true, values: stored, version: null })
+  expect({ intended: intendedRecord(plan.request), read: read.record }).toEqual({ intended: token, read: token })
+}

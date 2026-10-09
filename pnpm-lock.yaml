@@ -545,6 +545,9 @@ importers:
       '@formancy/data-server':
         specifier: workspace:*
         version: link:../data-server
+      '@types/mssql':
+        specifier: ^12.3.0
+        version: 12.3.0(supports-color@8.1.1)
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.5
@@ -554,6 +557,12 @@ importers:
       jose:
         specifier: ^6.2.12
         version: 6.2.12
+      mssql:
+        specifier: ^12.0.0
+        version: 12.7.4(supports-color@8.1.1)
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
       publint:
         specifier: 'catalog:'
         version: 0.3.25

@@ -5,10 +5,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { FieldBinding, FormPolicy } from '@formancy/data-core'
+import { startTcpHop } from '@formancy/data-fixtures'
+import type { TcpHop } from '@formancy/data-fixtures'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, createIdentityVerifier, DRIVER_FACTORIES } from '@formancy/data-server'
 import type { ConnectionConfig } from '@formancy/data-server'
 import { SignJWT } from 'jose'
+import mssql from 'mssql'
+import postgres from 'postgres'
 import { inject } from 'vitest'
+import type { DatabaseDetails } from './test-databases.js'
 import { createDataClient } from './client.js'
 import type { DataClient } from './client.js'
 
@@ -40,6 +45,19 @@ export interface Sent {
   body: string | undefined
 }
 
+/**
+ * A TCP hop in front of each database (0031), and the connections `pg-hop`
+ * and `ms-hop` through them, with `pg-hop-order` and `ms-hop-order`
+ * published over them: the forms whose answers a suite can lose after the
+ * database has sent them. Beside them, the owner's own connections, around
+ * the hops, to see what the database holds.
+ */
+export interface Lossy {
+  hops: Record<'pg' | 'ms', TcpHop>
+  /** How many orders have exactly these notes, asked of the database's owner, not through a hop. */
+  ordersWithNotes(connection: 'pg' | 'ms', notes: string): Promise<number>
+}
+
 export interface Plane {
   /** `http://127.0.0.1:<port>`: the server, across real HTTP. */
   base: string
@@ -50,6 +68,8 @@ export interface Plane {
   fetch: typeof fetch
   /** A client over the spied fetch, for one held token. */
   client(token?: string | (() => string)): DataClient
+  /** Present when the plane was started with `{ hops: true }`. */
+  lossy: Lossy | undefined
   close(): Promise<void>
 }
 
@@ -77,13 +97,25 @@ function headersOf(init: RequestInit | undefined): Record<string, string> {
   return Object.fromEntries(new Headers(init?.headers).entries())
 }
 
-/** Starts the server and publishes `pg-order` and `ms-order` through the administrator's plane. */
-export async function startPlane(): Promise<Plane> {
+/**
+ * Starts the server and publishes `pg-order` and `ms-order` through the
+ * administrator's plane -- and, with `hops`, `pg-hop-order` and
+ * `ms-hop-order` through a TCP hop each (`Lossy`).
+ */
+export async function startPlane(options: { hops?: boolean } = {}): Promise<Plane> {
   const { pg, ms } = inject('databases')
   const connections: ConnectionConfig[] = [
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
     { id: 'ms', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true } },
   ]
+  const hops = options.hops === true ? { pg: await startTcpHop(pg), ms: await startTcpHop(ms) } : undefined
+  if (hops !== undefined) {
+    // The same databases, reached through the hops by the address an operator would write.
+    connections.push(
+      { ...(connections[0] as ConnectionConfig), id: 'pg-hop', host: '127.0.0.1', port: hops.pg.port },
+      { ...(connections[1] as ConnectionConfig), id: 'ms-hop', host: '127.0.0.1', port: hops.ms.port },
+    )
+  }
   const registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: { PG_PASSWORD: pg.password, MS_PASSWORD: ms.password },
     readFile: async () => '',
@@ -110,7 +142,8 @@ export async function startPlane(): Promise<Plane> {
     if (!response.ok) throw new Error(`${path} answered ${String(response.status)}: ${JSON.stringify(parsed)}`)
     return parsed
   }
-  for (const { connection, versionColumn } of ENGINES) {
+  const published = ENGINES.flatMap((engine) => (hops === undefined ? [engine] : [engine, { ...engine, connection: `${engine.connection}-hop` }]))
+  for (const { connection, versionColumn } of published) {
     const formId = `${connection}-order`
     const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
       connection,
@@ -131,16 +164,46 @@ export async function startPlane(): Promise<Plane> {
     return fetch(input, init)
   }
 
+  const owners = hops === undefined ? undefined : await openOwners(pg, ms)
   return {
     base,
     tokens,
     sent,
     fetch: spied,
     client: (token = tokens.clerk) => createDataClient({ token: typeof token === 'function' ? token : () => token, base, fetch: spied }),
+    lossy: hops === undefined || owners === undefined ? undefined : { hops, ordersWithNotes: owners.ordersWithNotes },
     close: async () => {
       await app.close()
+      // Awaited behind the hops too: the PostgreSQL adapter bounds postgres.js's
+      // end(), which would otherwise wait for ever on a query cut under it (0031).
       await registry.close()
+      await owners?.close()
+      await Promise.all([hops?.pg.close(), hops?.ms.close()])
       await rm(root, { recursive: true, force: true })
+    },
+  }
+}
+
+/** The databases' owners, on connections of their own around the hops. */
+async function openOwners(pg: DatabaseDetails, ms: DatabaseDetails): Promise<{ ordersWithNotes: Lossy['ordersWithNotes']; close(): Promise<void> }> {
+  const pgOwner = postgres({ host: pg.host, port: pg.port, database: pg.database, username: pg.user, password: pg.password, onnotice: () => {} })
+  const msOwner = await new mssql.ConnectionPool({
+    server: ms.host,
+    port: ms.port,
+    database: ms.database,
+    user: ms.user,
+    password: ms.password,
+    options: { encrypt: false, trustServerCertificate: true },
+  }).connect()
+  return {
+    ordersWithNotes: async (connection, notes) => {
+      if (connection === 'pg') return (await pgOwner<Array<{ n: number }>>`select count(*)::int as n from sales."order" where notes = ${notes}`)[0]?.n ?? 0
+      const result = await msOwner.request().input('notes', mssql.NVarChar(mssql.MAX), notes).query<{ n: number }>('select count(*) as n from sales.[order] where notes = @notes')
+      return result.recordset[0]?.n ?? 0
+    },
+    close: async () => {
+      await pgOwner.end({ timeout: 5 })
+      await msOwner.close()
     },
   }
 }

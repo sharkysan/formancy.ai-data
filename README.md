@@ -28,7 +28,13 @@ operates without any AI dependency.
 > when the database still fits it — proved on both engines — and the studio
 > does both from its Drift step. A host renders, loads, saves and searches a
 > published form in both renderers through `@formancy/data-client`, and the
-> host page does so against both engines in its suite.
+> host page does so against both engines in its suite. A save whose answer is
+> lost says it may have been saved, all the way to the host page, which holds
+> a create until it is checked or the person confirms; on both engines a test
+> drops the database's answer after the commit and fails if anything sends the
+> write again. Chromium sends such a write again on its own, and the server
+> answers that copy with the first one's answer, within one process; the
+> browser gate measures it.
 > `CHANGELOG.md` says what each step found.
 
 ## Licence, in one table

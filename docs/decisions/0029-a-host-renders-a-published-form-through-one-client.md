@@ -1,6 +1,6 @@
 # 0029 — A host renders a published form through one client of the runtime plane
 
-- **Status:** accepted
+- **Status:** accepted; narrowed by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): a non-JSON 502 is `unexpected` on a read only; a write's answer is known only when the data server says what happened, every write carries a write id of its own, and `reconcile` reads an unknown one
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

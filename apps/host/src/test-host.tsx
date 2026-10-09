@@ -131,6 +131,11 @@ export function notice(renderer: RendererName): HTMLElement | null {
   return within(pane(renderer)).queryByRole('region', { name: `${renderer} Not saved` })
 }
 
+/** The notice a save whose outcome is unknown opens in a pane (0031); null when there is none. */
+export function unknownNotice(renderer: RendererName): HTMLElement | null {
+  return within(pane(renderer)).queryByRole('region', { name: `${renderer} It may have been saved` })
+}
+
 /** Load a record into both panes through the record bar. Nothing is waited for: the caller says what it expects to see. */
 export async function load(user: User, record: string): Promise<void> {
   const bar = screen.getByRole('region', { name: 'Record' })

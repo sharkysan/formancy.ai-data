@@ -18,3 +18,5 @@ export type {
 export { DISPLAY_PARITY, FILTER_PARITY, PARITY_SCOPE, REFUSAL_PARITY } from './parity.js'
 export type { FilterParityCase, ParityFilterColumn, RefusalParityCase } from './parity.js'
 export { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
+export { answerBytes, startTcpHop } from './tcp-hop.js'
+export type { LostAnswer, TcpHop } from './tcp-hop.js'

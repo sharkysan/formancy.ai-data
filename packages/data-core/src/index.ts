@@ -124,7 +124,7 @@ export type {
 } from './records/types.js'
 export { planCreate, planRead, planUpdate } from './records/plan.js'
 export { rejectedSelection, toFormAnswers } from './records/answers.js'
-export { decodeRecordKey, recordToken } from './records/token.js'
+export { decodeRecordKey, intendedRecord, recordToken } from './records/token.js'
 export type { RecordKeyDecoding, RecordTokenEncoding, RecordTokenErrorCode, RecordTokenRefusal } from './records/token.js'
 export type {
   FieldError,
@@ -137,4 +137,5 @@ export type {
   PlanRefusal,
   PlanRefusalCode,
 } from './records/plan-types.js'
-export type { PublishedForm, ResolvedLookup, RuntimeRefusal } from './runtime.js'
+export type { PublishedForm, ResolvedLookup, RuntimeRefusal, UnknownOutcome } from './runtime.js'
+export { WRITE_ID_HEADER } from './runtime.js'

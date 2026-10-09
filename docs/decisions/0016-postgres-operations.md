@@ -1,6 +1,6 @@
 # 0016 — Convert every PostgreSQL value on the server, bind it as text, and never let the driver's configuration decide an answer
 
-- **Status:** accepted; narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): a filter is a typed parameter compared again under `collate "C"`, labels are read by the record reader, and a refusal with no code of its own is `refused`
+- **Status:** accepted; narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): a filter is a typed parameter compared again under `collate "C"`, labels are read by the record reader, and a refusal with no code of its own is `refused`; extended by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): an answer lost after the commit is `unknown-outcome`, proved through a TCP hop, and `close()` is bounded at five seconds
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-postgres/src/lookups.integration.test.ts` and

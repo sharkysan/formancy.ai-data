@@ -3,6 +3,22 @@ import type { Sql } from 'postgres'
 import { discoverPostgres } from './discovery/discover.js'
 
 /**
+ * Seconds close() gives a statement still running before it destroys the
+ * connections (0031). postgres.js 3.4.9 keeps a statement that failed with its
+ * connection as that connection's current one, and `end()` with no timeout
+ * waits for it forever: after one lost answer, a server's shutdown never
+ * returned (measured 2026-10-09, still waiting after 15 s in the server's e2e
+ * suite and after 10 s in this package's). Five is a choice, not a
+ * measurement: half of `docker stop`'s default grace of ten, so a container
+ * still exits on its own terms. A statement still running past it is
+ * destroyed, and its caller is told CONNECTION_DESTROYED — `unknown-outcome`
+ * for a write, never a claim that nothing was written. data-server's shutdown
+ * finishes every request before it closes, so there it only ever ends the
+ * stuck ones.
+ */
+const CLOSE_GRACE = 5
+
+/**
  * PostgreSQL, through a driver the composition root connected.
  *
  * The driver rather than a connection string: opening the connection is where a
@@ -34,7 +50,7 @@ export function createPostgresAdapter(sql: Sql): DatabaseAdapter {
     async close(): Promise<void> {
       // `end()` resolves at once on a driver that has already ended, which is
       // what lets a shutdown path and an error path both call this.
-      await sql.end()
+      await sql.end({ timeout: CLOSE_GRACE })
     },
   }
 }

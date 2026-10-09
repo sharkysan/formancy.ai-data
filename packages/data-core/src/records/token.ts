@@ -3,7 +3,7 @@ import { decodeKeyToken, encodeKeyToken } from '../lookup/token.js'
 import type { KeyTokenErrorCode } from '../lookup/token.js'
 import type { LookupKeyColumn } from '../lookup/types.js'
 import { isKeyValue, isLookupKeyType } from '../lookup/values.js'
-import type { RecordColumn, RecordValue } from './types.js'
+import type { InsertRequest, RecordColumn, RecordValue } from './types.js'
 
 /**
  * How the API names one record: the key token of its identity values — the
@@ -94,4 +94,35 @@ export function decodeRecordKey(identity: readonly RecordColumn[], token: string
     key.push({ name: column.name, type: column.type, value })
   }
   return { ok: true, key }
+}
+
+/**
+ * The token the record an insert writes will have, when the insert names
+ * every identity value itself -- a key the person types, a tenant pinned from
+ * the context; null when the database supplies one, a value is NULL, or the
+ * key has no settled spelling. Equal to the token `toFormAnswers` gives the
+ * stored row (0031), because the values are already canonical (0008) and a
+ * `char(n)` is spelled without its padding on the way in and on the way back
+ * (0028).
+ *
+ * It is what a create whose answer was lost can be looked up by. A trigger
+ * that rewrites a key is outside this promise.
+ */
+export function intendedRecord(request: InsertRequest): string | null {
+  const identity = request.target.identity
+  if (identity.length === 0) return null
+  const values = new Map(request.values.map((entry) => [entry.name, entry.value]))
+  const key: Array<[string, string]> = []
+  for (const column of identity) {
+    const value = values.get(column.name)
+    // A token decodeRecordKey would refuse names nothing the reconciling read could find.
+    if (!isLookupKeyType(column.type) || typeof value !== 'string' || !isKeyValue(column.type, value)) return null
+    key.push([column.name, value])
+  }
+  // fromEntries defines own properties: a key column called __proto__ is a value, not a prototype.
+  const token = recordToken(
+    identity.map((column) => column.name),
+    Object.fromEntries(key),
+  )
+  return token.ok ? token.token : null
 }

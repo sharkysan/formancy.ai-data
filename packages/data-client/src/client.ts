@@ -1,9 +1,15 @@
+import { WRITE_ID_HEADER } from '@formancy/data-core'
 import type { FieldError, FormRecord, LookupResult, LookupRow, PublishedForm } from '@formancy/data-core'
+import { reconcile } from './reconcile.js'
+import type { Reconciliation } from './reconcile.js'
+import { isFormRecord, isLookupResult, isPublishedForm, isResolved, refusalOf, UNEXPECTED } from './shapes.js'
+import { writeOutcome } from './writes.js'
+import type { UnknownWrite, WriteAnswer, WriteIntent, WriteOutcome } from './writes.js'
 
 /*
- * One function per runtime route (0029), and the three decisions every host
- * would otherwise make again: where the token goes, how a name becomes a path,
- * and what an answer that is not a success says.
+ * One function per runtime route (0029), and the decisions every host would
+ * otherwise make again: where the token goes, how a name becomes a path, what
+ * an answer that is not a success says, and what a write's lost answer is.
  *
  * - **The token** is asked of the host once per request and sent in the
  *   Authorization header and nowhere else: never a query string, which is in
@@ -14,10 +20,17 @@ import type { FieldError, FormRecord, LookupResult, LookupRow, PublishedForm } f
  * - **A refusal** is the server's code and sentence, verbatim. The client adds
  *   words only when the server said none: nothing answered (`unreachable`), or
  *   what answered was not the data server's shape (`unexpected`).
+ * - **A write** is known only when the data server says what happened to it.
+ *   Its answer lost -- by the database, said in the server's 502, or between
+ *   the page and the server -- it is an `UnknownWrite`, not a refusal, and
+ *   `reconcile` reads what it addressed (0031). Each write carries a new
+ *   write id, so a copy the browser itself sends again -- Chromium does, on a
+ *   reused connection that closed before any answer -- is answered by the
+ *   server with the first one's answer instead of being applied twice.
  *
  * Nothing is cached and nothing is retried. The server asks the policy on
  * every request (0022), and a write whose outcome is unknown is the host's to
- * reconcile, never the client's to send again (0015).
+ * reconcile, never the client's to send again (0015, 0031).
  */
 
 export interface DataClientOptions {
@@ -41,16 +54,7 @@ export type Outcome<T> = { ok: true; value: T } | Refusal
 export type LookupOperation = 'read' | 'create' | 'update'
 
 const UNREACHABLE = 'The data server could not be reached.'
-const UNEXPECTED = 'The data server did not answer in a way this client understands.'
 const INVALID_NAME = 'A form or lookup name that is empty, "." or ".." cannot address a route.'
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function isNullableString(value: unknown): value is string | null {
-  return value === null || typeof value === 'string'
-}
 
 /**
  * `name` as one path segment, or undefined when it cannot be one. `fetch`
@@ -62,46 +66,7 @@ function pathSegment(name: string): string | undefined {
   return encodeURIComponent(name)
 }
 
-function isFieldError(value: unknown): value is FieldError {
-  return isRecord(value) && typeof value['field'] === 'string' && typeof value['code'] === 'string' && typeof value['message'] === 'string'
-}
-
-function isRows(value: unknown): value is LookupRow[] {
-  return Array.isArray(value) && value.every((row) => isRecord(row) && typeof row['token'] === 'string' && typeof row['label'] === 'string')
-}
-
-/*
- * The shape each route answers with. Shallow on purpose: enough that a
- * captive portal's `{}` or a proxy's page is `unexpected` rather than an
- * empty form, without restating the server's validation of a document.
- */
-
-function isPublishedForm(body: unknown): body is PublishedForm {
-  return isRecord(body) && isRecord(body['form']) && isRecord(body['form']['model']) && Array.isArray(body['operations']) && Array.isArray(body['readable'])
-}
-
-function isFormRecord(body: unknown): body is FormRecord {
-  return isRecord(body) && isNullableString(body['record']) && isNullableString(body['version']) && isRecord(body['answers'])
-}
-
-function isLookupResult(body: unknown): body is LookupResult {
-  return isRecord(body) && isRows(body['rows']) && typeof body['hasMore'] === 'boolean' && typeof body['omitted'] === 'number'
-}
-
-function isResolved(body: unknown): body is { rows: LookupRow[] } {
-  return isRecord(body) && isRows(body['rows'])
-}
-
-/** A non-2xx answer: the server's refusal when it carries a sentence, otherwise not the server's to have said. */
-function refusalOf(status: number, body: unknown): Refusal {
-  if (!isRecord(body) || typeof body['message'] !== 'string') return { ok: false, status, code: 'unexpected', message: UNEXPECTED }
-  const code = typeof body['code'] === 'string' ? body['code'] : `http-${String(status)}`
-  const refusal: Refusal = { ok: false, status, code, message: body['message'] }
-  if (Array.isArray(body['fieldErrors'])) refusal.fieldErrors = body['fieldErrors'].filter(isFieldError)
-  return refusal
-}
-
-/** The body as JSON, or undefined when it is not JSON. An abort while reading rethrows. */
+/** The body as JSON, or undefined when it is not JSON or could not be read. An abort while reading rethrows. */
 async function bodyOf(response: Response, signal: AbortSignal | undefined): Promise<unknown> {
   let text: string
   try {
@@ -117,16 +82,16 @@ async function bodyOf(response: Response, signal: AbortSignal | undefined): Prom
   }
 }
 
-interface Call<T> {
+interface Request {
   method: 'GET' | 'POST'
   /** The names that become one segment each; the route is built only when every one can. */
   names: readonly string[]
   /** The route, from the names as segments, in order. */
   route: (segments: readonly string[]) => string
   body?: Record<string, unknown>
-  /** The route's answer, read from what arrived; undefined when it is not that shape. */
-  read: (body: unknown) => T | undefined
   signal?: AbortSignal | undefined
+  /** Sent beside the token and the content type: a write's id. */
+  headers?: Record<string, string>
 }
 
 /**
@@ -141,18 +106,30 @@ function withoutTrailingSlashes(base: string): string {
 }
 
 /**
+ * A new write id: 128 random bits as hex, from `crypto.getRandomValues`,
+ * which a page served over plain HTTP has too, unlike `randomUUID`.
+ */
+function newWriteId(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/** What one request came to: a name that is no segment (nothing sent), nothing answered, or a status and its JSON body. */
+type Exchange = { sent: false } | WriteAnswer
+
+/**
  * A client of one data server's runtime plane. Every function resolves to an
- * Outcome and never rejects for an answer -- only for an abort the caller
+ * outcome and never rejects for an answer -- only for an abort the caller
  * asked for, which reaches it as the AbortError it raised.
  */
 export function createDataClient(options: DataClientOptions) {
   const base = withoutTrailingSlashes(options.base ?? '')
   const send = options.fetch ?? globalThis.fetch.bind(globalThis)
 
-  async function call<T>(request: Call<T>): Promise<Outcome<T>> {
+  /** The transport: the request sent once, and what came back. Classifying it is the caller's. */
+  async function exchange(request: Request): Promise<Exchange> {
     const segments = request.names.map(pathSegment)
-    if (segments.some((segment) => segment === undefined)) return { ok: false, status: 0, code: 'invalid-name', message: INVALID_NAME }
-    const headers: Record<string, string> = { authorization: `Bearer ${await options.token()}`, accept: 'application/json' }
+    if (segments.some((segment) => segment === undefined)) return { sent: false }
+    const headers: Record<string, string> = { ...request.headers, authorization: `Bearer ${await options.token()}`, accept: 'application/json' }
     if (request.body !== undefined) headers['content-type'] = 'application/json'
     let response: Response
     try {
@@ -166,17 +143,40 @@ export function createDataClient(options: DataClientOptions) {
       })
     } catch (error) {
       if (request.signal?.aborted === true) throw error
-      return { ok: false, status: 0, code: 'unreachable', message: UNREACHABLE }
+      return { answered: false }
     }
-    const body = await bodyOf(response, request.signal)
-    if (response.status < 200 || response.status > 299) return refusalOf(response.status, body)
-    const value = request.read(body)
-    return value === undefined ? { ok: false, status: response.status, code: 'unexpected', message: UNEXPECTED } : { ok: true, value }
+    return { answered: true, status: response.status, body: await bodyOf(response, request.signal) }
   }
 
-  const asRecord = (body: unknown): FormRecord | undefined => (isFormRecord(body) ? body : undefined)
-  const records = (formId: string, action: 'read' | 'create' | 'update', body: Record<string, unknown>): Promise<Outcome<FormRecord>> =>
-    call({ method: 'POST', names: [formId], route: ([form]) => `/v1/forms/${String(form)}/records/${action}`, body, read: asRecord })
+  const invalidName: Refusal = { ok: false, status: 0, code: 'invalid-name', message: INVALID_NAME }
+
+  /** A read: changes nothing, so an answer that went wrong is a refusal, and asking again is safe (0029). */
+  async function call<T>(request: Request & { read: (body: unknown) => T | undefined }): Promise<Outcome<T>> {
+    const answer = await exchange(request)
+    if ('sent' in answer) return invalidName
+    if (!answer.answered) return { ok: false, status: 0, code: 'unreachable', message: UNREACHABLE }
+    if (answer.status < 200 || answer.status > 299) return refusalOf(answer.status, answer.body)
+    const value = request.read(answer.body)
+    return value === undefined ? { ok: false, status: answer.status, code: 'unexpected', message: UNEXPECTED } : { ok: true, value }
+  }
+
+  /** A write: known only when the data server says what happened; otherwise unknown, and never sent again (0031). */
+  async function write(formId: string, intent: WriteIntent, body: Record<string, unknown>): Promise<WriteOutcome> {
+    const answer = await exchange({
+      method: 'POST',
+      names: [formId],
+      route: ([form]) => `/v1/forms/${String(form)}/records/${intent.operation}`,
+      body,
+      // New for every call: one id on two saves would answer the second with the first's answer.
+      headers: { [WRITE_ID_HEADER]: newWriteId() },
+    })
+    // Nothing was sent: a refusal like any other.
+    if ('sent' in answer) return invalidName
+    return writeOutcome(answer, intent)
+  }
+
+  const read = (formId: string, record: string): Promise<Outcome<FormRecord>> =>
+    call({ method: 'POST', names: [formId], route: ([form]) => `/v1/forms/${String(form)}/records/read`, body: { record }, read: (body) => (isFormRecord(body) ? body : undefined) })
   const lookups = <T>(formId: string, source: string, action: 'query' | 'resolve', body: Record<string, unknown>, read: (body: unknown) => T | undefined, signal?: AbortSignal) =>
     call({ method: 'POST', names: [formId, source], route: ([form, name]) => `/v1/forms/${String(form)}/lookups/${String(name)}/${action}`, body, read, signal })
 
@@ -186,18 +186,27 @@ export function createDataClient(options: DataClientOptions) {
       call({ method: 'GET', names: [formId], route: ([form]) => `/v1/forms/${String(form)}`, read: (body) => (isPublishedForm(body) ? body : undefined) }),
 
     /** `POST …/records/read`: one record by its token, with the version an update sends back. */
-    read: (formId: string, record: string): Promise<Outcome<FormRecord>> => records(formId, 'read', { record }),
+    read,
 
-    /** `POST …/records/create`: a new record from the answers; the reply is what was stored, in the stored spelling. */
-    create: (formId: string, answers: Readonly<Record<string, unknown>>): Promise<Outcome<FormRecord>> => records(formId, 'create', { answers }),
+    /**
+     * `POST …/records/create`: a new record from the answers; the reply is what
+     * was stored, in the stored spelling -- or an `UnknownWrite` when nobody
+     * can say whether it was stored.
+     */
+    create: (formId: string, answers: Readonly<Record<string, unknown>>): Promise<WriteOutcome> =>
+      write(formId, { operation: 'create', record: null, version: null }, { answers }),
 
     /**
      * `POST …/records/update`: saved only if the record is still at `version`,
-     * otherwise 409 `stale`. Exactly the route's keys are sent, whatever else
-     * the object passed carries.
+     * otherwise 409 `stale`; an `UnknownWrite` when nobody can say whether it
+     * was saved. Exactly the route's keys are sent, whatever else the object
+     * passed carries.
      */
-    update: (formId: string, change: { record: string; version: string; answers: Readonly<Record<string, unknown>> }): Promise<Outcome<FormRecord>> =>
-      records(formId, 'update', { record: change.record, version: change.version, answers: change.answers }),
+    update: (formId: string, change: { record: string; version: string; answers: Readonly<Record<string, unknown>> }): Promise<WriteOutcome> =>
+      write(formId, { operation: 'update', record: change.record, version: change.version }, { record: change.record, version: change.version, answers: change.answers }),
+
+    /** Reads what an unknown write addressed and says what that shows; never sends the write again (0031). */
+    reconcile: (formId: string, unknown: UnknownWrite): Promise<Reconciliation> => reconcile(read, formId, unknown),
 
     /** `POST …/lookups/:source/query`: one page of the options this person may pick for this operation. */
     query: (

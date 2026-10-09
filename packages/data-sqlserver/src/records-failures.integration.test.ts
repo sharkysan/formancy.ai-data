@@ -75,7 +75,8 @@ beforeAll(async () => {
       version int not null constraint df_restarted_version default 0);
     insert into ops.restarted (id, note) values (1, N'start');
     create table ops.reopened (id int not null constraint pk_reopened primary key, note nvarchar(20) null);
-    create table ops.ended (id int not null constraint pk_ended primary key, note nvarchar(20) null)`)
+    create table ops.ended (id int not null constraint pk_ended primary key, note nvarchar(20) null);
+    create table ops.raised (id int identity(1, 1) not null constraint pk_raised primary key, note nvarchar(20) null)`)
   for (const trigger of [
     'create trigger ops.ignored_insert on ops.ignored instead of insert as begin set nocount on; end',
     'create trigger ops.ignored_update on ops.ignored instead of update as begin set nocount on; end',
@@ -86,6 +87,10 @@ beforeAll(async () => {
     'create trigger ops.restarted_write on ops.restarted after insert, update as begin set nocount on; rollback transaction; begin transaction; end',
     'create trigger ops.reopened_insert on ops.reopened after insert as begin set nocount on; commit transaction; begin transaction; end',
     "create trigger ops.ended_insert on ops.ended after insert as begin set nocount on; if exists (select 1 from inserted where note = N'commit') commit transaction; else rollback transaction; end",
+    // Ends the write's transaction and then refuses it, by what the row's note asks for.
+    "create trigger ops.raised_insert on ops.raised after insert as begin set nocount on; declare @note nvarchar(20) = (select top (1) note from inserted); " +
+      "if @note = N'commit' commit transaction; else if @note = N'reopen' begin commit transaction; begin transaction; end; else if @note = N'rollback' rollback transaction; " +
+      "raiserror(N'a refusal of the customer''s own', 16, 1); end",
   ]) {
     await owner.request().batch(trigger)
   }
@@ -548,6 +553,39 @@ describe('a trigger that decides what a write stores', () => {
     }
     const stored = await owner.request().query<{ id: number; note: string }>('select id, note from ops.ended')
     expect(stored.recordset).toEqual([{ id: 1, note: 'commit' }])
+  })
+})
+
+// A trigger that commits the write's transaction -- or commits it and
+// begins another -- and then raises an error of its own has stored the row,
+// and the error reaches the batch's CATCH like any refusal. Measured before
+// 0031: reported `refused`, "nothing was written", over a stored row; on a
+// table whose key the database numbers, the next press stores a second. The
+// CATCH can tell: the transaction is no longer the one the batch began. It
+// cannot tell a COMMIT from a ROLLBACK, so a trigger that rolls back and then
+// raises is unknown-outcome too, which over-reports and is safe.
+describe('a trigger that ends the transaction and then raises an error', () => {
+  test('is unknown-outcome whether it committed, committed and began another, or rolled back, and only the commits are stored', async () => {
+    const records = createSqlServerRecords(owner)
+    const raised: ObjectRef = { schema: 'ops', name: 'raised' }
+    for (const note of ['commit', 'reopen', 'rollback']) {
+      const outcome = await records.insert({ target: target(raised), values: [valueOf(raised, 'note', note)], returning: [] })
+      expect({ note, outcome }).toMatchObject({ note, outcome: { ok: false, code: 'unknown-outcome' } })
+    }
+    const stored = await owner.request().query<{ note: string }>('select note from ops.raised order by id')
+    expect(stored.recordset.map((row) => row.note)).toEqual(['commit', 'reopen'])
+  })
+
+  // The control: a trigger that raises and ends nothing is still the
+  // customer's refusal, rolled back -- the check is the transaction, not the
+  // error.
+  test('a trigger that only raises is still refused, and nothing is stored', async () => {
+    const records = createSqlServerRecords(owner)
+    const raised: ObjectRef = { schema: 'ops', name: 'raised' }
+    const outcome = await records.insert({ target: target(raised), values: [valueOf(raised, 'note', 'only raise')], returning: [] })
+    expect(outcome).toMatchObject({ ok: false, code: 'refused' })
+    const stored = await owner.request().query<{ n: number }>("select count(*) as n from ops.raised where note = N'only raise'")
+    expect(stored.recordset[0]?.n).toBe(0)
   })
 })
 

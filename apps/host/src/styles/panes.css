@@ -62,6 +62,41 @@
   margin-top: 0.5rem;
 }
 
+/* An empty status line in a notice is there to speak later (0031), and
+   takes no room until it does. */
+.notice-text:empty {
+  margin: 0;
+}
+
+/* A save whose outcome is unknown: teal, the colour of what the server did,
+   because it may have stored this -- not the warm colour of a refusal. The
+   heading says "It may have been saved"; the colour only repeats it. */
+.notice[data-kind='unknown'] {
+  border-color: color-mix(in srgb, var(--server) 40%, transparent);
+  background: color-mix(in srgb, var(--server) 6%, transparent);
+}
+
+.notice[data-kind='unknown'] .notice-heading {
+  color: var(--server);
+}
+
+/* Its buttons, and the confirmation's, in a row that wraps on a phone. */
+.notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.notice-actions .button {
+  margin-top: 0;
+}
+
+.notice-actions .notice-text {
+  flex-basis: 100%;
+}
+
 /* The form: white paper on the bench, as the examples page and the studio's
    preview have it. Only the paper itself is the host's; what is on it is the
    renderer's markup, dressed by the Blueprint theme alone. */

@@ -49,5 +49,21 @@ added unvalidated beside one SQL Server disables.
   adapters' record reads must return them — one object, so neither engine can
   spell a real or a zoneless timestamp its own way.
 
+- `startTcpHop({ host, port })` puts a TCP hop in front of a database that
+  can lose an answer after the database has sent it (0031).
+  `swallowAnswersFrom(marker)` drops a connection's answers from the read in
+  which `marker` -- a text the write's answer echoes, in the driver's
+  encoding, `answerBytes('postgres' | 'sqlserver', text)` -- completes,
+  tolerating one 8-byte TDS packet header inside it; its `cut()` ends only the
+  connections that swallowed. `countSent(marker)` counts the marker on its way
+  to the database, which is how a suite shows a write was not sent again.
+  `cut()` ends every connection. Every byte is the driver's and the server's,
+  and a close is passed on only after every byte before it, so a suite behind
+  it is not a mocked driver; only a cut loses what is in flight. The host
+  page's browser gate puts one between Chromium and the page too. A matched answer is not proof
+  of a commit -- PostgreSQL sends a deferred constraint's refusal after the
+  row -- so a suite polls a connection of its own until the write is visible
+  before it cuts.
+
 Every adapter's suite asserts both lists are empty. That is how "both adapters
 pass the same mandatory suite" is something a test checks.

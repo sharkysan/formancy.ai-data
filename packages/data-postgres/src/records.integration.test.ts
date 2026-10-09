@@ -12,8 +12,8 @@ import type {
   RowFilters,
   UpdateRequest,
 } from '@formancy/data-core'
-import type { PostgresFixture } from '@formancy/data-fixtures'
-import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT, startPostgresFixture } from '@formancy/data-fixtures'
+import type { PostgresFixture, TcpHop } from '@formancy/data-fixtures'
+import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT, startPostgresFixture, startTcpHop } from '@formancy/data-fixtures'
 import { randomUUID } from 'node:crypto'
 import net from 'node:net'
 import postgres from 'postgres'
@@ -1114,29 +1114,12 @@ async function closedPort(): Promise<number> {
 }
 
 /**
- * A TCP hop between the driver and the container that can be cut. Not a
- * mock: every byte is the real driver's and the real server's. Cutting it
- * destroys both sides, which is what a dropped network does.
+ * The shared TCP hop (`@formancy/data-fixtures`) in front of the container.
+ * Not a mock: every byte is the real driver's and the real server's. Its
+ * `cut()` destroys both sides of every connection, which is what a dropped
+ * network does.
  */
-async function startProxy(): Promise<{ port: number; cut(): void; close(): Promise<void> }> {
+async function startProxy(): Promise<TcpHop> {
   const target = new URL(fixture.admin)
-  const sockets = new Set<net.Socket>()
-  const server = net.createServer((client) => {
-    const upstream = net.connect(Number(target.port), target.hostname)
-    for (const socket of [client, upstream]) {
-      sockets.add(socket)
-      socket.on('error', () => {})
-      socket.on('close', () => sockets.delete(socket))
-    }
-    client.pipe(upstream)
-    upstream.pipe(client)
-  })
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  return {
-    port: (server.address() as net.AddressInfo).port,
-    cut: () => {
-      for (const socket of sockets) socket.destroy()
-    },
-    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
-  }
+  return startTcpHop({ host: target.hostname, port: Number(target.port) })
 }

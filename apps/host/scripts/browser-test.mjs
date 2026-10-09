@@ -11,14 +11,24 @@
 //     the next the host token; once the form is open, Enter on the skip link
 //     puts the keyboard on the page's main part and the next Tab on its
 //     first control; after a stale save the keyboard is on the notice,
-//     after a refused selection in the error summary, and after a save that
-//     worked still on Save;
+//     after a refused selection in the error summary, after a save whose
+//     answer was lost on the "It may have been saved" notice (0031), after
+//     "Enter it again anyway" on "Allow saving it again", and after a save
+//     that worked still on Save;
+//   - a create whose answer the network lost after the server stored it:
+//     Chromium sends it again on its own, below the page, when the connection
+//     it reused closes before any answer -- measured at the socket, through a
+//     TCP hop between the browser and the server -- and the server answers
+//     that second sending with the first one's answer, so one order is
+//     stored and the page says what was created (0031);
 //   - the papers are the theme's: no rule of host.css selects anything on
 //     either form, so the host's people see what Blueprint draws;
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules jsdom cannot measure -- signed out, open, with the customer
-//     list open, loaded, saved, with the stale notice (Angular pane) and with
-//     a refused selection (React pane).
+//     list open, loaded, saved, with the stale notice (Angular pane), with
+//     a refused selection (React pane), with the notice of a save whose
+//     answer was lost, after its check, and with its confirmation open
+//     (React pane).
 //
 // Against the page `vite build` produces, served over HTTP from the same
 // origin as the real data server -- createDataServer, in this process, over
@@ -39,7 +49,7 @@ import { dirname, extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
 import { EMPTY_PRESENTATION } from '@formancy/data-core'
-import { startPostgresFixture } from '@formancy/data-fixtures'
+import { startPostgresFixture, startTcpHop } from '@formancy/data-fixtures'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, DRIVER_FACTORIES } from '@formancy/data-server'
 import postgres from 'postgres'
 
@@ -111,6 +121,8 @@ async function startPlane() {
       return (await call(TOKENS.clerk, `/v1/forms/${FORM}/records/create`, { answers: { customer, order_date: '2026-10-08', status: 'placed', amount: '1' } })).record
     },
     insertCustomer: (no, name) => sql`insert into sales.customer (tenant_id, customer_no, name) values (1, ${no}, ${name})`,
+    /** How many orders have exactly these notes: what the database holds, asked beside the page. */
+    ordersWithNotes: async (notes) => (await sql`select count(*)::int as n from sales."order" where notes = ${notes}`)[0].n,
     deleteCustomer: (no) => sql`delete from sales.customer where tenant_id = 1 and customer_no = ${no}`,
     close: async () => {
       await server.close()
@@ -275,13 +287,24 @@ const paper = (page, name) => pane(page, name).getByRole('form', { name: `Order,
 const customer = (page, name) => paper(page, name).getByRole('combobox', { name: 'Customer' })
 const saveIn = (page, name) => paper(page, name).getByRole('button', { name: 'Save' })
 const status = (page, name, text) => pane(page, name).getByRole('status').filter({ hasText: text })
+const unknownNotice = (page) => pane(page, 'React').getByRole('region', { name: 'React It may have been saved' })
+
+/** A new order in the React pane, every field a person types, with `notes` as its notes. Not saved. */
+async function newOrder(page, notes) {
+  await page.getByRole('region', { name: 'Record', exact: true }).getByRole('button', { name: 'New record' }).click()
+  await customer(page, 'React').fill('Muster')
+  await paper(page, 'React').getByRole('option', { name: 'Muster AG' }).click(WITHIN)
+  await paper(page, 'React').getByLabel('Order date', { exact: true }).fill('2026-10-08')
+  await paper(page, 'React').getByLabel('Amount', { exact: true }).fill('5')
+  await paper(page, 'React').getByLabel('Notes', { exact: true }).fill(notes)
+}
 
 /**
  * The journey, state by state: each entry brings the page to a state and
  * names it, checking on the way what only that moment can show. `run` holds
  * what one width's pass needs: its record, its customer number.
  */
-function journey(plane, check, run) {
+function journey(plane, hop, check, run) {
   return [
     ['Open', async (page) => {
       await page.getByLabel('Host token').fill(TOKENS.clerk)
@@ -356,6 +379,90 @@ function journey(plane, check, run) {
         check(`which matched host.css against the whole ${name} form`, found.rules > 0 && missing.length === 0 ? null : `${String(found.rules)} rules, and no ${missing.join(', ')} on the paper`)
       }
     }],
+    ['Unknown notice (React)', async (page) => {
+      await customer(page, 'React').fill('Muster')
+      await paper(page, 'React').getByRole('option', { name: 'Muster AG' }).click(WITHIN)
+      // The update reaches the real server, which stores it and answers; the
+      // page is then told the connection was reset, as when a network drops
+      // after sending. Chromium's own answer to a lost response, not jsdom's.
+      let lost = 0
+      await page.route('**/v1/forms/*/records/update', async (route) => {
+        lost += 1
+        await route.fetch()
+        await route.abort('connectionreset')
+      })
+      try {
+        const save = saveIn(page, 'React')
+        await save.focus()
+        await page.keyboard.press('Enter')
+        const notice = pane(page, 'React').getByRole('region', { name: 'React It may have been saved' })
+        await notice.waitFor(WITHIN)
+        check('after a save whose answer was lost, the keyboard is on the notice', await focusedOn(page, notice))
+        check('and the save was sent once', lost === 1 ? null : `it was sent ${String(lost)} times`)
+      } finally {
+        await page.unroute('**/v1/forms/*/records/update')
+      }
+    }],
+    ['Unknown notice, checked (React)', async (page) => {
+      // The check's answer and "Load the saved record", drawn in Chromium:
+      // their contrast and target size are measured nowhere else.
+      await unknownNotice(page).getByRole('button', { name: 'Check whether it was saved' }).click()
+      await unknownNotice(page).getByRole('button', { name: 'Load the saved record' }).waitFor(WITHIN)
+    }],
+    ['Create resent by Chromium (React)', async (page) => {
+      // The page reaches the server through the hop. The hop drops the answer
+      // carrying this order's notes, the server having stored it, and once
+      // the order is in the database closes the connection that carried it:
+      // what an idle reset by a balancer, or a dropped link, does. Chromium
+      // then sends the create again on a new connection, on its own.
+      const notes = `resent by Chromium ${String(run.customer)} ${String(Date.now())}`
+      await newOrder(page, notes)
+      const marker = Buffer.from(notes, 'utf8')
+      const sent = hop.countSent(marker)
+      const lost = hop.swallowAnswersFrom(marker)
+      // The answer the page does get: the second sending's, which the server
+      // answers from what it kept for the first (0031).
+      const answered = page.waitForResponse((response) => response.url().endsWith('/records/create') && response.status() === 201, WITHIN)
+      await saveIn(page, 'React').click()
+      await Promise.race([lost.matched, new Promise((_, reject) => setTimeout(() => reject(new Error('the create never answered through the hop')), WITHIN.timeout))])
+      await until(async () => (await plane.ordersWithNotes(notes)) === 1, 'the create never reached the database')
+      const cutAt = performance.now()
+      lost.cut()
+      // Polled every 5 ms rather than through until(), whose 100 ms step
+      // would be the measurement: how soon a resend follows the close is
+      // what the server's kept answers have to outlast.
+      while (sent() < 2 && performance.now() - cutAt < WITHIN.timeout) await new Promise((resolve) => setTimeout(resolve, 5))
+      const resentAfter = performance.now() - cutAt
+      await status(page, 'React', 'Created record').waitFor(WITHIN)
+      const answerBytes = (await (await answered).body()).length
+      console.log(`  measured: Chromium resent the create ${resentAfter.toFixed(0)} ms after its connection closed; the create's answer is ${String(answerBytes)} bytes`)
+      check('Chromium sent the create again on its own: the marker crossed the hop twice', sent() === 2 ? null : `it crossed ${String(sent())} time(s): Chromium did not resend, so this measured nothing`)
+      check('and one order is stored: the second sending was answered, not applied', (await plane.ordersWithNotes(notes)) === 1 ? null : `${String(await plane.ordersWithNotes(notes))} orders are stored`)
+    }],
+    ['Unknown create, confirming (React)', async (page) => {
+      // A create lost on the way, which nothing can find -- the database
+      // numbers orders -- checked, and "Enter it again anyway" pressed: the
+      // confirmation, drawn in Chromium, with the keyboard on its answer.
+      await newOrder(page, `lost and confirming ${String(run.customer)} ${String(Date.now())}`)
+      await page.route('**/v1/forms/*/records/create', async (route) => {
+        await route.fetch()
+        await route.abort('connectionreset')
+      })
+      try {
+        await saveIn(page, 'React').click()
+        await unknownNotice(page).waitFor(WITHIN)
+      } finally {
+        await page.unroute('**/v1/forms/*/records/create')
+      }
+      await unknownNotice(page).getByRole('button', { name: 'Check whether it was saved' }).click()
+      const again = unknownNotice(page).getByRole('button', { name: 'Enter it again anyway' })
+      await again.waitFor(WITHIN)
+      await again.focus()
+      await page.keyboard.press('Enter')
+      const allow = unknownNotice(page).getByRole('button', { name: 'Allow saving it again' })
+      await allow.waitFor(WITHIN)
+      check('after "Enter it again anyway", the keyboard is on "Allow saving it again"', await focusedOn(page, allow))
+    }],
   ]
 }
 
@@ -394,6 +501,9 @@ async function run() {
   const started = Date.now()
   const plane = await startPlane()
   const { http, port } = await serve(plane)
+  // Between Chromium and the page's origin: every byte the browser sends and
+  // receives crosses it, so what the browser itself does is counted there.
+  const hop = await startTcpHop({ host: '127.0.0.1', port })
   console.log(`PostgreSQL and the server started in ${String(Math.round((Date.now() - started) / 1000))} s`)
   const list = widths()
   try {
@@ -403,7 +513,7 @@ async function run() {
       const page = await browser.newPage({ viewport: { width, height: 900 } })
       if (refuseFonts) await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort())
       try {
-        await page.goto(`http://127.0.0.1:${String(port)}/`, { waitUntil: 'load' })
+        await page.goto(`http://127.0.0.1:${String(hop.port)}/`, { waitUntil: 'load' })
         console.log(`\n${label} -- ${String(width)}x900`)
 
         // Signed out: the skip link first, on screen, and then the token --
@@ -426,7 +536,7 @@ async function run() {
         await measured(page, 'Signed out')
 
         const run = { record: await plane.order(), customer: 9000 + pass }
-        for (const [state, act] of journey(plane, check, run)) {
+        for (const [state, act] of journey(plane, hop, check, run)) {
           await act(page)
           await measured(page, state)
         }
@@ -436,6 +546,7 @@ async function run() {
     }
   } finally {
     await browser.close()
+    await hop.close()
     http.close()
     await plane.close()
   }

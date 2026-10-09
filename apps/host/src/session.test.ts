@@ -1,10 +1,10 @@
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient, FormRecord, PublishedForm } from '@formancy/data-client'
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest'
-import { createSession } from './session.js'
+import { CHANGED_SINCE_UNKNOWN, createSession, HELD } from './session.js'
 import type { Session } from './session.js'
-import { EDGES, ENGINES, holdingWrites, startPlane, TOKENS } from './test-plane.js'
-import type { Holding, Plane } from './test-plane.js'
+import { EDGES, ENGINES, holdingWrites, losingWrites, startPlane, TOKENS } from './test-plane.js'
+import type { Holding, Losing, Plane } from './test-plane.js'
 
 /*
  * What one pane's session does with a save, against the real server on both
@@ -87,6 +87,25 @@ async function press(session: Session, holding: Holding): Promise<unknown> {
   const result = await Promise.race([session.save(submitted(session, {})), sent])
   answered = true
   return result
+}
+
+/** A session whose next create or update loses its answer: after the server stored it, or before it was sent on. */
+async function losingSession(formId: string, when: 'after' | 'before', record?: FormRecord): Promise<{ session: Session; losing: Losing }> {
+  const losing = losingWrites(plane.fetch, { when })
+  const lossy = createDataClient({ token: () => TOKENS.clerk, fetch: losing.fetch })
+  const session = createSession({ client: lossy, formId, definition: await definition(formId, lossy), renderer: 'react' })
+  session.open(record)
+  return { session, losing }
+}
+
+/** What the client says when the answer was lost between the page and the server (0031). */
+const LOST_ON_THE_WAY = 'The answer to this save was lost between this page and the data server. It may have been saved.'
+
+/** A fresh order of tenant 1's, made beside the session, read back as a session opens it. */
+async function freshOrder(formId: string, session: Session, notes: string): Promise<FormRecord> {
+  const created = await plane.clerk.create(formId, { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '20', notes })
+  if (!created.ok || created.value.record === null) throw new Error('the order was not created')
+  return stored(formId, created.value.record)
 }
 
 /** How many creates the page has sent for `formId` since `from`. */
@@ -328,5 +347,125 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     expect(creates(formId, from)).toBe(2)
     holding.answer()
     expect(await b).toMatchObject({ kind: 'created' })
+  })
+})
+
+describe.each(ENGINES)('a save whose answer is lost, on $engine (0031)', ({ formId, connection }) => {
+  // The answer was lost after the server stored the order. Shown as "not
+  // saved", the person presses Save again and makes a second order -- the
+  // renderer owns the button, so the session itself holds the form: the
+  // press sends nothing and says why. An order's key is numbered by the
+  // database, so nothing can find it, and checking says so without asking;
+  // only the person's word lets one more create through.
+  test('a create lost after it was stored holds the form until the person says to enter it again', async () => {
+    const { session, losing } = await losingSession(formId, 'after')
+    const notes = `lost in the session ${connection} ${String(Date.now())}`
+    const pick = await customer(session, 'Muster')
+    const from = plane.sent.length
+    const result = await session.save(submitted(session, { customer: pick, order_date: EDGES.orderDate, status: 'placed', amount: '21', notes }))
+    expect(result).toMatchObject({ kind: 'unknown', message: LOST_ON_THE_WAY, unknown: { operation: 'create', record: null, version: null, origin: 'transport' } })
+    expect(losing.lost).toEqual([`/v1/forms/${formId}/records/create`])
+    expect(await plane.db.countOrders(connection, notes)).toBe(1)
+    expect(session.state()).toEqual({ record: undefined, version: undefined, operation: 'create' })
+
+    expect(await session.save(submitted(session, {}))).toEqual({ kind: 'held', message: HELD })
+    expect(creates(formId, from)).toBe(1)
+    expect(await session.check()).toEqual({ ok: true, state: 'unverifiable' })
+    expect(plane.sent.length - from).toBe(1)
+
+    session.allowAgain()
+    expect(await session.save(submitted(session, {}))).toMatchObject({ kind: 'created' })
+    expect(creates(formId, from)).toBe(2)
+    // Two, because the person said so: the hold made it their choice, not a press's.
+    expect(await plane.db.countOrders(connection, notes)).toBe(2)
+    expect(session.unknown()).toBeUndefined()
+  })
+
+  // The hold is the form's, not the session's: New starts another record,
+  // which nothing has been sent for. A hold that outlived the form would
+  // refuse every new order after one lost answer.
+  test('New clears the hold, and the new form saves', async () => {
+    const { session } = await losingSession(formId, 'after')
+    const pick = await customer(session, 'Muster')
+    await session.save(submitted(session, { customer: pick, order_date: EDGES.orderDate, status: 'placed', amount: '22', notes: `held, then New ${connection}` }))
+    expect(session.unknown()).toMatchObject({ operation: 'create' })
+    session.open()
+    expect(session.unknown()).toBeUndefined()
+    expect(await session.check()).toMatchObject({ ok: false, code: 'nothing-to-check' })
+    expect(await session.save(submitted(session, { customer: pick, order_date: EDGES.orderDate, status: 'placed', amount: '23' }))).toMatchObject({ kind: 'created' })
+  })
+
+  // An update lost after it was stored holds nothing -- its version makes a
+  // resend safe -- and keeps the version it sent, which a session that
+  // applied nothing must. Checking reads the record and finds it moved on,
+  // with the change in it, for the person to load.
+  test('an update lost after it was stored is unknown, keeps its version, and checks as changed', async () => {
+    const reader = await losingSession(formId, 'after')
+    const loaded = await freshOrder(formId, reader.session, 'before the lost update')
+    const { session } = await losingSession(formId, 'after', loaded)
+    const notes = `lost update in the session ${connection} ${String(Date.now())}`
+    const result = await session.save(submitted(session, { notes }))
+    expect(result).toMatchObject({ kind: 'unknown', unknown: { operation: 'update', record: loaded.record, version: loaded.version, origin: 'transport' } })
+    expect(session.state().version).toBe(loaded.version)
+    const checked = await session.check()
+    expect(checked).toMatchObject({ ok: true, state: 'changed', current: { record: loaded.record, answers: { notes } } })
+    expect(checked.ok && checked.state === 'changed' ? checked.current.version : undefined).not.toBe(loaded.version)
+  })
+
+  // The 502's sentence invites Save with the same version, and when the
+  // lost update was stored that Save is answered 409 stale -- the record
+  // changed, by the person's own earlier save. Shown as a stale "Not saved",
+  // the person is told nothing was saved and the session forgets the earlier
+  // save may have been. It stays unknown: said as such, still checkable,
+  // and the check finds the record moved on, with the change in it.
+  test('an update lost after it was stored, saved again, is stale by its own doing and stays unknown', async () => {
+    const reader = await losingSession(formId, 'after')
+    const loaded = await freshOrder(formId, reader.session, 'before the lost update, then Save')
+    const { session } = await losingSession(formId, 'after', loaded)
+    const notes = `lost update, saved again ${connection} ${String(Date.now())}`
+    expect(await session.save(submitted(session, { notes }))).toMatchObject({ kind: 'unknown' })
+    const again = await session.save(submitted(session, {}))
+    expect(again).toMatchObject({ kind: 'unknown', message: CHANGED_SINCE_UNKNOWN, unknown: { operation: 'update', record: loaded.record, version: loaded.version } })
+    expect(session.unknown()).toMatchObject({ operation: 'update', record: loaded.record, version: loaded.version })
+    expect(await session.check()).toMatchObject({ ok: true, state: 'changed', current: { record: loaded.record, answers: { notes } } })
+  })
+
+  // Lost before it reached the server: nothing is stored, the record is
+  // still at the version sent, and checking says so -- "unchanged", not
+  // "saved". Pressing Save then sends the same version, which is how "it is
+  // stored at most once" holds, and it is stored.
+  test('an update lost before it was sent checks as unchanged, and Save then stores it with the version it sent', async () => {
+    const reader = await losingSession(formId, 'before')
+    const loaded = await freshOrder(formId, reader.session, 'before the unsent update')
+    const { session, losing } = await losingSession(formId, 'before', loaded)
+    const notes = `unsent update ${connection} ${String(Date.now())}`
+    const from = plane.sent.length
+    expect(await session.save(submitted(session, { notes }))).toMatchObject({ kind: 'unknown', message: LOST_ON_THE_WAY })
+    expect(losing.lost).toHaveLength(1)
+    expect(plane.sent.length).toBe(from)
+    expect(await session.check()).toMatchObject({ ok: true, state: 'unchanged', current: { version: loaded.version } })
+
+    expect(await session.save(submitted(session, {}))).toEqual({ kind: 'saved', message: 'Saved.' })
+    const update = plane.sent.slice(from).find((request) => request.path === `/v1/forms/${formId}/records/update`)
+    expect(JSON.parse(update?.body ?? '{}')).toMatchObject({ record: loaded.record, version: loaded.version })
+    expect((await stored(formId, String(loaded.record))).answers['notes']).toBe(notes)
+  })
+
+  // A check that finds the create absent lifts the hold: creating again is
+  // safe, because the key the insert named stops a second row. No form this
+  // plane publishes names its own key -- an order's is numbered -- so the
+  // answer is the client's (reconcile.test proves it from a 404) and what is
+  // proved here is only what the session does with it.
+  test('a check that finds the create absent lifts the hold', async () => {
+    const losing = losingWrites(plane.fetch, { when: 'before' })
+    const lossy = createDataClient({ token: () => TOKENS.clerk, fetch: losing.fetch })
+    const absent: DataClient = { ...lossy, reconcile: async () => ({ ok: true, state: 'absent' }) }
+    const session = createSession({ client: absent, formId, definition: await definition(formId, lossy), renderer: 'angular' })
+    session.open()
+    const data = submitted(session, { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '24' })
+    expect(await session.save(data)).toMatchObject({ kind: 'unknown' })
+    expect(await session.save(data)).toEqual({ kind: 'held', message: HELD })
+    expect(await session.check()).toEqual({ ok: true, state: 'absent' })
+    expect(await session.save(data)).toMatchObject({ kind: 'created' })
   })
 })

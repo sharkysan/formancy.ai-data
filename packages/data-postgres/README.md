@@ -37,6 +37,14 @@ composition root. Nothing in this package reads configuration, and nothing
 assumes how the driver was configured (below). `discoverPostgres(sql, scope)`
 is the same discovery as a function of its own.
 
+`adapter.close()` ends the driver it was given, and gives a statement still
+running five seconds to answer before it destroys the connections. Unbounded,
+it never returned once a connection had been cut in the middle of a
+statement: postgres.js 3.4.9 keeps that statement as the connection's current
+one, and `end()` waits for it. A statement destroyed by the bound is told
+CONNECTION_DESTROYED, which is `unknown-outcome` for a write. Five is a
+choice, half of `docker stop`'s default grace, not a measurement.
+
 `connectPostgres` opens the client from this package's own copy of
 postgres.js, and is how `@formancy/data-server` opens every connection: a
 driver object built by one copy of a driver and used by another is a defect no
@@ -150,6 +158,39 @@ in short:
   `unknown-outcome` — the tests show such a write committing after the client
   gave up — and it is never retried. A malformed request, filters that say
   nothing, or a syntax error in this adapter's own SQL is thrown.
+
+### An answer lost after a write
+
+[0031](../../docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)
+has the whole chain, from this adapter to the host page. What PostgreSQL does,
+proved through the shared TCP hop from `@formancy/data-fixtures`, which drops
+the server's answer after it was sent:
+
+- **A write that committed and whose answer was lost is `unknown-outcome`,**
+  CONNECTION_CLOSED from postgres.js. The insert was sent once, at the wire,
+  and exactly one row exists; an update's change is stored and its version
+  moved by exactly one.
+- **A refusal at commit follows the rows.** A deferred constraint is checked
+  when the implicit transaction commits, after the statement's row and its
+  command tag have been sent. The adapter answers the refusal —
+  `unique-violation` naming the constraint — and nothing is stored. So the
+  row coming back is not proof of a commit: a test that sees it, and cuts,
+  has to look for the row from a connection of its own first.
+- **A write cut while it waits can still commit** once the lock is released:
+  with `client_connection_check_interval` at its default of 0, the server
+  does not look for a client that has gone while a statement waits. It is
+  `unknown-outcome`, and it does commit. A write cut while the server is
+  still parsing it writes nothing and is `unknown-outcome` all the same, and
+  so is a backend terminated mid-write (the parity suite). Those over-report;
+  the adapter cannot tell them apart.
+- **A `statement_timeout` is the server's own answer:** 57014, rolled back,
+  `unavailable` — while the statement runs and while it waits on a lock.
+
+Measured once, on 2026-10-09 for 0031, and not held by a test here: a pooled
+connection given a statement within about a millisecond of a network drop
+fails CONNECTION_CLOSED, before the pool has seen the close; from 10 ms on,
+the pool had reconnected. A write sent in that window is reported
+`unknown-outcome` though nothing reached the server.
 
 ### Discovery reads pg_catalog, as the account the forms will run as
 
@@ -282,7 +323,9 @@ semantics are what this package is for, and a suite that passed without a
 database would be proving the mock (0003). The fixture is resolved from its
 built output, so run `pnpm build` first.
 
-- `adapter.integration.test.ts` — ping and close.
+- `adapter.integration.test.ts` — ping and close, including a close after a
+  connection was cut mid-statement, which returns, and one with a statement
+  still running, which lets it answer.
 - `discovery.integration.test.ts` — the shared model as the owner, the
   restricted reader's rule and its grants, privileges short of a whole
   table, the scope, the fingerprint, and a check added NOT VALID read as
@@ -327,6 +370,10 @@ built output, so run `pnpm build` first.
   connections, every refusal the fixture can provoke, writes a trigger or a
   rule declines, objects planted on the search path, and a connection cut
   through a TCP hop after a write was sent.
+- `records-lost-answer.integration.test.ts` — an insert and an update whose
+  answer the hop drops after the commit, counted at the wire; a deferred
+  unique constraint refused after the row was sent, with and without the
+  answer lost; and a statement timed out while it waits on a lock.
 
 ## Licence
 

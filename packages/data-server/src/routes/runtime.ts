@@ -3,6 +3,7 @@ import {
   buildLookupConfig,
   checkSubmittedFields,
   findObject,
+  intendedRecord,
   lookupRowFilter,
   planCreate,
   planRead,
@@ -23,7 +24,9 @@ import type { HostIdentity } from '../identity.js'
 import type { AuditEvent, AuditSink } from '../audit.js'
 import { recordReference } from '../audit.js'
 import { loadPublished } from '../published.js'
-import { planRefusal, recordFailure } from './runtime-errors.js'
+import { planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
+import { createWriteOnce, INVALID_WRITE_ID, writeId } from './write-once.js'
+import type { WriteAnswer } from './write-once.js'
 
 export interface RuntimeOptions {
   registry: ConnectionRegistry
@@ -38,7 +41,8 @@ export interface RuntimeOptions {
 
 declare module 'fastify' {
   interface FastifyRequest {
-    auditTrail?: { formVersion: number | null; record?: string; outcome?: string }
+    /** `repeated`: answered with an earlier sending's answer, and nothing asked of the database (0031). */
+    auditTrail?: { formVersion: number | null; record?: string; outcome?: string; repeated?: boolean }
   }
 }
 
@@ -109,6 +113,7 @@ function withoutEchoes(
  */
 export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOptions): Promise<void> {
   const { registry, store } = options
+  const writes = createWriteOnce()
 
   app.addHook('onRequest', async (request) => {
     request.auditTrail = { formVersion: null }
@@ -143,7 +148,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
         form: (request.params as { id?: string }).id ?? '',
         formVersion: trail.formVersion,
         status: reply.statusCode,
-        outcome: reply.statusCode < 400 ? 'ok' : (trail.outcome ?? `http-${String(reply.statusCode)}`),
+        outcome: trail.repeated === true ? 'repeated' : reply.statusCode < 400 ? 'ok' : (trail.outcome ?? `http-${String(reply.statusCode)}`),
         record: recordReference(key, trail.record),
       }
       try {
@@ -189,6 +194,40 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       await reply.code(503).send({ code: 'unavailable', message: 'The database cannot be reached. Nothing was saved.' })
     }
     return undefined
+  }
+
+  /**
+   * A write that was sent and whose answer was lost (0031): said once in the
+   * log, with the adapter's sentence, which names no value; answered with what
+   * was addressed; and never sent again -- each route asks the adapter once.
+   */
+  function lost(request: FastifyRequest<{ Params: { id: string } }>, operation: 'create' | 'update', record: string | null, version: string | null, failure: string): WriteAnswer {
+    request.log.warn({ form: request.params.id, operation, failure }, 'a write was sent and its answer lost; it is not retried')
+    return { ...unknownOutcome(operation, record, version), record: record ?? undefined }
+  }
+
+  /**
+   * Sends a write to the database once per sending (write-once.ts): `perform`
+   * runs the first time its write id arrives, and a later arrival is answered
+   * with that answer. A request without an id is performed every time.
+   */
+  async function sendOnce(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    operation: 'create' | 'update',
+    id: string | undefined,
+    perform: () => Promise<WriteAnswer>,
+  ): Promise<WriteAnswer & { repeated?: boolean }> {
+    const actor = request.identity?.actor.id
+    if (id === undefined || actor === undefined) return perform()
+    return writes.once({ actor, form: request.params.id, operation, id, body: request.body }, perform)
+  }
+
+  /** A write's answer, sent, with what the audit names: its record, and whether it was a repeat. */
+  async function answered(reply: FastifyReply, answer: WriteAnswer & { repeated?: boolean }): Promise<FastifyReply> {
+    const trail = reply.request.auditTrail
+    if (trail !== undefined && answer.record !== undefined) trail.record = answer.record
+    if (trail !== undefined && answer.repeated === true) trail.repeated = true
+    return reply.code(answer.status).send(answer.body)
   }
 
   /** Runs every membership check; returns field errors for rejected tokens, or a reply already sent. */
@@ -242,6 +281,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   app.post<{ Params: { id: string } }>('/v1/forms/:id/records/create', async (request, reply) => {
     const body = request.body
     if (!isRecord(body) || !isRecord(body['answers'])) return reply.code(400).send({ code: 'invalid-request', message: 'Expected { answers }.' })
+    const id = writeId(request)
+    if (id === null) return answered(reply, INVALID_WRITE_ID)
     const bundle = await published(request.params.id, reply)
     if (bundle === undefined) return reply
     const plan = planCreate(bundle.snapshot, bundle.bindings, bundle.policy, context(request), withoutEchoes(bundle, context(request), 'create', body['answers']))
@@ -255,14 +296,14 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const rejected = await memberships(open, plan.memberships, reply)
     if (rejected === undefined) return reply
     if (rejected.length > 0) return reply.code(422).send({ code: 'invalid-values', message: 'A selection is not one of the options.', fieldErrors: rejected })
-    const outcome = await open.records.insert(plan.request)
-    if (!outcome.ok) {
-      const failure = recordFailure(bundle.bindings, outcome)
-      return reply.code(failure.status).send(failure.body)
-    }
-    const created = toFormAnswers(bundle.bindings, plan.fields, outcome)
-    if (request.auditTrail !== undefined && created.record !== null) request.auditTrail.record = created.record
-    return reply.code(201).send(created)
+    const answer = await sendOnce(request, 'create', id, async () => {
+      const outcome = await open.records.insert(plan.request)
+      if (!outcome.ok && outcome.code === 'unknown-outcome') return lost(request, 'create', intendedRecord(plan.request), null, outcome.message)
+      if (!outcome.ok) return recordFailure(bundle.bindings, outcome)
+      const created = toFormAnswers(bundle.bindings, plan.fields, outcome)
+      return { status: 201, body: created, record: created.record ?? undefined }
+    })
+    return answered(reply, answer)
   })
 
   app.post<{ Params: { id: string } }>('/v1/forms/:id/records/update', async (request, reply) => {
@@ -271,6 +312,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       return reply.code(400).send({ code: 'invalid-request', message: 'Expected { record, version, answers }.' })
     }
     if (request.auditTrail !== undefined) request.auditTrail.record = body['record']
+    const id = writeId(request)
+    if (id === null) return answered(reply, INVALID_WRITE_ID)
     const bundle = await published(request.params.id, reply)
     if (bundle === undefined) return reply
     const actor = context(request)
@@ -296,12 +339,14 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const rejected = await memberships(open, plan.memberships, reply)
     if (rejected === undefined) return reply
     if (rejected.length > 0) return reply.code(422).send({ code: 'invalid-values', message: 'A selection is not one of the options.', fieldErrors: rejected })
-    const outcome = await open.records.update(plan.request)
-    if (!outcome.ok) {
-      const failure = recordFailure(bundle.bindings, outcome)
-      return reply.code(failure.status).send(failure.body)
-    }
-    return toFormAnswers(bundle.bindings, plan.fields, outcome)
+    const { record, version } = body
+    const answer = await sendOnce(request, 'update', id, async () => {
+      const outcome = await open.records.update(plan.request)
+      if (!outcome.ok && outcome.code === 'unknown-outcome') return lost(request, 'update', record, version, outcome.message)
+      if (!outcome.ok) return recordFailure(bundle.bindings, outcome)
+      return { status: 200, body: toFormAnswers(bundle.bindings, plan.fields, outcome) }
+    })
+    return answered(reply, answer)
   })
 
   /** The lookup field a source name stands for, its config and the actor's filter for it — or a reply already sent. */

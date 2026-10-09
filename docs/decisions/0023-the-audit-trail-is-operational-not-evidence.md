@@ -1,6 +1,6 @@
 # 0023 — The audit trail is operational, never holds a value, and is not evidence
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): an unknown create is named by the record it would have made, and a write answered from an earlier sending is `repeated`
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/routes/runtime.test.ts`, "the
