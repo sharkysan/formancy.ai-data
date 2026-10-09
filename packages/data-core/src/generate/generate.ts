@@ -45,8 +45,14 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
   for (const entry of lookups) for (const column of entry.foreignKey.columns) lookupByColumn.set(column, entry)
 
   const identity = identityFor(root)
+  const pinned = new Set(request.pinned ?? [])
+  for (const name of pinned) {
+    if (!root.columns.some((column) => column.name === name)) throw new Error(`${root.ref.name} has no column ${name} to pin`)
+  }
   const lookupColumns = new Set(lookups.flatMap((entry) => entry.foreignKey.columns))
-  const concurrency = concurrencyFor(root, request.versionColumn, identity ?? [], lookupColumns, notes)
+  // A pinned column is written from context, so it can no more be the version
+  // column than a lookup's column can.
+  const concurrency = concurrencyFor(root, request.versionColumn, identity ?? [], new Set([...lookupColumns, ...pinned]), notes)
   const planned: Planned[] = []
 
   for (const column of root.columns) {
@@ -57,11 +63,11 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
       if (lookup.foreignKey.columns[0] === column.name) planned.push(planLookup(root, lookup, request, allocate, isView, notes))
       continue
     }
-    const plan = planColumn(root, column, allocate, isView, notes)
+    const plan = planColumn(root, column, allocate, isView, pinned.has(column.name), notes)
     if (plan !== null) planned.push(plan)
   }
 
-  const operations = operationsFor(root, identity, concurrency, planned, notes)
+  const operations = operationsFor(root, identity, concurrency, planned, pinned, notes)
   const rules: LogicRule[] = planned
     .filter((entry) => !entry.binding.writable)
     .map((entry) => ({ target: entry.field.key, kind: 'disabled', cel: 'true' }))
@@ -171,6 +177,7 @@ function planColumn(
   column: ColumnMeta,
   allocate: (wanted: string) => string,
   isView: boolean,
+  pinned: boolean,
   notes: GenerationNote[],
 ): Planned | null {
   const control = controlFor(column.type, column.nullable)
@@ -181,13 +188,14 @@ function planColumn(
 
   const key = allocate(fieldKeyFor(column.name))
   const generated = column.generated !== 'none'
-  const writable = !isView && !generated && control.readOnly === undefined
+  const writable = !isView && !generated && !pinned && control.readOnly === undefined
   const required = writable && !column.nullable && !column.hasDefault
 
   notes.push({ subject: key, kind: 'inferred', message: `${labelFor(control.describe)} from ${column.databaseType}; label from the column name.` })
   if (generated) notes.push({ subject: key, kind: 'read-only', message: `The database computes this value (${column.generated}).` })
   if (control.readOnly !== undefined) notes.push({ subject: key, kind: 'read-only', message: `Shown, never written: ${control.readOnly}.` })
   if (isView) notes.push({ subject: key, kind: 'read-only', message: `${root.ref.name} is a view.` })
+  if (pinned) notes.push({ subject: key, kind: 'read-only', message: 'Pinned by the policy: its value comes from the trusted context, never from the person filling the form.' })
 
   return {
     ordinal: column.ordinal,
@@ -256,6 +264,7 @@ function operationsFor(
   identity: string[] | null,
   concurrency: ConcurrencyBinding | null,
   planned: readonly Planned[],
+  pinned: ReadonlySet<string>,
   notes: GenerationNote[],
 ): FormBindings['operations'] {
   if (root.kind === 'view') {
@@ -265,11 +274,13 @@ function operationsFor(
 
   // A create needs a value for every column that has neither a default nor a
   // generator. One with no writable field — excluded for its type — cannot get one.
-  const bound = new Set(
-    planned.flatMap((entry) =>
+  // A pinned column gets its value from context, so it is never one nobody can fill.
+  const bound = new Set([
+    ...pinned,
+    ...planned.flatMap((entry) =>
       entry.binding.writable ? (entry.binding.kind === 'lookup' ? entry.binding.columns : [entry.binding.column]) : [],
     ),
-  )
+  ])
   const unreachable = root.columns.filter(
     (column) => !column.nullable && !column.hasDefault && column.generated === 'none' && !bound.has(column.name),
   )

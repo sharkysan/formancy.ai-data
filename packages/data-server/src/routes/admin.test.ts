@@ -123,6 +123,11 @@ describe('the administrator plane', () => {
     const refused = await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, root: { schema: 'sales', name: 'nope' } } })
     expect(refused.statusCode).toBe(422)
     expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, formId: 'Employee' } })).statusCode).toBe(400)
+    // The policy's pinned columns reach the generator, so the field the tenant
+    // comes from is read-only rather than a required field nobody may fill.
+    const pinned = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, pinned: ['name'] } })).json()
+    expect(pinned.bindings.fields.find((binding: { field: string }) => binding.field === 'name')).toMatchObject({ writable: false })
+    expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, pinned: 'name' } })).statusCode).toBe(400)
   })
 
   // Publication is compare-and-swap: the first publish names no base, a second

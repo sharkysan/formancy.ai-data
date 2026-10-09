@@ -39,6 +39,9 @@ const { form, bindings, notes } = generateForm(snapshot, {
 })
 ```
 
+Pass the columns the form's policy pins as `pinned`: they become read-only
+fields filled from trusted context, never required fields the policy refuses.
+
 Exact decimals and integers past 2^53 become text fields with an exact pattern,
 never JavaScript numbers. Update is offered only with a proven concurrency
 token. See [0009](../../docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md).

@@ -24,6 +24,16 @@ export interface GenerationRequest {
    * concurrency strategy is how a lost update happens.
    */
   versionColumn?: string
+  /**
+   * Root columns the form's policy pins to trusted context — the tenant
+   * column, typically (0011). The request never supplies them: on create they
+   * come from the verified identity, and a submitted value is over-posting. So
+   * the generated field for one is shown and never written, and is not a
+   * required field a person could not fill. Found when the planner (0018) met
+   * the generator: without this, a pinned NOT NULL column was a required field
+   * the policy refused, and no submission could pass both.
+   */
+  pinned?: string[]
 }
 
 /** How one form field reaches the database. */
