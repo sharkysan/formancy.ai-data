@@ -98,6 +98,32 @@ export async function startPostgresFixture(): Promise<PostgresFixture> {
 }
 
 /**
+ * The first connection to a SQL Server container, retried while it refuses
+ * logins after saying it is ready.
+ *
+ * testcontainers reports the container started on "Recovery is complete",
+ * which SQL Server 2022 logs before its upgrade scripts have run; until they
+ * have, every login is refused with "Login failed" (ELOGIN). On a workstation
+ * the window is too short to meet. On CI's runner, with five SQL Server
+ * containers starting beside each other once the client and host suites
+ * joined (PR #29, 2026-10-09), the end-to-end suite's fixture met it. Only
+ * that refusal is retried, once a second; any other error, or a refusal still
+ * there after two minutes -- the module's own startup timeout -- fails the
+ * suite. It cannot be provoked on demand, so the CI run is its test.
+ */
+async function connectWhenAcceptingLogins(config: mssql.config): Promise<mssql.ConnectionPool> {
+  const deadline = Date.now() + 120_000
+  for (;;) {
+    try {
+      return await new mssql.ConnectionPool(config).connect()
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== 'ELOGIN' || Date.now() > deadline) throw error
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    }
+  }
+}
+
+/**
  * A SQL Server container with the fixture loaded into its own database, the
  * restricted principals created, and the parity schema (0028) beside it.
  *
@@ -115,7 +141,7 @@ export async function startSqlServerFixture(): Promise<SqlServerFixture> {
 
   // Server-level work happens in master: the database and the login. Both are
   // constants of this module, not input, which is why they can be spliced in.
-  const master = await new mssql.ConnectionPool({ ...owner, database: 'master' }).connect()
+  const master = await connectWhenAcceptingLogins({ ...owner, database: 'master' })
   try {
     await master.request().batch(`create database ${SQLSERVER_DATABASE}`)
     for (const login of [READER, WRITER]) {
