@@ -7,6 +7,15 @@ import { validateBundle } from './bundle.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 
+/**
+ * A pattern for "begins with exactly this text". The text holds a generated
+ * source name and dots, and in a template literal `\.` is a bare `.`, which
+ * matches any character: the anchor checked less than it said. CodeQL found it.
+ */
+function startsWith(text: string): RegExp {
+  return new RegExp(`^${text.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)
+}
+
 function column(name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
   return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra }
 }
@@ -213,7 +222,7 @@ describe('validateBundle', () => {
     expect(validateBundle(bundle(policy([], [{ column: 'id', attribute: 'tenant' }])))).toMatchObject({ ok: true })
     const flagged = validateBundle(bundle(policy([], [{ column: 'active', attribute: 'tenant' }, { column: 'region', attribute: 'tenant' }])))
     expect(flagged.ok ? [] : flagged.problems).toEqual([
-      expect.stringMatching(new RegExp(`^policy: lookups\.${lookup} active is bit, which a row filter cannot compare`)),
+      expect.stringMatching(startsWith(`policy: lookups.${lookup} active is bit, which a row filter cannot compare`)),
       `policy: lookups.${lookup} customer has no column region`,
     ])
     const stamped = validateBundle(bundle(policy([{ column: 'placed_at', attribute: 'tenant' }], [])))
