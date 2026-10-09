@@ -70,6 +70,10 @@ export function VersionsPanel({ client, formId, onRestored }: { client: AdminCli
     if (pending) return
     setPending(true)
     setRestored(null)
+    // The version pressed becomes the choice, even if it was only the default:
+    // the list is read again after a restore, and a default would move to the
+    // newest older version -- a different restore under the same focused button.
+    setChosen(version)
     const outcome = await client.restore(formId, version, expectedBase)
     if (outcome.ok) {
       setRestored({ kind: 'restored', version: outcome.value.version, restoredFrom: outcome.value.restoredFrom })

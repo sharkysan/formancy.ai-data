@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within, waitFor } from '@testing-library/react'
 import { applyPresentation, EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { FormPolicy, PresentationOverrides } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
@@ -82,11 +82,16 @@ describe('restoring a version', () => {
     expect((await within(versions).findByRole('status')).textContent).toBe(
       'Restored version 1 as version 3: the runtime serves it from now on, with the policy it had. The database was not changed.',
     )
-    expect(focusedName()).toBe('Restore version 1')
     expect((await file(3)).equals(await file(1))).toBe(true)
     const drift = within(document.body).getByRole('main', { name: 'Drift' })
     await within(drift).findByRole('region', { name: 'Version 3 of sales-order, against the database now' })
-    expect(offered(versions)).toEqual(['Version 1', 'Version 2'])
+    await waitFor(() => expect(offered(versions)).toEqual(['Version 1', 'Version 2']))
+    // Once the list is read again, with version 2 now older too: the keyboard
+    // is still on the button it pressed, and that button still restores what
+    // the person chose. Checked before the re-read, this passed by timing;
+    // after it, the choice had quietly become version 2 under the focus --
+    // found on CI, where the re-read came first.
+    expect(focusedName()).toBe('Restore version 1')
     expect(await audit()).toEqual([])
   })
 
