@@ -861,6 +861,10 @@
           "says": "A release's SBOM names what cdxgen finds, which on 2026-10-09 left out tedious, the package under mssql that speaks TDS to SQL Server."
         }
       ]
+    },
+    "0036": {
+      "reviewed": "sha256:4463042a110e470eac46550dc3965682323994fb60edb78026a20e330481e760",
+      "none": "A rule for this repository's branches; nobody who installs, integrates or operates the module meets it."
     }
   }
 }
