@@ -3,15 +3,16 @@
 - **Status:** accepted
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
-- **Verified by:** the repository setting *Automatically delete head
-  branches* (`delete_branch_on_merge`), read on every pull request by CI's
-  `verify` job through `scripts/merged-branches.mjs`, which fails when the
-  setting is off or the answer does not say;
-  `scripts/merged-branches.test.mjs` in `pnpm test:repo` holds both refusals
-  on fixtures, and the script was watched refusing a repository with the
-  setting off before the setting was relied on. A local branch or worktree
-  left on somebody's machine after a merge is held by nothing but the
-  sentence in `CLAUDE.md`.
+- **Verified by:** nothing in this repository fails when it is violated. The
+  repository setting *Automatically delete head branches*
+  (`delete_branch_on_merge`) does the deleting, and was seen doing it: when
+  #34 merged on 2026-10-09, its branch was gone from GitHub without anyone
+  deleting it. A check in CI was built and watched failing for the wrong
+  reason: the `verify` job of #35 asked GitHub for the repository with the
+  job's own token, and the answer left the merge settings out, so no
+  workflow here can read the setting it would hold. A local branch or
+  worktree left on somebody's machine after a merge is held by nothing but
+  the sentence in `CLAUDE.md`.
 
 ## Context
 
@@ -31,8 +32,8 @@ from abandoned work.
 
 ## Decision
 
-GitHub deletes a pull request's head branch when the pull request merges —
-the repository setting is on, and CI fails while it is off. Nobody deletes a
+GitHub deletes a pull request's head branch when the pull request merges:
+the repository setting is on. Nobody deletes a
 remote branch by hand after a merge. A local branch and its worktree are
 removed once `gh pr view N --json state` says `MERGED`, never before.
 
@@ -46,12 +47,9 @@ keeps its branch, whatever a script did next. The pull request page keeps a
 **What it costs.** A branch somebody meant to keep working on after the merge
 is gone from GitHub and has to be cut again from `main`, which is what
 [`CLAUDE.md`](../../CLAUDE.md) asks for anyway (no stacked pull requests). The
-`verify` job now asks GitHub's API on every pull request, so an outage of that
-API fails the job, and the check rests on the job's read-only token being
-allowed to see the repository's merge settings; if GitHub stops showing them
-to that token, the job fails rather than passing, and this record has to be
-revisited. It checks the setting, not the deletions: a branch pushed again
-after its merge is not caught.
+setting is held by nobody: an administrator who turns it off is told by
+nothing here, and branches would quietly start to pile up again. A branch
+pushed again after its merge is not caught either.
 
 **What it forecloses.** Long-lived branches on GitHub other than `main`. None
 exist, and a release is cut from a tag, not a branch.
@@ -61,6 +59,13 @@ exist, and a release is cut from a tag, not a branch.
 **Delete by hand after confirming the merge.** The practice this replaces:
 rejected because it is a step somebody remembers, and the one recorded
 failure was that step running when it should not have.
+
+**A CI step that fails while the setting is off.** Built and run: GitHub
+does not show the merge settings to a workflow's token, which has no
+administration permission to ask for, so the step could only ever fail, or,
+written the other way, pass without knowing. A personal token in a secret
+would see it, at the cost of an administrator's credential in every pull
+request's job; not worth it for a setting.
 
 **A scheduled workflow that prunes merged branches.** Rejected: it needs
 `contents: write` in a workflow, which this repository's workflows refuse, and

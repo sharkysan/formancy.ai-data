@@ -64,15 +64,6 @@ jobs:
       # gate is a comment.
       - run: pnpm test:repo
 
-      # GitHub deletes a pull request's branch when it merges (0036). Read with
-      # this job's own read-only token: an answer that does not say fails here
-      # rather than passing as "on".
-      - name: A merged branch is deleted by the merge
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-        run: gh api "repos/$REPOSITORY" | node scripts/merged-branches.mjs
-
   # Every package's suite, each in a job of its own on its own runner. They
   # ran as one `pnpm test:coverage` in `verify` until nine suites at once --
   # five of them starting PostgreSQL and SQL Server, three mounting Angular and
