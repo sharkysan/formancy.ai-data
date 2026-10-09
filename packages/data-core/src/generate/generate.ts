@@ -44,7 +44,9 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
   const lookupByColumn = new Map<string, { choice: LookupChoice; foreignKey: ForeignKeyMeta }>()
   for (const entry of lookups) for (const column of entry.foreignKey.columns) lookupByColumn.set(column, entry)
 
-  const concurrency = concurrencyFor(root, request.versionColumn, notes)
+  const identity = identityFor(root)
+  const lookupColumns = new Set(lookups.flatMap((entry) => entry.foreignKey.columns))
+  const concurrency = concurrencyFor(root, request.versionColumn, identity ?? [], lookupColumns, notes)
   const planned: Planned[] = []
 
   for (const column of root.columns) {
@@ -59,7 +61,6 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     if (plan !== null) planned.push(plan)
   }
 
-  const identity = identityFor(root)
   const operations = operationsFor(root, identity, concurrency, planned, notes)
   const rules: LogicRule[] = planned
     .filter((entry) => !entry.binding.writable)
@@ -197,19 +198,44 @@ function planColumn(
   }
 }
 
-function concurrencyFor(root: ObjectMeta, confirmed: string | undefined, notes: GenerationNote[]): ConcurrencyBinding | null {
+/**
+ * Why a column cannot be a version column, or `null`.
+ *
+ * Every update increments a version column in the statement that checks it
+ * (0015), so it must be an integer that statement may write and that means
+ * nothing else: not computed by the database, which refuses the write; not
+ * part of the key, which is the record's address and, with a tenant in it, its
+ * tenant; not bound to a field, which could set it twice. The generator
+ * holds a column to this before confirming or suggesting it, and the planner
+ * holds a bindings file to it, so a form the one makes the other never refuses.
+ */
+export function versionColumnProblem(column: ColumnMeta, identity: readonly string[], bound: ReadonlySet<string>): string | null {
+  if (column.type.kind !== 'integer' || column.nullable) return 'it must be a non-nullable integer'
+  if (column.generated !== 'none') return `the database generates it (${column.generated})`
+  if (identity.includes(column.name)) return "it is part of the record's key"
+  if (bound.has(column.name)) return 'a field is bound to it'
+  return null
+}
+
+/** `bound` is the chosen lookups' columns: any other column is left out of the form once it is the version column. */
+function concurrencyFor(
+  root: ObjectMeta,
+  confirmed: string | undefined,
+  identity: readonly string[],
+  bound: ReadonlySet<string>,
+  notes: GenerationNote[],
+): ConcurrencyBinding | null {
   const rowversion = root.columns.find((column) => column.type.kind === 'rowversion')
   if (rowversion !== undefined) return { kind: 'rowversion', column: rowversion.name, confirmed: true }
 
   if (confirmed !== undefined) {
     const column = root.columns.find((candidate) => candidate.name === confirmed)
-    if (column === undefined || column.type.kind !== 'integer' || column.nullable) {
-      throw new Error(`${confirmed} cannot be a version column: it must be a non-nullable integer column of ${root.ref.name}`)
-    }
-    return { kind: 'version-column', column: column.name, confirmed: true }
+    const problem = column === undefined ? `${root.ref.name} has no such column` : versionColumnProblem(column, identity, bound)
+    if (problem !== null) throw new Error(`${confirmed} cannot be a version column: ${problem}`)
+    return { kind: 'version-column', column: confirmed, confirmed: true }
   }
 
-  const candidate = root.columns.find((column) => VERSION_NAME.test(column.name) && column.type.kind === 'integer' && !column.nullable)
+  const candidate = root.columns.find((column) => VERSION_NAME.test(column.name) && versionColumnProblem(column, identity, bound) === null)
   if (candidate === undefined) return null
   notes.push({
     subject: candidate.name,
