@@ -1,0 +1,144 @@
+import { findObject } from '@formancy/data-core'
+import type { ColumnMeta, CoverageGap, ForeignKeyMeta, LookupChoice, MetadataSnapshot, ObjectMeta, ObjectRef, RowFilterRule } from '@formancy/data-core'
+import type { ProposalRequest } from './api.js'
+
+/**
+ * What the administrator chooses before anything is generated (plan section 3,
+ * step 3), and the facts each choice is offered from. Pure: the Choose step
+ * renders it, and the suite checks it without rendering.
+ */
+export interface Choice {
+  root: ObjectRef
+  formId: string
+  title: string
+  /** Foreign keys of the root offered as lookups, each with the target columns a person recognises a row by. */
+  lookups: LookupChoice[]
+  /** A version column the administrator confirms, or `null` for none. */
+  versionColumn: string | null
+}
+
+/**
+ * The server's rule for a form id: a configuration id, lower case so it means
+ * one thing on every filesystem (0013). The server checks it again on publish;
+ * `api.test.ts` puts candidates to both and fails where they disagree.
+ *
+ * At most 100 characters, not the 128 the store allows: Fastify answers a path
+ * parameter longer than its default `maxParamLength` of 100 with a 404 before
+ * the route runs, so a longer id could be generated and never published.
+ */
+export const FORM_ID_MAX = 100
+
+export function isFormId(id: string): boolean {
+  return id.length <= FORM_ID_MAX && /^[a-z0-9][a-z0-9._-]*$/.test(id)
+}
+
+export function describeRef(ref: ObjectRef): string {
+  return `${ref.schema}.${ref.name}`
+}
+
+export function sameRef(left: ObjectRef, right: ObjectRef): boolean {
+  return left.schema === right.schema && left.name === right.name
+}
+
+/** `sales.order` becomes `sales-order`: a form id the server accepts, where the names allow one. */
+export function formIdFor(ref: ObjectRef): string {
+  const id = `${ref.schema}-${ref.name}`.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '')
+  return id.slice(0, FORM_ID_MAX)
+}
+
+/** `order_line` becomes `Order line`, the way the generator writes a label. */
+export function titleFor(ref: ObjectRef): string {
+  const words = ref.name.replace(/[_-]+/g, ' ').trim()
+  return words === '' ? ref.name : `${words.charAt(0).toUpperCase()}${words.slice(1)}`
+}
+
+/** A fresh choice for `ref`: nothing offered, nothing confirmed. */
+export function choiceFor(ref: ObjectRef): Choice {
+  return { root: { ...ref }, formId: formIdFor(ref), title: titleFor(ref), lookups: [], versionColumn: null }
+}
+
+/** The gaps about one object, which are what "cannot tell" is made of (0004). */
+export function gapsAbout(snapshot: MetadataSnapshot, ref: ObjectRef): CoverageGap[] {
+  return snapshot.gaps.filter((gap) => gap.object !== null && sameRef(gap.object, ref))
+}
+
+/**
+ * Whether a foreign key can be offered as a lookup, and why not.
+ *
+ * The generator refuses one whose target this connection cannot see; the
+ * studio says so before anybody asks, with the gap that explains it when
+ * there is one, because "the target is not visible" and "there is no target"
+ * are different findings.
+ */
+export function lookupBlocker(snapshot: MetadataSnapshot, foreignKey: ForeignKeyMeta): string | null {
+  if (foreignKey.references === null) {
+    return 'This connection can see that the key exists but not what it references, so it cannot be offered.'
+  }
+  const target = foreignKey.references.table
+  if (findObject(snapshot, target) !== undefined) return null
+  const gaps = gapsAbout(snapshot, target)
+  if (gaps.length > 0) return `${describeRef(target)} is not visible to this connection: ${gaps.map((gap) => gap.detail).join('; ')}.`
+  return `${describeRef(target)} is outside the schemas this connection discovers, so its rows cannot be offered.`
+}
+
+/**
+ * A suggested display column for a lookup's target: the first text column that
+ * is not part of the key it points at, else its first column. A suggestion,
+ * shown checked for the administrator to confirm or change (plan section 3).
+ */
+export function suggestedDisplay(target: ObjectMeta, keyColumns: readonly string[]): string[] {
+  const text = target.columns.find((column) => column.type.kind === 'text' && !keyColumns.includes(column.name))
+  const first = text ?? target.columns[0]
+  return first === undefined ? [] : [first.name]
+}
+
+/**
+ * Columns that could be confirmed as a version column: a non-nullable integer
+ * the database does not generate, outside the key. The generator holds a
+ * confirmed column to the same rule and refuses one that fails it.
+ */
+export function versionCandidates(root: ObjectMeta): ColumnMeta[] {
+  const key = new Set(root.primaryKey?.columns ?? root.uniqueKeys[0]?.columns ?? [])
+  return root.columns.filter((column) => column.type.kind === 'integer' && !column.nullable && column.generated === 'none' && !key.has(column.name))
+}
+
+/** The root's rowversion column, which the database maintains and nobody confirms. */
+export function rowversionOf(root: ObjectMeta): ColumnMeta | undefined {
+  return root.columns.find((column) => column.type.kind === 'rowversion')
+}
+
+/** Columns a policy could pin: ones the person would otherwise write. A generated column has its value already. */
+export function pinCandidates(root: ObjectMeta): ColumnMeta[] {
+  return root.columns.filter((column) => column.generated === 'none')
+}
+
+/**
+ * The proposal to ask for. The pinned columns are the policy's root row
+ * filters -- one list, so the generator and the policy cannot disagree about
+ * which column the tenant comes from (0011).
+ */
+export function proposalFor(connection: string, choice: Choice, rowFilters: readonly RowFilterRule[]): ProposalRequest {
+  return {
+    connection,
+    root: { ...choice.root },
+    formId: choice.formId,
+    title: choice.title,
+    lookups: choice.lookups.map((lookup) => ({ foreignKey: lookup.foreignKey, display: [...lookup.display] })),
+    pinned: rowFilters.map((rule) => rule.column),
+    ...(choice.versionColumn === null ? {} : { versionColumn: choice.versionColumn }),
+  }
+}
+
+/** What is wrong with a choice before it is sent, in words; the server and the generator check again. */
+export function choiceProblems(choice: Choice, rowFilters: readonly RowFilterRule[]): string[] {
+  const problems: string[] = []
+  if (!isFormId(choice.formId)) problems.push(`The form id must start with a lower-case letter or digit and hold only those, dot, hyphen or underscore, up to ${String(FORM_ID_MAX)} characters.`)
+  if (choice.title.trim() === '') problems.push('The form needs a title.')
+  for (const lookup of choice.lookups) {
+    if (lookup.display.length === 0) problems.push(`${lookup.foreignKey} needs at least one column to show.`)
+  }
+  for (const rule of rowFilters) {
+    if (rule.attribute.trim() === '') problems.push(`Name the trusted attribute ${rule.column} is pinned to.`)
+  }
+  return problems
+}

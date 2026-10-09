@@ -70,6 +70,10 @@ component_management:
       name: apps/examples
       paths:
         - apps/examples/**
+    - component_id: app-studio
+      name: apps/studio
+      paths:
+        - apps/studio/**
 
 comment:
   # Components first, because "which package" is the question a reader has, and

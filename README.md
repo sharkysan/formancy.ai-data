@@ -10,16 +10,15 @@ in the first release, through one database-neutral core and two adapters. The
 published form renders in Angular or React with the formancy renderers and
 operates without any AI dependency.
 
-> **Status: in development, nothing released.** The phase-1 spike is done:
-> both adapters discover a real database, including what a restricted
-> account cannot see, and the same model checks both. A form can be generated
-> from a snapshot; values are checked exactly; access policy, lookup tokens and
-> the record port are defined. A page renders generated forms in React and
-> Angular side by side, and its suite holds the two to the same fields and
-> errors. Both adapters answer lookups and records; the server publishes forms
+> **Status: in development, nothing released.** Both adapters discover a real
+> database, including what a restricted account cannot see, and the same model
+> checks both. A form can be generated from a snapshot; values are checked
+> exactly. Both adapters answer lookups and records; the server publishes forms
 > and serves them over HTTP, asking the policy every time and auditing every
-> request; and one suite runs that whole journey on both engines. Not yet: the
-> studio. `CHANGELOG.md` says what each step found.
+> request, and one suite runs that whole journey on both engines. A page
+> renders generated forms in React and Angular side by side, and the studio
+> walks an administrator from a connection to a published form and its drift.
+> `CHANGELOG.md` says what each step found.
 
 ## Licence, in one table
 
@@ -49,9 +48,9 @@ project, and why in a repository of its own, is decision
 | `@formancy/data-server` | The server: configuration store, host identity, and the HTTP surface the adapters will sit behind. Fastify, like formancy's. |
 | `@formancy/data-fixtures` | Private test support: one business model for both engines, a restricted reader, and the comparator both adapters answer to. Never published. |
 
-Planned and not here: the record, lookup and publication routes of the
-server, and the studio for connecting a database and reviewing a generated
-form.
+Planned and not here: SQL Server's record and lookup operations, and the
+server's own composition root starting the administrator and runtime planes
+from a connections file and a store directory.
 
 ## Examples
 
@@ -78,7 +77,7 @@ size, clean and after a failed submit.
 
 ```bash
 pnpm --filter @formancy/data-examples exec playwright install chromium   # once per machine
-pnpm test:browser                                                        # builds the page, then measures it
+pnpm test:browser                                                        # builds both apps, then measures them
 ```
 
 The snapshot is captured from a real PostgreSQL container, never written by
@@ -94,6 +93,41 @@ and commit `apps/examples/src/fixture-snapshot.json` and
 fixture model and fails where they disagree, and refuses a snapshot edited by
 hand. The customer lookup is an in-memory source over the captured customers
 until the server's lookup route exists, and the page says so.
+
+## Studio
+
+`apps/studio` is the administrator's application, private and never
+published: sign in with a host token, connect, choose a root table, generate,
+write the policy, arrange labels, preview, publish, and review drift. It
+speaks only to the server's administrator plane and `/v1/whoami`
+([0024](./docs/decisions/0024-the-studio-speaks-only-the-admin-plane.md)).
+
+```bash
+pnpm build
+FORMANCY_DATA_SERVER=http://127.0.0.1:4390 pnpm --filter @formancy/data-studio dev   # http://localhost:4392
+```
+
+The server sends no CORS headers, so the studio is served from the server's
+origin: in development Vite proxies `/v1` to `FORMANCY_DATA_SERVER`, and in a
+deployment one reverse proxy serves `apps/studio/dist` and `/v1` together. The
+token is held in the tab's memory only; reloading the page signs out. The
+server's own `main` does not start the administrator plane yet, so the studio
+needs a server composed with `createDataServer({ admin })`; against the image
+it says the server has no administrator plane.
+
+Its suite runs the real server in the test — `createDataServer` with a fake
+connection registry over snapshots captured from the shared fixture, as the
+PostgreSQL owner, the restricted reader and the SQL Server owner — behind a
+fake `fetch`, so a change to a response shape fails the studio's tests.
+`pnpm test:browser` walks the whole journey in Chromium against the same
+server. After a change to the fixture, with Docker running:
+
+```bash
+pnpm build
+pnpm --filter @formancy/data-studio snapshot
+```
+
+and commit the three files under `apps/studio/src/fixtures/`.
 
 ## How it relates to formancy.ai
 

@@ -1,0 +1,49 @@
+{
+  "name": "@formancy/data-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The administrator's application: connect a database, choose a root table, generate a form, write its policy, preview and publish it, and review drift. Speaks only to the data server's administrator plane. Never published.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test:coverage": "vitest run --coverage",
+    "test": "vitest run",
+    "test:browser": "node scripts/browser-test.mjs",
+    "snapshot": "node scripts/capture-snapshots.mjs"
+  },
+  "dependencies": {
+    "@formancy/builder-core": "0.3.0",
+    "@formancy/core": "0.3.0",
+    "@formancy/data-core": "workspace:*",
+    "@formancy/react": "0.3.0",
+    "@formancy/spec": "0.3.0",
+    "@formancy/themes": "0.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@formancy/conformance": "0.3.0",
+    "@formancy/data-fixtures": "workspace:*",
+    "@formancy/data-postgres": "workspace:*",
+    "@formancy/data-server": "workspace:*",
+    "@formancy/data-sqlserver": "workspace:*",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "catalog:",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "catalog:",
+    "axe-core": "catalog:",
+    "dom-accessibility-api": "^0.5.16",
+    "jsdom": "^30.1.0",
+    "playwright": "catalog:",
+    "postgres": "^3.4.9",
+    "typescript": "catalog:",
+    "vite": "^8.3.0",
+    "vitest": "catalog:"
+  }
+}
