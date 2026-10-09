@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ColumnAccess, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { accessDisagreements, FIXTURE_SCOPE, startSqlServerFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
+import { accessDisagreements, FIXTURE_SCOPE, renamedColumn, startSqlServerFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
 import { discoverSqlServer } from './index.js'
 
 /**
@@ -179,6 +179,26 @@ describe('what a snapshot says an account may do', () => {
     expect(snapshot.gaps).toEqual([])
     expect(snapshot.account).toEqual({ user: WRITER.user, login: WRITER.user })
     expect(accessOf(object(snapshot, 'sales', 'order'))['row_version']).toEqual({ select: true, insert: true, update: false })
+  })
+
+  // The studio's drift gate stands a snapshot renamed in place for a
+  // database whose column was renamed; if discovery reported a rename
+  // differently -- a new ordinal, lost column grants -- the gate would walk
+  // a state no database reaches. As the writer, whose UPDATE of notes is a
+  // column grant: what a column added in its place would not have. Renamed
+  // back before the next test, which expects the fixture.
+  test('a column renamed in the database is discovered as renamedColumn says: the same column, ordinal and grants included, under its new name', async () => {
+    const writer = await connect(fixture.writer)
+    const order = { schema: 'sales', name: 'order' }
+    const before = await discoverSqlServer(writer, FIXTURE_SCOPE)
+    expect(accessOf(object(before, 'sales', 'order'))['notes']).toEqual({ select: true, insert: true, update: true })
+    await asOwner("exec sp_rename 'sales.[order].notes', 'memo', 'COLUMN'")
+    try {
+      expect(await discoverSqlServer(writer, FIXTURE_SCOPE)).toEqual(renamedColumn(before, order, 'notes', 'memo'))
+    } finally {
+      await asOwner("exec sp_rename 'sales.[order].memo', 'notes', 'COLUMN'")
+    }
+    expect(await discoverSqlServer(writer, FIXTURE_SCOPE)).toEqual(before)
   })
 
   // HAS_PERMS_BY_NAME parses the column it is asked about as an identifier
