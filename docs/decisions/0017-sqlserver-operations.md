@@ -14,8 +14,13 @@
   are rejected though the database matches `CH` and `A`; a statement binds
   2098 parameters and 2099 is refused with 8003, and 2500 tokens are answered
   in groups; the restricted reader's lookup over a table it may not read
-  throws. `records.integration.test.ts` — every `EDGE_VALUES` value and every
-  other kind reads back as its codec spells it; a text filter matches exactly;
+  throws; a sort direction that is neither `asc` nor `desc` is refused and
+  its injected insert does not run. `records.integration.test.ts` — every
+  `EDGE_VALUES` value and every other kind reads back as its codec spells it;
+  a text and a decimal column widened since discovery read back exactly; a
+  tampered decimal precision is refused and its injected insert does not
+  run, and every precision or scale SQL Server's syntax would not take is
+  thrown before anything is sent; a text filter matches exactly;
   another tenant's record and a missing one are the same `not-found`; the
   reader reads `sales.order` as the owner does and is refused
   `sales.customer`; an insert into `sales.order` returns 2^53 + 2 and
@@ -24,9 +29,10 @@
   kind is written as it is read back; an insert of no values takes every
   default and leaves no session setting behind, against a positive control in
   a transaction where one stays; two concurrent updates with one version give
-  one winner and one `stale`; a malformed or upper-case token is `stale`; an
-  update outside the tenant filter is `not-found`; a version column is
-  compared and incremented in one statement; the version an insert and an
+  one winner and one `stale`, for a rowversion and for a version column; a
+  malformed or upper-case token is `stale`; an update outside the tenant
+  filter is `not-found`; a version column is compared and incremented, and
+  stale once anyone saved; the version an insert and an
   update return, on rows an AFTER trigger touches again — keyed by a
   generated identity and by text under a binary collation — and on a version
   column a trigger also moves, is the one the next save names; a row keyed
@@ -38,10 +44,19 @@
   and the adapter refuses it on insert and `drąft` on update; unique (2627
   and 2601), foreign key, check, not null, too long (2628, and 8152 at
   compatibility level 140), out of range, permission (229 and 230) and
-  schema-changed (207, 208) each map to their code; a refusal it does not
-  know, and a trigger's THROW of the adapter's own number, are `unavailable`;
-  a trigger's RAISERROR without a rollback is `unavailable` and its insert
-  and update write nothing; no failure message repeats a value; a German
+  schema-changed (207, 208) each map to their code; a foreign key to its own
+  table names its constraint whichever way it is broken; a refusal it does
+  not know, and a trigger's THROW of the adapter's own number, are
+  `unavailable`; a trigger's RAISERROR without a rollback is `unavailable`
+  and its insert and update write nothing; an account granted INSERT and
+  UPDATE without SELECT is refused a write that the same account with SELECT
+  makes; an insert and an update an enabled INSTEAD OF trigger decides are
+  refused and store nothing, an INSTEAD OF trigger for another operation or
+  a disabled one leaves an insert alone, and an account denied VIEW
+  DEFINITION on the table is refused; a trigger that ends the write's
+  transaction and begins another, by ROLLBACK or by COMMIT, and one that ends
+  it without another (3609), are `unknown-outcome`, whatever each stored; no
+  failure message repeats a value; a German
   session gets the same codes; a write to a renamed table is
   `schema-changed`, leaves no transaction on its one connection, and the
   next write on it commits; a closed pool, and one with no connection free
@@ -65,12 +80,23 @@
   number, the TRY…CATCH (the RAISERROR insert and update committed), the
   xact_abort (266, and the write left open), the version read back (a token
   stale on return), the key compared through variables (468), the exact-key
-  check (another row's version), the no-identity check (102), and the pool's
-  own timeout (thrown). **Not mechanically enforced:** that a host updates
+  check (another row's version), the no-identity check (102), the pool's
+  own timeout (thrown), the INSTEAD OF check (`ok: true` over an unchanged
+  table), its `object_id` check (the blind account's `ok: true`), its
+  operation and disabled filters (a true write refused), the transaction
+  check (`ok: true` with nothing stored), 3609 (`unavailable` over a
+  committed write), the SAME TABLE spellings (the constraint lost),
+  nvarchar(max) and style 2 (`Muster AG,` and `1.2346`), and the precision
+  and direction checks (the injected insert ran); and a version compared in
+  one statement and incremented in another failed the race, with both
+  writers winning, while the sequential test still passed. **Not
+  mechanically enforced:** that a host updates
   only the fields a person changed, which the minute and second spellings
-  below rely on to lose nothing stored; and that `mssql` turns every failure
-  after it handed out a connection into a `RequestError`, which was read in
-  its source, not tested.
+  below rely on to lose nothing stored; that no INSTEAD OF trigger is
+  created, dropped, enabled or disabled between a write's statement and the
+  catalog check after it; and that `mssql` turns every failure after it
+  handed out a connection into a `RequestError`, which was read in its
+  source, not tested.
 
 ## Context
 
@@ -96,8 +122,19 @@ character and the adapter would translate the error; there is no error.
 two decimals by default; a `uniqueidentifier` prints in upper case; style 126
 of a `datetimeoffset` keeps its offset and seven fractional digits.
 
+**CONVERT to a narrower type says nothing.** `convert(nvarchar(10), …)` of
+`Muster AG, Zurich branch` is `Muster AG,`, and `convert(decimal(18, 4), …)`
+of 1.234567 is 1.2346: a column widened since discovery, read through the
+snapshot's length or scale, reads back as a value it does not hold. Style 2
+is ignored by a decimal, which converts with exactly its own digits, and
+gives `money` and `smallmoney` four places.
+
 **The statement shapes have edges.** `OUTPUT` without `INTO` is refused (334)
-on a table with an enabled trigger. A request carries at most 2100
+on a table with an enabled trigger, and needs SELECT on every column it
+names: an account granted only INSERT is refused with 229. A decimal's
+precision and scale, and ASC or DESC, take no parameter and are spliced into
+the statement; built from a tampered precision or direction, an insert into
+another table ran with the write and the lookup. A request carries at most 2100
 parameters, and `sp_executesql`'s own `@stmt` and `@params` are two of them,
 so 2098 is what a statement can bind. An ascending order puts NULLs first and
 there is no `NULLS LAST`. In LIKE, `%`, `_` and `[` are special. Under the
@@ -105,7 +142,9 @@ fixture's `SQL_Latin1_General_CP1_CI_AS`, `=` finds `ACME` for `acme`, and
 under every collation it ignores trailing spaces.
 
 **Refusals are numbered, and their messages are not stable.** 547 is a
-foreign key, a REFERENCE (a parent row still referenced) and a check alike.
+foreign key, a REFERENCE (a parent row still referenced) and a check alike;
+a foreign key to its own table is FOREIGN KEY SAME TABLE and SAME TABLE
+REFERENCE.
 `tedious` asks for `us_english` at login unless the composition root sets
 `options.language`; set, the messages are translated. In each of the 34
 languages `sys.syslanguages` lists on the 2022 image — checked by hand on
@@ -125,6 +164,19 @@ only when its statement runs, inside the transaction; `xact_abort` rolls that
 trigger that updates the row it fired for moves its rowversion past the one
 `OUTPUT` returned.
 
+**A trigger can decide what a write stores, or end the transaction it runs
+in.** An INSTEAD OF trigger runs in place of the statement, and `OUTPUT`
+returns the row as if the statement had run: one that does nothing gave an
+insert and an update a row over an unchanged table, and one that inserts the
+row itself, changed, gave the identity 0 and the values before its change.
+A trigger's `rollback transaction; begin transaction` leaves `@@trancount`
+where it found it, so nothing is raised and the batch went on to commit an
+empty transaction; `commit transaction; begin transaction` had stored the
+write. A trigger that ends the transaction without beginning another gets
+3609 after its COMMIT, which stored the write, and after its ROLLBACK, which
+did not. An account denied VIEW DEFINITION on a table may still write it,
+and to it `object_id` is NULL and `sys.triggers` lists nothing.
+
 **A connection can fail on either side of a write.** A closed pool raises
 `ConnectionError` before anything is sent. A pool with no connection free
 within `acquireTimeoutMillis` rejects with tarn's `TimeoutError`, which
@@ -135,24 +187,35 @@ its write waits on a lock gets 596 at severity 21; a request timeout gets
 ## Decision
 
 **Out of the database, the server converts every value to the text of its
-canonical API value** (`src/sql/values.ts`): integers as decimal strings,
-decimals through `decimal(p, s)` so `money` keeps four places, booleans as
+canonical API value** (`src/sql/values.ts`): text as nvarchar(max), integers
+as decimal strings, decimals in style 2 by their own type so every digit is
+kept and `money` has four places, booleans as
 `1`/`0` made `true`/`false`, floats in style 3, dates `YYYY-MM-DD`, times
 `HH:MM`, instants switched to UTC as `YYYY-MM-DDTHH:MM:SSZ`, zoneless
 timestamps `YYYY-MM-DDTHH:MM:SS`, UUIDs lower-cased. A rowversion comes back
 as its 8 bytes and is spelled by `encodeRowversion`. A lookup's display
 columns are spelled by style 126, because the configuration does not carry
-their types.
+their types. Nothing is read through the length, precision or scale the
+snapshot remembers, so a column widened since discovery reads what it holds,
+as PostgreSQL's `::text` does.
 
 **Into the database, every value travels as nvarchar text and is converted by
 the server** to the column's type — `convert(decimal(18, 4), @p3)` — except a
 boolean (bit), a float (float) and a rowversion token (varbinary(8)). A value
 of the wrong JavaScript type, a column kind with no canonical value, a key
 that is not the identity or a column named twice is a programming error,
-thrown before anything is sent.
+thrown before anything is sent. So is a decimal precision or scale that is
+not a whole number SQL Server's syntax takes (1 to 38, and 0 to the
+precision) and a sort direction that is not `asc` or `desc`: those are
+spliced, and are checked before they become SQL.
 
 **Every write is one batch:** `xact_abort`, a transaction, the one guarded
-statement with `OUTPUT … INTO` a table variable, a check that each text column
+statement with `OUTPUT … INTO` a table variable, a check that
+`current_transaction_id()` is still the transaction the batch began, a check
+in `sys.triggers` and `sys.trigger_events` that no enabled INSTEAD OF trigger
+for the operation decides what the table stores — refused too when the
+account cannot see the table in the catalog, because then whether one does
+cannot be told — a check that each text column
 stored exactly the text it was sent (compared under `Latin1_General_100_BIN2`),
 for an update a rollback if more than one row matched, the version read back
 from the row by its identity as the statement wrote it, and the commit — all
@@ -180,8 +243,17 @@ else with `@formancy/data-core`'s helpers.
 `not-null-violation`, 2628/8152 `too-long`, the conversion and overflow
 numbers `out-of-range`, 229/230 `permission-denied`, 207/208
 `schema-changed`. A constraint or column is named from an English message
-only. Every message is the adapter's own sentence. A number it does not know
-is `unavailable`. Whatever the pool rejected with before it handed out a
+only, a foreign key to its own table included. Every message is the
+adapter's own sentence. A number it does not know is `unavailable`. A write
+an INSTEAD OF trigger would decide is `unavailable` too: the batch rolled it
+back, which is that code's promise, and the port has no code for a table
+whose writes this adapter cannot verify; `schema-changed` would claim that a
+binding names something gone, and send someone to a drift review that cannot
+show a trigger, because the snapshot does not describe triggers. A trigger
+that ended the write's transaction — a replaced transaction, or 3609 — is
+`unknown-outcome`, because a COMMIT and a ROLLBACK look alike to the batch
+once the transaction is gone, and one of them stored the write. Whatever the
+pool rejected with before it handed out a
 connection — anything but a `RequestError` — is `unavailable` even for a
 write; any other driver failure, or a refusal at severity 20 or more, is
 `unknown-outcome` after a write and `unavailable` after a read, and is never
@@ -191,8 +263,10 @@ thrown rather than taken for the pool's.
 ## Consequences
 
 **What it buys.** Every edge value and every kind round-trips digit for digit,
-whatever the driver's defaults. A varchar cannot quietly keep a code nobody
-entered. A stale save is refused even when two of them race inside the server.
+whatever the driver's defaults, and a widened column reads what it holds. A
+varchar cannot quietly keep a code nobody entered. A write an INSTEAD OF
+trigger or a swapped transaction kept from the table is not reported done.
+A stale save is refused even when two of them race inside the server.
 Another tenant's record is indistinguishable from a missing one, in a lookup
 and in a write. A failure has the same code in any session language, and its
 message can be logged. The adapter's behaviour is what the suites show on a
@@ -218,22 +292,39 @@ AFTER trigger changed it; only the version is read back after one, which is a
 key lookup more per write. A record with no identity, or with a key column
 that is not text, an integer, a decimal, a uuid or a date — a time or an
 instant, whose text is cut short, a boolean or a float, which do not travel
-as text — is not found that way and keeps the version the statement saw. A trigger's `RAISERROR` refuses the write here even where the
-customer's own application lets it commit as a warning. Whether a rejection
+as text — is not found that way and keeps the version the statement saw. A
+trigger's `RAISERROR` refuses the write here even where the
+customer's own application lets it commit as a warning. A table with an
+enabled INSTEAD OF trigger for an operation — a view made writable by one
+included — cannot be written that way through this adapter at all, and an
+account denied VIEW DEFINITION on a table it writes cannot write it either.
+Every write asks the catalog about the table's triggers, and reads every
+text column as nvarchar(max), which the driver receives as a large value. A
+trigger that commits or rolls back the transaction and raises nothing makes
+its write `unknown-outcome`, which the host has to reconcile though a retry
+would often be safe. Two trigger shapes still mislead, measured by hand on
+2026-10-09 and held by no test: one
+that commits the transaction and then raises an error is reported as the
+refusal it raised, though the write is stored; and an AFTER trigger that
+deletes the row it fired for leaves `ok: true` over a table that does not
+hold it, because `returning` is the row as the statement wrote it. A value
+read from a widened column may be one the snapshot's codec would not
+accept. Whether a rejection
 came before a connection was handed out is read from the error's class,
 which holds for `mssql` 12 by its source and would have to be read again on
 an upgrade. Keys asked about in groups are several reads, not
 one. An unknown refusal reported as `unavailable` invites a retry that will be
 refused again. A constraint or column is named only in English, and in a
 translated session a 547 whose constraint name holds the other kind's keyword
-as a word of its own would be misread. The batch's error numbers 51701 and
-51702 are anybody's; a trigger that throws one with another message is an
+as a word of its own would be misread. The batch's own error numbers, from
+51701, are anybody's; a trigger that throws one with another message is an
 unknown refusal, and one that throws it with the adapter's exact message would
 be misread. Everything here was measured on SQL Server 2022 alone, which is
 the supported matrix (0003).
 
 **What it forecloses.** The driver's typed parameters for exact values, a bare
-`OUTPUT`, a filter compared by collation, and any retry of a write.
+`OUTPUT`, a filter compared by collation, any retry of a write, and writing
+through an INSTEAD OF trigger.
 
 ## Alternatives considered
 
@@ -268,3 +359,24 @@ the database finds equal to it, where EXISTS returns it once.
 **Retry a write after a deadlock or a dropped connection.** Rejected (0015):
 after a write was sent its outcome is unknown, and only the host can
 reconcile it.
+
+**Find the written row again by its key instead of asking about INSTEAD OF
+triggers.** Rejected as the guard: a target with no identity, or with a key
+whose text is not exact, cannot be found that way; an INSTEAD OF trigger may
+store the row under another key — it returned the identity 0 — and the row
+an INSTEAD OF UPDATE trigger left unchanged is still there to be found; and
+finding the row says nothing about what else the trigger did. It would also
+be the way to catch an AFTER trigger that deletes its row, and would refuse
+one that re-keys it.
+
+**Tell a trigger's COMMIT from its ROLLBACK** by a temporary table created
+inside the write's transaction, which a ROLLBACK removes and a COMMIT keeps.
+Rejected: a tempdb object for every write, its cost not measured, so that a
+trigger which commits and then refuses, or ends the transaction on purpose,
+gets a more precise code.
+
+**Read through the snapshot's length and scale, and refuse a column that has
+grown as `schema-changed`.** Rejected: a widened column holds values that
+were stored through other paths, and reading them exactly is what
+PostgreSQL does; a refusal would fail every read of the table after a
+harmless widening.

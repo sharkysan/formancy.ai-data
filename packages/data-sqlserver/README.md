@@ -116,7 +116,9 @@ const saved = await records.update({ target, key, set, expectedVersion: read.ver
   four places), integers as decimal strings, dates `YYYY-MM-DD`, times
   `HH:MM`, instants in UTC to the second, UUIDs in lower case. A time's
   seconds and an instant's fraction are cut off, because formancy's shapes
-  cannot hold them; update only the fields a person changed.
+  cannot hold them; update only the fields a person changed. Text and
+  decimals are read by the column's own type, not the snapshot's, so a
+  column widened since discovery reads what it holds.
 - **Values arrive as text the server converts**, never through the driver's
   typed parameters, whose decimal goes through a JavaScript number.
 - **A write is one batch**: the guarded statement, a check that every text
@@ -128,6 +130,16 @@ const saved = await records.update({ target, key, set, expectedVersion: read.ver
   before an AFTER trigger, and the version is the row's after one, read back
   by its key, so a trigger that touches the row does not make the next save
   stale.
+- **A trigger that decides what is stored is refused.** An INSTEAD OF
+  trigger runs in place of the statement, and what SQL Server returns is the
+  row as if it had not: a write to a table with an enabled one for that
+  operation — a view made writable by one included — is rolled back as
+  `unavailable`, and so is a write by an account that cannot see the table's
+  triggers. A trigger that ends the write's transaction itself, by COMMIT or
+  ROLLBACK, is `unknown-outcome`, because the batch cannot tell which. An
+  AFTER trigger that deletes the row it fired for, or that commits and then
+  raises an error, still misleads; [0017](../../docs/decisions/0017-sqlserver-operations.md)
+  says how.
 - **An update is one statement** naming the key, the filters and the
   expected version, incrementing a version column in the same SET. A record
   outside the filters is `not-found`, like one that does not exist.
@@ -140,8 +152,13 @@ const saved = await records.update({ target, key, set, expectedVersion: read.ver
   is retried.
 
 **What an account needs.** `SELECT` on what a form reads and a lookup offers,
-`INSERT` and `UPDATE` on what a form writes. A grant it lacks is
-`permission-denied` for a record and a thrown error for a lookup.
+and `INSERT` and `UPDATE` on what a form writes — with `SELECT` on it too: a
+write reads back through `OUTPUT` the columns it returns, the text it checks
+and the key it finds the row by again, and SQL Server asks `SELECT` for
+every column `OUTPUT` names, refusing an INSERT-only grant with 229. A grant
+it lacks is `permission-denied` for a record and a thrown error for a
+lookup. An account denied `VIEW DEFINITION` on a table it writes is refused
+the write, because whether a trigger decides it cannot be seen.
 
 ## What the spike found about the driver
 

@@ -11,7 +11,7 @@ import type { ExactKey } from '../sql/values.js'
  * `[found]`, then `[c0]`, `[c1]`, … the canonical text of each requested
  * column, then `[version]` — so one function in records.ts reads all of them.
  *
- * The write batches raise two errors of their own. A user error number is
+ * The write batches raise errors of their own, below. A user error number is
  * anybody's — a customer's trigger may THROW 51701 too — so errors.ts takes
  * one as the adapter's only when its message is exactly the adapter's.
  */
@@ -23,6 +23,12 @@ export const TEXT_NOT_STORED_MESSAGE = /^formancy: text not stored as sent: ([0-
 /** Raised when an update matched more than one row: an identity that is not a key. */
 export const NOT_ONE_ROW = 51702
 export const NOT_ONE_ROW_MESSAGE = 'formancy: the identity matched more than one row'
+/** Raised when an enabled INSTEAD OF trigger decides what the write stores, or the account cannot see whether one does. */
+export const DECIDED_BY_TRIGGER = 51703
+export const DECIDED_BY_TRIGGER_MESSAGE = 'formancy: an INSTEAD OF trigger decides what this write stores, or the account cannot see whether one does'
+/** Raised when a trigger ended the write's transaction and began another. */
+export const TRANSACTION_REPLACED = 51704
+export const TRANSACTION_REPLACED_MESSAGE = 'formancy: a trigger ended the transaction of the write and began another'
 
 /** A version as it is compared: the 8 bytes of a rowversion, or a version column's decimal string. */
 export type ExpectedVersion = { kind: 'rowversion'; bytes: Buffer } | { kind: 'version-column'; value: string }
@@ -126,6 +132,38 @@ function versionAfterTriggers(target: RecordTarget): Refind {
 }
 
 /**
+ * Whether an INSTEAD OF trigger decides what this write stores. Such a
+ * trigger runs in place of the statement, and OUTPUT returns the row as if
+ * the statement had run — the identity 0, the values before the trigger
+ * changed them, a row for an update that changed nothing — so nothing the
+ * batch reads says what the trigger stored, and the write is refused.
+ *
+ * Asked of the catalog after the statement, so a table that is not there has
+ * already failed it as schema-changed (208). A table the account writes but
+ * cannot see in the catalog — denied VIEW DEFINITION — is refused too, because
+ * whether a trigger decides its writes cannot be told: fail closed. The
+ * table's name is bound, as `object_id` reads it.
+ */
+function insteadOfGuard(parameters: Parameters, table: ObjectRef, operation: 'INSERT' | 'UPDATE'): string {
+  const name = parameters.add(mssql.NVarChar(mssql.MAX), quoteTable(table))
+  const deciding =
+    'select 1 from sys.triggers as [t] join sys.trigger_events as [e] on [e].[object_id] = [t].[object_id] ' +
+    `where [t].[parent_id] = object_id(${name}) and [t].[is_instead_of_trigger] = 1 and [t].[is_disabled] = 0 and [e].[type_desc] = N'${operation}'`
+  return `if object_id(${name}) is null or exists (${deciding}) throw ${String(DECIDED_BY_TRIGGER)}, N'${DECIDED_BY_TRIGGER_MESSAGE}', 1;`
+}
+
+/** One write: the statement given its OUTPUT clause, what it assigns, what it returns, and what is checked straight after it. */
+interface Write {
+  target: RecordTarget
+  operation: 'INSERT' | 'UPDATE'
+  statement: (output: string) => string
+  assigned: readonly Assigned[]
+  returned: Selected[]
+  /** Checks that may read `@rows`, the rows the statement changed. */
+  afterWrite: readonly string[]
+}
+
+/**
  * The batch every write runs in, so that what it stored is checked before it
  * commits, and nothing it did outlives an error:
  *
@@ -133,6 +171,12 @@ function versionAfterTriggers(target: RecordTarget): Refind {
  *   refuses (334) on a table with an enabled trigger. The output is the row as
  *   the statement wrote it, before any AFTER trigger changed it; the version
  *   is read back from the row afterwards (`versionAfterTriggers`).
+ * - The transaction is the one the batch began. A trigger that rolls it back
+ *   and begins another leaves `@@trancount` as it was, so nothing is raised,
+ *   and the commit would commit an empty transaction over a write that is
+ *   gone; one that commits it and begins another has stored the write. The
+ *   batch cannot tell the two apart, and says so (errors.ts).
+ * - No INSTEAD OF trigger decided what was stored (`insteadOfGuard`).
  * - Every text value is compared with what its column stored, and a
  *   difference rolls the write back: SQL Server converts nvarchar to a
  *   single-byte varchar without an error, a character its code page lacks
@@ -147,7 +191,7 @@ function versionAfterTriggers(target: RecordTarget): Refind {
  *   the transaction open on the pooled connection. Both settings end with the
  *   request, which runs inside `sp_executesql` (../sql/statement.ts).
  */
-function writeBatch(target: RecordTarget, write: (output: string) => string, assigned: readonly Assigned[], returned: Selected[], afterWrite: readonly string[]): string {
+function writeBatch(parameters: Parameters, { target, operation, statement, assigned, returned, afterWrite }: Write): string {
   const guarded = assigned.flatMap(({ value, sql }, index) => (value.type.kind === 'text' && value.value !== null ? [{ value, sql, index }] : []))
   const stored = guarded.map(({ value }, position) => ({
     name: `[w${String(position)}]`,
@@ -166,10 +210,15 @@ function writeBatch(target: RecordTarget, write: (output: string) => string, ass
     'set nocount on;',
     'set xact_abort on;',
     `declare @written table (${captured.map((column) => `${column.name} ${column.declared}`).join(', ')});`,
+    'declare @transaction bigint, @rows int;',
     ...refind.declared,
     'begin try',
     'begin transaction;',
-    `${write(output)};`,
+    'set @transaction = current_transaction_id();',
+    `${statement(output)};`,
+    'set @rows = @@rowcount;',
+    `if coalesce(current_transaction_id(), 0) <> @transaction throw ${String(TRANSACTION_REPLACED)}, N'${TRANSACTION_REPLACED_MESSAGE}', 1;`,
+    insteadOfGuard(parameters, target.table, operation),
     ...afterWrite,
     ...checks,
     ...refind.statements,
@@ -190,14 +239,14 @@ export function insertStatement(request: InsertRequest): Statement {
   const table = quoteTable(request.target.table)
   const columns = assigned.map(({ value }) => quoteName(value.name)).join(', ')
   const values = assigned.map(({ sql }) => sql).join(', ')
-  const returned = selection(request.returning, request.target.concurrency, 'inserted.')
-  const sql = writeBatch(
-    request.target,
-    (output) => (assigned.length === 0 ? `insert into ${table} ${output} default values` : `insert into ${table} (${columns}) ${output} values (${values})`),
+  const sql = writeBatch(parameters, {
+    target: request.target,
+    operation: 'INSERT',
+    statement: (output) => (assigned.length === 0 ? `insert into ${table} ${output} default values` : `insert into ${table} (${columns}) ${output} values (${values})`),
     assigned,
-    returned,
-    [],
-  )
+    returned: selection(request.returning, request.target.concurrency, 'inserted.'),
+    afterWrite: [],
+  })
   return parameters.statement(sql)
 }
 
@@ -222,13 +271,13 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
       ? `${version} = ${parameters.add(mssql.VarBinary(8), expected.bytes)}`
       : `${version} = convert(bigint, ${parameters.add(mssql.NVarChar(mssql.MAX), expected.value)})`,
   )
-  const returned = selection(request.returning, target.concurrency, 'inserted.')
-  const sql = writeBatch(
+  const sql = writeBatch(parameters, {
     target,
-    (output) => `update ${quoteTable(target.table)} set ${set.join(', ')} ${output} where ${where.join(' and ')}`,
+    operation: 'UPDATE',
+    statement: (output) => `update ${quoteTable(target.table)} set ${set.join(', ')} ${output} where ${where.join(' and ')}`,
     assigned,
-    returned,
-    [`if @@rowcount > 1 throw ${String(NOT_ONE_ROW)}, N'${NOT_ONE_ROW_MESSAGE}', 1;`],
-  )
+    returned: selection(request.returning, target.concurrency, 'inserted.'),
+    afterWrite: [`if @rows > 1 throw ${String(NOT_ONE_ROW)}, N'${NOT_ONE_ROW_MESSAGE}', 1;`],
+  })
   return parameters.statement(sql)
 }

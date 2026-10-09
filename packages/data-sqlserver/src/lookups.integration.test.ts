@@ -43,7 +43,8 @@ beforeAll(async () => {
   await owner.request().batch('create schema ops')
   await owner.request().batch(`create table ops.code (code nvarchar(60) null constraint uq_code unique, label nvarchar(50) not null);
     create table ops.code_use (id int not null constraint pk_code_use primary key,
-      code nvarchar(60) null constraint fk_code_use_code references ops.code (code))`)
+      code nvarchar(60) null constraint fk_code_use_code references ops.code (code));
+    create table ops.victim (note nvarchar(100) not null)`)
   await owner
     .request()
     .input('long', mssql.NVarChar(mssql.MAX), TOO_LONG_FOR_A_TOKEN)
@@ -276,5 +277,19 @@ describe('a request the configuration cannot answer', () => {
     expect((await lookups.search(unsearchable, page(''), tenant('1'))).rows).toEqual([{ token: 'k1:1,1001', label: '999999999999.99' }])
     const crowded: RowFilters = { kind: 'restricted', equal: [{ column: 'tenant_id', value: '1' }, ...Array.from({ length: 2096 }, () => ({ column: 'tenant_id', value: '1' }))] }
     await expect(lookups.resolve(customers(), ['k1:1,1001'], crowded)).rejects.toThrow(/leave no parameter for a key/)
+  })
+
+  // A sort direction is spliced, because SQL Server takes no parameter for
+  // ASC or DESC. buildLookupConfig only ever writes one of the two, but the
+  // adapter is handed a configuration, and one read from a bundle altered
+  // where it is stored must not become SQL: a direction of
+  // `asc offset 0 rows; insert …` ran its insert.
+  test('a sort direction that is not asc or desc is refused before it is spliced, and runs nothing', async () => {
+    const lookups = createSqlServerLookups(owner)
+    const direction = "asc offset 0 rows; insert into ops.victim (note) values (N'direction'); select [name] as [k0] from sales.country order by [name]"
+    const tampered: LookupConfig = { ...customers(), sort: [{ column: 'name', direction: direction as 'asc', nulls: 'last' }] }
+    await expect(lookups.search(tampered, page(''), tenant('1'))).rejects.toThrow(/sorts asc or desc/)
+    const victims = await owner.request().query<{ n: number }>('select count(*) as n from ops.victim')
+    expect(victims.recordset[0]?.n).toBe(0)
   })
 })

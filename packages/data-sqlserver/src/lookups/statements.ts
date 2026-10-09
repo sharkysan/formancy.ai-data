@@ -65,10 +65,16 @@ export function containsPattern(search: string): string {
  * the column's collation — the server's rule, not code-point order — and the
  * key that ends every order makes it total, because a key is unique under that
  * same collation.
+ *
+ * The direction is spliced, because SQL Server takes no parameter for ASC or
+ * DESC, so it is checked to be one of the two first: `buildLookupConfig` only
+ * writes those, but this is handed a configuration, and one read from a
+ * bundle altered where it is stored must not run as a statement.
  */
 function orderBy(config: LookupConfig): string {
   return config.sort
     .flatMap((sort) => {
+      if (sort.direction !== 'asc' && sort.direction !== 'desc') throw new Error(`${config.source}: ${sort.column} sorts asc or desc`)
       const name = column(sort.column)
       const [nullRank, valueRank] = sort.nulls === 'first' ? ['0', '1'] : ['1', '0']
       return [`case when ${name} is null then ${nullRank} else ${valueRank} end`, `${name} ${sort.direction}`]

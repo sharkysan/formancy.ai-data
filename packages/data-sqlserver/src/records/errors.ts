@@ -1,5 +1,14 @@
 import type { RecordFailure, RecordFailureCode, RecordValue } from '@formancy/data-core'
-import { NOT_ONE_ROW, NOT_ONE_ROW_MESSAGE, TEXT_NOT_STORED, TEXT_NOT_STORED_MESSAGE } from './statements.js'
+import {
+  DECIDED_BY_TRIGGER,
+  DECIDED_BY_TRIGGER_MESSAGE,
+  NOT_ONE_ROW,
+  NOT_ONE_ROW_MESSAGE,
+  TEXT_NOT_STORED,
+  TEXT_NOT_STORED_MESSAGE,
+  TRANSACTION_REPLACED,
+  TRANSACTION_REPLACED_MESSAGE,
+} from './statements.js'
 
 /**
  * What SQL Server's refusals mean, as the stable codes of the record port.
@@ -26,7 +35,8 @@ interface ServerError {
 
 const UNIQUE_KEY = /^Violation of (?:PRIMARY KEY|UNIQUE KEY) constraint '(.+?)'\. Cannot insert duplicate key in object '/
 const UNIQUE_INDEX = /^Cannot insert duplicate key row in object '.+?' with unique index '(.+?)'\. The duplicate key value is /
-const CONFLICT = /^The [A-Z]+ statement conflicted with the (FOREIGN KEY|REFERENCE|CHECK) constraint "(.+?)"\. The conflict occurred in /
+/** A foreign key to its own table is FOREIGN KEY SAME TABLE for a reference to no row, SAME TABLE REFERENCE for a row still referenced. */
+const CONFLICT = /^The [A-Z]+ statement conflicted with the (FOREIGN KEY(?: SAME TABLE)?|(?:SAME TABLE )?REFERENCE|CHECK) constraint "(.+?)"\. The conflict occurred in /
 /** Every translation of 547 keeps these SQL keywords: checked by hand in the 34 languages of SQL Server 2022 on 2026-10-09, and in German by the failures suite. */
 const FOREIGN_KEY_WORDS = /\b(?:FOREIGN KEY|REFERENCE)\b/
 const NULL_COLUMN = /^Cannot insert the value NULL into column '(.+?)', table '/
@@ -76,15 +86,35 @@ function constraintConflict(message: string): RecordFailure {
     : failure('check-violation', 'SQL Server refused the write: a check constraint does not accept a value (547).', { constraint: match?.[2] })
 }
 
+/** A trigger ended the transaction the write ran in. Whether by COMMIT or by ROLLBACK, nothing the batch can read says. */
+const ENDED_BY_TRIGGER = 'it may have committed, and it is not retried.'
+
 /**
  * The write batch's own errors (statements.ts), recognised by number AND
  * message: a customer's trigger may THROW the same number, and its error is
  * then an unrecognised refusal like any other.
+ *
+ * - An INSTEAD OF trigger that decides the write is `unavailable`: the batch
+ *   rolled it back, which is the promise that code makes, and the port has
+ *   no code for a table whose writes cannot be verified. `schema-changed`
+ *   would claim a binding names something gone, and send someone to a drift
+ *   review that cannot show a trigger (0017).
+ * - A transaction a trigger replaced is `unknown-outcome`: it may have
+ *   committed the write before beginning another.
  */
 function ownError(error: ServerError, written: readonly RecordValue[]): RecordFailure | undefined {
   if (error.number === NOT_ONE_ROW && error.message === NOT_ONE_ROW_MESSAGE) {
     // The bindings named an identity that is not a key; the batch rolled back.
     throw new Error('The record identity matched more than one row, so the update was rolled back: the bindings do not name a key.')
+  }
+  if (error.number === DECIDED_BY_TRIGGER && error.message === DECIDED_BY_TRIGGER_MESSAGE) {
+    return failure(
+      'unavailable',
+      'An INSTEAD OF trigger would decide what this write stores, or this account cannot see whether one does, so the adapter rolled it back; nothing was written.',
+    )
+  }
+  if (error.number === TRANSACTION_REPLACED && error.message === TRANSACTION_REPLACED_MESSAGE) {
+    return failure('unknown-outcome', `A trigger ended the transaction of the write and began another; ${ENDED_BY_TRIGGER}`)
   }
   const index = error.number === TEXT_NOT_STORED ? TEXT_NOT_STORED_MESSAGE.exec(error.message)?.[1] : undefined
   if (index === undefined) return undefined
@@ -97,13 +127,19 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
  * A refusal the server reported for this statement, which therefore did not
  * commit: the write batch rolls back on every error it is told of, a
  * trigger's RAISERROR included, and on the errors it cannot catch xact_abort
- * does (statements.ts).
+ * does (statements.ts). Except 3609: a trigger ended the write's transaction
+ * itself, and SQL Server raises it alike after a COMMIT, which stored the
+ * write, and after a ROLLBACK, which did not. A trigger that commits and then
+ * raises an error of its own is reported as that refusal though it stored
+ * the write, which the batch cannot see (0017).
  */
 function refusal(error: ServerError, written: readonly RecordValue[]): RecordFailure {
   const own = ownError(error, written)
   if (own !== undefined) return own
   const { number, message } = error
   switch (number) {
+    case 3609:
+      return failure('unknown-outcome', `A trigger ended the transaction of the write (3609); ${ENDED_BY_TRIGGER}`)
     case 2627:
     case 2601:
       return failure('unique-violation', `SQL Server refused the write: a unique key already holds this value (${String(number)}).`, {

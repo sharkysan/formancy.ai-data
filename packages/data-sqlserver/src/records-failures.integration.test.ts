@@ -59,6 +59,36 @@ beforeAll(async () => {
     insert into ops.drifting (id, note) values (1, N'here')`)
   await owner.request().batch("create trigger ops.thrower_insert on ops.thrower after insert as throw 51701, N'a rule of the customer''s own', 1;")
   await owner.request().batch("create trigger ops.warned_write on ops.warned after insert, update as raiserror('a warning of the customer''s own', 16, 1);")
+  // A foreign key to its own table, and tables whose triggers decide what a
+  // write stores or end the transaction it runs in.
+  await owner.request().batch(`
+    create table ops.node (id int not null constraint pk_node primary key, parent_id int null constraint fk_node_parent references ops.node (id),
+      version int not null constraint df_node_version default 0);
+    insert into ops.node (id, parent_id) values (1, null), (2, 1);
+    create table ops.ignored (id int identity(1, 1) not null constraint pk_ignored primary key, note nvarchar(20) null,
+      version int not null constraint df_ignored_version default 0);
+    insert into ops.ignored (note) values (N'start');
+    create table ops.rewritten (id int identity(1, 1) not null constraint pk_rewritten primary key, note nvarchar(20) null);
+    create table ops.update_only (id int not null constraint pk_update_only primary key, note nvarchar(20) null);
+    create table ops.dormant (id int not null constraint pk_dormant primary key, note nvarchar(20) null);
+    create table ops.restarted (id int not null constraint pk_restarted primary key, note nvarchar(20) null,
+      version int not null constraint df_restarted_version default 0);
+    insert into ops.restarted (id, note) values (1, N'start');
+    create table ops.reopened (id int not null constraint pk_reopened primary key, note nvarchar(20) null);
+    create table ops.ended (id int not null constraint pk_ended primary key, note nvarchar(20) null)`)
+  for (const trigger of [
+    'create trigger ops.ignored_insert on ops.ignored instead of insert as begin set nocount on; end',
+    'create trigger ops.ignored_update on ops.ignored instead of update as begin set nocount on; end',
+    "create trigger ops.rewritten_insert on ops.rewritten instead of insert as begin set nocount on; insert into ops.rewritten (note) select upper(note) + N'!' from inserted; end",
+    'create trigger ops.update_only_update on ops.update_only instead of update as begin set nocount on; end',
+    'create trigger ops.dormant_insert on ops.dormant instead of insert as begin set nocount on; end',
+    'disable trigger ops.dormant_insert on ops.dormant',
+    'create trigger ops.restarted_write on ops.restarted after insert, update as begin set nocount on; rollback transaction; begin transaction; end',
+    'create trigger ops.reopened_insert on ops.reopened after insert as begin set nocount on; commit transaction; begin transaction; end',
+    "create trigger ops.ended_insert on ops.ended after insert as begin set nocount on; if exists (select 1 from inserted where note = N'commit') commit transaction; else rollback transaction; end",
+  ]) {
+    await owner.request().batch(trigger)
+  }
   snapshot = await discoverSqlServer(owner, { schemas: ['sales', 'ops'] })
 })
 
@@ -101,6 +131,20 @@ function versioned(ref: ObjectRef, set: RecordValue[], expectedVersion: string, 
   return { target: { ...target(ref), concurrency: { kind: 'version-column', column: 'version' } }, key, set, expectedVersion, filters: EVERY_ROW, returning: [] }
 }
 
+/** A login and a user of its own, granted exactly `grants` (constants of this file, so spliced), and a pool connected as it. */
+async function account(name: string, grants: string): Promise<mssql.ConnectionPool> {
+  const password = 'Probe-Account-Password-1'
+  const master = await new mssql.ConnectionPool({ ...fixture.admin, database: 'master' }).connect()
+  try {
+    await master.request().batch(`create login ${name} with password = '${password}', check_policy = off`)
+  } finally {
+    await master.close()
+  }
+  await owner.request().batch(`create user ${name} for login ${name}`)
+  await owner.request().batch(grants)
+  return new mssql.ConnectionPool({ ...fixture.reader, user: name, password }).connect()
+}
+
 describe('each constraint the fixture can be made to break', () => {
   // 2627 is both a primary and a unique key; 2601 is a unique index, which
   // most migration tools emit instead. All three are the same refusal to a
@@ -135,6 +179,19 @@ describe('each constraint the fixture can be made to break', () => {
       code: 'foreign-key-violation',
       constraint: 'fk_child_parent',
     })
+  })
+
+  // A foreign key to its own table is spelled differently in 547's message:
+  // FOREIGN KEY SAME TABLE for a reference to no row, SAME TABLE REFERENCE for
+  // a row still referenced. Matched only as the plain spellings, the code
+  // survived on the keyword alone and the constraint a form should mark was
+  // lost.
+  test('a foreign key to its own table names the constraint, whichever way it is broken', async () => {
+    const records = createSqlServerRecords(owner)
+    const node: ObjectRef = { schema: 'ops', name: 'node' }
+    const broken = { ok: false, code: 'foreign-key-violation', constraint: 'fk_node_parent' }
+    expect(await records.insert({ target: target(node), values: [valueOf(node, 'id', '3'), valueOf(node, 'parent_id', '99')], returning: [] })).toMatchObject(broken)
+    expect(await records.update(versioned(node, [valueOf(node, 'id', '4')], '0'))).toMatchObject(broken)
   })
 
   // An insert writes only the columns it is given, so a required column left
@@ -316,15 +373,7 @@ describe("the account's own grants", () => {
   // A grant can stop at a column (error 230 rather than 229): reading it is
   // refused and names it, and a read that leaves it out is not refused.
   test('a column the account may not read is permission-denied, naming the column', async () => {
-    const master = await new mssql.ConnectionPool({ ...fixture.admin, database: 'master' }).connect()
-    try {
-      await master.request().batch("create login probe_columns with password = 'Probe-Columns-Password-1', check_policy = off")
-    } finally {
-      await master.close()
-    }
-    await owner.request().batch('create user probe_columns for login probe_columns')
-    await owner.request().batch('grant select on sales.[order] to probe_columns; deny select (amount) on sales.[order] to probe_columns')
-    const narrow = await new mssql.ConnectionPool({ ...fixture.reader, user: 'probe_columns', password: 'Probe-Columns-Password-1' }).connect()
+    const narrow = await account('probe_columns', 'grant select on sales.[order] to probe_columns; deny select (amount) on sales.[order] to probe_columns')
     try {
       const records = createSqlServerRecords(narrow)
       const read = (column: string) =>
@@ -334,6 +383,122 @@ describe("the account's own grants", () => {
     } finally {
       await narrow.close()
     }
+  })
+
+  // A write reads back what it stored — OUTPUT, for what it returns, the text
+  // it checks and the key it finds the row by again — and SQL Server asks
+  // SELECT for every column OUTPUT names (229 on an INSERT-only grant). An
+  // account given only INSERT and UPDATE, as a README that asked for nothing
+  // more would have it, is refused every write; with SELECT the same write
+  // is made.
+  test('an account that may write a table but not read it is refused the write', async () => {
+    const writer = await account('probe_writer', 'grant insert, update on ops.uniq to probe_writer')
+    try {
+      const records = createSqlServerRecords(writer)
+      const insert = (id: string) => records.insert({ target: target(UNIQ), values: [valueOf(UNIQ, 'id', id), valueOf(UNIQ, 'code', `w${id}`)], returning: [] })
+      expect(await insert('10')).toMatchObject({ ok: false, code: 'permission-denied' })
+      await owner.request().batch('grant select on ops.uniq to probe_writer')
+      expect(await insert('11')).toEqual({ ok: true, values: {}, version: null })
+    } finally {
+      await writer.close()
+    }
+  })
+})
+
+describe('a trigger that decides what a write stores', () => {
+  // An INSTEAD OF trigger runs in place of the statement, and OUTPUT returns
+  // the row as if the statement had run. Measured: a trigger that does nothing
+  // gave an insert and an update `ok: true` over an unchanged table, and one
+  // that inserts the row itself, changed, gave the identity 0 and the values
+  // before it changed them. Nothing the batch reads tells what such a trigger
+  // stored, so the write is refused and rolled back rather than reported done.
+  test('an enabled INSTEAD OF trigger for the operation refuses the write, and nothing is stored', async () => {
+    const records = createSqlServerRecords(owner)
+    const ignored: ObjectRef = { schema: 'ops', name: 'ignored' }
+    const rewritten: ObjectRef = { schema: 'ops', name: 'rewritten' }
+    const refused = { ok: false, code: 'unavailable', message: expect.stringContaining('INSTEAD OF') }
+    expect(await records.insert({ target: target(ignored), values: [valueOf(ignored, 'note', 'new')], returning: [columnOf(ignored, 'id')] })).toMatchObject(refused)
+    expect(await records.update(versioned(ignored, [valueOf(ignored, 'note', 'changed')], '0'))).toMatchObject(refused)
+    expect(
+      await records.insert({ target: target(rewritten), values: [valueOf(rewritten, 'note', 'new')], returning: [columnOf(rewritten, 'id'), columnOf(rewritten, 'note')] }),
+    ).toMatchObject(refused)
+    const stored = await owner.request().query('select (select count(*) from ops.ignored) as ignored, (select note from ops.ignored) as note, (select count(*) from ops.rewritten) as rewritten')
+    expect(stored.recordset).toEqual([{ ignored: 1, note: 'start', rewritten: 0 }])
+  })
+
+  // The trigger the guard looks for is the one that would run: an INSTEAD OF
+  // trigger for another operation, or a disabled one, does not decide this
+  // write, which stores exactly what it reports. Refusing every table that
+  // has one would refuse writes that are true.
+  test('an INSTEAD OF trigger for another operation, or a disabled one, leaves the write alone', async () => {
+    const records = createSqlServerRecords(owner)
+    for (const ref of [
+      { schema: 'ops', name: 'update_only' },
+      { schema: 'ops', name: 'dormant' },
+    ]) {
+      expect(await records.insert({ target: target(ref), values: [valueOf(ref, 'id', '1'), valueOf(ref, 'note', 'stored')], returning: [columnOf(ref, 'note')] })).toEqual({
+        ok: true,
+        values: { note: 'stored' },
+        version: null,
+      })
+    }
+    const stored = await owner.request().query('select (select note from ops.update_only) as update_only, (select note from ops.dormant) as dormant')
+    expect(stored.recordset).toEqual([{ update_only: 'stored', dormant: 'stored' }])
+  })
+
+  // An account denied VIEW DEFINITION on a table may still write it, and sees
+  // neither the table nor its triggers in the catalog (measured: object_id is
+  // NULL to it). Whether a trigger decides its write cannot be told, so the
+  // write is refused: fail closed. Without that, this account's insert into a
+  // table whose trigger ignores it was `ok: true` with nothing stored.
+  test("an account that cannot see the table's triggers is refused the write, and nothing is stored", async () => {
+    const blind = await account('probe_blind', 'grant insert, select on ops.ignored to probe_blind; deny view definition on ops.ignored to probe_blind')
+    try {
+      const ignored: ObjectRef = { schema: 'ops', name: 'ignored' }
+      const outcome = await createSqlServerRecords(blind).insert({ target: target(ignored), values: [valueOf(ignored, 'note', 'unseen')], returning: [] })
+      expect(outcome).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringContaining('INSTEAD OF') })
+    } finally {
+      await blind.close()
+    }
+    const stored = await owner.request().query<{ n: number }>('select count(*) as n from ops.ignored')
+    expect(stored.recordset[0]?.n).toBe(1)
+  })
+
+  // A trigger that rolls the write's transaction back and begins another
+  // leaves @@trancount where it found it, so SQL Server raises nothing and the
+  // batch commits the empty new transaction: measured, `ok: true` with no row
+  // stored. One that commits and begins another has stored the row. The batch
+  // sees only that its transaction is not the one it began, and cannot tell
+  // which of the two the trigger did, so both are unknown-outcome — neither a
+  // success nor a refusal that invites a retry.
+  test("a trigger that ends the write's transaction and begins another is unknown-outcome", async () => {
+    const records = createSqlServerRecords(owner)
+    const restarted: ObjectRef = { schema: 'ops', name: 'restarted' }
+    const reopened: ObjectRef = { schema: 'ops', name: 'reopened' }
+    const unknown = { ok: false, code: 'unknown-outcome' }
+    expect(await records.insert({ target: target(restarted), values: [valueOf(restarted, 'id', '2'), valueOf(restarted, 'note', 'new')], returning: [] })).toMatchObject(unknown)
+    expect(await records.update(versioned(restarted, [valueOf(restarted, 'note', 'changed')], '0'))).toMatchObject(unknown)
+    expect(await records.insert({ target: target(reopened), values: [valueOf(reopened, 'id', '1'), valueOf(reopened, 'note', 'kept')], returning: [] })).toMatchObject(unknown)
+    const stored = await owner.request().query("select (select string_agg(concat(id, ':', note, ':', version), ',') from ops.restarted) as restarted, (select string_agg(concat(id, ':', note), ',') from ops.reopened) as reopened")
+    expect(stored.recordset).toEqual([{ restarted: '1:start:0', reopened: '1:kept' }])
+  })
+
+  // Ending it without beginning another is error 3609, raised alike after
+  // the trigger's COMMIT and after its ROLLBACK. Measured: the COMMIT stored
+  // the row and was reported `unavailable`, a refusal over a committed write
+  // that invites the retry storing it twice. So 3609 is unknown-outcome.
+  test("a trigger that ends the write's transaction without beginning another is unknown-outcome", async () => {
+    const records = createSqlServerRecords(owner)
+    const ended: ObjectRef = { schema: 'ops', name: 'ended' }
+    for (const [id, note] of [
+      ['1', 'commit'],
+      ['2', 'rollback'],
+    ] as const) {
+      const outcome = await records.insert({ target: target(ended), values: [valueOf(ended, 'id', id), valueOf(ended, 'note', note)], returning: [] })
+      expect(outcome).toMatchObject({ ok: false, code: 'unknown-outcome', message: expect.stringContaining('3609') })
+    }
+    const stored = await owner.request().query<{ id: number; note: string }>('select id, note from ops.ended')
+    expect(stored.recordset).toEqual([{ id: 1, note: 'commit' }])
   })
 })
 

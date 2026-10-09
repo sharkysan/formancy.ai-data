@@ -21,8 +21,8 @@ import type { Parameters } from './statement.js'
  * `decimal(18,4)` is refused outright (8023, measured once on 2026-10-09).
  */
 
-/** nvarchar(n) holds at most 4000 UTF-16 units; anything wider is nvarchar(max). */
-const NVARCHAR_LIMIT = 4000
+/** SQL Server's largest decimal precision: decimal(38, s). */
+const MAX_PRECISION = 38
 
 /** SQL Server's integer types, narrowest first, by the range the snapshot gives each. */
 const INTEGER_TYPES: ReadonlyArray<readonly [name: string, min: bigint, max: bigint]> = [
@@ -34,10 +34,6 @@ const INTEGER_TYPES: ReadonlyArray<readonly [name: string, min: bigint, max: big
 
 type Kind<K extends NormalizedType['kind']> = Extract<NormalizedType, { kind: K }>
 
-function nvarchar(maxLength: number | null): string {
-  return maxLength === null || maxLength > NVARCHAR_LIMIT ? 'nvarchar(max)' : `nvarchar(${String(maxLength)})`
-}
-
 /** The integer type a column of this range is: a key compared with its own type is a seek, not a conversion of every row. */
 function integerType(type: Kind<'integer'>): string {
   const min = BigInt(type.min)
@@ -47,10 +43,21 @@ function integerType(type: Kind<'integer'>): string {
   return found[0]
 }
 
+/**
+ * The decimal type a value is converted to, spliced into the statement
+ * because SQL Server takes no parameter there. So the precision and the scale
+ * are checked to be what its syntax allows — whole numbers, 1 to 38 and 0 to
+ * the precision — before they become SQL: they come from approved bindings,
+ * and a bundle altered where it is stored must not run as a statement.
+ */
 function decimalType(type: Kind<'decimal'>): string {
+  const { precision, scale } = type
   // An unconstrained numeric is PostgreSQL's; every SQL Server decimal has both.
-  if (type.precision === null || type.scale === null) throw new Error('A SQL Server decimal has a precision and a scale')
-  return `decimal(${String(type.precision)}, ${String(type.scale)})`
+  if (precision === null || scale === null) throw new Error('A SQL Server decimal has a precision and a scale')
+  if (!Number.isSafeInteger(precision) || !Number.isSafeInteger(scale) || precision < 1 || precision > MAX_PRECISION || scale < 0 || scale > precision) {
+    throw new Error(`A SQL Server decimal's precision is 1 to ${String(MAX_PRECISION)} and its scale 0 to its precision`)
+  }
+  return `decimal(${String(precision)}, ${String(scale)})`
 }
 
 function noValue(type: NormalizedType): Error {
@@ -60,12 +67,12 @@ function noValue(type: NormalizedType): Error {
 /**
  * SQL that reads `expression` as the text of its canonical API value.
  *
- * - text: itself, as nvarchar, so a `varchar` is decoded by the server's code
- *   page and not by the driver's.
+ * - text: itself, as nvarchar(max), so a `varchar` is decoded by the server's
+ *   code page and not by the driver's.
  * - integer: the decimal string, whatever its width.
- * - decimal: padded to the column's scale. Through `decimal(p, s)` first, so a
- *   `money` column — 19,4 in the snapshot — keeps four digits: its own default
- *   conversion rounds to two.
+ * - decimal: every digit the column holds, padded to its scale, in style 2 —
+ *   which a decimal ignores, and which gives `money` its four places where
+ *   its default conversion rounds to two.
  * - boolean: `1` or `0`, which `fromCanonicalText` makes `true` or `false`.
  * - float: style 3, seventeen significant digits, which a double round-trips through.
  * - date `YYYY-MM-DD`; time `HH:MM`; an instant `YYYY-MM-DDTHH:MM:SSZ` in UTC;
@@ -73,15 +80,23 @@ function noValue(type: NormalizedType): Error {
  *   and a time's seconds and a timestamp's fraction are cut off, not rounded,
  *   because the shapes cannot hold them (0017).
  * - uuid: lower case, as the codec spells it; SQL Server prints upper case.
+ *
+ * Text and decimals are read by the column's own type, never by the length,
+ * precision or scale the snapshot remembers: CONVERT truncates text and
+ * rounds a decimal to the type it is given without a word, so a column
+ * widened since discovery would read back as a value it does not hold
+ * (measured: 'Muster AG,' for 'Muster AG, Zurich branch', 1.2346 for
+ * 1.234567). PostgreSQL reads `::text`, which loses nothing either.
  */
 export function canonicalText(type: NormalizedType, expression: string): string {
   switch (type.kind) {
     case 'text':
-      return `convert(${nvarchar(type.maxLength)}, ${expression})`
+      return `convert(nvarchar(max), ${expression})`
     case 'integer':
       return `convert(nvarchar(20), ${expression})`
     case 'decimal':
-      return `convert(nvarchar(50), convert(${decimalType(type)}, ${expression}))`
+      // decimal(38, 38) at its most negative is 41 characters.
+      return `convert(nvarchar(50), ${expression}, 2)`
     case 'boolean':
       return `convert(nchar(1), ${expression})`
     case 'float':

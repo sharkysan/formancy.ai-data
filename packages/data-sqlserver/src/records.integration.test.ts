@@ -55,8 +55,14 @@ beforeAll(async () => {
     insert into ops.kinds (id, f, r, m, t, ts, dto, u, b, tiny) values
       (1, 0.1, 0.1, 12.3456, '12:34:56.789', '2026-10-08T12:34:56.789', '2026-10-08T23:59:59.999+02:00',
        'A9E732BB-C26E-4BE6-9752-477E208C0CDC', 1, 255);
-    insert into ops.versioned (id, tenant_id, note) values (1, 1, N'start');
+    insert into ops.versioned (id, tenant_id, note) values (1, 1, N'start'), (2, 1, N'raced');
     insert into ops.heap (tenant_id, note) values (1, N'one'), (1, N'two')`)
+  // A table whose columns are widened after discovery, and one a tampered
+  // type would write into if it became SQL.
+  await owner.request().batch(`
+    create table ops.widened (id int not null constraint pk_widened primary key, name nvarchar(10) null, amount decimal(18, 4) null);
+    insert into ops.widened (id, name, amount) values (1, N'Muster AG', 1.2346);
+    create table ops.victim (note nvarchar(100) not null)`)
   await owner.request().batch(`create table ops.tenanted (id int not null constraint pk_tenanted primary key, tenant nvarchar(20) not null, note nvarchar(50) null);
     insert into ops.tenanted (id, tenant, note) values (1, N'ACME', N'upper'), (2, N'acme', N'lower')`)
   // Rows an AFTER trigger touches again: an audit count beside a rowversion,
@@ -150,6 +156,40 @@ function orderUpdate(set: RecordValue[], expectedVersion: string, filters: RowFi
 }
 
 /**
+ * Two updates sent while a third connection holds the row they name, so both
+ * are waiting inside SQL Server, with the same expected version, before
+ * either runs; then the row is released and their outcomes returned. Each
+ * update gets a pool of one connection, so its session is the one it uses.
+ */
+async function race(hold: (request: mssql.Request) => Promise<unknown>, update: (records: RecordAdapter, index: number) => Promise<RecordOutcome>): Promise<RecordOutcome[]> {
+  const pools = await Promise.all([1, 2, 3].map(() => new mssql.ConnectionPool({ ...fixture.admin, pool: { max: 1 } }).connect()))
+  const [first, second, holder] = pools
+  if (first === undefined || second === undefined || holder === undefined) throw new Error('three pools were asked for')
+  try {
+    const [one, two] = await Promise.all([first, second].map(async (pool) => (await pool.request().query<{ id: number }>('select @@spid as id')).recordset[0]?.id))
+    const transaction = new mssql.Transaction(holder)
+    await transaction.begin()
+    await hold(new mssql.Request(transaction))
+    const racing = [first, second].map((pool, index) => update(createSqlServerRecords(pool), index))
+    for (let attempt = 0; ; attempt += 1) {
+      // Blocked by the holder, or the second queued behind the first: either way, inside the server and waiting.
+      const waiting = await owner
+        .request()
+        .input('one', mssql.Int, one)
+        .input('two', mssql.Int, two)
+        .query<{ n: number }>('select count(*) as n from sys.dm_exec_requests where session_id in (@one, @two) and blocking_session_id <> 0')
+      if (waiting.recordset[0]?.n === 2) break
+      if (attempt === 200) throw new Error('the two updates never both waited on the held row')
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+    await transaction.commit()
+    return await Promise.all(racing)
+  } finally {
+    await Promise.all(pools.map((pool) => pool.close()))
+  }
+}
+
+/**
  * Whether every value read is the canonical one: what `codecFor(column).parse`
  * returns when handed it. A column the codec will not write — an identity, a
  * computed column, a zoneless timestamp — is left out, because it has no
@@ -239,6 +279,30 @@ describe('reading a record', () => {
       tiny: '255',
     })
     expect(canonicalDisagreements(KINDS, kinds.values)).toEqual([])
+  })
+
+  // A column widened since the snapshot was taken reads back exactly: text as
+  // nvarchar(max), a decimal by its own type, never through the length or the
+  // scale the snapshot remembers, which CONVERT truncates and rounds to
+  // without a word. Measured: nvarchar(10) widened to 40 read 'Muster AG,'
+  // for 'Muster AG, Zurich branch', and decimal(18,4) widened to (18,6) read
+  // 1.2346 for 1.234567. PostgreSQL reads ::text, which loses nothing, and the
+  // engines must not disagree about what a row holds.
+  test('a column widened since the snapshot reads back exactly, not at the snapshot’s width', async () => {
+    const records = createSqlServerRecords(owner)
+    const widened: ObjectRef = { schema: 'ops', name: 'widened' }
+    const columns = [columnOf(widened, 'name'), columnOf(widened, 'amount')]
+    expect(columns.map((column) => column.type)).toMatchObject([
+      { kind: 'text', maxLength: 10 },
+      { kind: 'decimal', precision: 18, scale: 4 },
+    ])
+    await owner.request().batch('alter table ops.widened alter column name nvarchar(40) null; alter table ops.widened alter column amount decimal(18, 6) null')
+    await owner.request().batch("update ops.widened set name = N'Muster AG, Zurich branch', amount = 1.234567")
+    expect(await records.read({ target: target(widened), key: [valueOf(widened, 'id', '1')], columns, filters: EVERY_ROW })).toEqual({
+      ok: true,
+      values: { name: 'Muster AG, Zurich branch', amount: '1.234567' },
+      version: null,
+    })
   })
 
   // A filter is an equality with a trusted value (0011), compared code point by
@@ -404,6 +468,24 @@ describe('writing every kind', () => {
     }
   })
 
+  // A decimal's precision and scale are spliced into the statement —
+  // `convert(decimal(18, 4), @p0)` — because SQL Server takes no parameter
+  // there. They come from approved bindings, and a bundle altered where it is
+  // stored must not become SQL: a precision of `19, 4), @p1)); insert …; --`
+  // ran its insert, and committed it with the write.
+  test('a tampered decimal type is refused before it is spliced, and runs nothing', async () => {
+    const records = createSqlServerRecords(owner)
+    const precision = "19, 4), @p1)); insert into ops.victim (note) values (N'precision'); --" as unknown as number
+    const tampered = records.insert({
+      target: target(KINDS),
+      values: [valueOf(KINDS, 'id', '9'), { name: 'm', type: { kind: 'decimal', precision, scale: 4 }, value: '1.0000' }],
+      returning: [],
+    })
+    await expect(tampered).rejects.toThrow(/precision is 1 to 38/)
+    const victims = await owner.request().query<{ n: number }>('select count(*) as n from ops.victim')
+    expect(victims.recordset[0]?.n).toBe(0)
+  })
+
   // A request no codec or binding could have produced — a key that is not the
   // identity, a column with no canonical value, a value of the wrong type, a
   // zoneless timestamp written as an instant, a column named twice, the
@@ -432,6 +514,19 @@ describe('writing every kind', () => {
     await expect(insert([valueOf(ORDER, 'amount', '1.0000'), valueOf(ORDER, 'amount', '2.0000')])).rejects.toThrow(/each column once/)
     await expect(insert([{ ...columnOf(KINDS, 'ts'), value: '2026-10-08T12:34:56Z' }])).rejects.toThrow(/no canonical API value/)
     await expect(insert([{ name: 'amount', type: { kind: 'decimal', precision: null, scale: null }, value: '1' }])).rejects.toThrow(/precision and a scale/)
+    // A decimal's precision and scale are spliced where SQL Server takes no
+    // parameter, so one its syntax would not accept, or one that is not a
+    // number at all, is refused rather than sent.
+    for (const [precision, scale] of [
+      [39, 4],
+      [0, 0],
+      [18, -1],
+      [4, 5],
+      [18.5, 4],
+      ['18', 4],
+    ] as const) {
+      await expect(insert([{ name: 'amount', type: { kind: 'decimal', precision: precision as number, scale }, value: '1' }])).rejects.toThrow(/precision is 1 to 38/)
+    }
     await expect(insert([{ name: 'id', type: { kind: 'integer', min: '0', max: '99999999999999999999' }, value: '1' }])).rejects.toThrow(/No SQL Server integer type/)
     await expect(records.update(orderUpdate([], '0000000000000001'))).rejects.toThrow(/at least one column/)
     await expect(records.update(orderUpdate([{ name: 'row_version', type: { kind: 'text', maxLength: 16, fixedLength: true }, value: 'x' }], '0000000000000001'))).rejects.toThrow(
@@ -466,40 +561,16 @@ describe('updating a record', () => {
   // would overwrite the first.
   test('of two concurrent updates with the same version, one wins, one is stale, and the winner’s change remains', async () => {
     const before = ok(await readOrder(createSqlServerRecords(owner)))
-    const [first, second, holder] = await Promise.all([1, 2, 3].map(() => new mssql.ConnectionPool({ ...fixture.admin, pool: { max: 1 } }).connect()))
-    if (first === undefined || second === undefined || holder === undefined) throw new Error('three pools were asked for')
-    try {
-      // Each pool holds one connection, so its session is the one the update will use.
-      const [one, two] = await Promise.all([first, second].map(async (pool) => (await pool.request().query<{ id: number }>('select @@spid as id')).recordset[0]?.id))
-      const transaction = new mssql.Transaction(holder)
-      await transaction.begin()
-      await new mssql.Request(transaction).input('id', mssql.BigInt, FIXTURE_ORDER).query('select id from sales.[order] with (updlock, holdlock) where id = @id')
-      const racing = ['from the first', 'from the second'].map((note, index) =>
-        createSqlServerRecords(index === 0 ? first : second).update(orderUpdate([valueOf(ORDER, 'notes', note)], before.version ?? '')),
-      )
-      for (let attempt = 0; ; attempt += 1) {
-        // Blocked by the holder, or the second queued behind the first: either way, inside the server and waiting.
-        const waiting = await owner
-          .request()
-          .input('one', mssql.Int, one)
-          .input('two', mssql.Int, two)
-          .query<{ n: number }>('select count(*) as n from sys.dm_exec_requests where session_id in (@one, @two) and blocking_session_id <> 0')
-        if (waiting.recordset[0]?.n === 2) break
-        if (attempt === 200) throw new Error('the two updates never both waited on the held row')
-        await new Promise((resolve) => setTimeout(resolve, 25))
-      }
-      await transaction.commit()
-
-      const outcomes = await Promise.all(racing)
-      const winners = outcomes.filter((outcome) => outcome.ok)
-      expect(winners).toHaveLength(1)
-      expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([expect.objectContaining({ ok: false, code: 'stale' })])
-      const after = ok(await readOrder(createSqlServerRecords(owner)))
-      expect(after.values.notes).toBe(winners[0]?.ok === true ? winners[0].values.notes : undefined)
-      expect(after.version).toBe(winners[0]?.version)
-    } finally {
-      await Promise.all([first.close(), second.close(), holder.close()])
-    }
+    const outcomes = await race(
+      (request) => request.input('id', mssql.BigInt, FIXTURE_ORDER).query('select id from sales.[order] with (updlock, holdlock) where id = @id'),
+      (records, index) => records.update(orderUpdate([valueOf(ORDER, 'notes', `from writer ${String(index)}`)], before.version ?? '')),
+    )
+    const winners = outcomes.filter((outcome) => outcome.ok)
+    expect(winners).toHaveLength(1)
+    expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([expect.objectContaining({ ok: false, code: 'stale' })])
+    const after = ok(await readOrder(createSqlServerRecords(owner)))
+    expect(after.values.notes).toBe(winners[0]?.ok === true ? winners[0].values.notes : undefined)
+    expect(after.version).toBe(winners[0]?.version)
   })
 
   // A version that is no longer the record's — or never was one — is stale
@@ -526,10 +597,10 @@ describe('updating a record', () => {
   })
 
   // PostgreSQL's fixture has no rowversion, and many SQL Server tables have
-  // none either: an integer every writer through this module increments in
-  // the same statement it compares, so the token a read returned is stale the
-  // moment anyone saves.
-  test('a version column is compared and incremented in the same statement', async () => {
+  // none either: an integer every writer through this module increments, so
+  // the token a read returned is stale the moment anyone saves. One save
+  // after another, here; the race is the next test.
+  test('a version column is compared, incremented, and stale once anyone saved', async () => {
     const records = createSqlServerRecords(owner)
     const versioned = target(VERSIONED, 'version')
     const concurrency = versioned.concurrency
@@ -554,6 +625,38 @@ describe('updating a record', () => {
     }
     expect(await update('elsewhere', '1', tenant('2'))).toMatchObject({ ok: false, code: 'not-found' })
     expect(await update('two', '1')).toEqual({ ok: true, values: { note: 'two' }, version: '2' })
+  })
+
+  // The lost update again, for a version column, as a race: both writers wait
+  // inside SQL Server behind a third connection's lock, each having named
+  // version 0. The comparison is in the WHERE and the increment in the SET of
+  // one statement, so the second re-reads the row once the first commits,
+  // finds 1, and changes nothing. Compared in one statement and incremented
+  // in another, both would have matched 0, and both would "win".
+  test('of two concurrent updates of a version column with the same version, one wins and one is stale', async () => {
+    const records = createSqlServerRecords(owner)
+    const versioned = target(VERSIONED, 'version')
+    const concurrency = { kind: 'version-column', column: 'version' } as const
+    const key = [valueOf(VERSIONED, 'id', '2')]
+    const read = async () => ok(await records.read({ target: versioned, key, columns: [columnOf(VERSIONED, 'note')], filters: tenant('1') }))
+    expect((await read()).version).toBe('0')
+    const outcomes = await race(
+      (request) => request.query('select id from ops.versioned with (updlock, holdlock) where id = 2'),
+      (writer, index) =>
+        writer.update({
+          target: { ...versioned, concurrency },
+          key,
+          set: [valueOf(VERSIONED, 'note', `from writer ${String(index)}`)],
+          expectedVersion: '0',
+          filters: tenant('1'),
+          returning: [columnOf(VERSIONED, 'note')],
+        }),
+    )
+    const winners = outcomes.filter((outcome) => outcome.ok)
+    expect(winners).toHaveLength(1)
+    expect(winners[0]?.version).toBe('1')
+    expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([expect.objectContaining({ ok: false, code: 'stale' })])
+    expect(await read()).toEqual(winners[0])
   })
 
   // An AFTER trigger that touches the row it fired for — an audit column, as

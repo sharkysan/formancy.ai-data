@@ -106,13 +106,18 @@ function onlyRow(rows: readonly Row[]): Row | undefined {
  *
  * Values arrive canonical and are bound as text the server converts; they
  * leave as text the server produced (`../sql/values.ts`). Each write is one
- * batch: the statement, a check that every text value was stored as sent, the
- * version read back from the row once its triggers ran, and a commit, all
- * rolled back on any error — so a single-byte varchar cannot quietly keep
- * `LA` for `ŁA`, and a refusal is never reported over a write that
- * committed. A database error is a `RecordFailure`, never thrown; a malformed
- * request — a key that is not the identity, a column named twice, a value no
- * codec returns — is a programming error and is.
+ * batch: the statement, a check that its transaction is still the one it
+ * began and that no INSTEAD OF trigger decided what it stored, a check that
+ * every text value was stored as sent, the version read back from the row
+ * once its triggers ran, and a commit, all rolled back on any error — so a
+ * single-byte varchar cannot quietly keep `LA` for `ŁA`, neither an INSTEAD
+ * OF trigger nor one that swaps the transaction can make a write that was not
+ * stored look done, and a refusal is not reported over a write the batch
+ * committed. A trigger that ends the transaction itself is `unknown-outcome`,
+ * because whether it committed cannot be told. A database error is a
+ * `RecordFailure`, never thrown; a malformed request — a key that is not the
+ * identity, a column named twice, a value no codec returns — is a programming
+ * error and is.
  */
 export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
   return {
