@@ -73,6 +73,13 @@ beforeAll(async () => {
     create table lk.day (day date primary key, name text not null);
     create table lk.day_use (id integer primary key, day date constraint fk_day_use_day references lk.day (day));
     insert into lk.day values ('2026-10-08', 'The order date'), ('0001-01-01', 'The first day');
+
+    -- A tenant's contacts, on a table with a domain that refuses NULL.
+    create domain lk.email as text not null;
+    create table lk.contact (tenant_id integer not null, contact_no integer not null, name text not null, email lk.email, primary key (tenant_id, contact_no));
+    create table lk.contact_use (id integer primary key, tenant_id integer, contact_no integer,
+      constraint fk_contact_use_contact foreign key (tenant_id, contact_no) references lk.contact (tenant_id, contact_no));
+    insert into lk.contact values (1, 1, 'Ours', 'ours@example.com'), (2, 1, 'Theirs', 'theirs@example.com');
   `)
   ;[sales, lk] = await Promise.all([discoverPostgres(owner, { schemas: ['sales'] }), discoverPostgres(owner, { schemas: ['lk'] })])
 })
@@ -131,6 +138,20 @@ describe('a composite-key lookup over sales.customer, filtered by tenant', () =>
     expect(await lookups.rejects(customers(), [ours, theirs], TENANT_1)).toEqual([theirs])
     expect(await lookups.rejects(customers(), [ours, theirs], TENANT_2)).toEqual([ours])
     expect(await lookups.resolve(customers(), [theirs, ours], TENANT_1)).toEqual([{ token: ours, label: 'Muster AG' }])
+  })
+
+  // A filter term parsed by building a row of the table's type from NULL
+  // runs every other column through its input function as NULL, so a
+  // domain can check it. A NOT NULL domain on a column the lookup never
+  // reads made every filtered search, resolve and membership check throw.
+  test('filters a table with a domain that refuses NULL like any other', async () => {
+    const config = lookupOver(lk, { schema: 'lk', name: 'contact_use' }, 'fk_contact_use_contact', ['name'])
+    const lookups = createPostgresLookups(owner)
+    const ours = tokenOf('1', '1')
+    const theirs = tokenOf('2', '1')
+    expect(await lookups.search(config, FIRST_PAGE, TENANT_1)).toEqual({ rows: [{ token: ours, label: 'Ours' }], hasMore: false, omitted: 0 })
+    expect(await lookups.resolve(config, [ours, theirs], TENANT_1)).toEqual([{ token: ours, label: 'Ours' }])
+    expect(await lookups.rejects(config, [ours, theirs], TENANT_1)).toEqual([theirs])
   })
 
   // `unrestricted` has to be written, and when it is, it means every row.
@@ -376,6 +397,67 @@ describe('what the composition root configured', () => {
       expect(await odd.rejects(days, tokens, EVERY_ROW)).toEqual([tokenOf('2026-10-09')])
     } finally {
       await configured.end()
+    }
+  })
+})
+
+describe('objects planted on the search path', () => {
+  /**
+   * What a role may define with CREATE on `public` and no right on any table
+   * — every login role on PostgreSQL 14 and earlier. An unqualified function
+   * or operator is resolved through the search path, and an exact match in
+   * `public` wins over pg_catalog's candidate when that one needs an
+   * implicit cast or is polymorphic. Exact matches, type names and collation
+   * names win only when the search path names pg_catalog after public, which
+   * is the composition root's to set.
+   */
+  const PLANTED = `
+    create function public.jsonb_populate_record(base sales.customer, fields pg_catalog.jsonb) returns sales.customer language sql
+      as $$ select pg_catalog.jsonb_populate_record(base, '{"tenant_id": "2"}') $$;
+    create function public.to_jsonb(pg_catalog.text) returns pg_catalog.jsonb language sql as $$ select '"PLANTED"'::pg_catalog.jsonb $$;
+    create function public.planted_true(pg_catalog.text, pg_catalog.text) returns boolean language sql immutable as 'select true';
+    create operator public.~~* (leftarg = pg_catalog.text, rightarg = pg_catalog.text, function = public.planted_true);
+    create function public.planted_equal(integer, integer) returns boolean language sql immutable as 'select true';
+    create operator public.= (leftarg = integer, rightarg = integer, function = public.planted_equal);
+    create collation public."default" (provider = icu, locale = 'und-u-ks-level2', deterministic = false);
+    create domain public.text as pg_catalog.text check (false);`
+
+  // A shadowed jsonb_populate_record offered another tenant's customers
+  // through the tenant filter, and a shadowed to_jsonb wrote every label.
+  // With pg_catalog last, the planted `=`, ILIKE, collation and text type
+  // were the ones the SQL named. Each name is qualified now, so neither path
+  // changes an answer.
+  test('change no answer, whether pg_catalog is searched first or last', async () => {
+    const ours = tokenOf('1', '1001')
+    const theirs = tokenOf('2', '1001')
+    const muster: LookupQuery = { search: 'muster', offset: 0, limit: 50 }
+    const ask = async (driver: Sql) => {
+      const lookups = createPostgresLookups(driver)
+      return {
+        page: await lookups.search(customersByKey(), FIRST_PAGE, TENANT_1),
+        found: await lookups.search(customersByKey(), muster, TENANT_1),
+        resolved: await lookups.resolve(customers(), [ours, theirs], TENANT_1),
+        rejected: await lookups.rejects(customers(), [ours, theirs], TENANT_1),
+      }
+    }
+    const expected = await ask(owner)
+    expect(expected.found.rows).toEqual([{ token: ours, label: 'Muster AG' }])
+    expect(expected.rejected).toEqual([theirs])
+
+    await owner.begin(async (tx) => {
+      await tx.unsafe('create role planter; grant create on schema public to planter; grant usage on schema sales to planter')
+      await tx.unsafe(`set local role planter; ${PLANTED}`)
+    })
+    // Fresh drivers: a statement prepared before the planting keeps the
+    // names it resolved then, and would pass for the wrong reason.
+    const catalogFirst = postgres(fixture.admin, { onnotice: () => {} })
+    const catalogLast = postgres(fixture.admin, { onnotice: () => {}, connection: { search_path: 'public, pg_catalog' } })
+    try {
+      expect(await ask(catalogFirst)).toEqual(expected)
+      expect(await ask(catalogLast)).toEqual(expected)
+    } finally {
+      await Promise.all([catalogFirst.end(), catalogLast.end()])
+      await owner.unsafe('drop owned by planter; drop role planter')
     }
   })
 })

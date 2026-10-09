@@ -1,14 +1,16 @@
 import type { LookupConfig, LookupKeyColumn, LookupQuery, LookupSort, RowFilterTerm } from '@formancy/data-core'
+import { op } from '../sql/catalog.js'
 import { filterSql } from '../sql/filters.js'
 import { quoteIdentifier, quoteTable } from '../sql/identifiers.js'
 import { Statement } from '../sql/statement.js'
+import type { Param } from '../sql/statement.js'
 import { sqlTypeOf } from '../sql/types.js'
 import { canonicalText, displayText } from '../sql/values.js'
 
 /** A statement ready to run: its text, and the parameters its placeholders name. */
 export interface LookupStatement {
   text: string
-  params: readonly (string | null)[]
+  params: readonly Param[]
 }
 
 /** The alias of the target table in every lookup query. */
@@ -76,14 +78,17 @@ function orderBy(sort: readonly LookupSort[]): string {
  * the default collation is always deterministic. ILIKE folds case as that
  * collation's ctype does; nothing folds accents, where formancy's own
  * narrowing does (README).
+ *
+ * Spelled as what `ilike … escape` stands for, `~~*` against `like_escape`,
+ * because the keyword names its operator without a schema (`sql/catalog.ts`).
  */
 function contains(name: string, pattern: string): string {
-  return `(${column(name)}::text collate "default") ilike ${pattern} escape '${ESCAPE}'`
+  return `(${column(name)}::pg_catalog.text collate pg_catalog."default") ${op('~~*')} pg_catalog.like_escape(${pattern}, '${ESCAPE}')`
 }
 
-/** A lookup query. `where` is never empty: a search excludes NULL keys, and a key query has its IN. */
-function assemble(config: LookupConfig, select: string, from: readonly string[], where: readonly string[], tail = ''): string {
-  return [`select ${select}`, `from ${[`${quoteTable(config.target)} as ${ROW}`, ...from].join(', ')}`, `where ${where.join(' and ')}`, tail]
+/** A lookup query. `where` is never empty: a search excludes NULL keys, and a key query has its keys. */
+function assemble(config: LookupConfig, select: string, where: readonly string[], tail = ''): string {
+  return [`select ${select}`, `from ${quoteTable(config.target)} as ${ROW}`, `where ${where.join(' and ')}`, tail]
     .filter((part) => part !== '')
     .join('\n')
 }
@@ -95,16 +100,15 @@ function assemble(config: LookupConfig, select: string, from: readonly string[],
  */
 export function searchStatement(config: LookupConfig, query: LookupQuery, terms: readonly RowFilterTerm[]): LookupStatement {
   const statement = new Statement()
-  const filters = filterSql(statement, config.target, ROW, terms)
   // No foreign key value can reference a key that holds a NULL.
-  const where = [...filters.where, ...config.targetColumns.map((key) => `${column(key.name)} is not null`)]
+  const where = [...filterSql(statement, ROW, terms), ...config.targetColumns.map((key) => `${column(key.name)} is not null`)]
   if (query.search !== '') {
     const pattern = statement.text(containsPattern(query.search))
     where.push(`(${config.search.map((name) => contains(name, pattern)).join(' or ')})`)
   }
-  const limit = statement.as(String(query.limit + 1), 'bigint')
-  const offset = statement.as(String(query.offset), 'bigint')
-  const text = assemble(config, selectList(config, true), filters.from, where, `order by ${orderBy(config.sort)}\nlimit ${limit} offset ${offset}`)
+  const limit = statement.as(String(query.limit + 1), 'pg_catalog.int8')
+  const offset = statement.as(String(query.offset), 'pg_catalog.int8')
+  const text = assemble(config, selectList(config, true), where, `order by ${orderBy(config.sort)}\nlimit ${limit} offset ${offset}`)
   return { text, params: statement.params }
 }
 
@@ -120,16 +124,23 @@ function keyTuple(statement: Statement, columns: readonly LookupKeyColumn[], key
 
 /**
  * The rows inside the filters whose key is one of `keys`, which `lookupKeys`
- * has already checked and which therefore has at least one entry: `IN ()` is
- * a syntax error. With the display columns for `resolve`, without for
- * `rejects`. A one-column key is a parenthesised one-column row, which
- * PostgreSQL reads as the value itself, so one spelling serves every key.
+ * has already checked and which therefore has at least one entry: an empty
+ * VALUES is a syntax error. With the display columns for `resolve`, without
+ * for `rejects`.
+ *
+ * `= any (values …)` rather than `in (…)`: IN names its `=` without a
+ * schema, and this one is pg_catalog's (`sql/catalog.ts`). A row compared
+ * with a named `=` is compared column by column with it, and the planner
+ * makes the whole a semi-join that probes the key's index once per distinct
+ * key (EXPLAIN on PostgreSQL 17). A one-column key is a parenthesised
+ * one-column row, which PostgreSQL reads as the value itself, so one
+ * spelling serves every key.
  */
 export function keysStatement(config: LookupConfig, keys: readonly (readonly string[])[], terms: readonly RowFilterTerm[], withDisplay: boolean): LookupStatement {
   const statement = new Statement()
-  const filters = filterSql(statement, config.target, ROW, terms)
+  const filters = filterSql(statement, ROW, terms)
   const target = `(${config.targetColumns.map((key) => column(key.name)).join(', ')})`
   const tuples = keys.map((key) => keyTuple(statement, config.targetColumns, key))
-  const text = assemble(config, selectList(config, withDisplay), filters.from, [...filters.where, `${target} in (${tuples.join(', ')})`])
+  const text = assemble(config, selectList(config, withDisplay), [...filters, `${target} ${op('=')} any (values ${tuples.join(', ')})`])
   return { text, params: statement.params }
 }

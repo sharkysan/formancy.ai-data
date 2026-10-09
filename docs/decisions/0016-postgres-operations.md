@@ -19,12 +19,17 @@
   reader*, *throws when the database refuses the account*, *asks the database
   nothing when no token can name a row*, *refuses an order it cannot spell*,
   *a filter on a boolean column selects the rows it names*, *names, values,
-  parsers, DateStyle and TimeZone do not change an answer*. Records: *reads
+  parsers, DateStyle and TimeZone do not change an answer*, *filters a table
+  with a domain that refuses NULL like any other*, and *objects planted on
+  the search path change no answer*. Records: *reads
   every edge value of the fixture back exactly*, *reads every kind as the
   value its codec would return*, *reads a value the canonical shapes cannot
   carry faithfully*, *reads the same values however the driver and the
   session are configured*, *reads a real as the shortest decimal PostgreSQL
-  itself prints for it*, *a record outside the filters is not-found*, *quotes
+  itself prints for it*, *a record outside the filters is not-found*, *a
+  filter on a table with a domain that refuses NULL reads, updates and
+  answers like any other*, *objects planted on the search path change no
+  answer*, *quotes
   a table name holding a dot and a column name holding quotes*, *refuses a
   name PostgreSQL would truncate into another table*, *an insert into
   sales.order returns its identity, its default status and its first
@@ -46,7 +51,18 @@
   first passed under their revert without testing anything — the
   configured-driver read compared two `not-found` answers when run alone, and
   the search-columns case displayed exactly what it searched — and were
-  rewritten until the revert failed them.
+  rewritten until the revert failed them. A review then found what no case
+  covered: unqualified names a role could shadow from the search
+  path, filters that failed on a table with a domain refusing NULL, and a
+  write the database declined without an error read as a success. The cases
+  written for them failed on the code before the fix. On the fixed code
+  each of these was then reverted alone and failed a case: the qualified `=`
+  of the version guard, of a key, of a filter and of a key list; `%`, `~~*`,
+  `to_char`, `to_jsonb`, the `text` and `date` type names and the default
+  collation; a filter parameter declared `unknown`; an insert's row count;
+  and the version read after an update changed nothing. The other names
+  are qualified the same way, and no planted object stands in for each of
+  them.
 
 ## Context
 
@@ -91,6 +107,29 @@ postgres.js's *parsers* and of nothing else the composition root controls:
   a table lock wrote nothing, because the lock was taken while the server was
   still parsing — before postgres.js had sent the values. The client cannot
   tell the two apart.
+- **The search path** is a setting too, and anybody may write into it who can
+  CREATE in a schema on it — every login role on PostgreSQL 14 and earlier,
+  through `public`. pg_catalog is searched first unless the path names it
+  later, but an unqualified function or operator in `public` that matches its
+  arguments exactly still wins over pg_catalog's candidate when that one
+  needs an implicit cast or is polymorphic. pg_catalog has no
+  `=(bigint, numeric)`: a role with no right on any table planted one in
+  `public`, and the version guard accepted a stale write. It has only a
+  polymorphic `jsonb_populate_record`: a planted one returned another
+  tenant's order through the tenant filter. A planted `to_char(date, text)`
+  rewrote every date. With pg_catalog named last, exact matches, type names
+  and collations are taken from `public` too.
+- **A domain that refuses NULL.** `jsonb_populate_record` from a NULL base
+  row runs every column its JSON leaves out through that column's input
+  function as NULL, so that a domain can check it. On a table with a NOT NULL
+  domain, or a CHECK that refuses NULL, every filtered statement failed with
+  23502 or 23514 — a record read answered `not-null-violation`, a lookup
+  threw — over a column the statement never named.
+- **A write declined without an error.** A BEFORE trigger that returns NULL,
+  or a rule that does nothing instead, makes the server complete an insert as
+  `INSERT 0 0` and an update as `UPDATE 0`. Read as success, the insert was
+  reported saved, its identity null; read as "nothing matched", the update
+  was `stale` on every attempt while the version never moved.
 
 ## Decision
 
@@ -110,13 +149,27 @@ faithful spelling the codec refuses (`2026-10-08T10:34:56.789012Z`,
 `0044-03-15 BC`), never rounded into the shape and never NULL, so it is shown
 and cannot be written back as something else.
 
-**Bind as text the server converts.** Every placeholder is `$n::text`, so the
-driver only ever serialises text; a typed value becomes `$n::text::bigint`,
-`::numeric`, `::bpchar`, `::date` and so on, named exactly from its normalised
-type so the comparison can use the column's index. Row filters carry no type,
-so each term's text is parsed by the column's own input function through
-`jsonb_populate_record(null::<table>, …)` over the table's row type, one record
-per term, and compared column to column.
+**Bind as text the server converts.** Every placeholder but a filter term's
+is `$n::pg_catalog.text`, so the driver only ever serialises text; a typed value
+becomes `$n::pg_catalog.text::pg_catalog.int8`, `::pg_catalog.numeric`,
+`::pg_catalog.bpchar`, `::pg_catalog.date` and so on, named exactly from its
+normalised type so the comparison can use the column's index. Row filters
+carry no type, so a term's parameter is declared of type `unknown` (oid 705)
+and compared with its column: the server gives it the column's type and
+parses the text with that type's input function, and the driver, which fills
+in the type the server reports only for a parameter declared `0` and has no
+serializer for `unknown`, sends the text as written. One equality per term.
+
+**Name everything in pg_catalog.** Every function the SQL calls, every
+operator — as `operator(pg_catalog.=)` — every type and the default collation
+are qualified, so neither the search path nor anything planted on it decides
+which one runs. What the grammar spells for itself is already qualified and
+is written as it is: `extract`, `at time zone`, `is not null`, and the sort
+operators `order by` takes from the type's default operator class. Where the
+keyword would name an operator without a schema, the SQL spells what it
+stands for: `ilike … escape` as `operator(pg_catalog.~~*)` against
+`pg_catalog.like_escape`, `between` as two comparisons, `in` as
+`operator(pg_catalog.=) any (values …)`, and `||` as `pg_catalog.concat`.
 
 **Quote identifiers one part at a time**, doubling quotes, and refuse one over
 63 bytes, or empty, or holding NUL, as a programming error.
@@ -135,8 +188,16 @@ thrown.
 **Records.** An update is one statement: key, filters and expected version in
 one WHERE, the version column incremented in the same SET. Zero rows, or
 SQLSTATE 40001, is followed by one read inside the same filters that tells
-`stale` from `not-found`. An expected version that is not a decimal number is
-answered the same way without being bound. Errors map by SQLSTATE, then by
+`stale` from `not-found`. After zero rows that read also asks whether the
+version is still the one sent; if it is, nobody else changed the record —
+versions only move forward — and the database declined the write itself: a
+trigger, a rule or a row security policy. That is `check-violation`, the
+code a trigger's `RAISE` has, not `stale`. After 40001 it is `stale` whatever
+the version reads, because under SERIALIZABLE a conflict over other rows is
+40001 too. An insert whose command tag counts no row — `INSERT 0 0`, a
+trigger or a rule — is `check-violation` the same way. An expected version
+that is not a decimal number is answered as stale or not-found without
+being bound. Errors map by SQLSTATE, then by
 class: 22 is `out-of-range`, 23 and P0 (a trigger's `RAISE`) `check-violation`,
 54000 `too-long`, 23P01 `unique-violation`, 42P01/42703/428C9/42883/42804
 `schema-changed`; anything else the server sends is `unavailable`, because it
@@ -155,18 +216,37 @@ literal has a `constructor`.
 
 **What it buys.** No setting the composition root can choose — parsers,
 transforms, DateStyle, TimeZone, `extra_float_digits`,
-`default_transaction_isolation` — changes a value, a filter or an answer; the
-tests run drivers with each of them changed beside a default one.
-A boolean filter means what the policy said. The fixture's edge values round
-trip exactly, as the restricted reader too. A tenant cannot see, resolve or
-write another tenant's record, and gets the same `not-found` for it as for a
-record that does not exist. A lost connection after a write is reported as
-what it is.
+`default_transaction_isolation`, `search_path` — changes a value, a filter or
+an answer; the tests run drivers with each of them changed beside a default
+one. Nor does a function, operator, type or collation a role plants on the
+search path, with pg_catalog searched first or last: the tests plant them in
+`public` as a role with no right on any table. A boolean filter means what
+the policy said, and a filter works on a table whatever domains its other
+columns have. The fixture's edge values round trip exactly, as the
+restricted reader too. A tenant cannot see, resolve or write another
+tenant's record, and gets the same `not-found` for it as for a record that
+does not exist. A write the database declined is not reported as saved, nor
+as stale. A lost connection after a write is reported as what it is.
 
 **What it costs.** The SQL is longer and less familiar than the obvious
-version: a `CASE` per date or timestamp column, a `jsonb_populate_record` per
-filter term, `$n::text::bigint` everywhere, hex for floats. Somebody reading a
-statement in `pg_stat_statements` has to know why. A value outside formancy's
+version: a `CASE` per date or timestamp column, `operator(pg_catalog.=)` and
+`$n::pg_catalog.text::pg_catalog.int8` everywhere, `= any (values …)` for
+`in`, hex for floats. Somebody reading a statement in `pg_stat_statements`
+has to know why. A filter parameter declared `unknown` relies on two things
+postgres.js 3.4 does: it keeps a parameter type it was given instead of the
+one the server reports, and it has no serializer for oid 705; a driver that
+changed either would bring back the inverted boolean filter, which the
+boolean-filter cases would catch. A filter on a column whose type's `=` is
+not pg_catalog's — `citext`, from an extension — is compared with
+pg_catalog's operators only: through citext's implicit cast to text, so
+case-sensitively, and fewer rows match than citext's own `=` would admit; a
+type with no such cast, such as `hstore`, is refused with 42883, which a
+record operation reads as `schema-changed` and a lookup throws. Neither
+admits a row; both were tried by hand on PostgreSQL 17, not in the suites.
+A declined update is `check-violation`, the code a trigger's `RAISE` has; a
+row security policy that lets the actor read a row and not update it is
+reported the same way, where `permission-denied` would say more, and no
+suite has such a policy. A value outside formancy's
 shapes reaches the form as text its field refuses — every row whose
 `created_at` came from `now()` — so a host that sends every field back on save
 cannot save that record until the person changes the value; that is friction
@@ -205,11 +285,14 @@ filter-column check, the value-shape check, the several-rows check, the
 order table as a `Map` (as an object literal it spliced `function Object()`
 into the ORDER BY), the raw-value check, unknown-outcome for writes and
 unavailable for reads, class 42 thrown, and the trigger, data-exception,
-exclusion, index-size and changed-type mappings.
+exclusion, index-size and changed-type mappings; then, after review, the
+pg_catalog names, the `unknown` filter parameter, the insert's row count
+and the declined update, as *Verified by* lists them.
 
 **What it forecloses.** The driver's `sql(identifier)` helper, untyped
-parameters, reading a value by column name, and session settings changed by
-the adapter on a pooled connection it does not own.
+parameters, an unqualified function, operator, type or collation, reading a
+value by column name, and session settings changed by the adapter on a
+pooled connection it does not own.
 
 ## Alternatives considered
 
@@ -222,11 +305,36 @@ on a pooled connection changes it for whoever uses it next. `SET LOCAL` would
 need a transaction around every statement.
 
 **Untyped parameters, letting the server infer.** The idiomatic postgres.js
-spelling, and the one that inverted a boolean filter.
+spelling, and the one that inverted a boolean filter. Declared `unknown`, a
+parameter lets the server infer without the driver serialising for what it
+inferred; that is kept for filter terms, the one value whose type the SQL
+cannot name.
 
 **Filters as `column::text = $n::text`.** Immune to the driver and simple, and
 it defeats the index on the tenant column: a lookup listing one tenant's
 customers would scan every tenant's.
+
+**Filters through `jsonb_populate_record` over the table's row type**, as
+first built. It parses with the column's input function and needs nothing of
+the driver, and from a NULL base row it runs every other column through its
+input function as NULL, so a NOT NULL domain anywhere in the table fails
+every filtered statement. With the current row as the base it would not,
+and the comparison would then depend on the row, so the tenant column's
+index is no use; with another row of the table as the base it needs SELECT
+on every column, and a row to exist.
+
+**Look each filter column's type up in the catalog, and cast to it.** A
+round trip before every filtered statement, or a cache that a schema change
+makes wrong.
+
+**`SET search_path` for the adapter's statements.** Rejected as for the
+other settings: on a pooled connection it changes the path for whoever uses
+it next, and `SET LOCAL` would need a transaction around every statement.
+
+**Qualify only what a planted object wins against with pg_catalog searched
+first**: the cross-type and polymorphic calls. Shorter, and wrong once the
+composition root names pg_catalog later in the path, when every exact match,
+type and collation is taken from the schema before it.
 
 **Truncate a fractional instant to the shape, or refuse the read.** Truncating
 writes the truncated value over the real one on the next save. Refusing makes

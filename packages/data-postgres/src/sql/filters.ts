@@ -1,38 +1,30 @@
-import type { ObjectRef, RowFilterTerm } from '@formancy/data-core'
-import { quoteIdentifier, quoteTable } from './identifiers.js'
+import type { RowFilterTerm } from '@formancy/data-core'
+import { op } from './catalog.js'
+import { quoteIdentifier } from './identifiers.js'
 import type { Statement } from './statement.js'
 
-/** What the trusted filters add to a statement: relations to join, and conditions on them. */
-export interface FilterSql {
-  from: string[]
-  where: string[]
-}
-
 /**
- * The actor's row filters (0011) as SQL: one equality per term, between the
- * column and the term's text read as that column's own type.
+ * The actor's row filters (0011) as SQL conditions on `row`: one equality per
+ * term, between the column and the term's text read as that column's type.
  *
- * A term carries a column and text, not a type, and an untyped parameter
- * goes through the driver's serializer for whatever type the server infers:
- * its boolean serializer turns 'true' into 'f', and a tenant filter on a
- * boolean column would select the other rows. So the text travels as text,
- * and `jsonb_populate_record` over the table's own row type parses it with
- * the column's input function. Nothing is spelled here, nothing is trusted
- * to the driver, and the comparison is between two values of one type,
- * which the column's index serves.
+ * A term carries a column and text, not a type, so no cast can be written
+ * for it. Its parameter is declared `unknown` (`Statement.inferred`): the
+ * server types it from the column it is compared with and parses the text
+ * with that type's input function, so 'true' is true for a boolean column,
+ * and the comparison is between two values of one type, which the column's
+ * index serves. Left untyped instead, the driver would serialise the text
+ * for the type the server reported, and its boolean serializer turns 'true'
+ * into 'f': a tenant filter on a boolean column selected the other rows.
  *
- * One record per term, so two terms on one column are both applied and
+ * Not `jsonb_populate_record(null::<table>, …)`, which parsed the text with
+ * the same input function and was used here first: from a NULL base row it
+ * runs every column the JSON leaves out through its input function as NULL,
+ * so that a domain can check it, and a NOT NULL domain anywhere in the table
+ * failed every filtered statement on it.
+ *
+ * One equality per term, so two terms on one column are both applied and
  * contradict each other, as they should, rather than one replacing the other.
  */
-export function filterSql(statement: Statement, table: ObjectRef, row: string, terms: readonly RowFilterTerm[]): FilterSql {
-  const from: string[] = []
-  const where: string[] = []
-  terms.forEach((term, index) => {
-    const alias = `"f${String(index)}"`
-    const column = quoteIdentifier(term.column)
-    const record = statement.text(JSON.stringify({ [term.column]: term.value }))
-    from.push(`jsonb_populate_record(null::${quoteTable(table)}, ${record}::jsonb) as ${alias}`)
-    where.push(`${row}.${column} = ${alias}.${column}`)
-  })
-  return { from, where }
+export function filterSql(statement: Statement, row: string, terms: readonly RowFilterTerm[]): string[] {
+  return terms.map((term) => `${row}.${quoteIdentifier(term.column)} ${op('=')} ${statement.inferred(term.value)}`)
 }

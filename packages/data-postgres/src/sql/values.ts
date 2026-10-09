@@ -1,4 +1,5 @@
 import type { ApiValue, NormalizedType } from '@formancy/data-core'
+import { op } from './catalog.js'
 
 /**
  * Values between canonical API text and PostgreSQL, in both directions,
@@ -9,6 +10,8 @@ import type { ApiValue, NormalizedType } from '@formancy/data-core'
  * `::text` for everything — `date::text` follows DateStyle ('08/10/2026'
  * under 'SQL, DMY'), `timestamptz::text` follows TimeZone, and a float's text
  * follows `extra_float_digits`, and each is the composition root's to set.
+ * Every function, operator and type is named in pg_catalog, because the
+ * search path is the composition root's to set too (`catalog.ts`).
  */
 
 /** The days formancy's date shape can name, which both engines store (0008). */
@@ -26,9 +29,9 @@ const LAST_DAY = `'9999-12-31'`
  */
 function dateText(column: string): string {
   return `case
-    when ${column} between date ${FIRST_DAY} and date ${LAST_DAY} then to_char(${column}, 'YYYY-MM-DD')
-    when isfinite(${column}) then to_char(${column}, 'YYYY-MM-DD BC')
-    else ${column}::text end`
+    when ${column} ${op('>=')} ${FIRST_DAY}::pg_catalog.date and ${column} ${op('<=')} ${LAST_DAY}::pg_catalog.date then pg_catalog.to_char(${column}, 'YYYY-MM-DD')
+    when pg_catalog.isfinite(${column}) then pg_catalog.to_char(${column}, 'YYYY-MM-DD BC')
+    else ${column}::pg_catalog.text end`
 }
 
 /**
@@ -43,13 +46,14 @@ function dateText(column: string): string {
 function timestampText(column: string, withTimeZone: boolean): string {
   const at = withTimeZone ? `(${column} at time zone 'UTC')` : column
   const zone = withTimeZone ? 'Z' : ''
+  const fraction = `case
+        when (extract(microseconds from ${at}) ${op('%')} 1000000) ${op('=')} 0 then ''
+        else pg_catalog.concat('.', pg_catalog.rtrim(pg_catalog.to_char(${at}, 'US'), '0')) end`
   return `case
-    when ${at} between timestamp ${FIRST_DAY} and timestamp '9999-12-31 23:59:59.999999' then
-      to_char(${at}, 'YYYY-MM-DD"T"HH24:MI:SS')
-      || case when extract(microseconds from ${at}) % 1000000 = 0 then '' else '.' || rtrim(to_char(${at}, 'US'), '0') end
-      || '${zone}'
-    when isfinite(${at}) then to_char(${at}, 'YYYY-MM-DD"T"HH24:MI:SS.US"${zone}" BC')
-    else ${at}::text end`
+    when ${at} ${op('>=')} ${FIRST_DAY}::pg_catalog.timestamp and ${at} ${op('<=')} '9999-12-31 23:59:59.999999'::pg_catalog.timestamp then
+      pg_catalog.concat(pg_catalog.to_char(${at}, 'YYYY-MM-DD"T"HH24:MI:SS'), ${fraction}, '${zone}')
+    when pg_catalog.isfinite(${at}) then pg_catalog.to_char(${at}, 'YYYY-MM-DD"T"HH24:MI:SS.US"${zone}" BC')
+    else ${at}::pg_catalog.text end`
 }
 
 /**
@@ -58,7 +62,7 @@ function timestampText(column: string, withTimeZone: boolean): string {
  * spells itself the same way in every DateStyle.
  */
 function timeText(column: string): string {
-  return `case when extract(second from ${column}) = 0 then substr(${column}::text, 1, 5) else ${column}::text end`
+  return `case when extract(second from ${column}) ${op('=')} 0 then pg_catalog.substr(${column}::pg_catalog.text, 1, 5) else ${column}::pg_catalog.text end`
 }
 
 /**
@@ -80,9 +84,9 @@ export function canonicalText(type: NormalizedType, column: string): string {
     case 'decimal':
     case 'uuid':
     case 'boolean':
-      return `${column}::text`
+      return `${column}::pg_catalog.text`
     case 'float':
-      return `encode(${type.bits === 32 ? 'float4send' : 'float8send'}(${column}), 'hex')`
+      return `pg_catalog.encode(pg_catalog.${type.bits === 32 ? 'float4send' : 'float8send'}(${column}), 'hex')`
     case 'date':
       return dateText(column)
     case 'time':
@@ -139,7 +143,7 @@ export function decodeCanonical(type: NormalizedType, text: string | null): ApiV
  * recognising a row, not for writing it back.
  */
 export function displayText(column: string): string {
-  return `to_jsonb(${column}) #>> '{}'`
+  return `pg_catalog.to_jsonb(${column}) ${op('#>>')} '{}'::pg_catalog.text[]`
 }
 
 /**

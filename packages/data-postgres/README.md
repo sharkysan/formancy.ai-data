@@ -57,11 +57,21 @@ in short:
   something else. A host that sends every field back on save cannot save such
   a record until the value is changed.
 - **Values are bound as text and converted by the server.** Every parameter
-  is `$n::text`, then cast to the column's exact type. postgres.js would
-  otherwise serialise an untyped parameter through its serializer for the type
-  the server inferred, and its boolean serializer turns the text `'true'` into
-  false. Row filters, which carry no type, are parsed by each column's own
-  input function through `jsonb_populate_record` over the table's row type.
+  is `$n::pg_catalog.text`, then cast to the column's exact type. postgres.js
+  would otherwise serialise an untyped parameter through its serializer for
+  the type the server inferred, and its boolean serializer turns the text
+  `'true'` into false. A row filter term, which carries no type, is a
+  parameter declared `unknown`: the server types it from the column it is
+  compared with and parses it with that type's input function, and the
+  driver sends the text as written. A domain that refuses NULL elsewhere in
+  the table does not get in the way.
+- **Every name is PostgreSQL's own.** Each function, operator
+  (`operator(pg_catalog.=)`), type and collation the SQL names is qualified
+  with `pg_catalog`, so nothing a role creates in a schema on the search
+  path — `public`, for every login role up to PostgreSQL 14 — can stand in
+  for it, whether the composition root's `search_path` names pg_catalog
+  first or last. Without it a planted `=(bigint, numeric)` let a stale write
+  through and a planted `jsonb_populate_record` crossed the tenant filter.
 - **Identifiers are quoted one part at a time**, never with the driver's
   `sql(name)`, which splits on dots. A name over 63 bytes is refused: the
   server would truncate it and address another table.
@@ -81,7 +91,10 @@ in short:
   WHERE, the version column incremented in the same SET. Zero rows, or 40001
   under REPEATABLE READ, is followed by one read that tells `stale` from
   `not-found`, inside the same filters, so another tenant's record is
-  `not-found` too.
+  `not-found` too. A record still at the version sent was declined by the
+  database itself — a BEFORE trigger returning NULL, a rule, a row security
+  policy — and is `check-violation`, not `stale`; so is an insert the server
+  completed as `INSERT 0 0`.
 - **Errors are values.** By SQLSTATE: 23505 and 23P01 `unique-violation`,
   23503 `foreign-key-violation`, 23502 `not-null-violation`, 23514 and a
   trigger's `RAISE` `check-violation`, 22001 and 54000 `too-long`, other class
@@ -189,10 +202,12 @@ built output, so run `pnpm build` first.
   the version column.
 - `lookups.integration.test.ts` — the lookup port over the fixture: tenant
   filters, literal search, order, NULL and unrepresentable keys, membership,
-  the restricted reader, and a driver configured every way it can be.
+  the restricted reader, a driver configured every way it can be, and
+  objects planted on the search path.
 - `records.integration.test.ts` — the record port over the fixture: every
   edge value and every kind, faithful reads, concurrency between real
-  connections, every refusal the fixture can provoke, and a connection cut
+  connections, every refusal the fixture can provoke, writes a trigger or a
+  rule declines, objects planted on the search path, and a connection cut
   through a TCP hop after a write was sent.
 
 ## Licence

@@ -65,6 +65,20 @@ beforeAll(async () => {
     create table rec.defaults (id integer generated always as identity primary key, opened date not null default '2026-10-08', state text not null default 'new');
     create table rec.reals (id integer primary key, f4 real not null);
     insert into rec.reals values (1, '10.0152025'), (2, '0.1'), (3, '3.4028235e38'), (4, '1.17549435e-38'), (5, '7e-45');
+    -- Domains that refuse NULL, on a table a tenant filter reads: one NOT
+    -- NULL, one whose CHECK says so.
+    create domain rec.email as text not null;
+    create domain rec.code as text check (value is not null and value <> '');
+    create table rec.contact (id integer primary key, tenant_id integer not null, name text, email rec.email, code rec.code, version bigint not null default 1);
+    insert into rec.contact values (1, 1, 'ours', 'ours@example.com', 'A', 1), (2, 2, 'theirs', 'theirs@example.com', 'B', 1);
+    -- Writes the database declines without an error: a BEFORE trigger that
+    -- returns NULL, and a rule that does nothing instead.
+    create table rec.declined (id integer primary key, note text, version bigint not null default 1);
+    insert into rec.declined values (1, 'kept', 1);
+    create function rec.decline() returns trigger language plpgsql as $$ begin return null; end $$;
+    create trigger declined_decline before insert or update on rec.declined for each row execute function rec.decline();
+    create table rec.ruled (id integer primary key, note text);
+    create rule ruled_nothing as on insert to rec.ruled do instead nothing;
   `)
   snapshot = await discoverPostgres(owner, { schemas: ['sales', 'rec'] })
 })
@@ -74,7 +88,7 @@ afterAll(async () => {
   await fixture?.stop()
 })
 
-function meta(table: string, name: string, schema = ['kinds', 'guarded', 'booking', 'indexed', 'defaults', 'reals'].includes(table) ? 'rec' : 'sales'): ColumnMeta {
+function meta(table: string, name: string, schema = ['kinds', 'guarded', 'booking', 'indexed', 'defaults', 'reals', 'contact', 'declined', 'ruled'].includes(table) ? 'rec' : 'sales'): ColumnMeta {
   const found = findObject(snapshot, { schema, name: table })?.columns.find((column) => column.name === name)
   if (found === undefined) throw new Error(`${schema}.${table} has no column ${name}`)
   return found
@@ -110,6 +124,9 @@ const KINDS = {
   identity: [ID],
   concurrency: { kind: 'version-column', column: 'version' },
 } as const satisfies RecordTarget
+
+const CONTACT = { ...KINDS, table: { schema: 'rec', name: 'contact' } } as const satisfies RecordTarget
+const DECLINED = { ...KINDS, table: { schema: 'rec', name: 'declined' } } as const satisfies RecordTarget
 
 const orderKey = (id: string): RecordValue[] => [{ ...ORDER_ID, value: id }]
 const customerKey = (tenant: string, number: string): RecordValue[] => [
@@ -330,6 +347,11 @@ describe('reading', () => {
     expect(succeeded(await records.read(customer('1', '1001'))).values).toEqual({ name: 'Muster AG' })
     expect(failed(await records.read(customer('2', '1001'))).code).toBe('not-found')
     expect(failed(await records.read(customer('1', '9999'))).code).toBe('not-found')
+    // A read of no columns asks only whether the record is there, and must
+    // draw the same line: its statement selects a constant, not nothing.
+    const there = (tenant: string) => records.read({ ...customer(tenant, '1001'), columns: [] })
+    expect(succeeded(await there('1'))).toEqual({ ok: true, values: {}, version: null })
+    expect(failed(await there('2')).code).toBe('not-found')
   })
 
   // The boolean serializer of postgres.js turns every value that is not the
@@ -342,6 +364,24 @@ describe('reading', () => {
     const read = (id: string) => records.read({ target: KINDS, key: idKey(id), columns: [col('kinds', 't')], filters: on })
     expect(succeeded(await read('6')).values).toEqual({ t: 'switched on' })
     expect(failed(await read('7')).code).toBe('not-found')
+  })
+
+  // A filter term parsed by building a row of the table's type from NULL
+  // runs every column the term does not name through its input function as
+  // NULL, so a domain can check it: a NOT NULL domain, or a CHECK that
+  // refuses NULL, failed every filtered statement on the table — a read
+  // answered not-null-violation, a write constraint — though neither domain
+  // column is read, written or filtered.
+  test('a filter on a table with a domain that refuses NULL reads, updates and answers like any other', async () => {
+    const records = createPostgresRecords(owner)
+    const read = (id: string) => records.read({ target: CONTACT, key: idKey(id), columns: [col('contact', 'name')], filters: TENANT_1 })
+    const update = (id: string, expectedVersion: string) =>
+      records.update({ target: CONTACT, key: idKey(id), set: [val('contact', 'name', 'renamed')], expectedVersion, filters: TENANT_1, returning: [col('contact', 'name')] })
+    expect(succeeded(await read('1')).values).toEqual({ name: 'ours' })
+    expect(failed(await read('2')).code).toBe('not-found')
+    expect(succeeded(await update('1', '1'))).toEqual({ ok: true, values: { name: 'renamed' }, version: '2' })
+    expect(failed(await update('1', '1')).code).toBe('stale')
+    expect(failed(await update('2', '1')).code).toBe('not-found')
   })
 
   // Identifiers are quoted one part at a time. The driver's own helper quotes
@@ -536,6 +576,28 @@ describe('what a refusal is called', () => {
     expect(outcome.message).not.toMatch(/negative/)
   })
 
+  // A BEFORE trigger that returns NULL, or a rule that does nothing instead,
+  // makes the server complete the statement — INSERT 0 0, UPDATE 0 — with no
+  // error. Taken as success, the insert was a save that never happened, its
+  // identity null; taken as "nothing matched", the update was stale on every
+  // attempt while the version never moved.
+  test('a write the database declines without an error is a check-violation, not a success and not stale', async () => {
+    const records = createPostgresRecords(owner)
+    const insert = (target: RecordTarget, returning: RecordColumn[]) => records.insert({ target, values: [val('declined', 'id', '2'), val('declined', 'note', 'never written')], returning })
+    expect(failed(await insert(DECLINED, [col('declined', 'id')]))).toMatchObject({ code: 'check-violation', message: expect.stringMatching(/declined/) })
+    expect(failed(await insert({ ...DECLINED, concurrency: null }, [])).code).toBe('check-violation')
+    expect(failed(await insert({ table: { schema: 'rec', name: 'ruled' }, identity: [ID], concurrency: null }, [])).code).toBe('check-violation')
+
+    const update = (id: string, expectedVersion: string) =>
+      records.update({ target: DECLINED, key: idKey(id), set: [val('declined', 'note', 'never written')], expectedVersion, filters: EVERY_ROW, returning: [] })
+    expect(failed(await update('1', '1'))).toMatchObject({ code: 'check-violation', message: expect.stringMatching(/declined/) })
+    // A version that has moved is still stale, and a record that is not there still not-found.
+    expect(failed(await update('1', '2')).code).toBe('stale')
+    expect(failed(await update('9', '1')).code).toBe('not-found')
+    expect([...(await owner`select id, note, version::text as version from rec.declined`)]).toEqual([{ id: 1, note: 'kept', version: '1' }])
+    expect([...(await owner`select id from rec.ruled`)]).toEqual([])
+  })
+
   // The connection's own grants. The reader may read sales.order and write
   // nothing; it may not read sales.customer at all.
   test("the account's own grants are permission-denied", async () => {
@@ -595,6 +657,76 @@ describe('what a refusal is called', () => {
       expect(failed(await records.insert({ target: ORDER, values: orderValues(), returning: [] })).code).toBe('unavailable')
     } finally {
       await nowhere.end()
+    }
+  })
+})
+
+describe('objects planted on the search path', () => {
+  /**
+   * What a role may define with CREATE on `public` and no right on any table
+   * — every login role on PostgreSQL 14 and earlier. An unqualified function
+   * or operator is resolved through the search path, and an exact match in
+   * `public` wins over pg_catalog's candidate when that one needs an implicit
+   * cast: there is no `=(bigint, numeric)` in pg_catalog, only a polymorphic
+   * `jsonb_populate_record` and a `to_char` of a timestamp. Exact matches and
+   * type names win only when the search path names pg_catalog after public,
+   * which is the composition root's to set.
+   */
+  const PLANTED = `
+    create function public.planted_true(bigint, pg_catalog.numeric) returns boolean language sql immutable as 'select true';
+    create operator public.= (leftarg = bigint, rightarg = pg_catalog.numeric, function = public.planted_true);
+    create function public.jsonb_populate_record(base sales."order", fields pg_catalog.jsonb) returns sales."order" language sql
+      as $$ select pg_catalog.jsonb_populate_record(base, '{"tenant_id": "2"}') $$;
+    create function public.to_char(pg_catalog.date, pg_catalog.text) returns pg_catalog.text language sql as $$ select 'PLANTED' $$;
+    create function public.planted_zero(pg_catalog.numeric, integer) returns pg_catalog.numeric language sql immutable as 'select 0::pg_catalog.numeric';
+    create operator public.% (leftarg = pg_catalog.numeric, rightarg = integer, function = public.planted_zero);
+    create function public.planted_equal(bigint, bigint) returns boolean language sql immutable as 'select true';
+    create operator public.= (leftarg = bigint, rightarg = bigint, function = public.planted_equal);
+    create function public.planted_equal(integer, integer) returns boolean language sql immutable as 'select true';
+    create operator public.= (leftarg = integer, rightarg = integer, function = public.planted_equal);
+    create domain public.text as pg_catalog.text check (false);
+    create domain public.date as pg_catalog.text check (false);`
+
+  // A shadowed `=(bigint, numeric)` accepted a stale write; a shadowed
+  // jsonb_populate_record returned another tenant's order through the tenant
+  // filter; a shadowed to_char and `%` rewrote a date and dropped the
+  // fraction of an instant. With pg_catalog last, every operator, function
+  // and type name the SQL spelled was the planted one. Each name is
+  // qualified now, so neither path changes an answer.
+  test('change no answer, whether pg_catalog is searched first or last', async () => {
+    const ours = await newOrder('ours')
+    const theirs = await newOrder('theirs', '2')
+    const createdAt = { target: CUSTOMER, key: customerKey('1', '1001'), columns: [col('customer', 'created_at')], filters: TENANT_1 }
+    const instant = succeeded(await createPostgresRecords(owner).read(createdAt)).values
+    expect(instant.created_at).toMatch(/\.[0-9]+Z$/)
+
+    await owner.begin(async (tx) => {
+      await tx.unsafe('create role planter; grant create on schema public to planter; grant usage on schema sales to planter')
+      await tx.unsafe(`set local role planter; ${PLANTED}`)
+    })
+    // Fresh drivers: a statement prepared before the planting keeps the
+    // names it resolved then, and would pass for the wrong reason.
+    const catalogFirst = postgres(fixture.admin, { onnotice: () => {} })
+    const catalogLast = postgres(fixture.admin, { onnotice: () => {}, connection: { search_path: 'public, pg_catalog' } })
+    try {
+      for (const [path, driver] of [
+        ['"$user", public', catalogFirst],
+        ['public, pg_catalog', catalogLast],
+      ] as const) {
+        const records = createPostgresRecords(driver)
+        const current = (await notesOf(ours.id))?.row_version ?? ''
+        expect(failed(await records.update(updateOf(ours.id, String(BigInt(current) - 1n), 'over a newer save'))).code, path).toBe('stale')
+        expect(succeeded(await records.update(updateOf(ours.id, current, path))).version, path).toBe(String(BigInt(current) + 1n))
+        expect(failed(await records.read({ target: ORDER, key: orderKey(theirs.id), columns: [col('order', 'notes')], filters: TENANT_1 })).code, path).toBe('not-found')
+        const edge = { target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'order_date'), col('order', 'amount')], filters: TENANT_1 }
+        expect(succeeded(await records.read(edge)).values, path).toEqual({ order_date: EDGE_VALUES.orderDate, amount: EDGE_VALUES.largestAmount })
+        expect(succeeded(await records.read(createdAt)).values, path).toEqual(instant)
+        const inserted = succeeded(await records.insert({ target: ORDER, values: orderValues({ notes: path }), returning: [col('order', 'order_date')] }))
+        expect(inserted, path).toEqual({ ok: true, values: { order_date: '2026-10-09' }, version: '1' })
+      }
+    } finally {
+      await Promise.all([catalogFirst.end(), catalogLast.end()])
+      await owner.unsafe('drop owned by planter; drop role planter')
     }
   })
 })
