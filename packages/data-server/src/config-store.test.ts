@@ -66,6 +66,20 @@ describe('the file configuration store', () => {
     expect(await store.list()).toEqual(['sales-order'])
   })
 
+  // The version list a restore is chosen from (0030). A leftover from a
+  // crashed publish is not a version, and listed as one it would be offered
+  // for restore and then fail to read. Ascending by number, not by name, or
+  // version 10 would sort before 2.
+  test('lists the versions published, ascending, and never a leftover', async () => {
+    expect(await store.versions('sales-order')).toEqual([])
+    for (let base: number | null = null; base === null || base < 10; base = (base ?? 0) + 1) await store.publish('sales-order', base, { base })
+    await writeFile(join(root, 'sales-order', '.publishing-crashed'), '{"half":')
+    await writeFile(join(root, 'sales-order', '07.json'), '{}')
+    expect(await store.versions('sales-order')).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    expect(await createFileConfigurationStore(join(root, 'missing')).versions('sales-order')).toEqual([])
+    await expect(store.versions('../etc')).rejects.toThrow(/not a configuration id/)
+  })
+
   // A published version edited by hand is no longer what was reviewed.
   // Serving a guess in its place would be worse than refusing.
   test('refuses to read a version that is not valid JSON', async () => {

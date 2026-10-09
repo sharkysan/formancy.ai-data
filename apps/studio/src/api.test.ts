@@ -3,6 +3,7 @@
 // Node rather than jsdom: nothing here renders. The client against the real
 // server, route by route.
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { FormPolicy } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { AdminClient, Bundle, ProposalRequest } from './api.js'
@@ -37,8 +38,9 @@ const READ_ONLY: FormPolicy = { version: 1, operations: { read: ['clerk'], creat
 async function bundle(policy: FormPolicy = READ_ONLY): Promise<Bundle> {
   const proposal = await admin.propose(ORDER)
   if (!proposal.ok) throw new Error(proposal.message)
-  const { form, bindings, snapshot } = proposal.value
-  return { format: 1, connection: 'fixture', form, bindings, policy, snapshot }
+  const { form, bindings, snapshot, generation } = proposal.value
+  // Format 2 (0030): the generated base, nothing chosen over it, and the request it came from.
+  return { format: 2, connection: 'fixture', generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot }
 }
 
 describe('the administrator plane, through the studio client', () => {
@@ -92,6 +94,57 @@ describe('the administrator plane, through the studio client', () => {
   // about something else.
   test('keeps a name with a slash in one path segment', async () => {
     expect(await admin.metadata('a/b')).toMatchObject({ ok: false, status: 404, code: 'unknown-connection' })
+  })
+
+  // The four routes of 0030 -- versions, one version, a regeneration and a
+  // restore -- each read in the shape the server sends. A renamed field would
+  // blank the Drift step's version list or its regeneration; here it is a
+  // failure that names the route.
+  test('lists, reads, regenerates and restores versions in the shapes the server sends', async () => {
+    await admin.publish('sales-order', null, await bundle())
+    await admin.publish('sales-order', 1, await bundle())
+    expect(await admin.versions('sales-order')).toEqual({ ok: true, value: [1, 2] })
+    const first = await admin.version('sales-order', 1)
+    expect(first.ok && [first.value.version, first.value.bundle.format]).toEqual([1, 2])
+    const regenerated = await admin.regenerate('sales-order')
+    if (!regenerated.ok) throw new Error(regenerated.message)
+    const { version, conflicts, lookupsDropped, keysReassigned, policyProblems, presentation } = regenerated.value
+    expect({ version, conflicts, lookupsDropped, keysReassigned, policyProblems, presentation }).toEqual({
+      version: 2,
+      conflicts: [],
+      lookupsDropped: [],
+      keysReassigned: [],
+      policyProblems: [],
+      presentation: EMPTY_PRESENTATION,
+    })
+    expect(regenerated.value.generation).toEqual(ORDER)
+    // A restore names the newest version it saw, as a publish does: 1 is stale.
+    expect(await admin.restore('sales-order', 1, 1)).toMatchObject({ ok: false, status: 409, code: 'conflict', current: 2 })
+    expect(await admin.restore('sales-order', 1, 2)).toEqual({
+      ok: true,
+      value: { version: 3, restoredFrom: 1, drift: { changes: [], blocking: false, writable: { create: true, update: true } } },
+    })
+    expect(await admin.version('sales-order', 9)).toMatchObject({ ok: false, status: 404, code: 'unknown-version' })
+    expect(await admin.versions('nothing-here')).toMatchObject({ ok: false, status: 404, code: 'unknown-form' })
+  })
+
+  // A refused restore says which changes block it, and a form that cannot be
+  // generated any more says what drifted. A client that kept only the
+  // sentence would leave the studio saying "no" without the reason a person
+  // acts on.
+  test('carries the blocking changes of a refused restore, and the drift of a form that cannot be generated', async () => {
+    await admin.publish('sales-order', null, await bundle())
+    await admin.publish('sales-order', 1, await bundle())
+    plane.databases.set('fixture', withoutColumn(OWNER_SNAPSHOT, 'order', 'notes'))
+    const refused = await admin.restore('sales-order', 1, 2)
+    expect(refused).toMatchObject({ ok: false, status: 409, code: 'incompatible' })
+    expect(!refused.ok && refused.changes?.map((change) => [change.kind, change.severity])).toEqual([['column-dropped', 'blocking']])
+
+    // The confirmed version column gone: nothing can be generated from the stored request.
+    plane.databases.set('fixture', withoutColumn(OWNER_SNAPSHOT, 'order', 'row_version'))
+    const cannot = await admin.regenerate('sales-order')
+    expect(cannot).toMatchObject({ ok: false, status: 422, code: 'cannot-generate' })
+    expect(!cannot.ok && cannot.drift?.changes.map((change) => change.kind)).toEqual(['concurrency-changed'])
   })
 
   // Drift runs against the database as it is now, through the real diff.

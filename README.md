@@ -22,6 +22,11 @@ operates without any AI dependency.
 > shared parity schema holds each adapter to one expectation per case. A page
 > renders generated forms in React and Angular side by side, and the studio
 > walks an administrator from a connection to a published form and its drift.
+> A published form keeps the presentation chosen over its generated base, and
+> the server regenerates it after a change to the database, carrying that
+> presentation by what each field stands for, and restores an older version
+> when the database still fits it — proved on both engines — and the studio
+> does both from its Drift step.
 > `CHANGELOG.md` says what each step found.
 
 ## Licence, in one table
@@ -101,6 +106,16 @@ published: sign in with a host token, connect, choose a root table, generate,
 write the policy, arrange labels, preview, publish, and review drift. It
 speaks only to the server's administrator plane and `/v1/whoami`
 ([0024](./docs/decisions/0024-the-studio-speaks-only-the-admin-plane.md)).
+The plane also regenerates a published form from the database as it is now,
+keeping the labels, order and full width chosen over the generated base and
+saying what it could not keep, and restores an older version when drift
+against it blocks nothing
+([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
+The studio does both from the Drift step: it shows what a regeneration could
+not carry, with a choice where one exists, carries a draft's presentation
+through the Policy step's "Generate again", holds publishing until each key
+that now names another column has its grants kept or removed, and restores
+an older version.
 
 ```bash
 pnpm build

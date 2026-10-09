@@ -1,6 +1,5 @@
-import type { DriftReport, FormPolicy, GeneratedForm, LookupChoice, MetadataSnapshot, ObjectRef, ServerIdentity } from '@formancy/data-core'
-import type { HostIdentity, PublishedBundle } from '@formancy/data-server'
-import type { FormSchema } from '@formancy/spec'
+import type { DriftChange, DriftReport, GeneratedForm, GenerationRequest, LookupChoice, MetadataSnapshot, ObjectRef, ServerIdentity } from '@formancy/data-core'
+import type { BundleV2, HostIdentity, PublishedBundle, Regeneration, Restoration } from '@formancy/data-server'
 
 /**
  * The studio's whole vocabulary: the data server's administrator plane, and
@@ -16,7 +15,7 @@ import type { FormSchema } from '@formancy/spec'
  * blank pane.
  */
 
-/** Why the server, or the network, said no. `problems` and `current` are carried when the server sends them. */
+/** Why the server, or the network, said no. `problems`, `current`, `changes` and `drift` are carried when the server sends them. */
 export interface Failure {
   ok: false
   /** The HTTP status, or 0 when nothing answered. */
@@ -29,6 +28,10 @@ export interface Failure {
   problems?: string[]
   /** The version somebody else published first (409 `conflict`). */
   current?: number | null
+  /** The changes that block restoring a version (409 `incompatible`). */
+  changes?: DriftChange[]
+  /** The drift of a form that can no longer be generated (422 `cannot-generate`). */
+  drift?: DriftReport
 }
 
 export type Outcome<T> = { ok: true; value: T } | Failure
@@ -44,12 +47,17 @@ export interface ProposalRequest {
   versionColumn?: string
 }
 
-/** A proposal: the generator's form, bindings and notes, and the snapshot to publish them with. */
-export type Proposal = GeneratedForm & { snapshot: MetadataSnapshot }
+/**
+ * A proposal: the generator's form, bindings and notes, the snapshot to
+ * publish them with, and the request as the server read it -- which a
+ * format-2 bundle keeps, so the form can be generated again (0030).
+ */
+export type Proposal = GeneratedForm & { snapshot: MetadataSnapshot; generation: GenerationRequest }
 
 /** A drift report, and the published version it was computed for. */
 export type Drift = DriftReport & { version: number }
 
+/** A published version. Format 1 is still served; narrow on `format` before reading a base or a presentation. */
 export interface Published {
   version: number
   bundle: PublishedBundle
@@ -64,17 +72,21 @@ export interface AdminClient {
   publish(formId: string, expectedBase: number | null, bundle: Bundle): Promise<Outcome<{ version: number }>>
   latest(formId: string): Promise<Outcome<Published>>
   drift(formId: string): Promise<Outcome<Drift>>
+  /** Every published version of a form, ascending. */
+  versions(formId: string): Promise<Outcome<number[]>>
+  version(formId: string, version: number): Promise<Outcome<Published>>
+  /** The newest version generated again from the database now, its presentation carried. Writes nothing. */
+  regenerate(formId: string): Promise<Outcome<Regeneration>>
+  /** Republish `version` as the next one, when drift against it blocks nothing. */
+  restore(formId: string, version: number, expectedBase: number): Promise<Outcome<Restoration>>
 }
 
-/** What the studio publishes: the four concerns of plan section 9, as the server's bundle. */
-export interface Bundle {
-  format: 1
-  connection: string
-  form: FormSchema
-  bindings: Proposal['bindings']
-  policy: FormPolicy
-  snapshot: MetadataSnapshot
-}
+/**
+ * What the studio publishes: the server's format-2 bundle (0030), the four
+ * concerns of plan section 9 with the generated base and the presentation
+ * chosen over it.
+ */
+export type Bundle = BundleV2
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -87,6 +99,8 @@ function failure(status: number, body: unknown): Failure {
   }
   const problems = body['problems']
   const current = body['current']
+  const changes = body['changes']
+  const drift = body['drift']
   return {
     ok: false,
     status,
@@ -94,6 +108,9 @@ function failure(status: number, body: unknown): Failure {
     message: body['message'],
     ...(Array.isArray(problems) ? { problems: problems.map(String) } : {}),
     ...(current === null || typeof current === 'number' ? { current } : {}),
+    // The server's own drift types, as every success here is read: a shape it changes is its tests' to catch.
+    ...(Array.isArray(changes) ? { changes: changes as DriftChange[] } : {}),
+    ...(isRecord(drift) ? { drift: drift as unknown as DriftReport } : {}),
   }
 }
 
@@ -147,5 +164,12 @@ export function createAdminClient({ token, fetch, base = '' }: { token: string; 
     publish: (formId, expectedBase, bundle) => call('POST', `/v1/forms/${segment(formId)}/versions`, { expectedBase, bundle }),
     latest: (formId) => call('GET', `/v1/forms/${segment(formId)}/versions/latest`),
     drift: (formId) => call('POST', `/v1/forms/${segment(formId)}/drift`),
+    versions: async (formId) => {
+      const listed = await call<{ versions: number[] }>('GET', `/v1/forms/${segment(formId)}/versions`)
+      return listed.ok ? { ok: true, value: listed.value.versions } : listed
+    },
+    version: (formId, version) => call('GET', `/v1/forms/${segment(formId)}/versions/${String(version)}`),
+    regenerate: (formId) => call('POST', `/v1/forms/${segment(formId)}/regenerations`),
+    restore: (formId, version, expectedBase) => call('POST', `/v1/forms/${segment(formId)}/restorations`, { version, expectedBase }),
   }
 }

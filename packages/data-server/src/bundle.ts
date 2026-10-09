@@ -1,7 +1,8 @@
 import { bindingsVersionProblem, createSnapshot, findObject, rowFilterColumnProblem, validatePolicy } from '@formancy/data-core'
-import type { FormBindings, FormPolicy, MetadataSnapshot, ObjectRef } from '@formancy/data-core'
+import type { FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { validateSchema } from '@formancy/spec/validate'
+import { format2Problems } from './bundle-format2.js'
 
 /**
  * Everything one published version of a form needs at runtime, as one
@@ -12,8 +13,7 @@ import { validateSchema } from '@formancy/spec/validate'
  * access policy, and the snapshot the bindings were generated from — which the
  * request planner reads column types from and drift review compares against.
  */
-export interface PublishedBundle {
-  format: 1
+interface BundleParts {
   /** The connection the form is bound to, by the name the deployment's allowlist gives it. */
   connection: string
   form: FormSchema
@@ -21,6 +21,25 @@ export interface PublishedBundle {
   policy: FormPolicy
   snapshot: MetadataSnapshot
 }
+
+/** Published before 0030: served as it is; it kept no base, so a regeneration cannot carry its presentation. */
+export interface BundleV1 extends BundleParts {
+  format: 1
+}
+
+/**
+ * Since 0030. `form` is `applyPresentation(base, presentation, bindings)`;
+ * `base` and `bindings` are `generateForm(snapshot, generation)`'s, which is
+ * checked at publish (`generatedProblems`) and not on read.
+ */
+export interface BundleV2 extends BundleParts {
+  format: 2
+  generation: GenerationRequest
+  base: FormSchema
+  presentation: PresentationOverrides
+}
+
+export type PublishedBundle = BundleV1 | BundleV2
 
 export type BundleValidation = { ok: true; bundle: PublishedBundle } | { ok: false; problems: string[] }
 
@@ -43,16 +62,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * - the bindings must be a version this release reads — one published before
  *   0027 cannot say which operation a field is written on, and is republished;
  * - every bound field must exist in the form, and the policy must fit the
- *   bindings (`validatePolicy`), so a rule nobody enforces cannot be published;
- * - every column a row filter compares — the root's, and each lookup's on its
- *   target — must be one a filter can compare: present, readable by the
- *   snapshot's account (0027), and of a kind with one spelling on both
- *   engines (0028). Otherwise every request the filter scopes is refused.
+ *   bindings and the snapshot (`policyProblems`), so a rule nobody enforces
+ *   cannot be published;
+ * - in format 2 (0030), the form must be its base with its presentation
+ *   applied, and the generation request the one this server would store and
+ *   the one its base and bindings say they came from (`bundle-format2.ts`).
+ *
+ * Format 1 is still read, so every version published before 0030 is served.
  */
 export function validateBundle(document: unknown): BundleValidation {
   if (!isRecord(document)) return { ok: false, problems: ['a bundle is an object'] }
   const problems: string[] = []
-  if (document['format'] !== 1) problems.push('format must be 1')
+  const format = document['format']
+  if (format !== 1 && format !== 2) problems.push('format must be 1 or 2')
   if (typeof document['connection'] !== 'string' || document['connection'] === '') problems.push('connection must name a connection')
 
   const form = validateSchema(document['form'])
@@ -96,11 +118,27 @@ export function validateBundle(document: unknown): BundleValidation {
     }
   }
 
-  const fitted = validatePolicy(policy, bindings)
-  if (!fitted.ok) problems.push(...fitted.problems.map((problem) => `policy: ${problem}`))
-  if (wellFormed) problems.push(...unfilterableColumns(snapshot, bindings, policy))
+  // A snapshot no catalog could produce cannot be searched for filter columns.
+  if (wellFormed) problems.push(...policyProblems(snapshot, bindings, policy))
+  else problems.push(...fitProblems(policy, bindings))
+  if (format === 2 && form.valid && Array.isArray(bindings.fields)) problems.push(...format2Problems(document, form.schema, bindings, wellFormed ? snapshot : null))
 
   return problems.length === 0 ? { ok: true, bundle: document as unknown as PublishedBundle } : { ok: false, problems }
+}
+
+/**
+ * Everything a policy does not fit: the bindings (`validatePolicy`), and the
+ * snapshot's columns a row filter compares (`unfilterableColumns`). One
+ * function for the bundle check and for the regeneration route's report, so
+ * the two cannot disagree about one policy.
+ */
+export function policyProblems(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy): string[] {
+  return [...fitProblems(policy, bindings), ...unfilterableColumns(snapshot, bindings, policy)]
+}
+
+function fitProblems(policy: FormPolicy, bindings: FormBindings): string[] {
+  const fitted = validatePolicy(policy, bindings)
+  return fitted.ok ? [] : fitted.problems.map((problem) => `policy: ${problem}`)
 }
 
 /** The filter rules of a policy as stored, whatever shape a hand edit left them in; `validatePolicy` reports a bad shape. */

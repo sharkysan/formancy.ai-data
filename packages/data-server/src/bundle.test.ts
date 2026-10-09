@@ -1,9 +1,10 @@
-import { createSnapshot, generateForm } from '@formancy/data-core'
-import type { ColumnMeta, FormPolicy, MetadataSnapshot, NormalizedType } from '@formancy/data-core'
+import { createSnapshot, EMPTY_PRESENTATION, generateForm } from '@formancy/data-core'
+import type { ColumnMeta, FormPolicy, GenerationRequest, MetadataSnapshot, NormalizedType } from '@formancy/data-core'
 import { schemaHash } from '@formancy/spec'
 import { describe, expect, test } from 'vitest'
-import type { PublishedBundle } from './bundle.js'
-import { validateBundle } from './bundle.js'
+import type { BundleV1, BundleV2, PublishedBundle } from './bundle.js'
+import { policyProblems, validateBundle } from './bundle.js'
+import { generatedProblems } from './bundle-format2.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 
@@ -51,15 +52,12 @@ function snapshot(edit: (columns: ColumnMeta[]) => void = () => {}): MetadataSna
   })
 }
 
+/** The request the employee form is generated from, as the proposal route normalises it. */
+const REQUEST: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'employee' }, formId: 'employee', title: 'Employee', lookups: [], pinned: [] }
+
 /** A bundle that is right in every way; each test breaks one thing. */
-function good(taken: MetadataSnapshot = snapshot()): PublishedBundle {
-  const { form, bindings } = generateForm(taken, {
-    connection: 'erp',
-    root: { schema: 'sales', name: 'employee' },
-    formId: 'employee',
-    title: 'Employee',
-    lookups: [],
-  })
+function good(taken: MetadataSnapshot = snapshot()): BundleV2 {
+  const { form, bindings } = generateForm(taken, REQUEST)
   const policy: FormPolicy = {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
@@ -67,10 +65,16 @@ function good(taken: MetadataSnapshot = snapshot()): PublishedBundle {
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
     lookups: {},
   }
-  return { format: 1, connection: 'erp', form, bindings, policy, snapshot: taken }
+  return { format: 2, connection: 'erp', generation: REQUEST, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot: taken }
 }
 
-const copy = (bundle: PublishedBundle): PublishedBundle => JSON.parse(JSON.stringify(bundle)) as PublishedBundle
+/** The same bundle as published before 0030: no request, no base, no presentation. */
+function before0030(): BundleV1 {
+  const { generation: _generation, base: _base, presentation: _presentation, ...parts } = good()
+  return { ...parts, format: 1 }
+}
+
+const copy = <T extends PublishedBundle>(bundle: T): T => JSON.parse(JSON.stringify(bundle)) as T
 
 describe('validateBundle', () => {
   // The baseline: a generated form, its bindings, a fitting policy and the
@@ -217,7 +221,7 @@ describe('validateBundle', () => {
     const policy = (rowFilters: FormPolicy['rowFilters'], rules: FormPolicy['rowFilters']): FormPolicy => ({
       version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields, rowFilters, lookups: { [lookup]: rules },
     })
-    const bundle = (chosen: FormPolicy): PublishedBundle => ({ format: 1, connection: 'erp', form, bindings, policy: chosen, snapshot: taken })
+    const bundle = (chosen: FormPolicy): BundleV1 => ({ format: 1, connection: 'erp', form, bindings, policy: chosen, snapshot: taken })
 
     expect(validateBundle(bundle(policy([], [{ column: 'id', attribute: 'tenant' }])))).toMatchObject({ ok: true })
     const flagged = validateBundle(bundle(policy([], [{ column: 'active', attribute: 'tenant' }, { column: 'region', attribute: 'tenant' }])))
@@ -250,7 +254,7 @@ describe('validateBundle', () => {
     if (binding !== undefined) binding.field = 'ghost'
     const missing = validateBundle(broken)
     expect(missing.ok ? [] : missing.problems).toContainEqual(expect.stringMatching(/bindings name ghost, which the form does not have/))
-    const invalid = copy(good()) as unknown as { form: { specVersion: string } }
+    const invalid = copy(before0030()) as unknown as { form: { specVersion: string } }
     invalid.form.specVersion = '99'
     expect(validateBundle(invalid)).toMatchObject({ ok: false, problems: [expect.stringMatching(/^form: /)] })
   })
@@ -259,13 +263,224 @@ describe('validateBundle', () => {
   test('refuses what is not a bundle at all', () => {
     expect(validateBundle(null)).toEqual({ ok: false, problems: ['a bundle is an object'] })
     expect(validateBundle([])).toEqual({ ok: false, problems: ['a bundle is an object'] })
-    const partial = { ...copy(good()), format: 2, connection: '', policy: undefined }
+    const partial = { ...copy(good()), format: 3, connection: '', policy: undefined }
     const outcome = validateBundle(partial)
     expect(outcome.ok ? [] : outcome.problems).toEqual(
-      expect.arrayContaining(['format must be 1', 'connection must name a connection', 'snapshot, bindings and policy must all be present']),
+      expect.arrayContaining(['format must be 1 or 2', 'connection must name a connection', 'snapshot, bindings and policy must all be present']),
     )
     const impossible = copy(good())
     impossible.snapshot.objects.push(copy(good()).snapshot.objects[0] as never)
     expect(validateBundle(impossible)).toMatchObject({ ok: false, problems: [expect.stringMatching(/not one a catalog could produce/)] })
+  })
+})
+
+describe('a format-2 bundle (0030)', () => {
+  // Every format-1 version already published is still served: refusing them
+  // on read would take forms down on upgrade that nothing about the database
+  // changed for. Format 1 cannot be regenerated, which the routes say.
+  test('format 1 still validates', () => {
+    expect(validateBundle(before0030())).toEqual({ ok: true, bundle: before0030() })
+  })
+
+  // The served form must be the base with its presentation applied. An edit
+  // to any of the three on the volume would serve a form nobody published,
+  // or carry to the next regeneration a patch over a base that never was.
+  test('an edited form, base or presentation is refused on read', () => {
+    const mismatch = 'form: is not the base with its presentation applied; the form, the base or the presentation was edited'
+    const form = copy(good())
+    form.form.title = 'Staff'
+    expect(validateBundle(form)).toEqual({ ok: false, problems: [mismatch] })
+    const base = copy(good())
+    const named = base.base.model.fields.find((field) => field.key === 'name')
+    if (named !== undefined) named.label = 'Full name'
+    expect(validateBundle(base)).toEqual({ ok: false, problems: [mismatch] })
+    const presentation = copy(good())
+    presentation.presentation = { version: 1, fields: [{ field: 'name', anchor: { kind: 'column', column: 'name' }, label: 'Full name' }], sections: [] }
+    expect(validateBundle(presentation)).toEqual({ ok: false, problems: [mismatch] })
+    const anchored = copy(presentation)
+    anchored.form = JSON.parse(JSON.stringify(anchored.form).replace('"Name"', '"Full name"')) as BundleV2['form']
+    expect(validateBundle(anchored)).toMatchObject({ ok: true })
+    const misanchored = copy(anchored)
+    misanchored.presentation.fields[0] = { field: 'name', anchor: { kind: 'column', column: 'tenant_id' }, label: 'Full name' }
+    expect(validateBundle(misanchored)).toEqual({ ok: false, problems: ['presentation: /fields/0/anchor: name stands for column name, not column tenant_id'] })
+    // A base formancy rejects is named as the base's problem, and nothing is applied to it.
+    const unrenderable = copy(good()) as unknown as { base: { specVersion: string } }
+    unrenderable.base.specVersion = '99'
+    const refused = validateBundle(unrenderable)
+    expect(refused.ok ? [] : refused.problems).toEqual([expect.stringMatching(/^base: /)])
+    const unread = copy(good()) as unknown as { presentation: { version: number } }
+    unread.presentation.version = 2
+    expect(validateBundle(unread)).toEqual({ ok: false, problems: ['presentation: version must be 1'] })
+  })
+
+  // A request for another connection would regenerate the form from another
+  // database; one in a spelling the proposal route never produces says the
+  // file was written by something other than this server.
+  test('a generation request for another connection or form, or not in its normalised form, is refused', () => {
+    const elsewhere = copy(good())
+    elsewhere.generation.connection = 'crm'
+    expect(validateBundle(elsewhere)).toEqual({ ok: false, problems: ['generation: names connection crm, and the bundle is bound to erp'] })
+    const another = copy(good())
+    another.generation.formId = 'staff'
+    expect(validateBundle(another)).toEqual({ ok: false, problems: ['generation: names form staff, and the base is employee'] })
+    const loose = copy(good()) as unknown as { generation: Record<string, unknown> }
+    delete loose.generation['pinned']
+    expect(validateBundle(loose)).toEqual({ ok: false, problems: ['generation: is not in its normalised form (lookups and pinned as lists, versionColumn only when given, nothing else)'] })
+    const extra = copy(good()) as unknown as { generation: Record<string, unknown> }
+    extra.generation['note'] = 'hello'
+    expect(validateBundle(extra)).toMatchObject({ ok: false })
+    const malformed = copy(good()) as unknown as { generation: Record<string, unknown> }
+    Object.assign(malformed.generation, { connection: 1, root: 'sales.employee', title: 7, versionColumn: 1 })
+    expect(validateBundle(malformed)).toEqual({
+      ok: false,
+      problems: ['generation: connection must name a connection', 'generation: root must be { schema, name }', 'generation: title must be text', 'generation: versionColumn must name a column'],
+    })
+    const missing = copy(good()) as unknown as Record<string, unknown>
+    delete missing['generation']
+    expect(validateBundle(missing)).toEqual({ ok: false, problems: ['generation: a generation request is an object'] })
+  })
+
+  // The stored request is what a regeneration generates from, and the
+  // regenerated draft is checked at publish against that same request, so a
+  // request edited by hand would reach the next version with nobody told.
+  // Nothing here asks the generator: each property is one the request alone
+  // decides, so a later release cannot make a stored version fail it.
+  describe('a generation request that does not say what its base and bindings say is refused', () => {
+    const ORDER_REQUEST: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'order' }, formId: 'order', title: 'Order', lookups: [{ foreignKey: 'fk_order_employee', display: ['name'] }], pinned: [], versionColumn: 'revision' }
+    /** An order table with a lookup to employee and an application-maintained version column. */
+    function ordered(request: GenerationRequest = ORDER_REQUEST): BundleV2 {
+      const { fingerprint: _fingerprint, ...employee } = snapshot()
+      const taken = createSnapshot({
+        ...employee,
+        objects: [
+          ...employee.objects,
+          {
+            ref: { schema: 'sales', name: 'order' },
+            kind: 'table',
+            comment: null,
+            columns: [column('id', 1, INT32), column('employee_id', 2, INT32), column('tenant_id', 3, INT32), column('revision', 4, INT32)],
+            primaryKey: { name: 'pk_order', columns: ['id'] },
+            uniqueKeys: [],
+            foreignKeys: [{ name: 'fk_order_employee', columns: ['employee_id'], references: { table: { schema: 'sales', name: 'employee' }, columns: ['id'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }],
+            checks: [],
+            rowSecurity: 'none',
+          },
+        ],
+      })
+      const { form, bindings } = generateForm(taken, request)
+      const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: {}, rowFilters: [], lookups: { employee: [] } }
+      return copy({ format: 2, connection: 'erp', generation: request, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot: taken })
+    }
+    const refused = (bundle: BundleV2) => {
+      const result = validateBundle(bundle)
+      return result.ok ? [] : result.problems
+    }
+
+    // The baseline the cases below break one property of.
+    test('accepts the request its base and bindings were generated from', () => {
+      expect(refused(ordered())).toEqual([])
+    })
+
+    // A retitled request would retitle the next version, unasked.
+    test('a title the base does not have', () => {
+      const bundle = ordered()
+      bundle.generation.title = 'Payroll'
+      expect(refused(bundle)).toEqual(['generation: is titled "Payroll", and the base "Order"'])
+    })
+
+    // A request over another table would regenerate the form over it, while
+    // drift kept comparing the table the bindings name.
+    test('a root the bindings do not name', () => {
+      const bundle = ordered()
+      bundle.generation.root = { schema: 'sales', name: 'employee' }
+      expect(refused(bundle)).toEqual(['generation: names root sales.employee, and the bindings sales.order'])
+    })
+
+    // A confirmed version column is an administrator's word that every
+    // writer increments it; one added or taken away by hand would give the
+    // next version a concurrency strategy nobody confirmed, or take one away.
+    test('a version column the bindings do not confirm, or one they confirm that the request does not give', () => {
+      const other = ordered()
+      other.generation.versionColumn = 'tenant_id'
+      expect(refused(other)).toEqual(['generation: confirms version column tenant_id, and the bindings use revision'])
+      const unconfirmed = ordered()
+      delete unconfirmed.generation.versionColumn
+      expect(refused(unconfirmed)).toEqual(['generation: confirms no version column, and the bindings use revision as a confirmed one'])
+      // Confirmed by hand where the bindings use none: the next version would update with a strategy nobody confirmed.
+      const { versionColumn: _confirmed, ...unasked } = ORDER_REQUEST
+      const inferred = ordered(unasked)
+      expect(inferred.bindings.concurrency).toBeNull()
+      inferred.generation.versionColumn = 'revision'
+      expect(refused(inferred)).toEqual(['generation: confirms version column revision, and the bindings use none'])
+      // A rowversion is used whatever the request confirms, so a request that confirms a column beside one is what the generator was given.
+      const beside = good()
+      beside.generation = { ...beside.generation, versionColumn: 'tenant_id' }
+      expect(refused(beside)).toEqual([])
+      // An unreadable rowversion leaves none, and still sets the request's column aside.
+      const unreadable = good(snapshot((columns) => { (columns[3] as ColumnMeta).access = { select: false, insert: false, update: false } }))
+      unreadable.generation = { ...unreadable.generation, versionColumn: 'tenant_id' }
+      unreadable.policy.operations.update = []
+      expect(unreadable.bindings.concurrency).toBeNull()
+      expect(refused(unreadable)).toEqual([])
+    })
+
+    // A pin says the column is written from the trusted context and never
+    // from the form; a pin added by hand over a field the form writes would
+    // turn that field read-only at the next regeneration, unasked.
+    test('a pinned column whose field the form writes', () => {
+      const bundle = ordered()
+      bundle.generation.pinned = ['tenant_id']
+      expect(refused(bundle)).toEqual(['generation: pins tenant_id, and its field tenant_id is written by the form'])
+    })
+
+    // Lookups are the request's own choice: one added, dropped or shown by
+    // other columns by hand would change the next version's fields.
+    test('a lookup the bindings do not have, or one they have that the request does not choose', () => {
+      const shown = ordered()
+      shown.generation.lookups = [{ foreignKey: 'fk_order_employee', display: ['tenant_id'] }]
+      expect(refused(shown)).toEqual([
+        'generation: chooses a lookup over fk_order_employee showing tenant_id, which the bindings do not have',
+        'generation: the bindings have a lookup over fk_order_employee showing name, which it does not choose',
+      ])
+      const dropped = ordered()
+      dropped.generation.lookups = []
+      expect(refused(dropped)).toEqual(['generation: the bindings have a lookup over fk_order_employee showing name, which it does not choose'])
+    })
+  })
+
+  // A bundle whose base the generator would not write could carry anything
+  // a person typed into it, such as a relaxed maxLength, as if the database
+  // had said so. Checked at publish, against this server's generator; never
+  // on read, where a later generator would make every stored version
+  // "corrupt".
+  test("generatedProblems names a base or bindings that are not the generator's", () => {
+    expect(generatedProblems(good())).toEqual([])
+    const forged = copy(good())
+    for (const form of [forged.base, forged.form]) {
+      const named = form.model.fields.find((field) => field.key === 'name')
+      if (named !== undefined) named.maxLength = 4000
+    }
+    expect(validateBundle(forged)).toMatchObject({ ok: true })
+    expect(generatedProblems(forged)).toEqual(['base: is not what this server generates from the stored snapshot and generation request'])
+    const bound = copy(good())
+    const binding = bound.bindings.fields.find((entry) => entry.field === 'name')
+    if (binding !== undefined) binding.nullable = true
+    expect(generatedProblems(bound)).toEqual(['bindings: are not what this server generates from the stored snapshot and generation request'])
+    const unknown = copy(good())
+    unknown.generation.root = { schema: 'sales', name: 'nope' }
+    expect(generatedProblems(unknown)).toEqual(['generation: sales.nope is not in the snapshot'])
+  })
+
+  // The regeneration route reports policy problems against the new bindings
+  // with this function, and the publish check uses it too, so a policy the
+  // one reports clean the other can never refuse.
+  test('policyProblems is what validateBundle reports about a policy', () => {
+    const loose = copy(good())
+    loose.policy.fields['ghost'] = { read: ['clerk'], write: [] }
+    loose.policy.rowFilters = [{ column: 'tenant_id', attribute: 'tenant' }, { column: 'region', attribute: 'tenant' }]
+    const reported = validateBundle(loose)
+    expect(reported.ok).toBe(false)
+    expect(reported.ok ? [] : reported.problems).toEqual(policyProblems(loose.snapshot, loose.bindings, loose.policy))
+    expect(policyProblems(loose.snapshot, loose.bindings, loose.policy)).toContainEqual('policy: fields.ghost: the form has no field ghost')
   })
 })

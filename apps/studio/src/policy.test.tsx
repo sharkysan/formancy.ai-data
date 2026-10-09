@@ -6,11 +6,11 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { createBuilderSession } from '@formancy/builder-core'
 import { validatePolicy } from '@formancy/data-core'
-import type { FormPolicy } from '@formancy/data-core'
+import type { FormPolicy, ReassignedKey } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Proposal } from './api.js'
 import { PolicyStep } from './policy.js'
-import { audit, discover, focusedName, generateOrder, goTo, pressEnter, servedDocument, signIn, step, writeOrderPolicy } from './test-studio.js'
+import { audit, discover, focusedName, generateOrder, goTo, paragraphs, pressEnter, servedDocument, signIn, step, writeOrderPolicy } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
@@ -192,16 +192,45 @@ describe('the policy editor', () => {
     expect(within(publish).getByRole('note').textContent).toContain('The row filters changed since the form was generated')
 
     policy = await goTo(user, 'Policy')
-    // Generating again starts a new builder session, so labels and order set
-    // in Presentation are gone. The Choose step says so; a button here that
-    // did not would take the work without a word.
+    // Generating again carries the draft's presentation to the new form
+    // (0030), and says where what it could not carry is listed. A button
+    // that said nothing would leave a person to find out by looking.
     const regenerate = within(policy).getByRole('button', { name: 'Generate again with these pins' })
-    expect(computeAccessibleDescription(regenerate)).toBe('Generating again starts the presentation afresh: labels and order set in Presentation are replaced. The policy is kept.')
+    expect(computeAccessibleDescription(regenerate)).toBe(
+      'Generating again carries the labels, order and widths set in Presentation to the new form, and Presentation lists anything it could not carry. The policy is kept.',
+    )
     await user.click(regenerate)
     const generated = await screen.findByRole('main', { name: 'Generate' })
     const readOnly = within(within(generated).getByRole('list', { name: 'Read-only' })).getAllByRole('listitem').map((item) => item.textContent)
     expect(readOnly).toContain('status Pinned by the policy: its value comes from the trusted context, never from the person filling the form.')
     expect(within(await goTo(user, 'Policy')).queryByRole('note')).toBeNull()
+    expect(await audit()).toEqual([])
+  })
+
+  // "Generate again" used to start a new builder session from the
+  // generator's document, so a label set in Presentation was gone the
+  // moment a pin changed. It now derives the draft's presentation and
+  // carries it onto the new form (0030): the label is still there, the
+  // order with it, and the step says what came across.
+  test('generating again after a pin change keeps a label edited earlier', async () => {
+    const user = await signIn(plane)
+    await generateOrder(user)
+    let presentation = await goTo(user, 'Presentation')
+    await user.clear(within(presentation).getByLabelText('Label of notes'))
+    await user.type(within(presentation).getByLabelText('Label of notes'), 'Delivery notes')
+    await user.click(within(presentation).getByRole('button', { name: 'Move up Amount' }))
+    const policy = await goTo(user, 'Policy')
+    await user.click(within(policy).getByRole('button', { name: 'Add a row filter' }))
+    await user.selectOptions(within(policy).getByLabelText('Column of row filter 2'), 'status')
+    await user.click(within(policy).getByRole('button', { name: 'Generate again with these pins' }))
+    await screen.findByRole('main', { name: 'Generate' })
+
+    presentation = await goTo(user, 'Presentation')
+    expect((within(presentation).getByLabelText('Label of notes') as HTMLInputElement).value).toBe('Delivery notes')
+    const order = within(within(presentation).getByRole('region', { name: 'Order' })).getAllByRole('button', { name: /^Move up / }).map((button) => button.textContent)
+    expect(order.indexOf('Move up Amount')).toBe(order.indexOf('Move up Status') - 1)
+    const carried = within(presentation).getByRole('region', { name: 'Carried from your earlier draft' })
+    expect(within(carried).getByText('Everything you chose was carried.')).toBeTruthy()
     expect(await audit()).toEqual([])
   })
 
@@ -293,12 +322,23 @@ describe('a policy kept across a regeneration', () => {
  * produces -- two stale field entries, two stray lookup filters -- can then be
  * edited as one would be.
  */
-function PolicyOf({ proposal, initial }: { proposal: Proposal; initial: FormPolicy }): ReactElement {
+function PolicyOf({ proposal, initial, reassigned = [] }: { proposal: Proposal; initial: FormPolicy; reassigned?: ReassignedKey[] }): ReactElement {
   const [policy, setPolicy] = useState(initial)
+  const [undecided, setUndecided] = useState(reassigned)
   const [session] = useState(() => createBuilderSession(proposal.form))
   return (
     <main aria-label="Policy">
-      <PolicyStep bindings={proposal.bindings} snapshot={proposal.snapshot} session={session} policy={policy} onPolicy={setPolicy} stale={false} onRegenerate={() => Promise.resolve(null)} />
+      <PolicyStep
+        bindings={proposal.bindings}
+        snapshot={proposal.snapshot}
+        session={session}
+        policy={policy}
+        onPolicy={setPolicy}
+        stale={false}
+        onRegenerate={() => Promise.resolve(null)}
+        reassigned={undecided}
+        onDecided={(key) => setUndecided((keys) => keys.filter((entry) => entry.field !== key))}
+      />
     </main>
   )
 }
@@ -355,6 +395,48 @@ describe('where the keyboard goes when a removal takes its button', () => {
     await pressEnter(user, within(policy).getByRole('button', { name: 'Remove the also_gone lookup filter' }))
     expect(document.activeElement).toBe(verdict)
     expect(within(verdict).getByRole('status').textContent).toBe('The policy fits this form.')
+  })
+})
+
+describe('keys that now stand for another column', () => {
+  // Two keys whose grants wait for a decision, as a regeneration that took
+  // two renames would leave them. Deciding one takes its entry, and the
+  // button pressed, out of the list: the keyboard goes to the next entry's
+  // Keep, and after the last to the policy check. Removing takes the field's
+  // roles and its lookup filter, which were written for what the key stood
+  // for before.
+  test('a decision: the next key’s Keep, else the policy check, and Remove takes every grant', async () => {
+    servedDocument()
+    const proposal = await orderProposal()
+    const user = userEvent.setup()
+    const reassigned: ReassignedKey[] = [
+      { field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } },
+      { field: 'customer', was: { kind: 'lookup', foreignKey: 'fk_order_customer' }, now: { kind: 'lookup', foreignKey: 'fk_order_buyer' } },
+    ]
+    const initial: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+      fields: { order_date: { read: ['clerk'], write: ['clerk'] }, customer: { read: ['clerk'], write: ['clerk'] } },
+      rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+      lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
+    }
+    render(<PolicyOf proposal={proposal} initial={initial} reassigned={reassigned} />)
+    const policy = screen.getByRole('main', { name: 'Policy' })
+    const keys = within(policy).getByRole('region', { name: 'Keys that now stand for something else' })
+    expect(within(within(keys).getByRole('list')).getAllByRole('listitem').map((item) => paragraphs(item)[0])).toEqual([
+      'Grants for order_date were written for column order_date; it now stands for column order date.',
+      'Grants for customer were written for the lookup over fk_order_customer; it now stands for the lookup over fk_order_buyer.',
+    ])
+    expect(await audit()).toEqual([])
+    await pressEnter(user, within(keys).getByRole('button', { name: 'Keep grants for order_date' }))
+    expect(focusedName()).toBe('Keep grants for customer')
+    await pressEnter(user, within(keys).getByRole('button', { name: 'Remove grants for customer' }))
+    expect(document.activeElement).toBe(within(policy).getByRole('region', { name: 'Policy check' }))
+    expect(within(policy).queryByRole('region', { name: 'Keys that now stand for something else' })).toBeNull()
+    // The customer lookup's filter went with its grants, so validatePolicy now asks for a decision on it.
+    expect(check(policy).problems).toEqual(['lookups has no entry for customer: say which rows of sales.customer it may offer, or [] for every row'])
+    expect((within(policy).getByLabelText('Read roles for Order date') as HTMLInputElement).value).toBe('clerk')
+    expect((within(policy).getByLabelText('Read roles for Customer') as HTMLInputElement).value).toBe('')
   })
 })
 

@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createSnapshot } from '@formancy/data-core'
+import { createSnapshot, EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, NormalizedType, ObjectMeta, RecordAdapter } from '@formancy/data-core'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -96,11 +96,15 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
+/** A proposal published as proposed: format 2, with nothing chosen over the generated base (0030). */
+function bundleOf(proposal: any, policy: unknown = POLICY) {
+  return { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy, snapshot: proposal.snapshot }
+}
+
 /** Propose, then publish what was proposed with a policy, as an administrator would. */
 async function publish(expectedBase: number | null = null) {
   const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
-  const bundle = { format: 1, connection: 'erp', form: proposal.form, bindings: proposal.bindings, policy: POLICY, snapshot: proposal.snapshot }
-  return app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase, bundle } })
+  return app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase, bundle: bundleOf(proposal) } })
 }
 
 describe('the administrator plane', () => {
@@ -136,6 +140,9 @@ describe('the administrator plane', () => {
     expect(proposal.form.id).toBe('employee')
     expect(proposal.bindings.concurrency).toEqual({ kind: 'rowversion', column: 'row_version', confirmed: true })
     expect(proposal.snapshot.fingerprint).toBe(proposal.bindings.snapshotFingerprint)
+    // What it was generated from, normalised, so a format-2 bundle can keep
+    // it and a regeneration can ask for the same form again (0030).
+    expect(proposal.generation).toEqual({ connection: 'erp', root: { schema: 'sales', name: 'employee' }, formId: 'employee', title: 'Employee', lookups: [], pinned: [] })
     const refused = await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, root: { schema: 'sales', name: 'nope' } } })
     expect(refused.statusCode).toBe(422)
     expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, formId: 'Employee' } })).statusCode).toBe(400)
@@ -153,7 +160,7 @@ describe('the administrator plane', () => {
   test('a form id as long as the store allows is published and read back', async () => {
     const formId = `e${'x'.repeat(127)}`
     const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, formId } })).json()
-    const bundle = { format: 1, connection: 'erp', form: proposal.form, bindings: proposal.bindings, policy: POLICY, snapshot: proposal.snapshot }
+    const bundle = bundleOf(proposal)
     const published = await app.inject({ method: 'POST', url: `/v1/forms/${formId}/versions`, headers: as('admin'), payload: { expectedBase: null, bundle } })
     expect(published.statusCode, published.body).toBe(201)
     const latest = await app.inject({ method: 'GET', url: `/v1/forms/${formId}/versions/latest`, headers: as('admin') })
@@ -182,7 +189,7 @@ describe('the administrator plane', () => {
   // the route's, or whose connection is not allowlisted, neither.
   test('refuses a bundle that does not validate, belongs to another form, or names an unknown connection', async () => {
     const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
-    const bundle = { format: 1, connection: 'erp', form: proposal.form, bindings: proposal.bindings, policy: POLICY, snapshot: proposal.snapshot }
+    const bundle = bundleOf(proposal)
     const loose = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, policy: { ...POLICY, fields: { ghost: { read: [], write: [] } } } } } })
     expect(loose.statusCode).toBe(422)
     expect(loose.json().problems).toContainEqual(expect.stringMatching(/ghost/))
@@ -190,6 +197,39 @@ describe('the administrator plane', () => {
     expect((await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, connection: 'elsewhere' } } })).statusCode).toBe(422)
     expect((await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { bundle } })).statusCode).toBe(400)
     expect(await store.latest('employee')).toBeNull()
+  })
+
+  // Since 0030 a version keeps what it was generated from, or it cannot be
+  // regenerated with its presentation. A format-1 bundle is refused at
+  // publish with what to send instead, and nothing is written.
+  test('refuses to publish format 1', async () => {
+    const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
+    const bundle = { format: 1, connection: 'erp', form: proposal.form, bindings: proposal.bindings, policy: POLICY, snapshot: proposal.snapshot }
+    const refused = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle } })
+    expect(refused.statusCode).toBe(422)
+    expect(refused.json()).toMatchObject({ code: 'invalid-bundle', problems: ['publish format 2: since 0030 a version keeps its generation request, generated base and presentation'] })
+    expect(await store.latest('employee')).toBeNull()
+  })
+
+  // A base the generator would not write is a database fact somebody typed:
+  // a name of 4000 characters into a column of 200 would be offered and then
+  // refused by the database on every save. Checked at publish against this
+  // server's generator. Watched failing with that check moved into the read
+  // path: the same document already in the store must still be served,
+  // because a later release's generator must never make a stored version
+  // "corrupt".
+  test('a forged base is refused at publish, and the same document already stored is still served', async () => {
+    const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
+    const bundle = bundleOf(proposal)
+    for (const form of [bundle.base, bundle.form]) form.model.fields.find((field: { key: string }) => field.key === 'name').maxLength = 4000
+    const refused = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle } })
+    expect(refused.statusCode).toBe(422)
+    expect(refused.json().problems).toEqual(['base: is not what this server generates from the stored snapshot and generation request'])
+    expect(await store.latest('employee')).toBeNull()
+
+    expect(await store.publish('employee', null, bundle)).toEqual({ ok: true, version: 1 })
+    const served = await app.inject({ method: 'GET', url: '/v1/forms/employee/versions/latest', headers: as('admin') })
+    expect(served.statusCode, served.body).toBe(200)
   })
 
   // A published version edited by hand on the volume is not served, and the
@@ -230,7 +270,7 @@ describe('the administrator plane', () => {
     const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, lookups: [{ foreignKey: 'fk_employee_dept', display: ['name'] }] } })).json()
     const fields = (proposal.bindings.fields as Array<{ field: string; writable: boolean }>).map((binding) => [binding.field, { read: ['clerk'], write: binding.writable ? ['clerk'] : [] }])
     const policy = { ...POLICY, fields: Object.fromEntries(fields), lookups: { dept: [{ column: 'region', attribute: 'tenant' }] } }
-    const bundle = { format: 1, connection: 'erp', form: proposal.form, bindings: proposal.bindings, policy, snapshot: proposal.snapshot }
+    const bundle = bundleOf(proposal, policy)
     const published = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle } })
     expect(published.statusCode, published.body).toBe(201)
     expect((await app.inject({ method: 'POST', url: '/v1/forms/employee/drift', headers: as('admin') })).json()).toMatchObject({ changes: [], blocking: false })
@@ -259,6 +299,9 @@ describe('the administrator plane', () => {
   test('refuses malformed requests before they reach a database', async () => {
     for (const lookups of ['fk', [{ foreignKey: 1, display: [] }], [{ foreignKey: 'fk', display: [1] }], [null]]) {
       expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, lookups } })).statusCode).toBe(400)
+    }
+    for (const wrong of [{ connection: 1 }, { root: 'sales.employee' }, { root: { schema: 'sales' } }, { title: 7 }, { versionColumn: 1 }]) {
+      expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, ...wrong } })).statusCode, JSON.stringify(wrong)).toBe(400)
     }
     const unknownKey = await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, lookups: [{ foreignKey: 'fk_nope', display: ['name'] }] } })
     expect(unknownKey.statusCode).toBe(422)

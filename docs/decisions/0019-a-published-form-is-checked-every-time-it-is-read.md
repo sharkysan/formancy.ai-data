@@ -1,6 +1,6 @@
 # 0019 — A published form is one bundle, checked every time it is read; a form reaches only allowlisted databases
 
-- **Status:** accepted
+- **Status:** accepted; bundle format 2, whose presentation is checked on every read and whose base against the generator at publish only, extended by [0030](0030-presentation-is-a-patch-over-the-generated-base.md)
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/bundle.test.ts` — a generated

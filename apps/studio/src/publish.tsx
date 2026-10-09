@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
-import { validatePolicy } from '@formancy/data-core'
+import { presentationOf, validatePolicy } from '@formancy/data-core'
 import type { FormPolicy } from '@formancy/data-core'
 import type { AdminClient, Bundle, Proposal, Published } from './api.js'
 import { describeRef } from './choice.js'
@@ -14,8 +14,11 @@ const PUBLISH = 'publish'
 /** What the studio knows about the newest published version, which is the base a publish names. */
 type Base =
   | { state: 'reading' }
-  /** `rebased`: the person chose this base after a conflict, so publishing replaces somebody else's version. */
-  | { state: 'known'; version: number | null; rebased?: true }
+  /**
+   * `rebased`: the person chose this base after a conflict, so publishing replaces somebody else's version.
+   * `regenerated`: the version the draft was regenerated from, never re-read, so a publish since is a conflict.
+   */
+  | { state: 'known'; version: number | null; rebased?: true; regenerated?: true }
   /** The server could not serve it -- a version edited on disk, say. Publishing finds out which is current. */
   | { state: 'unknown'; message: string }
 
@@ -46,7 +49,13 @@ function describePublished(published: Published): string {
 /**
  * Step 8: publish the form, its bindings, its policy and the snapshot they
  * were generated from as one bundle (0019), against the version this studio
- * last saw.
+ * last saw -- or, for a draft regenerated from a version, against that one.
+ *
+ * The bundle is format 2 (0030): the generated base, the request it came
+ * from, and the presentation chosen over it, derived here by
+ * `presentationOf` from the session's document. A draft holding anything
+ * else -- builder-core accepts a required flag or a numeric span -- waits,
+ * with each reason, rather than being refused at the last step.
  *
  * Publication is compare-and-swap (0013). The base is read when the step
  * opens and named in the request; if somebody published in between, the
@@ -61,6 +70,8 @@ export function PublishStep({
   session,
   policy,
   stale,
+  regeneratedFrom = null,
+  undecided = [],
   onPublished,
   onDrift,
 }: {
@@ -70,17 +81,22 @@ export function PublishStep({
   session: BuilderSession
   policy: FormPolicy
   stale: boolean
-  onPublished: (formId: string) => void
+  /** The version the draft was regenerated from, which is its base; `null` for a draft generated afresh. */
+  regeneratedFrom?: number | null
+  /** Keys whose grants were written for another column, not yet kept or removed in the Policy step. */
+  undecided?: readonly string[]
+  onPublished: (formId: string, version: number) => void
   onDrift: () => void
 }): ReactElement {
   const document = useDocument(session)
   const formId = document.id
-  const [base, setBase] = useState<Base>({ state: 'reading' })
+  const [base, setBase] = useState<Base>(regeneratedFrom === null ? { state: 'reading' } : { state: 'known', version: regeneratedFrom, regenerated: true })
   const [result, setResult] = useState<Result | null>(null)
   const [pending, setPending] = useState(false)
   const focusAfter = useFocusAfterRender()
 
   useEffect(() => {
+    if (regeneratedFrom !== null) return
     let current = true
     void client.latest(formId).then((latest) => {
       if (!current) return
@@ -91,12 +107,18 @@ export function PublishStep({
     return () => {
       current = false
     }
-  }, [client, formId])
+  }, [client, formId, regeneratedFrom])
 
+  // Derived from the document that will be sent, on every edit: the one source of truth for what the presentation is.
+  const derived = useMemo(() => presentationOf(proposal.form, document, proposal.bindings), [proposal, document])
   const checked = validatePolicy(policy, proposal.bindings)
   const blockers = [
     checked.ok ? null : `The policy has ${String(checked.problems.length)} ${checked.problems.length === 1 ? 'problem' : 'problems'}: the Policy step lists ${checked.problems.length === 1 ? 'it' : 'them'}.`,
     stale ? 'The row filters changed since the form was generated: generate it again from the Policy step.' : null,
+    undecided.length === 0
+      ? null
+      : `Grants for ${undecided.join(', ')} were written for another column or lookup: keep or remove them in the Policy step. The studio asks this; the server would publish them.`,
+    ...(derived.ok ? [] : derived.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`)),
   ].filter((blocker): blocker is string => blocker !== null)
   const expected = base.state === 'known' ? base.version : null
   const next = (expected ?? 0) + 1
@@ -105,7 +127,9 @@ export function PublishStep({
     // A second press while the first is on its way does nothing; the button
     // stays enabled, because a disabled one drops the keyboard's focus.
     if (pending) return
-    const bundle: Bundle = { format: 1, connection, form: session.exportDocument(), bindings: proposal.bindings, policy, snapshot: proposal.snapshot }
+    if (!derived.ok) return
+    const { form, bindings, snapshot, generation } = proposal
+    const bundle: Bundle = { format: 2, connection, generation, base: form, presentation: derived.presentation, form: session.exportDocument(), bindings, policy, snapshot }
     setPending(true)
     setResult(null)
     const outcome = await client.publish(formId, expected, bundle)
@@ -113,7 +137,7 @@ export function PublishStep({
       setResult({ kind: 'published', version: outcome.value.version })
       // The next publish from here goes on top of this one.
       setBase({ state: 'known', version: outcome.value.version })
-      onPublished(formId)
+      onPublished(formId, outcome.value.version)
     } else if (outcome.status === 409) {
       const latest = await client.latest(formId)
       setResult({ kind: 'conflict', current: outcome.current ?? null, published: latest.ok ? latest.value : null })
@@ -147,9 +171,11 @@ export function PublishStep({
             ? `The published version of ${formId} could not be read: ${base.message} Publishing will find out which version is current.`
             : base.version === null
               ? `No version of ${formId} is published yet: this will be version 1.`
-              : base.rebased === true
-                ? `You rebased onto version ${String(base.version)}, which somebody else published. Publishing makes version ${String(next)} from your draft: their labels and policy are replaced, not merged.`
-                : `Version ${String(base.version)} of ${formId} is published. Publishing makes version ${String(next)}, which the runtime serves from then on.`}
+              : base.regenerated === true
+                ? `Regenerated from version ${String(base.version)} of ${formId}. Publishing makes version ${String(next)}; if somebody has published since, the server says so and replaces nothing.`
+                : base.rebased === true
+                  ? `You rebased onto version ${String(base.version)}, which somebody else published. Publishing makes version ${String(next)} from your draft: their labels and policy are replaced, not merged.`
+                  : `Version ${String(base.version)} of ${formId} is published. Publishing makes version ${String(next)}, which the runtime serves from then on.`}
       </p>
       {blockers.length === 0 ? null : (
         <div className="notice" role="note" id="publish-blockers">

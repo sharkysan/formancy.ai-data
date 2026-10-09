@@ -1,6 +1,6 @@
 # 0010 — Drift is classified against one form's bindings, and what cannot be seen is never called gone
 
-- **Status:** accepted; the retyped row narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md): a different length unit or fixed length is a retyping; the new drift kinds and per-operation stops, and the concurrency column gone, which now blocks the form, narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md); compared against the policy's lookup filters too, and a lookup's key, display and filter column retyped in any direction blocks it, narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)
+- **Status:** accepted; the retyped row narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md): a different length unit or fixed length is a retyping; the new drift kinds and per-operation stops, and the concurrency column gone, which now blocks the form, narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md); compared against the policy's lookup filters too, and a lookup's key, display and filter column retyped in any direction blocks it, narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md); compatible changes preserve a published presentation (DATA-14), extended by [0030](0030-presentation-is-a-patch-over-the-generated-base.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/drift/diff.test.ts` — identical

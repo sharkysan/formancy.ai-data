@@ -95,6 +95,43 @@ column, a new one and a hint, never inferred. Tables the form neither binds nor
 looks up are left out, so an empty report means nothing this form rests on
 changed. See [0010](../../docs/decisions/0010-drift-is-classified-against-the-bindings.md).
 
+## Presentation over a generated base
+
+A person's edits to a generated form are kept as a patch beside the base the
+generator wrote, and carried to the next base when the form is regenerated
+([0030](../../docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
+The patch holds exactly four edits — a field's label, a section's label, a
+field's place within its own section's grid, and full width — and nothing
+else.
+
+```ts
+import { presentationOf, rebasePresentation } from '@formancy/data-core'
+
+const derived = presentationOf(base, edited, bindings) // refuses every other difference, by JSON path
+const { presentation, form, conflicts } = rebasePresentation(
+  { base, presentation: derived.presentation, bindings },
+  { base: next.form, bindings: next.bindings },
+)
+```
+
+A field is anchored by what it stands for — its column, or its lookup's
+foreign key — so a label follows the column when a colliding key renumbers.
+A section is anchored by the label the generator wrote and which of the
+sections with that label it is. What cannot be carried as it was is a
+conflict: a field gone, a field under another key, a field the generator put
+in another section, a section gone, a label the generator also changed (the
+person's is kept). `applyPresentation` is what the server checks a stored
+form against; `reassignedKeys` names keys that now stand for another column,
+whose grants somebody has to confirm.
+
+What it does not do: a renamed column reads as one gone and one new, and its
+overrides are reported dropped rather than guessed across; a root whose own
+label is `Record` has two sections labelled Record, and when one of them
+comes or goes the rebase cannot tell which is left, so their overrides are
+reported dropped (`section-gone`) rather than put on the wrong one; help
+text, translations, `required`, a numeric span and a move between sections
+are refused, not carried.
+
 ## Lookups
 
 The database-neutral half of a foreign-key lookup: what a `select` stores, what

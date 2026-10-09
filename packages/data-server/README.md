@@ -32,6 +32,18 @@ existed would be documented and inert.
   A row filter on a column a filter cannot compare — a boolean, a float, a
   time or a timestamp — or one the table lacks is refused the same way
   ([0028](../../docs/decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)).
+  Since [0030](../../docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)
+  a bundle is format 2: it also keeps the generation request, the generated
+  base and the presentation chosen over it, and its form must be that base
+  with that presentation applied. Format 1 is still read and served, and no
+  longer published. Publish also checks that this server's generator writes
+  the stored base and bindings from the stored snapshot and request; reads
+  do not, so a later generator never makes a stored version corrupt. Reads
+  do check what the stored request alone decides — its title, root,
+  confirmed version column, pins over written fields and lookups — against
+  the base and bindings, because a regeneration generates from that request;
+  a pin taken out by hand is the one edit to it that no check short of the
+  generator can see.
 - **`DRIVER_FACTORIES`** — one connection factory per engine, opening every
   connection through the adapter package's own `connect…` function, so a host
   embedding the server never builds a pool from another copy of a driver
@@ -44,6 +56,21 @@ existed would be documented and inert.
   publication and drift, for a host token holding an administrator role
   ([0020](../../docs/decisions/0020-administration-is-a-separate-plane.md)).
   Registered only when the server is given a registry, a store and those roles.
+  Since [0030](../../docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md):
+  `GET /v1/forms/:id/versions` and `GET /v1/forms/:id/versions/:n` list and
+  read versions, each validated as the latest is; `POST
+  /v1/forms/:id/regenerations` rediscovers, regenerates from the stored
+  request, carries the presentation by the column or lookup each edit was
+  chosen for, and reports what it could not carry, lookups the runtime would
+  now refuse, keys that now name another column and the policy's problems
+  with the new bindings — and writes nothing; `POST
+  /v1/forms/:id/restorations` republishes an older version — the same
+  document, written as the store writes every version, so the same bytes for
+  a version this store wrote — only when drift against it blocks nothing. A
+  restore brings back that version's policy and is not a database rollback.
+  Neither a restore nor a publish writes an audit event or a log line: the
+  audit trail ([0023](../../docs/decisions/0023-the-audit-trail-is-operational-not-evidence.md))
+  covers the runtime plane only.
 
 - **The runtime plane** — a published form, its records and its lookups, for
   the host application's people, each request asking the policy

@@ -21,6 +21,8 @@ export type PublishOutcome =
 export interface ConfigurationStore {
   /** The newest published version, or `null` before the first. */
   latest(id: string): Promise<number | null>
+  /** Every published version, ascending; `[]` for an id never published (0030). */
+  versions(id: string): Promise<number[]>
   /** One published version, or `undefined` if it does not exist. */
   read(id: string, version: number): Promise<unknown>
   /**
@@ -44,11 +46,11 @@ export interface ConfigurationStore {
  * never have shown it.
  */
 export const CONFIGURATION_ID_MAX_LENGTH = 128
-const ID = new RegExp(`^[a-z0-9][a-z0-9._-]{0,${String(CONFIGURATION_ID_MAX_LENGTH - 1)}}$`)
+export const CONFIGURATION_ID = new RegExp(`^[a-z0-9][a-z0-9._-]{0,${String(CONFIGURATION_ID_MAX_LENGTH - 1)}}$`)
 const VERSION_FILE = /^([1-9][0-9]*)\.json$/
 
 function assertId(id: string): void {
-  if (!ID.test(id)) throw new Error(`${JSON.stringify(id)} is not a configuration id`)
+  if (!CONFIGURATION_ID.test(id)) throw new Error(`${JSON.stringify(id)} is not a configuration id`)
 }
 
 function isCode(error: unknown, code: string): boolean {
@@ -92,7 +94,7 @@ export function createFileConfigurationStore(root: string): ConfigurationStore {
     }
   }
 
-  async function latest(id: string): Promise<number | null> {
+  async function versions(id: string): Promise<number[]> {
     assertId(id)
     let names: string[]
     try {
@@ -100,20 +102,24 @@ export function createFileConfigurationStore(root: string): ConfigurationStore {
     } catch (error) {
       if (!isCode(error, 'ENOENT') && !isCode(error, 'ENOTDIR')) throw error
       await rootIsMissing()
-      return null
+      return []
     }
-    let newest: number | null = null
+    // Only the final names: a `.publishing-*` leftover of a crashed publish is never a version.
+    const found: number[] = []
     for (const name of names) {
       const match = VERSION_FILE.exec(name)
-      if (match?.[1] === undefined) continue
-      const version = Number(match[1])
-      if (newest === null || version > newest) newest = version
+      if (match?.[1] !== undefined) found.push(Number(match[1]))
     }
-    return newest
+    return found.sort((a, b) => a - b)
+  }
+
+  async function latest(id: string): Promise<number | null> {
+    return (await versions(id)).at(-1) ?? null
   }
 
   return {
     latest,
+    versions,
 
     async read(id, version) {
       assertId(id)
@@ -169,7 +175,7 @@ export function createFileConfigurationStore(root: string): ConfigurationStore {
       const names = await readdir(root)
       const ids: string[] = []
       for (const name of names) {
-        if (ID.test(name) && (await latest(name)) !== null) ids.push(name)
+        if (CONFIGURATION_ID.test(name) && (await latest(name)) !== null) ids.push(name)
       }
       return ids.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
     },

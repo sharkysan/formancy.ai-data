@@ -136,8 +136,8 @@ export function RowFilters({
             runs again the form and this policy disagree about which fields a person fills in.
           </p>
           <p className="hint" id="regenerate-replaces">
-            Generating again starts the presentation afresh: labels and order set in Presentation are replaced. The policy is
-            kept.
+            Generating again carries the labels, order and widths set in Presentation to the new form, and Presentation lists
+            anything it could not carry. The policy is kept.
           </p>
           <button
             type="button"

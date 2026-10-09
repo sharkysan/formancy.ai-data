@@ -1,8 +1,13 @@
 import { useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
-import type { DriftChange, DriftSeverity, DriftSubject } from '@formancy/data-core'
+import type { DriftSeverity } from '@formancy/data-core'
+import type { Regeneration } from '@formancy/data-server'
 import type { AdminClient, Drift, Published } from './api.js'
-import { describeRef, isFormId } from './choice.js'
+import { isFormId } from './choice.js'
+import { Change } from './drift-change.js'
+import { regenerateForm, RegenerationView } from './regenerate.js'
+import type { Regenerated } from './regenerate.js'
+import { VersionsPanel } from './versions.js'
 
 /**
  * The three severities, most severe first, each with what it stops -- the
@@ -14,13 +19,6 @@ const SEVERITIES: ReadonlyArray<{ severity: DriftSeverity; heading: string; bloc
   { severity: 'info', heading: 'Info', blocks: 'Blocks nothing. Recorded so the review is complete.' },
 ]
 
-function describeSubject(subject: DriftSubject): string {
-  if (subject.kind === 'scope') return 'the discovery scope'
-  if (subject.kind === 'schema') return `schema ${subject.schema}`
-  if (subject.kind === 'object') return describeRef(subject.object)
-  return `${describeRef(subject.object)}, ${subject.kind} ${subject.name}`
-}
-
 /** What an operation the published form offered can still do, from the report and the bundle. */
 function operationState(offered: boolean | undefined, writable: boolean): string {
   if (offered === false) return 'never offered by this form'
@@ -28,26 +26,15 @@ function operationState(offered: boolean | undefined, writable: boolean): string
   return 'blocked by the changes below'
 }
 
-function labelIn(published: Published | null, key: string): string {
-  const label = published?.bundle.form.model.fields.find((field) => field.key === key)?.label
-  return typeof label === 'string' ? `${label} (${key})` : key
-}
+/**
+ * A check's answer. A failure names the form when it has versions to offer
+ * anyway: a newest version edited on disk is not served, and restoring an
+ * older one over it is the way back (0030).
+ */
+type Checked = { formId: string; drift: Drift; published: Published | null } | { failure: string; formId?: string }
 
-function Change({ change, published }: { change: DriftChange; published: Published | null }): ReactElement {
-  return (
-    <li className="change" data-severity={change.severity}>
-      <p>
-        <span className="severity">{change.severity}</span> <code>{change.kind}</code> on {describeSubject(change.subject)}
-      </p>
-      <p>{change.message}</p>
-      <p className="affects">
-        {change.affects.length === 0 ? 'Affects no field of this form.' : `Affects ${change.affects.map((key) => labelIn(published, key)).join(', ')}.`}
-      </p>
-    </li>
-  )
-}
-
-type Checked = { formId: string; drift: Drift; published: Published | null } | { failure: string }
+/** The refusals of a published form whose versions are still listed and may be restored. */
+const VERSIONS_STILL_OFFERED = new Set(['corrupt-bundle', 'unavailable'])
 
 /**
  * Step 9: a published form against the database as it is now (plan sections 3
@@ -57,11 +44,41 @@ type Checked = { formId: string; drift: Drift; published: Published | null } | {
  * id is typed, and defaults to the form this session generated. Each change is
  * shown with its severity, what that severity stops, and the fields it
  * touches; above them, what the published form may still do.
+ *
+ * Once checked, the two answers to drift (0030): regenerate the form from
+ * the database now, keeping its presentation, as a draft to review and
+ * publish; or restore an older version, when the database can still serve
+ * it. The versions are offered too when the newest one is not served or the
+ * database cannot be read, because a restore over it is the way back.
  */
-export function DriftStep({ client, formId: initial }: { client: AdminClient; formId: string }): ReactElement {
+export function DriftStep({
+  client,
+  formId: initial,
+  onRegenerated,
+}: {
+  client: AdminClient
+  formId: string
+  /** Continue with a regeneration as the draft: the Workbench takes it from here. */
+  onRegenerated: (regeneration: Regeneration, fresh: string[]) => void
+}): ReactElement {
   const [formId, setFormId] = useState(initial)
   const [checking, setChecking] = useState(false)
   const [checked, setChecked] = useState<Checked | null>(null)
+  const [regenerating, setRegenerating] = useState(false)
+  const [regenerated, setRegenerated] = useState<Regenerated | null>(null)
+
+  async function run(id: string): Promise<void> {
+    setChecking(true)
+    const [drift, latest] = await Promise.all([client.drift(id), client.latest(id)])
+    setChecking(false)
+    // A regeneration was of the version checked before; it says nothing about this one.
+    setRegenerated(null)
+    setChecked(
+      drift.ok
+        ? { formId: id, drift: drift.value, published: latest.ok ? latest.value : null }
+        : { failure: drift.message, ...(VERSIONS_STILL_OFFERED.has(drift.code) ? { formId: id } : {}) },
+    )
+  }
 
   async function check(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
@@ -72,11 +89,17 @@ export function DriftStep({ client, formId: initial }: { client: AdminClient; fo
       setChecked({ failure: `${id === '' ? 'An empty id' : id} is not a form id: lower-case letters, digits, dot, hyphen or underscore.` })
       return
     }
-    setChecking(true)
-    const [drift, latest] = await Promise.all([client.drift(id), client.latest(id)])
-    setChecking(false)
-    setChecked(drift.ok ? { formId: id, drift: drift.value, published: latest.ok ? latest.value : null } : { failure: drift.message })
+    await run(id)
   }
+
+  async function regenerate(id: string): Promise<void> {
+    if (regenerating) return
+    setRegenerating(true)
+    setRegenerated(await regenerateForm(client, id))
+    setRegenerating(false)
+  }
+
+  const versionsOf = checked?.formId
 
   return (
     <>
@@ -98,10 +121,29 @@ export function DriftStep({ client, formId: initial }: { client: AdminClient; fo
           {checked.failure}
         </p>
       ) : (
-        <DriftReportView drift={checked.drift} published={checked.published} formId={checked.formId} />
+        <>
+          <DriftReportView drift={reported(checked.drift, regenerated)} published={checked.published} formId={checked.formId} />
+          <p className="next">
+            <button type="button" className="primary" onClick={() => void regenerate(checked.formId)}>
+              Regenerate, keeping your presentation
+            </button>
+          </p>
+          {regenerated === null ? null : <RegenerationView regenerated={regenerated} onContinue={onRegenerated} />}
+        </>
+      )}
+      {versionsOf === undefined ? null : (
+        // Keyed by form: one form's chosen version and restore outcome are never shown under another's heading.
+        <VersionsPanel key={versionsOf} client={client} formId={versionsOf} onRestored={() => void run(versionsOf)} />
       )}
     </>
   )
+}
+
+/** The drift to show: the regeneration's, which is newer, once there is one; the check's until then. */
+function reported(drift: Drift, regenerated: Regenerated | null): Drift {
+  if (regenerated?.ok === true) return { ...regenerated.regeneration.drift, version: regenerated.regeneration.version }
+  if (regenerated?.ok === false && regenerated.drift !== undefined) return { ...regenerated.drift, version: drift.version }
+  return drift
 }
 
 function DriftReportView({ drift, published, formId }: { drift: Drift; published: Published | null; formId: string }): ReactElement {

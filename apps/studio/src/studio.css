@@ -24,7 +24,8 @@
 
 /*
  * In cascade order, one file per reason to change: the room, the controls,
- * prose, the shell (sign-in and the workbench), the steps' panes, and narrow
+ * prose, the shell (sign-in and the workbench), the steps' panes, the panes
+ * of a form's evolution -- regenerate, carry, restore (0030) -- and narrow
  * screens last so their rules win. Vite inlines each import into one
  * stylesheet; the browser gate inlines them the same way before it parses.
  */
@@ -33,4 +34,5 @@
 @import './styles/prose.css';
 @import './styles/shell.css';
 @import './styles/steps.css';
+@import './styles/evolve.css';
 @import './styles/narrow.css';

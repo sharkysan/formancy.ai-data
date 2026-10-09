@@ -1,0 +1,67 @@
+/* ------------------------------------------- regenerate, carry, restore */
+
+/* What the server did with a regeneration is its side of the room: teal at
+   the edge, as the policy check that fits. The findings are lists a person
+   reads down, each marked like a generator's note. */
+.regeneration,
+.versions,
+.carried {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 2%);
+}
+
+.regeneration {
+  border-color: color-mix(in srgb, var(--server) 45%, transparent);
+}
+
+.regeneration > h3,
+.versions > h3,
+.carried > h3 {
+  margin-top: 0;
+}
+
+.finding li,
+.carried li {
+  padding-inline-start: 0.625rem;
+  border-inline-start: 2px solid var(--edge-strong);
+  font-size: 0.875rem;
+}
+
+/* A conflict is something the person decides: violet, as what they act on. */
+.carried li {
+  border-color: var(--client);
+}
+
+.carried li + li {
+  margin-top: 0.5rem;
+}
+
+.carried li > p {
+  margin: 0.25rem 0;
+}
+
+.carried .inline-form {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.versions .described {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.versions .problem-box h4 {
+  margin: 0.5rem 0 0.25rem;
+}
+
+.reassigned h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.reassigned li + li {
+  margin-top: 0.5rem;
+}
