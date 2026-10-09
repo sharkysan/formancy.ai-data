@@ -7,6 +7,7 @@ interface CheckRow {
   object_id: number
   name: string
   definition: string | null
+  is_disabled: boolean
   is_not_trusted: boolean
 }
 
@@ -15,12 +16,15 @@ interface CheckRow {
  * not as it was written: `status in ('draft', 'placed', 'shipped')` comes back
  * as `([status]='shipped' OR [status]='placed' OR [status]='draft')`.
  *
- * A disabled check is reported `validated: false`, because SQL Server marks it
- * untrusted. The contract has no `enforced` for checks, so a disabled one and
- * a WITH NOCHECK one read the same; 0007 says so.
+ * `enforced` is not `is_disabled`: ALTER TABLE … NOCHECK CONSTRAINT stops the
+ * check for new rows. `validated` is not `is_not_trusted`, which WITH NOCHECK
+ * sets and which disabling sets too, so a disabled check is never validated;
+ * a WITH NOCHECK one is enforced and not validated, and only `is_disabled`
+ * tells the two apart (0026). `is_not_for_replication` is not read: it exempts
+ * a replication agent's writes, which are not a form's.
  */
 const SQL = (scoped: string): string => `
-  select cc.parent_object_id as object_id, cc.name, cc.definition, cc.is_not_trusted
+  select cc.parent_object_id as object_id, cc.name, cc.definition, cc.is_disabled, cc.is_not_trusted
   from sys.check_constraints cc
   where cc.parent_object_id in ${scoped}`
 
@@ -37,7 +41,7 @@ export async function readChecks(pool: ConnectionPool, schemas: readonly string[
         if (row.definition === null) {
           gaps.push({ objectId, aspect: 'checks', detail: `${row.name}: the expression is hidden without VIEW DEFINITION` })
         }
-        return { name: row.name, expression: row.definition, validated: !row.is_not_trusted }
+        return { name: row.name, expression: row.definition, enforced: !row.is_disabled, validated: !row.is_not_trusted }
       }),
     )
   }

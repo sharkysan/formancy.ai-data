@@ -1,4 +1,4 @@
-import type { NormalizedType } from '@formancy/data-core'
+import type { NormalizedType, TextLengthUnit } from '@formancy/data-core'
 
 /** What sys.columns and sys.types say about one column's type. */
 export interface TypeFacts {
@@ -16,6 +16,12 @@ export interface TypeFacts {
   maxLength: number
   precision: number
   scale: number
+  /**
+   * COLLATIONPROPERTY(collation, 'CodePage') of the column's own collation:
+   * 65001 for a UTF-8 one, 1252 for the Latin1 ones, 932 for Japanese. `null`
+   * for a type with no collation, and for a collation the server cannot name.
+   */
+  codePage: number | null
 }
 
 export interface ColumnType {
@@ -34,21 +40,36 @@ const length = (bytes: number, bytesPerUnit: number): number | null => (bytes ==
 const integer = (min: string, max: string): Normalize => () => ({ kind: 'integer', min, max })
 const decimal: Normalize = (facts) => ({ kind: 'decimal', precision: facts.precision, scale: facts.scale })
 const timestamp = (withTimeZone: boolean): Normalize => (facts) => ({ kind: 'timestamp', withTimeZone, precision: facts.scale })
+
+/** The code page of every UTF-8 collation. */
+const UTF8_CODE_PAGE = 65001
+
+/** char and varchar count bytes: of UTF-8 under a UTF-8 collation, of the code page under any other, and a NULL code page is the weaker claim. */
+const byteUnit = (facts: TypeFacts): TextLengthUnit => (facts.codePage === UTF8_CODE_PAGE ? 'utf8-bytes' : 'code-page-bytes')
+/** nchar and nvarchar count UTF-16 code units, two bytes each, under every collation, a UTF-8 one included. */
+const codeUnits = (): TextLengthUnit => 'utf16-code-units'
+
 const text =
-  (bytesPerUnit: number, fixedLength: boolean): Normalize =>
-  (facts) => ({ kind: 'text', maxLength: length(facts.maxLength, bytesPerUnit), fixedLength })
-const binary: Normalize = (facts) => ({ kind: 'binary', maxLength: length(facts.maxLength, 1) })
+  (unit: (facts: TypeFacts) => TextLengthUnit, bytesPerUnit: number, fixedLength: boolean): Normalize =>
+  (facts) => ({ kind: 'text', maxLength: length(facts.maxLength, bytesPerUnit), lengthUnit: unit(facts), fixedLength })
+const binary =
+  (fixedLength: boolean): Normalize =>
+  (facts) => ({ kind: 'binary', maxLength: length(facts.maxLength, 1), fixedLength })
 
 /**
  * The system types this adapter has a normalised meaning for. Anything else --
  * xml, sql_variant, the CLR types, the deprecated text/ntext/image, a type a
  * later server adds -- is `unsupported`: reported, never dropped (0004).
  *
- * The lengths are the catalog's BYTES turned into the unit the type counts:
- * nchar and nvarchar store UTF-16 code units, two bytes each, so
- * nvarchar(200) is 400 in sys.columns and 200 here. char and varchar count
- * bytes, which are characters on a single-byte code page and are not under a
- * UTF-8 collation; 0007 says what that costs.
+ * The lengths are the catalog's BYTES turned into the unit the type counts,
+ * and the unit is said (0026): nchar and nvarchar store UTF-16 code units, two
+ * bytes each, so nvarchar(200) is 400 in sys.columns and 200 here. char and
+ * varchar count bytes -- of UTF-8 under a UTF-8 collation, where é is two,
+ * and of the collation's code page under any other, which is one per
+ * character on 1252 and one or two on 932.
+ *
+ * binary(n) is fixed: it pads a shorter value with zero bytes to n, so 0x01
+ * written to binary(4) reads 0x01000000. varbinary keeps what it is given.
  *
  * Temporal precision is the catalog's scale for every temporal type, which is
  * the number of fractional-second digits the server writes. For datetime that
@@ -80,13 +101,13 @@ const BY_SYSTEM_TYPE: ReadonlyMap<string, Normalize> = new Map<string, Normalize
   ['datetimeoffset', timestamp(true)],
   ['datetime', timestamp(false)],
   ['smalldatetime', timestamp(false)],
-  ['char', text(1, true)],
-  ['varchar', text(1, false)],
-  ['nchar', text(2, true)],
-  ['nvarchar', text(2, false)],
+  ['char', text(byteUnit, 1, true)],
+  ['varchar', text(byteUnit, 1, false)],
+  ['nchar', text(codeUnits, 2, true)],
+  ['nvarchar', text(codeUnits, 2, false)],
   ['uniqueidentifier', () => ({ kind: 'uuid' })],
-  ['binary', binary],
-  ['varbinary', binary],
+  ['binary', binary(true)],
+  ['varbinary', binary(false)],
   // rowversion's catalog name is its deprecated synonym, timestamp. It is a
   // counter, never a clock.
   ['timestamp', () => ({ kind: 'rowversion' })],

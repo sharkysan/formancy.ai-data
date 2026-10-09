@@ -2,7 +2,7 @@ import { createSnapshot } from '@formancy/data-core'
 import type { DiscoveryScope, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
 import type { Sql, TransactionSql } from 'postgres'
 import { readChecks } from './checks.js'
-import { readColumns } from './columns.js'
+import { readColumns, textUnitOf } from './columns.js'
 import { readComments } from './comments.js'
 import { readForeignKeys } from './foreign-keys.js'
 import { readKeys } from './keys.js'
@@ -35,14 +35,14 @@ import { readObjects } from './objects.js'
 export async function discoverPostgres(sql: Sql, scope: DiscoveryScope): Promise<MetadataSnapshot> {
   const schemas = [...scope.schemas]
   return sql.begin('isolation level repeatable read read only', async (tx) => {
-    const [inScope, columns, keys, foreignKeys, checks, comments, serverVersion] = await Promise.all([
+    const { version: serverVersion, encoding } = await readSettings(tx)
+    const [inScope, columns, keys, foreignKeys, checks, comments] = await Promise.all([
       readObjects(tx, schemas),
-      readColumns(tx, schemas),
+      readColumns(tx, schemas, textUnitOf(encoding)),
       readKeys(tx, schemas),
       readForeignKeys(tx, schemas),
       readChecks(tx, schemas),
       readComments(tx, schemas),
-      readServerVersion(tx),
     ])
 
     const objects = inScope.usable.map((object): ObjectMeta => {
@@ -68,11 +68,17 @@ export async function discoverPostgres(sql: Sql, scope: DiscoveryScope): Promise
   })
 }
 
-/** The same setting `createPostgresAdapter().ping()` reports, so the two cannot disagree. */
-async function readServerVersion(sql: TransactionSql): Promise<string> {
-  const [row] = await sql<{ version: string }[]>`select pg_catalog.current_setting('server_version') as version`
-  // Never reached: a SELECT of one expression returns one row. Kept, as in
-  // ping, because `row` is `T | undefined` under noUncheckedIndexedAccess.
-  if (row === undefined) throw new Error('PostgreSQL answered the version query with no row')
-  return row.version
+/**
+ * The server's version — the same setting `createPostgresAdapter().ping()`
+ * reports, so the two cannot disagree — and the encoding of the database this
+ * connection is in, fixed when it was created, which decides what a text
+ * length counts.
+ */
+async function readSettings(sql: TransactionSql): Promise<{ version: string; encoding: string }> {
+  const [row] = await sql<{ version: string; encoding: string }[]>`
+    select pg_catalog.current_setting('server_version') as version, pg_catalog.current_setting('server_encoding') as encoding`
+  // Never reached: a SELECT of one row of expressions returns one row. Kept,
+  // as in ping, because `row` is `T | undefined` under noUncheckedIndexedAccess.
+  if (row === undefined) throw new Error('PostgreSQL answered the settings query with no row')
+  return row
 }

@@ -1,6 +1,6 @@
 # 0017 — Convert every SQL Server value in SQL, check what a write stored, and translate a refusal by its number
 
-- **Status:** accepted
+- **Status:** accepted; `real` and zoneless timestamp reads narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md)
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** three suites in `packages/data-sqlserver/src/` against

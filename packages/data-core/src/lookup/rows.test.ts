@@ -96,8 +96,8 @@ describe('lookupKeys', () => {
     expect(asked({ kind: 'uuid' }, [uuid, uuid.toUpperCase(), `{${uuid}}`, uuid.replaceAll('-', ''), 'abc'])).toEqual([uuid])
 
     // PostgreSQL refuses a NUL in a text parameter outright, and SQL Server binds it.
-    expect(asked({ kind: 'text', maxLength: 3, fixedLength: false }, ['abc', 'a c', 'abcd', 'a\u0000'])).toEqual(['abc', 'a c'])
-    expect(asked({ kind: 'text', maxLength: null, fixedLength: false }, ['x'.repeat(39), ''])).toEqual(['x'.repeat(39), ''])
+    expect(asked({ kind: 'text', maxLength: 3, lengthUnit: 'utf16-code-units', fixedLength: false }, ['abc', 'a c', 'abcd', 'a\u0000'])).toEqual(['abc', 'a c'])
+    expect(asked({ kind: 'text', maxLength: null, lengthUnit: 'utf16-code-units', fixedLength: false }, ['x'.repeat(39), ''])).toEqual(['x'.repeat(39), ''])
 
     expect(
       asked({ kind: 'date' }, ['2024-02-29', '0001-01-01', '9999-12-31', '2023-02-29', '2026-13-01', '2026-00-10', '2026-04-31', '2026-04-00', '0000-01-01', '2026-1-01', '20260101', '2026-01-01T00:00:00Z']),

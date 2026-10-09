@@ -316,11 +316,12 @@ describe('objects', () => {
 })
 
 describe('checks and comments', () => {
-  // NOT VALID means the rows already there were never checked. And the
-  // expression is the expression: pg_get_constraintdef would append
-  // "NOT VALID" to it, and a translator would choke on SQL that is not one.
-  test('a NOT VALID check is unvalidated, and its expression is only the expression', () => {
-    expect(described('measure').checks).toEqual([{ name: 'ck_measure_positive', expression: '(reading > 0)', validated: false }])
+  // NOT VALID means the rows already there were never checked; new rows are
+  // (enforced). And the expression is the expression: pg_get_constraintdef
+  // would append "NOT VALID" to it, and a translator would choke on SQL that
+  // is not one.
+  test('a NOT VALID check is enforced and unvalidated, and its expression is only the expression', () => {
+    expect(described('measure').checks).toEqual([{ name: 'ck_measure_positive', expression: '(reading > 0)', enforced: true, validated: false }])
   })
 
   // A column comment lives in pg_description beside the table's, told apart

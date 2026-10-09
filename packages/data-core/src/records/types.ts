@@ -85,7 +85,14 @@ export interface UpdateRequest {
 /** A record as the API carries it: canonical values by column, and its current version token. */
 export interface RecordRead {
   ok: true
-  /** Canonical text and JSON values, exactly what `codecFor(column).parse` would return for them. */
+  /**
+   * Canonical text and JSON values, exactly what `codecFor(column).parse` would
+   * return for them. Two are named here because each engine's own spelling
+   * differs (0026): a 32-bit float is the number `canonicalFloat32` gives — 0.1,
+   * never 0.10000000149011612, the same the codec accepts it as — and a
+   * zoneless timestamp, which has no codec, is `YYYY-MM-DDTHH:MM:SS` and then
+   * its fraction with trailing zeros dropped, as `NormalizedType` describes.
+   */
   values: Record<string, ApiValue>
   /** The version token to send back with an update, or `null` when the target has no concurrency. */
   version: string | null

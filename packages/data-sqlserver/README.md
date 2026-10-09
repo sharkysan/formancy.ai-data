@@ -57,6 +57,21 @@ A table someone has denied `VIEW DEFINITION` or `CONTROL` on, whether to the
 account or to a role it is in, vanishes even under that grant; the account can
 count those denials, though not place them, and the snapshot says that too.
 
+**What a column is read as**
+([0026](../../docs/decisions/0026-name-every-column-fact-the-engines-disagree-on.md)).
+A text length is in the unit the column counts: UTF-16 code units for
+`nchar`/`nvarchar` under every collation, a UTF-8 one included, though the
+catalog reports code page 65001 for it; bytes of UTF-8 for `char`/`varchar`
+under a UTF-8 collation; bytes of its code page under any other. `binary(n)`
+pads and says so. `IDENTITY` is `identity-always`; a default that is exactly
+`NEXT VALUE FOR` a sequence numbers a row an insert leaves out and takes a
+value given by hand, as PostgreSQL's BY DEFAULT identity does, and is
+`identity-by-default`, keeping its default. Without `VIEW DEFINITION` that
+definition is `NULL`, the column reads as an ordinary default, and the
+snapshot's `defaults` gap says so. A check is `enforced` unless it is
+disabled, and `validated` unless it is untrusted — which every disabled check
+also is.
+
 Every function here takes a connected pool rather than a connection string:
 opening the connection is where a secret is handled, and that happens once, in
 the composition root. Nothing in this package reads configuration.
@@ -120,10 +135,16 @@ const saved = await records.update({ target, key, set, expectedVersion: read.ver
 
 - **Values leave as text the server produced**, exactly what
   `codecFor(column).parse` returns: decimals padded to their scale (money to
-  four places), integers as decimal strings, dates `YYYY-MM-DD`, times
-  `HH:MM`, instants in UTC to the second, UUIDs in lower case. A time's
-  seconds and an instant's fraction are cut off, because formancy's shapes
-  cannot hold them; update only the fields a person changed. Text and
+  four places), integers as decimal strings, a `real` as the shortest decimal
+  naming its float (`0.1`, never `0.10000000149011612`), dates `YYYY-MM-DD`,
+  times `HH:MM`, instants in UTC to the second, a zoneless timestamp with its
+  fraction and no trailing zeros (`2026-10-08T12:34:56.5`), as PostgreSQL
+  spells it ([0026](../../docs/decisions/0026-name-every-column-fact-the-engines-disagree-on.md)) —
+  a `datetime`, which keeps 1/300 s, to the millisecond, rounded as SQL
+  Server spells it —
+  UUIDs in lower case. A time's seconds and an instant's fraction are cut
+  off, because formancy's shapes cannot hold them; update only the fields a
+  person changed. Text and
   decimals are read by the column's own type, not the snapshot's, so a
   column widened since discovery reads what it holds.
 - **Values arrive as text the server converts**, never through the driver's
@@ -180,7 +201,9 @@ upgrade that changes any of this fails by name:
   row; bound as its decimal string it addresses the right one.
 - A `date` arrives as a JavaScript `Date` at midnight UTC.
 - `nvarchar(n)` holds n UTF-16 code units, and `varchar(n)` under a UTF-8
-  collation holds n bytes; neither is n characters.
+  collation holds n bytes; neither is n characters. Discovery says which, as
+  each text column's `lengthUnit`, from its own collation's code page, and
+  the codec counts in it (0026).
 - Optimistic concurrency on `rowversion` holds between two independent
   connections: the update that names the current 8-byte token wins, and the
   stale one changes no rows.

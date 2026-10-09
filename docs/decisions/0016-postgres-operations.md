@@ -25,8 +25,9 @@
   every edge value of the fixture back exactly*, *reads every kind as the
   value its codec would return*, *reads a value the canonical shapes cannot
   carry faithfully*, *reads the same values however the driver and the
-  session are configured*, *reads a real as the shortest decimal PostgreSQL
-  itself prints for it*, *a record outside the filters is not-found*, *a
+  session are configured*, *reads a real as the shortest decimal naming
+  its float, never longer than PostgreSQL prints it* (renamed by 0026, which
+  found PostgreSQL's own text is not always that decimal), *a record outside the filters is not-found*, *a
   filter on a table with a domain that refuses NULL reads, updates and
   answers like any other*, *objects planted on the search path change no
   answer*, *quotes

@@ -1,9 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ApiValue, MetadataSnapshot, ObjectMeta, ObjectRef, RecordAdapter, RecordColumn, RecordOutcome, RecordTarget, RecordValue, RowFilters, UpdateRequest } from '@formancy/data-core'
 import { codecFor, findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { EDGE_VALUES, startSqlServerFixture } from '@formancy/data-fixtures'
+import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT, startSqlServerFixture } from '@formancy/data-fixtures'
 import { createSqlServerRecords, discoverSqlServer } from './index.js'
 
 /**
@@ -29,6 +30,7 @@ const KINDS: ObjectRef = { schema: 'ops', name: 'kinds' }
 const VERSIONED: ObjectRef = { schema: 'ops', name: 'versioned' }
 const AUDITED: ObjectRef = { schema: 'ops', name: 'audited' }
 const HEAP: ObjectRef = { schema: 'ops', name: 'heap' }
+const ZONELESS: ObjectRef = { schema: 'ops', name: 'zoneless' }
 const FIXTURE_ORDER = EDGE_VALUES.beyondSafeInteger
 
 beforeAll(async () => {
@@ -79,6 +81,14 @@ beforeAll(async () => {
     create table ops.timed (at time(0) not null constraint df_timed_at default '09:30:15' constraint pk_timed primary key,
       note nvarchar(20) null, row_version rowversion not null);
     insert into ops.timed (at, note) values ('09:30:00', N'whole minute')`)
+  // Zoneless timestamps of every scale, with a fraction and without: style 126
+  // spells each differently (0026).
+  await owner.request().batch(`
+    create table ops.zoneless (id int not null constraint pk_zoneless primary key, d7 datetime2(7) null, dt datetime null, sdt smalldatetime null);
+    insert into ops.zoneless (id, d7, dt, sdt) values
+      (1, '2026-10-08T12:34:50.12', '2026-10-08T12:34:56.007', '2026-10-08T12:34:50'),
+      (2, '2026-10-08T12:34:50', '2026-10-08T12:34:50', '2026-10-08T12:34:00'),
+      (3, '2026-10-08T12:34:56.0000001', '2026-10-08T12:34:59.997', null)`)
   await owner.request().batch(`create trigger ops.stamped_touch on ops.stamped after insert, update as
     begin set nocount on; update s set touched = s.touched + 1 from ops.stamped as s join inserted as i on i.id = s.id; end`)
   await owner.request().batch(`create trigger ops.coded_touch on ops.coded after insert, update as
@@ -259,20 +269,22 @@ describe('reading a record', () => {
   })
 
   // The kinds the fixture does not hold, each as its codec spells it: a float
-  // as the double it is, a real as the double its 32 bits are, money to four
-  // places (its own default conversion rounds to two), a uuid in lower case,
-  // an instant in UTC. A time keeps its minutes and an instant its seconds:
-  // formancy's shapes cannot hold more, and what is cut off is said in 0017.
+  // as the double it is, a real as the shortest decimal naming its 32 bits
+  // (0026), money to four places (its own default conversion rounds to two), a
+  // uuid in lower case, an instant in UTC, a zoneless timestamp with its
+  // fraction. Only a time and an instant are cut short -- a time to its
+  // minutes, an instant to its seconds -- because formancy's shapes cannot hold
+  // more (0017).
   test('every other kind reads as its codec spells it, and what the shapes cannot hold is cut off', async () => {
     const records = createSqlServerRecords(owner)
     const kinds = ok(await records.read({ target: target(KINDS), key: [valueOf(KINDS, 'id', '1')], columns: readable(KINDS), filters: EVERY_ROW }))
     expect(kinds.values).toEqual({
       id: '1',
       f: 0.1,
-      r: 0.10000000149011612,
+      r: 0.1,
       m: '12.3456',
       t: '12:34',
-      ts: '2026-10-08T12:34:56',
+      ts: '2026-10-08T12:34:56.789',
       dto: '2026-10-08T21:59:59Z',
       u: 'a9e732bb-c26e-4be6-9752-477e208c0cdc',
       b: true,
@@ -505,7 +517,7 @@ describe('writing every kind', () => {
     await expect(read({ key: [valueOf(ORDER, 'tenant_id', '1')] })).rejects.toThrow(/names exactly its identity/)
     await expect(read({ key: [...orderKey, ...orderKey] })).rejects.toThrow(/names exactly its identity/)
     await expect(read({ target: { ...target(ORDER), identity: [] }, key: [] })).rejects.toThrow(/names exactly its identity/)
-    await expect(read({ columns: [{ name: 'flag', type: { kind: 'binary', maxLength: null } }] })).rejects.toThrow(/no canonical API value/)
+    await expect(read({ columns: [{ name: 'flag', type: { kind: 'binary', maxLength: null, fixedLength: false } }] })).rejects.toThrow(/no canonical API value/)
     await expect(read({ filters: { kind: 'restricted', equal: [] } as unknown as RowFilters })).rejects.toThrow(/Row filters are/)
     await expect(read({ columns: [{ name: '', type: { kind: 'boolean' } }] })).rejects.toThrow(/An identifier is/)
     await expect(insert([valueOf(ORDER, 'amount', 12.5)])).rejects.toThrow(/not the canonical value/)
@@ -529,7 +541,7 @@ describe('writing every kind', () => {
     }
     await expect(insert([{ name: 'id', type: { kind: 'integer', min: '0', max: '99999999999999999999' }, value: '1' }])).rejects.toThrow(/No SQL Server integer type/)
     await expect(records.update(orderUpdate([], '0000000000000001'))).rejects.toThrow(/at least one column/)
-    await expect(records.update(orderUpdate([{ name: 'row_version', type: { kind: 'text', maxLength: 16, fixedLength: true }, value: 'x' }], '0000000000000001'))).rejects.toThrow(
+    await expect(records.update(orderUpdate([{ name: 'row_version', type: { kind: 'text', maxLength: 16, lengthUnit: 'code-page-bytes', fixedLength: true }, value: 'x' }], '0000000000000001'))).rejects.toThrow(
       /concurrency column/,
     )
     // And the same closed pool, asked something well-formed — a safe integer may
@@ -751,5 +763,164 @@ describe('updating a record', () => {
       { note: 'one', version: 0 },
       { note: 'two', version: 0 },
     ])
+  })
+})
+
+/**
+ * The column facts the two engines disagree on (0026), on this engine: the
+ * shared shipments, each text unit at its edge, a real, and a zoneless
+ * timestamp. Last in the file, because the order writes below take identity
+ * numbers that 'an insert into sales.order returns its identity' names.
+ * Shipments 1 and 2 are the shared model's and are only ever read; every
+ * write makes a shipment of its own, with a tracking number of its own.
+ */
+describe('the column facts the engines disagree on', () => {
+  const SHIPMENT: ObjectRef = { schema: 'sales', name: 'shipment' }
+
+  /** The codec the server would build for a column of the discovered snapshot. */
+  const codecOf = (ref: ObjectRef, name: string) => {
+    const column = meta(ref).columns.find((candidate) => candidate.name === name)
+    if (column === undefined) throw new Error(`${ref.name} has no column ${name}`)
+    return codecFor(column)
+  }
+
+  /** A shipment of its own: the columns a create must give, and any others. */
+  const newShipment = (values: Record<string, ApiValue>): RecordValue[] =>
+    Object.entries({ tenant_id: '1', tracking_no: randomUUID(), carrier_code: '1', reference: 'R', pickup_time: '08:00', ...values }).map(([name, value]) =>
+      valueOf(SHIPMENT, name, value),
+    )
+
+  /** The same written by hand, past every codec, so that only the server decides. */
+  const rawShipment = (reference: string) =>
+    owner
+      .request()
+      .input('tracking', mssql.NVarChar(36), randomUUID())
+      .input('reference', mssql.NVarChar(mssql.MAX), reference)
+      .query("insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pickup_time) values (1, @tracking, 1, @reference, '08:00')")
+
+  // One expected object for both engines. Before 0026 this engine read the
+  // first shipment's dispatched_at as '…56', its half second cut off, and its
+  // temperature as 0.10000000149011612, the double its 32 bits are, where
+  // PostgreSQL reads '…56.5' and 0.1: the same row, two answers.
+  test('the shipments read back exactly as both adapters must return them', async () => {
+    const records = createSqlServerRecords(owner)
+    const read = async (id: string) =>
+      ok(await records.read({ target: target(SHIPMENT), key: [valueOf(SHIPMENT, 'id', id)], columns: readable(SHIPMENT), filters: tenant('1') }))
+    const [first, second] = await Promise.all([read('1'), read('2')])
+    expect(first).toEqual({ ok: true, values: FIRST_SHIPMENT, version: null })
+    expect(second).toEqual({ ok: true, values: SECOND_SHIPMENT, version: null })
+    expect([...canonicalDisagreements(SHIPMENT, first.values), ...canonicalDisagreements(SHIPMENT, second.values)]).toEqual([])
+  })
+
+  // reference is varchar(20) under a UTF-8 collation: twenty bytes, so ten
+  // e-acutes and not eleven, though eleven are eleven UTF-16 code units. A
+  // codec counting code units would pass the eleventh to the server and get
+  // its 2628; counting bytes, it refuses first, with a message in bytes.
+  test('a UTF-8 varchar(20) holds 20 bytes, and the codec counts the same', async () => {
+    const records = createSqlServerRecords(owner)
+    const codec = codecOf(SHIPMENT, 'reference')
+    const ten = 'é'.repeat(10)
+    expect(codec.parse(ten)).toEqual({ ok: true, value: ten })
+    const inserted = ok(await records.insert({ target: target(SHIPMENT), values: newShipment({ reference: ten }), returning: [columnOf(SHIPMENT, 'id')] }))
+    const id = inserted.values.id ?? null
+    expect(ok(await records.read({ target: target(SHIPMENT), key: [valueOf(SHIPMENT, 'id', id)], columns: [columnOf(SHIPMENT, 'reference')], filters: EVERY_ROW })).values).toEqual({
+      reference: ten,
+    })
+
+    const eleven = 'é'.repeat(11)
+    expect(codec.parse(eleven)).toEqual({ ok: false, code: 'too-long', message: 'At most 20 bytes of UTF-8: a letter such as é takes two, and an emoji four.' })
+    await expect(rawShipment(eleven)).rejects.toMatchObject({ number: 2628 })
+  })
+
+  // nvarchar(50) counts UTF-16 code units under every collation: an emoji is
+  // two, so twenty-five fill it and a twenty-sixth is refused, though it makes
+  // only twenty-six characters. The codec's count and the server's agree.
+  test('an nvarchar(50) holds 50 code units, and the codec counts the same', async () => {
+    const records = createSqlServerRecords(owner)
+    const codec = codecOf(ORDER, 'group')
+    const fill = '\u{1F600}'.repeat(25)
+    expect(codec.parse(fill)).toEqual({ ok: true, value: fill })
+    const values = [valueOf(ORDER, 'tenant_id', '1'), valueOf(ORDER, 'customer_no', '1001'), valueOf(ORDER, 'order_date', '2026-10-09'), valueOf(ORDER, 'amount', '1.0000')]
+    const inserted = ok(await records.insert({ target: target(ORDER), values: [...values, valueOf(ORDER, 'group', fill)], returning: [columnOf(ORDER, 'id')] }))
+    expect(ok(await readOrder(records, String(inserted.values.id))).values.group).toBe(fill)
+
+    const over = '\u{1F600}'.repeat(26)
+    expect(codec.parse(over)).toMatchObject({ ok: false, code: 'too-long' })
+    await expect(
+      owner
+        .request()
+        .input('group', mssql.NVarChar(mssql.MAX), over)
+        .query("insert into sales.[order] (tenant_id, customer_no, order_date, amount, [group]) values (1, 1001, '2026-10-09', 1, @group)"),
+    ).rejects.toMatchObject({ number: 2628 })
+  })
+
+  // A real stores the float32 nearest 0.1. Read as the double that float is,
+  // 0.10000000149011612, it is not the 0.1 the codec gave, and a form that
+  // sends back what it read would report a change nobody made.
+  test('a real written as 0.1 reads back as 0.1', async () => {
+    const records = createSqlServerRecords(owner)
+    const parsed = codecOf(SHIPMENT, 'temperature_c').parse(0.1)
+    expect(parsed).toEqual({ ok: true, value: 0.1 })
+    const inserted = ok(
+      await records.insert({ target: target(SHIPMENT), values: newShipment({ temperature_c: parsed.ok ? parsed.value : null }), returning: [columnOf(SHIPMENT, 'id')] }),
+    )
+    const read = ok(
+      await records.read({
+        target: target(SHIPMENT),
+        key: [valueOf(SHIPMENT, 'id', inserted.values.id ?? null)],
+        columns: [columnOf(SHIPMENT, 'temperature_c')],
+        filters: EVERY_ROW,
+      }),
+    )
+    expect(read.values).toEqual({ temperature_c: 0.1 })
+    expect(canonicalDisagreements(SHIPMENT, read.values)).toEqual([])
+  })
+
+  // SQL Server stores a double too close to zero for a real as 0, without a
+  // word, where PostgreSQL refuses it. The codec refuses it on both, so a
+  // person is told rather than finding a 0 they never wrote.
+  test('a value a real would store as zero is refused by the codec', async () => {
+    expect(codecOf(KINDS, 'r').parse(1e-50)).toMatchObject({ ok: false, code: 'out-of-range' })
+    await owner.request().batch('insert into ops.kinds (id, r) values (20, cast(1e-50 as float))')
+    const stored = await owner.request().query<{ r: number; zero: number }>('select r, case when r = 0 then 1 else 0 end as zero from ops.kinds where id = 20')
+    expect(stored.recordset).toEqual([{ r: 0, zero: 1 }])
+  })
+
+  // Style 126 prints a zoneless value's fraction to the column's own scale,
+  // trailing zeros and all, and leaves it out on a whole second. Cut to
+  // nineteen characters, as before 0026, it lost the fraction; trimmed without
+  // the length guard, a whole second ending in 0 -- 12:34:50 -- would lose its
+  // last digit. datetime keeps 1/300 s and SQL Server spells it to the
+  // millisecond, .00666… as .007: rounded by SQL Server, the one exception the
+  // contract names. smalldatetime keeps its minute.
+  test('a zoneless timestamp keeps its fraction, trailing zeros dropped', async () => {
+    const records = createSqlServerRecords(owner)
+    const read = async (id: string) =>
+      ok(await records.read({ target: target(ZONELESS), key: [valueOf(ZONELESS, 'id', id)], columns: readable(ZONELESS).slice(1), filters: EVERY_ROW })).values
+    expect(await read('1')).toEqual({ d7: '2026-10-08T12:34:50.12', dt: '2026-10-08T12:34:56.007', sdt: '2026-10-08T12:35:00' })
+    expect(await read('2')).toEqual({ d7: '2026-10-08T12:34:50', dt: '2026-10-08T12:34:50', sdt: '2026-10-08T12:34:00' })
+    expect(await read('3')).toEqual({ d7: '2026-10-08T12:34:56.0000001', dt: '2026-10-08T12:34:59.997', sdt: null })
+  })
+
+  // NEXT VALUE FOR numbers a create that leaves the id out and takes one given
+  // by hand, as PostgreSQL's BY DEFAULT identity does, and the form never
+  // gives one: the codec keeps it read-only. This is why. A number chosen by
+  // hand does not move the sequence, so the next create that leaves the
+  // column out is handed that same number and collides with it (2627).
+  test('a sequence default numbers a create that leaves it out, and a number chosen by hand collides later', async () => {
+    const records = createSqlServerRecords(owner)
+    expect(meta(SHIPMENT).columns.find((column) => column.name === 'id')?.generated).toBe('identity-by-default')
+    expect(codecOf(SHIPMENT, 'id')).toMatchObject({ status: 'read-only', reason: expect.stringMatching(/identity-by-default/) as unknown })
+    const numbered = ok(await records.insert({ target: target(SHIPMENT), values: newShipment({ reference: 'numbered' }), returning: [columnOf(SHIPMENT, 'id')] }))
+    const next = Number(numbered.values.id) + 1
+    // The database accepts the next number, given by hand...
+    await owner
+      .request()
+      .input('id', mssql.Int, next)
+      .input('tracking', mssql.NVarChar(36), randomUUID())
+      .query("insert into sales.shipment (id, tenant_id, tracking_no, carrier_code, reference, pickup_time) values (@id, 1, @tracking, 1, N'by hand', '08:00')")
+    // ...and the next create through the adapter is handed it again.
+    const collided = await records.insert({ target: target(SHIPMENT), values: newShipment({ reference: 'collides' }), returning: [] })
+    expect(collided).toMatchObject({ ok: false, code: 'unique-violation', constraint: 'pk_shipment' })
   })
 })

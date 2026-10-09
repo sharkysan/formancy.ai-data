@@ -1,4 +1,4 @@
-import type { ColumnMeta, Generation } from '@formancy/data-core'
+import type { ColumnMeta, Generation, TextLengthUnit } from '@formancy/data-core'
 import type { TransactionSql } from 'postgres'
 import { normalizeType } from './types.js'
 
@@ -31,9 +31,10 @@ export type UncommentedColumn = Omit<ColumnMeta, 'comment'>
  * `format_type` gives the type as PostgreSQL spells it in DDL --
  * `character varying(200)`, `numeric(18,4)` -- which is what a person reading
  * the report recognises; the normalised type is decoded from the catalog
- * itself, not parsed back out of that spelling.
+ * itself, not parsed back out of that spelling. A text's length unit is the
+ * database's, from its encoding, and passed in (see `textUnitOf`).
  */
-export async function readColumns(sql: TransactionSql, schemas: readonly string[]): Promise<Map<number, UncommentedColumn[]>> {
+export async function readColumns(sql: TransactionSql, schemas: readonly string[], textUnit: TextLengthUnit): Promise<Map<number, UncommentedColumn[]>> {
   const rows = await sql<ColumnRow[]>`
     select
       a.attrelid as oid,
@@ -68,7 +69,7 @@ export async function readColumns(sql: TransactionSql, schemas: readonly string[
       name: row.name,
       ordinal: row.ordinal,
       databaseType: row.database_type,
-      type: normalizeType({ name: row.type_name, schema: row.type_schema, modifier: row.type_modifier }),
+      type: normalizeType({ name: row.type_name, schema: row.type_schema, modifier: row.type_modifier }, textUnit),
       nullable: !row.not_null,
       hasDefault: row.default_expression !== null,
       defaultExpression: row.default_expression,
@@ -80,15 +81,53 @@ export async function readColumns(sql: TransactionSql, schemas: readonly string[
 }
 
 /**
- * `attidentity` is `a` (ALWAYS) or `d` (BY DEFAULT); the contract has one
- * `identity` for both, because a form omits the column either way.
- * `attgenerated` is `s` for a stored generated column, the only kind
- * PostgreSQL 17 has; PostgreSQL 18's virtual columns (`v`) would fall into
- * the same branch, untested, because no suite here runs 18. `serial` is
- * neither: it is a default of nextval(), and reported as one.
+ * A default that is exactly the next value of one sequence, as pg_get_expr
+ * deparses it: `nextval('schema.name'::regclass)`, a quote inside the name
+ * doubled. `serial` is this, and so is a default written by hand.
  */
-function generation(row: ColumnRow): Generation {
-  if (row.identity !== '') return 'identity'
+const NEXT_VALUE = /^nextval\('(?:[^']|'')+'::regclass\)$/
+
+/**
+ * `attidentity` is `a` for GENERATED ALWAYS, which refuses a value given to
+ * it unless the statement says OVERRIDING SYSTEM VALUE, and `d` for BY
+ * DEFAULT, which numbers a row only when the write leaves the column out and
+ * accepts one otherwise. The contract names them apart (0026); a form treats
+ * both as read-only, because a number chosen by hand does not advance the
+ * sequence and is handed out again later. A code neither version has is
+ * read as ALWAYS, the stricter: an identity of an unknown kind is never
+ * offered as an ordinary column.
+ *
+ * A default that is exactly a sequence's next value — `serial`, or written
+ * by hand — behaves as BY DEFAULT does, collision included, and is named so;
+ * its default is still reported. One that computes with nextval() is an
+ * ordinary default. SQL Server's NEXT VALUE FOR default is read the same way.
+ *
+ * `attgenerated` is `s` for a stored generated column, the only kind
+ * PostgreSQL 17 has; PostgreSQL 18's virtual columns (`v`) fall into the
+ * same branch, and are computed too.
+ */
+export function generation(row: Pick<ColumnRow, 'identity' | 'generated' | 'default_expression'>): Generation {
+  if (row.identity === 'd') return 'identity-by-default'
+  if (row.identity !== '') return 'identity-always'
   if (row.generated !== '') return 'computed'
+  if (row.default_expression !== null && NEXT_VALUE.test(row.default_expression)) return 'identity-by-default'
   return 'none'
+}
+
+/**
+ * What a text length counts in this database (0026). atttypmod's length is
+ * characters of the database encoding, and the driver talks UTF-8:
+ *
+ * - `UTF8`: characters of Unicode, `code-points`.
+ * - `SQL_ASCII`: no encoding at all. The server stores the client's UTF-8
+ *   bytes as they come and counts each byte as a character, so varchar(4)
+ *   refuses 'ééé' (22001): `utf8-bytes`.
+ * - Any other (LATIN1, WIN1252, EUC_JP, …): characters of that encoding, and
+ *   a character it lacks is refused (22P05) — `code-page-bytes`, the unit
+ *   for a text whose encoding is not Unicode, checked by characters.
+ */
+export function textUnitOf(encoding: string): TextLengthUnit {
+  if (encoding === 'UTF8') return 'code-points'
+  if (encoding === 'SQL_ASCII') return 'utf8-bytes'
+  return 'code-page-bytes'
 }

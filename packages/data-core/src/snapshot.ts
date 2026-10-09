@@ -1,5 +1,5 @@
 import { schemaHash } from '@formancy/spec'
-import type { CoverageGap, MetadataSnapshot, ObjectMeta, ObjectRef } from './metadata.js'
+import type { ColumnMeta, CoverageGap, Generation, MetadataSnapshot, ObjectMeta, ObjectRef, TextLengthUnit } from './metadata.js'
 
 /**
  * Codepoint order, deliberately not `localeCompare`.
@@ -21,6 +21,45 @@ function describe(ref: ObjectRef): string {
   return `${ref.schema}.${ref.name}`
 }
 
+/** Every `Generation`, as a record so that a sixth one is a compile error here until it is listed. */
+const GENERATIONS: Readonly<Record<Generation, true>> = {
+  none: true,
+  'identity-always': true,
+  'identity-by-default': true,
+  computed: true,
+  rowversion: true,
+}
+
+/** Every `TextLengthUnit`, listed for the same reason. */
+const TEXT_LENGTH_UNITS: Readonly<Record<TextLengthUnit, true>> = {
+  'code-points': true,
+  'utf16-code-units': true,
+  'utf8-bytes': true,
+  'code-page-bytes': true,
+}
+
+const isListed = (record: Readonly<Record<string, true>>, value: unknown): boolean =>
+  typeof value === 'string' && Object.hasOwn(record, value)
+
+/**
+ * The column facts contract v2 added (0026), which a snapshot stored before it
+ * lacks. Such a snapshot — a published bundle, a captured example — is read
+ * back from JSON, so the types above promise nothing about it; checked here, it
+ * is refused rather than handed to a codec that would count in no unit.
+ */
+function assertContractColumn(where: string, column: ColumnMeta): void {
+  if (!isListed(GENERATIONS, column.generated)) {
+    throw new Error(`${where}: column ${column.name} has generation ${JSON.stringify(column.generated)}, which is not one the contract names`)
+  }
+  const type = column.type
+  if (type.kind === 'text' && !isListed(TEXT_LENGTH_UNITS, type.lengthUnit)) {
+    throw new Error(`${where}: column ${column.name} has no text length unit`)
+  }
+  if (type.kind === 'binary' && typeof (type.fixedLength as unknown) !== 'boolean') {
+    throw new Error(`${where}: column ${column.name} is binary with no fixedLength flag`)
+  }
+}
+
 /**
  * Refuse what no catalog could have produced.
  *
@@ -35,6 +74,10 @@ function assertConsistent(object: ObjectMeta): void {
   for (const column of object.columns) {
     if (columns.has(column.name)) throw new Error(`${where}: column ${column.name} is reported twice`)
     columns.add(column.name)
+    assertContractColumn(where, column)
+  }
+  for (const check of object.checks) {
+    if (typeof (check.enforced as unknown) !== 'boolean') throw new Error(`${where}: check ${check.name} has no enforced flag`)
   }
 
   const keys = [...(object.primaryKey === null ? [] : [object.primaryKey]), ...object.uniqueKeys]

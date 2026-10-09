@@ -133,6 +133,34 @@ describe('createSnapshot', () => {
     ).toThrow(/foreign key fk names nope/)
   })
 
+  // A snapshot stored before contract v2 — a published bundle, the examples
+  // page's capture — has text with no length unit, binary with no fixedLength,
+  // checks with no enforced flag and a bare 'identity'. Trusted, it would reach
+  // a codec counting in no unit and a generator reading an identity it does
+  // not know. Refused here, naming the column or check (0026).
+  test("refuses a snapshot in the shape contract v1 wrote: a text with no length unit, a binary with no fixedLength, a check with no enforced flag, generated 'identity'", () => {
+    const old = (columns: unknown[], checks: unknown[] = []) => () => snapshot([table('a', columns as ColumnMeta[], { checks: checks as ObjectMeta['checks'] })])
+    const typed = (type: unknown, extra: Record<string, unknown> = {}) => ({ ...column('name', 1), type, ...extra })
+
+    expect(old([typed({ kind: 'text', maxLength: 20, fixedLength: false })])).toThrow(/sales\.a: column name has no text length unit/)
+    expect(old([typed({ kind: 'text', maxLength: 20, lengthUnit: 'characters', fixedLength: false })])).toThrow(/sales\.a: column name has no text length unit/)
+    expect(old([typed({ kind: 'binary', maxLength: 16 })])).toThrow(/sales\.a: column name is binary with no fixedLength flag/)
+    expect(old([typed({ kind: 'integer', min: '0', max: '1' }, { generated: 'identity' })])).toThrow(/sales\.a: column name has generation "identity", which is not one the contract names/)
+    expect(old([column('x', 1)], [{ name: 'ck_a', expression: null, validated: true }])).toThrow(/sales\.a: check ck_a has no enforced flag/)
+
+    // The shape contract v2 writes is accepted.
+    expect(
+      old(
+        [
+          typed({ kind: 'text', maxLength: 20, lengthUnit: 'utf8-bytes', fixedLength: false }),
+          { ...column('id', 2), generated: 'identity-by-default' },
+          { ...column('hash', 3), type: { kind: 'binary', maxLength: 32, fixedLength: true } },
+        ],
+        [{ name: 'ck_a', expression: null, enforced: false, validated: false }],
+      ),
+    ).not.toThrow()
+  })
+
   // The scope is what the administrator approved; repeating a schema is not two scopes.
   test('normalises the scope and finds an object by reference', () => {
     const made = snapshot([table('a', [column('x', 1)])], { scope: { schemas: ['sales', 'audit', 'sales'] } })

@@ -4,5 +4,13 @@ export { restrictedDisagreements, snapshotDisagreements } from './conformance.js
 export { readFixture, splitBatches } from './load.js'
 export type { FixtureFile } from './load.js'
 export { FIXTURE_MODEL, FIXTURE_SCOPE } from './model.js'
-export type { ExpectedColumn, ExpectedColumnFacts, ExpectedForeignKey, ExpectedObject, ExpectedType } from './model.js'
-export { EDGE_VALUES } from './values.js'
+export type {
+  ExpectedCheck,
+  ExpectedCheckFacts,
+  ExpectedColumn,
+  ExpectedColumnFacts,
+  ExpectedForeignKey,
+  ExpectedObject,
+  ExpectedType,
+} from './model.js'
+export { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'

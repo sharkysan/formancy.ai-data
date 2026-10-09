@@ -12,10 +12,19 @@ import { discoverPostgres } from './index.js'
  * the catalog back -- never by feeding a decoder the numbers we believe
  * pg_attribute holds, which would test the belief.
  *
- * The shared fixture covers the types both engines' business model uses. The
- * rest of PostgreSQL's built-in types are declared here, in a schema of this
- * suite's own, because `@formancy/data-fixtures` does not yet describe them;
- * they belong in the shared model when SQL Server's counterparts are written.
+ * The shared fixture covers the types both engines have: smallint, time, a
+ * zoneless timestamp, uuid, real and double are in its model now, beside the
+ * integers, decimals, text, dates, instants and binary it began with, and
+ * the discovery suite holds this adapter to it. The cases left here are the
+ * shapes only PostgreSQL has: unconstrained, negative-scale and over-scale
+ * numeric; bare `bpchar`; unbounded `varchar`; timetz, jsonb, interval,
+ * money, arrays, an enum, a domain and an impostor. The rest stay beside
+ * them so this file reads as the whole map from typname to contract.
+ *
+ * Every text here counts `code-points`: atttypmod's length is characters,
+ * and the fixture's database is UTF8. In a SQL_ASCII or LATIN1 database the
+ * same declaration counts something else, and the last block proves which
+ * (0026).
  */
 interface TypeCase {
   column: string
@@ -46,16 +55,16 @@ const CASES: TypeCase[] = [
   { column: 'tiny', declared: 'numeric(3, 5)', type: { kind: 'decimal', precision: 3, scale: 5 } },
   // atttypmod holds the length plus a four-byte header. Forgetting the header
   // says 34 characters where the column takes 30.
-  { column: 'bounded', declared: 'varchar(30)', type: { kind: 'text', maxLength: 30, fixedLength: false } },
-  { column: 'unbounded', declared: 'varchar', type: { kind: 'text', maxLength: null, fixedLength: false } },
-  { column: 'padded', declared: 'char(3)', type: { kind: 'text', maxLength: 3, fixedLength: true } },
+  { column: 'bounded', declared: 'varchar(30)', type: { kind: 'text', maxLength: 30, lengthUnit: 'code-points', fixedLength: false } },
+  { column: 'unbounded', declared: 'varchar', type: { kind: 'text', maxLength: null, lengthUnit: 'code-points', fixedLength: false } },
+  { column: 'padded', declared: 'char(3)', type: { kind: 'text', maxLength: 3, lengthUnit: 'code-points', fixedLength: true } },
   // `char` without a length is char(1), not an unbounded text.
-  { column: 'single', declared: 'char', type: { kind: 'text', maxLength: 1, fixedLength: true } },
+  { column: 'single', declared: 'char', type: { kind: 'text', maxLength: 1, lengthUnit: 'code-points', fixedLength: true } },
   // `bpchar` with no length pads to nothing and still ignores trailing
   // blanks: neither a fixed-length text nor a variable one. Reported as
   // either, a form would promise semantics the column does not have.
   { column: 'blank_padded', declared: 'bpchar', type: UNSUPPORTED },
-  { column: 'body', declared: 'text', type: { kind: 'text', maxLength: null, fixedLength: false } },
+  { column: 'body', declared: 'text', type: { kind: 'text', maxLength: null, lengthUnit: 'code-points', fixedLength: false } },
   { column: 'flag', declared: 'boolean', type: { kind: 'boolean' } },
   { column: 'day', declared: 'date', type: { kind: 'date' } },
   { column: 'clock', declared: 'time(3)', type: { kind: 'time', precision: 3 } },
@@ -69,7 +78,8 @@ const CASES: TypeCase[] = [
   { column: 'local_default', declared: 'timestamp', type: { kind: 'timestamp', withTimeZone: false, precision: null } },
   { column: 'instant', declared: 'timestamptz(3)', type: { kind: 'timestamp', withTimeZone: true, precision: 3 } },
   { column: 'key', declared: 'uuid', type: { kind: 'uuid' } },
-  { column: 'blob', declared: 'bytea', type: { kind: 'binary', maxLength: null } },
+  // bytea is never padded: what is read is what was written.
+  { column: 'blob', declared: 'bytea', type: { kind: 'binary', maxLength: null, fixedLength: false } },
   { column: 'single_float', declared: 'real', type: { kind: 'float', bits: 32 } },
   { column: 'double_float', declared: 'double precision', type: { kind: 'float', bits: 64 } },
   // `float(p)` is resolved to real or double precision when the table is made.
@@ -115,6 +125,11 @@ beforeAll(async () => {
       after_retired integer
     );
     alter table types_probe.generation drop column retired;
+    create sequence types_probe.ticket;
+    create table types_probe.sequenced (
+      plain bigint default nextval('types_probe.ticket'),
+      scaled bigint default (nextval('types_probe.ticket') * 2)
+    );
   `)
   snapshot = await discoverPostgres(owner, { schemas: ['types_probe'] })
 })
@@ -160,29 +175,42 @@ describe('type normalisation', () => {
   // Composite types are pg_class rows of their own (relkind 'c'). An object
   // query that did not filter by kind would report the impostor as a table.
   test('a composite type is not reported as an object', () => {
-    expect(snapshot.objects.map((object) => object.ref.name)).toEqual(['everything', 'generation'])
+    expect(snapshot.objects.map((object) => object.ref.name)).toEqual(['everything', 'generation', 'sequenced'])
   })
 })
 
 describe('generation, defaults and nullability', () => {
-  // GENERATED ALWAYS and BY DEFAULT are both identity: the database supplies
-  // the value. The contract does not say which, and a form omits it either way.
-  test('both kinds of identity column are identity, with no default', () => {
-    for (const name of ['always_id', 'default_id']) {
-      expect(columnOf('generation', name)).toMatchObject({ generated: 'identity', hasDefault: false, defaultExpression: null })
-    }
+  // ALWAYS refuses a value without OVERRIDING SYSTEM VALUE; BY DEFAULT takes
+  // one. Reported alike, a form that ever offered the by-default column would
+  // be offering the always one too, which the database refuses -- and the
+  // by-default one would hand out numbers its sequence later collides with.
+  // Neither has a pg_attrdef row, so neither has a default.
+  test('GENERATED ALWAYS is identity-always and BY DEFAULT is identity-by-default, neither with a default', () => {
+    expect(columnOf('generation', 'always_id')).toMatchObject({ generated: 'identity-always', hasDefault: false, defaultExpression: null })
+    expect(columnOf('generation', 'default_id')).toMatchObject({ generated: 'identity-by-default', hasDefault: false, defaultExpression: null })
   })
 
-  // serial is a default of nextval(), not an identity: an explicit value is
-  // accepted and an update may change it. Reported as identity, a form would
-  // refuse what the column allows.
-  test('a serial column is an ordinary column whose default is a sequence', () => {
+  // serial is a default of nextval(): it numbers a row that leaves it out and
+  // takes a value given to it, exactly as BY DEFAULT does, and a number given
+  // by hand collides with the sequence later just the same. SQL Server's
+  // NEXT VALUE FOR default is this case too. Reported as an ordinary default,
+  // one table's id was read-only on one engine and hand-settable on the
+  // other. Its default is still reported: it has one, which an identity has not.
+  test('a serial column is identity-by-default, and keeps the default it has', () => {
     expect(columnOf('generation', 'counter')).toMatchObject({
       type: INT32,
-      generated: 'none',
+      generated: 'identity-by-default',
       hasDefault: true,
       defaultExpression: "nextval('types_probe.generation_counter_seq'::regclass)",
     })
+  })
+
+  // Only a default that IS the sequence's next value is that case: one that
+  // computes with it is an ordinary default. A rule matching "contains
+  // nextval" would make a column read-only for a default it merely uses.
+  test("a default that is exactly a sequence's next value is by-default; one that computes with it is not", () => {
+    expect(columnOf('sequenced', 'plain')).toMatchObject({ generated: 'identity-by-default', defaultExpression: "nextval('types_probe.ticket'::regclass)" })
+    expect(columnOf('sequenced', 'scaled')).toMatchObject({ generated: 'none', defaultExpression: "(nextval('types_probe.ticket'::regclass) * 2)" })
   })
 
   test('a stored generated column is computed, with no default', () => {
@@ -209,5 +237,63 @@ describe('generation, defaults and nullability', () => {
       ['optional', 6],
       ['after_retired', 8],
     ])
+  })
+})
+
+/**
+ * What a text length counts depends on the database's encoding, and only a
+ * UTF8 database counts characters of the whole of Unicode. Measured on
+ * PostgreSQL 17: in a SQL_ASCII database, which stores the client's UTF-8
+ * bytes unconverted, varchar(4) refuses 'éééé' (22001) — it counts bytes; in
+ * a LATIN1 database it holds 'éééé' and refuses an emoji (22P05), which LATIN1
+ * has no byte for. Reported as `code-points` regardless, the codec accepted
+ * values both databases refuse, and the form's caveat promised the reverse.
+ * Each database is made here, from constants, and dropped with the container.
+ */
+describe('what a text length counts, by the database encoding', () => {
+  const ENCODINGS = [
+    { database: 'enc_sql_ascii', encoding: 'SQL_ASCII', unit: 'utf8-bytes' },
+    { database: 'enc_latin1', encoding: 'LATIN1', unit: 'code-page-bytes' },
+  ] as const
+
+  async function inDatabase<T>(database: string, encoding: string, run: (sql: Sql) => Promise<T>): Promise<T> {
+    await owner.unsafe(`create database ${database} encoding '${encoding}' locale 'C' template template0`)
+    const url = new URL(fixture.admin)
+    url.pathname = `/${database}`
+    const sql = postgres(url.toString(), { onnotice: () => {} })
+    try {
+      await sql.unsafe('create table probe (v varchar(4), c char(2), body text)')
+      return await run(sql)
+    } finally {
+      await sql.end()
+    }
+  }
+
+  test.each(ENCODINGS)('a $encoding database counts text in $unit', async ({ database, encoding, unit }) => {
+    await inDatabase(database, encoding, async (sql) => {
+      const found = findObject(await discoverPostgres(sql, { schemas: ['public'] }), { schema: 'public', name: 'probe' })
+      expect(found?.columns.map((column) => column.type)).toEqual([
+        { kind: 'text', maxLength: 4, lengthUnit: unit, fixedLength: false },
+        { kind: 'text', maxLength: 2, lengthUnit: unit, fixedLength: true },
+        { kind: 'text', maxLength: null, lengthUnit: unit, fixedLength: false },
+      ])
+      // The server, not the belief: what each database does with the values
+      // the unit says it refuses.
+      const refused = async (value: string): Promise<string | undefined> => {
+        try {
+          await sql`insert into probe (v) values (${value})`
+          return undefined
+        } catch (error) {
+          return (error as { code?: string }).code
+        }
+      }
+      if (encoding === 'SQL_ASCII') {
+        expect(await refused('éé')).toBeUndefined()
+        expect(await refused('ééé')).toBe('22001')
+      } else {
+        expect(await refused('éééé')).toBeUndefined()
+        expect(await refused('😀')).toBe('22P05')
+      }
+    })
   })
 })

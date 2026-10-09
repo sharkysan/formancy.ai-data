@@ -1,3 +1,4 @@
+import { canonicalFloat32 } from '@formancy/data-core'
 import type { ApiValue, NormalizedType } from '@formancy/data-core'
 import { op } from './catalog.js'
 
@@ -42,6 +43,12 @@ function dateText(column: string): string {
  * value with a fraction — what `now()` writes — keeps it, trailing zeros
  * dropped, rather than being truncated into a value a save would then write
  * over the real one. Outside years 1 to 9999 the era is spelled, as for a date.
+ *
+ * A zoneless timestamp is spelled the same, without the `Z`: its fraction,
+ * trailing zeros dropped, never rounded, and none on a whole second. That is
+ * the spelling both adapters give it (0026), held by the shared
+ * FIRST_SHIPMENT and SECOND_SHIPMENT; SQL Server reaches it with a trim over
+ * style 126, this one with `rtrim` over the microseconds.
  */
 function timestampText(column: string, withTimeZone: boolean): string {
   const at = withTimeZone ? `(${column} at time zone 'UTC')` : column
@@ -74,7 +81,8 @@ function timeText(column: string): string {
  *   char-to-text cast does: trailing blanks are not significant in char(n).
  * - boolean: `true` or `false`.
  * - float: the IEEE 754 bits, as hex, decoded below. Exact, and independent
- *   of `extra_float_digits`.
+ *   of `extra_float_digits`. A real is then given its canonical value,
+ *   `canonicalFloat32` (0026), which is the one the codec accepts it as.
  * - date, time, timestamp: as above.
  */
 export function canonicalText(type: NormalizedType, column: string): string {
@@ -101,28 +109,21 @@ export function canonicalText(type: NormalizedType, column: string): string {
 }
 
 /**
- * The shortest decimal that reads back as this 32-bit float, as PostgreSQL's
- * own output gives it: `0.1`, not the double `0.10000000149011612` that is
- * the float's exact value. Nine significant digits always suffice.
- */
-function shortestFloat32(value: number): number {
-  for (let digits = 1; digits < 9; digits += 1) {
-    const candidate = Number(value.toPrecision(digits))
-    if (Math.fround(candidate) === value) return candidate
-  }
-  return Number(value.toPrecision(9))
-}
-
-/**
  * A float from its bits. A finite one is a JSON number, as the codec takes
- * it. NaN and the infinities have no JSON number — `JSON.stringify` would
- * write `null`, which is a different value — so they stay text.
+ * it: a double as itself, a real as `canonicalFloat32` names it — `0.1`, the
+ * shortest decimal that is the same float, not the double
+ * `0.10000000149011612` that is its exact value. Not PostgreSQL's own float4
+ * text, which can differ in a last digit; the SQL Server adapter reads a real
+ * through the same function, so the engines agree. The codec
+ * gives a real the same value, so a read sent back unchanged is unchanged
+ * (0026). NaN and the infinities have no JSON number — `JSON.stringify`
+ * would write `null`, which is a different value — so they stay text.
  */
 function floatOf(hex: string, bits: 32 | 64): ApiValue {
   const bytes = Buffer.from(hex, 'hex')
   const value = bits === 32 ? bytes.readFloatBE(0) : bytes.readDoubleBE(0)
   if (!Number.isFinite(value)) return String(value)
-  return bits === 32 ? shortestFloat32(value) : value
+  return bits === 32 ? canonicalFloat32(value) : value
 }
 
 /** The API value for one column's canonical text, as `canonicalText` spelled it. */

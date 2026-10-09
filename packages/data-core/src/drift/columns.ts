@@ -135,6 +135,10 @@ function effectOf(bindings: FormBindings, kind: ColumnChangeKind, is: ColumnMeta
       }
       return note(unbound)
     case 'column-generation-changed':
+      // A by-default identity would take the value, which is worse: a number its sequence later hands out again (0026).
+      if (writable && is.generated === 'identity-by-default') {
+        return { kind, stops: BOTH, breaksReads: false, otherwise: 'review', consequence: 'The form writes it, and the database now numbers it when a create leaves it out; a value written by hand would not advance that numbering, so writes are blocked until the form is reviewed.' }
+      }
       if (writable && is.generated !== 'none') {
         return { kind, stops: BOTH, breaksReads: false, otherwise: 'review', consequence: 'The form writes it, and the database refuses a value for a column it generates, so writes are blocked until the form is reviewed.' }
       }

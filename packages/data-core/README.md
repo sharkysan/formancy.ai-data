@@ -25,7 +25,15 @@ browser.
 - **Codecs**: `codecFor(column)` checks and canonicalises one API value for a
   column — decimals as strings, never rounded; integers past 2^53 as strings;
   formancy's date and time shapes on real days
-  ([0008](../../docs/decisions/0008-exact-values-travel-as-strings.md)).
+  ([0008](../../docs/decisions/0008-exact-values-travel-as-strings.md)); text
+  counted in the unit its column counts, and refused with NUL or an unpaired
+  surrogate; a 32-bit float as `canonicalFloat32` names it, the shortest
+  decimal for its float, and refused where a real would store infinity or a
+  zero nobody wrote
+  ([0026](../../docs/decisions/0026-name-every-column-fact-the-engines-disagree-on.md)).
+  The snapshot names what the engines disagree on about a column — a text's
+  length unit, a binary's padding, an identity ALWAYS or BY DEFAULT, a check
+  enforced or not — and `createSnapshot` refuses one stored before it did.
 
 ```ts
 import { generateForm } from '@formancy/data-core'

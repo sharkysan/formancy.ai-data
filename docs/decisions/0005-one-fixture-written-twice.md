@@ -1,6 +1,6 @@
 # 0005 — One business model, written twice, and one comparator both adapters answer to
 
-- **Status:** accepted
+- **Status:** accepted; the list of where the engines differ is extended by [0026](0026-name-every-column-fact-the-engines-disagree-on.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-fixtures/src/load.test.ts` — both SQL files

@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import type { DatabaseKind } from '../adapter.js'
 import { generateForm } from '../generate/generate.js'
 import type { GenerationRequest } from '../generate/types.js'
-import type { ColumnMeta, CoverageAspect, CoverageGap, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef } from '../metadata.js'
+import type { ColumnMeta, CoverageAspect, CoverageGap, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
 import { createSnapshot } from '../snapshot.js'
 import { diffSnapshots } from './diff.js'
 import type { DriftChange, DriftKind, DriftReport } from './types.js'
@@ -20,7 +20,8 @@ import type { DriftChange, DriftKind, DriftReport } from './types.js'
 export const INT16: NormalizedType = { kind: 'integer', min: '-32768', max: '32767' }
 export const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 export const INT64: NormalizedType = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' }
-export const text = (maxLength: number | null): NormalizedType => ({ kind: 'text', maxLength, fixedLength: false })
+// One length unit for every text: these suites test planning, not units, which codec.test.ts covers (0026).
+export const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({ kind: 'text', maxLength, lengthUnit, fixedLength })
 export const decimal = (precision: number, scale: number): NormalizedType => ({ kind: 'decimal', precision, scale })
 
 export const ORDER_REF: ObjectRef = { schema: 'sales', name: 'order' }
@@ -63,7 +64,7 @@ function model(kind: DatabaseKind): ObjectMeta[] {
     table(
       'order',
       [
-        col('id', 'bigint', INT64, { generated: 'identity' }),
+        col('id', 'bigint', INT64, { generated: 'identity-always' }),
         col('tenant_id', 'int', INT32),
         col('customer_no', 'int', INT32),
         col('order_date', 'date', { kind: 'date' }),
@@ -72,7 +73,7 @@ function model(kind: DatabaseKind): ObjectMeta[] {
         col('notes', 'nvarchar(max)', text(null), { nullable: true }),
         col('created_by', 'int', INT32, { nullable: true }),
         col('paid', 'bit', { kind: 'boolean' }),
-        col('attachment', 'varbinary(max)', { kind: 'binary', maxLength: null }, { nullable: true }),
+        col('attachment', 'varbinary(max)', { kind: 'binary', maxLength: null, fixedLength: false }, { nullable: true }),
         kind === 'sqlserver'
           ? col('row_version', 'rowversion', { kind: 'rowversion' }, { generated: 'rowversion' })
           : col('row_version', 'bigint', INT64, { hasDefault: true, defaultExpression: '0' }),
@@ -83,7 +84,7 @@ function model(kind: DatabaseKind): ObjectMeta[] {
           foreignKeyTo('fk_order_customer', ['tenant_id', 'customer_no'], CUSTOMER_REF, ['tenant_id', 'customer_no']),
           foreignKeyTo('fk_order_created_by', ['created_by'], EMPLOYEE_REF, ['id']),
         ],
-        checks: [{ name: 'ck_order_amount', expression: '([amount]>=(0))', validated: true }],
+        checks: [{ name: 'ck_order_amount', expression: '([amount]>=(0))', enforced: true, validated: true }],
       },
     ),
     table('customer_summary', [col('tenant_id', 'int', INT32), col('customer_no', 'int', INT32), col('order_count', 'bigint', INT64)], { kind: 'view' }),

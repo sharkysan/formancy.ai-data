@@ -59,19 +59,19 @@ only enforcement is "we remember" says so plainly.
 | [0002](0002-depend-on-upstream-never-copy-it.md) | Depend on released upstream packages at exact versions; never copy them | accepted |
 | [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted |
 | [0004](0004-a-snapshot-says-what-it-could-not-see.md) | A metadata snapshot says what it could not see, and is made in one place | accepted |
-| [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted |
+| [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026 |
 | [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted |
-| [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted |
-| [0008](0008-exact-values-travel-as-strings.md) | Exact values travel as strings, are canonical, and are never rounded | accepted |
-| [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted |
-| [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted |
+| [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted; narrowed by 0026 |
+| [0008](0008-exact-values-travel-as-strings.md) | Exact values travel as strings, are canonical, and are never rounded | accepted; narrowed by 0026 |
+| [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026 |
+| [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026 |
 | [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted |
 | [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted |
 | [0013](0013-published-configuration-is-files-with-link-based-swap.md) | Published configuration is files, and compare-and-swap is a hard link | accepted |
 | [0014](0014-host-identity-is-verified-offline.md) | Host identity is a token verified offline, with a pinned algorithm | accepted |
 | [0015](0015-a-record-operation-is-one-guarded-statement.md) | A record operation is one guarded statement, canonical in and out, never retried | accepted |
 | [0016](0016-postgres-operations.md) | PostgreSQL operations: canonical text in and out, every name from pg_catalog | accepted |
-| [0017](0017-sqlserver-operations.md) | SQL Server operations: one guarded batch, and a write reported done only when the table holds it | accepted |
+| [0017](0017-sqlserver-operations.md) | SQL Server operations: one guarded batch, and a write reported done only when the table holds it | accepted; narrowed by 0026 |
 | [0018](0018-one-planner-turns-answers-into-requests.md) | One planner turns answers into requests, and leaves membership to the database | accepted |
 | [0019](0019-a-published-form-is-checked-every-time-it-is-read.md) | A published form is one bundle, checked every time it is read; a form reaches only allowlisted databases | accepted |
 | [0020](0020-administration-is-a-separate-plane.md) | Administration is a separate plane, held by a role in the host's token | accepted |
@@ -81,3 +81,4 @@ only enforcement is "we remember" says so plainly.
 | [0023](0023-the-audit-trail-is-operational-not-evidence.md) | The audit trail is operational, never holds a value, and is not evidence | accepted |
 | [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted |
 | [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted |
+| [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted |

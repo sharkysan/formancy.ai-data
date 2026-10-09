@@ -15,6 +15,8 @@ interface ColumnRow {
   max_length: number
   precision: number
   scale: number
+  /** The code page of the column's collation; `null` for a type that has none, and for a collation the server does not know. */
+  code_page: number | null
   is_nullable: boolean
   is_identity: boolean
   is_computed: boolean
@@ -40,12 +42,19 @@ interface ColumnRow {
  * without VIEW DEFINITION. Identity and computed come from sys.columns' own
  * flags: sys.identity_columns and sys.computed_columns add the seed, the
  * increment and the expression, none of which the contract carries.
+ *
+ * The code page is read from the column's own collation, never the
+ * database's: a column may be declared under any collation, and the fixture's
+ * UTF-8 varchar sits in a database whose default is code page 1252. It says
+ * what a char or varchar length counts (0026).
  */
 const SQL = (scoped: string): string => `
   select c.object_id, c.column_id, c.name,
     t.name as type_name, schema_name(t.schema_id) as type_schema, t.is_user_defined,
     st.name as system_name,
-    c.max_length, c.precision, c.scale, c.is_nullable, c.is_identity, c.is_computed, c.generated_always_type,
+    c.max_length, c.precision, c.scale,
+    convert(int, collationproperty(c.collation_name, 'CodePage')) as code_page,
+    c.is_nullable, c.is_identity, c.is_computed, c.generated_always_type,
     c.default_object_id, object_name(c.default_object_id) as default_name,
     object_definition(c.default_object_id) as default_definition,
     cast(ep.value as nvarchar(max)) as comment
@@ -60,15 +69,39 @@ const SQL = (scoped: string): string => `
 /** The name sys.types gives rowversion's system type: its deprecated synonym. */
 const ROWVERSION_SYSTEM_TYPE = 'timestamp'
 
+/** One bracketed name as SQL Server stores it in a definition, a `]` inside it doubled. */
+const BRACKETED = String.raw`\[(?:[^\]]|\]\])+\]`
+
 /**
- * How the column gets its value. A period column (GENERATED ALWAYS AS ROW
- * START or END) is written by the database and refused in an insert, which is
- * what `computed` tells a form generator; `none` would offer it as an input.
+ * A default that is exactly the next value of one sequence, as SQL Server
+ * stores the definition: `(NEXT VALUE FOR [schema].[name])`, however it was
+ * written. One that computes with the value has more around it.
+ */
+const NEXT_VALUE = new RegExp(String.raw`^\(NEXT VALUE FOR (?:${BRACKETED}\.){0,2}${BRACKETED}\)$`, 'i')
+
+/**
+ * How the column gets its value.
+ *
+ * IDENTITY is `identity-always`: an insert that names it is refused (544)
+ * unless IDENTITY_INSERT is on, which needs ALTER on the table, and an update
+ * of it is refused outright (8102). SQL Server has no BY DEFAULT identity; a
+ * default of NEXT VALUE FOR a sequence is what takes its place, and behaves as
+ * PostgreSQL's does: it numbers a row an insert leaves out, takes a value
+ * given to it, and a value given by hand collides with the sequence later
+ * (2627, measured). It is `identity-by-default`, and keeps its default (0026).
+ * Its definition is read without VIEW DEFINITION only as NULL, and then the
+ * column cannot be told from an ordinary default: it is `none`, and the
+ * snapshot's `defaults` gap says the definition was hidden.
+ *
+ * A period column (GENERATED ALWAYS AS ROW START or END) is written by the
+ * database and refused in an insert, which is what `computed` tells a form
+ * generator; `none` would offer it as an input.
  */
 function generation(row: ColumnRow): Generation {
-  if (row.is_identity) return 'identity'
+  if (row.is_identity) return 'identity-always'
   if (row.system_name === ROWVERSION_SYSTEM_TYPE) return 'rowversion'
   if (row.is_computed || row.generated_always_type !== 0) return 'computed'
+  if (row.default_definition !== null && NEXT_VALUE.test(row.default_definition)) return 'identity-by-default'
   return 'none'
 }
 
@@ -81,6 +114,7 @@ function toColumn(row: ColumnRow, gaps: ObjectGap[]): ColumnMeta {
     maxLength: row.max_length,
     precision: row.precision,
     scale: row.scale,
+    codePage: row.code_page,
   })
   if (hidden) {
     gaps.push({

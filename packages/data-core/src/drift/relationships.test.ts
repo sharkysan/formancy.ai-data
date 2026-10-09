@@ -235,8 +235,8 @@ describe('diffSnapshots: constraints the form does not rest on', () => {
           validated: true,
         })
         order.checks = [
-          { name: 'ck_order_amount', expression: '([amount]>(0))', validated: false },
-          { name: 'ck_order_status', expression: "([status]<>'')", validated: false },
+          { name: 'ck_order_amount', expression: '([amount]>(0))', enforced: true, validated: false },
+          { name: 'ck_order_status', expression: "([status]<>'')", enforced: true, validated: false },
         ]
       },
       {},
@@ -285,6 +285,21 @@ describe('diffSnapshots: constraints the form does not rest on', () => {
     ])
   })
 
+  // A disabled SQL Server check is also untrusted, so by validation alone it
+  // read exactly like a WITH NOCHECK one: still checking new rows. Named, a
+  // reviewer sees that the database stopped checking writes at all.
+  test('a check that stopped being enforced is noted, enforcement named', () => {
+    const report = drift((objects) => {
+      const check = object(objects, 'order').checks[0]
+      if (check !== undefined) Object.assign(check, { enforced: false, validated: false })
+    })
+    expect(only(report)).toMatchObject({
+      kind: 'check-changed',
+      severity: 'info',
+      message: expect.stringMatching(/^ck_order_amount .*enforcement from enforced to not enforced; validation from validated to not validated/),
+    })
+  })
+
   // Out of sight is not gone, for a constraint as for a table. The gap says
   // so once, and a "dropped" note beside it would contradict it.
   test('a constraint the form does not rest on, gone behind a gap, is left to the gap', () => {
@@ -292,7 +307,7 @@ describe('diffSnapshots: constraints the form does not rest on', () => {
     expect(kinds(drift((objects) => dropForeignKey(objects, 'fk_order_created_by'), { gaps: [gap(ORDER_REF, 'foreign-keys')] }))).toEqual(['access-narrowed'])
 
     // An expression that can no longer be read is a changed check, and noted as one.
-    const unreadable = drift((objects) => (object(objects, 'order').checks = [{ name: 'ck_order_amount', expression: null, validated: true }]), { gaps: [gap(ORDER_REF, 'checks')] })
+    const unreadable = drift((objects) => (object(objects, 'order').checks = [{ name: 'ck_order_amount', expression: null, enforced: true, validated: true }]), { gaps: [gap(ORDER_REF, 'checks')] })
     expect(unreadable.changes.map((change) => [change.kind, change.severity])).toEqual([
       ['access-narrowed', 'info'],
       ['check-changed', 'info'],

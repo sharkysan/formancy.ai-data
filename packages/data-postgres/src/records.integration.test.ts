@@ -1,6 +1,7 @@
-import { codecFor, findObject } from '@formancy/data-core'
+import { canonicalFloat32, codecFor, findObject } from '@formancy/data-core'
 import type {
   ApiValue,
+  CodecOutcome,
   ColumnMeta,
   MetadataSnapshot,
   RecordColumn,
@@ -12,7 +13,8 @@ import type {
   UpdateRequest,
 } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { EDGE_VALUES, startPostgresFixture } from '@formancy/data-fixtures'
+import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT, startPostgresFixture } from '@formancy/data-fixtures'
+import { randomUUID } from 'node:crypto'
 import net from 'node:net'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
@@ -64,7 +66,7 @@ beforeAll(async () => {
     create table rec.indexed (id integer primary key, code text constraint uq_indexed_code unique);
     create table rec.defaults (id integer generated always as identity primary key, opened date not null default '2026-10-08', state text not null default 'new');
     create table rec.reals (id integer primary key, f4 real not null);
-    insert into rec.reals values (1, '10.0152025'), (2, '0.1'), (3, '3.4028235e38'), (4, '1.17549435e-38'), (5, '7e-45');
+    insert into rec.reals values (1, '10.0152025'), (2, '0.1'), (3, '3.4028235e38'), (4, '1.17549435e-38'), (5, '7e-45'), (6, '1.26217745e-29'), (7, '805306368'), (8, '0.000244140625');
     -- Domains that refuse NULL, on a table a tenant filter reads: one NOT
     -- NULL, one whose CHECK says so.
     create domain rec.email as text not null;
@@ -105,7 +107,7 @@ function val(table: string, name: string, value: ApiValue): RecordValue {
 
 const INT32 = { kind: 'integer', min: '-2147483648', max: '2147483647' } as const
 const INT64 = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' } as const
-const TEXT = { kind: 'text', maxLength: null, fixedLength: false } as const
+const TEXT = { kind: 'text', maxLength: null, lengthUnit: 'code-points', fixedLength: false } as const
 const ORDER_ID: RecordColumn = { name: 'id', type: INT64 }
 const ID: RecordColumn = { name: 'id', type: INT32 }
 const TENANT_ID: RecordColumn = { name: 'tenant_id', type: INT32 }
@@ -319,19 +321,41 @@ describe('reading', () => {
   })
 
   // A real is a 32-bit float. Its exact value as a double is long
-  // (0.1 is 0.10000000149011612); PostgreSQL prints the shortest decimal
-  // that reads back as the same float, which needs up to nine digits —
-  // 10.0152025 needs all nine. Read from its bits, it must come back as
-  // that same shortest decimal.
-  test('reads a real as the shortest decimal PostgreSQL itself prints for it', async () => {
+  // (0.1 is 0.10000000149011612). Read from its bits, it must come back as
+  // data-core's canonicalFloat32 names it — what the codec accepts and the
+  // SQL Server adapter reads too (0026) — and PostgreSQL's own text is the
+  // independent check on it: the same float, never in more digits.
+  // PostgreSQL's text is not the spelling, and the last three rows say why:
+  // 2^-96 (row 6) once came back in nine digits where PostgreSQL, and now
+  // canonicalFloat32, use eight; 805306368 (row 7) is named by 805306400,
+  // halfway to the next float and rounded to this one, which PostgreSQL's
+  // printer does not take; 2^-12 (row 8) ends in an exact tie, which
+  // PostgreSQL breaks to even and toExponential away from zero.
+  test('reads a real as the shortest decimal naming its float, never longer than PostgreSQL prints it', async () => {
     const records = createPostgresRecords(owner)
     const target: RecordTarget = { table: { schema: 'rec', name: 'reals' }, identity: [ID], concurrency: null }
     const printed = await owner<{ id: number; f4: string }[]>`select id, f4::text as f4 from rec.reals order by id`
-    expect(printed.map((row) => row.f4)).toEqual(['10.0152025', '0.1', '3.4028235e+38', '1.1754944e-38', '7e-45'])
+    expect(printed.map((row) => row.f4)).toEqual([
+      '10.0152025',
+      '0.1',
+      '3.4028235e+38',
+      '1.1754944e-38',
+      '7e-45',
+      '1.2621775e-29',
+      '8.0530637e+08',
+      '0.00024414062',
+    ])
+    const digits = (value: number): number => value.toExponential().replace(/^-|e.*$|\./g, '').length
+    const reads: unknown[] = []
     for (const row of printed) {
       const read = succeeded(await records.read({ target, key: idKey(String(row.id)), columns: [col('reals', 'f4')], filters: EVERY_ROW }))
-      expect(read.values.f4).toBe(Number(row.f4))
+      const value = read.values.f4 as number
+      expect(Math.fround(value), row.f4).toBe(Math.fround(Number(row.f4)))
+      expect(digits(value), row.f4).toBeLessThanOrEqual(digits(Number(row.f4)))
+      expect(value, row.f4).toBe(canonicalFloat32(Number(row.f4)))
+      reads.push(value)
     }
+    expect(reads).toEqual([10.0152025, 0.1, 3.4028235e38, 1.1754944e-38, 7e-45, 1.2621775e-29, 805306400, 0.00024414063])
   })
 
   // Another tenant's row exists, and a different answer for it than for a
@@ -402,6 +426,138 @@ describe('reading', () => {
     const request = (name: string) => ({ target: { table: { schema: 'rec', name }, identity: [ID], concurrency: null }, key: idKey('1'), columns: [{ name: 'note', type: TEXT }], filters: EVERY_ROW })
     expect(succeeded(await records.read(request(LONGEST))).values).toEqual({ note: 'the table a longer name would be truncated to' })
     await expect(records.read(request(`${LONGEST}y`))).rejects.toThrow(/63 bytes/)
+  })
+})
+
+describe('the column facts both engines are held to (0026)', () => {
+  const SHIPMENT: RecordTarget = { table: { schema: 'sales', name: 'shipment' }, identity: [ID], concurrency: null }
+  const shipmentKey = (id: string): RecordValue[] => [val('shipment', 'id', id)]
+
+  /** The values a shipment cannot be inserted without, a fresh tracking number each time. */
+  const shipmentValues = (reference: string): RecordValue[] =>
+    Object.entries({ tenant_id: '7', tracking_no: randomUUID(), carrier_code: '1', reference, pickup_time: '08:00' }).map(([name, value]) => val('shipment', name, value))
+
+  /** A shipment of its own, inserted through the adapter, so rows 1 and 2 stay what the model says; its id. */
+  async function newShipment(reference: string): Promise<string> {
+    const outcome = succeeded(await createPostgresRecords(owner).insert({ target: SHIPMENT, values: shipmentValues(reference), returning: [col('shipment', 'id')] }))
+    return String(outcome.values.id)
+  }
+
+  function refused(outcome: CodecOutcome): { code: string; message: string } {
+    if (outcome.ok) throw new Error(`expected the codec to refuse, it accepted ${JSON.stringify(outcome.value)}`)
+    return { code: outcome.code, message: outcome.message }
+  }
+
+  // One expected object for both engines, from @formancy/data-fixtures. An
+  // adapter that spelled a zoneless timestamp its own way (cut at the second,
+  // or padded to its scale) or answered a real as the double it widens to
+  // would read these rows differently from SQL Server's, and an unchanged
+  // echo of one would look like a change on the other.
+  test('the shipments read back exactly as both adapters must return them', async () => {
+    const shipment = findObject(snapshot, { schema: 'sales', name: 'shipment' })
+    if (shipment === undefined) throw new Error('sales.shipment is not in the snapshot')
+    const columns = shipment.columns.filter((column) => column.type.kind !== 'binary').map(({ name, type }) => ({ name, type }))
+    const read = async (id: string) => succeeded(await createPostgresRecords(owner).read({ target: SHIPMENT, key: shipmentKey(id), columns, filters: EVERY_ROW })).values
+    expect(await read('1')).toEqual(FIRST_SHIPMENT)
+    expect(await read('2')).toEqual(SECOND_SHIPMENT)
+  })
+
+  // varchar(20) is twenty characters in PostgreSQL's UTF8 database:
+  // twenty two-byte letters, twenty four-byte emoji. A codec counting UTF-16
+  // code units, as it did before 0026, refused the twenty emoji the column
+  // holds; one counting bytes would refuse the letters. The 21st is refused
+  // by both, the codec first.
+  test('varchar(20) holds 20 characters, and the codec counts the same', async () => {
+    const reference = meta('shipment', 'reference')
+    expect(reference.type).toEqual({ kind: 'text', maxLength: 20, lengthUnit: 'code-points', fixedLength: false })
+    const codec = codecFor(reference)
+    for (const value of ['é'.repeat(20), '😀'.repeat(20)]) {
+      expect(codec.parse(value)).toEqual({ ok: true, value })
+      const id = await newShipment(value)
+      const read = succeeded(await createPostgresRecords(owner).read({ target: SHIPMENT, key: shipmentKey(id), columns: [col('shipment', 'reference')], filters: EVERY_ROW }))
+      expect(read.values.reference).toBe(value)
+    }
+    expect(refused(codec.parse('é'.repeat(21)))).toEqual({ code: 'too-long', message: 'At most 20 characters.' })
+    // The server draws the line at the same place: 22001, value too long.
+    await expect(
+      owner`insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pickup_time) values (7, ${randomUUID()}, 1, ${'é'.repeat(21)}, '08:00')`,
+    ).rejects.toMatchObject({ code: '22001' })
+  })
+
+  // A real stores the float nearest the value it is given, and its exact
+  // value as a double is long. Were the codec's value, the stored value as
+  // read and the value echoed back not one number, an unchanged form would
+  // save a change; and 0.123456789, which a real cannot hold, must read back
+  // as the 0.12345679 the codec already said it would be.
+  test('a real written as the codec gives it reads back as that same value, and an echo of it changes nothing', async () => {
+    const codec = codecFor(meta('kinds', 'f4'))
+    const records = createPostgresRecords(owner)
+    const f4 = [col('kinds', 'f4')]
+    for (const [id, sent, saved] of [['30', 0.1, 0.1], ['31', 0.123456789, 0.12345679], ['32', 0.10000000149011612, 0.1]] as const) {
+      expect(codec.parse(sent)).toEqual({ ok: true, value: saved })
+      succeeded(await records.insert({ target: KINDS, values: [...idKey(id), val('kinds', 'f4', saved)], returning: [] }))
+      const first = succeeded(await records.read({ target: KINDS, key: idKey(id), columns: f4, filters: EVERY_ROW }))
+      expect(first.values).toEqual({ f4: saved })
+      const echo = { target: KINDS, key: idKey(id), set: [val('kinds', 'f4', first.values.f4 ?? null)], expectedVersion: String(first.version), filters: EVERY_ROW, returning: f4 }
+      expect(succeeded(await records.update(echo)).values).toEqual({ f4: saved })
+      expect(succeeded(await records.read({ target: KINDS, key: idKey(id), columns: f4, filters: EVERY_ROW })).values).toEqual({ f4: saved })
+    }
+  })
+
+  // An unpaired surrogate cannot be UTF-8. The driver writes U+FFFD in its
+  // place, PostgreSQL stores that, and the write reports success: the value
+  // read back is not the value written, and nothing said so. The codec refuses
+  // it first, so a form never reaches this silent change.
+  test('a text with an unpaired surrogate is refused by the codec, because PostgreSQL would store U+FFFD in silence', async () => {
+    const lone = '\ud800ab'
+    expect(refused(codecFor(meta('shipment', 'reference')).parse(lone)).code).toBe('invalid-character')
+    const id = await newShipment(lone)
+    const read = succeeded(await createPostgresRecords(owner).read({ target: SHIPMENT, key: shipmentKey(id), columns: [col('shipment', 'reference')], filters: EVERY_ROW }))
+    expect(read.values.reference).toBe('�ab')
+  })
+
+  // PostgreSQL refuses a value a real cannot hold (22003) where SQL Server
+  // stores 1e-50 as 0 without a word. The codec refuses both first, so
+  // neither engine is asked and the two cannot differ.
+  test('a value a real would refuse is refused by the codec first', async () => {
+    const codec = codecFor(meta('shipment', 'temperature_c'))
+    expect(refused(codec.parse(1e-50)).code).toBe('out-of-range')
+    expect(refused(codec.parse(3.5e38)).code).toBe('out-of-range')
+    await expect(owner`select '1e-50'::pg_catalog.float4`).rejects.toMatchObject({ code: '22003' })
+    await expect(owner`select '3.5e38'::pg_catalog.float4`).rejects.toMatchObject({ code: '22003' })
+    // The smallest denormal is a real, and both say so.
+    expect(codec.parse(1e-45)).toEqual({ ok: true, value: 1e-45 })
+    const [printed] = await owner<{ f4: string }[]>`select '1e-45'::pg_catalog.float4::pg_catalog.text as f4`
+    expect(printed?.f4).toBe('1e-45')
+  })
+
+  // A wall clock is spelled with its fraction, trailing zeros dropped, and
+  // nothing more: a whole second ending in 0 keeps the 0. That is the trap
+  // SQL Server's trim had to be guarded against (…:50 read as …:5), checked
+  // here too so the two spellings are held to the same edges.
+  test('a zoneless timestamp keeps its fraction, trailing zeros dropped, never a digit of the seconds', async () => {
+    await owner.unsafe(`insert into rec.kinds (id, tsl) values (40, '2026-10-08 12:34:50.120000'), (41, '2026-10-08 12:34:50'), (42, '2026-10-08 12:34:56.000001')`)
+    const read = async (id: string) => succeeded(await createPostgresRecords(owner).read({ target: KINDS, key: idKey(id), columns: [col('kinds', 'tsl')], filters: EVERY_ROW })).values.tsl
+    expect(await read('40')).toBe('2026-10-08T12:34:50.12')
+    expect(await read('41')).toBe('2026-10-08T12:34:50')
+    expect(await read('42')).toBe('2026-10-08T12:34:56.000001')
+  })
+
+  // BY DEFAULT takes a number given to it, and the form never gives one: the
+  // codec keeps the column read-only. This is why. A number chosen by hand
+  // does not move the identity's sequence, so the next create that leaves the
+  // column out is handed that same number and collides with it.
+  test('a by-default identity numbers a create that leaves it out, and a number chosen by hand collides later', async () => {
+    const id = meta('shipment', 'id')
+    expect(id.generated).toBe('identity-by-default')
+    expect(codecFor(id)).toMatchObject({ status: 'read-only', reason: expect.stringMatching(/identity-by-default/) as unknown })
+    const numbered = BigInt(await newShipment('numbered'))
+    expect(numbered > 2n).toBe(true)
+    // The database accepts the next number, given by hand...
+    await owner`insert into sales.shipment (id, tenant_id, tracking_no, carrier_code, reference, pickup_time) values (${String(numbered + 1n)}, 7, ${randomUUID()}, 1, 'by hand', '08:00')`
+    // ...and the next create through the adapter is handed it again.
+    const collided = failed(await createPostgresRecords(owner).insert({ target: SHIPMENT, values: shipmentValues('collides'), returning: [] }))
+    expect(collided).toMatchObject({ code: 'unique-violation', constraint: 'pk_shipment' })
   })
 })
 

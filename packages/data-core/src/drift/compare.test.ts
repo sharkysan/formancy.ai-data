@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import type { ColumnMeta, NormalizedType } from '../metadata.js'
+import type { ColumnMeta, NormalizedType, TextLengthUnit } from '../metadata.js'
 import { classify, compareTypes, type TypeVerdict } from './compare.js'
 
 const INT16: NormalizedType = { kind: 'integer', min: '-32768', max: '32767' }
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const INT64: NormalizedType = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' }
-const text = (maxLength: number | null, fixedLength = false): NormalizedType => ({ kind: 'text', maxLength, fixedLength })
+const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({ kind: 'text', maxLength, lengthUnit, fixedLength })
 const decimal = (precision: number | null, scale: number | null): NormalizedType => ({ kind: 'decimal', precision, scale })
 
 function col(name: string, databaseType: string, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
@@ -43,7 +43,7 @@ describe('compareTypes', () => {
       ['single to double', { kind: 'float', bits: 32 }, { kind: 'float', bits: 64 }, 'loosened'],
       ['time precision down', { kind: 'time', precision: 6 }, { kind: 'time', precision: 3 }, 'tightened'],
       ['timestamp precision up', { kind: 'timestamp', withTimeZone: true, precision: 6 }, { kind: 'timestamp', withTimeZone: true, precision: 7 }, 'loosened'],
-      ['shorter binary', { kind: 'binary', maxLength: 16 }, { kind: 'binary', maxLength: 8 }, 'tightened'],
+      ['shorter binary', { kind: 'binary', maxLength: 16, fixedLength: false }, { kind: 'binary', maxLength: 8, fixedLength: false }, 'tightened'],
       ['same date', { kind: 'date' }, { kind: 'date' }, 'same'],
       ['same text', text(20), text(20), 'same'],
     ]
@@ -58,6 +58,30 @@ describe('compareTypes', () => {
     expect(compareTypes({ kind: 'timestamp', withTimeZone: true, precision: 6 }, { kind: 'timestamp', withTimeZone: false, precision: 6 })).toBe('changed')
     expect(compareTypes(INT32, text(10))).toBe('changed')
     expect(compareTypes({ kind: 'boolean' }, INT16)).toBe('changed')
+  })
+
+  // A collation move of varchar(20) from 1252 to UTF-8 keeps every spelling
+  // the database shows and changes what 20 counts. Before the unit was in the
+  // snapshot the move was invisible, fingerprint included, and the published
+  // codec went on counting characters where the column now counts bytes.
+  // Only a move across the UTF-8 boundary is seen: 1252 to 932 is
+  // code-page-bytes on both sides, and is left to the save's checks.
+  test('a text counted in another unit is a different type, though the database spells it alike', () => {
+    expect(compareTypes(text(20, false, 'code-page-bytes'), text(20, false, 'utf8-bytes'))).toBe('changed')
+    expect(compareTypes(text(20, false, 'code-page-bytes'), text(40, false, 'utf8-bytes'))).toBe('changed')
+    expect(compareTypes(text(20, false, 'utf8-bytes'), text(20, false, 'utf8-bytes'))).toBe('same')
+    const reference = col('reference', 'varchar(20)', text(20, false, 'code-page-bytes'))
+    expect(classify(reference, { ...reference, type: text(20, false, 'utf8-bytes') })).toEqual({
+      kind: 'column-type-changed',
+      reasons: ['its length now counts utf8-bytes where it counted code-page-bytes, though the database still spells it varchar(20)'],
+    })
+  })
+
+  // binary(n) pads a shorter value with zeros and varbinary(n) does not: what
+  // is read back is a different value, not more or less of the same one.
+  test('a binary that starts padding is a different type', () => {
+    expect(compareTypes({ kind: 'binary', maxLength: 32, fixedLength: false }, { kind: 'binary', maxLength: 32, fixedLength: true })).toBe('changed')
+    expect(compareTypes({ kind: 'binary', maxLength: 32, fixedLength: true }, { kind: 'binary', maxLength: 16, fixedLength: true })).toBe('tightened')
   })
 })
 
@@ -114,7 +138,23 @@ describe('classify', () => {
   // A generated column cannot be written, and one that stopped being
   // generated must be given a value. Either way the form's write changes.
   test('the database starting or stopping generating a column is a generation change', () => {
-    const id = col('id', 'bigint', INT64, { generated: 'identity' })
-    expect(classify(id, { ...id, generated: 'none' })).toEqual({ kind: 'column-generation-changed', reasons: ['the database no longer generates it (it was identity)'] })
+    const id = col('id', 'bigint', INT64, { generated: 'identity-always' })
+    expect(classify(id, { ...id, generated: 'none' })).toEqual({ kind: 'column-generation-changed', reasons: ['the database no longer generates it (it was identity-always)'] })
+  })
+
+  // ALWAYS refuses a value and BY DEFAULT accepts one. Reported as no change,
+  // a column that starts accepting values would go unreviewed; reported as
+  // "now generates it", the reason would claim it was not generated before.
+  test('identity-always to identity-by-default is a generation change, named both ways', () => {
+    const id = col('id', 'integer', INT32, { generated: 'identity-always' })
+    expect(classify(id, { ...id, generated: 'identity-by-default' })).toEqual({
+      kind: 'column-generation-changed',
+      reasons: ['the database generates it as identity-by-default where it was identity-always'],
+    })
+    expect(classify({ ...id, generated: 'identity-by-default' }, id)).toEqual({
+      kind: 'column-generation-changed',
+      reasons: ['the database generates it as identity-always where it was identity-by-default'],
+    })
+    expect(classify({ ...id, generated: 'none' }, { ...id, generated: 'identity-by-default' })?.reasons).toEqual(['the database now generates it (identity-by-default)'])
   })
 })
