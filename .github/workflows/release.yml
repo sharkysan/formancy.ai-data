@@ -19,7 +19,45 @@ permissions:
   contents: read
 
 jobs:
+  # CI's getting-started job, again, at the tagged commit (0032): the guide's
+  # own commands from a clean checkout, and the journey through the composed
+  # stack on both engines. A release whose guide does not work is not cut,
+  # so `release` waits for it. Node only, as in CI: the clean checkout is the
+  # point.
+  # With the runner's Compose and the oldest the guide says works, as in CI;
+  # steps.test.mjs fails when this pin, CI's and the guide disagree.
+  getting-started:
+    name: getting-started (Compose ${{ matrix.compose }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compose: runner
+          - compose: 2.20.3
+            # The release's own docker-compose-linux-x86_64.sha256.
+            sha256: f45e4cb687df8b48a57f656097ce7175fa8e8bef70be407b011e29ff663f475f
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compose ${{ matrix.compose }}
+        if: matrix.compose != 'runner'
+        run: |
+          mkdir -p ~/.docker/cli-plugins
+          curl -fsSL -o ~/.docker/cli-plugins/docker-compose "https://github.com/docker/compose/releases/download/v${{ matrix.compose }}/docker-compose-linux-x86_64"
+          echo "${{ matrix.sha256 }}  $HOME/.docker/cli-plugins/docker-compose" | sha256sum -c
+          chmod +x ~/.docker/cli-plugins/docker-compose
+          test "$(docker compose version --short)" = "${{ matrix.compose }}"
+
+      - run: node scripts/getting-started.mjs
+
   release:
+    needs: getting-started
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

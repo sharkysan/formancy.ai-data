@@ -15,6 +15,7 @@
     "test:repo": "vitest run --config vitest.repo.config.mts",
     "test:e2e:install": "node scripts/install-test.mjs",
     "test:browser": "turbo run test:browser",
+    "test:getting-started": "node scripts/getting-started.mjs",
     "typecheck": "turbo run typecheck",
     "check:pkg": "turbo run check:pkg"
   },

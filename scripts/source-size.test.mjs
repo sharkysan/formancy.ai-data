@@ -22,8 +22,11 @@ const repo = join(dirname(fileURLToPath(import.meta.url)), '..')
 /** Lines, for a file that is one subject read top to bottom. */
 const BUDGET = 600
 
-/** Where a person writes code: the packages, the apps, and the repository's own scripts. */
-const ROOTS = ['packages', 'apps', 'scripts']
+/**
+ * Where a person writes code: the packages, the apps, the repository's own
+ * scripts, and what the composed stack runs from the checkout (0032).
+ */
+const ROOTS = ['packages', 'apps', 'scripts', 'deploy']
 
 /** Installed, built or measured, never written. A dot-directory is a tool's. */
 const SKIP = new Set(['node_modules', 'dist', 'coverage'])
@@ -67,6 +70,7 @@ describe('how big a source file may be', () => {
     expect(paths).toContain('packages/data-core/src/generate/generate.ts')
     expect(paths).toContain('apps/examples/src/app.tsx')
     expect(paths).toContain('scripts/check-cla.mjs')
+    expect(paths).toContain('deploy/mint-token.mjs')
     expect(paths.filter((path) => NOT_SOURCE.test(path))).toEqual([])
   })
 

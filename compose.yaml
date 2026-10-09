@@ -1,25 +1,97 @@
-# The two databases the adapters are developed against, and nothing else: this
-# repository has no server to run yet. The test suites start their own
-# containers through testcontainers and need none of this; it is for a
-# developer who wants a database to poke at from a shell or a client.
+# Two ways to use this file.
 #
 #   docker compose up -d
 #
-# Both are bound to loopback, not to every interface, and both on a port one
-# off the default -- a locally installed Postgres usually has 5432 and a local
-# SQL Server 1433, and formancy.ai's compose file already took 5439. A silent
-# collision looks exactly like a wrong password.
+# starts the two databases the adapters are developed against, after the
+# one-shot `secrets` service that makes their passwords, and nothing else, for
+# a developer who wants one to poke at from a shell or a client. The test
+# suites start their own containers through testcontainers and need none of
+# this.
+#
+#   docker compose --profile stack up -d --build --wait --wait-timeout 900
+#
+# is the composed stack docs/getting-started.md walks an operator through
+# (0032): the databases with the sample fixture loaded, the data server with
+# both planes on, and the studio at /studio/ and the host page at /host/ on
+# one origin, http://127.0.0.1:4394. Tokens for it come from the `token`
+# service:
+#
+#   docker compose run --rm token --subject ada --role data-admin
+#
+# scripts/getting-started.mjs runs that guide against this file, in CI on
+# every pull request, and fails if anything here is published off loopback,
+# publishes the server, holds a secret as a value or restarts on its own.
+# Both uses need the Compose release the guide's section 0 names, or a later
+# one: an older one can refuse the file outright, as 2.19.1 does the web
+# front's `start_interval` (measured 2026-10-09 in a Docker Sandbox VM on
+# Windows 11), and the CI job runs the guide with that release as well as the
+# runner's own.
+#
+# Passwords and keys are generated into the formancy-data-secrets volume on the
+# first start and kept after it; nothing here or in `.env` holds one. Each
+# service is handed only the ones it reads, in a volume of its own mounted at
+# /run/formancy-secrets, and every setting below names a file there. Read one
+# with, for example,
+#
+#   docker compose exec sqlserver cat /run/formancy-secrets/mssql-sa-password
+#
+# `docker compose --profile stack down -v` deletes the data, the published
+# forms and the secrets, and every token signed by the old ones stops working.
+# A database volume made before the secrets volume existed holds the old
+# password and needs that too.
+#
+# Everything published is bound to loopback, not to every interface, and each
+# on a port one off the default -- a locally installed Postgres usually has
+# 5432 and a local SQL Server 1433, formancy.ai's compose file already took
+# 5439, and 4390 to 4393 are the server's and the apps' development ports. A
+# silent collision looks exactly like a wrong password. .env.example lists the
+# overrides.
+
+# The host's identity settings, shared by the server that verifies tokens and
+# the minter that signs them, so the two cannot name different issuers,
+# audiences, keys or claims.
+x-identity: &identity
+  FORMANCY_DATA_ISSUER: formancy-data-compose
+  FORMANCY_DATA_AUDIENCE: formancy-data
+  FORMANCY_DATA_IDENTITY_SECRET: file:/run/formancy-secrets/host-token-secret
+  FORMANCY_DATA_ATTRIBUTES: tenant=tid
+
 services:
+  # Generates whatever secret the volume does not hold yet, and hands each
+  # service the ones it reads; see deploy/secrets.sh.
+  secrets:
+    image: postgres:17-alpine
+    user: "0"
+    entrypoint: ["sh", "/deploy/secrets.sh"]
+    volumes:
+      - ./deploy/secrets.sh:/deploy/secrets.sh:ro
+      - formancy-data-secrets:/secrets
+      - formancy-data-secrets-postgres:/handed/postgres
+      - formancy-data-secrets-sqlserver:/handed/sqlserver
+      - formancy-data-secrets-server:/handed/server
+      - formancy-data-secrets-token:/handed/token
+    # The image declares its data directory a VOLUME, which this service does
+    # not use. Without the tmpfs over it Docker makes a volume there for every
+    # container, labelled with no project: `down` keeps it, the next start
+    # makes another, and `down -v` cannot find the ones left behind.
+    tmpfs:
+      - /var/lib/postgresql/data
+    restart: "no"
+
   postgres:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: formancy
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-formancy}
+      POSTGRES_PASSWORD_FILE: /run/formancy-secrets/postgres-owner-password
       POSTGRES_DB: formancy_data
     ports:
-      - "127.0.0.1:5440:5432"
+      - "127.0.0.1:${FORMANCY_DATA_PG_PORT:-5440}:5432"
     volumes:
       - formancy-data-pg:/var/lib/postgresql/data
+      - formancy-data-secrets-postgres:/run/formancy-secrets:ro
+    depends_on:
+      secrets:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U formancy"]
       interval: 5s
@@ -28,25 +100,148 @@ services:
 
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    # The image's own entrypoint and command (`docker image inspect`), with the
+    # sa password read from the volume into that one process's environment, so
+    # it is in neither this file nor the container's configuration.
+    entrypoint: ["/bin/bash", "-c", "export MSSQL_SA_PASSWORD=\"$$(cat /run/formancy-secrets/mssql-sa-password)\"; exec /opt/mssql/bin/launch_sqlservr.sh /opt/mssql/bin/sqlservr"]
     environment:
       # The EULA is Microsoft's and accepting it is the operator's act, which is
-      # why it is spelled out here rather than hidden in an image default.
+      # why it is spelled out here rather than hidden in an image default. The
+      # Developer edition is not licensed for production.
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
-      # `:?` means compose stops with this message rather than starting a
-      # server with no password. There is no default, here or in the image.
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?set it in .env -- see .env.example}
     ports:
-      - "127.0.0.1:1434:1433"
+      - "127.0.0.1:${FORMANCY_DATA_MS_PORT:-1434}:1433"
     volumes:
       - formancy-data-mssql:/var/opt/mssql
+      - formancy-data-secrets-sqlserver:/run/formancy-secrets:ro
+    depends_on:
+      secrets:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -b -Q 'SELECT 1'"]
+      test: ["CMD-SHELL", "SQLCMDPASSWORD=\"$$(cat /run/formancy-secrets/mssql-sa-password)\" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -Q 'SELECT 1'"]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 30s
 
+  # The sample fixture, loaded once through each engine's own client, and the
+  # order form's account given the volume's password on every start; see
+  # deploy/seed/*.sh.
+  #
+  # As root, which reads the checkout's files whatever their mode: the image's
+  # own user is not the host user who cloned it.
+  seed-postgres:
+    profiles: [stack]
+    image: postgres:17-alpine
+    user: "0"
+    entrypoint: ["sh", "/seed/postgres.sh"]
+    volumes:
+      - ./packages/data-fixtures/fixtures:/fixtures:ro
+      - ./deploy/seed:/seed:ro
+      - formancy-data-secrets-postgres:/run/formancy-secrets:ro
+    # As under `secrets`: psql only, and no volume left behind.
+    tmpfs:
+      - /var/lib/postgresql/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  seed-sqlserver:
+    profiles: [stack]
+    # The database's own image, so its sqlcmd and no second pull.
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    user: "0"
+    entrypoint: ["bash", "/seed/sqlserver.sh"]
+    volumes:
+      - ./packages/data-fixtures/fixtures:/fixtures:ro
+      - ./deploy/seed:/seed:ro
+      - formancy-data-secrets-sqlserver:/run/formancy-secrets:ro
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: "no"
+
+  # The data server, built from this checkout under a local tag, never the
+  # released image's name. No published port: the browser's way in is `web`,
+  # so the studio, the host page and /v1 share one origin. A local process on
+  # a Linux host can still reach it at its container address, which the
+  # guide's section 8 says.
+  server:
+    profiles: [stack]
+    build:
+      context: .
+      dockerfile: packages/data-server/Dockerfile
+    image: formancy/data-server:compose
+    environment:
+      <<: *identity
+      FORMANCY_DATA_STORE_DIR: /var/lib/formancy-data
+      FORMANCY_DATA_CONNECTIONS: /etc/formancy-data/connections.json
+      FORMANCY_DATA_ADMIN_ROLES: data-admin
+      FORMANCY_DATA_AUDIT_KEY: file:/run/formancy-secrets/audit-key
+    volumes:
+      - formancy-data-store:/var/lib/formancy-data
+      - ./deploy/connections.json:/etc/formancy-data/connections.json:ro
+      - formancy-data-secrets-server:/run/formancy-secrets:ro
+    depends_on:
+      seed-postgres:
+        condition: service_completed_successfully
+      seed-sqlserver:
+        condition: service_completed_successfully
+
+  # nginx with the studio and the host page; see deploy/web/.
+  web:
+    profiles: [stack]
+    build:
+      context: .
+      dockerfile: deploy/web/Dockerfile
+    image: formancy/data-web:compose
+    ports:
+      - "127.0.0.1:${FORMANCY_DATA_WEB_PORT:-4394}:8080"
+    depends_on:
+      server:
+        # The server image's own HEALTHCHECK. Restarted when the server is
+        # recreated, because nginx resolves `server` once, when it starts.
+        condition: service_healthy
+        restart: true
+    # Through the proxy to the server, so healthy means a request gets through.
+    # Every check is a request the server logs: often while starting, then
+    # twice a minute.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health"]
+      start_period: 60s
+      start_interval: 2s
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Mints a host token; see deploy/mint-token.mjs. Run, never started:
+  #   docker compose run --rm token --subject clara --role clerk --tenant 1
+  token:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: packages/data-server/Dockerfile
+    image: formancy/data-server:compose
+    entrypoint: ["node", "/deploy/mint-token.mjs"]
+    environment:
+      <<: *identity
+    volumes:
+      - ./deploy/mint-token.mjs:/deploy/mint-token.mjs:ro
+      - formancy-data-secrets-token:/run/formancy-secrets:ro
+    depends_on:
+      secrets:
+        condition: service_completed_successfully
+
 volumes:
   formancy-data-pg:
   formancy-data-mssql:
+  # Every secret, generated once and kept; only `secrets` mounts it.
+  formancy-data-secrets:
+  # What each consumer is handed from it, on every start.
+  formancy-data-secrets-postgres:
+  formancy-data-secrets-sqlserver:
+  formancy-data-secrets-server:
+  formancy-data-secrets-token:
+  formancy-data-store:

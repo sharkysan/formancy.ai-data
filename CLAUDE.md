@@ -290,9 +290,24 @@ CI runs `pnpm build`, `pnpm typecheck`, `pnpm check:pkg`,
 package's `test:coverage` in a job of its own, on its own runner, because nine
 suites sharing one runner timed out a test that takes two seconds alone
 (`scripts/ci-test-jobs.test.mjs` fails when that list and the workspace
-disagree); and in jobs of their own `pnpm test:e2e:install` and
-`pnpm test:browser`. Locally `pnpm test:coverage` still runs them all. Run
-the ones for what you changed.
+disagree); in jobs of their own `pnpm test:e2e:install` and
+`pnpm test:browser`; and `pnpm test:getting-started` in the
+`getting-started` job, run once with the runner's Compose and once with the
+oldest release `docs/getting-started.md` names, which `release.yml` runs too
+before it publishes. Locally `pnpm test:coverage` still runs every package's
+suite. Run the ones for what you changed.
+
+`test:getting-started` runs `docs/getting-started.md` as written -- its own
+`docker compose` commands, from the checkout, with Node and Docker and
+nothing installed -- then the journey the guide describes over HTTP on both
+engines, and fails if a secret or a token reaches a log
+([0032](docs/decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
+It builds both images and starts both databases in a compose project of its
+own, which it removes, volumes included, however it ends. A change to
+`compose.yaml`, `deploy/`, the guide or a control the guide names is a change
+it checks; `scripts/getting-started/steps.test.mjs`, in `test:repo`, holds the
+guide's generated tables, its control names and its Compose pin without
+Docker, and each app's `guide.test.tsx` holds the controls.
 
 `test:coverage` needs Docker and starts both databases. The first run pulls the
 SQL Server image, which is about a gigabyte and a half.

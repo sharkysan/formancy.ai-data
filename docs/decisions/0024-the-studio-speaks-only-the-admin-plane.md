@@ -1,6 +1,6 @@
 # 0024 — The studio speaks only the administrator plane
 
-- **Status:** accepted; presentation survives regeneration, and an edit that is not presentation is refused at publish, narrowed by [0030](0030-presentation-is-a-patch-over-the-generated-base.md)
+- **Status:** accepted; presentation survives regeneration, and an edit that is not presentation is refused at publish, narrowed by [0030](0030-presentation-is-a-patch-over-the-generated-base.md); the one reverse proxy is `deploy/web/nginx.conf` in the composed stack, serving the studio at `/studio/` beside `/v1`, extended by [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `apps/studio/src/journey.test.tsx` — every request the

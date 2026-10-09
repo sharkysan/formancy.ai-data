@@ -1,0 +1,24 @@
+[
+  {
+    "id": "pg",
+    "kind": "postgres",
+    "host": "postgres",
+    "port": 5432,
+    "database": "formancy_data",
+    "user": "formancy_writer",
+    "password": "file:/run/formancy-secrets/pg-writer-password",
+    "schemas": ["sales"],
+    "tls": { "enabled": false }
+  },
+  {
+    "id": "ms",
+    "kind": "sqlserver",
+    "host": "sqlserver",
+    "port": 1433,
+    "database": "formancy_fixture",
+    "user": "formancy_writer",
+    "password": "file:/run/formancy-secrets/ms-writer-password",
+    "schemas": ["sales"],
+    "tls": { "enabled": false, "trustServerCertificate": true }
+  }
+]

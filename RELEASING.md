@@ -17,6 +17,7 @@ node scripts/bump.mjs 0.1.0
 # 3. Verify locally — the workflow runs these again, but finding out here is cheaper
 pnpm build && pnpm typecheck && pnpm test && pnpm check:pkg && pnpm test:repo
 node scripts/verify-licenses.mjs
+pnpm test:getting-started   # docs/getting-started.md as written; needs Docker, not the build
 
 # 4. Commit, tag, push
 git commit -am "Release 0.1.0"
@@ -28,6 +29,16 @@ Pushing the tag is what starts the release. Everything after that is the
 workflow's job.
 
 ## What the workflow does
+
+Before anything is built for publishing, the `getting-started` job runs
+[`docs/getting-started.md`](docs/getting-started.md) at the tagged commit, as
+CI does on every pull request: the guide's own commands from a clean checkout
+with Node and Docker alone, once with the runner's Compose and once with the
+oldest release the guide names, then the journey it describes over HTTP on
+both engines, failing if a secret or a token reaches a log. The `release` job
+`needs` it, so a release whose clean install does not work is not cut
+([0032](docs/decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
+Then:
 
 1. **Refuses a tag that disagrees with the manifests.** A tag saying `v0.2.0`
    on a tree saying `0.1.0` would publish the wrong version under the right
@@ -49,7 +60,16 @@ The server image is built by this workflow at the tagged commit, pushed to
 `ghcr.io/<owner>/formancy-data-server:<tag>` with build provenance, signed with
 cosign **by digest**, and carries the SBOM as an attestation. There is no
 `latest` tag. CI builds the same image on every pull request and proves it
-starts, refuses when unconfigured, and runs unprivileged.
+starts, refuses when unconfigured, runs unprivileged, and can write its
+store's directory.
+
+The composed stack's web image -- nginx with the studio and the host page,
+`formancy/data-web:compose` -- is never released. Compose builds it from the
+checkout on the operator's machine, and no workflow pushes it: the studio is
+private ([0024](docs/decisions/0024-the-studio-speaks-only-the-admin-plane.md))
+and the host page an example. That is held by review; nothing fails if a
+workflow did push it. The server image compose builds is tagged
+`formancy/data-server:compose`, never the released name.
 
 ## Provenance
 

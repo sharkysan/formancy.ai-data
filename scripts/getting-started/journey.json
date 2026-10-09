@@ -1,0 +1,41 @@
+{
+  "forms": [
+    {
+      "engine": "PostgreSQL",
+      "connection": "pg",
+      "root": { "schema": "sales", "name": "order" },
+      "formId": "pg-order",
+      "title": "Order",
+      "lookups": [{ "foreignKey": "fk_order_customer", "display": ["name"] }],
+      "pinned": ["tenant_id"],
+      "versionColumn": "row_version"
+    },
+    {
+      "engine": "SQL Server",
+      "connection": "ms",
+      "root": { "schema": "sales", "name": "order" },
+      "formId": "ms-order",
+      "title": "Order",
+      "lookups": [{ "foreignKey": "fk_order_customer", "display": ["name"] }],
+      "pinned": ["tenant_id"]
+    }
+  ],
+  "policy": {
+    "operations": { "read": ["clerk"], "create": ["clerk"], "update": ["clerk"] },
+    "rowFilters": [{ "column": "tenant_id", "attribute": "tenant" }],
+    "lookups": { "customer": [{ "column": "tenant_id", "attribute": "tenant" }] }
+  },
+  "generator": {
+    "createOnly": "amount",
+    "rowLevelSecurity": { "field": "customer", "table": "sales.customer" }
+  },
+  "order": {
+    "customer": { "label": "Customer", "search": "Muster", "choose": "Muster AG" },
+    "create": [
+      { "field": "order_date", "label": "Order date", "value": "2026-10-01" },
+      { "field": "status", "label": "Status", "value": "placed" },
+      { "field": "amount", "label": "Amount", "value": "5", "stored": "5.0000" }
+    ],
+    "update": { "field": "status", "label": "Status", "value": "shipped" }
+  }
+}

@@ -271,4 +271,65 @@ jobs:
           # Unprivileged, and carrying its licence.
           test "$(docker exec data-server id -un)" = "node"
           docker exec data-server test -f /app/LICENSE.md
+          # The store's directory is the server's own to write. Docker gives a
+          # new named volume the owner of the image directory it is mounted
+          # on, so without the Dockerfile's mkdir and chown a composed
+          # stack's first publish fails (0032).
+          docker exec data-server test -w /var/lib/formancy-data || {
+            echo "::error::/var/lib/formancy-data is not writable by the server's user"
+            exit 1
+          }
           docker rm -f data-server
+
+  # docs/getting-started.md, run as written (0032): its own commands, in order,
+  # from this clean checkout, then propose, publish, lookup, create, a create
+  # sent again, update, a stale update and another tenant's refusal over HTTP
+  # through the composed stack's one origin, on PostgreSQL and SQL Server; and
+  # it fails if a secret or a token reaches a log, compose's configuration or
+  # a container's inspect. Release gate 9 asked for clean-install
+  # documentation that works, and a guide nothing runs is a claim nobody
+  # checked.
+  #
+  # Node and nothing else: no corepack, no pnpm install. The guide's reader
+  # has Docker and git, and the gate runs on Node's built-ins, so the
+  # checkout is as clean as theirs. The step table and the image sizes go in
+  # the job summary, which is where 0032's measurements come from. The limit
+  # is the gate's twenty minutes for the first start -- two image builds and
+  # SQL Server's pull -- with the journey and the teardown after it.
+  #
+  # Twice: with the runner's own Compose, and with the oldest release the
+  # guide's section 0 says works, so that sentence fails here the day
+  # compose.yaml needs a newer one. It is 2.20 because 2.19.1 refuses
+  # compose.yaml outright (the web healthcheck's start_interval), measured on
+  # 2026-10-09; steps.test.mjs fails when the guide and this pin disagree.
+  getting-started:
+    name: getting-started (Compose ${{ matrix.compose }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compose: runner
+          - compose: 2.20.3
+            # The release's own docker-compose-linux-x86_64.sha256.
+            sha256: f45e4cb687df8b48a57f656097ce7175fa8e8bef70be407b011e29ff663f475f
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The user's plugin directory comes before the system's, so this
+      # Compose is the one every `docker compose` in the job runs.
+      - name: Compose ${{ matrix.compose }}
+        if: matrix.compose != 'runner'
+        run: |
+          mkdir -p ~/.docker/cli-plugins
+          curl -fsSL -o ~/.docker/cli-plugins/docker-compose "https://github.com/docker/compose/releases/download/v${{ matrix.compose }}/docker-compose-linux-x86_64"
+          echo "${{ matrix.sha256 }}  $HOME/.docker/cli-plugins/docker-compose" | sha256sum -c
+          chmod +x ~/.docker/cli-plugins/docker-compose
+          test "$(docker compose version --short)" = "${{ matrix.compose }}"
+
+      - run: node scripts/getting-started.mjs

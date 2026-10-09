@@ -51,6 +51,14 @@ WORKDIR /app
 
 COPY --from=build --chown=node:node /app /app
 
+# The configuration store's directory, owned by the user the server runs as.
+# Docker copies an image directory's owner into a new named volume mounted on
+# it; without this one, such a volume is root's and the first publish fails
+# (compose.yaml mounts one here as FORMANCY_DATA_STORE_DIR, 0032). No VOLUME
+# instruction: an anonymous volume nobody asked for is a surprise, not a
+# default.
+RUN mkdir -p /var/lib/formancy-data && chown node:node /var/lib/formancy-data
+
 # Unprivileged. The one place the server writes is the configuration volume,
 # which the operator mounts and owns.
 USER node
