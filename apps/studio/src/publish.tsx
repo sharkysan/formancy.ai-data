@@ -14,7 +14,8 @@ const PUBLISH = 'publish'
 /** What the studio knows about the newest published version, which is the base a publish names. */
 type Base =
   | { state: 'reading' }
-  | { state: 'known'; version: number | null }
+  /** `rebased`: the person chose this base after a conflict, so publishing replaces somebody else's version. */
+  | { state: 'known'; version: number | null; rebased?: true }
   /** The server could not serve it -- a version edited on disk, say. Publishing finds out which is current. */
   | { state: 'unknown'; message: string }
 
@@ -23,6 +24,17 @@ type Result =
   | { kind: 'conflict'; current: number | null; published: Published | null }
   | { kind: 'invalid'; message: string; problems: string[] }
   | { kind: 'failed'; message: string }
+
+/**
+ * What the publish button does, in its name: a version number only when the
+ * studio knows it, and "over" when the base is somebody else's version the
+ * person rebased onto, because that publish replaces it.
+ */
+function publishLabel(base: Base, next: number): string {
+  if (base.state !== 'known') return 'Publish'
+  if (base.rebased === true && base.version !== null) return `Publish over version ${String(base.version)}`
+  return `Publish version ${String(next)}`
+}
 
 /** The newest version as the server serves it, said in one line. */
 function describePublished(published: Published): string {
@@ -114,7 +126,7 @@ export function PublishStep({
   }
 
   function rebase(current: number | null): void {
-    setBase({ state: 'known', version: current })
+    setBase(current === null ? { state: 'known', version: null } : { state: 'known', version: current, rebased: true })
     setResult(null)
     // The conflict closes, and the button pressed with it; what is left to
     // do is publish, on top of the version just rebased onto.
@@ -135,7 +147,9 @@ export function PublishStep({
             ? `The published version of ${formId} could not be read: ${base.message} Publishing will find out which version is current.`
             : base.version === null
               ? `No version of ${formId} is published yet: this will be version 1.`
-              : `Version ${String(base.version)} of ${formId} is published. Publishing makes version ${String(next)}, which the runtime serves from then on.`}
+              : base.rebased === true
+                ? `You rebased onto version ${String(base.version)}, which somebody else published. Publishing makes version ${String(next)} from your draft: their labels and policy are replaced, not merged.`
+                : `Version ${String(base.version)} of ${formId} is published. Publishing makes version ${String(next)}, which the runtime serves from then on.`}
       </p>
       {blockers.length === 0 ? null : (
         <div className="notice" role="note" id="publish-blockers">
@@ -156,7 +170,7 @@ export function PublishStep({
           aria-describedby={blockers.length === 0 ? undefined : 'publish-blockers'}
           onClick={() => void publish()}
         >
-          Publish version {next}
+          {publishLabel(base, next)}
         </button>
       </p>
       {result === null ? null : result.kind === 'published' ? (

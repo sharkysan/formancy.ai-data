@@ -106,12 +106,26 @@ function serve(plane) {
 }
 
 /**
+ * The studio's stylesheet as one text: src/studio.css with each of its
+ * `@import`s replaced by the file it names, which is what Vite builds. Read
+ * from the source, so a rule or a file added is checked without anybody
+ * listing it here; an import that names no file, or one this does not
+ * understand, stops the gate rather than checking less than the page loads.
+ */
+function stylesheet() {
+  const entry = join(app, 'src', 'studio.css')
+  const text = readFileSync(entry, 'utf8').replaceAll(/@import\s+'(\.\/[^']+\.css)';/g, (_, path) => readFileSync(join(app, 'src', path), 'utf8'))
+  if (/@import/.test(text.replaceAll(/\/\*[\s\S]*?\*\//g, ''))) throw new Error('src/studio.css has an @import the gate does not inline')
+  return text
+}
+
+/**
  * The widths worth measuring. Breakpoints are read from the stylesheet, one
  * pixel past each `max-width`, where the wider layout is at its narrowest; a
  * breakpoint added to studio.css is measured without anybody editing this.
  */
 function widths() {
-  const css = readFileSync(join(app, 'src', 'studio.css'), 'utf8')
+  const css = stylesheet()
   const breakpoints = [...css.matchAll(/@media\s*\(\s*max-width:\s*([\d.]+)rem\s*\)/g)].map((match) => Number(match[1]) * 16)
   if (breakpoints.length === 0) throw new Error('found no max-width breakpoint in src/studio.css, so the widths below measure nothing')
   return [
@@ -196,7 +210,7 @@ async function focusAfterEnter(page, pressed, settled, expected) {
  * page; that is not a rule selecting it.
  */
 function rulesOnThePaper(page) {
-  const css = readFileSync(join(app, 'src', 'studio.css'), 'utf8')
+  const css = stylesheet()
   return page.locator('form.sheet').evaluate((paper, text) => {
     const stylesheet = new CSSStyleSheet()
     stylesheet.replaceSync(text)
@@ -304,7 +318,7 @@ function journey(plane, check) {
       // is publish, on top of the version just rebased onto.
       const publish = step(page, 'Publish')
       const rebase = publish.getByRole('button', { name: 'Rebase on version 2' })
-      const again = publish.getByRole('button', { name: 'Publish version 3' })
+      const again = publish.getByRole('button', { name: 'Publish over version 2' })
       check('rebasing leaves the keyboard on Publish', await focusAfterEnter(page, rebase, () => again.waitFor(), again))
     }],
     ['Drift, blocking', async (page) => {

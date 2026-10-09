@@ -49,7 +49,7 @@ export function SignIn({ fetch, onSignedIn }: { fetch: typeof globalThis.fetch; 
         listed.status === 403
           ? `The administrator plane refused this token: ${listed.message}`
           : listed.status === 404
-            ? 'This server has no administrator plane: it was started without a configuration store and connections, so there is nothing to administer.'
+            ? 'This server has no administrator plane: it was started without a configuration store, connections and administrator roles, so there is nothing to administer.'
             : listed.message
       setRefusal({ message, identity: who.value })
       return

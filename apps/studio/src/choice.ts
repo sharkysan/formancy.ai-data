@@ -22,11 +22,12 @@ export interface Choice {
  * one thing on every filesystem (0013). The server checks it again on publish;
  * `api.test.ts` puts candidates to both and fails where they disagree.
  *
- * At most 100 characters, not the 128 the store allows: Fastify answers a path
- * parameter longer than its default `maxParamLength` of 100 with a 404 before
- * the route runs, so a longer id could be generated and never published.
+ * At most 128 characters, the store's limit. The server's router once refused
+ * anything past 100 before a route ran, so an id the store accepted could be
+ * generated and never published; the comparison in `api.test.ts` found it,
+ * and fails again the day the two limits part.
  */
-export const FORM_ID_MAX = 100
+export const FORM_ID_MAX = 128
 
 export function isFormId(id: string): boolean {
   return id.length <= FORM_ID_MAX && /^[a-z0-9][a-z0-9._-]*$/.test(id)

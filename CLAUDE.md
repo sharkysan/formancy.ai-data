@@ -158,7 +158,7 @@ What holds this section, brought with the first UI from upstream's guards for
 the same promises:
 
 - **The size budget**, `scripts/source-size.test.mjs` in `pnpm test:repo`:
-  no source file past the 600 lines below.
+  no source file past the 600 lines below, stylesheets included.
 - **The starter-demo test**, `apps/examples/src/examples.test.ts`: every
   document the page shows is one the released spec accepts, places every field
   in the layout both previews draw, and has what the page says it shows.
@@ -174,11 +174,14 @@ the same promises:
   nothing past either edge down to 320 pixels, the first Tab on the skip link
   and the next into the content, and axe's colour-contrast and target-size
   rules — for the examples clean and after a failed submit, for the studio at
-  every step of the journey against the real server on its own origin.
+  every step of the journey against the real server on its own origin, where
+  it also fails when any rule of the studio's stylesheet selects an element on
+  the preview's paper.
 
 What nothing holds yet, said: the palette is copied from `admin.css` by hand,
-into `app.css` and `studio.css`, and nothing fails when upstream's moves; that
-neither stylesheet reaches into a preview's paper is held by review; and the
+into `app.css` and the studio's `styles/room.css`, and nothing fails when
+upstream's moves; that the examples' `app.css` never reaches into a preview's
+paper is held by review; and the
 one-shell bullet has nothing to hold until the `formancy.ai/data` page
 exists.
 

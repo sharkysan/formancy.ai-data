@@ -87,8 +87,14 @@ describe('publishing', () => {
     // Rebasing closes the conflict, and the button pressed with it. The
     // keyboard goes to what there is left to do -- publish, on top -- rather
     // than falling to the top of the page.
-    expect(focusedName()).toBe('Publish version 2')
-    await user.click(within(publish).getByRole('button', { name: 'Publish version 2' }))
+    expect(focusedName()).toBe('Publish over version 1')
+    // Rebasing moves the base and nothing else: the next publish replaces
+    // their version with this draft. Once the conflict box is gone, the page
+    // still has to say so, or "publish" reads as "merge".
+    expect(within(publish).getByText(/rebased onto/).textContent).toBe(
+      'You rebased onto version 1, which somebody else published. Publishing makes version 2 from your draft: their labels and policy are replaced, not merged.',
+    )
+    await user.click(within(publish).getByRole('button', { name: 'Publish over version 1' }))
     await within(publish).findByText('Published version 2 of sales-order.')
     const first = await plane.store.read('sales-order', 1)
     expect((first as { form: { title: string } }).form.title).toBe('Their order')
@@ -113,9 +119,11 @@ describe('publishing', () => {
     expect((await within(publish).findByText(/could not be read/)).textContent).toBe(
       'The published version of sales-order could not be read: Version 1 of sales-order no longer validates and is not served. Publishing will find out which version is current.',
     )
-    await user.click(within(publish).getByRole('button', { name: 'Publish version 1' }))
+    // The studio does not know which version is current, so its button names
+    // none: "Publish version 1" here would be a guess, and a wrong one.
+    await user.click(within(publish).getByRole('button', { name: 'Publish' }))
     await user.click(await within(publish).findByRole('button', { name: 'Rebase on version 1' }))
-    await user.click(within(publish).getByRole('button', { name: 'Publish version 2' }))
+    await user.click(within(publish).getByRole('button', { name: 'Publish over version 1' }))
     await within(publish).findByText('Published version 2 of sales-order.')
   })
 

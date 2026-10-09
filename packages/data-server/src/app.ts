@@ -1,6 +1,7 @@
 import rateLimit from '@fastify/rate-limit'
 import Fastify from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
+import { CONFIGURATION_ID_MAX_LENGTH } from './config-store.js'
 import type { ConfigurationStore } from './config-store.js'
 import type { ConnectionRegistry } from './connections.js'
 import type { HostIdentity, IdentityVerifier } from './identity.js'
@@ -69,7 +70,15 @@ function bearer(request: FastifyRequest): string | undefined {
  * issuer, audience or claim mapping is visible before any form depends on it.
  */
 export async function createDataServer(options: DataServerOptions): Promise<FastifyInstance> {
-  const app = Fastify({ logger: options.logger ?? false, bodyLimit: BODY_LIMIT })
+  const app = Fastify({
+    logger: options.logger ?? false,
+    bodyLimit: BODY_LIMIT,
+    // The longest path parameter is a form id, and the router's default of
+    // 100 refused the store's longer ones with 414 before any route ran: a
+    // form could be proposed and never published. Lookup sources and
+    // connection ids are shorter.
+    routerOptions: { maxParamLength: CONFIGURATION_ID_MAX_LENGTH },
+  })
 
   // Global, unlike formancy's server, where the management plane is
   // authenticated by its own sessions: every route here except /health is

@@ -91,14 +91,18 @@ describe('signing in', () => {
   })
 
   // A server started without the administrator plane answers 404 for it; the
-  // studio says what that means rather than "not found".
+  // studio says what that means rather than "not found". The 404 is the real
+  // server's, started without the plane, not a body written here to look like it.
   test('says so when the server has no administrator plane', async () => {
-    const bare: typeof fetch = async (input, init) =>
-      String(input).endsWith('/v1/whoami') ? plane.fetch(input, init) : new Response(JSON.stringify({ message: 'Route GET:/v1/connections not found', error: 'Not Found', statusCode: 404 }), { status: 404 })
-    const user = userEvent.setup()
-    mount(bare)
-    await user.type(screen.getByLabelText('Host token'), TOKENS.admin)
-    await user.click(screen.getByRole('button', { name: 'Sign in' }))
-    expect((await screen.findByRole('alert')).textContent).toMatch(/has no administrator plane/)
+    const bare = await startPlane({ administrator: false })
+    try {
+      const user = userEvent.setup()
+      mount(bare.fetch)
+      await user.type(screen.getByLabelText('Host token'), TOKENS.admin)
+      await user.click(screen.getByRole('button', { name: 'Sign in' }))
+      expect((await screen.findByRole('alert')).textContent).toMatch(/has no administrator plane/)
+    } finally {
+      await bare.close()
+    }
   })
 })

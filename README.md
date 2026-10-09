@@ -45,12 +45,8 @@ project, and why in a repository of its own, is decision
 | `@formancy/data-core` | The database-neutral port and metadata contract: what discovery returns, including what it could not see. No driver, no HTTP, no Node. |
 | `@formancy/data-postgres` | The PostgreSQL adapter, on the `postgres` driver. |
 | `@formancy/data-sqlserver` | The SQL Server adapter, on `mssql` over `tedious` — pure JavaScript, no ODBC. |
-| `@formancy/data-server` | The server: configuration store, host identity, and the HTTP surface the adapters will sit behind. Fastify, like formancy's. |
+| `@formancy/data-server` | The server: configuration store, host identity, the administrator and runtime planes over HTTP, the audit trail, and the composition root that starts them from configuration. Fastify, like formancy's. |
 | `@formancy/data-fixtures` | Private test support: one business model for both engines, a restricted reader, and the comparator both adapters answer to. Never published. |
-
-Planned and not here: SQL Server's record and lookup operations, and the
-server's own composition root starting the administrator and runtime planes
-from a connections file and a store directory.
 
 ## Examples
 
@@ -111,9 +107,10 @@ The server sends no CORS headers, so the studio is served from the server's
 origin: in development Vite proxies `/v1` to `FORMANCY_DATA_SERVER`, and in a
 deployment one reverse proxy serves `apps/studio/dist` and `/v1` together. The
 token is held in the tab's memory only; reloading the page signs out. The
-server's own `main` does not start the administrator plane yet, so the studio
-needs a server composed with `createDataServer({ admin })`; against the image
-it says the server has no administrator plane.
+server needs its administrator plane turned on — a store, an allowlist and
+`FORMANCY_DATA_ADMIN_ROLES`, as
+[its README](./packages/data-server/README.md) says; against a server without
+one, the studio says so at sign-in.
 
 Its suite runs the real server in the test — `createDataServer` with a fake
 connection registry over snapshots captured from the shared fixture, as the

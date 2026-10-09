@@ -1,0 +1,85 @@
+/* ------------------------------------------------------ narrow screens
+ *
+ * The step list becomes a block across the top and wraps, rather than
+ * scrolling sideways; the step fills the rest.
+ */
+@media (max-width: 64rem) {
+  .studio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .studio-side {
+    position: static;
+  }
+
+  .steps {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .steps li {
+    flex: 1 1 9rem;
+  }
+
+  .field-roles li {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .field-roles .field-name {
+    grid-column: 1 / -1;
+  }
+
+  .field-roles .hint {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 40rem) {
+  .studio {
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .step {
+    padding: 1rem;
+  }
+
+  .signin {
+    padding: 0.75rem;
+  }
+
+  .signin-card {
+    padding: 1.5rem 1rem 1rem;
+  }
+
+  .pair,
+  .field-roles li,
+  .rule,
+  .placed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .placed .actions {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .equals {
+    display: none;
+  }
+
+  fieldset:where(:not(.sheet *)) {
+    padding: 0.5rem 0.75rem 0.75rem;
+  }
+
+  fieldset.nested,
+  .pin .field,
+  .choice .hint,
+  .choice .cannot-tell {
+    margin-inline-start: 0;
+  }
+
+  .sheet {
+    padding: 0.875rem;
+  }
+}

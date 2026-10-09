@@ -76,7 +76,12 @@ export interface TestPlane {
 /** The connections the registry allows, in the order the server lists them. */
 export const CONNECTIONS = ['fixture', 'fixture-reader', 'fixture-sqlserver'] as const
 
-export async function startPlane(): Promise<TestPlane> {
+/**
+ * `administrator: false` starts the server as one started without a store, an
+ * allowlist or administrator roles would be: `/v1/whoami` answers and the
+ * administrator plane does not exist.
+ */
+export async function startPlane(options: { administrator?: boolean } = {}): Promise<TestPlane> {
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-studio-'))
   const store = createFileConfigurationStore(root)
   const databases = new Map<string, MetadataSnapshot>([
@@ -111,7 +116,9 @@ export async function startPlane(): Promise<TestPlane> {
     close: async () => {},
   }
 
-  const app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: [ADMIN_ROLE] } })
+  const app = await createDataServer(
+    options.administrator === false ? { verifyIdentity } : { verifyIdentity, admin: { registry, store, adminRoles: [ADMIN_ROLE] } },
+  )
 
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input), 'http://studio.test')

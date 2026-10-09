@@ -135,7 +135,16 @@ export function RowFilters({
             The form was generated with other pinned columns. The generator shows a pinned column read-only, so until it
             runs again the form and this policy disagree about which fields a person fills in.
           </p>
-          <button type="button" className="primary" onClick={() => void onRegenerate().then(setRefused)}>
+          <p className="hint" id="regenerate-replaces">
+            Generating again starts the presentation afresh: labels and order set in Presentation are replaced. The policy is
+            kept.
+          </p>
+          <button
+            type="button"
+            className="primary"
+            aria-describedby="regenerate-replaces"
+            onClick={() => void onRegenerate().then(setRefused)}
+          >
             Generate again with these pins
           </button>
           {refused === null ? null : (

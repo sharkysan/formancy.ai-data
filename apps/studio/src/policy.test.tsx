@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { computeAccessibleDescription } from 'dom-accessibility-api'
 import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
@@ -132,7 +133,12 @@ describe('the policy editor', () => {
     expect(within(publish).getByRole('note').textContent).toContain('The row filters changed since the form was generated')
 
     policy = await goTo(user, 'Policy')
-    await user.click(within(policy).getByRole('button', { name: 'Generate again with these pins' }))
+    // Generating again starts a new builder session, so labels and order set
+    // in Presentation are gone. The Choose step says so; a button here that
+    // did not would take the work without a word.
+    const regenerate = within(policy).getByRole('button', { name: 'Generate again with these pins' })
+    expect(computeAccessibleDescription(regenerate)).toBe('Generating again starts the presentation afresh: labels and order set in Presentation are replaced. The policy is kept.')
+    await user.click(regenerate)
     const generated = await screen.findByRole('main', { name: 'Generate' })
     const readOnly = within(within(generated).getByRole('list', { name: 'Read-only' })).getAllByRole('listitem').map((item) => item.textContent)
     expect(readOnly).toContain('status Pinned by the policy: its value comes from the trusted context, never from the person filling the form.')

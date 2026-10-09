@@ -44,7 +44,7 @@
   `apps/studio/scripts/browser-test.mjs` (`pnpm test:browser`, the existing CI
   job) — the whole journey in Chromium, against the real server on the
   studio's own origin, at 320 and 360 pixels, one past each breakpoint in
-  `studio.css` and 1440, and at 320 again with the web fonts refused: no
+  the studio's stylesheet and 1440, and at 320 again with the web fonts refused: no
   sideways scroll and nothing past either edge at any step, the first Tab on
   the token and in the workbench on the skip link and then into the step, and
   axe's colour-contrast and target-size rules in every state that adds colour
@@ -52,8 +52,11 @@
   than a phone and the skip link kept off screen); Enter on Move down, on a
   filter's Remove and on Rebase leaves the focus on a deliberate control
   (watched failing with the rows keyed by position, and before the removals
-  moved it); and no rule of `studio.css` selects an element on the preview's
-  paper (watched failing with the element rules unscoped).
+  moved it); and no rule of the studio's stylesheet — `studio.css` with its imports
+  inlined, as Vite builds it — selects an element on the preview's paper
+  (watched failing with the element rules unscoped).
+  `scripts/source-size.test.mjs` counts stylesheets against the 600-line
+  budget (watched failing on the studio's, at 1042 lines, before it was split).
   `scripts/upstream-deps.mjs` refuses a range in the studio's manifest,
   watched failing with `@formancy/builder-core` at `^0.3.0`.
 
@@ -156,18 +159,12 @@ its gap.
   full width, no moves between sections, no help text, no translations. Each
   is a command the session already has, to be offered once it can be shown not
   to touch a binding.
-- **Form ids stop at 100 characters**, not the store's 128. Fastify answers a
-  path parameter longer than its default `maxParamLength` with a 404 before the
-  route runs, so a longer id could be generated and never published. Found by
-  `api.test.ts`; the server's limit is the server's to change.
 - **One origin for both.** A deployment routes the studio's files and `/v1` to
   one origin, or the studio cannot sign in.
-- **The server's own `main` does not start the plane yet.** The image reads no
-  connections file and no store directory, so it serves `/health` and
-  `/v1/whoami` and nothing the studio administers; against it the studio says
-  the server has no administrator plane. Until the composition root learns
-  that configuration, the studio works against a server composed in code with
-  `createDataServer({ admin })`, as its suite and its browser gate compose one.
+- **The plane is configuration.** A server started without a store, an
+  allowlist and administrator roles has no administrator plane
+  ([0025](0025-each-adapter-owns-its-driver.md)); the studio says so at sign-in
+  rather than failing request by request.
 - **The admin's palette is copied twice** by hand now, in the examples and the
   studio, and nothing fails when upstream's moves.
 - **Three captured snapshots.** Re-capturing needs Docker and both images; the

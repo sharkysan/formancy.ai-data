@@ -28,7 +28,9 @@ const ROOTS = ['packages', 'apps', 'scripts']
 /** Installed, built or measured, never written. A dot-directory is a tool's. */
 const SKIP = new Set(['node_modules', 'dist', 'coverage'])
 
-const SOURCE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/
+// Stylesheets count: one is read top to bottom like any other source, and the
+// studio's passed a thousand lines with the guard counting only scripts.
+const SOURCE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|css)$/
 const NOT_SOURCE = /\.(test|spec)\.[cm]?[jt]sx?$|\.d\.[cm]?ts$/
 
 /** Every source file a person maintains: no tests, no declarations, no build output. */

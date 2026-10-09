@@ -146,9 +146,9 @@ describe("the studio's form id rule", () => {
   // the id exactly when it went on to refuse the bundle (422).
   //
   // The lengths are the reason this asks the server rather than reading its
-  // regular expression. The store allows 128 characters, and the route never
-  // sees more than 100: Fastify answers a longer path parameter with 404
-  // before any handler runs. Found here.
+  // regular expression. The store allows 128 characters, and the router used
+  // to refuse any path parameter past 100 before a handler ran — a limit no
+  // regular expression shows. Found here, and fixed in the server.
   test('agrees with the server on every candidate', async () => {
     const candidates = ['sales-order', 'order.v2', 'a', '9lives', 'Order', 'sales order', '-order', '.hidden', '_x', 'ordér', ...[99, 100, 101, 128, 129].map((length) => 'x'.repeat(length))]
     for (const id of candidates) {
