@@ -380,9 +380,16 @@ async function run() {
         console.log(`\n${label} -- ${String(width)}x900`)
 
         // Sign in: the first Tab reaches the token, which is the whole screen's purpose.
-        await page.keyboard.press('Tab')
+        // Once the screen is there: "load" fires before React has rendered it,
+        // and on a slow runner a Tab pressed into the empty page went nowhere.
         const token = page.getByLabel('Host token')
-        check('the first Tab reaches the host token', (await token.evaluate((input) => input === document.activeElement)) ? null : 'focus went somewhere else first')
+        await token.waitFor()
+        await page.keyboard.press('Tab')
+        const focused = await page.evaluate(() => {
+          const active = document.activeElement
+          return active === null ? 'nothing' : `<${active.tagName.toLowerCase()}${active.id === '' ? '' : ` id="${active.id}"`}>`
+        })
+        check('the first Tab reaches the host token', (await token.evaluate((input) => input === document.activeElement)) ? null : `focus went to ${focused} first`)
         await measured(page, 'Sign in')
         await token.fill(TOKEN)
         await page.getByRole('button', { name: 'Sign in' }).click()
