@@ -1,7 +1,7 @@
 import { findObject } from '@formancy/data-core'
 import type { MetadataSnapshot, ObjectMeta, RecordColumn, RecordOutcome, RecordTarget, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { accessDisagreements, FIXTURE_SCOPE, renamedColumn, startPostgresFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
+import { accessDisagreements, covers, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startPostgresFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -100,7 +100,7 @@ describe('the writer, the order form’s account', () => {
   // asked about the login's own grants only would report nothing here. On
   // PostgreSQL the application maintains row_version, and the writer may
   // update it; SQL Server's writer may not.
-  test('agrees with WRITER_ACCESS, row_version updatable, with no gap, as itself', async () => {
+  test('agrees with WRITER_ACCESS, row_version updatable, with no gap, as itself', covers('postgres', MODEL_CASES.writerAccess), async () => {
     const snapshot = await discoverPostgres(writer, FIXTURE_SCOPE)
     expect(accessDisagreements(snapshot, WRITER_ACCESS)).toEqual([])
     expect(snapshot.gaps).toEqual([])

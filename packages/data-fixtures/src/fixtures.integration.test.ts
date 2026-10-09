@@ -1,8 +1,11 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { PostgresFixture, SqlServerFixture } from './containers.js'
-import { startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
+import { POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
 import { FILTER_PARITY } from './parity.js'
 import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 
@@ -336,5 +339,40 @@ describe('the parity schema', () => {
     } finally {
       await pool.close()
     }
+  })
+})
+
+describe('what each start records for the release report', () => {
+  /** The records this process wrote, as the report's collect step reads them: from the files. */
+  function written(): unknown[] {
+    const folder = join(process.cwd(), 'test-results', 'servers')
+    return readdirSync(folder).map((name) => JSON.parse(readFileSync(join(folder, name), 'utf8')) as unknown)
+  }
+
+  // The report says what every run was tested on from these records (0035).
+  // A version that was not the server's would name a build nobody ran, and a
+  // caller that was not this file -- both started inside one Promise.all, the
+  // way the host's and the client's suites start theirs -- would name a test
+  // that never ran on it.
+  test('is the server that answered, started by this file, and is on disk', async () => {
+    const here = fileURLToPath(import.meta.url)
+    const sql = postgres(pg.admin)
+    try {
+      const [row] = await sql<{ version: string }[]>`select current_setting('server_version') as version`
+      expect(pg.server).toMatchObject({ engine: 'postgres', image: POSTGRES_IMAGE, version: row?.version, updateLevel: null, edition: null, caller: here })
+    } finally {
+      await sql.end()
+    }
+    const pool = await new mssql.ConnectionPool(ms.admin).connect()
+    try {
+      const result = await pool.request().query<{ version: string; edition: string }>(
+        "select cast(serverproperty('ProductVersion') as nvarchar(128)) as version, cast(serverproperty('Edition') as nvarchar(128)) as edition",
+      )
+      const [row] = result.recordset
+      expect(ms.server).toMatchObject({ engine: 'sqlserver', image: SQLSERVER_IMAGE, version: row?.version, edition: row?.edition, caller: here })
+    } finally {
+      await pool.close()
+    }
+    expect(written()).toEqual(expect.arrayContaining([pg.server, ms.server]))
   })
 })

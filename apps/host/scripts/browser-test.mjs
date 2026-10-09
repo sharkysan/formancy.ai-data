@@ -52,6 +52,7 @@ import { EMPTY_PRESENTATION } from '@formancy/data-core'
 import { startPostgresFixture, startTcpHop } from '@formancy/data-fixtures'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, DRIVER_FACTORIES } from '@formancy/data-server'
 import postgres from 'postgres'
+import { recorded } from '../../../scripts/release-report/gate-results.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(app, 'dist')
@@ -221,6 +222,7 @@ async function audit(page, target) {
     const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags } })
     const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
     return {
+      axe: window.axe.version,
       violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
       measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
       undecided: nodes(results.incomplete, 'color-contrast').map((node) => node.html.slice(0, 60)).slice(0, 4),
@@ -302,10 +304,11 @@ async function newOrder(page, notes) {
 
 /**
  * The journey, state by state: each entry brings the page to a state and
- * names it, checking on the way what only that moment can show. `run` holds
- * what one width's pass needs: its record, its customer number.
+ * names it, checking -- and measuring -- through the gate's recorder on the
+ * way what only that moment can show. `run` holds what one width's pass
+ * needs: its record, its customer number.
  */
-function journey(plane, hop, check, run) {
+function journey(plane, hop, { check, measure }, run) {
   return [
     ['Open', async (page) => {
       await page.getByLabel('Host token').fill(TOKENS.clerk)
@@ -436,7 +439,8 @@ function journey(plane, hop, check, run) {
       const resentAfter = performance.now() - cutAt
       await status(page, 'React', 'Created record').waitFor(WITHIN)
       const answerBytes = (await (await answered).body()).length
-      console.log(`  measured: Chromium resent the create ${resentAfter.toFixed(0)} ms after its connection closed; the create's answer is ${String(answerBytes)} bytes`)
+      measure({ name: 'Chromium resent the create after its connection closed', value: resentAfter, unit: 'ms' })
+      measure({ name: "the create's answer", value: answerBytes, unit: 'bytes' })
       check('Chromium sent the create again on its own: the marker crossed the hop twice', sent() === 2 ? null : `it crossed ${String(sent())} time(s): Chromium did not resend, so this measured nothing`)
       check('and one order is stored: the second sending was answered, not applied', (await plane.ordersWithNotes(notes)) === 1 ? null : `${String(await plane.ordersWithNotes(notes))} orders are stored`)
     }],
@@ -467,7 +471,8 @@ function journey(plane, hop, check, run) {
   ]
 }
 
-async function run() {
+/** The gate, reporting through `gate` (scripts/release-report/gate-results.mjs), which keeps what it found for the release report. */
+async function run(gate) {
   if (!existsSync(join(dist, 'index.html'))) throw new Error('no built page at apps/host/dist: run `pnpm build` first')
   let chromium
   try {
@@ -481,19 +486,16 @@ async function run() {
   } catch (error) {
     throw new Error(`could not launch Chromium (${String(error)}).\nRun \`pnpm exec playwright install chromium\`.`)
   }
+  gate.launched(chromium, browser)
 
-  const failures = []
-  const check = (name, problem) => {
-    if (problem === null) return void console.log(`  ok    ${name}`)
-    console.log(`  FAIL  ${name}\n          ${problem}`)
-    failures.push(`${name}: ${problem}`)
-  }
+  const { check } = gate
   const measured = async (page, state) => {
     const width = await measureWidth(page)
     check(`${state}: no sideways scroll`, width.overflow > 0 ? `${String(width.overflow)}px of horizontal overflow` : null)
     check(`${state}: nothing past either edge`, width.past.length === 0 ? null : width.past.join('; '))
     await page.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined))
     const result = await audit(page)
+    gate.axe(result.axe)
     check(`${state}: axe finds nothing at WCAG 2.2 AA`, result.violations.length === 0 ? null : result.violations.join('; '))
     check(`${state}: contrast and target size measured, over something`, result.measured.length === 2 ? null : `only ${result.measured.join(', ') || 'nothing'}`)
     check(`${state}: the contrast of every text decided`, result.undecided.length === 0 ? null : `undecided: ${result.undecided.join('; ')}`)
@@ -511,6 +513,7 @@ async function run() {
     let pass = 0
     for (const { label, width, refuseFonts = false } of list) {
       pass += 1
+      gate.width(width)
       const page = await browser.newPage({ viewport: { width, height: 900 } })
       if (refuseFonts) await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort())
       try {
@@ -537,7 +540,7 @@ async function run() {
         await measured(page, 'Signed out')
 
         const run = { record: await plane.order(), customer: 9000 + pass }
-        for (const [state, act] of journey(plane, hop, check, run)) {
+        for (const [state, act] of journey(plane, hop, gate, run)) {
           await act(page)
           await measured(page, state)
         }
@@ -553,10 +556,11 @@ async function run() {
   }
 
   console.log('')
+  const failures = gate.failures()
   if (failures.length > 0) throw new Error(`${String(failures.length)} browser check(s) failed:\n  ${failures.join('\n  ')}`)
   console.log(
     `browser checks passed: the host page's journey at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
   )
 }
 
-await run()
+await recorded('apps/host', run)

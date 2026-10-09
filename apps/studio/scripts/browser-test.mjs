@@ -41,6 +41,7 @@ import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
 import { createSnapshot } from '@formancy/data-core'
 import { renamedColumn } from '@formancy/data-fixtures'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
+import { recorded } from '../../../scripts/release-report/gate-results.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(app, 'dist')
@@ -174,6 +175,7 @@ async function audit(page, target) {
     const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags } })
     const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
     return {
+      axe: window.axe.version,
       violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
       measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
       undecided: nodes(results.incomplete, 'color-contrast').map((node) => node.html.slice(0, 60)).slice(0, 4),
@@ -376,7 +378,8 @@ function journey(plane, check) {
   ]
 }
 
-async function run() {
+/** The gate, reporting through `gate` (scripts/release-report/gate-results.mjs), which keeps what it found for the release report. */
+async function run(gate) {
   if (!existsSync(join(dist, 'index.html'))) throw new Error('no built studio at apps/studio/dist: run `pnpm build` first')
   let chromium
   try {
@@ -390,22 +393,16 @@ async function run() {
   } catch (error) {
     throw new Error(`could not launch Chromium (${String(error)}).\nRun \`pnpm exec playwright install chromium\`.`)
   }
+  gate.launched(chromium, browser)
 
-  const failures = []
-  const check = (name, problem) => {
-    if (problem === null) {
-      console.log(`  ok    ${name}`)
-      return
-    }
-    console.log(`  FAIL  ${name}\n          ${problem}`)
-    failures.push(`${name}: ${problem}`)
-  }
+  const { check } = gate
   const measured = async (page, state) => {
     const width = await measureWidth(page)
     check(`${state}: no sideways scroll`, width.overflow > 0 ? `${String(width.overflow)}px of horizontal overflow` : null)
     check(`${state}: nothing past either edge`, width.past.length === 0 ? null : width.past.join('; '))
     await page.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined))
     const result = await audit(page)
+    gate.axe(result.axe)
     check(`${state}: axe finds nothing at WCAG 2.2 AA`, result.violations.length === 0 ? null : result.violations.join('; '))
     check(`${state}: contrast and target size measured, over something`, result.measured.length === 2 ? null : `only ${result.measured.join(', ') || 'nothing'}`)
     check(`${state}: the contrast of every text decided`, result.undecided.length === 0 ? null : `undecided: ${result.undecided.join('; ')}`)
@@ -414,6 +411,7 @@ async function run() {
   const list = widths()
   try {
     for (const { label, width, refuseFonts = false } of list) {
+      gate.width(width)
       const plane = await startPlane()
       const { http, port } = await serve(plane)
       const page = await browser.newPage({ viewport: { width, height: 900 } })
@@ -474,10 +472,11 @@ async function run() {
   }
 
   console.log('')
+  const failures = gate.failures()
   if (failures.length > 0) throw new Error(`${String(failures.length)} browser check(s) failed:\n  ${failures.join('\n  ')}`)
   console.log(
     `browser checks passed: the studio's whole journey at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, for the layout, focus and colour facts jsdom cannot represent`,
   )
 }
 
-await run()
+await recorded('apps/studio', run)

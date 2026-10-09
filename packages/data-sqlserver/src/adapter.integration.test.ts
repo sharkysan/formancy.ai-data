@@ -1,8 +1,8 @@
-import { MSSQLServerContainer } from '@testcontainers/mssqlserver'
-import type { StartedMSSQLServerContainer } from '@testcontainers/mssqlserver'
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { DatabaseAdapter } from '@formancy/data-core'
+import { startSqlServerContainer } from '@formancy/data-fixtures'
+import type { ServerRecord, StartedMSSQLServerContainer } from '@formancy/data-fixtures'
 import { createSqlServerAdapter } from './adapter.js'
 import { connectSqlServer } from './connect.js'
 
@@ -13,12 +13,13 @@ import { connectSqlServer } from './connect.js'
  * the mock.
  */
 let container: StartedMSSQLServerContainer
+let server: ServerRecord
 let adapter: DatabaseAdapter
 
 beforeAll(async () => {
-  // Accepting the EULA is the operator's act. In a test it is this line, which
-  // is the same decision compose.yaml makes a developer spell out.
-  container = await new MSSQLServerContainer('mcr.microsoft.com/mssql/server:2022-latest').acceptLicense().start()
+  // The default image, through the harness that records what answered
+  // (0035), and that accepts the EULA as compose.yaml makes a developer do.
+  ;({ container, server } = await startSqlServerContainer())
   const pool = await new mssql.ConnectionPool({
     server: container.getHost(),
     port: container.getPort(),
@@ -40,12 +41,15 @@ afterAll(async () => {
 
 describe('the SQL Server adapter', () => {
   // A ping that answered from the driver's configuration would pass against a
-  // server that is not there. SQL Server 2022 is version 16, and that is the
-  // image the container runs, so the answer has to have come from it.
+  // server that is not there, and one that reported a version other than the
+  // server's would put a wrong one in every snapshot. The version asserted is
+  // what the server told the harness when it started, asked its own way, so
+  // the adapter's answer has to have come from it -- and if the two queries
+  // ever disagree, this is how anybody finds out.
   test('ping reports the server that answered', async () => {
     const identity = await adapter.ping()
     expect(identity.kind).toBe('sqlserver')
-    expect(identity.version).toMatch(/^16\./)
+    expect(identity.version).toBe(server.version)
   })
 
   // A composition root closes on shutdown and again on an error path. The

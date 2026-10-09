@@ -3,7 +3,9 @@ import type { MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
 import {
   accessDisagreements,
+  covers,
   FIXTURE_SCOPE,
+  MODEL_CASES,
   READER_ACCESS,
   restrictedDisagreements,
   snapshotDisagreements,
@@ -68,7 +70,7 @@ describe('discovery as the owner', () => {
   // The conformance both engines answer to (0005). A table, a key, a type or a
   // relationship that this adapter reads differently from the model is a
   // named sentence here, and the same sentence on SQL Server's suite.
-  test('describes the fixture exactly as the shared model says', async () => {
+  test('describes the fixture exactly as the shared model says', covers('postgres', MODEL_CASES.owner), async () => {
     const snapshot = await discoverPostgres(owner, FIXTURE_SCOPE)
     expect(snapshotDisagreements(snapshot)).toEqual([])
   })
@@ -188,7 +190,7 @@ describe('discovery as the restricted reader', () => {
   // The rule every engine is held to: for each foreign key of sales.order,
   // the right target or a gap that says it cannot tell. Never the silent
   // answer, which reads as "no relationship".
-  test('says the right thing about every foreign key of sales.order', async () => {
+  test('says the right thing about every foreign key of sales.order', covers('postgres', MODEL_CASES.restricted), async () => {
     expect(restrictedDisagreements(await discoverPostgres(reader, FIXTURE_SCOPE))).toEqual([])
   })
 
@@ -197,7 +199,7 @@ describe('discovery as the restricted reader', () => {
   // pg_catalog and the privilege functions answer every role, so nothing is
   // left that this account cannot establish -- an unusable table returning as
   // a gap would make "not yours" read as "cannot tell" again.
-  test('describes every object in scope with no gap, and each capability as the fixture grants it', async () => {
+  test('describes every object in scope with no gap, and each capability as the fixture grants it', covers('postgres', MODEL_CASES.readerAccess), async () => {
     const snapshot = await discoverPostgres(reader, FIXTURE_SCOPE)
     expect(names(snapshot)).toEqual([
       'sales.country',
@@ -221,7 +223,7 @@ describe('discovery as the restricted reader', () => {
   // owner's structure everywhere -- only what it may do, and whether row
   // security applies to it, differ. A privilege-filtered read sneaking back
   // in (information_schema, or a privilege test in a WHERE) fails here.
-  test("has the owner's structure, every object, key and constraint, apart from access", async () => {
+  test("has the owner's structure, every object, key and constraint, apart from access", covers('postgres', MODEL_CASES.structure), async () => {
     expect(structuralDisagreements(await discoverPostgres(reader, FIXTURE_SCOPE))).toEqual([])
   })
 

@@ -13,7 +13,7 @@
 // them, on both engines, through the order form's own account.
 
 import { randomBytes } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -103,12 +103,64 @@ function expectEqual(where, actual, expected) {
   }
 }
 
-/** The account each connection logs in as, from deploy/connections.json: what the snapshot must say it saw. */
-function connectionUser(connection) {
+/** A connection of deploy/connections.json, by the id journey.json names. */
+function connectionEntry(connection) {
   const entries = JSON.parse(readFileSync(join(repo, 'deploy', 'connections.json'), 'utf8'))
   const entry = entries.find((candidate) => candidate.id === connection)
   if (entry === undefined) throw new Error(`deploy/connections.json has no connection ${connection}, which journey.json names`)
-  return entry.user
+  return entry
+}
+
+/** The account each connection logs in as, from deploy/connections.json: what the snapshot must say it saw. */
+function connectionUser(connection) {
+  return connectionEntry(connection).user
+}
+
+/**
+ * The composed database behind `form`'s connection, as the release report
+ * records every server a run talked to (0035): its version as the product's
+ * own adapter reports it, through the administrator plane's connection test,
+ * and its image from compose's resolved configuration (`config`). The
+ * record has data-fixtures' shape, whose `updateLevel`, `edition` and
+ * `description` the ping does not give, so they are null; collect.mjs refuses
+ * a record of any other shape, which is how the two writers are held alike.
+ */
+export async function composedServer(base, admin, form, config) {
+  const at = `${form.connection}:`
+  const answer = await call(base, 'POST', `/v1/connections/${form.connection}/test`, { token: admin })
+  expectStatus(`${at} POST /v1/connections/${form.connection}/test`, answer, 200)
+  const service = connectionEntry(form.connection).host
+  const image = config.services?.[service]?.image
+  if (typeof image !== 'string') throw new Error(`${at} compose's configuration names no image for the service ${service} the connection reaches`)
+  return {
+    engine: answer.json.kind,
+    image,
+    version: answer.json.version,
+    updateLevel: null,
+    edition: null,
+    description: null,
+    caller: 'scripts/getting-started.mjs',
+    script: 'getting-started',
+    at: new Date().toISOString(),
+  }
+}
+
+/** Numbers this process's records, as data-fixtures numbers its own. */
+let recorded = 0
+
+/** Writes `record` where collect.mjs reads a job's records: `<dir>/test-results/servers/`, never over another. */
+export function writeServerRecord(record, dir = repo) {
+  const folder = join(dir, 'test-results', 'servers')
+  mkdirSync(folder, { recursive: true })
+  for (;;) {
+    recorded += 1
+    try {
+      writeFileSync(join(folder, `${record.script}-${record.engine}-${String(process.pid)}-${String(recorded)}.json`), `${JSON.stringify(record, null, 2)}\n`, { flag: 'wx' })
+      return
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error
+    }
+  }
 }
 
 /** A write's id as data-client makes one: 32 hex characters, new for every write (0031). */

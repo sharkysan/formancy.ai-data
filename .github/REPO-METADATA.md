@@ -48,5 +48,11 @@ Not yet. The plan proposes `formancy.ai/data`; nothing is live there, and the
 
 | Secret | Used by | Without it |
 |---|---|---|
-| `CODECOV_TOKEN` | `ci.yml`, coverage upload | The upload step is skipped, visibly; with the token set, a failed upload fails `verify`, as upstream |
-| `NPM_TOKEN` | `release.yml` | The release refuses to start, before building anything |
+| `CODECOV_TOKEN` | `gates.yml`'s coverage upload, passed by `ci.yml` and never by `release.yml` | The upload step is skipped, visibly; with the token set, a failed upload fails that package's `test` job, as upstream |
+| `NPM_TOKEN` | `release.yml`'s `npm-token` and `publish` jobs, on a tag only. A secret of the **`npm` environment**, not of the repository: create the environment with a deployment policy of selected tags, `v*`, and set the secret there, so a workflow pushed to any other branch or tag cannot read it | A tag push is red in `npm-token`, which runs beside the gates rather than after them, and nothing is published; a rehearsal does not need it |
+
+Both jobs that read `NPM_TOKEN` name the `npm` environment, which
+`scripts/release-report/workflows.test.mjs` holds. The environment's
+deployment policy is a setting of the repository, which no test here can
+read: on 2026-10-09 the repository had no environment, and GitHub creates
+one with no policy the first time a job names it.

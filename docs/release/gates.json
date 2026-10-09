@@ -1,0 +1,99 @@
+{
+  "$comment": "The release gates as the delivery plan numbers them, each with the evidence a run must pass or the reason it has none. The plan is a working document kept out of the repository, so no gate's wording is here: the report prints the number and its evidence. Read by scripts/release-report/report.mjs; held by scripts/release-report/gates.test.mjs. A document is stated evidence and never counts as passed in a run. Each file below is one its decision record's Verified-by line names.",
+  "gates": [
+    {
+      "gate": 1,
+      "evidence": [
+        { "sharedCases": true },
+        { "file": "packages/data-server/src/e2e.integration.test.ts" }
+      ]
+    },
+    {
+      "gate": 2,
+      "evidence": [
+        { "file": "apps/host/src/page.test.tsx" },
+        { "file": "apps/host/src/journey.test.tsx" },
+        { "file": "apps/host/src/stale.test.tsx" },
+        { "file": "apps/host/src/in-flight.test.tsx" },
+        { "file": "apps/examples/src/previews.test.tsx" },
+        { "browserGate": "apps/examples" },
+        { "browserGate": "apps/host" }
+      ]
+    },
+    {
+      "gate": 3,
+      "evidence": [
+        { "file": "packages/data-fixtures/src/fixtures.integration.test.ts" },
+        { "file": "packages/data-core/src/codecs/codec.test.ts" },
+        { "file": "packages/data-postgres/src/records.integration.test.ts" },
+        { "file": "packages/data-sqlserver/src/records.integration.test.ts" },
+        { "file": "packages/data-postgres/src/spike.integration.test.ts" },
+        { "file": "packages/data-sqlserver/src/spike.integration.test.ts" }
+      ]
+    },
+    {
+      "gate": 4,
+      "evidence": [
+        { "file": "packages/data-core/src/generate/generate.test.ts" },
+        { "file": "packages/data-core/src/snapshot.test.ts" },
+        { "file": "packages/data-postgres/src/discovery-access.integration.test.ts" },
+        { "file": "packages/data-sqlserver/src/discovery-access.integration.test.ts" },
+        { "file": "packages/data-postgres/src/discovery-types.integration.test.ts" }
+      ]
+    },
+    {
+      "gate": 5,
+      "evidence": [
+        { "file": "packages/data-server/src/routes/runtime.test.ts" },
+        { "file": "packages/data-core/src/policy/evaluate.test.ts" },
+        { "file": "packages/data-server/src/e2e.integration.test.ts" },
+        { "file": "packages/data-client/src/lookups.integration.test.ts" }
+      ]
+    },
+    {
+      "gate": 6,
+      "evidence": [
+        { "file": "packages/data-postgres/src/records.integration.test.ts" },
+        { "file": "packages/data-sqlserver/src/records.integration.test.ts" },
+        { "file": "packages/data-postgres/src/records-lost-answer.integration.test.ts" },
+        { "file": "packages/data-sqlserver/src/records-lost-answer.integration.test.ts" },
+        { "file": "packages/data-server/src/e2e-lost-answer.integration.test.ts" },
+        { "file": "packages/data-server/src/routes/runtime.test.ts" },
+        { "file": "packages/data-client/src/lost-answer.integration.test.ts" },
+        { "file": "apps/host/src/stale.test.tsx" },
+        { "file": "apps/host/src/in-flight.test.tsx" },
+        { "browserGate": "apps/host" }
+      ]
+    },
+    {
+      "gate": 7,
+      "evidence": [
+        { "file": "packages/data-core/src/presentation/rebase.test.ts" },
+        { "file": "packages/data-server/src/routes/admin-evolution.test.ts" },
+        { "file": "packages/data-core/src/drift/compare.test.ts" }
+      ]
+    },
+    {
+      "gate": 8,
+      "open": "No AI proposal workflow is built (plan item DATA-13), so nothing exists to test."
+    },
+    {
+      "gate": 9,
+      "evidence": [
+        { "job": "getting-started" }
+      ]
+    },
+    {
+      "gate": 10,
+      "open": "Needs people: legal review of LICENSE.md, the dependency inventory and customer terms."
+    },
+    {
+      "gate": 11,
+      "open": "No performance figures are published yet; the performance-evidence record (0034) is to supply them."
+    },
+    {
+      "gate": 12,
+      "open": "No design-partner acceptance run has happened."
+    }
+  ]
+}

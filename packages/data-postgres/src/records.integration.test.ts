@@ -13,7 +13,7 @@ import type {
   UpdateRequest,
 } from '@formancy/data-core'
 import type { PostgresFixture, TcpHop } from '@formancy/data-fixtures'
-import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT, startPostgresFixture, startTcpHop } from '@formancy/data-fixtures'
+import { covers, EDGE_VALUES, edgeCase, FIRST_SHIPMENT, SECOND_SHIPMENT, shipmentCase, startPostgresFixture, startTcpHop } from '@formancy/data-fixtures'
 import { randomUUID } from 'node:crypto'
 import net from 'node:net'
 import postgres from 'postgres'
@@ -174,7 +174,7 @@ describe('reading', () => {
   // The values a driver loses by default: 2^53 + 1, eighteen significant
   // digits, a computed product that is 0.30000000000000004 as a double, and a
   // date with no zone. Each must come back as the exact string it is.
-  test('reads every edge value of the fixture back exactly', async () => {
+  test('reads every edge value of the fixture back exactly', covers('postgres', edgeCase('beyondSafeInteger'), edgeCase('largestAmount'), edgeCase('orderDate'), edgeCase('largestCreditLimit'), edgeCase('smallestCreditLimit'), edgeCase('computedLineTotal')), async () => {
     const records = createPostgresRecords(owner)
     const order = succeeded(
       await records.read({
@@ -456,7 +456,7 @@ describe('the column facts both engines are held to (0026)', () => {
   // or padded to its scale) or answered a real as the double it widens to
   // would read these rows differently from SQL Server's, and an unchanged
   // echo of one would look like a change on the other.
-  test('the shipments read back exactly as both adapters must return them', async () => {
+  test('the shipments read back exactly as both adapters must return them', covers('postgres', shipmentCase('first'), shipmentCase('second'), edgeCase('largestSmallint'), edgeCase('localTimestamp'), edgeCase('localTimestampWholeSecond')), async () => {
     const shipment = findObject(snapshot, { schema: 'sales', name: 'shipment' })
     if (shipment === undefined) throw new Error('sales.shipment is not in the snapshot')
     const columns = shipment.columns.filter((column) => column.type.kind !== 'binary').map(({ name, type }) => ({ name, type }))

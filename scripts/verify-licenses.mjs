@@ -20,57 +20,64 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const required = ['LICENSE.md', 'NOTICE']
+/** What every tarball carries beside its code: the terms, and the notices of what it depends on. */
+export const LICENSE_FILES = ['LICENSE.md', 'NOTICE']
+const required = LICENSE_FILES
 
 /** What every publishable manifest declares. The terms themselves are in the file it names. */
 export const LICENSE_FIELD = 'SEE LICENSE IN LICENSE.md'
 
-const problems = []
-let checked = 0
+// The checks run when this is the script Node was asked to run, and not when
+// another module imports LICENSE_FIELD from it: verify-publish.mjs (0035)
+// holds a release's tarballs to the same field, from the same constant.
+if (process.argv[1]?.replaceAll('\\', '/').endsWith('scripts/verify-licenses.mjs')) {
+  const problems = []
+  let checked = 0
 
-for (const entry of readdirSync(join(root, 'packages'), { withFileTypes: true })) {
-  if (!entry.isDirectory()) continue
+  for (const entry of readdirSync(join(root, 'packages'), { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
 
-  const dir = join(root, 'packages', entry.name)
-  const manifestPath = join(dir, 'package.json')
-  if (!existsSync(manifestPath)) continue
+    const dir = join(root, 'packages', entry.name)
+    const manifestPath = join(dir, 'package.json')
+    if (!existsSync(manifestPath)) continue
 
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  if (manifest.private === true) continue
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    if (manifest.private === true) continue
 
-  // Wherever the tarball is actually made from.
-  const packRoot = manifest.publishConfig?.directory
-    ? join(dir, manifest.publishConfig.directory)
-    : dir
+    // Wherever the tarball is actually made from.
+    const packRoot = manifest.publishConfig?.directory
+      ? join(dir, manifest.publishConfig.directory)
+      : dir
 
-  checked += 1
+    checked += 1
 
-  if (manifest.license !== LICENSE_FIELD) {
-    problems.push(`${manifest.name}: license is ${String(manifest.license)}, expected "${LICENSE_FIELD}"`)
-  }
+    if (manifest.license !== LICENSE_FIELD) {
+      problems.push(`${manifest.name}: license is ${String(manifest.license)}, expected "${LICENSE_FIELD}"`)
+    }
 
-  for (const file of required) {
-    if (!existsSync(join(packRoot, file))) {
-      problems.push(`${manifest.name}: no ${file} where it packs from`)
+    for (const file of required) {
+      if (!existsSync(join(packRoot, file))) {
+        problems.push(`${manifest.name}: no ${file} where it packs from`)
+      }
+    }
+
+    // npm always includes LICENSE* whatever `files` says. It does not do that for
+    // NOTICE, so a `files` array that omits it would drop it from the tarball
+    // even though the file is sitting right there. LICENSE.md is required in the
+    // list too, so the manifest says what ships rather than relying on npm's
+    // special case.
+    for (const file of required) {
+      if (Array.isArray(manifest.files) && !manifest.files.includes(file)) {
+        problems.push(`${manifest.name}: "files" does not list ${file}, so it will not be packed`)
+      }
     }
   }
 
-  // npm always includes LICENSE* whatever `files` says. It does not do that for
-  // NOTICE, so a `files` array that omits it would drop it from the tarball
-  // even though the file is sitting right there. LICENSE.md is required in the
-  // list too, so the manifest says what ships rather than relying on npm's
-  // special case.
-  for (const file of required) {
-    if (Array.isArray(manifest.files) && !manifest.files.includes(file)) {
-      problems.push(`${manifest.name}: "files" does not list ${file}, so it will not be packed`)
-    }
+  if (problems.length > 0) {
+    console.error('Licence check failed:')
+    for (const problem of problems) console.error(`  - ${problem}`)
+    process.exit(1)
   }
-}
 
-if (problems.length > 0) {
-  console.error('Licence check failed:')
-  for (const problem of problems) console.error(`  - ${problem}`)
-  process.exit(1)
+  console.log(`licences: ${String(checked)} publishable packages carry LICENSE.md and NOTICE and declare the right terms`)
 }
-
-console.log(`licences: ${String(checked)} publishable packages carry LICENSE.md and NOTICE and declare the right terms`)

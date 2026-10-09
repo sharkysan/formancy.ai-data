@@ -1,5 +1,6 @@
 import { defineConfig, mergeConfig } from 'vitest/config'
 import { coverage } from '../../vitest.coverage'
+import { reporters } from '../../vitest.results'
 import app from './vite.config.ts'
 
 /**
@@ -12,6 +13,7 @@ export default mergeConfig(
   app,
   defineConfig({
     test: {
+      reporters,
       coverage: {
         ...coverage,
         // The shared policy counts `.ts`; this is the one workspace member with

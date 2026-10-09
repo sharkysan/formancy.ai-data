@@ -76,3 +76,48 @@ added unvalidated beside one SQL Server disables.
 
 Every adapter's suite asserts both lists are empty. That is how "both adapters
 pass the same mandatory suite" is something a test checks.
+
+## What a run records
+
+Every container a suite or a gate starts goes through here:
+`startPostgresContainer(image?)` and `startSqlServerContainer(image?)` start
+an empty server -- the image `DEFAULT_IMAGES` names for its engine, unless a
+test names another -- and the two fixtures are built on them. Each asks the
+server what it is (`server_version`, or `ProductVersion` -- what the adapters'
+pings read, and both adapters' ping tests hold them to it -- with
+`ProductUpdateLevel` and `Edition`) and writes that, the image and the file
+that asked to
+`test-results/servers/<script>-<engine>-<pid>-<n>.json` in the working
+directory, and returns it as `server`. The release report reads those files
+from every job and lists every image a run started, with what each server
+answered and which tests ran on it (0035). A suite that started a container
+any other way would leave no record, so nothing else in the workspace
+declares testcontainers, and `scripts/release-report/tested-on.test.mjs`
+fails when something does. The adapters' own typed variables take
+`StartedPostgreSqlContainer` and `StartedMSSQLServerContainer` from here.
+
+## Shared cases
+
+`sharedCases()` is every case both adapters are held to, by id: the model's
+comparators, each `FILTER_PARITY` entry, each `DISPLAY_PARITY` column, each
+`REFUSAL_PARITY` refusal, each `EDGE_VALUES` value and the two shipments. The
+ids are derived from the shared data -- `filterCase(entry)`,
+`displayCase(column)`, `refusalCase(name)`, `edgeCase(name)`,
+`shipmentCase('first')`, `MODEL_CASES.owner` -- so no test types one.
+
+An adapter test that asserts a case through its adapter says so with
+`covers()`: `test(title, covers('sqlserver', filterCase(entry)), async () =>
+...)`, or the same on a `describe`, whose tests inherit it. `covers()` fails
+the file while it is collected on an id that is no shared case, on no case,
+and inside a suite that already declares cases: vitest merges `meta`
+shallowly, so the inner declaration would replace the outer one instead of
+adding to it. The fixture-load test declares nothing: it reads the values
+through raw drivers, which shows the database holds them and is not either
+adapter passing anything.
+
+The release report shows every case on every engine as passed, failed or
+missing, from the tests' declarations in that run, and a case that passed on
+one engine only fails the run. What it cannot show is that a test which
+declares a case asserts it; review holds that. `src/cases.test.ts` fails when
+this package exports a table of shared expectations that is no family of
+cases, and gives no reason why.

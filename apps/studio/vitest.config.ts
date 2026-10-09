@@ -1,5 +1,6 @@
 import { defineConfig, mergeConfig } from 'vitest/config'
 import { coverage } from '../../vitest.coverage'
+import { reporters } from '../../vitest.results'
 import app from './vite.config.ts'
 
 /**
@@ -10,6 +11,7 @@ export default mergeConfig(
   app,
   defineConfig({
     test: {
+      reporters,
       coverage: {
         ...coverage,
         // `.tsx` counts here as it does in the examples. `main.tsx` is the

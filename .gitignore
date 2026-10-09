@@ -11,6 +11,12 @@ coverage/
 *.log
 .vitest-reports/
 test-results/
+# The release report's inputs and output (0035): each job's collected
+# results, the report built from them, and the tarballs the install gate
+# packed. Build outputs of a run, never committed.
+/release-results/
+/release-report/
+/release-tarballs/
 .idea/
 .pnpm-store/
 

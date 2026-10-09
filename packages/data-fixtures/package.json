@@ -28,14 +28,14 @@
     "@types/mssql": "^12.3.0",
     "mssql": "^12.0.0",
     "postgres": "^3.4.9",
-    "testcontainers": "catalog:"
+    "testcontainers": "catalog:",
+    "vitest": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "unrun": "^0.3.1",
-    "vitest": "catalog:"
+    "unrun": "^0.3.1"
   }
 }

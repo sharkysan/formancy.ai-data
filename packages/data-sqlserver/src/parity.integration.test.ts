@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ApiValue, LookupConfig, LookupQuery, MetadataSnapshot, ObjectMeta, ObjectRef, RecordColumn, RecordTarget, RecordValue, RowFilters, UpdateRequest } from '@formancy/data-core'
 import { buildLookupConfig, encodeKeyToken, findObject, generateForm, scopeRowFilters } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { DISPLAY_PARITY, FILTER_PARITY, PARITY_SCOPE, REFUSAL_PARITY, startSqlServerFixture } from '@formancy/data-fixtures'
+import { covers, DISPLAY_PARITY, displayCase, FILTER_PARITY, filterCase, PARITY_SCOPE, REFUSAL_PARITY, refusalCase, startSqlServerFixture } from '@formancy/data-fixtures'
 import { createSqlServerLookups, createSqlServerRecords, discoverSqlServer } from './index.js'
 
 /**
@@ -166,10 +166,24 @@ describe('FILTER_PARITY: a row filter compares the canonical value exactly', () 
   // operation a filter scopes: a lookup's page, resolve and membership, and a
   // record's read and guarded update.
   for (const parityCase of FILTER_PARITY) {
-    test(`${parityCase.column} = ${JSON.stringify(parityCase.value)}`, async () => {
+    test(`${parityCase.column} = ${JSON.stringify(parityCase.value)}`, covers('sqlserver', filterCase(parityCase)), async () => {
       const scoped = scopeRowFilters(meta(parity, TENANT_ITEM), [{ column: parityCase.column, value: parityCase.value }], 'parity')
       if ('refused' in parityCase) {
+        // A fixed-length column's canonical value has no trailing space, so
+        // `AB ` names nothing it holds. Bound, SQL Server's `=` would ignore
+        // the space and select every row whose code is `AB`; refused, no SQL
+        // is built. And a term that reaches the adapter by hand is thrown by
+        // its lookups and its records before anything is sent, as
+        // PostgreSQL's suite asks of its adapter: this case is declared on
+        // both engines, so it asserts the same of both.
         expect(scoped).toMatchObject({ ok: false, code: parityCase.refused })
+        const forged = { kind: 'restricted', equal: [{ column: parityCase.column, type: columnOf(parity, TENANT_ITEM, parityCase.column).type, value: parityCase.value }] } as unknown as RowFilters
+        const lookups = createSqlServerLookups(owner)
+        const config = lookupConfig(parity, ITEM_USE, 'fk_item_use_item', ['label'])
+        await expect(lookups.search(config, PAGE, forged)).rejects.toThrow(/not spelled as its column holds it/)
+        await expect(lookups.resolve(config, NAMED.map(token), forged)).rejects.toThrow(/not spelled as its column holds it/)
+        const key = [parityValue(TENANT_ITEM, 'tenant_code', 'acme'), parityValue(TENANT_ITEM, 'item_no', '1')]
+        await expect(createSqlServerRecords(owner).read({ target: versioned(parity, TENANT_ITEM), key, columns: [], filters: forged })).rejects.toThrow(/not spelled as its column holds it/)
         return
       }
       if (!scoped.ok) throw new Error(scoped.message)
@@ -248,7 +262,7 @@ describe('DISPLAY_PARITY: a label is spelled from the canonical value', () => {
     ['us_english', () => owner],
     ['Deutsch', () => german],
   ] as const) {
-    test(`every kind labels alike, in a ${language} session`, async () => {
+    test(`every kind labels alike, in a ${language} session`, covers('sqlserver', ...Object.keys(DISPLAY_PARITY).map(displayCase)), async () => {
       const lookups = createSqlServerLookups(pool())
       const labels: Record<string, string | undefined> = {}
       const resolved: Record<string, string | undefined> = {}
@@ -340,7 +354,7 @@ describe('REFUSAL_PARITY: a refusal names the same code on both engines', () => 
   // constraint the form could have checked. The code is from the number, so
   // a German session gets the same.
   for (const [language, pool] of sessions) {
-    test(`a trigger's own error is refused on insert and update, and nothing is written, in a ${language} session`, async () => {
+    test(`a trigger's own error is refused on insert and update, and nothing is written, in a ${language} session`, covers('sqlserver', refusalCase('guardedInsert'), refusalCase('oddInsert'), refusalCase('guardedUpdate')), async () => {
       const records = createSqlServerRecords(pool())
       const target = versioned(parity, GUARDED)
       const insert = (id: string, note: string) => records.insert({ target, values: [parityValue(GUARDED, 'id', id), parityValue(GUARDED, 'note', note)], returning: [] })
@@ -362,7 +376,7 @@ describe('REFUSAL_PARITY: a refusal names the same code on both engines', () => 
   // adapter cannot verify what it stored, so it refuses the write. It was
   // `unavailable`; PostgreSQL's BEFORE trigger returning NULL is the same
   // refusal, and neither passes with time.
-  test('a declined insert is refused, and nothing is written', async () => {
+  test('a declined insert is refused, and nothing is written', covers('sqlserver', refusalCase('declinedInsert')), async () => {
     for (const [, pool] of sessions) {
       const records = createSqlServerRecords(pool())
       const target: RecordTarget = { table: DECLINED, identity: [columnOf(parity, DECLINED, 'id')], concurrency: null }
@@ -380,7 +394,7 @@ describe('REFUSAL_PARITY: a refusal names the same code on both engines', () => 
   // comes to name one, and discovery counts every one as generated. 544 was
   // `unavailable`; the period's numbers were `refused`, as if sending again
   // could not help when a review of the form would.
-  test('writing a generated column is schema-changed, and nothing is written', async () => {
+  test('writing a generated column is schema-changed, and nothing is written', covers('sqlserver', refusalCase('generatedInsert')), async () => {
     for (const [, pool] of sessions) {
       const records = createSqlServerRecords(pool())
       const generated: RecordTarget = { table: GENERATED, identity: [columnOf(parity, GENERATED, 'id')], concurrency: null }
@@ -425,7 +439,7 @@ describe('REFUSAL_PARITY: a refusal names the same code on both engines', () => 
   // shows it blocked does the holder ask for row 1: on a timer the update
   // sometimes finished first and nothing deadlocked (C10). The holder's high
   // deadlock priority makes the adapter the one chosen.
-  test('the victim of a deadlock is unavailable, and the row is unchanged', async () => {
+  test('the victim of a deadlock is unavailable, and the row is unchanged', covers('sqlserver', refusalCase('deadlockVictim')), async () => {
     const adapterPool = await connect({ ...fixture.admin, pool: { max: 1 } })
     const holderPool = await connect({ ...fixture.admin, pool: { max: 1 } })
     const holder = new mssql.Transaction(holderPool)

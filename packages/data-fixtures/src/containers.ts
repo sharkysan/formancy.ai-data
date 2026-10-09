@@ -1,9 +1,13 @@
-import type { DiscoveryAccount } from '@formancy/data-core'
+import type { DatabaseKind, DiscoveryAccount } from '@formancy/data-core'
 import { MSSQLServerContainer } from '@testcontainers/mssqlserver'
+import type { StartedMSSQLServerContainer } from '@testcontainers/mssqlserver'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
+import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import { readFixture, splitBatches } from './load.js'
+import type { ServerAnswer, ServerRecord } from './servers.js'
+import { captureCaller, recordServer } from './servers.js'
 
 /**
  * The images the suites run against. The supported matrix is exactly these
@@ -11,6 +15,14 @@ import { readFixture, splitBatches } from './load.js'
  */
 export const POSTGRES_IMAGE = 'postgres:17-alpine'
 export const SQLSERVER_IMAGE = 'mcr.microsoft.com/mssql/server:2022-latest'
+
+/**
+ * The image each engine's tests run on unless a file names another. The
+ * supported matrix is exactly these until a test names another (0003), and
+ * the release report lists every image a test started, these first (0035).
+ * A record, so a third engine without an image is a compile error here.
+ */
+export const DEFAULT_IMAGES: Readonly<Record<DatabaseKind, string>> = { postgres: POSTGRES_IMAGE, sqlserver: SQLSERVER_IMAGE }
 
 /** The restricted principal both fixture files create. */
 export const READER = {
@@ -44,6 +56,8 @@ export interface PostgresFixture {
   writer: string
   /** Who `admin` discovers as: the container's superuser, as both principal and login. */
   owner: DiscoveryAccount
+  /** What the server said about itself, as recorded for the release report. */
+  server: ServerRecord
   stop(): Promise<void>
 }
 
@@ -53,7 +67,47 @@ export interface SqlServerFixture {
   writer: mssql.config
   /** Who `admin` discovers as: `sa` connects, and in a database it does not own by name is `dbo`. */
   owner: DiscoveryAccount
+  /** What the server said about itself, as recorded for the release report. */
+  server: ServerRecord
   stop(): Promise<void>
+}
+
+/** A started container and what its server said about itself, recorded. */
+export interface StartedServer<Container> {
+  container: Container
+  server: ServerRecord
+}
+
+/** What PostgreSQL says it is: `server_version`, the setting the adapter's ping reads too, and `version()`. */
+async function askPostgres(uri: string): Promise<ServerAnswer> {
+  const sql = postgres(uri, { onnotice: () => {} })
+  try {
+    const [row] = await sql<{ version: string; description: string }[]>`select current_setting('server_version') as version, version() as description`
+    if (row === undefined) throw new Error('PostgreSQL answered the version query with no row')
+    return { version: row.version, updateLevel: null, edition: null, description: row.description }
+  } finally {
+    await sql.end()
+  }
+}
+
+/**
+ * A PostgreSQL container, empty, and a record of the server that answered in
+ * it (0035): every container a suite or a gate starts comes through here or
+ * `startSqlServerContainer`, so the release report can say what each test
+ * ran on. `image` is for a test that names another; the default is the one
+ * every other test runs.
+ */
+export async function startPostgresContainer(image: string = POSTGRES_IMAGE): Promise<StartedServer<StartedPostgreSqlContainer>> {
+  // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
+  const caller = captureCaller()
+  const container = await new PostgreSqlContainer(image).start()
+  try {
+    const answer = await askPostgres(container.getConnectionUri())
+    return { container, server: recordServer({ engine: 'postgres', image, caller, ...answer }) }
+  } catch (error) {
+    await container.stop()
+    throw error
+  }
 }
 
 /**
@@ -65,7 +119,7 @@ export interface SqlServerFixture {
  * would drift from this one the first time somebody added a table to it.
  */
 export async function startPostgresFixture(): Promise<PostgresFixture> {
-  const container = await new PostgreSqlContainer(POSTGRES_IMAGE).start()
+  const { container, server } = await startPostgresContainer()
   const admin = container.getConnectionUri()
   const sql = postgres(admin, { onnotice: () => {} })
   try {
@@ -91,6 +145,7 @@ export async function startPostgresFixture(): Promise<PostgresFixture> {
     reader: as(READER.user, READER.postgresPassword),
     writer: as(WRITER.user, WRITER.postgresPassword),
     owner: { user: owner, login: owner },
+    server,
     stop: async () => {
       await container.stop()
     },
@@ -124,24 +179,76 @@ async function connectWhenAcceptingLogins(config: mssql.config): Promise<mssql.C
 }
 
 /**
- * A SQL Server container with the fixture loaded into its own database, the
- * restricted principals created, and the parity schema (0028) beside it.
- *
- * The container's certificate is self-signed, so `trustServerCertificate` is
- * set here, in the test harness, and nowhere in a package a customer runs.
+ * The container's owner, in `database`. Its certificate is self-signed, so
+ * `trustServerCertificate` is set here, in the test harness, and nowhere in a
+ * package a customer runs.
  */
-export async function startSqlServerFixture(): Promise<SqlServerFixture> {
-  const container = await new MSSQLServerContainer(SQLSERVER_IMAGE).acceptLicense().start()
-  const base = {
+function ownerOf(container: StartedMSSQLServerContainer, database: string): mssql.config {
+  return {
     server: container.getHost(),
     port: container.getPort(),
+    user: container.getUsername(),
+    password: container.getPassword(),
+    database,
     options: { encrypt: false, trustServerCertificate: true },
   }
-  const owner = { ...base, user: container.getUsername(), password: container.getPassword() }
+}
+
+/**
+ * What SQL Server says it is: `ProductVersion`, the property the adapter's
+ * ping reads too, its update level and edition, and `@@version`. Cast,
+ * because `SERVERPROPERTY` returns `sql_variant`. Asked through the first
+ * connection's retry, so whoever connects next does so after the window in
+ * which logins are refused.
+ */
+async function askSqlServer(config: mssql.config): Promise<ServerAnswer> {
+  const pool = await connectWhenAcceptingLogins(config)
+  try {
+    const result = await pool.request().query<{ version: string; update_level: string | null; edition: string | null; description: string | null }>(
+      `select cast(serverproperty('ProductVersion') as nvarchar(128)) as version,
+        cast(serverproperty('ProductUpdateLevel') as nvarchar(128)) as update_level,
+        cast(serverproperty('Edition') as nvarchar(128)) as edition,
+        @@version as description`,
+    )
+    const row = result.recordset[0]
+    if (row === undefined) throw new Error('SQL Server answered the version query with no row')
+    return { version: row.version, updateLevel: row.update_level, edition: row.edition, description: row.description }
+  } finally {
+    await pool.close()
+  }
+}
+
+/**
+ * A SQL Server container, empty, accepting logins, and a record of the
+ * server that answered in it (0035), as `startPostgresContainer`. Accepting
+ * the EULA is the operator's act; in a test it is this call, the decision
+ * compose.yaml makes a developer spell out.
+ */
+export async function startSqlServerContainer(image: string = SQLSERVER_IMAGE): Promise<StartedServer<StartedMSSQLServerContainer>> {
+  // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
+  const caller = captureCaller()
+  const container = await new MSSQLServerContainer(image).acceptLicense().start()
+  try {
+    const answer = await askSqlServer(ownerOf(container, 'master'))
+    return { container, server: recordServer({ engine: 'sqlserver', image, caller, ...answer }) }
+  } catch (error) {
+    await container.stop()
+    throw error
+  }
+}
+
+/**
+ * A SQL Server container with the fixture loaded into its own database, the
+ * restricted principals created, and the parity schema (0028) beside it.
+ */
+export async function startSqlServerFixture(): Promise<SqlServerFixture> {
+  const { container, server } = await startSqlServerContainer()
+  const owner = ownerOf(container, 'master')
+  const base = { server: owner.server, port: owner.port, options: owner.options }
 
   // Server-level work happens in master: the database and the login. Both are
   // constants of this module, not input, which is why they can be spliced in.
-  const master = await connectWhenAcceptingLogins({ ...owner, database: 'master' })
+  const master = await connectWhenAcceptingLogins(owner)
   try {
     await master.request().batch(`create database ${SQLSERVER_DATABASE}`)
     for (const login of [READER, WRITER]) {
@@ -165,7 +272,8 @@ export async function startSqlServerFixture(): Promise<SqlServerFixture> {
     admin,
     reader: { ...base, user: READER.user, password: READER.sqlServerPassword, database: SQLSERVER_DATABASE },
     writer: { ...base, user: WRITER.user, password: WRITER.sqlServerPassword, database: SQLSERVER_DATABASE },
-    owner: { user: 'dbo', login: owner.user },
+    owner: { user: 'dbo', login: String(owner.user) },
+    server,
     stop: async () => {
       await container.stop()
     },

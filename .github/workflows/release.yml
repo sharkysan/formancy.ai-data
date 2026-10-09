@@ -4,9 +4,17 @@ name: Release
 # carry provenance -- the attestation is a statement by GitHub about which
 # workflow, at which commit, produced the tarball, and only the workflow can
 # make it.
+#
+# In this order (0035): the gates CI runs, and the report of this run; then,
+# in a job that holds `contents: read` and no secret, every check on what
+# would be published, pinned by hash; then, only on a version tag's push,
+# everything permanent, in one job that publishes only what was pinned. A
+# `workflow_dispatch` rehearses all of it but that last job, on any branch,
+# with no secret and no permission beyond reading the repository.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 # Third-party actions are pinned to commit hashes, with the tag in a comment.
 #
@@ -19,66 +27,72 @@ permissions:
   contents: read
 
 jobs:
-  # CI's getting-started job, again, at the tagged commit (0032): the guide's
-  # own commands from a clean checkout, and the journey through the composed
-  # stack on both engines. A release whose guide does not work is not cut,
-  # so `release` waits for it. Node only, as in CI: the clean checkout is the
-  # point.
-  # With the runner's Compose and the oldest the guide says works, as in CI;
-  # steps.test.mjs fails when this pin, CI's and the guide disagree.
-  getting-started:
-    name: getting-started (Compose ${{ matrix.compose }})
+  # Whether this run publishes, decided once. The condition is positive and
+  # written in this one place: a dispatch can never satisfy it, and an output
+  # that is missing is '', which is not 'true'. `release` names everything
+  # this run writes -- the tag when publishing, `dry-run` otherwise -- so no
+  # file name below is built from a ref, and a dispatch from `feat/x` cannot
+  # put a `/` into a path.
+  tag:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - compose: runner
-          - compose: 2.20.3
-            # The release's own docker-compose-linux-x86_64.sha256.
-            sha256: f45e4cb687df8b48a57f656097ce7175fa8e8bef70be407b011e29ff663f475f
+    timeout-minutes: 5
+    outputs:
+      publishing: ${{ steps.mode.outputs.publishing }}
+      release: ${{ steps.mode.outputs.release }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Compose ${{ matrix.compose }}
-        if: matrix.compose != 'runner'
+      - name: Publishing only on the push of a version tag
+        id: mode
+        env:
+          PUBLISHING: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
         run: |
-          mkdir -p ~/.docker/cli-plugins
-          curl -fsSL -o ~/.docker/cli-plugins/docker-compose "https://github.com/docker/compose/releases/download/v${{ matrix.compose }}/docker-compose-linux-x86_64"
-          echo "${{ matrix.sha256 }}  $HOME/.docker/cli-plugins/docker-compose" | sha256sum -c
-          chmod +x ~/.docker/cli-plugins/docker-compose
-          test "$(docker compose version --short)" = "${{ matrix.compose }}"
+          echo "publishing=$PUBLISHING" >> "$GITHUB_OUTPUT"
+          if [ "$PUBLISHING" = true ]; then
+            echo "release=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=dry-run" >> "$GITHUB_OUTPUT"
+          fi
 
-      - run: node scripts/getting-started.mjs
+      - name: The version the packages say
+        id: version
+        run: echo "version=$(node -p "require('./packages/data-core/package.json').version")" >> "$GITHUB_OUTPUT"
 
-  release:
-    needs: getting-started
+      # The tag is the claim; this checks the repository agrees with it. A tag
+      # that says v0.1.0 on a tree that says 0.2.0 would publish the wrong
+      # version under the right name, which is unfixable after the fact.
+      - name: The tag and the manifests must agree
+        if: steps.mode.outputs.publishing == 'true'
+        env:
+          RELEASE: ${{ steps.mode.outputs.release }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ "${RELEASE#v}" != "$VERSION" ]; then
+            echo "::error::The tag is ${RELEASE} but the packages say ${VERSION}"
+            exit 1
+          fi
+          echo "Releasing $VERSION"
+
+  # Beside the gates, so a missing or refused token is red while they run
+  # rather than after them. A rehearsal skips it and needs no secret.
+  #
+  # The token is a secret of the `npm` environment, whose deployment policy
+  # admits only `v*` tags (REPO-METADATA.md): a repository secret would be
+  # readable by a workflow on any branch a collaborator pushes. That policy
+  # is a repository setting, which nothing in this repository can see.
+  npm-token:
+    needs: tag
+    if: needs.tag.outputs.publishing == 'true'
+    environment: npm
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write # create the GitHub release
-      id-token: write # OIDC, for npm provenance and keyless signing
-      packages: write # push the server image to GHCR
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # the tag's history, so the release notes can reference it
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: corepack enable pnpm
 
-      - run: pnpm install --frozen-lockfile
-
-      # Before anything expensive. A token problem discovered after eight
-      # minutes of build and test is the same token problem, found later.
       - name: The npm token must work, and must not want an OTP
         run: |
           if [ -z "${NODE_AUTH_TOKEN}" ]; then
@@ -100,79 +114,197 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      # The tag is the claim; this checks the repository agrees with it. A tag
-      # that says v0.1.0 on a tree that says 0.2.0 would publish the wrong
-      # version under the right name, which is unfixable after the fact.
-      - name: The tag and the manifests must agree
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          PKG=$(node -p "require('./packages/data-core/package.json').version")
-          if [ "$TAG" != "$PKG" ]; then
-            echo "::error::Tag is $TAG but the packages say $PKG"
-            exit 1
-          fi
-          echo "Releasing $PKG"
+  # Exactly the gates CI runs, each package's suite on a runner of its own,
+  # the browser, install, container and getting-started gates, and the
+  # report of this run, which writes the release body. No secret is passed:
+  # the coverage upload never runs in a release.
+  gates:
+    needs: tag
+    uses: ./.github/workflows/gates.yml
+    with:
+      release: ${{ needs.tag.outputs.release }}
 
-      # The same gates CI runs. A release must not be the first time they run
-      # against this tree.
-      - run: pnpm build
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm check:pkg
-      - run: pnpm test:repo
+  # Every check on what would be published, in a job that holds
+  # `contents: read` and no secret: the report is green and is this run's, of
+  # this commit, release and version; the tarballs are the install gate's,
+  # byte for byte, one per published package, each at the release's version
+  # and carrying its licence; the release body exists and fits; the SBOM
+  # names both drivers, and every runtime dependency and upstream package it
+  # names at the version the suites loaded.
+  #
+  # It is not a job that can write nothing: like every job of a run it can
+  # write to the run's artefacts, and it uploads the SBOM. So what it checked
+  # is pinned by sha256 as its outputs -- the report and the tarballs before
+  # cdxgen runs, whose dependencies nothing locks, the SBOM once it is
+  # checked -- and `publish` refuses anything it downloads that is not that.
+  # No cache is restored here: a tag's run may restore one a main-branch run
+  # saved.
+  check:
+    needs: [tag, gates]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      checked: ${{ steps.report-checked.outputs.checked }}
+      sbom: ${{ steps.sbom-checked.outputs.checked }}
+    steps:
+      - uses: actions/checkout@v4
 
-      # Every tarball carries the source-available terms and the NOTICE for its
-      # Apache-2.0 dependencies, and declares the right licence field. A
-      # commercial package published under the scope's Apache-2.0 declaration
-      # cannot be unpublished into not having happened.
-      - name: Every tarball carries its licence
-        run: node scripts/verify-licenses.mjs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
 
-      # `--access public` is about the registry's visibility of a scoped
-      # package, not about the terms: the packages are public to install and
-      # LICENSE.md says what may be done with them.
-      - name: Publish to npm with provenance
-        run: pnpm publish -r --access public --provenance --no-git-checks
+      # cdxgen reads the installed tree.
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-report
+          path: release-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-tarballs
+          path: release-tarballs
+
+      - name: The report and the tarballs are what this run gated
+        id: report-checked
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: 'true'
+          RELEASE: ${{ needs.tag.outputs.release }}
+          VERSION: ${{ needs.tag.outputs.version }}
+        run: |
+          node scripts/release-report/verify-publish.mjs --stage content \
+            --report release-report/release-report.json \
+            --tarballs release-tarballs \
+            --notes release-report/RELEASE_NOTES.md \
+            --release "${RELEASE}" \
+            --version "${VERSION}"
 
       # A bill of materials for what actually ships, so a customer -- or an
-      # auditor -- can answer "what is in this" without resolving it themselves.
-      # --required-only because an SBOM for a released artefact should describe
-      # the artefact, not the workbench.
+      # auditor -- can answer "what is in this" without resolving it
+      # themselves. --required-only because an SBOM for a released artefact
+      # should describe the artefact, not the workbench.
       - name: Generate a CycloneDX SBOM
+        id: sbom
+        env:
+          RELEASE: ${{ needs.tag.outputs.release }}
+          VERSION: ${{ needs.tag.outputs.version }}
         run: |
           npx --yes @cyclonedx/cdxgen@12.8.4 \
             --type javascript \
             --required-only \
-            --output "formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json" \
+            --output "formancy-data-${RELEASE}-sbom.cdx.json" \
             --project-name formancy-data \
-            --project-version "${GITHUB_REF_NAME#v}" \
+            --project-version "${VERSION}" \
             .
-          node -e "
-            const s = require('./formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json');
-            const purls = (s.components ?? []).map((c) => c.purl ?? '').join('\n');
-            // The drivers are what talks to a customer's database. An SBOM
-            // that omitted them would be worse than none, so the release stops here.
-            for (const driver of ['pkg:npm/postgres@', 'pkg:npm/mssql@']) {
-              if (!purls.includes(driver)) {
-                console.error('::error::SBOM is missing ' + driver);
-                process.exit(1);
-              }
-            }
-            console.log('SBOM: ' + String((s.components ?? []).length) + ' components');
-          "
 
-      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+      - name: The SBOM names what the suites loaded
+        id: sbom-checked
+        env:
+          RELEASE: ${{ needs.tag.outputs.release }}
+        run: |
+          node scripts/release-report/verify-publish.mjs --stage sbom \
+            --report release-report/release-report.json \
+            --sbom "formancy-data-${RELEASE}-sbom.cdx.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-sbom
+          path: formancy-data-${{ needs.tag.outputs.release }}-sbom.cdx.json
+          if-no-files-found: error
+          overwrite: true
+
+  # Everything that cannot be taken back, and the only job with any
+  # permission beyond reading. The job-level condition is the boundary: no
+  # step here carries an `if` of its own, so a step added later is guarded
+  # without anybody remembering to guard it. Nothing is installed or built
+  # for npm here; it publishes the tarballs `check` passed, and first refuses
+  # anything it downloaded that is not what `check` pinned, and a report that
+  # is not this run's -- before anything is signed, and again in the step
+  # that holds the npm token.
+  #
+  # Ordered so that npm, whose version numbers nothing can delete, comes as
+  # late as possible: signatures, then the image, then npm, then the GitHub
+  # release, which can be edited or deleted. A re-run of this job resumes:
+  # publish.mjs skips a version npm already holds with the same bytes.
+  publish:
+    needs: [tag, npm-token, gates, check]
+    if: needs.tag.outputs.publishing == 'true'
+    environment: npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # OIDC, for npm provenance and keyless signing
+      packages: write # push the server image to GHCR
+    env:
+      RELEASE: ${{ needs.tag.outputs.release }}
+      VERSION: ${{ needs.tag.outputs.version }}
+      CHECKED: ${{ needs.check.outputs.checked }}
+      CHECKED_SBOM: ${{ needs.check.outputs.sbom }}
+    steps:
+      - id: checkout
+        uses: actions/checkout@v4
+
+      - id: node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - id: report
+        uses: actions/download-artifact@v4
+        with:
+          name: release-report
+          path: release-report
+      - id: tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: release-tarballs
+          path: release-tarballs
+      - id: sbom
+        uses: actions/download-artifact@v4
+        with:
+          name: release-sbom
+          path: .
+
+      # Every file just downloaded is, byte for byte, one `check` pinned, and
+      # the report is this run's, green and whole; or nothing is signed.
+      - name: What was downloaded is what check checked
+        id: downloads-checked
+        run: |
+          node scripts/release-report/verify-publish.mjs --stage downloads \
+            --report release-report/release-report.json \
+            --tarballs release-tarballs \
+            --notes release-report/RELEASE_NOTES.md \
+            --sbom "formancy-data-${RELEASE}-sbom.cdx.json" \
+            --release "${RELEASE}" \
+            --version "${VERSION}"
+
+      - id: cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
 
       # Keyless: the signature is bound to this workflow's OIDC identity rather
       # than to a private key somebody has to keep.
       - name: Sign the SBOM
+        id: sign-sbom
         run: |
           cosign sign-blob --yes \
-            --bundle "formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json.sigstore" \
-            "formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json"
+            --bundle "formancy-data-${RELEASE}-sbom.cdx.json.sigstore" \
+            "formancy-data-${RELEASE}-sbom.cdx.json"
+
+      # The report of the run that gated this release, signed by the same
+      # identity, so a customer can check it is the one this workflow made.
+      - name: Sign the release report
+        id: sign-report
+        run: |
+          for kind in md json; do
+            cp "release-report/release-report.${kind}" "formancy-data-${RELEASE}-release-report.${kind}"
+            cosign sign-blob --yes \
+              --bundle "formancy-data-${RELEASE}-release-report.${kind}.sigstore" \
+              "formancy-data-${RELEASE}-release-report.${kind}"
+          done
 
       # ── The server image ────────────────────────────────────────────────
       #
@@ -180,9 +312,11 @@ jobs:
       # produced by the workflow that signs it, at the commit the tag names, and
       # not carried between jobs where the thing signed and the thing built could
       # drift apart. The same steps as formancy.ai's release, with the same pins.
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - id: buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to the registry
+        id: registry-login
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
@@ -198,46 +332,66 @@ jobs:
           context: .
           file: packages/data-server/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/formancy-data-server:${{ github.ref_name }}
+          tags: ghcr.io/${{ github.repository_owner }}/formancy-data-server:${{ needs.tag.outputs.release }}
           provenance: mode=max
 
       # By DIGEST, never by tag. A tag is mutable, so signing a tag says nothing
       # about the bytes anybody later pulls under that name.
       - name: Sign the image
-        run: |
-          cosign sign --yes \
-            "ghcr.io/${{ github.repository_owner }}/formancy-data-server@${{ steps.image.outputs.digest }}"
+        id: sign-image
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+          OWNER: ${{ github.repository_owner }}
+        run: cosign sign --yes "ghcr.io/${OWNER}/formancy-data-server@${DIGEST}"
 
       - name: Attach the SBOM to the image
+        id: attest-sbom
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+          OWNER: ${{ github.repository_owner }}
         run: |
           cosign attest --yes \
             --type cyclonedx \
-            --predicate "formancy-data-${GITHUB_REF_NAME}-sbom.cdx.json" \
-            "ghcr.io/${{ github.repository_owner }}/formancy-data-server@${{ steps.image.outputs.digest }}"
+            --predicate "formancy-data-${RELEASE}-sbom.cdx.json" \
+            "ghcr.io/${OWNER}/formancy-data-server@${DIGEST}"
 
       - name: Say which image this release is
+        id: image-summary
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+          OWNER: ${{ github.repository_owner }}
         run: |
           {
             echo "### Container image"
             echo
             echo '```'
-            echo "ghcr.io/${{ github.repository_owner }}/formancy-data-server:${GITHUB_REF_NAME}"
-            echo "digest: ${{ steps.image.outputs.digest }}"
+            echo "ghcr.io/${OWNER}/formancy-data-server:${RELEASE}"
+            echo "digest: ${DIGEST}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # The body is this version's section, not the whole changelog. GitHub
-      # refuses a release body over 125,000 characters, and it refuses it HERE
-      # -- after the packages are on npm. The extractor throws when the version
-      # has no section, so an empty body fails loudly rather than quietly.
-      - name: The release body is this version's entry
-        run: node scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" RELEASE_NOTES.md
+      # The tarballs the install gate packed, installed and ran, and `check`
+      # held to the report and pinned: npm receives exactly those bytes, with
+      # provenance. publish.mjs holds them to the pin again itself.
+      - name: Publish to npm with provenance
+        id: npm-publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+        run: node scripts/release-report/publish.mjs --tarballs release-tarballs --report release-report/release-report.json
 
+      # The body is this version's changelog section and the report's summary,
+      # built and measured by the report job before anything was published.
       - name: Create the GitHub release
+        id: github-release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
-          body_path: RELEASE_NOTES.md
+          body_path: release-report/RELEASE_NOTES.md
           files: |
             formancy-data-*-sbom.cdx.json
             formancy-data-*-sbom.cdx.json.sigstore
+            formancy-data-*-release-report.md
+            formancy-data-*-release-report.md.sigstore
+            formancy-data-*-release-report.json
+            formancy-data-*-release-report.json.sigstore
           fail_on_unmatched_files: true

@@ -1,0 +1,866 @@
+{
+  "$comment": "What each decision record's cost paragraphs say a user, integrator or operator of a release will meet, one sentence each, or why the record has none. Held to the records by scripts/release-report/limitations.test.mjs: 'reviewed' is the sha256 of the record as it was read, so any edit to a record -- a status line naming a later record included -- fails until it is read again and stamped with 'node scripts/release-report/limitations.mjs --stamp NNNN'. A line can outlive its truth until its record changes; 'heldBy' names a test that shows it still holds, and the release report fails a run in which that test did not pass. The wording is held by review.",
+  "records": {
+    "0001": {
+      "reviewed": "sha256:a1bc7ad08ab6e58752d047c0e3e57c75b86c71cc609c9734f77bd45b7b314139",
+      "limitations": [
+        {
+          "area": "licence",
+          "says": "The `@formancy` scope mixes formancy's Apache-2.0 packages with this module's source-available ones, so a dependency audit reads each package's licence rather than its scope."
+        }
+      ]
+    },
+    "0002": {
+      "reviewed": "sha256:88c6bdd7d4cb8298464ee60adf907e007da7276b7f91d7e40ec59d1a3c23dca4",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The published packages depend on upstream `@formancy/*` at exact versions, so an upstream fix reaches an installation only through a release of this module that moves the version."
+        }
+      ]
+    },
+    "0003": {
+      "reviewed": "sha256:72c6843e2a78deb9aa8f6f80d1483f72649ac8b23a80c8d12f7d4b8a7dae9216",
+      "none": "Its user-facing cost, that what is tested is exactly the images the tests name, is the report's tested-on section, derived from each run."
+    },
+    "0004": {
+      "reviewed": "sha256:1f7c448c008ebcd083ad7d6cc7a38d5c500e59f69b059136d56ad7c4c8fca47a",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "A coverage gap is an aspect of an object with a sentence, so a consumer that wants to act on one has to read the sentence."
+        }
+      ]
+    },
+    "0005": {
+      "reviewed": "sha256:dff4d300dc4011863352eb88ec3889fa2b934fc4bd410d35d62e7d35b0d25bba",
+      "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
+    },
+    "0006": {
+      "reviewed": "sha256:2861ad227f6776e7b551a4a62a55a5ba74b4afc5866d7f71dbd5f34b5bd5d30a",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "A PostgreSQL snapshot describes the database as one account sees it, so discovery runs as the account the forms will run as, and snapshots taken by two accounts differ as an access change, not as drift."
+        },
+        {
+          "area": "databases",
+          "says": "PostgreSQL 18's `NOT NULL` constraints in `pg_constraint` and its virtual generated columns are not tested here."
+        },
+        {
+          "area": "databases",
+          "says": "PostgreSQL defaults and check expressions are kept as the server deparses them, inside the fingerprint, so a major upgrade that deparses one differently reads as drift."
+        },
+        {
+          "area": "databases",
+          "says": "The deparsing functions read the catalog caches, not the discovery transaction's snapshot, so the one-moment guarantee covers the rows and not the spellings of defaults and checks."
+        },
+        {
+          "area": "databases",
+          "says": "PostgreSQL's `enforced` is read from triggers as they fire in an ordinary session; a session with `session_replication_role = replica` skips them, and nothing in the snapshot can say so."
+        }
+      ]
+    },
+    "0007": {
+      "reviewed": "sha256:10cc84adfbb6d49dd542ef16832a9414ac5c023c64086b2614dfdbac98b44ce0",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A form told a SQL Server `datetime` has three digits accepts `.001`, which the server stores as `.000`, and one told `smalldatetime` keeps seconds sees them rounded to the minute, silently."
+        },
+        {
+          "area": "databases",
+          "says": "SQL Server's `money` is described as a `decimal(19,4)` whose upper part it cannot hold, and the server refuses such a value."
+        },
+        {
+          "area": "databases",
+          "says": "SQL Server discovery is seven queries side by side, not one consistent read, so a concurrent `ALTER` can tear it."
+        },
+        {
+          "area": "databases",
+          "says": "SQL Server discovery's queries name catalog columns a release older than 2022 may not have."
+        }
+      ]
+    },
+    "0008": {
+      "reviewed": "sha256:0fca5d8ee9db87652c96c8acd1d0a9f5b5be6a095a438a81a61147a88037282b",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A client sends exact decimals as strings, which an ordinary JSON client does not do by default."
+        },
+        {
+          "area": "forms",
+          "says": "A value is canonicalised to its column's scale, so the API changes what it was sent: `12.5` comes back `12.50`."
+        }
+      ]
+    },
+    "0009": {
+      "reviewed": "sha256:cb6cb0de6ede714f52fe7fd1ab72ce3136fb90cd9a8a8ca1db3aacec7f7df35e",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "Decimal fields are text inputs, with no numeric keyboard hint and no spinner, and totals over money are not offered, because formancy has no decimal-safe expression."
+        },
+        {
+          "area": "forms",
+          "says": "The whole-number rule is checked on one side only until formancy's spec 4 ships."
+        },
+        {
+          "area": "forms",
+          "says": "A form for a table with a version-looking column is create-only until somebody confirms the column."
+        },
+        {
+          "area": "forms",
+          "says": "Generated labels are de-snaked column names, a starting point and nothing more."
+        }
+      ]
+    },
+    "0010": {
+      "reviewed": "sha256:0c20728141d81895fc2d2638f09f5f2a7920f73ec0229614813df75d10ea8c12",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "Any change to a lookup's foreign key stops the lookup, including `ON DELETE`, which a form never exercises."
+        },
+        {
+          "area": "forms",
+          "says": "A new gap on the root's columns stops writes even when every bound column is still visible."
+        },
+        {
+          "area": "forms",
+          "says": "A server upgrade that respells a type stops every form that binds it."
+        },
+        {
+          "area": "forms",
+          "says": "Writability is per operation, so a tightened field stops all of update, even a patch that does not touch it."
+        },
+        {
+          "area": "forms",
+          "says": "Drift leaves out changes outside the form, so an empty report beside two different fingerprints is normal, and no schema-wide diff exists."
+        },
+        {
+          "area": "forms",
+          "says": "Rename hints compare definitions only: two same-typed columns renamed at once give crossed hints, and a rename that also changed the type gives none."
+        },
+        {
+          "area": "forms",
+          "says": "Drift does not compare triggers, check expressions as validation, or DDL that lands after the rescan."
+        },
+        {
+          "area": "forms",
+          "says": "Drift's sentences are English and not a contract; its `kind` is."
+        }
+      ]
+    },
+    "0011": {
+      "reviewed": "sha256:86f99011f416e950c30491e7f82750ef056b270cd0757f9e9faa3887ec1a6408",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "Equality is all a row filter can say: \"a manager sees their team's orders\" is not expressible, nor is an actor in two tenants at once."
+        },
+        {
+          "area": "access",
+          "says": "A policy names every field, so a field a regeneration adds is invisible until somebody grants it, and a regeneration that renames a field makes the policy invalid until it is edited."
+        },
+        {
+          "area": "access",
+          "says": "The trusted context is only as trustworthy as the host that builds it: a host that builds it from a request body defeats every check."
+        }
+      ]
+    },
+    "0012": {
+      "reviewed": "sha256:08e8a5fdd64e2944eb523829334a685423ed02158d026f88b521a9935f9a611a",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A text key of forty non-ASCII characters, or twenty emoji, cannot be offered as a lookup at all; such a row is counted in `omitted` and cannot be chosen."
+        },
+        {
+          "area": "forms",
+          "says": "Lookup membership compares spellings, so a saved answer naming a key the database has since re-cased is refused on the next save."
+        },
+        {
+          "area": "forms",
+          "says": "A foreign key onto a boolean, a time or a timestamp key cannot be offered as a lookup."
+        },
+        {
+          "area": "forms",
+          "says": "A person who sees a date in a lookup label cannot search for it."
+        },
+        {
+          "area": "operations",
+          "says": "Lookup paging is by offset, which costs a scan up to the offset on both engines."
+        },
+        {
+          "area": "databases",
+          "says": "The order of text, and of UUIDs on SQL Server, is each engine's collation, so a lookup lists non-ASCII text in an order that differs by engine."
+        },
+        {
+          "area": "forms",
+          "says": "Lookup labels are not unique: two customers called \"Acme AG\" look alike, and only the token tells them apart."
+        },
+        {
+          "area": "operations",
+          "says": "Nothing caps the lookup page size an administrator configures."
+        }
+      ]
+    },
+    "0013": {
+      "reviewed": "sha256:8d38ab042e9d85b0a3fb20e24cf96d37cd5f47ba122456f1558df5c4747e7d19",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The file configuration store serves one instance: over NFS, two instances on a shared volume could both believe they lost a compare-and-swap."
+        },
+        {
+          "area": "operations",
+          "says": "Finding a form's newest version reads its directory, which is linear in the number of versions."
+        }
+      ]
+    },
+    "0014": {
+      "reviewed": "sha256:ab957eacd80cf4c1e347cbdb6926469f33e2ad31d88cb4d2785881704fc1a3aa",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "Rotating the host identity key is a restart with a new key, not a fetched key set."
+        },
+        {
+          "area": "host",
+          "says": "A host with no backend of its own, a purely static single-page application, cannot hold a signing secret and so cannot use this module directly."
+        },
+        {
+          "area": "access",
+          "says": "Roles and attributes are only as fine-grained as the host's token; the server cannot ask anybody anything else."
+        }
+      ]
+    },
+    "0015": {
+      "reviewed": "sha256:5a62305654e9b1cfdfd4496679621c23f2c3b18474f1408bcabc5d3ab2a6d8d9",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "Every record read converts every column to text in SQL, which is slower than letting the driver parse."
+        },
+        {
+          "area": "writes",
+          "says": "A failed update costs a second query to tell `stale` from `not-found`."
+        }
+      ]
+    },
+    "0016": {
+      "reviewed": "sha256:365820a4363cc860b250e89200b484973ccc37087686457e9e844a0a8b812680",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "On PostgreSQL, a filter on a column whose type's `=` is not pg_catalog's, such as `citext`, compares case-sensitively and matches fewer rows than its own `=` would, and one with no cast to text, such as `hstore`, is refused."
+        },
+        {
+          "area": "forms",
+          "says": "A PostgreSQL value outside formancy's shapes, such as a `created_at` from `now()`, reaches the form as text its field refuses, so a host that sends every field back on save cannot save that record until the person changes the value."
+        },
+        {
+          "area": "forms",
+          "says": "PostgreSQL search folds case but not accents, and folds through the database's default collation rather than the column's own."
+        },
+        {
+          "area": "databases",
+          "says": "PostgreSQL text sorts in the column's collation, which on the tested image is code point order; the same data on a glibc image orders differently."
+        },
+        {
+          "area": "writes",
+          "says": "On PostgreSQL, `unknown-outcome` is also reported for a cut while the server is still parsing, which wrote nothing."
+        },
+        {
+          "area": "testing",
+          "says": "PostgreSQL's 40003 is mapped to `unknown-outcome` and 23001 to `foreign-key-violation` without a test that provokes them."
+        },
+        {
+          "area": "writes",
+          "says": "An update trusts that the identity is a key: an identity that is not unique would change every matching row, and the adapter throws afterwards rather than before."
+        },
+        {
+          "area": "databases",
+          "says": "The PostgreSQL adapter refuses a name longer than 63 bytes, the default build's limit, which a server compiled with a larger `NAMEDATALEN` allows."
+        },
+        {
+          "area": "forms",
+          "says": "Nothing bounds how many tokens a PostgreSQL `resolve` or `rejects` is handed: past 65,533 parameters postgres.js throws, which fails closed but not gracefully."
+        }
+      ]
+    },
+    "0017": {
+      "reviewed": "sha256:4c5f74f88d0a58413e84c82d507a7a87b895d563750915f52935b581dbf79b48",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "SQL Server reads a time cut to the minute and an instant to the second, so a host that writes back an unedited value writes the shorter one."
+        },
+        {
+          "area": "writes",
+          "says": "On SQL Server, `returning` is the row as the statement wrote it, before an AFTER trigger changed it; only the version is read back after one."
+        },
+        {
+          "area": "writes",
+          "says": "A SQL Server record with no identity, or with a key column that is not text, an integer, a decimal, a uuid or a date, keeps the version its statement saw."
+        },
+        {
+          "area": "writes",
+          "says": "A trigger's `RAISERROR` refuses the write on SQL Server even where the customer's own application lets it commit as a warning."
+        },
+        {
+          "area": "writes",
+          "says": "A SQL Server table with an enabled INSTEAD OF trigger for an operation cannot be written that way through this adapter, nor can a table whose account is denied VIEW DEFINITION on it.",
+          "heldBy": "packages/data-sqlserver/src/records-failures.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A SQL Server view made writable by an INSTEAD OF trigger cannot be written through this adapter either."
+        },
+        {
+          "area": "writes",
+          "says": "A SQL Server trigger that commits or rolls back the transaction and raises nothing makes its write `unknown-outcome`, though a retry would often be safe."
+        },
+        {
+          "area": "writes",
+          "says": "On SQL Server, an AFTER trigger that deletes the row it fired for leaves `ok: true` over a table that does not hold it."
+        },
+        {
+          "area": "forms",
+          "says": "A value read from a widened SQL Server column may be one the snapshot's codec would not accept."
+        },
+        {
+          "area": "writes",
+          "says": "SQL Server names a constraint or a column only in English, and in a translated session a 547 whose constraint name holds the other kind's keyword as a word of its own is misread."
+        },
+        {
+          "area": "writes",
+          "says": "A SQL Server trigger that throws one of the adapter's own error numbers, from 51701, with the adapter's exact message is misread."
+        }
+      ]
+    },
+    "0018": {
+      "reviewed": "sha256:563217ade9f4f13d167dae50cf43f09bd729180d70c47a240df231556cb1c8ac",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A record token tells anyone who may read the record its key, whatever the policy says about the key's field, and a create-only actor gets the key of what it made."
+        },
+        {
+          "area": "forms",
+          "says": "A record whose key no token can carry, such as forty non-ASCII characters, a timestamp or a float, is readable by nobody through this module."
+        },
+        {
+          "area": "forms",
+          "says": "The planner is strict: a JSON boolean for the three-state radio, `'true'` for a checkbox, an empty patch, a changed key and a tenant attribute of `'042'` are refused, and `PATCH {}` is an error."
+        },
+        {
+          "area": "forms",
+          "says": "A table whose only version column is part of its key cannot be updated through this module."
+        },
+        {
+          "area": "access",
+          "says": "`validatePolicy` accepts a row filter on the version column, so that mistake shows at the first save and not at publication."
+        },
+        {
+          "area": "operations",
+          "says": "Every request is checked against its snapshot from scratch, a pass over the bindings per request that has not been measured."
+        }
+      ]
+    },
+    "0019": {
+      "reviewed": "sha256:1941d45f9c55ae08eee4ea2d7d3f44f41edf51574f45aa4904b0248b427407f9",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The connection registry holds one pool per connection for the server's lifetime, so a deployment with many rarely used connections pays for idle pools."
+        },
+        {
+          "area": "operations",
+          "says": "A connection cannot be created through the API: adding a database is a change to a reviewed file and a restart."
+        }
+      ]
+    },
+    "0020": {
+      "reviewed": "sha256:f9f07ed05c78c74a5b46e2cb73bd6fb648c800876d49dee64c693ae33c4e885e",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "Administration is only as granular as one list of roles: everyone who may propose may also publish and see every connection's metadata."
+        },
+        {
+          "area": "operations",
+          "says": "The administrator plane's 503 tells the caller nothing actionable, so an administrator debugging a connection reads the server log."
+        },
+        {
+          "area": "access",
+          "says": "An administrator is a user of the host application; formancy's own admin users and sessions are not consulted."
+        }
+      ]
+    },
+    "0021": {
+      "reviewed": "sha256:92ff1f7d5a57488870708b8a40bc0d064c1a7ae764e57359d43566928d3af1c8",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "In `@formancy/core` 0.3.0 an answer is checked once `validate()` has run and on every change after that, so a person typing into an untouched form sees nothing until they press Validate."
+        }
+      ]
+    },
+    "0022": {
+      "reviewed": "sha256:a8dc7d61d75b5d4c167f80b4206580d509829534d387259691762006de6c574a",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "Every update reads the record first, one extra query, and an actor who may update and not read gets no echo removed and must send only writable fields."
+        },
+        {
+          "area": "host",
+          "says": "A lookup query says which operation the form is open for, which a client has to know."
+        }
+      ]
+    },
+    "0023": {
+      "reviewed": "sha256:b329ace8bb3e206236d82979a8d6b7dd8ccf755c2be37482b006db451c69daa3",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The audit trail is not evidence: an event is written after the database commits, by a different system, so a crash between the two loses it, and nothing stops a privileged operator editing the log."
+        },
+        {
+          "area": "operations",
+          "says": "Without an audit key, two events about one record cannot be told to be about the same record."
+        }
+      ]
+    },
+    "0024": {
+      "reviewed": "sha256:7f8df6fe9f1100e1765e36dc6711e329b30e463080e6fc4e140b690ea3655c88",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "There is no list of published forms: the studio's drift step asks for a form id."
+        },
+        {
+          "area": "studio",
+          "says": "The studio's preview shows no lookup options; the list is the runtime plane's, under the published policy."
+        },
+        {
+          "area": "studio",
+          "says": "Reloading the studio signs the administrator out, and a token that expires mid-work turns every request into the server's 401."
+        },
+        {
+          "area": "operations",
+          "says": "A deployment serves the studio's files and `/v1` from one origin, or the studio cannot sign in."
+        }
+      ]
+    },
+    "0025": {
+      "reviewed": "sha256:95d4cb5e31e239e983febf5dd6bebee8948f69c9414ab562c8f03a134906d9e7",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "A deployment that wants its own pool, with custom sizes or a TLS setup the options do not express, goes through the adapters' connect functions, whose options are deliberately few, and cannot pass in a driver built elsewhere."
+        }
+      ]
+    },
+    "0026": {
+      "reviewed": "sha256:b6cbd26a18217dc65db494deeff1263885417f37643dc32ff80dc4188d892e1c",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "The browser's `maxLength` is looser than a UTF-8 or code-page `varchar`, which is checked on the server only, and stricter than PostgreSQL for emoji."
+        },
+        {
+          "area": "writes",
+          "says": "A code-page `varchar` is checked only by characters; on a double-byte code page the save decides."
+        },
+        {
+          "area": "forms",
+          "says": "A collation change on a bound `varchar` blocks its form until it is reviewed, though reads would still work."
+        },
+        {
+          "area": "forms",
+          "says": "A by-default identity, a `serial` column and a sequence-default key cannot be set from a form, though the column allows it."
+        },
+        {
+          "area": "forms",
+          "says": "A SQL Server sequence default whose definition the account may not read cannot be told from an ordinary default, and stays writable."
+        },
+        {
+          "area": "writes",
+          "says": "A 32-bit float's answer is not always what was sent: `0.123456789` comes back `0.12345679`.",
+          "heldBy": "packages/data-core/src/codecs/codec.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "Instants and times differ between the engines: PostgreSQL keeps a fraction, and SQL Server cuts an instant to the second and a time to the minute."
+        },
+        {
+          "area": "forms",
+          "says": "A move between two code pages that are not UTF-8, such as 1252 to 932, is seen neither by drift nor by the fingerprint."
+        },
+        {
+          "area": "databases",
+          "says": "A SQL Server `datetime` reads rounded to the millisecond, by SQL Server."
+        },
+        {
+          "area": "databases",
+          "says": "SQL Server's `is_not_for_replication` is not read."
+        },
+        {
+          "area": "forms",
+          "says": "Binary columns have no codec."
+        }
+      ]
+    },
+    "0027": {
+      "reviewed": "sha256:7a7ef9c476e8d2134e51c9b79f1e2a44f916b34bd0f606f374ded4bc184a9ad8",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "A SQL Server snapshot carries a row-security gap unless the account holds database VIEW DEFINITION and no VIEW DEFINITION or CONTROL deny on any object or schema."
+        },
+        {
+          "area": "access",
+          "says": "A snapshot's capabilities are what was true at discovery: a grant revoked later fails at runtime as `permission-denied` until drift review sees it."
+        },
+        {
+          "area": "access",
+          "says": "That row security `applies` says nothing about which rows, so a changed policy expression is not drift."
+        },
+        {
+          "area": "access",
+          "says": "A view is not followed to its tables: a read through one may be refused while its columns say SELECT, and the generator offers such a view."
+        },
+        {
+          "area": "databases",
+          "says": "The privilege functions and `row_security_active` read live catalog state, so a GRANT or an ALTER committed mid-discovery can make an answer a moment later than the rows beside it."
+        },
+        {
+          "area": "access",
+          "says": "A row-security policy that reads the login rather than the user is not followed, and a login change is not in the fingerprint."
+        },
+        {
+          "area": "access",
+          "says": "DELETE, REFERENCES and EXECUTE privileges are not described."
+        },
+        {
+          "area": "access",
+          "says": "A PostgreSQL `serial` or `nextval` default needs USAGE on its sequence, which is not described, so such a create fails `permission-denied`."
+        },
+        {
+          "area": "forms",
+          "says": "A field written on create only is not disabled on update, because formancy has no per-operation mode; the server refuses a changed value."
+        },
+        {
+          "area": "forms",
+          "says": "Drift compares the scope's schemas case-sensitively, so on a case-insensitive SQL Server database whose scope is configured as `SALES` a missing root reads as `scope-narrowed`."
+        }
+      ]
+    },
+    "0028": {
+      "reviewed": "sha256:aa967a444a81a9b2f351fa436cb34e04803b12d202d7adb136a4bc64bdd6d2b8",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "On SQL Server, a `char` or `varchar` filter under a `SQL_` collation scans rather than seeks."
+        },
+        {
+          "area": "forms",
+          "says": "Labels are not localised: a person reads `true`, an instant in UTC to the second and a time to the minute, cut and never rounded."
+        },
+        {
+          "area": "access",
+          "says": "Boolean row filters are refused, in lookups too: a policy that filtered by a flag must use a column a filter can compare.",
+          "heldBy": "packages/data-core/src/lookup/filters.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A policy whose lookup filters by a boolean column is refused at publish.",
+          "heldBy": "packages/data-server/src/bundle.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A policy whose root row filter names a boolean column is refused at publish too."
+        },
+        {
+          "area": "writes",
+          "says": "`refused` lumps a broken trigger with a business rule; the person reads one sentence, and the message is for the log."
+        },
+        {
+          "area": "testing",
+          "says": "Most transient error codes are allowlisted by documentation and not provoked by any test."
+        },
+        {
+          "area": "forms",
+          "says": "Drift blocks a lookup on a widening of a column it reads by too, until the form is published again."
+        },
+        {
+          "area": "writes",
+          "says": "A SQL Server `varchar` created under `ANSI_PADDING OFF` refuses a trailing space as `out-of-range`.",
+          "heldBy": "packages/data-sqlserver/src/parity.integration.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "Search folding differs by engine: a filter matches the same rows on both, a search does not."
+        }
+      ]
+    },
+    "0029": {
+      "reviewed": "sha256:b92dc8ec382dde2cff82f5b0a49df3c383ece0b6b1940cc7508065a92b58abad",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "`hasMore` and `omitted` do not reach the person, so a lookup list of exactly one page looks complete."
+        },
+        {
+          "area": "host",
+          "says": "Every name a published form carries gets a server-backed option source, and a name the server does not know fails closed."
+        },
+        {
+          "area": "host",
+          "says": "Records are addressed by token only: the definition does not say which columns identify a record."
+        },
+        {
+          "area": "host",
+          "says": "The server's sentences are English; a host that shows another language maps the codes itself."
+        },
+        {
+          "area": "host",
+          "says": "The generator emits a plain select for a lookup, and a typeahead is each host's own choice."
+        },
+        {
+          "area": "host",
+          "says": "The client and the server require the host page and the data server on one origin."
+        },
+        {
+          "area": "host",
+          "says": "On the host page, \"Load the saved record\" discards the draft, and nothing merges."
+        },
+        {
+          "area": "host",
+          "says": "A press during a save sends nothing and is not queued, and the form is not locked during a save."
+        }
+      ]
+    },
+    "0030": {
+      "reviewed": "sha256:29de6a24ecef5d194108d923b9ca2cfdc78333d1cc70e271312957a764bcd3e3",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "A column rename loses its presentation overrides: the old label is reported `field-gone`, and a person carries it across by hand."
+        },
+        {
+          "area": "studio",
+          "says": "A generator release that renames a section reports that section's overrides as `section-gone`."
+        },
+        {
+          "area": "studio",
+          "says": "A root whose own label is `Record` loses its section overrides when its main or system section comes or goes."
+        },
+        {
+          "area": "operations",
+          "says": "A pin taken out of a stored request by hand is not caught on read."
+        },
+        {
+          "area": "studio",
+          "says": "Regenerated forms place new fields by the generator's neighbour, not where a person would put them, and keep a person's label where both changed, which can keep a stale one."
+        },
+        {
+          "area": "studio",
+          "says": "A dropped field's place in an order is not reported."
+        },
+        {
+          "area": "operations",
+          "says": "A server upgraded between propose and publish refuses the draft, which is proposed again."
+        },
+        {
+          "area": "studio",
+          "says": "Anything outside the four presentation edits is refused at publish: help text, translations, new sections, a numeric span and moves between sections."
+        },
+        {
+          "area": "operations",
+          "says": "A restore brings back that version's policy; it is not a database rollback."
+        },
+        {
+          "area": "access",
+          "says": "Only the studio holds `keysReassigned`: the server does not refuse a publish that ignores keys that now stand for another column."
+        },
+        {
+          "area": "forms",
+          "says": "The runtime does not stop writes on drift."
+        },
+        {
+          "area": "studio",
+          "says": "A publish conflict is a rebase onto the other version, not a merge."
+        },
+        {
+          "area": "forms",
+          "says": "Publish does not build each lookup's configuration, so a lookup that cannot be configured fails at runtime."
+        }
+      ]
+    },
+    "0031": {
+      "reviewed": "sha256:4637bc02384c6df587d4fc8b59164cc3c310115da8fcbc8d89eb12fb1264c17f",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "\"It may have been saved\" is also said where nothing was: a cut while PostgreSQL parses or a SQL Server write waits, a KILL, a trigger that rolls back and raises, a data server that is down, or a proxy's page on a save."
+        },
+        {
+          "area": "writes",
+          "says": "The write id holds in one process: a resend that reaches another replica, arrives after a restart or after its answer left the bounded store, or comes from a client that sends no id, is applied again."
+        },
+        {
+          "area": "operations",
+          "says": "Kept answers hold the record's values in memory for ten minutes."
+        },
+        {
+          "area": "writes",
+          "says": "A create whose key the database numbers cannot be reconciled, so a person who confirms \"Enter it again anyway\" may make a duplicate."
+        },
+        {
+          "area": "writes",
+          "says": "`unchanged` means not visible yet: on PostgreSQL an orphaned write can still commit after the check."
+        },
+        {
+          "area": "writes",
+          "says": "`absent` is what the read shows through the person's read filter, so a stored row the filter hides, or whose key a trigger rewrote, is `absent` too."
+        },
+        {
+          "area": "writes",
+          "says": "`present` is a row with that key, which another person's create of the same key also is."
+        },
+        {
+          "area": "access",
+          "says": "`reconcile` needs read permission: a person who may create and not read gets the read's refusal."
+        },
+        {
+          "area": "operations",
+          "says": "A write whose answer the page lost in transport is audited as `ok`."
+        },
+        {
+          "area": "host",
+          "says": "The hold on an unknown create belongs to the form: New or Load clears it, and nothing stops the person entering the same record into the new form."
+        },
+        {
+          "area": "host",
+          "says": "A 4xx with a sentence and no code is taken as a refusal, so a proxy that answered a write with such a JSON body would be believed."
+        },
+        {
+          "area": "operations",
+          "says": "A server shutting down after a cut waits up to five seconds on PostgreSQL for a statement that will never answer."
+        }
+      ]
+    },
+    "0032": {
+      "reviewed": "sha256:f3c48172f9c8c7148821cce852ec446b9d9a83343e544ddd499a8a95cbebbe8d",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The composed stack is not a production deployment: no TLS, loopback only, HS256 with a minted token, one replica, a file store on a local volume, SQL Server's Developer edition, fixture data, secrets as plain files and nothing restarted after a reboot."
+        },
+        {
+          "area": "operations",
+          "says": "The composed stack's `down -v` destroys the secrets too, and with them every token signed by the old key."
+        },
+        {
+          "area": "operations",
+          "says": "The composed stack needs Compose 2.20 or later."
+        },
+        {
+          "area": "testing",
+          "says": "Docker Desktop, Windows and macOS are run by no gate, and neither are the seeds' bind mounts there."
+        },
+        {
+          "area": "testing",
+          "says": "Nothing clicks through the composed stack in a browser: the guide's clicks are held by the apps' suites against the real server in jsdom."
+        },
+        {
+          "area": "server",
+          "says": "The server's 500 for a configuration store it cannot write names the path."
+        }
+      ]
+    },
+    "0033": {
+      "reviewed": "sha256:899ae16583ab383ed90123333f257a39cfc5e3b9a1409ebab946d1dc8fb69b7f",
+      "limitations": [
+        {
+          "area": "server",
+          "says": "The administrator plane's audit sink is required, while the runtime plane's stays optional."
+        },
+        {
+          "area": "operations",
+          "says": "An administrator request whose connection is not allowlisted, or whose form id does not have the shape, is audited with that part `null`, and so is every read of a stored version whose connection left the allowlist."
+        },
+        {
+          "area": "operations",
+          "says": "A request whose client left is audited with the status the server answered."
+        },
+        {
+          "area": "operations",
+          "says": "A body Fastify refuses is audited naming no actor, an administrator's included."
+        },
+        {
+          "area": "operations",
+          "says": "The request log no longer says which path a request addressed."
+        },
+        {
+          "area": "operations",
+          "says": "An administrator-plane event is written after the store's swap commits, so a crash in between loses it, and a sink that fails is logged while the publish stands."
+        },
+        {
+          "area": "operations",
+          "says": "A route that never finishes writes no audit event, and neither does a process killed while a route runs."
+        },
+        {
+          "area": "server",
+          "says": "That every audited request writes exactly one event rests on what was measured on Fastify 5.12.5 and Node 22; a Fastify or Node that changed either behaviour would lose an event."
+        },
+        {
+          "area": "operations",
+          "says": "A request that never reaches a route of either plane is not audited: a 404 or a 414 from the router, a URL that does not decode, the 503 while the server closes, and what Node's parser refuses."
+        },
+        {
+          "area": "operations",
+          "says": "The audit trail does not say what changed between two versions, and does not record the bundle, the policy or a snapshot."
+        },
+        {
+          "area": "operations",
+          "says": "`/health` and `/v1/whoami` are not audited."
+        },
+        {
+          "area": "operations",
+          "says": "Every request of the administrator plane is a log line, the studio's page loads and every refused probe included, a volume not measured."
+        }
+      ]
+    },
+    "0035": {
+      "reviewed": "sha256:dd419d209c0a0d9f336fea9ff0bbcefe53659352d5e5eb36531c92c99f089f47",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "Nothing in the product refuses a server version no test ran: what a release says it was tested on is not what it accepts."
+        },
+        {
+          "area": "testing",
+          "says": "The images are moving tags, so two runs of one commit can test, and report, different server builds."
+        },
+        {
+          "area": "testing",
+          "says": "That a test declaring a shared case asserts that case is held by review; the report counts the declaration."
+        },
+        {
+          "area": "testing",
+          "says": "A limitation in this register can outlive its truth until a later record changes the record that states it: the register is held to the records by hash, not to the code."
+        },
+        {
+          "area": "licence",
+          "says": "A release's SBOM names what cdxgen finds, which on 2026-10-09 left out tedious, the package under mssql that speaks TDS to SQL Server."
+        }
+      ]
+    }
+  }
+}
