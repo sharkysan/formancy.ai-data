@@ -48,8 +48,9 @@
   the identity made ALWAYS (`a`), and the SQL Server id made `int identity`.
   `packages/data-server/src/bundle.test.ts` — a bundle whose snapshot predates
   this contract is refused; watched failing with the snapshot guard removed.
-  `apps/examples/src/fixture-snapshot.json`, recaptured, and the examples
-  suite, which refused the old capture by this record's snapshot guard.
+  `apps/examples/src/fixture-snapshot.json` and the studio's three captures in
+  `apps/studio/src/fixtures/`, recaptured, and both apps' suites, which
+  refused the old captures by this record's snapshot guard.
   PostgreSQL: `discovery-types.integration.test.ts` — the two identities, a
   serial column and a default of exactly `nextval()` by-default, one that
   computes with it not, and a SQL_ASCII and a LATIN1 database, each made for
@@ -169,7 +170,7 @@ against `mcr.microsoft.com/mssql/server:2022-latest` (16.0.4295),
 
 A snapshot in the old shape is refused by `createSnapshot`, so a published
 bundle or a captured example from before this record is refused rather than
-trusted; the examples page's capture was taken again.
+trusted; the examples page's capture and the studio's three were taken again.
 
 ## Consequences
 

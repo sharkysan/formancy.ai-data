@@ -27,7 +27,7 @@
           "nullable": false,
           "hasDefault": false,
           "defaultExpression": null,
-          "generated": "identity",
+          "generated": "identity-always",
           "comment": null
         },
         {
@@ -37,6 +37,7 @@
           "type": {
             "kind": "text",
             "maxLength": 2,
+            "lengthUnit": "code-points",
             "fixedLength": true
           },
           "nullable": false,
@@ -52,6 +53,7 @@
           "type": {
             "kind": "text",
             "maxLength": 100,
+            "lengthUnit": "code-points",
             "fixedLength": false
           },
           "nullable": false,
@@ -66,7 +68,8 @@
           "databaseType": "bytea",
           "type": {
             "kind": "binary",
-            "maxLength": null
+            "maxLength": null,
+            "fixedLength": false
           },
           "nullable": true,
           "hasDefault": false,
@@ -150,6 +153,7 @@
           "type": {
             "kind": "text",
             "maxLength": 200,
+            "lengthUnit": "code-points",
             "fixedLength": false
           },
           "nullable": false,
@@ -165,6 +169,7 @@
           "type": {
             "kind": "text",
             "maxLength": 2,
+            "lengthUnit": "code-points",
             "fixedLength": true
           },
           "nullable": true,
@@ -293,6 +298,7 @@
           "type": {
             "kind": "text",
             "maxLength": 200,
+            "lengthUnit": "code-points",
             "fixedLength": false
           },
           "nullable": true,
@@ -352,6 +358,7 @@
           "type": {
             "kind": "text",
             "maxLength": 200,
+            "lengthUnit": "code-points",
             "fixedLength": false
           },
           "nullable": false,
@@ -426,7 +433,7 @@
           "nullable": false,
           "hasDefault": false,
           "defaultExpression": null,
-          "generated": "identity",
+          "generated": "identity-always",
           "comment": null
         },
         {
@@ -479,6 +486,7 @@
           "type": {
             "kind": "text",
             "maxLength": 20,
+            "lengthUnit": "code-points",
             "fixedLength": false
           },
           "nullable": false,
@@ -509,6 +517,7 @@
           "type": {
             "kind": "text",
             "maxLength": null,
+            "lengthUnit": "code-points",
             "fixedLength": false
           },
           "nullable": true,
@@ -524,6 +533,7 @@
           "type": {
             "kind": "text",
             "maxLength": 50,
+            "lengthUnit": "code-points",
             "fixedLength": false
           },
           "nullable": true,
@@ -650,6 +660,7 @@
         {
           "name": "ck_order_status",
           "expression": "((status)::text = ANY ((ARRAY['draft'::character varying, 'placed'::character varying, 'shipped'::character varying])::text[]))",
+          "enforced": true,
           "validated": true
         }
       ]
@@ -768,8 +779,215 @@
         }
       ],
       "checks": []
+    },
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "shipment"
+      },
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "identity-by-default",
+          "comment": null
+        },
+        {
+          "name": "tenant_id",
+          "ordinal": 2,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "tracking_no",
+          "ordinal": 3,
+          "databaseType": "uuid",
+          "type": {
+            "kind": "uuid"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "carrier_code",
+          "ordinal": 4,
+          "databaseType": "smallint",
+          "type": {
+            "kind": "integer",
+            "min": "-32768",
+            "max": "32767"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "reference",
+          "ordinal": 5,
+          "databaseType": "character varying(20)",
+          "type": {
+            "kind": "text",
+            "maxLength": 20,
+            "lengthUnit": "code-points",
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "pickup_time",
+          "ordinal": 6,
+          "databaseType": "time(0) without time zone",
+          "type": {
+            "kind": "time",
+            "precision": 0
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "dispatched_at",
+          "ordinal": 7,
+          "databaseType": "timestamp(3) without time zone",
+          "type": {
+            "kind": "timestamp",
+            "withTimeZone": false,
+            "precision": 3
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "weight_kg",
+          "ordinal": 8,
+          "databaseType": "double precision",
+          "type": {
+            "kind": "float",
+            "bits": 64
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "temperature_c",
+          "ordinal": 9,
+          "databaseType": "real",
+          "type": {
+            "kind": "float",
+            "bits": 32
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "manifest_hash",
+          "ordinal": 10,
+          "databaseType": "bytea",
+          "type": {
+            "kind": "binary",
+            "maxLength": null,
+            "fixedLength": false
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        },
+        {
+          "name": "signature",
+          "ordinal": 11,
+          "databaseType": "bytea",
+          "type": {
+            "kind": "binary",
+            "maxLength": null,
+            "fixedLength": false
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_shipment",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniqueKeys": [
+        {
+          "name": "uq_shipment_tracking",
+          "columns": [
+            "tenant_id",
+            "tracking_no"
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "checks": [
+        {
+          "name": "ck_shipment_carrier",
+          "expression": "(carrier_code > 0)",
+          "enforced": true,
+          "validated": false
+        },
+        {
+          "name": "ck_shipment_reference",
+          "expression": "((reference)::text <> ''::text)",
+          "enforced": true,
+          "validated": true
+        },
+        {
+          "name": "ck_shipment_weight",
+          "expression": "(weight_kg > (0)::double precision)",
+          "enforced": true,
+          "validated": true
+        }
+      ]
     }
   ],
   "gaps": [],
-  "fingerprint": "deb1336a97eeaefa66ddf73f33582a2e620cb2c82c403bc252b2cc7b4b5f9619"
+  "fingerprint": "d5de22bd44d59221b1807db9506ee4f0157ee1b9bc4a62781ae6bb8612c05b16"
 }

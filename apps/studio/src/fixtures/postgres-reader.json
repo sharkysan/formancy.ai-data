@@ -27,7 +27,7 @@
           "nullable": false,
           "hasDefault": false,
           "defaultExpression": null,
-          "generated": "identity",
+          "generated": "identity-always",
           "comment": null
         },
         {
@@ -80,6 +80,7 @@
           "type": {
             "kind": "text",
             "maxLength": 20,
+            "lengthUnit": "code-points",
             "fixedLength": false
           },
           "nullable": false,
@@ -110,6 +111,7 @@
           "type": {
             "kind": "text",
             "maxLength": null,
+            "lengthUnit": "code-points",
             "fixedLength": false
           },
           "nullable": true,
@@ -125,6 +127,7 @@
           "type": {
             "kind": "text",
             "maxLength": 50,
+            "lengthUnit": "code-points",
             "fixedLength": false
           },
           "nullable": true,
@@ -251,6 +254,7 @@
         {
           "name": "ck_order_status",
           "expression": "((status)::text = ANY ((ARRAY['draft'::character varying, 'placed'::character varying, 'shipped'::character varying])::text[]))",
+          "enforced": true,
           "validated": true
         }
       ]
@@ -296,7 +300,15 @@
       },
       "aspect": "objects",
       "detail": "this account holds no privilege on it that a form could read or write with"
+    },
+    {
+      "object": {
+        "schema": "sales",
+        "name": "shipment"
+      },
+      "aspect": "objects",
+      "detail": "this account holds no privilege on it that a form could read or write with"
     }
   ],
-  "fingerprint": "1a2d8cac0fe46c2f2b1dcc0776cffa3077f4e5cd79051ad72570e6b61004d0f7"
+  "fingerprint": "8b3ec4cd449abe5ccd3b59d1f6d02a5ebc5feb35df55dc7abb235525c85c2513"
 }
