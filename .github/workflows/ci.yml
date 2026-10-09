@@ -18,12 +18,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Build, types, packaging, licences and the repository's own guards: the
+  # fast signal. The suites run in the `test` job below, one package per runner.
   verify:
     runs-on: ubuntu-latest
-    # Longer than formancy.ai's twenty minutes, for one reason: the suites start
-    # a real SQL Server, and its image is close to a gigabyte and a half. The
-    # pull is cached by Docker between steps but not between runs.
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -48,27 +47,6 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
 
-      # Runs the adapters against real PostgreSQL and real SQL Server, through
-      # testcontainers on the runner's Docker. There is no mocked driver in this
-      # repository and there is not going to be one (0003): database semantics
-      # are the product, and a suite that passed without a database would be
-      # proving the mock.
-      - run: pnpm test:coverage
-      # Skipped, visibly, while the repository has no CODECOV_TOKEN -- a new
-      # repository should not be red for a reason unrelated to its code. Once
-      # the secret exists the upload runs and a failed upload fails the job, as
-      # upstream: a report that silently did not arrive is a number nobody can
-      # read. A secret cannot be tested in `if:` directly, so it goes through
-      # the environment.
-      - name: Upload coverage to Codecov
-        if: env.CODECOV_TOKEN != ''
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
-
       # Packaging correctness (publint + attw) is a release gate, not a nicety:
       # broken exports maps are the top cause of "doesn't work in my app".
       - run: pnpm check:pkg
@@ -81,9 +59,75 @@ jobs:
 
       # The repository's own guards: codecov.yml matches its generator, every
       # CLA signature names the current text, upstream is depended on at exact
-      # versions, no source file is past the 600-line budget. A guard that is
-      # not a gate is a comment.
+      # versions, no source file is past the 600-line budget, and the `test`
+      # job's matrix names every package with a suite. A guard that is not a
+      # gate is a comment.
       - run: pnpm test:repo
+
+  # Every package's suite, each in a job of its own on its own runner. They
+  # ran as one `pnpm test:coverage` in `verify` until nine suites at once --
+  # five of them starting PostgreSQL and SQL Server, three mounting Angular and
+  # React into jsdom -- shared one four-CPU runner: on main (run 37940021594)
+  # data-core's pure suite took 51 s, the studio's 235 s, and a studio test
+  # that runs in 2 s locally passed its 60 s limit. Raising limits one test at
+  # a time was chasing the contention; a runner per suite removes it.
+  # scripts/ci-test-jobs.test.mjs fails when this list and the workspace's
+  # packages with a `test:coverage` script disagree, so a new package cannot
+  # go untested in CI by being left off it.
+  #
+  # The suites run the adapters against real PostgreSQL and real SQL Server,
+  # through testcontainers on the runner's Docker. There is no mocked driver in
+  # this repository and there is not going to be one (0003): database
+  # semantics are the product, and a suite that passed without a database
+  # would be proving the mock.
+  test:
+    name: test (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    # The suites start a real SQL Server, and its image is close to a gigabyte
+    # and a half; the pull is not cached between runs.
+    timeout-minutes: 25
+    strategy:
+      # Every suite reports, rather than the first failure cancelling the rest.
+      fail-fast: false
+      matrix:
+        package: ['@formancy/data-core', '@formancy/data-fixtures', '@formancy/data-postgres', '@formancy/data-sqlserver', '@formancy/data-server', '@formancy/data-client', '@formancy/data-examples', '@formancy/data-studio', '@formancy/data-host']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      # turbo builds what the package depends on first (`^build`), then runs
+      # its suite and nothing else's.
+      - run: pnpm exec turbo run test:coverage --filter=${{ matrix.package }}
+      # Skipped, visibly, while the repository has no CODECOV_TOKEN -- a new
+      # repository should not be red for a reason unrelated to its code. Once
+      # the secret exists the upload runs and a failed upload fails the job, as
+      # upstream: a report that silently did not arrive is a number nobody can
+      # read. Each job uploads its own package's report; Codecov merges them by
+      # commit. A secret cannot be tested in `if:` directly, so it goes through
+      # the environment.
+      - name: Upload coverage to Codecov
+        if: env.CODECOV_TOKEN != ''
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
   # What jsdom cannot see on the examples page, in the studio and on the host
   # page, measured in Chromium: no sideways scroll down to 320px, the keyboard

@@ -285,10 +285,14 @@ feature, a class whose name needs "and" to describe it.
 
 ## Checks before pushing
 
-CI runs `pnpm build`, `pnpm typecheck`, `pnpm test:coverage`, `pnpm check:pkg`,
-`node scripts/verify-licenses.mjs`, `pnpm test:repo`, and in jobs of their own
-`pnpm test:e2e:install` and `pnpm test:browser`. Run the ones for what you
-changed.
+CI runs `pnpm build`, `pnpm typecheck`, `pnpm check:pkg`,
+`node scripts/verify-licenses.mjs` and `pnpm test:repo` in one job; each
+package's `test:coverage` in a job of its own, on its own runner, because nine
+suites sharing one runner timed out a test that takes two seconds alone
+(`scripts/ci-test-jobs.test.mjs` fails when that list and the workspace
+disagree); and in jobs of their own `pnpm test:e2e:install` and
+`pnpm test:browser`. Locally `pnpm test:coverage` still runs them all. Run
+the ones for what you changed.
 
 `test:coverage` needs Docker and starts both databases. The first run pulls the
 SQL Server image, which is about a gigabyte and a half.
