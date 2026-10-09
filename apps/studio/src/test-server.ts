@@ -126,7 +126,8 @@ export async function startPlane(options: { administrator?: boolean } = {}): Pro
   }
 
   const app = await createDataServer(
-    options.administrator === false ? { verifyIdentity } : { verifyIdentity, admin: { registry, store, adminRoles: [ADMIN_ROLE] } },
+    // The administrator's trail is the server's suites' subject; here it is required and discarded.
+    options.administrator === false ? { verifyIdentity } : { verifyIdentity, admin: { registry, store, adminRoles: [ADMIN_ROLE], audit: { sink: () => {} } } },
   )
 
   const fetch: typeof globalThis.fetch = async (input, init) => {

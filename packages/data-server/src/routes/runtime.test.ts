@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
 import type { PublishedBundle } from '../bundle.js'
 import { recordReference } from '../audit.js'
-import type { AuditEvent } from '../audit.js'
+import type { AuditSink, RuntimeAuditEvent } from '../audit.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
 import type { IdentityVerifier } from '../identity.js'
@@ -508,21 +508,26 @@ describe('the operational audit trail', () => {
   const KEY = 'an-audit-key-the-operator-keeps-secret'
 
   // A key of null means none at all: undefined would bring the default back.
-  async function audited(sink: (event: AuditEvent) => void, key: string | null = KEY) {
+  async function audited(sink: AuditSink, key: string | null = KEY) {
     const store = createFileConfigurationStore(root)
     return createDataServer({ verifyIdentity, runtime: { registry: registry(), store, audit: { sink, ...(key === null ? {} : { key }), now: () => '2026-10-09T12:00:00.000Z' } } })
+  }
+
+  /** Keeps runtime events, narrowed on `plane` as a typed sink must since 0033; an event of another plane is left out, so a comparison fails. */
+  const collect = (events: RuntimeAuditEvent[]): AuditSink => (event) => {
+    if (event.plane === 'runtime') events.push(event)
   }
 
   // One event per request, with what happened and against which version — and
   // nothing the person typed. An audit log holding answers would be a second
   // copy of the customer's data with none of its permissions.
   test('records who did what to which version, and never a value', async () => {
-    const events: AuditEvent[] = []
-    const server = await audited((event) => events.push(event))
+    const events: RuntimeAuditEvent[] = []
+    const server = await audited(collect(events))
     const response = await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: NEW } })
     expect(response.statusCode).toBe(201)
     expect(events).toEqual([
-      { at: '2026-10-09T12:00:00.000Z', actor: 'c', operation: 'create', form: 'customer', formVersion: 1, status: 201, outcome: 'ok', record: recordReference(KEY, 'k1:1,7') },
+      { at: '2026-10-09T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'create', form: 'customer', formVersion: 1, status: 201, outcome: 'ok', record: recordReference(KEY, 'k1:1,7') },
     ])
     expect(JSON.stringify(events)).not.toContain('Neu GmbH')
     expect(JSON.stringify(events)).not.toContain('k1:')
@@ -533,8 +538,8 @@ describe('the operational audit trail', () => {
   // to the read that settles it. Without it the event says only "a create
   // went wrong", about no record.
   test('records an unknown create with the record it would have made', async () => {
-    const events: AuditEvent[] = []
-    const server = await audited((event) => events.push(event))
+    const events: RuntimeAuditEvent[] = []
+    const server = await audited(collect(events))
     writeOutcome = { ok: false, code: 'unknown-outcome', message: 'ECONNRESET' }
     await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: NEW } })
     expect(events.map(({ status, outcome, record }) => ({ status, outcome, record }))).toEqual([
@@ -546,8 +551,8 @@ describe('the operational audit trail', () => {
   // database: the trail says so, rather than a second "ok" create that an
   // operator would count as a second record.
   test('records a write that arrived again as repeated', async () => {
-    const events: AuditEvent[] = []
-    const server = await audited((event) => events.push(event))
+    const events: RuntimeAuditEvent[] = []
+    const server = await audited(collect(events))
     for (let n = 0; n < 2; n += 1) {
       await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: { ...as('clerk'), 'formancy-write-id': '0123456789abcdef0123456789abcdef' }, payload: { answers: NEW } })
     }
@@ -560,8 +565,8 @@ describe('the operational audit trail', () => {
   // Refusals are audited too, by the stable code the response carried, and a
   // request that never authenticated is recorded with no actor.
   test('records refusals by their code, and an unauthenticated request with no actor', async () => {
-    const events: AuditEvent[] = []
-    const server = await audited((event) => events.push(event))
+    const events: RuntimeAuditEvent[] = []
+    const server = await audited(collect(events))
     await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: { ...NEW, tenant_id: 2 } } })
     await server.inject({ method: 'POST', url: '/v1/forms/customer/records/read', payload: { record: RECORD } })
     await server.inject({ method: 'POST', url: '/v1/forms/nope/records/read', headers: as('clerk'), payload: { record: RECORD } })
@@ -575,8 +580,8 @@ describe('the operational audit trail', () => {
   // The outcome is the body's code, so a refusal is audited as refused and
   // not as the database being down — the two ask an operator different things.
   test('records a refused write as refused', async () => {
-    const events: AuditEvent[] = []
-    const server = await audited((event) => events.push(event))
+    const events: RuntimeAuditEvent[] = []
+    const server = await audited(collect(events))
     writeOutcome = { ok: false, code: 'refused', message: 'trigger' }
     await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: NEW } })
     expect(events.map(({ status, outcome }) => ({ status, outcome }))).toEqual([{ status: 422, outcome: 'refused' }])
@@ -585,12 +590,43 @@ describe('the operational audit trail', () => {
   // A record token spells its key, and a key is often small. Without a key to
   // hash with, nothing is recorded rather than a reference that only looks redacted.
   test('names a record only by a keyed hash, and not at all without a key', async () => {
-    const events: AuditEvent[] = []
-    const server = await audited((event) => events.push(event), null)
+    const events: RuntimeAuditEvent[] = []
+    const server = await audited(collect(events), null)
     await server.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: as('clerk'), payload: { record: RECORD } })
     expect(events[0]?.record).toBeNull()
     expect(recordReference(KEY, RECORD)).toMatch(/^[0-9a-f]{32}$/)
     expect(recordReference(KEY, RECORD)).not.toBe(recordReference('another-key', RECORD))
+  })
+
+  // A form id is recorded only when it has the store's shape, as the
+  // administrator's plane records it: anybody who can reach the port could
+  // otherwise write any text into the trail under `form`, a pasted
+  // connection string included, naming a form that cannot exist (0033).
+  test('records a path that is not a form id as no form', async () => {
+    const events: RuntimeAuditEvent[] = []
+    const server = await audited(collect(events))
+    const forged = encodeURIComponent('Server=10.0.0.5;Password=S3cret-pw-e81')
+    await server.inject({ method: 'POST', url: `/v1/forms/${forged}/records/read`, headers: as('clerk'), payload: { record: RECORD } })
+    await server.inject({ method: 'GET', url: `/v1/forms/${forged}` })
+    await server.inject({ method: 'GET', url: '/v1/forms/Customer', headers: as('clerk') })
+    expect(events.map(({ operation, form, status }) => ({ operation, form, status }))).toEqual([
+      { operation: 'read', form: null, status: 404 },
+      { operation: 'form', form: null, status: 401 },
+      { operation: 'form', form: null, status: 404 },
+    ])
+    expect(JSON.stringify(events)).not.toContain('S3cret-pw-e81')
+    expect(JSON.stringify(events)).not.toContain('10.0.0.5')
+  })
+
+  // The token is read after the body, on this plane as on the
+  // administrator's (0033), so a body Fastify refuses is refused before
+  // anybody is known: audited by its code, with no actor whatever token it
+  // carried. The record says so; this holds the record to the server.
+  test('records a body the server cannot read by its code, with no actor whatever the token', async () => {
+    const events: RuntimeAuditEvent[] = []
+    const server = await audited(collect(events))
+    await server.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: { ...as('clerk'), 'content-type': 'application/json' }, payload: '{' })
+    expect(events.map(({ actor, status, outcome }) => ({ actor, status, outcome }))).toEqual([{ actor: null, status: 400, outcome: 'FST_ERR_CTP_INVALID_JSON_BODY' }])
   })
 
   // By the time the event exists the write has committed or not; refusing to

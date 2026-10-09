@@ -1,6 +1,6 @@
 # 0023 — The audit trail is operational, never holds a value, and is not evidence
 
-- **Status:** accepted; extended by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): an unknown create is named by the record it would have made, and a write answered from an earlier sending is `repeated`
+- **Status:** accepted; extended by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): an unknown create is named by the record it would have made, and a write answered from an earlier sending is `repeated`; extended by [0033](0033-the-administrator-plane-is-audited.md): the administrator's plane is audited too, every event names its plane, and a path that is not a form id is recorded as no form
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/routes/runtime.test.ts`, "the

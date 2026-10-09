@@ -12,6 +12,7 @@ import { DATABASE_KINDS, isDatabaseKind } from '@formancy/data-core'
 import type { DatabaseAdapter, DatabaseKind } from '@formancy/data-core'
 import { connectPostgres, createPostgresAdapter } from '@formancy/data-postgres'
 import { DRIVER_FACTORIES } from '@formancy/data-server'
+import type { AdminAuditEvent, AuditEvent, AuditSink, RuntimeAuditEvent } from '@formancy/data-server'
 import { connectSqlServer, createSqlServerAdapter } from '@formancy/data-sqlserver'
 import type { FormSchema } from '@formancy/spec'
 
@@ -52,6 +53,24 @@ if (outcome.ok || fieldProblems(outcome)['customer']?.[0] !== 'This is not one o
   throw new Error('fieldProblems did not give the server sentence for customer')
 }
 
+// The audit trail is one union of two planes (0033), and a sink reads a
+// plane's own fields only after narrowing on `plane`. A package that stopped
+// exporting either plane's event, or a union that no longer narrowed, fails
+// the type check above this line; one whose events lost `plane` fails here.
+const heard: string[] = []
+const sink: AuditSink = (event: AuditEvent) => {
+  if (event.plane === 'runtime') {
+    const runtime: RuntimeAuditEvent = event
+    heard.push(`runtime ${runtime.record ?? 'no record'}`)
+  } else {
+    const admin: AdminAuditEvent = event
+    heard.push(`admin ${admin.connection ?? 'no connection'}`)
+  }
+}
+await sink({ at: 't', plane: 'runtime', actor: null, operation: 'read', form: 'order', formVersion: null, status: 401, outcome: 'unauthenticated', record: null })
+await sink({ at: 't', plane: 'admin', actor: 'a', operation: 'publish', connection: 'erp', form: 'order', formVersion: 1, expectedBase: null, restoredFrom: null, status: 201, outcome: 'ok' })
+if (heard.join() !== 'runtime no record,admin erp') throw new Error('an audit sink did not tell the planes apart')
+
 const form: FormSchema = { specVersion: '3', id: 'order', title: 'Order', model: { fields: [{ key: 'customer', type: 'select', optionsSource: 'order.customer' }] } }
 if (sourceNames(form).join() !== 'order.customer') throw new Error('sourceNames did not name order.customer')
 
@@ -70,4 +89,4 @@ const dotted = await client.form('..')
 if (dotted.ok || dotted.code !== 'invalid-name' || fetched !== 0) throw new Error('form("..") was not refused before a request')
 if (Object.keys(lookupSources(client, 'order', form, 'create')).join() !== 'order.customer') throw new Error('lookupSources did not name order.customer')
 
-console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client`)
+console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client; audit events`)

@@ -110,7 +110,8 @@ beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'formancy-data-e2e-'))
   const store = createFileConfigurationStore(root)
   const verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: SECRET }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: 'tid' } })
-  app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'] }, runtime: { registry, store } })
+  // The administrator's trail is admin-audit.test.ts's subject; here it is required and discarded.
+  app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
   admin = await token('admin-1', { roles: ['data-admin'] })
   clerk = await token('clerk-1', { roles: ['clerk'], tid: 1 })
   otherClerk = await token('clerk-2', { roles: ['clerk'], tid: 2 })

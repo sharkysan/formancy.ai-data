@@ -17,7 +17,8 @@ operates without any AI dependency.
 > whether row-level security applies to it, which generation and drift review
 > now read. Both adapters answer lookups and records; the server publishes forms
 > and serves them over HTTP, asking the policy every time and auditing every
-> request, and one suite runs that whole journey on both engines. A row
+> request that reaches a route of either plane, publishing and restoring
+> included, and one suite runs that whole journey on both engines. A row
 > filter, a lookup label and a refusal mean the same on both engines, and a
 > shared parity schema holds each adapter to one expectation per case. A page
 > renders generated forms in React and Angular side by side, and the studio

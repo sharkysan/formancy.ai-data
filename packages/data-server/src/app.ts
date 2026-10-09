@@ -1,18 +1,22 @@
 import rateLimit from '@fastify/rate-limit'
-import Fastify from 'fastify'
+import Fastify, { LogController } from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { CONFIGURATION_ID_MAX_LENGTH } from './config-store.js'
 import type { ConfigurationStore } from './config-store.js'
 import type { ConnectionRegistry } from './connections.js'
 import type { HostIdentity, IdentityVerifier } from './identity.js'
 import { adminRoutes } from './routes/admin.js'
+import type { AdminOptions } from './routes/admin.js'
 import { runtimeRoutes } from './routes/runtime.js'
 import type { RuntimeOptions } from './routes/runtime.js'
 
 export interface DataServerOptions {
   verifyIdentity: IdentityVerifier
-  /** Fastify's logger. Off by default in tests; the composition root turns it on. */
-  logger?: boolean
+  /**
+   * Fastify's logger: `true` for standard output, or a stream to write its
+   * lines to. Off by default in tests; the composition root turns it on.
+   */
+  logger?: boolean | { stream: { write: (line: string) => void } }
   /**
    * Requests per client address per window, on every route but `/health`.
    *
@@ -26,9 +30,10 @@ export interface DataServerOptions {
   /**
    * The administrator's plane: connections, discovery, proposals, publication
    * and drift. Absent, none of those routes exist — a server without a store
-   * answers 404 for them rather than pretending.
+   * answers 404 for them rather than pretending. Its audit sink is required:
+   * every request that reaches one of its routes is an event (0033).
    */
-  admin?: { registry: ConnectionRegistry; store: ConfigurationStore; adminRoles: readonly string[] }
+  admin?: { registry: ConnectionRegistry; store: ConfigurationStore; adminRoles: readonly string[]; audit: AdminOptions['audit'] }
   /**
    * The runtime plane: published forms, their records and their lookups, for
    * the host application's people. Absent, none of those routes exist.
@@ -46,6 +51,27 @@ const BODY_LIMIT = 1024 * 1024
 declare module 'fastify' {
   interface FastifyRequest {
     identity?: HostIdentity
+  }
+}
+
+/**
+ * A request as the log names it: its method and the route that answered it,
+ * never the path, the query or the Host header it was sent with. Those are
+ * whatever a caller typed, token or none -- a connection string pasted where
+ * a connection's name goes, a password in a query -- and the log is the
+ * stream the audit trail is written to, read by whoever runs the collector
+ * (0033). Fastify's default writes the URL and the Host as sent.
+ */
+function requestForLog(request: FastifyRequest) {
+  const port = request.socket.remotePort
+  return { method: request.method, route: request.routeOptions.url ?? null, remoteAddress: request.ip, ...(port === undefined ? {} : { remotePort: port }) }
+}
+
+/** Fastify's request lines, but for its 404 line, which names the path it was sent: here, a 404 is named by its method. */
+class RouteOnlyLog extends LogController {
+  override routeNotFound(request: FastifyRequest): void {
+    if (this.isLogDisabled(request)) return
+    request.log.info({ req: request }, 'no route matches')
   }
 }
 
@@ -70,8 +96,10 @@ function bearer(request: FastifyRequest): string | undefined {
  * issuer, audience or claim mapping is visible before any form depends on it.
  */
 export async function createDataServer(options: DataServerOptions): Promise<FastifyInstance> {
+  const logger = options.logger ?? false
   const app = Fastify({
-    logger: options.logger ?? false,
+    logger: logger === false ? false : { serializers: { req: requestForLog }, ...(logger === true ? {} : { stream: logger.stream }) },
+    logController: new RouteOnlyLog(),
     bodyLimit: BODY_LIMIT,
     // The longest path parameter is a form id, and the router's default of
     // 100 refused the store's longer ones with 414 before any route ran: a

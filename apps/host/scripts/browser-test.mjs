@@ -85,7 +85,8 @@ async function startPlane() {
     if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-1', roles: ['clerk'] }, attributes: { tenant: '1' } } }
     return { ok: false, reason: 'ERR_JWS_INVALID' }
   }
-  const server = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'] }, runtime: { registry, store } })
+  // The administrator's trail is the server's suites' subject; here it is required and discarded.
+  const server = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
   const call = async (token, path, payload) => {
     const reply = await server.inject({ method: 'POST', url: path, headers: { authorization: `Bearer ${token}` }, payload })
     if (reply.statusCode >= 300) throw new Error(`${path} answered ${String(reply.statusCode)}: ${reply.body}`)

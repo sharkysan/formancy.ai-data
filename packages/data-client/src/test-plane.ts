@@ -123,7 +123,8 @@ export async function startPlane(options: { hops?: boolean } = {}): Promise<Plan
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-client-'))
   const store = createFileConfigurationStore(root)
   const verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: SECRET }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: 'tid' } })
-  const app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'] }, runtime: { registry, store } })
+  // The administrator's trail is the server's suites' subject; here it is required and discarded.
+  const app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
   await app.listen({ host: '127.0.0.1', port: 0 })
   const base = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
   const tokens = {

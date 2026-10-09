@@ -19,6 +19,7 @@ import { policyProblems } from '../bundle.js'
 import type { BundleV2 } from '../bundle.js'
 import type { ConfigurationStore } from '../config-store.js'
 import { FORM_ID, loadPublished, loadVersion } from '../published.js'
+import { adminTrail } from './admin-audit.js'
 import type { Discover, Refuse } from './admin.js'
 
 /**
@@ -147,6 +148,9 @@ export function evolutionRoutes(app: FastifyInstance, { store, discover, refuse 
     if (version === undefined) return refuse(reply, 400, 'invalid-request', 'A version is a whole number from 1.')
     const loaded = await loadVersion(store, request.params.id, version, reply.log)
     if (!loaded.ok) return refuse(reply, loaded.status, loaded.code, loaded.message)
+    const trail = adminTrail(request)
+    trail.formVersion = version
+    trail.connection = loaded.bundle.connection
     return { version, bundle: loaded.bundle }
   })
 
@@ -155,6 +159,9 @@ export function evolutionRoutes(app: FastifyInstance, { store, discover, refuse 
     const loaded = await loadPublished(store, id, reply.log)
     if (!loaded.ok) return refuse(reply, loaded.status, loaded.code, loaded.message)
     const bundle = loaded.bundle
+    const trail = adminTrail(request)
+    trail.formVersion = loaded.version
+    trail.connection = bundle.connection
     if (bundle.format === 1) {
       return refuse(reply, 409, 'published-before-0030', `Version ${String(loaded.version)} was published before 0030 and kept no generation request: propose the form again.`)
     }
@@ -206,8 +213,12 @@ export function evolutionRoutes(app: FastifyInstance, { store, discover, refuse 
       return refuse(reply, 400, 'invalid-request', 'Expected { version: the version to restore, expectedBase: the newest version you saw }.')
     }
     const version = body['version']
+    const trail = adminTrail(request)
+    trail.restoredFrom = version
+    trail.expectedBase = body['expectedBase']
     const loaded = await loadVersion(store, id, version, reply.log)
     if (!loaded.ok) return refuse(reply, loaded.status, loaded.code, loaded.message)
+    trail.connection = loaded.bundle.connection
     const current = await discover(loaded.bundle.connection, reply)
     if (current === undefined) return reply
 
@@ -226,6 +237,7 @@ export function evolutionRoutes(app: FastifyInstance, { store, discover, refuse 
     // The same bytes only for a version this store wrote; one reformatted on the volume comes back in the store's spelling.
     const outcome = await store.publish(id, body['expectedBase'], loaded.bundle)
     if (!outcome.ok) return refuse(reply, 409, 'conflict', 'Somebody published first. Look at the current version and try again.', { current: outcome.current })
+    trail.formVersion = outcome.version
     const restoration: Restoration = { version: outcome.version, restoredFrom: version, drift }
     return reply.code(201).send(restoration)
   })

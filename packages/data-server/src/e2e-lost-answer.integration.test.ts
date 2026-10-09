@@ -13,7 +13,7 @@ import type { FastifyInstance } from 'fastify'
 import { SignJWT } from 'jose'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { createDataServer } from './app.js'
-import type { AuditEvent } from './audit.js'
+import type { AuditEvent, RuntimeAuditEvent } from './audit.js'
 import { recordReference } from './audit.js'
 import { createFileConfigurationStore } from './config-store.js'
 import type { ConnectionConfig, ConnectionRegistry } from './connections.js'
@@ -112,7 +112,8 @@ beforeAll(async () => {
   const verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: SECRET }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: 'tid' } })
   app = await createDataServer({
     verifyIdentity,
-    admin: { registry, store, adminRoles: ['data-admin'] },
+    // One sink for both planes, as main.ts wires it; the trail below narrows on `plane`.
+    admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: (event) => void events.push(event) } },
     runtime: { registry, store, audit: { sink: (event) => void events.push(event), key: AUDIT_KEY } },
   })
   admin = await token('admin-1', { roles: ['data-admin'] })
@@ -287,7 +288,7 @@ describe.each([
     expect(again.statusCode, again.body).toBe(409)
     expect(again.json()).toMatchObject({ code: 'stale' })
 
-    const trail = events.filter((event) => event.form === orderForm && event.record === recordReference(AUDIT_KEY, record))
+    const trail = events.filter((event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === orderForm && event.record === recordReference(AUDIT_KEY, record))
     expect(trail.map(({ operation, status, outcome }) => ({ operation, status, outcome }))).toEqual([
       { operation: 'create', status: 201, outcome: 'ok' },
       { operation: 'update', status: 502, outcome: 'unknown-outcome' },
@@ -323,7 +324,7 @@ describe.each([
     // The trail names the lost create's record as the read that settles it
     // does. The refused second create names none: a create is named by what
     // it made, or by what it would have made when that is unknown.
-    const trail = events.filter((event) => event.form === customerForm && event.record === recordReference(AUDIT_KEY, record))
+    const trail = events.filter((event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === customerForm && event.record === recordReference(AUDIT_KEY, record))
     expect(trail.map(({ operation, status, outcome }) => ({ operation, status, outcome }))).toEqual([
       { operation: 'create', status: 502, outcome: 'unknown-outcome' },
       { operation: 'read', status: 200, outcome: 'ok' },
