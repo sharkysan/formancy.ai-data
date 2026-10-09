@@ -5,6 +5,7 @@ import type { ConfigurationStore } from './config-store.js'
 import type { ConnectionRegistry } from './connections.js'
 import type { HostIdentity, IdentityVerifier } from './identity.js'
 import { adminRoutes } from './routes/admin.js'
+import { runtimeRoutes } from './routes/runtime.js'
 
 export interface DataServerOptions {
   verifyIdentity: IdentityVerifier
@@ -26,6 +27,11 @@ export interface DataServerOptions {
    * answers 404 for them rather than pretending.
    */
   admin?: { registry: ConnectionRegistry; store: ConfigurationStore; adminRoles: readonly string[] }
+  /**
+   * The runtime plane: published forms, their records and their lookups, for
+   * the host application's people. Absent, none of those routes exist.
+   */
+  runtime?: { registry: ConnectionRegistry; store: ConfigurationStore }
 }
 
 /**
@@ -96,6 +102,10 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
 
   if (options.admin !== undefined) {
     await app.register(adminRoutes, { ...options.admin, authenticate })
+  }
+
+  if (options.runtime !== undefined) {
+    await app.register(runtimeRoutes, { ...options.runtime, authenticate })
   }
 
   return app

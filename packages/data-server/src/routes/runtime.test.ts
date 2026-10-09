@@ -1,0 +1,275 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { createSnapshot, generateForm } from '@formancy/data-core'
+import type {
+  ColumnMeta,
+  DatabaseAdapter,
+  FormPolicy,
+  InsertRequest,
+  LookupAdapter,
+  NormalizedType,
+  RecordAdapter,
+  RecordOutcome,
+  UpdateRequest,
+} from '@formancy/data-core'
+import type { FastifyInstance } from 'fastify'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { createDataServer } from '../app.js'
+import type { PublishedBundle } from '../bundle.js'
+import { createFileConfigurationStore } from '../config-store.js'
+import type { ConnectionRegistry } from '../connections.js'
+import type { IdentityVerifier } from '../identity.js'
+
+/*
+ * The runtime plane over fake ports. What the database does with a request is
+ * the adapter suites' business, against real servers (0003); what is under
+ * test here is what the route decides before and after: who may, what is
+ * stripped, what reaches the port, and how each answer is translated.
+ */
+const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
+const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
+  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, ...extra,
+})
+const ref = (name: string) => ({ schema: 'sales', name })
+
+const SNAPSHOT = createSnapshot({
+  kind: 'sqlserver', serverVersion: '16.0', scope: { schemas: ['sales'] }, gaps: [],
+  objects: [
+    {
+      ref: ref('country'), kind: 'table', comment: null,
+      columns: [col('id', 1, INT32, { generated: 'identity' }), col('iso_code', 2, { kind: 'text', maxLength: 2, fixedLength: true }), col('name', 3, { kind: 'text', maxLength: 100, fixedLength: false })],
+      primaryKey: { name: 'pk_country', columns: ['id'] }, uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }], foreignKeys: [], checks: [],
+    },
+    {
+      ref: ref('customer'), kind: 'table', comment: null,
+      columns: [
+        col('tenant_id', 1, INT32),
+        col('customer_no', 2, INT32),
+        col('name', 3, { kind: 'text', maxLength: 200, fixedLength: false }),
+        col('country_code', 4, { kind: 'text', maxLength: 2, fixedLength: true }, { nullable: true }),
+        col('created_at', 5, { kind: 'timestamp', withTimeZone: true, precision: 7 }, { hasDefault: true }),
+        col('row_version', 6, { kind: 'rowversion' }, { generated: 'rowversion' }),
+      ],
+      primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] }, uniqueKeys: [],
+      foreignKeys: [{ name: 'fk_customer_country', columns: ['country_code'], references: { table: ref('country'), columns: ['iso_code'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }],
+      checks: [],
+    },
+  ],
+})
+
+const RW = { read: ['clerk'], write: ['clerk'] }
+const POLICY: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+  fields: { tenant_id: { read: ['clerk'], write: [] }, customer_no: RW, name: RW, country: RW, created_at: { read: ['clerk'], write: [] } },
+  rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+  lookups: { country: [] },
+}
+
+const verifyIdentity: IdentityVerifier = async (token) =>
+  token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '1' } } }
+    : token === 'stranger' ? { ok: true, identity: { actor: { id: 's', roles: [] }, attributes: { tenant: '1' } } }
+      : { ok: false, reason: 'bad' }
+
+const STORED = { tenant_id: '1', customer_no: '7', name: 'Muster AG', country_code: 'CH', created_at: '2026-10-08T00:00:00Z' }
+const RECORD = 'k1:1,7'
+const VERSION = '00000000000007d1'
+
+/** What the fake ports were asked, and what they answer. Each test sets what it needs. */
+let calls: { inserts: InsertRequest[]; updates: UpdateRequest[]; rejects: string[][] }
+let writeOutcome: RecordOutcome
+let rejected: string[]
+let rejectsFails: boolean
+let root: string
+let app: FastifyInstance
+
+function registry(): ConnectionRegistry {
+  const records: RecordAdapter = {
+    read: async () => ({ ok: true, values: { ...STORED }, version: VERSION }),
+    insert: async (request) => {
+      calls.inserts.push(request)
+      return writeOutcome
+    },
+    update: async (request) => {
+      calls.updates.push(request)
+      return writeOutcome
+    },
+  }
+  const lookups: LookupAdapter = {
+    search: async () => ({ rows: [{ token: 'k1:CH', label: 'Switzerland' }], hasMore: false, omitted: 0 }),
+    resolve: async (_config, tokens) => tokens.map((token) => ({ token, label: 'Switzerland' })),
+    rejects: async (_config, tokens) => {
+      calls.rejects.push([...tokens])
+      if (rejectsFails) throw new Error('timeout on 10.0.0.5')
+      return tokens.filter((token) => rejected.includes(token))
+    },
+  }
+  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0' }), discover: async () => SNAPSHOT, close: async () => {} } as DatabaseAdapter
+  return { ids: () => ['erp'], scope: () => ({ schemas: ['sales'] }), open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined), close: async () => {} }
+}
+
+beforeEach(async () => {
+  calls = { inserts: [], updates: [], rejects: [] }
+  writeOutcome = { ok: true, values: { ...STORED }, version: VERSION }
+  rejected = []
+  rejectsFails = false
+  root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-'))
+  const store = createFileConfigurationStore(root)
+  const { form, bindings } = generateForm(SNAPSHOT, {
+    connection: 'erp', root: ref('customer'), formId: 'customer', title: 'Customer',
+    lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }], pinned: ['tenant_id'],
+  })
+  const bundle: PublishedBundle = { format: 1, connection: 'erp', form, bindings, policy: POLICY, snapshot: SNAPSHOT }
+  await store.publish('customer', null, bundle)
+  app = await createDataServer({ verifyIdentity, runtime: { registry: registry(), store } })
+})
+
+afterEach(async () => {
+  await rm(root, { recursive: true, force: true })
+})
+
+const as = (token: string) => ({ authorization: `Bearer ${token}` })
+const post = (url: string, payload: unknown, token = 'clerk') => app.inject({ method: 'POST', url, headers: as(token), payload: payload as Record<string, unknown> })
+/** What a renderer submits for a new customer: every field, the read-only ones empty. */
+const NEW = { tenant_id: null, customer_no: 8, name: 'Neu GmbH', country: 'k1:CH', created_at: null }
+
+describe('the runtime plane', () => {
+  // Nothing about a form is served to somebody the host has not vouched for,
+  // and a person the policy grants nothing does not learn the form exists.
+  test('requires a verified token, and an operation the policy grants', async () => {
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/customer' })).statusCode).toBe(401)
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('stranger') })).statusCode).toBe(403)
+    const served = (await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).json()
+    expect(served.operations).toEqual(['read', 'create', 'update'])
+    expect(served.readable).toEqual(['tenant_id', 'customer_no', 'name', 'country', 'created_at'])
+    expect(served.form.id).toBe('customer')
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/nope', headers: as('clerk') })).statusCode).toBe(404)
+  })
+
+  // A read returns the answers the generated form holds: numbers for number
+  // fields, the lookup as its token, plus the record token and version.
+  test('reads a record as the form holds it', async () => {
+    const response = await post('/v1/forms/customer/records/read', { record: RECORD })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({
+      record: RECORD,
+      version: VERSION,
+      answers: { tenant_id: 1, customer_no: 7, name: 'Muster AG', country: 'k1:CH', created_at: '2026-10-08T00:00:00Z' },
+    })
+    expect((await post('/v1/forms/customer/records/read', { record: 'not-a-token' })).statusCode).toBe(400)
+    expect((await post('/v1/forms/customer/records/read', {})).statusCode).toBe(400)
+  })
+
+  // A renderer submits every field, the read-only ones empty. The echo is
+  // removed, the tenant comes from the token, and the selection is checked
+  // against the database before anything is written.
+  test('creates: strips the empty read-only echo, pins the tenant from context, checks the selection', async () => {
+    const response = await post('/v1/forms/customer/records/create', { answers: NEW })
+    expect(response.statusCode).toBe(201)
+    expect(calls.rejects).toEqual([['k1:CH']])
+    const values = Object.fromEntries((calls.inserts[0]?.values ?? []).map((entry) => [entry.name, entry.value]))
+    expect(values).toEqual({ tenant_id: '1', customer_no: '8', name: 'Neu GmbH', country_code: 'CH' })
+  })
+
+  // A tenant in the request is the browser's claim, not the host's. Sent with
+  // a value, it is over-posting, and nothing is written.
+  test('refuses a submitted tenant, and writes nothing', async () => {
+    const response = await post('/v1/forms/customer/records/create', { answers: { ...NEW, tenant_id: 2 } })
+    expect(response.statusCode).toBe(403)
+    expect(response.json()).toMatchObject({ code: 'over-posting' })
+    expect(calls.inserts).toEqual([])
+  })
+
+  // A selection the database does not vouch for is a field error; one it
+  // cannot answer for refuses the save, closed, with nothing written.
+  test('a rejected selection is a field error, and a lookup that cannot answer refuses the save', async () => {
+    rejected = ['k1:CH']
+    const refused = await post('/v1/forms/customer/records/create', { answers: NEW })
+    expect(refused.statusCode).toBe(422)
+    expect(refused.json().fieldErrors).toEqual([expect.objectContaining({ field: 'country' })])
+    rejected = []
+    rejectsFails = true
+    const down = await post('/v1/forms/customer/records/create', { answers: NEW })
+    expect(down.statusCode).toBe(503)
+    expect(down.body).not.toContain('10.0.0.5')
+    expect(calls.inserts).toEqual([])
+  })
+
+  // The codec's field errors reach the person by field; the database's
+  // refusals are translated, and an ambiguous write says it may have happened.
+  test('field errors from the planner, and translated database refusals', async () => {
+    const invalid = await post('/v1/forms/customer/records/create', { answers: { ...NEW, name: 'x'.repeat(201) } })
+    expect(invalid.statusCode).toBe(422)
+    expect(invalid.json().fieldErrors).toEqual([expect.objectContaining({ field: 'name' })])
+    writeOutcome = { ok: false, code: 'unique-violation', column: 'customer_no', message: 'duplicate key value is (8)' }
+    const duplicate = await post('/v1/forms/customer/records/create', { answers: NEW })
+    expect(duplicate.statusCode).toBe(422)
+    expect(duplicate.json()).toEqual({ code: 'unique-violation', message: 'Another record already has this value.', fieldErrors: [{ field: 'customer_no', code: 'unique-violation', message: 'Another record already has this value.' }] })
+    expect(duplicate.body).not.toContain('(8)')
+    writeOutcome = { ok: false, code: 'unknown-outcome', message: 'ECONNRESET after commit' }
+    const unknown = await post('/v1/forms/customer/records/create', { answers: NEW })
+    expect(unknown.statusCode).toBe(502)
+    expect(unknown.json().message).toMatch(/may have been saved/)
+  })
+
+  // An update echoes every read-only field as it was read. Unchanged, the echo
+  // is removed; changed, it is over-posting. A stale version is 409.
+  test('updates: an unchanged read-only echo is removed, a changed one refused, a stale version is 409', async () => {
+    const current = { tenant_id: 1, customer_no: 7, name: 'Neuer Name', country: 'k1:CH', created_at: '2026-10-08T00:00:00Z' }
+    const saved = await post('/v1/forms/customer/records/update', { record: RECORD, version: VERSION, answers: current })
+    expect(saved.statusCode).toBe(200)
+    expect(calls.updates[0]?.set.map((entry) => entry.name)).toContain('name')
+    expect(calls.updates[0]?.set.map((entry) => entry.name)).not.toContain('created_at')
+    const tampered = await post('/v1/forms/customer/records/update', { record: RECORD, version: VERSION, answers: { ...current, created_at: '2020-01-01T00:00:00Z' } })
+    expect(tampered.statusCode).toBe(403)
+    expect(calls.updates).toHaveLength(1)
+    writeOutcome = { ok: false, code: 'stale', message: 'changed' }
+    expect((await post('/v1/forms/customer/records/update', { record: RECORD, version: VERSION, answers: current })).statusCode).toBe(409)
+    expect((await post('/v1/forms/customer/records/update', { record: RECORD, answers: current })).statusCode).toBe(400)
+  })
+
+  // Every way the database can be out of reach answers the same, says nothing
+  // about hosts, and writes nothing: a lookup that throws, a connection that
+  // will not open, and a form published against a connection the operator has
+  // since removed from the allowlist — that last one is the server's
+  // configuration, not the person's, so it is 500.
+  test('a database out of reach is 503 with no detail; a removed connection is 500', async () => {
+    const store = createFileConfigurationStore(root)
+    const failing: ConnectionRegistry = {
+      ...registry(),
+      open: async () => {
+        const open = await registry().open('erp')
+        if (open === undefined) throw new Error('unreachable')
+        return { ...open, lookups: { ...open.lookups, search: async () => { throw new Error('timeout on 10.0.0.5') }, resolve: async () => { throw new Error('timeout on 10.0.0.5') } } }
+      },
+    }
+    const broken = await createDataServer({ verifyIdentity, runtime: { registry: failing, store } })
+    const source = 'erp-sales-customer-fk-customer-country'
+    for (const url of [`/v1/forms/customer/lookups/${source}/query`, `/v1/forms/customer/lookups/${source}/resolve`]) {
+      const response = await broken.inject({ method: 'POST', url, headers: as('clerk'), payload: { operation: 'create', tokens: ['k1:CH'] } })
+      expect(response.statusCode, url).toBe(503)
+      expect(response.body).not.toContain('10.0.0.5')
+    }
+    const unreachable = await createDataServer({ verifyIdentity, runtime: { registry: { ...registry(), open: async () => { throw new Error('ECONNREFUSED 10.0.0.5') } }, store } })
+    const down = await unreachable.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: as('clerk'), payload: { record: RECORD } })
+    expect(down.statusCode).toBe(503)
+    expect(down.body).not.toContain('10.0.0.5')
+    const removed = await createDataServer({ verifyIdentity, runtime: { registry: { ...registry(), open: async () => undefined }, store } })
+    expect((await removed.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: as('clerk'), payload: { record: RECORD } })).statusCode).toBe(500)
+  })
+
+  // A lookup is found by the option-source name the form document carries,
+  // under the policy for the operation the form is open for.
+  test('lookups: search and resolve through the policy, and refuse what they cannot honour', async () => {
+    const source = (await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).json().form.model.fields.find((field: { key: string }) => field.key === 'country').optionsSource
+    const search = await post(`/v1/forms/customer/lookups/${String(source)}/query`, { operation: 'create', search: 'Sw' })
+    expect(search.statusCode).toBe(200)
+    expect(search.json()).toEqual({ rows: [{ token: 'k1:CH', label: 'Switzerland' }], hasMore: false, omitted: 0 })
+    expect((await post(`/v1/forms/customer/lookups/${String(source)}/resolve`, { operation: 'update', tokens: ['k1:CH'] })).json()).toEqual({ rows: [{ token: 'k1:CH', label: 'Switzerland' }] })
+    expect((await post(`/v1/forms/customer/lookups/${String(source)}/query`, { search: 'Sw' })).statusCode).toBe(400)
+    expect((await post('/v1/forms/customer/lookups/nope/query', { operation: 'create' })).statusCode).toBe(404)
+    expect((await post(`/v1/forms/customer/lookups/${String(source)}/resolve`, { operation: 'create', tokens: Array.from({ length: 101 }, () => 'k1:CH') })).statusCode).toBe(400)
+    expect((await post(`/v1/forms/customer/lookups/${String(source)}/query`, { operation: 'create' }, 'stranger')).statusCode).toBe(403)
+  })
+})

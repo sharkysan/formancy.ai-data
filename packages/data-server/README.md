@@ -33,6 +33,11 @@ existed would be documented and inert.
   ([0020](../../docs/decisions/0020-administration-is-a-separate-plane.md)).
   Registered only when the server is given a registry, a store and those roles.
 
+- **The runtime plane** — a published form, its records and its lookups, for
+  the host application's people, each request asking the policy
+  ([0022](../../docs/decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)).
+  Registered only when the server is given a registry and a store.
+
 ## Running it
 
 ```bash
