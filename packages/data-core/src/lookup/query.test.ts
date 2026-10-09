@@ -11,8 +11,8 @@ const CONFIG: LookupConfig = {
     { name: 'tenant_id', type: { kind: 'integer', min: '-2147483648', max: '2147483647' } },
     { name: 'customer_no', type: { kind: 'integer', min: '-2147483648', max: '2147483647' } },
   ],
-  display: ['name'],
-  search: ['name'],
+  display: [{ name: 'name', type: { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false } }],
+  search: [{ name: 'name', type: { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false } }],
   sort: [
     { column: 'name', direction: 'asc', nulls: 'last' },
     { column: 'tenant_id', direction: 'asc', nulls: 'last' },

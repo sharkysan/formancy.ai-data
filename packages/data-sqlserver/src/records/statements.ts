@@ -3,7 +3,8 @@ import mssql from 'mssql'
 import { quoteName, quoteTable } from '../sql/quote.js'
 import { Parameters } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
-import { bindFilterValue, bindValue, canonicalText, EXACT_COLLATION, fromText, isExactKey } from '../sql/values.js'
+import { exactText, filterPredicate } from '../sql/filters.js'
+import { bindValue, canonicalText, fromText, isExactKey } from '../sql/values.js'
 import type { ExactKey } from '../sql/values.js'
 
 /**
@@ -16,7 +17,7 @@ import type { ExactKey } from '../sql/values.js'
  * one as the adapter's only when its message is exactly the adapter's.
  */
 
-/** Raised when a text column did not store the text it was sent: a varchar whose code page lacks a character. */
+/** Raised when a text column did not store the text it was sent: a varchar whose code page lacks a character, or that drops trailing spaces. */
 export const TEXT_NOT_STORED = 51701
 /** Its message: the index of the written value, in the request's order. */
 export const TEXT_NOT_STORED_MESSAGE = /^formancy: text not stored as sent: ([0-9]+)$/
@@ -67,8 +68,9 @@ function keyPredicates(parameters: Parameters, key: readonly RecordValue[]): str
   return key.map((value) => `${quoteName(value.name)} = ${bindValue(parameters, value.type, value.value)}`)
 }
 
+/** The trusted filters, each comparing the column's canonical value exactly (../sql/filters.ts, 0028). */
 function filterPredicates(parameters: Parameters, terms: readonly RowFilterTerm[]): string[] {
-  return terms.map((term) => `${quoteName(term.column)} = ${bindFilterValue(parameters, term.value)}`)
+  return terms.map((term) => filterPredicate(parameters, quoteName(term.column), term))
 }
 
 /** One record under the filters. `top (2)`, so an identity that matched more than one row is noticed without reading every row it matched. */
@@ -177,10 +179,14 @@ interface Write {
  *   gone; one that commits it and begins another has stored the write. The
  *   batch cannot tell the two apart, and says so (errors.ts).
  * - No INSTEAD OF trigger decided what was stored (`insteadOfGuard`).
- * - Every text value is compared with what its column stored, and a
+ * - Every text value is compared with what its column stored, exactly, and a
  *   difference rolls the write back: SQL Server converts nvarchar to a
  *   single-byte varchar without an error, a character its code page lacks
- *   becoming its "best fit" or `?` (0017).
+ *   becoming its "best fit" or `?` (0017), and a varchar created under
+ *   ANSI_PADDING OFF drops trailing spaces without one (C12, 0028). The stored
+ *   side is canonical text, a char(n)'s padding trimmed, so one comparison
+ *   (`exactText`) serves both lengths. OUTPUT shows the row before an AFTER
+ *   trigger changed it, so this sees what the statement stored, not a trigger.
  * - TRY…CATCH rolls back on every error it catches, then rethrows it as it
  *   was. xact_abort alone does not: a trigger's RAISERROR, unlike THROW, ends
  *   nothing, so the statement and the commit would run and the driver would
@@ -203,7 +209,7 @@ function writeBatch(parameters: Parameters, { target, operation, statement, assi
   const output = `output ${captured.map((column) => column.expression).join(', ')} into @written (${captured.map((column) => column.name).join(', ')})`
   const checks = guarded.map(
     ({ sql, index }, position) =>
-      `if exists (select 1 from @written where not ([w${String(position)}] = ${sql} collate ${EXACT_COLLATION})) ` +
+      `if exists (select 1 from @written where not (${exactText(`[w${String(position)}]`, sql)})) ` +
       `throw ${String(TEXT_NOT_STORED)}, N'formancy: text not stored as sent: ${String(index)}', 1;`,
   )
   return [

@@ -5,6 +5,9 @@ import { codecFor } from './codec.js'
 import { canonicalFloat32 } from './numbers.js'
 import { decodeRowversion, encodeRowversion } from './rowversion.js'
 
+/** U+00A0, which neither engine treats as padding (C1b). Spelled by its code point so the source shows it. */
+const NO_BREAK_SPACE = String.fromCodePoint(0xa0)
+
 function column(type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
   return {
     name: 'c',
@@ -178,6 +181,25 @@ describe('text', () => {
       }
       expect(accepted(any, '😀')).toBe('😀')
     }
+  })
+
+  // Both engines pad a fixed-length column with spaces and read it back
+  // without them: 'AB ' written to char(3) reads 'AB' on PostgreSQL, and on
+  // SQL Server once its reader rtrims (0028). Kept as sent, the value written
+  // and the value read would differ, so a save reported unchanged would show
+  // a change (0008). The padding is dropped before the length is measured, so
+  // 'AB   ' fits char(3) as it does in the database; only U+0020 is padding.
+  test('canonicalises fixed-length text without trailing spaces, and measures it after', () => {
+    const fixed: NormalizedType = { kind: 'text', maxLength: 3, lengthUnit: 'code-points', fixedLength: true }
+    expect(accepted(fixed, 'AB ')).toBe('AB')
+    expect(accepted(fixed, 'AB   ')).toBe('AB')
+    expect(accepted(fixed, '   ')).toBe('')
+    expect(accepted(fixed, ' AB')).toBe(' AB')
+    expect(accepted(fixed, `AB${NO_BREAK_SPACE}`)).toBe(`AB${NO_BREAK_SPACE}`)
+    expect(accepted(fixed, 'ABCD ')).toBe('refused:too-long')
+    // A variable-length column holds its trailing space, and it counts.
+    expect(accepted({ ...fixed, fixedLength: false }, 'AB ')).toBe('AB ')
+    expect(accepted({ ...fixed, fixedLength: false }, 'ABC ')).toBe('refused:too-long')
   })
 })
 

@@ -7,6 +7,15 @@ import { validateBundle } from './bundle.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 
+/**
+ * A pattern for "begins with exactly this text". The text holds a generated
+ * source name and dots, and in a template literal `\.` is a bare `.`, which
+ * matches any character: the anchor checked less than it said. CodeQL found it.
+ */
+function startsWith(text: string): RegExp {
+  return new RegExp(`^${text.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)
+}
+
 function column(name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
   return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra }
 }
@@ -171,6 +180,53 @@ describe('validateBundle', () => {
     readOnly.bindings.operations.create = false
     readOnly.policy.operations.create = []
     expect(validateBundle(readOnly)).toMatchObject({ ok: true })
+  })
+
+  // A filter compares a column's canonical value exactly (0028), so one on a
+  // boolean, a timestamp or a column the target lacks cannot be applied: the
+  // planner refuses every request it scopes, and the form would be published
+  // with a lookup that is 500 on every search. Refused at publish, by the
+  // same rowFilterColumnProblem the planner and the studio ask.
+  test('a lookup or root filter on a column a filter cannot compare is refused at publish, naming it', () => {
+    const text = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false } as const
+    const taken = createSnapshot({
+      kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
+      objects: [
+        {
+          ref: { schema: 'sales', name: 'customer' }, kind: 'table', comment: null,
+          columns: [column('id', 1, INT32), column('name', 2, text), column('active', 3, { kind: 'boolean' }, { databaseType: 'bit' })],
+          primaryKey: { name: 'pk_customer', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+        },
+        {
+          ref: { schema: 'sales', name: 'order' }, kind: 'table', comment: null,
+          columns: [
+            column('id', 1, INT32),
+            column('customer_id', 2, INT32),
+            column('placed_at', 3, { kind: 'timestamp', withTimeZone: true, precision: 7 }, { databaseType: 'datetimeoffset' }),
+            column('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
+          ],
+          primaryKey: { name: 'pk_order', columns: ['id'] }, uniqueKeys: [],
+          foreignKeys: [{ name: 'fk_order_customer', columns: ['customer_id'], references: { table: { schema: 'sales', name: 'customer' }, columns: ['id'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }],
+          checks: [], rowSecurity: 'none',
+        },
+      ],
+    })
+    const { form, bindings } = generateForm(taken, { connection: 'erp', root: { schema: 'sales', name: 'order' }, formId: 'order', title: 'Order', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }] })
+    const lookup = bindings.fields.find((binding) => binding.kind === 'lookup')?.field ?? ''
+    const fields = Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: ['clerk'] }]))
+    const policy = (rowFilters: FormPolicy['rowFilters'], rules: FormPolicy['rowFilters']): FormPolicy => ({
+      version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields, rowFilters, lookups: { [lookup]: rules },
+    })
+    const bundle = (chosen: FormPolicy): PublishedBundle => ({ format: 1, connection: 'erp', form, bindings, policy: chosen, snapshot: taken })
+
+    expect(validateBundle(bundle(policy([], [{ column: 'id', attribute: 'tenant' }])))).toMatchObject({ ok: true })
+    const flagged = validateBundle(bundle(policy([], [{ column: 'active', attribute: 'tenant' }, { column: 'region', attribute: 'tenant' }])))
+    expect(flagged.ok ? [] : flagged.problems).toEqual([
+      expect.stringMatching(startsWith(`policy: lookups.${lookup} active is bit, which a row filter cannot compare`)),
+      `policy: lookups.${lookup} customer has no column region`,
+    ])
+    const stamped = validateBundle(bundle(policy([{ column: 'placed_at', attribute: 'tenant' }], [])))
+    expect(stamped.ok ? [] : stamped.problems).toContainEqual(expect.stringMatching(/^policy: rowFilters placed_at is datetimeoffset, which a row filter cannot compare/))
   })
 
   // Bindings from one snapshot over another describe columns that may not exist.

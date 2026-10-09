@@ -8,6 +8,27 @@ import type { NormalizedType, ObjectRef } from '../metadata.js'
  */
 export type LookupKeyType = Extract<NormalizedType, { kind: 'text' | 'integer' | 'decimal' | 'uuid' | 'date' }>
 
+/** The kinds a row filter compares: those with one settled spelling (0012). A boolean, float, time or timestamp filter is refused (0028). */
+export type RowFilterType = LookupKeyType
+
+/** What a label can show: every kind with a canonical value. Binary, rowversion and unsupported columns have none. */
+export type LookupDisplayType = Exclude<NormalizedType, { kind: 'binary' | 'rowversion' | 'unsupported' }>
+
+/** One column a label is made of, with the type its value is read and spelled by. */
+export interface LookupDisplayColumn {
+  readonly name: string
+  readonly type: LookupDisplayType
+}
+
+/** What a typed search may match: the kinds both engines spell alike as text. */
+export type LookupSearchType = Extract<NormalizedType, { kind: 'text' | 'integer' }>
+
+/** One column a search matches, with its type: text as itself, an integer as its canonical text (0028). */
+export interface LookupSearchColumn {
+  readonly name: string
+  readonly type: LookupSearchType
+}
+
 /** One column of the referenced key. */
 export interface LookupKeyColumn {
   name: string
@@ -49,10 +70,13 @@ export interface LookupConfig {
    * foreign key's order: the order of a token's values.
    */
   targetColumns: readonly LookupKeyColumn[]
-  /** The columns a label is made of, in order. */
-  display: readonly string[]
-  /** Display columns a typed search may match. Empty: the lookup lists but cannot be searched. */
-  search: readonly string[]
+  /**
+   * The columns a label is made of, in order, with the snapshot's types: an
+   * adapter reads each with its record reader, and `displayText` spells it.
+   */
+  display: readonly LookupDisplayColumn[]
+  /** Display columns a typed search may match, with their types. Empty: the lookup lists but cannot be searched. */
+  search: readonly LookupSearchColumn[]
   /**
    * A total order: the key columns always end it, so paging never repeats or
    * skips a row, and every column says where its NULLs go.
@@ -87,9 +111,19 @@ export interface LookupResult {
   omitted: number
 }
 
-/** One equality from trusted context: a column of the target table, and the canonical text of the value it must hold. */
+/**
+ * One equality from trusted context: the column's canonical value (0008) —
+ * what a record read returns for it — is exactly `value`, UTF-16 unit for
+ * unit. For text, case, accents and trailing spaces all count, and the
+ * column's collation is not consulted. A fixed-length column's canonical
+ * value has no trailing spaces (both engines pad it and ignore the padding),
+ * so a value ending in one is refused. `type` is the column's, from the
+ * snapshot, so an adapter binds the value as that type and no engine converts
+ * it (0028). Made by `scopeRowFilters`.
+ */
 export interface RowFilterTerm {
   readonly column: string
+  readonly type: RowFilterType
   readonly value: string
 }
 
@@ -116,7 +150,10 @@ export type RowFilters = { readonly kind: 'unrestricted' } | { readonly kind: 'r
  *
  * Every method takes the trusted filters, reads them with `rowFilterTerms`, and
  * applies them as part of the same query: a row outside them does not exist
- * for this call. A row whose key holds a NULL is never offered, because no
+ * for this call. Each term compares the column's canonical value exactly, as
+ * `RowFilterTerm` says, whatever the column's collation (0028). Display
+ * columns are read with the adapter's record reader, and the label spelled by
+ * `displayText`. A row whose key holds a NULL is never offered, because no
  * foreign key value can reference it. Where NULLs sort is the config's, and
  * each adapter spells it. The order of text — and of UUIDs on SQL Server — is
  * each engine's own; that is a real difference between the engines and the

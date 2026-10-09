@@ -28,14 +28,17 @@ describe('the fixture files', () => {
   // CREATE SCHEMA, CREATE VIEW and CREATE FUNCTION must each open a batch on
   // SQL Server; a GO lost in an edit fails there with an error about the
   // batch, far from here.
-  test('the SQL Server file opens a batch with each CREATE SCHEMA, CREATE VIEW and CREATE FUNCTION', () => {
-    const batches = splitBatches(readFixture('sqlserver.sql'))
-    expect(batches.some((batch) => /\bcreate function\b/i.test(batch))).toBe(true)
-    for (const batch of batches) {
+  // CREATE TRIGGER too, which the parity file uses.
+  test('each SQL Server file opens a batch with each CREATE SCHEMA, VIEW, FUNCTION and TRIGGER', () => {
+    const sales = splitBatches(readFixture('sqlserver.sql'))
+    const parity = splitBatches(readFixture('sqlserver.parity.sql'))
+    expect(sales.some((batch) => /\bcreate function\b/i.test(batch))).toBe(true)
+    expect(parity.some((batch) => /\bcreate trigger\b/i.test(batch))).toBe(true)
+    for (const batch of [...sales, ...parity]) {
       const body = batch.replaceAll(/--.*$/gm, '').trim().toLowerCase()
-      const opensWith = /^create (schema|view|function)\b/.test(body)
-      const contains = /\bcreate (schema|view|function)\b/.test(body)
-      expect(contains ? opensWith : true, `a batch contains CREATE SCHEMA, VIEW or FUNCTION after its first statement:\n${batch.slice(0, 120)}`).toBe(true)
+      const opensWith = /^create (schema|view|function|trigger)\b/.test(body)
+      const contains = /\bcreate (schema|view|function|trigger)\b/.test(body)
+      expect(contains ? opensWith : true, `a batch contains CREATE SCHEMA, VIEW, FUNCTION or TRIGGER after its first statement:\n${batch.slice(0, 120)}`).toBe(true)
     }
   })
 
@@ -76,5 +79,20 @@ describe('the fixture files', () => {
     const postgres = tables(readFixture('postgres.sql'))
     expect(postgres).toContain('shipment')
     expect(tables(readFixture('sqlserver.sql'))).toEqual(postgres)
+  })
+
+  // The parity files are one schema in two dialects (0028): a table or a
+  // constraint in one only would make a parity case compare two datasets.
+  // Derived from the statements, as for the sales files; SQL Server names its
+  // defaults (df_) where PostgreSQL leaves them unnamed.
+  test('both parity editions create the same tables and name the same constraints', () => {
+    const strip = (text: string) => text.replaceAll(/--.*$/gm, '')
+    const tables = (text: string) => [...strip(text).matchAll(/create\s+table\s+parity\.(\w+)/gi)].map((match) => match[1]).sort()
+    const names = (text: string) => [...new Set([...strip(text).matchAll(/constraint\s+(\w+)/gi)].map((match) => match[1]))].filter((name) => !name?.startsWith('df_')).sort()
+    const postgres = readFixture('postgres.parity.sql')
+    const sqlServer = readFixture('sqlserver.parity.sql')
+    expect(tables(postgres)).toEqual(['contended', 'declined', 'display_kinds', 'display_use', 'generated', 'guarded', 'item_use', 'tenant_item'])
+    expect(tables(sqlServer)).toEqual(tables(postgres))
+    expect(names(sqlServer)).toEqual(names(postgres))
   })
 })

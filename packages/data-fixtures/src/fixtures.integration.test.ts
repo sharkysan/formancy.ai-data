@@ -3,6 +3,7 @@ import postgres from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { PostgresFixture, SqlServerFixture } from './containers.js'
 import { startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
+import { FILTER_PARITY } from './parity.js'
 import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 
 /**
@@ -242,6 +243,98 @@ describe('the SQL Server fixture', () => {
     } finally {
       if (begun) await transaction.rollback()
       await writer.close()
+    }
+  })
+})
+
+/*
+ * The parity schema (0028): both adapters' parity suites hold the two engines
+ * to one expectation per case, and that means nothing unless the schema they
+ * run against is one dataset on both. Read back as text built in SQL, so
+ * neither driver is on trial; floats as their IEEE 754 bits, which is exact
+ * where any decimal spelling is one engine's choice.
+ */
+describe('the parity schema', () => {
+  const NAMED = ['acme|1', 'ACME|2', 'acme |3', 'Acmé|4']
+  const KINDS = {
+    t: 'Text',
+    fixed: 'AB',
+    i: '9007199254740993',
+    d: '12.50',
+    b: 'true',
+    f: '3fd3333333333334',
+    r: '4996b43f',
+    dt: '2026-10-08',
+    tm: '10:34:56.789',
+    ts: '2026-10-08T08:34:56.789Z',
+    tz: '2026-10-08T10:34:56.789',
+    u: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  }
+
+  /**
+   * The keys each FILTER_PARITY case should select, worked out from the rows
+   * as they are stored — exact comparison in JavaScript, of the canonical
+   * text — so the expectations both adapter suites run are the data's, not
+   * a guess written beside it. A refused case selects nothing to compare.
+   */
+  type NamedRow = { tenant_code: string; item_no: string; fixed_code: string }
+  const selectedBy = (rows: readonly NamedRow[]) =>
+    FILTER_PARITY.map((entry) => ('keys' in entry ? rows.filter((row) => row[entry.column] === entry.value).map((row) => [row.tenant_code, row.item_no]) : 'refused'))
+  const expected = FILTER_PARITY.map((entry) => ('keys' in entry ? entry.keys.map((key) => [...key]) : 'refused'))
+
+  // The four named tenants differ by case, a trailing space and an accent;
+  // a trailing space lost on load would make 'acme ' the same tenant as
+  // 'acme' and the case that caught SQL Server's leak (C2-table) vacuous.
+  // The fillers are the size the plans were read at (C4, C5).
+  test('loads on PostgreSQL: the four named tenants, the fillers, the rows each filter case selects, and one value of every label kind', async () => {
+    const sql = postgres(pg.admin)
+    try {
+      const named = await sql<{ row: string }[]>`select tenant_code || '|' || item_no as row from parity.tenant_item where item_no < 10 order by item_no`
+      expect(named.map((entry) => entry.row)).toEqual(NAMED)
+      const rows = await sql<NamedRow[]>`select tenant_code::text as tenant_code, item_no::text as item_no, fixed_code::text as fixed_code from parity.tenant_item order by item_no`
+      expect(selectedBy(rows)).toEqual(expected)
+      const [fillers] = await sql<{ n: number }[]>`select count(*)::int as n from parity.tenant_item where label = 'Filler'`
+      expect(fillers?.n).toBe(20_000)
+      const [kinds] = await sql<Record<string, string>[]>`
+        select t, fixed::text as fixed, i::text as i, d::text as d, b::text as b,
+               pg_catalog.encode(pg_catalog.float8send(f), 'hex') as f, pg_catalog.encode(pg_catalog.float4send(r), 'hex') as r,
+               pg_catalog.to_char(dt, 'YYYY-MM-DD') as dt, tm::text as tm,
+               pg_catalog.to_char(ts at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as ts,
+               pg_catalog.to_char(tz, 'YYYY-MM-DD"T"HH24:MI:SS.MS') as tz, u::text as u
+        from parity.display_kinds`
+      expect({ ...kinds }).toEqual(KINDS)
+    } finally {
+      await sql.end()
+    }
+  })
+
+  // As on PostgreSQL, through T-SQL's own conversions.
+  test('loads on SQL Server: the same tenants, fillers and values', async () => {
+    const pool = await new mssql.ConnectionPool(ms.admin).connect()
+    try {
+      const named = await pool.request().query<{ row: string }>(
+        `select tenant_code + N'|' + convert(nvarchar(10), item_no) as row from parity.tenant_item where item_no < 10 order by item_no`,
+      )
+      expect(named.recordset.map((entry) => entry.row)).toEqual(NAMED)
+      // rtrim: SQL Server keeps a char column's padding when it converts it (C1); its canonical value does not.
+      const rows = await pool.request().query<NamedRow>(
+        `select tenant_code, convert(nvarchar(10), item_no) as item_no, rtrim(fixed_code) as fixed_code from parity.tenant_item order by item_no`,
+      )
+      expect(selectedBy(rows.recordset)).toEqual(expected)
+      const fillers = await pool.request().query<{ n: number }>(`select count(*) as n from parity.tenant_item where label = N'Filler'`)
+      expect(fillers.recordset[0]?.n).toBe(20_000)
+      const kinds = await pool.request().query<Record<string, string>>(
+        `select t, rtrim(fixed) as fixed, convert(varchar(20), i) as i, convert(varchar(20), d) as d,
+                case b when 1 then 'true' else 'false' end as b,
+                lower(convert(varchar(16), convert(binary(8), f), 2)) as f, lower(convert(varchar(8), convert(binary(4), r), 2)) as r,
+                convert(varchar(10), dt, 23) as dt, convert(varchar(12), tm) as tm,
+                convert(varchar(23), switchoffset(ts, '+00:00'), 126) + 'Z' as ts,
+                convert(varchar(23), tz, 126) as tz, lower(convert(varchar(36), u)) as u
+         from parity.display_kinds`,
+      )
+      expect(kinds.recordset[0]).toEqual(KINDS)
+    } finally {
+      await pool.close()
     }
   })
 })

@@ -123,6 +123,45 @@ describe('the policy editor', () => {
     expect(check(policy).problems).toEqual(['operations.update grants roles, and this form does not offer update'])
   })
 
+  // A filter compares a column's canonical value exactly, and a boolean or a
+  // timestamp has no spelling both engines compare alike, so the server
+  // refuses such a filter at publish (0028). Offered here, an administrator
+  // would compose a policy only publishing could tell them was wrong.
+  // Read by role and name: the options of the filter's column box.
+  test('the customer list’s filter column offers neither active nor created_at', async () => {
+    const user = await signIn(plane)
+    await generateOrder(user)
+    const policy = await writeOrderPolicy(user)
+    const offered = within(within(policy).getByRole('combobox', { name: 'Column of Customer filter 1' }))
+      .getAllByRole('option')
+      .map((option) => option.textContent)
+    expect(offered).toContain('tenant_id')
+    expect(offered).toContain('name')
+    expect(offered).not.toContain('active')
+    expect(offered).not.toContain('created_at')
+  })
+
+  // The root's filter is offered from the bound columns the same way: the
+  // customer form binds active and created_at, and neither is a filter column.
+  test('the root’s filter column offers no boolean or timestamp column', async () => {
+    const user = await signIn(plane)
+    await discover(user)
+    await user.click(screen.getByRole('button', { name: 'Choose a root' }))
+    const choose = step('Choose')
+    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.customer')
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    const policy = await goTo(user, 'Policy')
+    await user.click(within(policy).getByRole('button', { name: 'Add a row filter' }))
+    const offered = within(within(policy).getByRole('combobox', { name: 'Column of row filter 1' }))
+      .getAllByRole('option')
+      .map((option) => option.textContent)
+    expect(offered).toContain('tenant_id')
+    expect(offered).toContain('name')
+    expect(offered).not.toContain('active')
+    expect(offered).not.toContain('created_at')
+  })
+
   // Typing a list keeps what was typed: a box that re-wrote "clerk, " to
   // "clerk" as it parsed would swallow the comma before the next role.
   test('keeps a list of roles as it is typed', async () => {

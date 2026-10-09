@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { ApiValue, MetadataSnapshot, ObjectMeta, ObjectRef, RecordAdapter, RecordColumn, RecordOutcome, RecordTarget, RecordValue, RowFilters, UpdateRequest } from '@formancy/data-core'
+import type { ApiValue, MetadataSnapshot, ObjectMeta, ObjectRef, RecordAdapter, RecordColumn, RecordOutcome, RecordTarget, RecordValue, RowFilters, RowFilterType, UpdateRequest } from '@formancy/data-core'
 import { codecFor, findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
 import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT, startSqlServerFixture } from '@formancy/data-fixtures'
@@ -140,7 +140,12 @@ function target(ref: ObjectRef, versionColumn?: string): RecordTarget {
 }
 
 const valueOf = (ref: ObjectRef, name: string, value: ApiValue): RecordValue => ({ ...columnOf(ref, name), value })
-const tenant = (value: string): RowFilters => ({ kind: 'restricted', equal: [{ column: 'tenant_id', value }] })
+/** A one-term filter, typed from the snapshot's column as scopeRowFilters types it. */
+const filterOn = (ref: ObjectRef, column: string, value: string): RowFilters => ({
+  kind: 'restricted',
+  equal: [{ column, type: columnOf(ref, column).type as RowFilterType, value }],
+})
+const tenant = (value: string): RowFilters => filterOn(ORDER, 'tenant_id', value)
 const EVERY_ROW: RowFilters = { kind: 'unrestricted' }
 
 function ok(outcome: RecordOutcome): Extract<RecordOutcome, { ok: true }> {
@@ -324,7 +329,7 @@ describe('reading a record', () => {
   test("a text filter matches its value exactly, not by the column's collation", async () => {
     const records = createSqlServerRecords(owner)
     const tenanted: ObjectRef = { schema: 'ops', name: 'tenanted' }
-    const acme: RowFilters = { kind: 'restricted', equal: [{ column: 'tenant', value: 'acme' }] }
+    const acme = filterOn(tenanted, 'tenant', 'acme')
     const read = (id: string) => records.read({ target: target(tenanted), key: [valueOf(tenanted, 'id', id)], columns: [columnOf(tenanted, 'note')], filters: acme })
     expect(await read('1')).toMatchObject({ ok: false, code: 'not-found' })
     expect(await read('2')).toEqual({ ok: true, values: { note: 'lower' }, version: null })

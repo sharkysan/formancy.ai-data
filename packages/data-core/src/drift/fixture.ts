@@ -3,6 +3,7 @@ import type { DatabaseKind } from '../adapter.js'
 import { generateForm } from '../generate/generate.js'
 import type { GenerationRequest } from '../generate/types.js'
 import type { ColumnMeta, CoverageAspect, CoverageGap, CoverageSubject, DiscoveryAccount, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
+import type { FormPolicy } from '../policy/types.js'
 import { createSnapshot } from '../snapshot.js'
 import { diffSnapshots } from './diff.js'
 import type { DriftChange, DriftKind, DriftReport } from './types.js'
@@ -92,6 +93,9 @@ function model(kind: DatabaseKind): ObjectMeta[] {
   ]
 }
 
+/** A policy whose lookups filter nothing: what drift is given when a test is not about filter columns. */
+export const NO_FILTERS: Pick<FormPolicy, 'lookups'> = { lookups: {} }
+
 export const OWNER: DiscoveryAccount = { user: 'owner', login: 'owner' }
 
 export interface Options {
@@ -100,6 +104,8 @@ export interface Options {
   kind?: DatabaseKind
   serverVersion?: string
   account?: DiscoveryAccount
+  /** The published policy's lookup filters, which drift compares by type on each target (0028). None by default. */
+  policy?: Pick<FormPolicy, 'lookups'>
 }
 
 export function snapshot(edit: (objects: ObjectMeta[]) => void = () => {}, options: Options = {}): MetadataSnapshot {
@@ -195,7 +201,7 @@ export function drift(
   base: MetadataSnapshot = snapshot(undefined, { kind: options.kind ?? 'sqlserver' }),
 ): DriftReport {
   const { bindings } = generateForm(base, request)
-  return diffSnapshots(base, snapshot(edit, options), bindings)
+  return diffSnapshots(base, snapshot(edit, options), bindings, options.policy ?? NO_FILTERS)
 }
 
 export function kinds(report: DriftReport): DriftKind[] {

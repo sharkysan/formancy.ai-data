@@ -135,19 +135,6 @@ export function decodeCanonical(type: NormalizedType, text: string | null): ApiV
 }
 
 /**
- * The SQL that reads a lookup's display column as text, whatever its type.
- *
- * A config names display columns without their types, so this is the one
- * spelling that needs none: `to_jsonb` writes dates and timestamps in ISO
- * 8601 whatever DateStyle says, numerics with their scale, booleans as
- * `true`, and `#>> '{}'` takes the scalar back out as text. A label is for
- * recognising a row, not for writing it back.
- */
-export function displayText(column: string): string {
-  return `pg_catalog.to_jsonb(${column}) ${op('#>>')} '{}'::pg_catalog.text[]`
-}
-
-/**
  * The text a value is bound from: exactly what the codec returned (0008).
  *
  * Throws on a value of the wrong shape for its kind — a decimal or an

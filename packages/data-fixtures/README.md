@@ -32,6 +32,18 @@ added unvalidated beside one SQL Server disables.
   fixture grants it, column by column, with every column the model has: an
   adapter that left out what the account may not read, as a
   privilege-filtered catalog would, disagrees.
+- Beside it, the `parity` schema (0028) — `fixtures/postgres.parity.sql` and
+  `fixtures/sqlserver.parity.sql`, loaded last — which is outside
+  `FIXTURE_SCOPE`, so no snapshot of `sales` sees it. A tenant column under a
+  case-insensitive collation with four tenants that differ by case, a
+  trailing space and an accent, beside 20,000 fillers, and a `char(3)` code
+  that is `AB` for three of them and `ab` for the fourth; one row with a value
+  of every kind a label shows, its floats ones whose text a session's
+  `extra_float_digits` changes; and tables whose triggers refuse, decline,
+  sleep and deadlock. `FILTER_PARITY`, `DISPLAY_PARITY` and `REFUSAL_PARITY`
+  are what both adapters' parity suites expect of it, written once:
+  `FILTER_PARITY` is checked against the stored rows on both engines by this
+  package's own suite. `PARITY_SCOPE` is the scope that discovers it.
 - `EDGE_VALUES` names each inserted edge value as the exact string it is, and
   `FIRST_SHIPMENT` and `SECOND_SHIPMENT` are the two shipments as both
   adapters' record reads must return them — one object, so neither engine can

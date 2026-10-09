@@ -15,4 +15,6 @@ export type {
   ExpectedObject,
   ExpectedType,
 } from './model.js'
+export { DISPLAY_PARITY, FILTER_PARITY, PARITY_SCOPE, REFUSAL_PARITY } from './parity.js'
+export type { FilterParityCase, ParityFilterColumn, RefusalParityCase } from './parity.js'
 export { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'

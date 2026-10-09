@@ -17,18 +17,19 @@ const STALE: RecordFailure = { ok: false, code: 'stale', message: 'The record ch
  * A write the server completed without writing the row, and without an
  * error: a BEFORE trigger that returned NULL, a rule that did something
  * else instead, or — for an update — a row security policy that lets the
- * actor see the row and not change it. The contract has no code of its
- * own for a rule the database enforces without declaring it as a
- * constraint; a trigger's RAISE is `check-violation` too (errors.ts).
+ * actor see the row and not change it. `refused` (0028), as a trigger's
+ * RAISE is (errors.ts): the database declined it by a rule of its own, no
+ * constraint the form could have checked is named, and the same write will
+ * be declined again. SQL Server's INSTEAD OF trigger is answered the same.
  */
 const DECLINED_INSERT: RecordFailure = {
   ok: false,
-  code: 'check-violation',
+  code: 'refused',
   message: 'PostgreSQL completed the insert without writing the row: a trigger or a rule on the table declined it.',
 }
 const DECLINED_UPDATE: RecordFailure = {
   ok: false,
-  code: 'check-violation',
+  code: 'refused',
   message: 'PostgreSQL completed the update without writing the row, though it exists at the version sent: a trigger, a rule or a row security policy declined it.',
 }
 

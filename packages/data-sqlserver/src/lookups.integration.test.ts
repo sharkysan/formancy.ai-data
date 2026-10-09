@@ -1,7 +1,7 @@
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { LookupConfig, LookupOptions, LookupQuery, LookupRow, MetadataSnapshot, ObjectRef, RowFilters } from '@formancy/data-core'
-import { buildLookupConfig, generateForm } from '@formancy/data-core'
+import type { LookupConfig, LookupOptions, LookupQuery, LookupRow, MetadataSnapshot, ObjectRef, RowFilters, RowFilterTerm, RowFilterType } from '@formancy/data-core'
+import { buildLookupConfig, findObject, generateForm } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
 import { startSqlServerFixture } from '@formancy/data-fixtures'
 import { createSqlServerLookups, discoverSqlServer } from './index.js'
@@ -68,7 +68,14 @@ function lookupConfig(root: ObjectRef, foreignKey: string, display: string[], op
 }
 
 const customers = (): LookupConfig => lookupConfig(ORDER, 'fk_order_customer', ['name'])
-const tenant = (value: string): RowFilters => ({ kind: 'restricted', equal: [{ column: 'tenant_id', value }] })
+/** sales.customer.tenant_id's type, as scopeRowFilters types a term from the snapshot. */
+function tenantType(): RowFilterType {
+  const found = findObject(snapshot, CUSTOMER)?.columns.find((column) => column.name === 'tenant_id')
+  if (found?.type.kind !== 'integer') throw new Error('sales.customer.tenant_id is an integer')
+  return found.type
+}
+const tenantTerm = (value: string): RowFilterTerm => ({ column: 'tenant_id', type: tenantType(), value })
+const tenant = (value: string): RowFilters => ({ kind: 'restricted', equal: [tenantTerm(value)] })
 const EVERY_ROW: RowFilters = { kind: 'unrestricted' }
 const page = (search: string, offset = 0, limit = 50): LookupQuery => ({ search, offset, limit })
 const labels = (rows: readonly LookupRow[]): string[] => rows.map((row) => row.label)
@@ -111,7 +118,7 @@ describe('the tenant filter', () => {
     await expect(lookups.resolve(customers(), ['k1:1,1001'], empty)).rejects.toThrow(/Row filters are/)
     const everyone = await lookups.search(customers(), page('GmbH'), EVERY_ROW)
     expect(labels(everyone.rows)).toEqual(['Other Tenant GmbH'])
-    const wrongColumn: RowFilters = { kind: 'restricted', equal: [{ column: 'region', value: 'north' }] }
+    const wrongColumn: RowFilters = { kind: 'restricted', equal: [{ column: 'region', type: { kind: 'text', maxLength: null, lengthUnit: 'utf16-code-units', fixedLength: false }, value: 'north' }] }
     await expect(lookups.search(customers(), page(''), wrongColumn)).rejects.toMatchObject({ number: 207 })
   })
 })
@@ -139,12 +146,16 @@ describe('a search', () => {
   })
 
   // A displayed integer is searched as the digits its label shows, so typing
-  // a customer number finds the customer. The configuration does not carry a
-  // search column's type; the server converts the integer for LIKE.
+  // a customer number finds the customer. The configuration carries each
+  // search column's type, and an integer is matched as its canonical text,
+  // converted explicitly, as PostgreSQL matches it (0028).
   test('matches an integer column by the digits a label shows', async () => {
     const lookups = createSqlServerLookups(owner)
     const config = lookupConfig(ORDER, 'fk_order_customer', ['customer_no', 'name'])
-    expect(config.search).toEqual(['customer_no', 'name'])
+    expect(config.search.map((column) => [column.name, column.type.kind])).toEqual([
+      ['customer_no', 'integer'],
+      ['name', 'text'],
+    ])
     expect((await lookups.search(config, page('100'), tenant('1'))).rows).toEqual([{ token: 'k1:1,1001', label: '1001 · Muster AG' }])
     expect((await lookups.search(config, page('99'), tenant('1'))).rows).toEqual([])
   })
@@ -275,7 +286,7 @@ describe('a request the configuration cannot answer', () => {
     expect(unsearchable.search).toEqual([])
     await expect(lookups.search(unsearchable, page('Muster'), tenant('1'))).rejects.toThrow(/no searchable column/)
     expect((await lookups.search(unsearchable, page(''), tenant('1'))).rows).toEqual([{ token: 'k1:1,1001', label: '999999999999.99' }])
-    const crowded: RowFilters = { kind: 'restricted', equal: [{ column: 'tenant_id', value: '1' }, ...Array.from({ length: 2096 }, () => ({ column: 'tenant_id', value: '1' }))] }
+    const crowded: RowFilters = { kind: 'restricted', equal: [tenantTerm('1'), ...Array.from({ length: 2096 }, () => tenantTerm('1'))] }
     await expect(lookups.resolve(customers(), ['k1:1,1001'], crowded)).rejects.toThrow(/leave no parameter for a key/)
   })
 

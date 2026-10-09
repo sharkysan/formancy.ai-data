@@ -2,6 +2,7 @@ import type { FieldBinding } from '../generate/types.js'
 import type { CheckMeta, CoverageAspect, ForeignKeyMeta, ForeignKeyTarget, KeyMeta, ObjectMeta } from '../metadata.js'
 import { findObject } from '../snapshot.js'
 import { absence, cite, hiding, unseen } from './access.js'
+import { typeDifference } from './compare.js'
 import {
   candidateKeys,
   type Comparison,
@@ -178,6 +179,56 @@ function targetChanges(comparison: Comparison, lookup: Lookup, blocked: Pick<Dra
     if (!target.columns.some((column) => column.name === name)) {
       lost({ kind: 'column', object: ref, name }, 'columns', `Column ${name} of ${where}`, `${name} of ${where} is gone, and the lookup shows it.`)
     }
+  }
+  const filtered = filterColumns(comparison, lookup)
+  for (const name of filtered) {
+    if (!target.columns.some((column) => column.name === name)) {
+      lost({ kind: 'column', object: ref, name }, 'columns', `Column ${name} of ${where}`, `${name} of ${where} is gone, and the lookup's row filter compares it.`)
+    }
+  }
+  return [...drafts, ...retypedColumns(comparison, lookup, target, filtered, blocked)]
+}
+
+/** The target columns the policy's filter on this lookup compares, as the published policy names them. */
+function filterColumns(comparison: Comparison, lookup: Lookup): string[] {
+  const { lookups: rules } = comparison.policy
+  const given: unknown = Object.hasOwn(rules, lookup.field) ? rules[lookup.field] : []
+  const names = Array.isArray(given) ? given.map((rule: unknown) => (rule as { column?: unknown } | null)?.column) : []
+  return [...new Set(names.filter((name): name is string => typeof name === 'string'))]
+}
+
+/**
+ * A lookup reads its target's key, display and row filter columns by the
+ * types the published snapshot gives them (0028): a key is encoded and
+ * checked, a label decoded and spelled, a filter value checked and bound,
+ * each by that type. A column whose type is now another — in any direction —
+ * is read by the wrong reader: a display column that became a bit labelled
+ * every row through its old reader, and a filter column that became varchar
+ * failed every search. Each blocks the lookup until the form is reviewed and
+ * published again from the snapshot as it is.
+ */
+function retypedColumns(comparison: Comparison, lookup: Lookup, target: ObjectMeta, filtered: readonly string[], blocked: Pick<Draft, 'affects' | 'stops' | 'breaksReads' | 'otherwise'>): Draft[] {
+  const before = objectIn(comparison.base, lookup.target.table)
+  const uses = new Map<string, string[]>()
+  const use = (names: readonly string[], role: string) => {
+    for (const name of names) uses.set(name, [...(uses.get(name) ?? []), role])
+  }
+  use(lookup.target.columns, 'key')
+  use(lookup.display, 'label')
+  use(filtered, 'row filter')
+
+  const drafts: Draft[] = []
+  for (const [name, roles] of uses) {
+    const was = before.columns.find((column) => column.name === name)
+    const now = target.columns.find((column) => column.name === name)
+    const difference = was === undefined || now === undefined ? null : typeDifference(was, now)
+    if (difference === null) continue
+    drafts.push({
+      ...blocked,
+      kind: 'lookup-changed',
+      subject: { kind: 'column', object: target.ref, name },
+      message: `${name} of ${describe(target.ref)}: ${difference}. The ${lookup.field} lookup reads it as its ${roles.join(' and ')} by the type it was published with, so it is blocked until the form is reviewed.`,
+    })
   }
   return drafts
 }

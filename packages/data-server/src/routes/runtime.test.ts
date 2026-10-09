@@ -72,6 +72,7 @@ const POLICY: FormPolicy = {
 
 const verifyIdentity: IdentityVerifier = async (token) =>
   token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '1' } } }
+    : token === 'clerk-042' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '042' } } }
     : token === 'stranger' ? { ok: true, identity: { actor: { id: 's', roles: [] }, attributes: { tenant: '1' } } }
       : { ok: false, reason: 'bad' }
 
@@ -80,7 +81,7 @@ const RECORD = 'k1:1,7'
 const VERSION = '00000000000007d1'
 
 /** What the fake ports were asked, and what they answer. Each test sets what it needs. */
-let calls: { inserts: InsertRequest[]; updates: UpdateRequest[]; rejects: string[][] }
+let calls: { inserts: InsertRequest[]; updates: UpdateRequest[]; rejects: string[][]; lookups: number }
 let writeOutcome: RecordOutcome
 let rejected: string[]
 let rejectsFails: boolean
@@ -100,8 +101,14 @@ function registry(): ConnectionRegistry {
     },
   }
   const lookups: LookupAdapter = {
-    search: async () => ({ rows: [{ token: 'k1:CH', label: 'Switzerland' }], hasMore: false, omitted: 0 }),
-    resolve: async (_config, tokens) => tokens.map((token) => ({ token, label: 'Switzerland' })),
+    search: async () => {
+      calls.lookups += 1
+      return { rows: [{ token: 'k1:CH', label: 'Switzerland' }], hasMore: false, omitted: 0 }
+    },
+    resolve: async (_config, tokens) => {
+      calls.lookups += 1
+      return tokens.map((token) => ({ token, label: 'Switzerland' }))
+    },
     rejects: async (_config, tokens) => {
       calls.rejects.push([...tokens])
       if (rejectsFails) throw new Error('timeout on 10.0.0.5')
@@ -113,7 +120,7 @@ function registry(): ConnectionRegistry {
 }
 
 beforeEach(async () => {
-  calls = { inserts: [], updates: [], rejects: [] }
+  calls = { inserts: [], updates: [], rejects: [], lookups: 0 }
   writeOutcome = { ok: true, values: { ...STORED }, version: VERSION }
   rejected = []
   rejectsFails = false
@@ -125,6 +132,12 @@ beforeEach(async () => {
   })
   const bundle: PublishedBundle = { format: 1, connection: 'erp', form, bindings, policy: POLICY, snapshot: SNAPSHOT }
   await store.publish('customer', null, bundle)
+  // The same form whose country list is scoped by the tenant, through the country's integer id.
+  const scoped = generateForm(SNAPSHOT, {
+    connection: 'erp', root: ref('customer'), formId: 'scoped', title: 'Customer',
+    lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }], pinned: ['tenant_id'],
+  })
+  await store.publish('scoped', null, { ...bundle, form: scoped.form, bindings: scoped.bindings, policy: { ...POLICY, lookups: { country: [{ column: 'id', attribute: 'tenant' }] } } })
   app = await createDataServer({ verifyIdentity, runtime: { registry: registry(), store } })
 })
 
@@ -275,6 +288,40 @@ describe('the runtime plane', () => {
     expect((await post(`/v1/forms/customer/lookups/${String(source)}/resolve`, { operation: 'create', tokens: Array.from({ length: 101 }, () => 'k1:CH') })).statusCode).toBe(400)
     expect((await post(`/v1/forms/customer/lookups/${String(source)}/query`, { operation: 'create' }, 'stranger')).statusCode).toBe(403)
   })
+
+  // The route scoped nothing: it passed the policy's text to the adapter, so
+  // a tenant of '042' — which a record request refuses, because each engine
+  // would convert it to 42 — listed tenant 42's countries (0028). Scoped
+  // with scopeRowFilters like a record request, it is refused the same way,
+  // before a connection is opened and with the adapter never asked.
+  test('lookups: a trusted value not spelled as its column holds it is refused before the adapter is asked', async () => {
+    const source = 'erp-sales-customer-fk-customer-country'
+    expect((await post(`/v1/forms/scoped/lookups/${source}/query`, { operation: 'create', search: '' })).statusCode).toBe(200)
+    expect(calls.lookups).toBe(1)
+    for (const route of ['query', 'resolve']) {
+      const response = await post(`/v1/forms/scoped/lookups/${source}/${route}`, { operation: 'create', search: '', tokens: ['k1:CH'] }, 'clerk-042')
+      expect(response.statusCode, route).toBe(403)
+      expect(response.json(), route).toMatchObject({ code: 'invalid-context' })
+    }
+    expect(calls.lookups).toBe(1)
+  })
+
+  // A refusal the port has no code for — a trigger's own error, a write the
+  // database declined — will be refused again, so the person is told not to
+  // retry; only `unavailable` says the database could not answer now (0028).
+  test('a refused write is 422 and says it will be refused again; unavailable stays 503', async () => {
+    writeOutcome = { ok: false, code: 'refused', message: 'trigger tr_customer raised 51701' }
+    const refused = await post('/v1/forms/customer/records/create', { answers: NEW })
+    expect(refused.statusCode).toBe(422)
+    expect(refused.json()).toEqual({ code: 'refused', message: 'The database refused this request, and nothing was saved. Sending it again will be refused the same way.' })
+    expect(refused.body).not.toContain('51701')
+    writeOutcome = { ok: false, code: 'refused', column: 'name', message: 'trigger tr_customer refused name' }
+    expect((await post('/v1/forms/customer/records/create', { answers: NEW })).json().fieldErrors).toEqual([expect.objectContaining({ field: 'name', code: 'refused' })])
+    writeOutcome = { ok: false, code: 'unavailable', message: 'deadlock victim' }
+    const unavailable = await post('/v1/forms/customer/records/create', { answers: NEW })
+    expect(unavailable.statusCode).toBe(503)
+    expect(unavailable.json()).toEqual({ code: 'unavailable', message: 'The database could not complete this now. Nothing was saved.' })
+  })
 })
 
 describe('the operational audit trail', () => {
@@ -314,6 +361,16 @@ describe('the operational audit trail', () => {
       { actor: null, operation: 'read', status: 401, outcome: 'unauthenticated', formVersion: null },
       { actor: 'c', operation: 'read', status: 404, outcome: 'unknown-form', formVersion: null },
     ])
+  })
+
+  // The outcome is the body's code, so a refusal is audited as refused and
+  // not as the database being down — the two ask an operator different things.
+  test('records a refused write as refused', async () => {
+    const events: AuditEvent[] = []
+    const server = await audited((event) => events.push(event))
+    writeOutcome = { ok: false, code: 'refused', message: 'trigger' }
+    await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: NEW } })
+    expect(events.map(({ status, outcome }) => ({ status, outcome }))).toEqual([{ status: 422, outcome: 'refused' }])
   })
 
   // A record token spells its key, and a key is often small. Without a key to

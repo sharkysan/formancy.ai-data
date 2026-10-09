@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, NormalizedType, RecordAdapter } from '@formancy/data-core'
+import type { ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, NormalizedType, ObjectMeta, RecordAdapter } from '@formancy/data-core'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
@@ -19,13 +19,26 @@ const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial
 /** The database as it is "now", and who discovers it; a test changes either to make drift. */
 let columns: ColumnMeta[]
 let account: MetadataSnapshot['account']
+/** Off unless a test turns it on: an employee's department, a lookup target whose `region` a policy can filter on. */
+let department: { region: NormalizedType } | null
 function snapshot(): MetadataSnapshot {
+  const departmentObjects: ObjectMeta[] = department === null ? [] : [{
+    ref: { schema: 'sales', name: 'dept' }, kind: 'table', comment: null,
+    columns: [col('id', 1, INT32), col('name', 2, { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }), col('region', 3, department.region)],
+    primaryKey: { name: 'pk_dept', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+  }]
   return createSnapshot({
     kind: 'sqlserver', serverVersion: '16.0', account, scope: { schemas: ['sales'] }, gaps: [],
     objects: [{
-      ref: { schema: 'sales', name: 'employee' }, kind: 'table', comment: null, columns,
-      primaryKey: { name: 'pk_employee', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
-    }],
+      ref: { schema: 'sales', name: 'employee' }, kind: 'table', comment: null,
+      columns: department === null ? columns : [...columns, col('dept_id', 9, INT32)],
+      primaryKey: { name: 'pk_employee', columns: ['id'] }, uniqueKeys: [],
+      foreignKeys: department === null ? [] : [{
+        name: 'fk_employee_dept', columns: ['dept_id'], references: { table: { schema: 'sales', name: 'dept' }, columns: ['id'] },
+        onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true,
+      }],
+      checks: [], rowSecurity: 'none',
+    }, ...departmentObjects],
   })
 }
 
@@ -72,6 +85,7 @@ const POLICY = {
 beforeEach(async () => {
   columns = [col('id', 1, INT32), col('name', 2, { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', 3, { kind: 'rowversion' }, { generated: 'rowversion' })]
   account = { user: 'dbo', login: 'sa' }
+  department = null
   reachable = true
   root = await mkdtemp(join(tmpdir(), 'formancy-data-admin-'))
   store = createFileConfigurationStore(root)
@@ -204,6 +218,27 @@ describe('the administrator plane', () => {
     expect(drift.blocking).toBe(true)
     expect(drift.changes).toContainEqual(expect.objectContaining({ kind: 'column-dropped', severity: 'blocking' }))
     expect((await app.inject({ method: 'POST', url: '/v1/forms/nope/drift', headers: as('admin') })).statusCode).toBe(404)
+  })
+
+  // A lookup's policy may filter its target on a column that is neither the
+  // key nor a display column (0028), and drift has to see that column retyped:
+  // the trusted value a filter binds was checked against the old type. Drift
+  // learns the filter columns from the published policy, so a route that
+  // handed it any other policy would report nothing here.
+  test('drift sees a lookup filter column retyped, from the published policy', async () => {
+    department = { region: { kind: 'text', maxLength: 20, lengthUnit: 'utf16-code-units', fixedLength: false } }
+    const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, lookups: [{ foreignKey: 'fk_employee_dept', display: ['name'] }] } })).json()
+    const fields = (proposal.bindings.fields as Array<{ field: string; writable: boolean }>).map((binding) => [binding.field, { read: ['clerk'], write: binding.writable ? ['clerk'] : [] }])
+    const policy = { ...POLICY, fields: Object.fromEntries(fields), lookups: { dept: [{ column: 'region', attribute: 'tenant' }] } }
+    const bundle = { format: 1, connection: 'erp', form: proposal.form, bindings: proposal.bindings, policy, snapshot: proposal.snapshot }
+    const published = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle } })
+    expect(published.statusCode, published.body).toBe(201)
+    expect((await app.inject({ method: 'POST', url: '/v1/forms/employee/drift', headers: as('admin') })).json()).toMatchObject({ changes: [], blocking: false })
+
+    department = { region: INT32 }
+    const drift = (await app.inject({ method: 'POST', url: '/v1/forms/employee/drift', headers: as('admin') })).json()
+    expect(drift.changes).toContainEqual(expect.objectContaining({ kind: 'lookup-changed', severity: 'blocking' }))
+    expect(drift.blocking).toBe(true)
   })
 
   // The connection's credentials were rotated to another principal: grants

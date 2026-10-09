@@ -16,6 +16,7 @@ import {
   INT32,
   kinds,
   named,
+  NO_FILTERS,
   object,
   only,
   ORDER,
@@ -36,16 +37,16 @@ describe('diffSnapshots: what is compared, and the root', () => {
   test('identical snapshots give an empty report, and the form keeps what it offered', () => {
     const base = snapshot()
     const { bindings } = generateForm(base, ORDER)
-    expect(diffSnapshots(base, snapshot(undefined, { serverVersion: '16.0.4135' }), bindings)).toEqual({
+    expect(diffSnapshots(base, snapshot(undefined, { serverVersion: '16.0.4135' }), bindings, NO_FILTERS)).toEqual({
       changes: [],
       blocking: false,
       writable: { create: true, update: true },
     })
-    expect(diffSnapshots(base, base, generateForm(base, EMPLOYEE).bindings).writable).toEqual({ create: true, update: false })
+    expect(diffSnapshots(base, base, generateForm(base, EMPLOYEE).bindings, NO_FILTERS).writable).toEqual({ create: true, update: false })
 
     // Equal fingerprints are createSnapshot's promise that two snapshots
     // describe the same thing, so the objects are not walked at all.
-    expect(diffSnapshots(base, { ...base, objects: [] }, bindings).changes).toEqual([])
+    expect(diffSnapshots(base, { ...base, objects: [] }, bindings, NO_FILTERS).changes).toEqual([])
   })
 
   // Bindings judged against a snapshot they were not generated from would be
@@ -55,11 +56,11 @@ describe('diffSnapshots: what is compared, and the root', () => {
     const base = snapshot()
     const { bindings } = generateForm(base, ORDER)
     const other = snapshot((objects) => object(objects, 'employee').columns.push(col('email', 'nvarchar(200)', text(200), { nullable: true, ordinal: 3 })))
-    expect(() => diffSnapshots(other, other, bindings)).toThrow(/generated from snapshot/)
-    expect(() => diffSnapshots(base, snapshot(undefined, { kind: 'postgres' }), bindings)).toThrow(/a sqlserver snapshot cannot be compared with a postgres one/)
+    expect(() => diffSnapshots(other, other, bindings, NO_FILTERS)).toThrow(/generated from snapshot/)
+    expect(() => diffSnapshots(base, snapshot(undefined, { kind: 'postgres' }), bindings, NO_FILTERS)).toThrow(/a sqlserver snapshot cannot be compared with a postgres one/)
     // A version-1 file cannot say what a field writes on each operation, so
     // every verdict about writes would be a guess (0027); the remedy is named.
-    expect(() => diffSnapshots(base, base, { ...bindings, version: 1 as 2 })).toThrow(/version 1 were published before 0027.*republish/)
+    expect(() => diffSnapshots(base, base, { ...bindings, version: 1 as 2 }, NO_FILTERS)).toThrow(/version 1 were published before 0027.*republish/)
   })
 
   // Bindings edited by hand to name something the base does not have would
@@ -72,7 +73,7 @@ describe('diffSnapshots: what is compared, and the root', () => {
     const doctored = (edit: (copy: FormBindings) => void) => {
       const copy = JSON.parse(JSON.stringify(bindings)) as FormBindings
       edit(copy)
-      return () => diffSnapshots(base, current, copy)
+      return () => diffSnapshots(base, current, copy, NO_FILTERS)
     }
     const lookup = (copy: FormBindings) => {
       const found = copy.fields.find((field) => field.kind === 'lookup')
@@ -90,7 +91,7 @@ describe('diffSnapshots: what is compared, and the root', () => {
     // match says the database did not change, not that these bindings fit it.
     const ghost = JSON.parse(JSON.stringify(bindings)) as FormBindings
     ghost.fields.push({ kind: 'column', field: 'ghost', column: 'ghost', type: INT32, nullable: true, writes: { create: true, update: true } })
-    expect(() => diffSnapshots(base, base, ghost)).toThrow(/column ghost of sales\.order/)
+    expect(() => diffSnapshots(base, base, ghost, NO_FILTERS)).toThrow(/column ghost of sales\.order/)
   })
 
   // The table really is gone: no gap says the connection lost sight of it,

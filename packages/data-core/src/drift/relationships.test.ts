@@ -14,6 +14,7 @@ import {
   foreignKey,
   gap,
   INT32,
+  INT64,
   kinds,
   named,
   object,
@@ -21,6 +22,7 @@ import {
   ORDER,
   ORDER_REF,
   remove,
+  retype,
   snapshot,
   table,
   text,
@@ -145,6 +147,53 @@ describe('diffSnapshots: lookups', () => {
 
     const gone = drift((objects) => dropForeignKey(objects, 'fk_order_customer'), { gaps: [gap(ORDER_REF, 'foreign-keys')] })
     expect(only(gone)).toMatchObject({ kind: 'access-narrowed', subject: { kind: 'foreign-key', object: ORDER_REF, name: 'fk_order_customer' } })
+  })
+
+  // A lookup reads its target's key, display and row filter columns by the
+  // types in the published snapshot (0028): a label is decoded and spelled by
+  // its type, a filter bound by it. A display column retyped from text to bit
+  // labelled every row by the published reader, and a filter column retyped
+  // from int to varchar failed every search on PostgreSQL (42883) — while
+  // drift said nothing had changed, because only the root's types were
+  // compared.
+  test("a lookup's display, key or row filter column whose type changed blocks the lookup", () => {
+    const display = drift((objects) => retype(objects, 'customer', 'name', 'bit', { kind: 'boolean' }))
+    expect(only(display)).toMatchObject({
+      kind: 'lookup-changed',
+      severity: 'blocking',
+      subject: { kind: 'column', object: CUSTOMER_REF, name: 'name' },
+      affects: ['customer'],
+      message: expect.stringMatching(/^name of crm\.customer: its type changed from nvarchar\(200\) to bit\. The customer lookup reads it as its label /),
+    })
+    expect(display.writable).toEqual({ create: false, update: false })
+    // A widening too: what the lookup binds and decodes is the published type, whatever the direction.
+    expect(only(drift((objects) => retype(objects, 'customer', 'name', 'nvarchar(400)', text(400))))).toMatchObject({ kind: 'lookup-changed', subject: { name: 'name' } })
+    // A key column the foreign key still matches, retyped on the target alone.
+    expect(only(drift((objects) => retype(objects, 'customer', 'customer_no', 'bigint', INT64)))).toMatchObject({
+      kind: 'lookup-changed',
+      subject: { kind: 'column', object: CUSTOMER_REF, name: 'customer_no' },
+      message: expect.stringMatching(/reads it as its key /),
+    })
+
+    // A filter column is the policy's, not the bindings': a column neither key
+    // nor display is compared only when the policy filters the lookup by it.
+    const region = col('region', 'nvarchar(20)', text(20))
+    const base = snapshot((objects) => addColumn(objects, 'customer', region))
+    const retyped = (objects: ObjectMeta[]) => {
+      addColumn(objects, 'customer', region)
+      retype(objects, 'customer', 'region', 'int', INT32)
+    }
+    const byRegion = { lookups: { customer: [{ column: 'region', attribute: 'region' }] } }
+    expect(only(drift(retyped, { policy: byRegion }, ORDER, base))).toMatchObject({
+      kind: 'lookup-changed',
+      severity: 'blocking',
+      subject: { kind: 'column', object: CUSTOMER_REF, name: 'region' },
+      message: expect.stringMatching(/reads it as its row filter /),
+    })
+    expect(drift(retyped, {}, ORDER, base).changes).toEqual([])
+    // Gone, every search names a column that is not there.
+    const dropped = drift((objects) => objects, { policy: byRegion }, ORDER, base)
+    expect(only(dropped)).toMatchObject({ kind: 'lookup-changed', severity: 'blocking', subject: { kind: 'column', object: CUSTOMER_REF, name: 'region' } })
   })
 })
 

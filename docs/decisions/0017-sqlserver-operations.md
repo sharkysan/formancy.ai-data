@@ -1,6 +1,6 @@
 # 0017 — Convert every SQL Server value in SQL, check what a write stored, and translate a refusal by its number
 
-- **Status:** accepted; `real` and zoneless timestamp reads narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md); the refusals translated by number extended by [0027](0027-a-snapshot-says-what-its-account-may-do.md): a block predicate's 33504 is `permission-denied`
+- **Status:** accepted; `real` and zoneless timestamp reads narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md); the refusals translated by number extended by [0027](0027-a-snapshot-says-what-its-account-may-do.md): a block predicate's 33504 is `permission-denied`; narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): a filter also compares `datalength`, `char(n)` reads unpadded, labels are read by the record reader, and a number from 50000 or none on the allowlist is `refused`
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** three suites in `packages/data-sqlserver/src/` against

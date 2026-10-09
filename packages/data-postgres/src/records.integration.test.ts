@@ -34,7 +34,8 @@ let owner: Sql
 let reader: Sql
 let snapshot: MetadataSnapshot
 
-const TENANT_1: RowFilters = { kind: 'restricted', equal: [{ column: 'tenant_id', value: '1' }] }
+/** sales.order's, sales.customer's and rec.contact's tenant_id, an integer, as `scopeRowFilters` types it. */
+const TENANT_1: RowFilters = { kind: 'restricted', equal: [{ column: 'tenant_id', type: { kind: 'integer', min: '-2147483648', max: '2147483647' }, value: '1' }] }
 const EVERY_ROW: RowFilters = { kind: 'unrestricted' }
 /** 63 bytes: PostgreSQL's longest identifier. One byte more and the server truncates to this. */
 const LONGEST = 'x'.repeat(63)
@@ -379,15 +380,17 @@ describe('reading', () => {
   })
 
   // The boolean serializer of postgres.js turns every value that is not the
-  // JavaScript `true` into 'f', so an untyped filter of 'true' selects the
-  // FALSE rows. A row filter has to mean what the trusted context says.
-  test('a filter on a boolean column selects the rows it names', async () => {
-    await owner.unsafe(`insert into rec.kinds (id, t, b) values (6, 'switched on', true), (7, 'switched off', false)`)
+  // JavaScript `true` into 'f', so an untyped filter of 'true' once selected
+  // the FALSE rows. A boolean has no spelling both engines compare alike,
+  // so a boolean filter is refused (0028), and one that reaches the adapter
+  // by hand is thrown before anything is sent, for a read and an update.
+  test('a boolean filter throws before anything is sent', async () => {
     const records = createPostgresRecords(owner)
-    const on: RowFilters = { kind: 'restricted', equal: [{ column: 'b', value: 'true' }] }
-    const read = (id: string) => records.read({ target: KINDS, key: idKey(id), columns: [col('kinds', 't')], filters: on })
-    expect(succeeded(await read('6')).values).toEqual({ t: 'switched on' })
-    expect(failed(await read('7')).code).toBe('not-found')
+    const on = { kind: 'restricted', equal: [{ column: 'b', type: col('kinds', 'b').type, value: 'true' }] } as unknown as RowFilters
+    await expect(records.read({ target: KINDS, key: idKey('6'), columns: [col('kinds', 't')], filters: on })).rejects.toThrow(/carries its column's type/)
+    await expect(
+      records.update({ target: KINDS, key: idKey('6'), set: [val('kinds', 't', 'x')], expectedVersion: '1', filters: on, returning: [] }),
+    ).rejects.toThrow(/carries its column's type/)
   })
 
   // A filter term parsed by building a row of the table's type from NULL
@@ -723,12 +726,12 @@ describe('what a refusal is called', () => {
   })
 
   // A trigger is the database refusing by a rule it does not declare as a
-  // constraint. The contract has no code of its own for it; check-violation
-  // is the refusal a person can act on.
-  test('a trigger that raises is a check-violation', async () => {
+  // constraint. `check-violation` claimed a constraint the form could have
+  // checked; `refused` (0028) says the same request will be refused again.
+  test('a trigger that raises is refused', async () => {
     const guarded: RecordTarget = { table: { schema: 'rec', name: 'guarded' }, identity: [ID], concurrency: null }
     const outcome = failed(await createPostgresRecords(owner).insert({ target: guarded, values: [val('guarded', 'id', '1'), val('guarded', 'amount', '-1')], returning: [] }))
-    expect(outcome.code).toBe('check-violation')
+    expect(outcome.code).toBe('refused')
     expect(outcome.message).not.toMatch(/negative/)
   })
 
@@ -736,17 +739,18 @@ describe('what a refusal is called', () => {
   // makes the server complete the statement — INSERT 0 0, UPDATE 0 — with no
   // error. Taken as success, the insert was a save that never happened, its
   // identity null; taken as "nothing matched", the update was stale on every
-  // attempt while the version never moved.
-  test('a write the database declines without an error is a check-violation, not a success and not stale', async () => {
+  // attempt while the version never moved. Not `check-violation` either,
+  // which names a constraint the form could have checked (0028).
+  test('a write the database declines without an error is refused, not a success and not stale', async () => {
     const records = createPostgresRecords(owner)
     const insert = (target: RecordTarget, returning: RecordColumn[]) => records.insert({ target, values: [val('declined', 'id', '2'), val('declined', 'note', 'never written')], returning })
-    expect(failed(await insert(DECLINED, [col('declined', 'id')]))).toMatchObject({ code: 'check-violation', message: expect.stringMatching(/declined/) })
-    expect(failed(await insert({ ...DECLINED, concurrency: null }, [])).code).toBe('check-violation')
-    expect(failed(await insert({ table: { schema: 'rec', name: 'ruled' }, identity: [ID], concurrency: null }, [])).code).toBe('check-violation')
+    expect(failed(await insert(DECLINED, [col('declined', 'id')]))).toMatchObject({ code: 'refused', message: expect.stringMatching(/declined/) })
+    expect(failed(await insert({ ...DECLINED, concurrency: null }, [])).code).toBe('refused')
+    expect(failed(await insert({ table: { schema: 'rec', name: 'ruled' }, identity: [ID], concurrency: null }, [])).code).toBe('refused')
 
     const update = (id: string, expectedVersion: string) =>
       records.update({ target: DECLINED, key: idKey(id), set: [val('declined', 'note', 'never written')], expectedVersion, filters: EVERY_ROW, returning: [] })
-    expect(failed(await update('1', '1'))).toMatchObject({ code: 'check-violation', message: expect.stringMatching(/declined/) })
+    expect(failed(await update('1', '1'))).toMatchObject({ code: 'refused', message: expect.stringMatching(/declined/) })
     // A version that has moved is still stale, and a record that is not there still not-found.
     expect(failed(await update('1', '2')).code).toBe('stale')
     expect(failed(await update('9', '1')).code).toBe('not-found')

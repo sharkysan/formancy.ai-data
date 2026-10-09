@@ -1,4 +1,4 @@
-import { findObject, gapCovers } from '@formancy/data-core'
+import { findObject, gapCovers, rowFilterColumnProblem } from '@formancy/data-core'
 import type { ColumnMeta, CoverageGap, ForeignKeyMeta, LookupChoice, MetadataSnapshot, ObjectMeta, ObjectRef, RowFilterRule } from '@formancy/data-core'
 import type { ProposalRequest } from './api.js'
 
@@ -147,12 +147,14 @@ export function rowversionOf(root: ObjectMeta): ColumnMeta | undefined {
 }
 
 /**
- * Columns a policy could pin: ones the person would otherwise write. A
- * generated column has its value already, and one the account may not read
- * would fail every read the pin filters (0027).
+ * Columns a policy could pin: ones the person would otherwise write, and that
+ * a row filter can compare. A generated column has its value already; one the
+ * account may not read would fail every read the pin filters (0027); and a
+ * boolean, float, time or timestamp has no spelling both engines compare
+ * alike, so the server refuses the filter at publish (0028).
  */
 export function pinCandidates(root: ObjectMeta): ColumnMeta[] {
-  return root.columns.filter((column) => column.generated === 'none' && column.access.select)
+  return root.columns.filter((column) => column.generated === 'none' && rowFilterColumnProblem(root, column.name) === null)
 }
 
 /**

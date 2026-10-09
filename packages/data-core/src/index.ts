@@ -47,10 +47,14 @@ export { buildLookupConfig, DEFAULT_MAX_PAGE_SIZE } from './lookup/config.js'
 export type { LookupOptions, LookupSortChoice } from './lookup/config.js'
 export { lookupKeys, lookupPage, rejectedTokens, resolvedRows } from './lookup/rows.js'
 export type { FoundRow } from './lookup/rows.js'
-export { lookupFilters, rowFilterTerms } from './lookup/filters.js'
+export { rowFilterColumnProblem, rowFilterTerms, scopeRowFilters } from './lookup/filters.js'
+export type { FilterScoping } from './lookup/filters.js'
+export { displayText } from './lookup/display.js'
 export type {
   LookupAdapter,
   LookupConfig,
+  LookupDisplayColumn,
+  LookupDisplayType,
   LookupKeyColumn,
   LookupKeyType,
   LookupMembership,
@@ -59,9 +63,12 @@ export type {
   LookupResult,
   LookupRow,
   LookupSearch,
+  LookupSearchColumn,
+  LookupSearchType,
   LookupSort,
   RowFilterTerm,
   RowFilters,
+  RowFilterType,
 } from './lookup/types.js'
 
 export { codecFor } from './codecs/codec.js'

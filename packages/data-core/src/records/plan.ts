@@ -3,6 +3,7 @@ import { codecFor } from '../codecs/codec.js'
 import { decodeRowversion } from '../codecs/rowversion.js'
 import type { FormBindings } from '../generate/types.js'
 import { buildLookupConfig } from '../lookup/config.js'
+import { scopeRowFilters } from '../lookup/filters.js'
 import type { LookupConfig, RowFilters } from '../lookup/types.js'
 import { isKeyValue, isLookupKeyType } from '../lookup/values.js'
 import type { ColumnMeta, MetadataSnapshot, ObjectMeta } from '../metadata.js'
@@ -11,7 +12,7 @@ import type { FormPolicy, PolicyContext, RowFilter } from '../policy/types.js'
 import { findObject } from '../snapshot.js'
 import { columnAnswer, lookupAnswer } from './answers.js'
 import type { FieldError, InvalidValues, MembershipCheck, PlannedInsert, PlannedRead, PlannedUpdate, PlanRefusal } from './plan-types.js'
-import { columnsOf, inCatalogOrder, prepare, type Prepared, refuse, scopedFilters } from './prepare.js'
+import { columnsOf, inCatalogOrder, prepare, type Prepared, refuse } from './prepare.js'
 import { decodeRecordKey } from './token.js'
 import type { RecordColumn, RecordValue } from './types.js'
 
@@ -65,11 +66,11 @@ function inCatalogValues(root: ObjectMeta, values: readonly RecordValue[]): Reco
   return [...values].sort((left, right) => (position.get(left.name) as number) - (position.get(right.name) as number))
 }
 
-/** The root's filter for an operation, each value spelled as its column holds it. */
+/** The root's filter for an operation, each term typed from its column and spelled as the column holds it (0028). */
 function filtersFor(prepared: Prepared, policy: FormPolicy, context: PolicyContext, operation: 'read' | 'update'): { ok: true; filter: RowFilter; filters: RowFilters } | PlanRefusal {
   const filter = rowFilter(policy, context, operation)
   if (!filter.ok) return filter
-  const scoped = scopedFilters(prepared.root, filter.filter, 'rowFilters')
+  const scoped = scopeRowFilters(prepared.root, filter.filter, 'rowFilters')
   return scoped.ok ? { ok: true, filter: filter.filter, filters: scoped.filters } : scoped
 }
 
@@ -159,7 +160,7 @@ function membershipChecks(
       return refuse('invalid-bindings', `${field} cannot be rechecked: ${(error as Error).message}`)
     }
     // buildLookupConfig found the target in this snapshot, or it would have thrown.
-    const scoped = scopedFilters(findObject(snapshot, config.target) as ObjectMeta, filter.filter, `lookups.${field}`)
+    const scoped = scopeRowFilters(findObject(snapshot, config.target) as ObjectMeta, filter.filter, `lookups.${field}`)
     if (!scoped.ok) return scoped
     checks.push({ field, config, tokens: [token], filters: scoped.filters })
   }
@@ -195,7 +196,7 @@ export function planRead(snapshot: MetadataSnapshot, bindings: FormBindings, pol
 function pinnedValues(prepared: Prepared, policy: FormPolicy, context: PolicyContext): { ok: true; values: RecordValue[] } | PlanRefusal {
   const forced = forcedValues(policy, context)
   if (!forced.ok) return forced
-  const scoped = scopedFilters(prepared.root, forced.values, 'rowFilters')
+  const scoped = scopeRowFilters(prepared.root, forced.values, 'rowFilters')
   if (!scoped.ok) return scoped
   const values: RecordValue[] = []
   for (const { column: name, value } of forced.values) {

@@ -1,3 +1,5 @@
+import type { ApiValue } from '../codecs/codec.js'
+import { displayText } from './display.js'
 import { formatLabel } from './label.js'
 import { decodeKeyToken, encodeKeyToken } from './token.js'
 import type { LookupConfig, LookupResult, LookupRow } from './types.js'
@@ -18,8 +20,23 @@ export interface FoundRow {
    * otherwise, a row would be offered under a token `lookupKeys` never asks about.
    */
   key: readonly string[]
-  /** Each display column's canonical API string in `display` order, or `null` for SQL NULL. */
-  display: ReadonlyArray<string | null>
+  /**
+   * Each display column's canonical API value, in `display` order, as the
+   * adapter's record reader decodes it — a boolean as `true`, a real as its
+   * shortest decimal — or `null` for SQL NULL. `displayText` spells the label
+   * from it, so neither adapter chooses a spelling (0028).
+   */
+  display: ReadonlyArray<ApiValue>
+}
+
+/** A row's label, each display value spelled by its column's type. */
+function labelOf(config: LookupConfig, row: FoundRow): string {
+  const display = config.display
+  if (row.display.length !== display.length) throw new Error(`A found row has ${String(row.display.length)} display values and the lookup shows ${String(display.length)}.`)
+  return formatLabel(
+    row.display.map((value, index) => displayText((display[index] as LookupConfig['display'][number]).type, value)),
+    row.key,
+  )
 }
 
 function tokenFor(key: readonly string[]): string | undefined {
@@ -64,9 +81,10 @@ export function lookupKeys(config: LookupConfig, tokens: readonly string[]): str
  * not fit a token is counted in `omitted`, because a row that silently is not
  * there looks like a table that does not have it. A key twice on one page is an
  * adapter that joined wrongly, and formancy would refuse the whole list for it,
- * so it is refused here, where the message can say why.
+ * so it is refused here, where the message can say why. Labels are spelled
+ * from `config.display`'s types.
  */
-export function lookupPage(fetched: readonly FoundRow[], limit: number): LookupResult {
+export function lookupPage(config: LookupConfig, fetched: readonly FoundRow[], limit: number): LookupResult {
   const rows: LookupRow[] = []
   const seen = new Set<string>()
   let omitted = 0
@@ -78,7 +96,7 @@ export function lookupPage(fetched: readonly FoundRow[], limit: number): LookupR
     }
     if (seen.has(token)) throw new Error(`${token} appears twice in one page: the lookup query repeats a row`)
     seen.add(token)
-    rows.push({ token, label: formatLabel(row.display, row.key) })
+    rows.push({ token, label: labelOf(config, row) })
   }
   return { rows, hasMore: fetched.length > limit, omitted }
 }
@@ -88,11 +106,11 @@ export function lookupPage(fetched: readonly FoundRow[], limit: number): LookupR
  * once, in the order they were submitted. A token with no such row is left
  * out, so the browser shows the stored value rather than another row's name.
  */
-export function resolvedRows(tokens: readonly string[], found: readonly FoundRow[]): LookupRow[] {
+export function resolvedRows(config: LookupConfig, tokens: readonly string[], found: readonly FoundRow[]): LookupRow[] {
   const labels = new Map<string, string>()
   for (const row of found) {
     const token = tokenFor(row.key)
-    if (token !== undefined) labels.set(token, formatLabel(row.display, row.key))
+    if (token !== undefined) labels.set(token, labelOf(config, row))
   }
   const rows: LookupRow[] = []
   for (const token of new Set(tokens)) {

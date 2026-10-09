@@ -3,10 +3,13 @@ import type { FoundRow, LookupAdapter, LookupConfig } from '@formancy/data-core'
 import type { Sql } from 'postgres'
 import { run } from '../sql/statement.js'
 import type { TextRow } from '../sql/statement.js'
+import { decodeCanonical } from '../sql/values.js'
 import { keysStatement, searchStatement } from './sql.js'
 
 /**
- * The rows a lookup query returned, split into key and display text.
+ * The rows a lookup query returned: the key as canonical text, and each
+ * display value decoded by its column's type, as a record read decodes it,
+ * for `displayText` to spell (0028).
  *
  * A key column is never NULL here — searches exclude such rows, and an `IN`
  * never matches one — but a NULL that arrived anyway is kept as one, and
@@ -15,7 +18,10 @@ import { keysStatement, searchStatement } from './sql.js'
  */
 function foundRows(config: LookupConfig, rows: readonly TextRow[]): FoundRow[] {
   const width = config.targetColumns.length
-  return rows.map((row) => ({ key: row.slice(0, width) as string[], display: row.slice(width) }))
+  return rows.map((row) => ({
+    key: row.slice(0, width) as string[],
+    display: config.display.map((column, index) => decodeCanonical(column.type, row[width + index] ?? null)),
+  }))
 }
 
 /**
@@ -24,8 +30,9 @@ function foundRows(config: LookupConfig, rows: readonly TextRow[]): FoundRow[] {
  * Each method reads the actor's filters with `rowFilterTerms` before
  * anything else, so filters that say nothing throw before the database is
  * asked, and applies them in the same statement as everything else. Which
- * tokens are asked about, how a page knows there is more, the label and
- * membership are the core's helpers, so this adapter decides none of them.
+ * tokens are asked about, how a page knows there is more, how a label is
+ * spelled and membership are the core's helpers, so this adapter decides
+ * none of them.
  *
  * A database error is thrown, not answered: formancy refuses a submission
  * whose membership check throws (formancy.ai 0022), and a search that throws
@@ -36,7 +43,7 @@ export function createPostgresLookups(sql: Sql): LookupAdapter {
     async search(config, query, filters) {
       const statement = searchStatement(config, query, rowFilterTerms(filters))
       const result = await run(sql, statement.text, statement.params)
-      return lookupPage(foundRows(config, result.rows), query.limit)
+      return lookupPage(config, foundRows(config, result.rows), query.limit)
     },
 
     async resolve(config, tokens, filters) {
@@ -45,7 +52,7 @@ export function createPostgresLookups(sql: Sql): LookupAdapter {
       if (keys.length === 0) return []
       const statement = keysStatement(config, keys, terms, true)
       const result = await run(sql, statement.text, statement.params)
-      return resolvedRows(tokens, foundRows(config, result.rows))
+      return resolvedRows(config, tokens, foundRows(config, result.rows))
     },
 
     async rejects(config, tokens, filters) {

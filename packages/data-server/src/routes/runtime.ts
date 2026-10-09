@@ -2,17 +2,18 @@ import {
   authorizeOperation,
   buildLookupConfig,
   checkSubmittedFields,
-  lookupFilters,
+  findObject,
   lookupRowFilter,
   planCreate,
   planRead,
   planUpdate,
   readableFields,
   rejectedSelection,
+  scopeRowFilters,
   toFormAnswers,
   validateLookupQuery,
 } from '@formancy/data-core'
-import type { FieldError, MembershipCheck, PolicyContext, PolicyOperation } from '@formancy/data-core'
+import type { FieldError, MembershipCheck, ObjectMeta, PolicyContext, PolicyOperation } from '@formancy/data-core'
 import { canonicalize } from '@formancy/spec'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
@@ -322,9 +323,20 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       await reply.code(refusal.status).send(refusal.body)
       return undefined
     }
+    // Scoped as a record request's filter is (0028), before a connection is
+    // opened: a trusted value the column does not hold in that spelling is
+    // refused here, never left to the engine to convert.
+    const config = buildLookupConfig(bundle.bindings, binding.field, { snapshot: bundle.snapshot })
+    // buildLookupConfig found the target in this snapshot, or it would have thrown.
+    const scoped = scopeRowFilters(findObject(bundle.snapshot, config.target) as ObjectMeta, filter.filter, `lookups.${binding.field}`)
+    if (!scoped.ok) {
+      const refusal = planRefusal(scoped.code, scoped.message)
+      await reply.code(refusal.status).send(refusal.body)
+      return undefined
+    }
     const open = await connection(bundle, reply)
     if (open === undefined) return undefined
-    return { bundle, open, config: buildLookupConfig(bundle.bindings, binding.field, { snapshot: bundle.snapshot }), filters: lookupFilters(filter.filter) }
+    return { bundle, open, config, filters: scoped.filters }
   }
 
   app.post<{ Params: { id: string; source: string } }>('/v1/forms/:id/lookups/:source/query', async (request, reply) => {

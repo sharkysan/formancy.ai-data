@@ -40,10 +40,33 @@ const BY_CLASS: ReadonlyMap<string, RecordFailureCode> = new Map([
   ['22', 'out-of-range'],
   // Any other integrity constraint.
   ['23', 'check-violation'],
-  // RAISE in a PL/pgSQL trigger or function: a rule the database enforces
-  // without declaring it as a constraint. The contract has no code of its own.
-  ['P0', 'check-violation'],
 ])
+
+/**
+ * What passes, or what the deployment has to change, and so is `unavailable`
+ * (0028): the server could not answer now, and the statement certainly did
+ * not commit. By class — connection exceptions (08), transaction rollbacks
+ * (40: a serialization failure, a deadlock this statement was chosen to lose),
+ * insufficient resources (53), operator intervention (57), system errors
+ * (58), a login refused (28) — and by state: a lock not available in time
+ * (55P03), an object in use (55006), a read-only transaction (25006, a
+ * standby), a database that does not exist (3D000).
+ *
+ * Of class 57, only a statement cancelled or timed out (57014) arrives here as
+ * a SQLSTATE. A terminated backend, a server shutting down and PostgreSQL
+ * 17's transaction_timeout (25P04) are FATAL: the server closes the
+ * connection, postgres.js reports CONNECTION_CLOSED, and `IN_FLIGHT` below
+ * answers it — `unknown-outcome` for a write, `unavailable` for a read. The
+ * parity suite terminates a backend mid-write and lets a transaction time
+ * out, and sees exactly that.
+ *
+ * An allowlist, not a default. Everything else the server sends — a
+ * trigger's RAISE (P0), an error code only a function knows (38000, C11), a
+ * feature not supported, an internal error — is `refused`: the same request
+ * is expected to be refused again, so it is not a reason to try again.
+ */
+const PASSING_CLASSES: ReadonlySet<string> = new Set(['08', '40', '53', '57', '58', '28'])
+const PASSING_STATES: ReadonlySet<string> = new Set(['55P03', '55006', '25006', '3D000'])
 
 /**
  * Class 42 is syntax errors and access-rule violations. The ones a database
@@ -90,23 +113,28 @@ function identifier(value: unknown): string | undefined {
   return typeof value === 'string' && value !== '' ? value : undefined
 }
 
+/** The code for a SQLSTATE: an exact entry, then its class, then what passes, and `refused` for the rest. */
+function codeOf(state: string): RecordFailureCode {
+  const errorClass = state.slice(0, 2)
+  const known = BY_STATE.get(state) ?? BY_CLASS.get(errorClass)
+  if (known !== undefined) return known
+  return PASSING_CLASSES.has(errorClass) || PASSING_STATES.has(state) ? 'unavailable' : 'refused'
+}
+
 /**
  * The failure for a refusal the server sent.
  *
  * Every error the server sends ends the statement, and outside an explicit
- * transaction its implicit one rolls back, so a refusal with no more
- * specific meaning — a deadlock or 40001 outside an update, a cancelled or
- * timed-out statement, a terminated backend, a standby that is read-only, a
- * failed login — certainly did not commit: `unavailable`.
+ * transaction its implicit one rolls back, so nothing was written whatever
+ * the code: `unavailable` when it passes, `refused` when it will not.
  *
  * The message names the SQLSTATE and the constraint or column, which are
  * identifiers; never the server's own message or detail, which can quote the
  * value ("Key (id)=(42) already exists").
  */
 function serverFailure(error: ServerError): RecordFailure {
-  const errorClass = error.code.slice(0, 2)
-  if (errorClass === PROGRAMMING_ERROR_CLASS && !BY_STATE.has(error.code)) throw error
-  const code = BY_STATE.get(error.code) ?? BY_CLASS.get(errorClass) ?? 'unavailable'
+  if (error.code.slice(0, 2) === PROGRAMMING_ERROR_CLASS && !BY_STATE.has(error.code)) throw error
+  const code = codeOf(error.code)
   const constraint = identifier(error.constraint_name)
   const column = identifier(error.column_name)
   const about = [constraint === undefined ? '' : ` on constraint ${constraint}`, column === undefined ? '' : ` for column ${column}`].join('')

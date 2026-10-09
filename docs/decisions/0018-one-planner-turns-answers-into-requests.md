@@ -1,6 +1,6 @@
 # 0018 — One planner turns answers into requests, and leaves membership to the database
 
-- **Status:** accepted
+- **Status:** accepted; narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): a lookup's filter is scoped as a request's is, by `scopeRowFilters`
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/records/token.test.ts` — a record

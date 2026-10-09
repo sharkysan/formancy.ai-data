@@ -1,5 +1,5 @@
 import { TEMPORAL_SHAPES } from '@formancy/spec'
-import { textLength } from '../codecs/text.js'
+import { LONE_SURROGATE, textLength } from '../codecs/text.js'
 import type { NormalizedType } from '../metadata.js'
 import type { LookupKeyType } from './types.js'
 
@@ -69,14 +69,25 @@ function isDate(value: string): boolean {
 
 /**
  * Whether a decoded token value is one a key column of this type can hold,
- * spelled as an adapter reads it back. Text is taken as it is, without a NUL,
- * up to the column's length in the column's own unit (0026): a token is
- * measured as the column measures it, the codec's `textLength`.
+ * spelled as an adapter reads it back. Text is taken as it is, without a NUL
+ * or an unpaired surrogate, up to the column's length in the column's own
+ * unit (0026): a token is measured as the column measures it, the codec's
+ * `textLength`. A fixed-length column reads back without its padding on both
+ * engines, so a value ending in U+0020 is none it can hold in that spelling
+ * (0028); any other trailing character, a no-break space included, is not
+ * padding.
+ *
+ * An unpaired surrogate is refused as the codec refuses it, and for a
+ * trusted filter value the reason is sharper: postgres.js sends UTF-8, which
+ * turns it into U+FFFD, and tedious sends UTF-16, which keeps it, so one
+ * filter would select two different sets of rows (0028).
  */
 export function isKeyValue(type: LookupKeyType, value: string): boolean {
   switch (type.kind) {
     case 'text':
-      return !value.includes('\u0000') && (type.maxLength === null || textLength(value, type.lengthUnit) <= type.maxLength)
+      if (type.fixedLength && value.endsWith(' ')) return false
+      if (value.includes('\u0000') || LONE_SURROGATE.test(value)) return false
+      return type.maxLength === null || textLength(value, type.lengthUnit) <= type.maxLength
     case 'integer':
       return isInteger(value, type.min, type.max)
     case 'decimal':

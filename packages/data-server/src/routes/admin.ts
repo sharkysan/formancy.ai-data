@@ -194,6 +194,6 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     if (published === undefined) return reply
     const current = await discover(published.bundle.connection, reply)
     if (current === undefined) return reply
-    return { version: published.version, ...diffSnapshots(published.bundle.snapshot, current, published.bundle.bindings) }
+    return { version: published.version, ...diffSnapshots(published.bundle.snapshot, current, published.bundle.bindings, published.bundle.policy) }
   })
 }

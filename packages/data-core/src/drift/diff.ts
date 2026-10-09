@@ -1,6 +1,7 @@
 import type { FormBindings } from '../generate/types.js'
 import { bindingsVersionProblem } from '../generate/version.js'
 import type { MetadataSnapshot, ObjectMeta } from '../metadata.js'
+import type { FormPolicy } from '../policy/types.js'
 import { findObject } from '../snapshot.js'
 import { absence, gapChanges, unseen } from './access.js'
 import { columnChanges } from './columns.js'
@@ -14,7 +15,8 @@ import type { DriftChange, DriftReport, DriftSeverity, DriftSubject } from './ty
  * database as it is now, classified by what it means for that form.
  *
  * Only what the form touches is compared: its root, and the targets of its
- * lookups. A change elsewhere in scope is not this form's business and is left
+ * lookups — on a target, what the lookup reads, including the columns the
+ * policy's lookup filters compare (0028), which is why the policy is given. A change elsewhere in scope is not this form's business and is left
  * out, so an empty report means nothing this form rests on changed, not that
  * nothing changed. Equal fingerprints are the fast path: `createSnapshot`
  * promises they describe the same thing, so nothing is walked.
@@ -25,7 +27,7 @@ import type { DriftChange, DriftReport, DriftSeverity, DriftSubject } from './ty
  * bindings were not generated from `base` or the two snapshots are of
  * different engines.
  */
-export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings): DriftReport {
+export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings, policy: Pick<FormPolicy, 'lookups'>): DriftReport {
   // First: a version-1 file says one write flag for both operations, and
   // every verdict below about which writes a change stops would be a guess.
   const version = bindingsVersionProblem(bindings.version)
@@ -48,7 +50,7 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
   // The account is said beside a missing root: under another principal it may be missing for that principal only.
   if (after === undefined) return finish([rootMissing(current, bindings), ...accountChanges(base, current, bindings)], offered)
 
-  const comparison: Comparison = { base, current, bindings, before, after, cited: new Set() }
+  const comparison: Comparison = { base, current, bindings, policy, before, after, cited: new Set() }
   return finish(
     [
       ...rootKindChanges(comparison),

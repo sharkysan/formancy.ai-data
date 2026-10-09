@@ -4,6 +4,7 @@ import { createSnapshot } from '../snapshot.js'
 import { generateForm } from '../generate/generate.js'
 import type { FieldBinding, FormBindings, LookupChoice } from '../generate/types.js'
 import { buildLookupConfig, DEFAULT_MAX_PAGE_SIZE } from './config.js'
+import type { LookupConfig } from './types.js'
 import { validateLookupQuery } from './query.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
@@ -106,8 +107,14 @@ describe('buildLookupConfig', () => {
         { name: 'tenant_id', type: INT32 },
         { name: 'customer_no', type: INT32 },
       ],
-      display: ['name', 'city'],
-      search: ['name', 'city'],
+      display: [
+        { name: 'name', type: text(200) },
+        { name: 'city', type: text(100) },
+      ],
+      search: [
+        { name: 'name', type: text(200) },
+        { name: 'city', type: text(100) },
+      ],
       sort: [
         { column: 'name', direction: 'asc', nulls: 'last' },
         { column: 'city', direction: 'asc', nulls: 'last' },
@@ -167,6 +174,24 @@ describe('buildLookupConfig', () => {
     )
   })
 
+  // An adapter reads each display column with its record reader and searches
+  // an integer as its canonical text (0028). Both need the column's type, and
+  // the snapshot is the only place it comes from: a type the adapter guessed
+  // would spell a label, or match a search, one way per engine.
+  test("display and search columns carry the snapshot's types", () => {
+    const source = snapshot()
+    const config = buildLookupConfig(bindingsFor(source, ['customer_no', 'name', 'since']), 'customer', { snapshot: source })
+    expect(config.display).toEqual([
+      { name: 'customer_no', type: INT32 },
+      { name: 'name', type: text(200) },
+      { name: 'since', type: { kind: 'date' } },
+    ])
+    expect(config.search).toEqual([
+      { name: 'customer_no', type: INT32 },
+      { name: 'name', type: text(200) },
+    ])
+  })
+
   // formancy narrows a list by its label and nothing else, because matching
   // data the person cannot see makes a filter behave inexplicably. A search
   // column that is not displayed would do exactly that. And a date searched
@@ -174,11 +199,12 @@ describe('buildLookupConfig', () => {
   // session setting — so only text and integers, which both spell alike, are searched.
   test('searches only displayed text and integer columns', () => {
     const source = snapshot()
-    expect(buildLookupConfig(bindingsFor(source, ['customer_no', 'name', 'since']), 'customer', { snapshot: source }).search).toEqual(['customer_no', 'name'])
+    const names = (config: LookupConfig) => config.search.map((column) => column.name)
+    expect(names(buildLookupConfig(bindingsFor(source, ['customer_no', 'name', 'since']), 'customer', { snapshot: source }))).toEqual(['customer_no', 'name'])
     expect(buildLookupConfig(bindingsFor(source, ['since']), 'customer', { snapshot: source }).search).toEqual([])
 
     const bindings = bindingsFor(source, ['name', 'city', 'since'])
-    expect(buildLookupConfig(bindings, 'customer', { snapshot: source, search: ['city'] }).search).toEqual(['city'])
+    expect(names(buildLookupConfig(bindings, 'customer', { snapshot: source, search: ['city'] }))).toEqual(['city'])
     expect(() => buildLookupConfig(bindings, 'customer', { snapshot: source, search: ['notes'] })).toThrow(/notes is not displayed/)
     expect(() => buildLookupConfig(bindings, 'customer', { snapshot: source, search: ['since'] })).toThrow(/since is date; only text and integer/)
     expect(() => buildLookupConfig(bindings, 'customer', { snapshot: source, search: ['name', 'name'] })).toThrow(/name is named twice/)

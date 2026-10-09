@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
-import { validatePolicy } from '@formancy/data-core'
+import { findObject, rowFilterColumnProblem, validatePolicy } from '@formancy/data-core'
 import type { FormBindings, FormPolicy, MetadataSnapshot } from '@formancy/data-core'
 import { describeRef } from './choice.js'
 import { labelOf, useDocument } from './document.js'
@@ -116,6 +116,9 @@ export function PolicyStep({
   const problems = checked.ok ? [] : checked.problems
   const labels = Object.fromEntries(bindings.fields.map((binding) => [binding.field, labelOf(document, binding.field)]))
   const pinned = new Set(policy.rowFilters.map((rule) => rule.column))
+  // Only what a filter can compare (0028): the server refuses any other column at publish.
+  const root = findObject(snapshot, bindings.root)
+  const filterable = boundColumns(bindings).filter((column) => root === undefined || rowFilterColumnProblem(root, column) === null)
   const orphans = orphanFields(policy, bindings)
   const strayLookups = orphanLookups(policy, bindings)
   const focusAfter = useFocusAfterRender()
@@ -232,7 +235,7 @@ export function PolicyStep({
       <RowFilters
         root={describeRef(bindings.root)}
         rules={policy.rowFilters}
-        columns={boundColumns(bindings)}
+        columns={filterable}
         onRules={(rowFilters) => onPolicy({ ...policy, rowFilters })}
         stale={stale}
         onRegenerate={onRegenerate}

@@ -22,10 +22,13 @@ export default mergeConfig(
       include: ['src/**/*.test.{ts,tsx}'],
       environment: 'jsdom',
       // Each journey test runs the real data server and every step of the
-      // studio against it, with axe over each step. Measured on 2026-10-09 on
-      // a Windows 11 workstation: the whole journey took under four seconds,
-      // and the default of five is too little margin for a loaded CI runner.
-      testTimeout: 20_000,
+      // studio against it, with axe over each step. Measured on 2026-10-09: on
+      // a Windows 11 workstation the slowest test took under four seconds; on
+      // CI's hosted runner, sharing two CPUs with every other package's suite,
+      // both databases and coverage instrumentation, one policy test took 9 s
+      // on one run and passed 20 s on another (PR #27). Sixty leaves room for
+      // that spread without hiding a test that hangs.
+      testTimeout: 60_000,
     },
   }),
 )

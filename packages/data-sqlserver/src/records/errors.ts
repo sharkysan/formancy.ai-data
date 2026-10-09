@@ -23,6 +23,20 @@ import {
  * typed ("The duplicate key value is (CH)", "Truncated value: 'AB'"), and a
  * failure's message goes to a log. Every sentence here is the adapter's own,
  * and names nothing but the error number, a constraint and a column.
+ *
+ * Two codes for a refusal nothing else names, as PostgreSQL's adapter has
+ * them (0028):
+ *
+ * - `refused`, the default: the database refused the statement for a reason
+ *   the port has no code for — a trigger's THROW or RAISERROR, an INSTEAD OF
+ *   trigger the adapter cannot verify, a number nobody mapped. Nothing was
+ *   written, and the same request would be refused again.
+ * - `unavailable`, only for what SQL Server documents as passing: a deadlock
+ *   it chose this statement to lose, a lock or resource it could not get in
+ *   time, a log or filegroup that is full, a database that is read-only or
+ *   an availability replica that is not accessible now. Nothing was written,
+ *   and a retry may succeed. Anything not on that list is `refused`, because promising a
+ *   retry for a business rule invites a person to send it again.
  */
 
 /** Whether the operation could have changed anything: a write was sent, a read never changes a row. */
@@ -54,6 +68,42 @@ const OUT_OF_RANGE: ReadonlySet<number> = new Set([
   8114, // text that cannot be converted to the column's type
   8115, // arithmetic overflow converting to the column's type: money past its range, a version column past its largest value
 ])
+
+/**
+ * A column the database writes itself, which a binding named for a write: an
+ * identity (544 on insert, 8102 on update), a computed column (271), a
+ * rowversion (273 on insert, 272 on update — measured, not 273 for both), a
+ * GENERATED ALWAYS column such as a system-versioning period's start or end
+ * (13536 on insert, 13537 on update). A
+ * binding comes to name one when the column became one after discovery, so
+ * it is `schema-changed`, as PostgreSQL's 428C9 is (C8, 0028). The parity
+ * suite provokes every number here.
+ */
+const GENERATED_COLUMN: ReadonlySet<number> = new Set([544, 8102, 271, 273, 272, 13536, 13537])
+
+/**
+ * The refusals SQL Server documents as passing, and the only `unavailable`
+ * ones. 1205, a deadlock victim, and 3906, a database switched to read-only,
+ * are provoked by the parity suite; the others are by documentation, not
+ * provoked.
+ */
+const PASSING: ReadonlySet<number> = new Set([
+  1205, // chosen as a deadlock victim
+  1222, // lock request timed out
+  1204, // no more locks available
+  701, // not enough memory to run the query
+  8645, // timed out waiting for memory to run the query
+  8651, // the memory grant could not be met
+  9002, // the transaction log is full
+  1105, // the filegroup is full
+  3960, // a snapshot isolation update conflict: another transaction changed the row
+  3906, // the database is read-only: PostgreSQL's 25006, a read-only transaction or a standby
+  976, // an availability group database that is not accessible for queries now
+  983, // an availability group database whose replica is in neither role yet
+])
+
+/** The first number SQL Server leaves to users: THROW's and RAISERROR's own. */
+const FIRST_USER_ERROR = 50000
 
 function named(pattern: RegExp, message: string): string | undefined {
   return pattern.exec(message)?.[1]
@@ -94,11 +144,10 @@ const ENDED_BY_TRIGGER = 'it may have committed, and it is not retried.'
  * message: a customer's trigger may THROW the same number, and its error is
  * then an unrecognised refusal like any other.
  *
- * - An INSTEAD OF trigger that decides the write is `unavailable`: the batch
- *   rolled it back, which is the promise that code makes, and the port has
- *   no code for a table whose writes cannot be verified. `schema-changed`
- *   would claim a binding names something gone, and send someone to a drift
- *   review that cannot show a trigger (0017).
+ * - An INSTEAD OF trigger that decides the write is `refused`: the batch
+ *   rolled it back, and the same write would be refused again (0028). Not
+ *   `schema-changed`, which would claim a binding names something gone, and
+ *   send someone to a drift review that cannot show a trigger (0017).
  * - A transaction a trigger replaced is `unknown-outcome`: it may have
  *   committed the write before beginning another.
  */
@@ -109,8 +158,8 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
   }
   if (error.number === DECIDED_BY_TRIGGER && error.message === DECIDED_BY_TRIGGER_MESSAGE) {
     return failure(
-      'unavailable',
-      'An INSTEAD OF trigger would decide what this write stores, or this account cannot see whether one does, so the adapter rolled it back; nothing was written.',
+      'refused',
+      'An INSTEAD OF trigger would decide what this write stores, or this account cannot see whether one does, so the adapter refused it; nothing was written.',
     )
   }
   if (error.number === TRANSACTION_REPLACED && error.message === TRANSACTION_REPLACED_MESSAGE) {
@@ -118,7 +167,7 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
   }
   const index = error.number === TEXT_NOT_STORED ? TEXT_NOT_STORED_MESSAGE.exec(error.message)?.[1] : undefined
   if (index === undefined) return undefined
-  return failure('out-of-range', "SQL Server could not store a character of this text in its column's code page, and the write was rolled back.", {
+  return failure('out-of-range', 'SQL Server did not store this text as sent: its code page lacks a character, or the column drops trailing spaces, and the write was rolled back.', {
     column: written[Number(index)]?.name,
   })
 }
@@ -172,10 +221,17 @@ function refusal(error: ServerError, written: readonly RecordValue[]): RecordFai
       })
     default:
       if (OUT_OF_RANGE.has(number)) return failure('out-of-range', `SQL Server could not hold a value in its column's type (${String(number)}).`)
+      if (GENERATED_COLUMN.has(number)) {
+        return failure('schema-changed', `A column the binding writes is one SQL Server now generates itself (${String(number)}); nothing was written.`)
+      }
+      if (PASSING.has(number)) return failure('unavailable', `SQL Server could not complete this now (${String(number)}), and nothing was written.`)
+      if (number >= FIRST_USER_ERROR) {
+        return failure('refused', `The database refused the statement with an error of its own (${String(number)}), a trigger's or a procedure's, and nothing was written.`)
+      }
       // A refusal this adapter does not recognise. It was reported for the
-      // statement, and the batch rolled back on it, which is what
-      // `unavailable` promises; the number is the lead for whoever reads the log.
-      return failure('unavailable', `SQL Server refused the statement with error ${String(number)}, and nothing was written.`)
+      // statement, and the batch rolled back on it; nothing says it will pass,
+      // so it is not `unavailable`. The number is the lead for the log.
+      return failure('refused', `SQL Server refused the statement with error ${String(number)}, and nothing was written.`)
   }
 }
 
