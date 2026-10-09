@@ -20,7 +20,7 @@ export default mergeConfig(
         // as `main.ts`, for the same reason. The two `test-` files are the
         // suite's own setup and queries: test code, which is not measured.
         include: ['src/**/*.{ts,tsx}'],
-        exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts', 'src/main.tsx', 'src/test-setup.ts', 'src/test-accessible.ts'],
+        exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts', 'src/main.tsx', 'src/test-setup.ts', 'src/test-accessible.ts', 'src/test-timing.ts'],
       },
       setupFiles: ['src/test-setup.ts'],
       include: ['src/**/*.test.{ts,tsx}'],
@@ -32,8 +32,8 @@ export default mergeConfig(
       // client's and the host page's suites and their databases ran beside it,
       // it passed 20 s and timed out (PR #30), a spread the studio's suite
       // showed too (PR #27). Sixty leaves room for that spread without hiding a
-      // test that hangs, and stays above the ten seconds the waits inside
-      // allow for Angular to arrive.
+      // test that hangs, and stays above the thirty seconds the waits inside
+      // allow for Angular to arrive (src/test-timing.ts).
       testTimeout: 60_000,
     },
   }),

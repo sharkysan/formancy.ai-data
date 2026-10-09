@@ -10,6 +10,7 @@ import { generateExamples } from './examples.js'
 import type { Example } from './examples.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
 import { answerable, paragraphs } from './test-accessible.js'
+import { ANGULAR_ARRIVES } from './test-timing.js'
 
 /**
  * One generated document, two renderers, and the claim that they agree.
@@ -75,7 +76,7 @@ async function mounted(): Promise<void> {
         expect(within(pane(subject, 'Angular')).queryByLabelText(first), `the Angular ${tableOf(subject)} never rendered`).not.toBeNull()
       }
     },
-    { timeout: 10_000 },
+    ANGULAR_ARRIVES,
   )
   for (const subject of EXAMPLES) expect(within(pane(subject, 'Angular')).queryByRole('alert')).toBeNull()
 }
@@ -285,7 +286,7 @@ describe('a lookup with no rows on this page', () => {
           expect(within(pane(order, renderer)).queryByLabelText('Order date'), `${renderer} never rendered`).not.toBeNull()
         }
       },
-      { timeout: 10_000 },
+      ANGULAR_ARRIVES,
     )
 
     for (const renderer of RENDERERS) {

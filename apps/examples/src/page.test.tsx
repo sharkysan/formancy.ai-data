@@ -14,6 +14,7 @@ import type { Example } from './examples.js'
 import { NOTE_KINDS } from './notes.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
 import { ANSWERING_ROLES, answerable, paragraphs } from './test-accessible.js'
+import { ANGULAR_ARRIVES } from './test-timing.js'
 
 /**
  * The page around the previews: what it says, and whether it can be used.
@@ -73,7 +74,7 @@ async function mounted(): Promise<void> {
         expect(within(angular).queryByLabelText(first)).not.toBeNull()
       }
     },
-    { timeout: 10_000 },
+    ANGULAR_ARRIVES,
   )
 }
 
