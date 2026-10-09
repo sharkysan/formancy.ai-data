@@ -44,6 +44,15 @@ added unvalidated beside one SQL Server disables.
   are what both adapters' parity suites expect of it, written once:
   `FILTER_PARITY` is checked against the stored rows on both engines by this
   package's own suite. `PARITY_SCOPE` is the scope that discovers it.
+- `renamedColumn(snapshot, table, from, to)` is a snapshot as discovery
+  reports it once a column has been renamed in the database: the same column
+  — ordinal, type, default, comment and access — under its new name, made
+  through `createSnapshot`, so the fingerprint follows. Both adapters'
+  discovery suites rename `sales.order.notes` for real and hold what the
+  writer then discovers to it, which is what lets the studio's browser gate
+  stand it for a rename. It refuses a column that a key, a foreign key or a
+  check names — a check by its text, or one whose text the account could not
+  read — because no suite compares that case with a real rename.
 - `EDGE_VALUES` names each inserted edge value as the exact string it is, and
   `FIRST_SHIPMENT` and `SECOND_SHIPMENT` are the two shipments as both
   adapters' record reads must return them — one object, so neither engine can

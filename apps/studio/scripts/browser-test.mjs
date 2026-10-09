@@ -39,6 +39,7 @@ import { dirname, extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
 import { createSnapshot } from '@formancy/data-core'
+import { renamedColumn } from '@formancy/data-fixtures'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -79,14 +80,6 @@ async function startPlane() {
   // The administrator's trail is the server's suites' subject; here it is required and discarded.
   const server = await createDataServer({ verifyIdentity, admin: { registry, store: createFileConfigurationStore(root), adminRoles: ['data-admin'], audit: { sink: () => {} } } })
   return { server, databases, close: async () => { await server.close(); rmSync(root, { recursive: true, force: true }) } }
-}
-
-/** The fixture's sales.order with one column renamed: to the catalog, one dropped and one added in its place. */
-function renamed(from, to) {
-  const { fingerprint: _, ...contents } = snapshot('postgres-owner.json')
-  const column = contents.objects.find((object) => object.ref.name === 'order').columns.find((candidate) => candidate.name === from)
-  column.name = to
-  return createSnapshot(contents)
 }
 
 /** The built studio and the plane, on one origin, on a port the system picks. */
@@ -359,7 +352,7 @@ function journey(plane, check) {
     }],
     ['Drift, regenerated', async (page) => {
       // notes renamed to memo: the label chosen for notes is dropped, and memo is a field to give it to.
-      plane.databases.set('fixture', renamed('notes', 'memo'))
+      plane.databases.set('fixture', renamedColumn(snapshot('postgres-owner.json'), { schema: 'sales', name: 'order' }, 'notes', 'memo'))
       const drift = step(page, 'Drift')
       await drift.getByRole('button', { name: 'Regenerate, keeping your presentation' }).click()
       await drift.getByRole('region', { name: /^Regenerated from version \d+$/ }).waitFor()

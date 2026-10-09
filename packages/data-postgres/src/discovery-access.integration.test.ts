@@ -1,7 +1,7 @@
 import { findObject } from '@formancy/data-core'
 import type { MetadataSnapshot, ObjectMeta, RecordColumn, RecordOutcome, RecordTarget, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { accessDisagreements, FIXTURE_SCOPE, startPostgresFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
+import { accessDisagreements, FIXTURE_SCOPE, renamedColumn, startPostgresFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -122,6 +122,27 @@ describe('the writer, the order form’s account', () => {
     expect(viaRole.fingerprint).not.toBe(own.fingerprint)
     // What the server does with that principal: the policy no longer names it.
     expect(await asRole`select tenant_id from sales.customer order by tenant_id`).toEqual([{ tenant_id: 1 }, { tenant_id: 2 }])
+  })
+})
+
+describe('a column renamed in the database', () => {
+  // The studio's drift gate stands a snapshot renamed in place for a
+  // database whose column was renamed; if discovery reported a rename
+  // differently -- a new ordinal, lost column grants -- the gate would walk
+  // a state no database reaches. As the writer, whose UPDATE of notes is a
+  // column grant: what a column added in its place would not have. Renamed
+  // back before the next test, which expects the fixture.
+  test('is discovered as renamedColumn says: the same column, ordinal and grants included, under its new name', async () => {
+    const order = { schema: 'sales', name: 'order' }
+    const before = await discoverPostgres(writer, FIXTURE_SCOPE)
+    expect(capabilities(described(before, 'sales', 'order'))).toContain('notes:siu')
+    await owner`alter table sales."order" rename column notes to memo`
+    try {
+      expect(await discoverPostgres(writer, FIXTURE_SCOPE)).toEqual(renamedColumn(before, order, 'notes', 'memo'))
+    } finally {
+      await owner`alter table sales."order" rename column memo to notes`
+    }
+    expect(await discoverPostgres(writer, FIXTURE_SCOPE)).toEqual(before)
   })
 })
 
