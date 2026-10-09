@@ -207,6 +207,15 @@ function generatedNote(generated: Exclude<Generation, 'none'>): string {
   }
 }
 
+/**
+ * The generator's own wording, opening a sentence: its first letter raised and
+ * nothing else touched. Not `labelFor`, which turns an identifier into words
+ * and would read "JavaScript" as "java script", "UTC" as "utc" and drop commas.
+ */
+function sentence(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`
+}
+
 function planColumn(
   root: ObjectMeta,
   column: ColumnMeta,
@@ -229,7 +238,7 @@ function planColumn(
   const generated = column.generated !== 'none'
   const possible = !isView && !generated && !pinned && control.readOnly === undefined
 
-  notes.push({ subject: key, kind: 'inferred', message: `${labelFor(control.describe)} from ${column.databaseType}; label from the column name.` })
+  notes.push({ subject: key, kind: 'inferred', message: `${sentence(control.describe)} from ${column.databaseType}; label from the column name.` })
   if (control.caveat !== undefined) notes.push({ subject: key, kind: 'inferred', message: control.caveat })
   if (column.generated !== 'none') notes.push({ subject: key, kind: 'read-only', message: generatedNote(column.generated) })
   if (control.readOnly !== undefined) notes.push({ subject: key, kind: 'read-only', message: `Shown, never written: ${control.readOnly}.` })

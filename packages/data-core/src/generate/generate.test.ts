@@ -332,6 +332,31 @@ describe('generateForm', () => {
     expect(derived.notes).toContainEqual({ subject: 'name', kind: 'read-only', message: 'The database computes this value (computed).' })
   })
 
+  // A sentence run through `labelFor` reads "java script" and "utc" in the
+  // studio and on the examples page and loses its commas; the generator's own
+  // wording must arrive as written, with only its first letter raised. The
+  // database types are spelled as PostgreSQL's catalog spells them in the
+  // captured fixture, so the note reads as a reviewer would see it.
+  test("an inferred note is the generator's own sentence, with only its first letter raised", () => {
+    const snapshot = fixtureLike('postgres', (objects) => {
+      const spell = (table: string, column: string, databaseType: string): void => {
+        const found = objects.find((object) => object.ref.name === table)?.columns.find((candidate) => candidate.name === column)
+        if (found !== undefined) found.databaseType = databaseType
+      }
+      spell('order', 'id', 'bigint')
+      spell('order', 'amount', 'numeric(18,4)')
+      spell('customer', 'created_at', 'timestamp with time zone')
+    })
+    const inferred = (notes: ReturnType<typeof generateForm>['notes'], subject: string): string[] =>
+      notes.filter((note) => note.subject === subject && note.kind === 'inferred').map((note) => note.message)
+
+    const order = generateForm(snapshot, ORDER).notes
+    expect(inferred(order, 'id')).toEqual(['A whole number held as text, because it can exceed what JavaScript represents exactly from bigint; label from the column name.'])
+    expect(inferred(order, 'amount')).toEqual([expect.stringContaining('never as a floating-point number')])
+    const customer = generateForm(snapshot, { ...ORDER, root: { schema: 'sales', name: 'customer' }, lookups: [] }).notes
+    expect(inferred(customer, 'created_at')).toEqual([expect.stringContaining('in UTC')])
+  })
+
   // The browser's maxLength is the column's rule for nvarchar only. For a UTF-8
   // varchar a reviewer must read that the server alone checks the bytes, or a
   // form that passes the browser and fails the save looks like a bug.
