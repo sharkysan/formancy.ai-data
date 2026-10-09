@@ -1,5 +1,5 @@
 import type { FieldDef } from '@formancy/spec'
-import type { NormalizedType } from '../metadata.js'
+import type { NormalizedType, TextLengthUnit } from '../metadata.js'
 
 /**
  * The part of a field that follows from the column's type: which control, and
@@ -8,9 +8,13 @@ import type { NormalizedType } from '../metadata.js'
  * `readOnly` is a reason, when a type has a value worth showing and no control
  * that can write it faithfully. `exclude` is a reason, when there is nothing a
  * form can usefully show at all.
+ *
+ * `caveat` is what the field's own checks do not say about the column — how a
+ * text's `maxLength` relates to the unit the column counts, what a real keeps
+ * — and becomes an inferred note on the field.
  */
 export type ControlPlan =
-  | { field: Omit<FieldDef, 'key' | 'label' | 'required'>; describe: string; readOnly?: string }
+  | { field: Omit<FieldDef, 'key' | 'label' | 'required'>; describe: string; readOnly?: string; caveat?: string }
   | { exclude: string }
 
 /** Above this, a text column gets a multi-line control. */
@@ -31,6 +35,28 @@ function decimalPattern(precision: number | null, scale: number | null): string 
   return `^-?[0-9]{1,${String(whole)}}(\\.[0-9]{1,${String(fraction)}})?$`
 }
 
+/**
+ * How the browser's `maxLength` of n relates to a column of this unit (0026).
+ *
+ * The browser counts UTF-16 code units, which are never more than code points,
+ * UTF-8 bytes or code-page bytes, so n never refuses a value the column holds —
+ * except a PostgreSQL value with emoji, where the browser is stricter. That is
+ * 0008's direction: the browser refuses first, and the server may refuse more.
+ */
+function lengthCaveat(n: number, unit: TextLengthUnit): string {
+  const max = String(n)
+  switch (unit) {
+    case 'utf16-code-units':
+      return `The browser's maxLength of ${max} counts UTF-16 code units, the unit the column counts.`
+    case 'code-points':
+      return `The browser's maxLength of ${max} counts UTF-16 code units and the column counts characters: an emoji counts twice in the browser, so the form can refuse a value the column would hold, never the reverse.`
+    case 'utf8-bytes':
+      return `The column holds ${max} bytes of UTF-8 and the browser's maxLength of ${max} counts UTF-16 code units: a value of accented letters or emoji can pass the browser and be refused by the server as too long. Checked on the server only.`
+    case 'code-page-bytes':
+      return `The column counts ${max} in its code page, not in Unicode, and the browser's maxLength of ${max} counts UTF-16 code units: the server checks characters, and a value longer in the code page's bytes, or with a character the code page lacks, is refused when it is saved.`
+  }
+}
+
 function isSafe(bound: string): boolean {
   const value = Number(bound)
   return Number.isSafeInteger(value) && String(value) === bound
@@ -38,14 +64,13 @@ function isSafe(bound: string): boolean {
 
 export function controlFor(type: NormalizedType, nullable: boolean): ControlPlan {
   switch (type.kind) {
-    case 'text':
-      if (type.maxLength === null || type.maxLength > SINGLE_LINE_LIMIT) {
-        return {
-          field: { type: 'textarea', ...(type.maxLength === null ? {} : { maxLength: type.maxLength }) },
-          describe: 'multi-line text',
-        }
-      }
-      return { field: { type: 'text', maxLength: type.maxLength }, describe: 'text' }
+    case 'text': {
+      // maxLength stays n in every unit: see lengthCaveat for why that is safe and what it leaves to the server.
+      if (type.maxLength === null) return { field: { type: 'textarea' }, describe: 'multi-line text' }
+      const caveat = lengthCaveat(type.maxLength, type.lengthUnit)
+      if (type.maxLength > SINGLE_LINE_LIMIT) return { field: { type: 'textarea', maxLength: type.maxLength }, describe: 'multi-line text', caveat }
+      return { field: { type: 'text', maxLength: type.maxLength }, describe: 'text', caveat }
+    }
 
     case 'boolean':
       // A nullable boolean has three answers, and a checkbox has two: unticked
@@ -82,7 +107,13 @@ export function controlFor(type: NormalizedType, nullable: boolean): ControlPlan
       }
 
     case 'float':
-      return { field: { type: 'number' }, describe: 'a floating-point number' }
+      if (type.bits === 64) return { field: { type: 'number' }, describe: 'a floating-point number' }
+      return {
+        field: { type: 'number' },
+        describe: 'a 32-bit floating-point number',
+        caveat:
+          'A 32-bit float keeps about seven significant digits: the server saves the nearest one and answers with its shortest spelling, so 0.123456789 is saved as 0.12345679.',
+      }
 
     case 'date':
       return { field: { type: 'date' }, describe: 'a calendar date' }

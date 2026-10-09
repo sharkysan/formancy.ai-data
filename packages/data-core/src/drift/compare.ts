@@ -46,7 +46,11 @@ function verdict(directions: readonly Direction[]): TypeVerdict {
 export function compareTypes(before: NormalizedType, after: NormalizedType): TypeVerdict {
   if (before.kind === 'text' && after.kind === 'text') {
     // char pads with spaces and varchar does not: not a wider or narrower text.
-    return before.fixedLength === after.fixedLength ? verdict([limit(before.maxLength, after.maxLength)]) : 'changed'
+    // Nor is a length in another unit (0026) — 20 bytes of UTF-8 against 20
+    // characters of code page 1252 is neither more nor less.
+    return before.fixedLength === after.fixedLength && before.lengthUnit === after.lengthUnit
+      ? verdict([limit(before.maxLength, after.maxLength)])
+      : 'changed'
   }
   if (before.kind === 'integer' && after.kind === 'integer') return verdict(range(before, after))
   if (before.kind === 'decimal' && after.kind === 'decimal') {
@@ -60,7 +64,10 @@ export function compareTypes(before: NormalizedType, after: NormalizedType): Typ
     // An instant and a wall clock are different values, not more or less precise ones.
     return before.withTimeZone === after.withTimeZone ? verdict([limit(before.precision, after.precision)]) : 'changed'
   }
-  if (before.kind === 'binary' && after.kind === 'binary') return verdict([limit(before.maxLength, after.maxLength)])
+  if (before.kind === 'binary' && after.kind === 'binary') {
+    // binary(n) pads with zero bytes and varbinary(n) does not: what is read back differs.
+    return before.fixedLength === after.fixedLength ? verdict([limit(before.maxLength, after.maxLength)]) : 'changed'
+  }
   return before.kind === after.kind ? 'same' : 'changed'
 }
 
@@ -68,6 +75,21 @@ export type ColumnChangeKind = 'column-type-changed' | 'column-generation-change
 
 /** Most serious first. A column whose type changed and that became nullable is a changed type that also accepts null. */
 const SERIOUSNESS: readonly ColumnChangeKind[] = ['column-type-changed', 'column-generation-changed', 'column-tightened', 'column-loosened', 'column-default-changed']
+
+/** Why a type is a different one. A text whose unit moved under one spelling — a collation change — says so, rather than "from varchar(20) to varchar(20)". */
+function typeChange(before: ColumnMeta, after: ColumnMeta): string {
+  if (before.type.kind === 'text' && after.type.kind === 'text' && before.type.lengthUnit !== after.type.lengthUnit && before.databaseType === after.databaseType) {
+    return `its length now counts ${after.type.lengthUnit} where it counted ${before.type.lengthUnit}, though the database still spells it ${after.databaseType}`
+  }
+  return `its type changed from ${before.databaseType} to ${after.databaseType}`
+}
+
+/** Why the way the database generates a column is different, named both ways. */
+function generationChange(before: ColumnMeta, after: ColumnMeta): string {
+  if (after.generated === 'none') return `the database no longer generates it (it was ${before.generated})`
+  if (before.generated === 'none') return `the database now generates it (${after.generated})`
+  return `the database generates it as ${after.generated} where it was ${before.generated}`
+}
 
 /**
  * What changed about one column, as one change named by its most serious
@@ -78,7 +100,7 @@ export function classify(before: ColumnMeta, after: ColumnMeta): { kind: ColumnC
   const found: Array<{ kind: ColumnChangeKind; reason: string }> = []
 
   const type = compareTypes(before.type, after.type)
-  if (type === 'changed') found.push({ kind: 'column-type-changed', reason: `its type changed from ${before.databaseType} to ${after.databaseType}` })
+  if (type === 'changed') found.push({ kind: 'column-type-changed', reason: typeChange(before, after) })
   if (type === 'tightened') found.push({ kind: 'column-tightened', reason: `it narrowed from ${before.databaseType} to ${after.databaseType}` })
   if (type === 'loosened') found.push({ kind: 'column-loosened', reason: `it widened from ${before.databaseType} to ${after.databaseType}` })
   if (type === 'same' && before.databaseType !== after.databaseType) {
@@ -89,12 +111,7 @@ export function classify(before: ColumnMeta, after: ColumnMeta): { kind: ColumnC
     })
   }
 
-  if (before.generated !== after.generated) {
-    found.push({
-      kind: 'column-generation-changed',
-      reason: after.generated === 'none' ? `the database no longer generates it (it was ${before.generated})` : `the database now generates it (${after.generated})`,
-    })
-  }
+  if (before.generated !== after.generated) found.push({ kind: 'column-generation-changed', reason: generationChange(before, after) })
 
   if (before.nullable !== after.nullable) {
     found.push(after.nullable ? { kind: 'column-loosened', reason: 'it now accepts null' } : { kind: 'column-tightened', reason: 'it no longer accepts null' })

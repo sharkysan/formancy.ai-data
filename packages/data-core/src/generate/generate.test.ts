@@ -14,6 +14,9 @@ import type { GenerationRequest } from './types.js'
  * depend on that package — it depends on this one — so the shape is restated
  * here, and the end-to-end path (discover a real database, generate, validate)
  * belongs to the adapter suites once both adapters can discover.
+ *
+ * Every text is counted in UTF-16 code units: these suites test planning, not
+ * units, which codec.test.ts and controls.test.ts cover (0026).
  */
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const INT64: NormalizedType = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' }
@@ -54,10 +57,10 @@ function fixtureLike(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void =
     table(
       'country',
       [
-        col('id', INT32, { generated: 'identity' }),
-        col('iso_code', { kind: 'text', maxLength: 2, fixedLength: true }),
-        col('name', { kind: 'text', maxLength: 100, fixedLength: false }),
-        col('flag', { kind: 'binary', maxLength: null }, { nullable: true }),
+        col('id', INT32, { generated: 'identity-always' }),
+        col('iso_code', { kind: 'text', maxLength: 2, lengthUnit: 'utf16-code-units', fixedLength: true }),
+        col('name', { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }),
+        col('flag', { kind: 'binary', maxLength: null, fixedLength: false }, { nullable: true }),
         col('shape', { kind: 'unsupported' }, { nullable: true, databaseType: 'point' }),
       ],
       { primaryKey: { name: 'pk_country', columns: ['id'] }, uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }] },
@@ -67,8 +70,8 @@ function fixtureLike(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void =
       [
         col('tenant_id', INT32),
         col('customer_no', INT32),
-        col('name', { kind: 'text', maxLength: 200, fixedLength: false }),
-        col('country_code', { kind: 'text', maxLength: 2, fixedLength: true }, { nullable: true }),
+        col('name', { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }),
+        col('country_code', { kind: 'text', maxLength: 2, lengthUnit: 'utf16-code-units', fixedLength: true }, { nullable: true }),
         col('credit_limit', { kind: 'decimal', precision: 14, scale: 2 }, { nullable: true }),
         col('active', { kind: 'boolean' }, { hasDefault: true }),
         col('created_at', { kind: 'timestamp', withTimeZone: true, precision: 6 }, { hasDefault: true }),
@@ -77,20 +80,20 @@ function fixtureLike(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void =
     ),
     table(
       'employee',
-      [col('id', INT32), col('name', { kind: 'text', maxLength: 200, fixedLength: false }), col('manager_id', INT32, { nullable: true })],
+      [col('id', INT32), col('name', { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }), col('manager_id', INT32, { nullable: true })],
       { primaryKey: { name: 'pk_employee', columns: ['id'] }, foreignKeys: [fk('fk_employee_manager', ['manager_id'], 'employee', ['id'])] },
     ),
     table(
       'order',
       [
-        col('id', INT64, { generated: 'identity' }),
+        col('id', INT64, { generated: 'identity-always' }),
         col('tenant_id', INT32),
         col('customer_no', INT32),
         col('order_date', { kind: 'date' }),
-        col('status', { kind: 'text', maxLength: 20, fixedLength: false }, { hasDefault: true }),
+        col('status', { kind: 'text', maxLength: 20, lengthUnit: 'utf16-code-units', fixedLength: false }, { hasDefault: true }),
         col('amount', { kind: 'decimal', precision: 18, scale: 4 }),
-        col('notes', { kind: 'text', maxLength: null, fixedLength: false }, { nullable: true }),
-        col('group', { kind: 'text', maxLength: 50, fixedLength: false }, { nullable: true }),
+        col('notes', { kind: 'text', maxLength: null, lengthUnit: 'utf16-code-units', fixedLength: false }, { nullable: true }),
+        col('group', { kind: 'text', maxLength: 50, lengthUnit: 'utf16-code-units', fixedLength: false }, { nullable: true }),
         col('created_by', INT32, { nullable: true }),
         col('approved_by', INT32, { nullable: true }),
         kind === 'sqlserver'
@@ -250,7 +253,7 @@ describe('generateForm', () => {
   // out of the form and could never be confirmed; it stays a field instead.
   test('does not suggest a key column as a version column, however it is named', () => {
     const revisions = fixtureLike('postgres', (objects) => {
-      objects.push(table('document', [col('id', INT32), col('version', INT32), col('body', { kind: 'text', maxLength: null, fixedLength: false })], {
+      objects.push(table('document', [col('id', INT32), col('version', INT32), col('body', { kind: 'text', maxLength: null, lengthUnit: 'utf16-code-units', fixedLength: false })], {
         primaryKey: { name: 'pk_document', columns: ['id', 'version'] },
       }))
     })
@@ -277,6 +280,52 @@ describe('generateForm', () => {
     expect(form.logic?.rules).toContainEqual({ target: 'id', kind: 'disabled', cel: 'true' })
     const sections = form.layouts?.[0]?.nodes.map((node) => ('label' in node ? node.label : undefined))
     expect(sections).toEqual(['Order', 'Record'])
+  })
+
+  // A by-default identity would accept a number, and one chosen by hand is a
+  // number the identity later hands out again: a create collides. So the form
+  // never writes it, never requires it, and create stays offered because the
+  // database fills it.
+  test('a by-default identity is read-only, never required, and create is still offered', () => {
+    const byDefault = fixtureLike('postgres', (objects) => {
+      const id = objects.find((object) => object.ref.name === 'country')?.columns.find((column) => column.name === 'id')
+      if (id !== undefined) id.generated = 'identity-by-default'
+    })
+    const { form, bindings, notes } = generateForm(byDefault, { ...ORDER, root: { schema: 'sales', name: 'country' }, lookups: [] })
+    expect(form.model.fields.find((field) => field.key === 'id')).not.toHaveProperty('required')
+    expect(bindings.fields.find((binding) => binding.field === 'id')).toMatchObject({ writable: false })
+    expect(bindings.operations.create).toBe(true)
+    expect(notes).toContainEqual({
+      subject: 'id',
+      kind: 'read-only',
+      message:
+        'The database numbers this value when a create leaves it out (identity-by-default). It would accept one, and the form never gives it: a number chosen by hand is one its sequence would later hand out again.',
+    })
+    const always = generateForm(fixtureLike('postgres'), { ...ORDER, root: { schema: 'sales', name: 'country' }, lookups: [] })
+    expect(always.notes).toContainEqual({ subject: 'id', kind: 'read-only', message: 'The database numbers this value (identity-always) and refuses one given to it.' })
+    // A computed column is not numbered, and a note saying so would mislead the reviewer.
+    const computed = fixtureLike('postgres', (objects) => {
+      const name = objects.find((object) => object.ref.name === 'country')?.columns.find((column) => column.name === 'name')
+      if (name !== undefined) name.generated = 'computed'
+    })
+    const derived = generateForm(computed, { ...ORDER, root: { schema: 'sales', name: 'country' }, lookups: [] })
+    expect(derived.notes).toContainEqual({ subject: 'name', kind: 'read-only', message: 'The database computes this value (computed).' })
+  })
+
+  // The browser's maxLength is the column's rule for nvarchar only. For a UTF-8
+  // varchar a reviewer must read that the server alone checks the bytes, or a
+  // form that passes the browser and fails the save looks like a bug.
+  test('a bounded text field says what its maxLength counts against the column', () => {
+    const utf8 = fixtureLike('sqlserver', (objects) => {
+      const name = objects.find((object) => object.ref.name === 'employee')?.columns.find((column) => column.name === 'name')
+      if (name !== undefined) name.type = { kind: 'text', maxLength: 200, lengthUnit: 'utf8-bytes', fixedLength: false }
+    })
+    const { notes } = generateForm(utf8, { ...ORDER, root: { schema: 'sales', name: 'employee' }, lookups: [] })
+    const said = notes.filter((note) => note.subject === 'name').map((note) => note.message)
+    expect(said).toEqual([
+      'Text from text; label from the column name.',
+      expect.stringMatching(/^The column holds 200 bytes of UTF-8 .*Checked on the server only\.$/),
+    ])
   })
 
   // A type with no codec is reported, never silently dropped; and a NOT NULL
@@ -330,9 +379,9 @@ describe('generateForm', () => {
   // key is an identity when there is no primary key.
   test('identity comes from the primary key, else a unique key, else update is refused', () => {
     const keyless = fixtureLike('sqlserver', (objects) => {
-      objects.push(table('log', [col('message', { kind: 'text', maxLength: 100, fixedLength: false }), col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' })]))
+      objects.push(table('log', [col('message', { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' })]))
       objects.push(
-        table('code', [col('code', { kind: 'text', maxLength: 10, fixedLength: false }), col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' })], {
+        table('code', [col('code', { kind: 'text', maxLength: 10, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' })], {
           uniqueKeys: [{ name: 'uq_code', columns: ['code'] }],
         }),
       )

@@ -1,6 +1,7 @@
 import type { ColumnMeta } from '../metadata.js'
-import { parseDecimal, parseInteger } from './numbers.js'
+import { canonicalFloat32, parseDecimal, parseInteger } from './numbers.js'
 import { isDate, isInstant, isTime } from './temporal.js'
+import { parseText } from './text.js'
 
 /** A value as the API carries it: JSON, with exact numbers as strings. */
 export type ApiValue = string | number | boolean | null
@@ -32,30 +33,34 @@ function notWritable(status: 'read-only' | 'unsupported', reason: string): Codec
 }
 
 /**
+ * A 32-bit float, after the finite check: refused where a real would store
+ * infinity or a zero nobody wrote — SQL Server stores 1e-50 as 0 silently,
+ * where PostgreSQL refuses it — and otherwise the shortest decimal naming the
+ * float the column stores, which is what both adapters read back (0026).
+ */
+function parseFloat32(value: number): CodecOutcome {
+  const stored = Math.fround(value)
+  if (!Number.isFinite(stored)) {
+    return refuse('out-of-range', 'Too large for a 32-bit floating-point number, which holds up to about 3.4e38.')
+  }
+  if (stored === 0 && value !== 0) {
+    return refuse('out-of-range', 'Too close to zero for a 32-bit floating-point number, which would store it as 0.')
+  }
+  return { ok: true, value: canonicalFloat32(value) }
+}
+
+/**
  * The check for one value of this column's type, with null already handled.
  *
- * Text length is counted in UTF-16 code units — JavaScript's `length`, which is
- * what formancy's own `maxLength` counts in the browser, so the two agree. It
- * is never fewer than characters, so a value accepted here fits PostgreSQL's
- * `varchar(n)` (characters) and SQL Server's `nvarchar(n)` (code units). SQL
- * Server's single-byte `varchar` can still refuse a character its code page
- * lacks; the adapter translates that error rather than this guessing at code
- * pages.
+ * Text is counted in the column's own `lengthUnit` (0026, `parseText`): the
+ * browser's `maxLength` counts UTF-16 code units, which is the server's rule
+ * for nvarchar only, and the generator says per field how the two relate.
  */
 function valueParser(column: ColumnMeta): ((value: unknown) => CodecOutcome) | string {
   const type = column.type
   switch (type.kind) {
     case 'text':
-      return (value) => {
-        if (typeof value !== 'string') return refuse('type', 'Expected text.')
-        // PostgreSQL cannot store NUL in text at all; refused on both engines
-        // so the same value means the same thing on either.
-        if (value.includes('\u0000')) return refuse('invalid-character', 'Text cannot contain a NUL character.')
-        if (type.maxLength !== null && value.length > type.maxLength) {
-          return refuse('too-long', `At most ${String(type.maxLength)} characters.`)
-        }
-        return { ok: true, value }
-      }
+      return (value) => (typeof value === 'string' ? parseText(type, value) : refuse('type', 'Expected text.'))
 
     case 'boolean':
       return (value) => (typeof value === 'boolean' ? { ok: true, value } : refuse('type', 'Expected true or false.'))
@@ -75,8 +80,10 @@ function valueParser(column: ColumnMeta): ((value: unknown) => CodecOutcome) | s
             refuse('type', 'Send an exact decimal as a string, such as "1234.56".')
 
     case 'float':
-      return (value) =>
-        typeof value === 'number' && Number.isFinite(value) ? { ok: true, value } : refuse('not-finite', 'Expected a finite number.')
+      return (value) => {
+        if (typeof value !== 'number' || !Number.isFinite(value)) return refuse('not-finite', 'Expected a finite number.')
+        return type.bits === 32 ? parseFloat32(value) : { ok: true, value }
+      }
 
     case 'date':
       return (value) =>

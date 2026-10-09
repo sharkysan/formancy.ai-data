@@ -1,7 +1,7 @@
 import type { DatabaseKind } from '../adapter.js'
 import { generateForm } from '../generate/generate.js'
 import type { FieldBinding, FormBindings, GeneratedForm } from '../generate/types.js'
-import type { ColumnMeta, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef } from '../metadata.js'
+import type { ColumnMeta, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { createSnapshot } from '../snapshot.js'
 import type { RecordColumn, RecordValue } from './types.js'
@@ -23,7 +23,8 @@ export const INT64: NormalizedType = { kind: 'integer', min: '-92233720368547758
 export const DATE: NormalizedType = { kind: 'date' }
 export const BOOLEAN: NormalizedType = { kind: 'boolean' }
 export const AMOUNT: NormalizedType = { kind: 'decimal', precision: 18, scale: 4 }
-export const text = (maxLength: number | null, fixedLength = false): NormalizedType => ({ kind: 'text', maxLength, fixedLength })
+// One length unit for every text: these suites test planning, not units, which codec.test.ts covers (0026).
+export const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({ kind: 'text', maxLength, lengthUnit, fixedLength })
 
 /** 2^53 + 1, the fixture's sales.order.id. */
 export const ORDER_ID = '9007199254740993'
@@ -45,7 +46,7 @@ export function table(name: string, columns: ColumnMeta[], extra: Partial<Object
 
 export function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}): MetadataSnapshot {
   const objects: ObjectMeta[] = [
-    table('country', [col('id', 1, INT32, { generated: 'identity' }), col('iso_code', 2, text(2, true)), col('name', 3, text(100))], {
+    table('country', [col('id', 1, INT32, { generated: 'identity-always' }), col('iso_code', 2, text(2, true)), col('name', 3, text(100))], {
       primaryKey: { name: 'pk_country', columns: ['id'] },
       uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }],
     }),
@@ -68,7 +69,7 @@ export function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => vo
     table(
       'order',
       [
-        col('id', 1, INT64, { generated: 'identity' }),
+        col('id', 1, INT64, { generated: 'identity-always' }),
         col('tenant_id', 2, INT32),
         col('customer_no', 3, INT32),
         col('order_date', 4, DATE),

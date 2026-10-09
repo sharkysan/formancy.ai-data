@@ -102,20 +102,46 @@ describe('discovery as the owner', () => {
 
     const [check] = order.checks
     expect(check?.name).toBe('ck_order_status')
+    expect(check?.enforced).toBe(true)
     expect(check?.validated).toBe(true)
     expect(check?.expression).toMatch(/status.*'draft'.*'placed'.*'shipped'/)
   })
 
   // An identity column takes its value from a sequence, not a default, and
   // pg_attrdef has no row for it. Reported with a default, a form would treat
-  // it as "may be supplied, else filled in", which GENERATED ALWAYS refuses.
-  test('an identity column is generated and has no default', async () => {
+  // it as "may be supplied, else filled in", which GENERATED ALWAYS refuses --
+  // and BY DEFAULT accepts, so the two are named apart, and shipment.id, the
+  // by-default one, has no default either.
+  test('an identity column is generated, always or by default, and has no default', async () => {
     const snapshot = await discoverPostgres(owner, FIXTURE_SCOPE)
     expect(column(described(snapshot, 'sales', 'country'), 'id')).toMatchObject({
-      generated: 'identity',
+      generated: 'identity-always',
       hasDefault: false,
       defaultExpression: null,
     })
+    expect(column(described(snapshot, 'sales', 'shipment'), 'id')).toMatchObject({
+      generated: 'identity-by-default',
+      hasDefault: false,
+      defaultExpression: null,
+    })
+  })
+
+  // NOT VALID skips the rows already there and nothing else: PostgreSQL 17
+  // checks every new row against the constraint. An adapter that read
+  // convalidated as enforcement would call ck_shipment_carrier switched off,
+  // and a form would let through the carrier 0 the database refuses.
+  test('a check added NOT VALID is enforced and not validated', async () => {
+    const snapshot = await discoverPostgres(owner, FIXTURE_SCOPE)
+    const checks = described(snapshot, 'sales', 'shipment').checks.map(({ name, enforced, validated }) => ({ name, enforced, validated }))
+    expect(checks.sort((a, b) => a.name.localeCompare(b.name))).toEqual([
+      { name: 'ck_shipment_carrier', enforced: true, validated: false },
+      { name: 'ck_shipment_reference', enforced: true, validated: true },
+      { name: 'ck_shipment_weight', enforced: true, validated: true },
+    ])
+    // And the database agrees: carrier 0 is refused for a new row.
+    await expect(
+      owner`insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pickup_time) values (9, gen_random_uuid(), 0, 'C', '08:00')`,
+    ).rejects.toMatchObject({ code: '23514', constraint_name: 'ck_shipment_carrier' })
   })
 
   // The model compares on-delete and validation only. On-update and
@@ -159,6 +185,7 @@ describe('discovery as the restricted reader', () => {
       { object: 'sales.customer_summary', aspect: 'objects' },
       { object: 'sales.employee', aspect: 'objects' },
       { object: 'sales.order_line', aspect: 'objects' },
+      { object: 'sales.shipment', aspect: 'objects' },
     ])
     for (const gap of snapshot.gaps) expect(gap.detail).toMatch(/no privilege/)
   })

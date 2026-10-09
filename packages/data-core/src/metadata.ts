@@ -17,8 +17,9 @@ export interface ObjectRef {
  *
  * Ranges and lengths rather than type names, because the names do not line up:
  * PostgreSQL's `integer` and SQL Server's `int` are one thing, `char(2)` is a
- * text of fixed length two in both, and `nvarchar(200)` is two hundred
- * characters even though SQL Server's catalog says four hundred bytes. The
+ * text of fixed length two in both, and `nvarchar(200)` is two hundred UTF-16
+ * code units even though SQL Server's catalog says four hundred bytes —
+ * `lengthUnit` says which unit a length counts (0026). The
  * database's own spelling is kept beside this, in `ColumnMeta.databaseType`,
  * so nothing is lost by normalising.
  *
@@ -28,7 +29,13 @@ export interface ObjectRef {
  * never had it.
  */
 export type NormalizedType =
-  | { kind: 'text'; maxLength: number | null; fixedLength: boolean }
+  | {
+      kind: 'text'
+      /** In `lengthUnit`s; `null` is unbounded. */
+      maxLength: number | null
+      lengthUnit: TextLengthUnit
+      fixedLength: boolean
+    }
   | { kind: 'boolean' }
   /** Bounds as decimal strings, because a 64-bit bound is not a JavaScript number. */
   | { kind: 'integer'; min: string; max: string }
@@ -37,17 +44,81 @@ export type NormalizedType =
   | { kind: 'float'; bits: 32 | 64 }
   | { kind: 'date' }
   | { kind: 'time'; precision: number | null }
+  /**
+   * `withTimeZone` false is a wall clock in no zone: read-only (0009), read as
+   * `YYYY-MM-DDTHH:MM:SS`, then — when the value has a fraction of a second —
+   * `.` and its digits with trailing zeros dropped, as many as the column
+   * holds, never rounded: `2026-10-08T12:34:56.5`. Both adapters spell it so
+   * (0026). One exception: SQL Server's `datetime` keeps 1/300 s and SQL
+   * Server itself spells it to the millisecond — a stored .00666… reads
+   * `.007` — so that type's read is rounded, as SQL Server rounds it. Outside
+   * years 1–9999 (PostgreSQL only) the era is spelled, as for a date.
+   */
   | { kind: 'timestamp'; withTimeZone: boolean; precision: number | null }
   | { kind: 'uuid' }
-  | { kind: 'binary'; maxLength: number | null }
+  /**
+   * `fixedLength`: binary(n) pads a shorter value with zero bytes to n, so what
+   * is read is not what was written. PostgreSQL's bytea never is. Binary has no
+   * codec yet; the flag is for drift, and for the binary codec that will need
+   * it, which must refuse or pad.
+   */
+  | { kind: 'binary'; maxLength: number | null; fixedLength: boolean }
   /** SQL Server's `rowversion`: an opaque, database-generated concurrency token, never a clock. */
   | { kind: 'rowversion' }
   | { kind: 'unsupported' }
 
 export type NormalizedTypeKind = NormalizedType['kind']
 
-/** How a column gets its value when nobody supplies one. */
-export type Generation = 'none' | 'identity' | 'computed' | 'rowversion'
+/**
+ * What a text column's declared length counts. The engines do not agree, and
+ * neither always agrees with the browser, whose `maxLength` counts UTF-16 code
+ * units (JavaScript's `length`):
+ *
+ * - `code-points` — PostgreSQL varchar(n)/char(n) in a UTF8 database: n
+ *   characters. Two emoji are two.
+ * - `utf16-code-units` — SQL Server nvarchar(n)/nchar(n), under every
+ *   collation, a UTF-8 one included: n byte pairs. An emoji is two;
+ *   nvarchar(4) holds two and refuses a third (2628).
+ * - `utf8-bytes` — SQL Server varchar(n)/char(n) under a UTF-8 collation
+ *   (code page 65001): n bytes. `é` is two; varchar(4) refuses three (2628).
+ *   Also PostgreSQL in a SQL_ASCII database, which stores the client's UTF-8
+ *   bytes unconverted and counts each byte as a character.
+ * - `code-page-bytes` — a text in an encoding that is not Unicode: SQL Server
+ *   varchar(n)/char(n) under any other collation, n bytes of its code page —
+ *   one per character on a single-byte page such as 1252, one or two on 932,
+ *   936, 949 and 950; PostgreSQL in a database of any other encoding, such as
+ *   LATIN1, n characters of it. Nothing here holds an encoding's table, so a
+ *   value is checked by characters — a lower bound — and the save refuses
+ *   what is longer in bytes or holds a character the encoding lacks:
+ *   PostgreSQL itself (22P05), and on SQL Server, which stores `?` or a best
+ *   fit without an error, the adapter's check that the text was stored as
+ *   sent.
+ */
+export type TextLengthUnit = 'code-points' | 'utf16-code-units' | 'utf8-bytes' | 'code-page-bytes'
+
+/**
+ * How a column gets its value when nobody supplies one.
+ *
+ * - `identity-always` — numbered by the database, and an explicit value is
+ *   refused in an ordinary write: PostgreSQL GENERATED ALWAYS AS IDENTITY (only
+ *   OVERRIDING SYSTEM VALUE gets past it), SQL Server IDENTITY (only
+ *   IDENTITY_INSERT, which needs ALTER on the table; an UPDATE of it is
+ *   refused, 8102).
+ * - `identity-by-default` — numbered from a sequence when a write leaves it
+ *   out, and an explicit value accepted: PostgreSQL GENERATED BY DEFAULT AS
+ *   IDENTITY, and on either engine a default that is exactly a sequence's
+ *   next value — PostgreSQL's `serial`, `nextval('…'::regclass)`, and SQL
+ *   Server's `NEXT VALUE FOR`, which has no BY DEFAULT identity and uses this
+ *   instead. They behave alike, so they are named alike. Such a column still
+ *   reports the default it has (`hasDefault`); an identity has none.
+ * - `computed` — derived by the database from other columns of the row.
+ * - `rowversion` — SQL Server's concurrency token, written on every change.
+ *
+ * Both identities are read-only in a form (0026): a number chosen by hand does
+ * not advance the sequence, and a later create collides with it (measured on
+ * both engines: PostgreSQL 23505, SQL Server 2627).
+ */
+export type Generation = 'none' | 'identity-always' | 'identity-by-default' | 'computed' | 'rowversion'
 
 export interface ColumnMeta {
   name: string
@@ -104,6 +175,17 @@ export interface CheckMeta {
   name: string
   /** The expression as the catalog reports it, or `null` when this connection cannot read it. */
   expression: string | null
+  /**
+   * Whether new writes are checked against it. SQL Server: not `is_disabled`
+   * (ALTER TABLE … NOCHECK CONSTRAINT). PostgreSQL 17: always — NOT VALID only
+   * skips the rows already there.
+   */
+  enforced: boolean
+  /**
+   * Whether the rows that existed when it was added or re-enabled were
+   * checked. PostgreSQL NOT VALID; SQL Server WITH NOCHECK, and every disabled
+   * check, which SQL Server marks untrusted.
+   */
   validated: boolean
 }
 

@@ -98,6 +98,8 @@ const FOREIGN_KEY: ReadonlyArray<Property<ForeignKeyMeta>> = [
 
 const CHECK: ReadonlyArray<Property<CheckMeta>> = [
   ['expression', (check) => check.expression ?? 'not readable', (was, now) => was.expression === now.expression],
+  // A disabled SQL Server check is also untrusted; without this it read like a WITH NOCHECK one (0026).
+  ['enforcement', (check) => (check.enforced ? 'enforced' : 'not enforced'), (was, now) => was.enforced === now.enforced],
   ['validation', (check) => (check.validated ? 'validated' : 'not validated'), (was, now) => was.validated === now.validated],
 ]
 

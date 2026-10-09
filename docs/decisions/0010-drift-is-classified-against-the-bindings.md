@@ -1,6 +1,6 @@
 # 0010 — Drift is classified against one form's bindings, and what cannot be seen is never called gone
 
-- **Status:** accepted
+- **Status:** accepted; the retyped row narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md): a different length unit or fixed length is a retyping
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/drift/diff.test.ts` — identical
@@ -69,7 +69,7 @@ blocks and what the form may still write.
   |---|---|
   | New nullable, defaulted or generated column | `review`: an optional inclusion |
   | New NOT NULL column, no default, no generator | stops create |
-  | Bound column dropped, retyped, or spelled differently with the same normalised type (`nvarchar` to `varchar`) | blocks the form: the published codec is wrong for it |
+  | Bound column dropped, retyped — including a different length unit or fixed length (0026) — or spelled differently with the same normalised type (`nvarchar` to `varchar`) | blocks the form: the published codec is wrong for it |
   | Bound, written column tightened: precision, scale, length, range, nullability, or a default create relied on | stops writes |
   | Column loosened | `info`, unless the published control cannot hold it — an integer past 2^53 in a number field, a now-nullable boolean in a checkbox — which stops writes |
   | Database starts generating a written column, or stops generating one nobody fills | stops writes, or create |

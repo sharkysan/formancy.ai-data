@@ -1,5 +1,5 @@
 import type { FieldDef, FormSchema, LayoutNode, LogicRule } from '@formancy/spec'
-import type { ColumnMeta, ForeignKeyMeta, MetadataSnapshot, ObjectMeta } from '../metadata.js'
+import type { ColumnMeta, ForeignKeyMeta, Generation, MetadataSnapshot, ObjectMeta } from '../metadata.js'
 import { findObject } from '../snapshot.js'
 import { controlFor } from './controls.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, sourceNameFor } from './names.js'
@@ -172,6 +172,25 @@ function planLookup(
   }
 }
 
+/**
+ * Why a generated column is shown and never written, per kind. A by-default
+ * identity would accept a value; it is still never written, because a number
+ * chosen by hand does not advance the sequence and a later create
+ * collides with it (0026).
+ */
+function generatedNote(generated: Exclude<Generation, 'none'>): string {
+  switch (generated) {
+    case 'identity-always':
+      return 'The database numbers this value (identity-always) and refuses one given to it.'
+    case 'identity-by-default':
+      return 'The database numbers this value when a create leaves it out (identity-by-default). It would accept one, and the form never gives it: a number chosen by hand is one its sequence would later hand out again.'
+    case 'computed':
+      return 'The database computes this value (computed).'
+    case 'rowversion':
+      return 'The database writes this value (rowversion).'
+  }
+}
+
 function planColumn(
   root: ObjectMeta,
   column: ColumnMeta,
@@ -192,7 +211,8 @@ function planColumn(
   const required = writable && !column.nullable && !column.hasDefault
 
   notes.push({ subject: key, kind: 'inferred', message: `${labelFor(control.describe)} from ${column.databaseType}; label from the column name.` })
-  if (generated) notes.push({ subject: key, kind: 'read-only', message: `The database computes this value (${column.generated}).` })
+  if (control.caveat !== undefined) notes.push({ subject: key, kind: 'inferred', message: control.caveat })
+  if (column.generated !== 'none') notes.push({ subject: key, kind: 'read-only', message: generatedNote(column.generated) })
   if (control.readOnly !== undefined) notes.push({ subject: key, kind: 'read-only', message: `Shown, never written: ${control.readOnly}.` })
   if (isView) notes.push({ subject: key, kind: 'read-only', message: `${root.ref.name} is a view.` })
   if (pinned) notes.push({ subject: key, kind: 'read-only', message: 'Pinned by the policy: its value comes from the trusted context, never from the person filling the form.' })

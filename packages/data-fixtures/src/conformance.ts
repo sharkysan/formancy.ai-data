@@ -1,6 +1,6 @@
 import type { ColumnMeta, MetadataSnapshot, ObjectMeta, ObjectRef } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
-import type { ExpectedColumn, ExpectedColumnFacts, ExpectedObject } from './model.js'
+import type { ExpectedCheck, ExpectedCheckFacts, ExpectedColumn, ExpectedColumnFacts, ExpectedObject } from './model.js'
 import { FIXTURE_MODEL } from './model.js'
 
 /**
@@ -134,7 +134,16 @@ function objectDisagreements(actual: ObjectMeta, entry: ExpectedObject, kind: Me
   }
 
   const checks = actual.checks.map((check) => check.name).sort()
-  if (checks.join() !== [...entry.checks].sort().join()) out.push(`${where} checks are [${checks.join(', ')}], expected [${entry.checks.join(', ')}]`)
+  const wantedChecks = entry.checks.map((check) => check.name).sort()
+  if (checks.join() !== wantedChecks.join()) out.push(`${where} checks are [${checks.join(', ')}], expected [${wantedChecks.join(', ')}]`)
+  for (const check of entry.checks) {
+    const found = actual.checks.find((candidate) => candidate.name === check.name)
+    if (found === undefined) continue
+    const facts = resolveCheck(check, kind)
+    const at = `${where} ${check.name}`
+    if (facts.enforced !== undefined && found.enforced !== facts.enforced) out.push(`${at} enforced is ${String(found.enforced)}, expected ${String(facts.enforced)}`)
+    if (facts.validated !== undefined && found.validated !== facts.validated) out.push(`${at} validated is ${String(found.validated)}, expected ${String(facts.validated)}`)
+  }
 
   return out
 }
@@ -161,6 +170,11 @@ function columnDisagreements(actual: ColumnMeta, expected: ExpectedColumnFacts, 
 
 function resolve(column: ExpectedColumn, kind: MetadataSnapshot['kind']): ExpectedColumnFacts {
   const { name: _name, byKind, ...facts } = column
+  return { ...facts, ...(byKind?.[kind] ?? {}) }
+}
+
+function resolveCheck(check: ExpectedCheck, kind: MetadataSnapshot['kind']): ExpectedCheckFacts {
+  const { name: _name, byKind, ...facts } = check
   return { ...facts, ...(byKind?.[kind] ?? {}) }
 }
 

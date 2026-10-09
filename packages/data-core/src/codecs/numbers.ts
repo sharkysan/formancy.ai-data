@@ -95,3 +95,44 @@ export function parseInteger(value: number | string, min: string, max: string): 
   }
   return { ok: true, value: text }
 }
+
+/**
+ * The canonical API value of a 32-bit float: the shortest decimal that names
+ * the same float32, and of that length the nearest to it — 0.1, never
+ * 0.10000000149011612. Idempotent, and applies Math.fround first, so any
+ * double names the float a real would store. -0 is 0.
+ *
+ * One function for the codec and both adapters' reads (0026), because the echo
+ * of an unchanged real compares the value written with the value read: if the
+ * two spelled one float differently, a read would show as a change. It is not
+ * PostgreSQL's own float4 text, which agrees on the float and differs in a
+ * last digit at an exact tie (it rounds to even, `toExponential` away from
+ * zero) and is a digit longer where a decimal halfway to the next float
+ * already names this one; both adapters return this function's value, so they
+ * agree with each other, which is the point.
+ */
+export function canonicalFloat32(value: number): number {
+  const float = Math.fround(value)
+  if (float === 0 || !Number.isFinite(float)) return float === 0 ? 0 : float
+  // Nine significant digits always name a float32, so the loop returns.
+  for (let digits = 1; ; digits += 1) {
+    const found = ofLength(float, digits)
+    if (found !== null) return found
+  }
+}
+
+/**
+ * The decimal of `digits` significant digits nearest to `float` that names it,
+ * or `null`. `toExponential` gives the nearest of that length; when it misses,
+ * only its neighbour on the other side of the float can name it, because the
+ * float's interval is lopsided only just below a power of two, where the gap
+ * down is half the gap up.
+ */
+function ofLength(float: number, digits: number): number | null {
+  const [mantissa = '', exponent = ''] = float.toExponential(digits - 1).split('e')
+  const nearest = Number(`${mantissa}e${exponent}`)
+  if (Math.fround(nearest) === float) return nearest
+  const units = Number(mantissa.replace('.', ''))
+  const neighbour = Number(`${String(nearest < float ? units + 1 : units - 1)}e${String(Number(exponent) - (digits - 1))}`)
+  return Math.fround(neighbour) === float ? neighbour : null
+}

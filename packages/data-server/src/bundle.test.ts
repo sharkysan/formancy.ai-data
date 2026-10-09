@@ -1,5 +1,6 @@
 import { createSnapshot, generateForm } from '@formancy/data-core'
 import type { ColumnMeta, FormPolicy, MetadataSnapshot, NormalizedType } from '@formancy/data-core'
+import { schemaHash } from '@formancy/spec'
 import { describe, expect, test } from 'vitest'
 import type { PublishedBundle } from './bundle.js'
 import { validateBundle } from './bundle.js'
@@ -24,7 +25,7 @@ function snapshot(): MetadataSnapshot {
         columns: [
           column('id', 1, INT32),
           column('tenant_id', 2, INT32),
-          column('name', 3, { kind: 'text', maxLength: 200, fixedLength: false }),
+          column('name', 3, { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }),
           column('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
         ],
         primaryKey: { name: 'pk_employee', columns: ['id'] },
@@ -72,10 +73,27 @@ describe('validateBundle', () => {
   test('refuses a snapshot edited after it was taken', () => {
     const edited = copy(good())
     const name = edited.snapshot.objects[0]?.columns.find((entry) => entry.name === 'name')
-    if (name !== undefined) name.type = { kind: 'text', maxLength: 4000, fixedLength: false }
+    if (name !== undefined) name.type = { kind: 'text', maxLength: 4000, lengthUnit: 'utf16-code-units', fixedLength: false }
     const outcome = validateBundle(edited)
     expect(outcome.ok).toBe(false)
     expect(outcome.ok ? [] : outcome.problems).toContainEqual(expect.stringMatching(/does not hash to its own fingerprint/))
+  })
+
+  // A bundle published before contract v2 (0026) holds text with no length
+  // unit, and its fingerprint is its own, so the hash check passes. Served, it
+  // would hand the planner a codec that counts in no unit.
+  test('a bundle whose snapshot predates contract v2 is refused, not served', () => {
+    const old = copy(good())
+    const name = old.snapshot.objects[0]?.columns.find((entry) => entry.name === 'name')
+    if (name?.type.kind === 'text') delete (name.type as { lengthUnit?: unknown }).lengthUnit
+    const { fingerprint: _stale, ...rest } = old.snapshot
+    // Rehashed as contract v1 hashed it, so only the shape is wrong.
+    old.snapshot.fingerprint = schemaHash({ kind: rest.kind, objects: rest.objects, gaps: rest.gaps })
+    old.bindings.snapshotFingerprint = old.snapshot.fingerprint
+    expect(validateBundle(old)).toEqual({
+      ok: false,
+      problems: ['the snapshot is not one a catalog could produce: sales.employee: column name has no text length unit'],
+    })
   })
 
   // Bindings from one snapshot over another describe columns that may not exist.

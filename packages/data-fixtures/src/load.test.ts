@@ -39,8 +39,22 @@ describe('the fixture files', () => {
   // is a conformance failure on one engine; catching it here names the file.
   test('both editions name the same constraints', () => {
     // Comments stripped first: "every constraint is named" in a header is prose, not a constraint called "is".
+    // A set, because SQL Server's file names ck_shipment_reference twice — once
+    // to add it and once to disable it (NOCHECK CONSTRAINT), which PostgreSQL 17
+    // cannot do — and a constraint named twice is still one constraint.
     const names = (text: string) =>
-      [...text.replaceAll(/--.*$/gm, '').matchAll(/constraint\s+(\w+)/gi)].map((match) => match[1]).sort()
+      [...new Set([...text.replaceAll(/--.*$/gm, '').matchAll(/constraint\s+(\w+)/gi)].map((match) => match[1]))].sort()
     expect(names(readFixture('sqlserver.sql')).filter((name) => !name?.startsWith('df_'))).toEqual(names(readFixture('postgres.sql')))
+  })
+
+  // A table created in one file only is a conformance failure on one engine,
+  // reported as a missing object far from the edit that caused it. Derived
+  // from the CREATE TABLE statements, with each dialect's quoting stripped.
+  test('both editions create the same tables', () => {
+    const tables = (text: string) =>
+      [...text.replaceAll(/--.*$/gm, '').matchAll(/create\s+table\s+sales\.([^\s(]+)/gi)].map((match) => (match[1] ?? '').replaceAll(/["[\]]/g, '')).sort()
+    const postgres = tables(readFixture('postgres.sql'))
+    expect(postgres).toContain('shipment')
+    expect(tables(readFixture('sqlserver.sql'))).toEqual(postgres)
   })
 })

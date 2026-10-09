@@ -130,7 +130,7 @@ describe('diffSnapshots: columns', () => {
     expect(only(report)).toMatchObject({ kind: 'column-tightened', severity: 'info', affects: ['id'] })
     expect(report.writable).toEqual({ create: true, update: true })
     // Nor one no field binds at all.
-    expect(only(drift((objects) => retype(objects, 'order', 'attachment', 'varbinary(100)', { kind: 'binary', maxLength: 100 })))).toMatchObject({ kind: 'column-tightened', severity: 'info', affects: [] })
+    expect(only(drift((objects) => retype(objects, 'order', 'attachment', 'varbinary(100)', { kind: 'binary', maxLength: 100, fixedLength: false })))).toMatchObject({ kind: 'column-tightened', severity: 'info', affects: [] })
   })
 
   // Wider is harmless only while the published field can hold every value.
@@ -164,6 +164,37 @@ describe('diffSnapshots: columns', () => {
     expect(plain.writable).toEqual({ create: false, update: true })
 
     expect(only(drift((objects) => (column(objects, 'order', 'attachment').generated = 'computed')))).toMatchObject({ severity: 'info' })
+  })
+
+  // A collation move from 1252 to UTF-8 keeps varchar(20) spelled alike. The
+  // published codec counts characters, the column now counts bytes: a bound
+  // field must be reviewed before it reads or writes again, or a value the
+  // codec accepts fails as 2628 and the change goes unreported.
+  test('a bound varchar whose collation became UTF-8 blocks the form', () => {
+    const codePage = snapshot((objects) => retype(objects, 'order', 'status', 'varchar(20)', text(20, false, 'code-page-bytes')))
+    const report = drift((objects) => retype(objects, 'order', 'status', 'varchar(20)', text(20, false, 'utf8-bytes')), {}, ORDER, codePage)
+    expect(only(report)).toMatchObject({
+      kind: 'column-type-changed',
+      severity: 'blocking',
+      affects: ['status'],
+      message: expect.stringMatching(/^status: its length now counts utf8-bytes where it counted code-page-bytes.*blocked until it is reviewed\.$/),
+    })
+
+  })
+
+  // A by-default identity accepts a written value, and the form would go on
+  // writing one: a number the identity later hands out again, so a create
+  // collides. Writes stop until a person decides.
+  test('a written column that became a by-default identity stops writes', () => {
+    const report = drift((objects) => (column(objects, 'order', 'created_by').generated = 'identity-by-default'))
+    expect(only(report)).toMatchObject({
+      kind: 'column-generation-changed',
+      severity: 'blocking',
+      affects: ['created_by'],
+      message:
+        'created_by: the database now generates it (identity-by-default). The form writes it, and the database now numbers it when a create leaves it out; a value written by hand would not advance that numbering, so writes are blocked until the form is reviewed.',
+    })
+    expect(report.writable).toEqual({ create: false, update: false })
   })
 
   // The concurrency token is how a stale update is detected (0009). Gone or
@@ -224,7 +255,7 @@ describe('diffSnapshots: columns', () => {
     // A hint about a column no field binds is only a note.
     const unbound = drift((objects) => {
       dropColumn(objects, 'order', 'attachment')
-      addColumn(objects, 'order', col('scan', 'varbinary(max)', { kind: 'binary', maxLength: null }, { nullable: true }))
+      addColumn(objects, 'order', col('scan', 'varbinary(max)', { kind: 'binary', maxLength: null, fixedLength: false }, { nullable: true }))
     })
     expect(unbound.changes.find((change) => change.kind === 'possible-rename')?.severity).toBe('info')
   })
@@ -247,7 +278,7 @@ describe('diffSnapshots: columns', () => {
     const unbound = drift(
       (objects) => {
         dropColumn(objects, 'order', 'attachment')
-        addColumn(objects, 'order', col('scan', 'varbinary(max)', { kind: 'binary', maxLength: null }, { nullable: true }))
+        addColumn(objects, 'order', col('scan', 'varbinary(max)', { kind: 'binary', maxLength: null, fixedLength: false }, { nullable: true }))
       },
       { gaps: [gap(ORDER_REF, 'columns')] },
     )

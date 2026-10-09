@@ -11,7 +11,7 @@ import { validatePolicy } from './validate.js'
  * it is a plain column field, part of the key.
  */
 function column(field: string, writable = true): FieldBinding {
-  return { kind: 'column', field, column: field, type: { kind: 'text', maxLength: 100, fixedLength: false }, nullable: true, writable }
+  return { kind: 'column', field, column: field, type: { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }, nullable: true, writable }
 }
 
 function lookup(field: string, columns: string[], table: string, targetColumns: string[]): FieldBinding {

@@ -40,7 +40,7 @@ const SNAPSHOT = createSnapshot({
   objects: [
     {
       ref: ref('country'), kind: 'table', comment: null,
-      columns: [col('id', 1, INT32, { generated: 'identity' }), col('iso_code', 2, { kind: 'text', maxLength: 2, fixedLength: true }), col('name', 3, { kind: 'text', maxLength: 100, fixedLength: false })],
+      columns: [col('id', 1, INT32, { generated: 'identity-always' }), col('iso_code', 2, { kind: 'text', maxLength: 2, lengthUnit: 'utf16-code-units', fixedLength: true }), col('name', 3, { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false })],
       primaryKey: { name: 'pk_country', columns: ['id'] }, uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }], foreignKeys: [], checks: [],
     },
     {
@@ -48,8 +48,8 @@ const SNAPSHOT = createSnapshot({
       columns: [
         col('tenant_id', 1, INT32),
         col('customer_no', 2, INT32),
-        col('name', 3, { kind: 'text', maxLength: 200, fixedLength: false }),
-        col('country_code', 4, { kind: 'text', maxLength: 2, fixedLength: true }, { nullable: true }),
+        col('name', 3, { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }),
+        col('country_code', 4, { kind: 'text', maxLength: 2, lengthUnit: 'utf16-code-units', fixedLength: true }, { nullable: true }),
         col('created_at', 5, { kind: 'timestamp', withTimeZone: true, precision: 7 }, { hasDefault: true }),
         col('row_version', 6, { kind: 'rowversion' }, { generated: 'rowversion' }),
       ],

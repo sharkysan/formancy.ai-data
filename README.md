@@ -142,7 +142,7 @@ Node 22.12 or later, pnpm through corepack, and Docker for the tests.
 corepack enable pnpm
 pnpm install
 pnpm build
-pnpm test        # starts postgres:17-alpine and mssql/server:2022 through testcontainers
+pnpm test        # starts postgres:17-alpine (and 18-alpine for one suite) and mssql/server:2022 through testcontainers
 ```
 
 There is no mocked driver and no `--skip-db` flag. Database behaviour is proved

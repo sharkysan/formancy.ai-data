@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { DatabaseKind, MetadataSnapshot, NormalizedType, ObjectMeta } from '@formancy/data-core'
+import type { ColumnMeta, DatabaseKind, MetadataSnapshot, NormalizedType, ObjectMeta } from '@formancy/data-core'
 import { createSnapshot } from '@formancy/data-core'
 import { restrictedDisagreements, snapshotDisagreements } from './conformance.js'
 import { FIXTURE_MODEL } from './model.js'
@@ -40,8 +40,17 @@ function perfect(kind: DatabaseKind): ObjectMeta[] {
       enforced: true,
       validated: foreignKey.validated,
     })),
-    checks: entry.checks.map((name) => ({ name, expression: null, validated: true })),
+    checks: entry.checks.map((check) => {
+      const facts = { ...check, ...(check.byKind?.[kind] ?? {}) }
+      return { name: check.name, expression: null, enforced: facts.enforced ?? true, validated: facts.validated ?? true }
+    }),
   }))
+}
+
+function columnOf(objects: ObjectMeta[], table: string, name: string): ColumnMeta {
+  const found = object(objects, table).columns.find((entry) => entry.name === name)
+  if (found === undefined) throw new Error(`no ${table}.${name}`)
+  return found
 }
 
 function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}, gaps: MetadataSnapshot['gaps'] = []): MetadataSnapshot {
@@ -89,9 +98,71 @@ describe('snapshotDisagreements', () => {
   test('notices a text length that is twice what it should be', () => {
     const doubled = snapshot('sqlserver', (objects) => {
       const column = object(objects, 'customer').columns.find((entry) => entry.name === 'name')
-      if (column !== undefined) column.type = { kind: 'text', maxLength: 400, fixedLength: false }
+      if (column !== undefined) column.type = { kind: 'text', maxLength: 400, lengthUnit: 'utf16-code-units', fixedLength: false }
     })
     expect(snapshotDisagreements(doubled)).toEqual([expect.stringMatching(/customer\.name type maxLength is 400, expected 200/)])
+  })
+
+  // shipment.reference is varchar(20) under a UTF-8 collation on SQL Server.
+  // An adapter that read every varchar as code-page bytes would hand the codec
+  // a characters rule, and three é in varchar(4) would reach the server as 2628.
+  test('notices a text column counted in the wrong unit', () => {
+    const wrong = snapshot('sqlserver', (objects) => {
+      columnOf(objects, 'shipment', 'reference').type = { kind: 'text', maxLength: 20, lengthUnit: 'code-page-bytes', fixedLength: false }
+    })
+    expect(snapshotDisagreements(wrong)).toEqual([expect.stringMatching(/sales\.shipment\.reference type lengthUnit is "code-page-bytes", expected "utf8-bytes"/)])
+    // The same column is characters on PostgreSQL, and nothing else.
+    const postgres = snapshot('postgres', (objects) => {
+      columnOf(objects, 'shipment', 'reference').type = { kind: 'text', maxLength: 20, lengthUnit: 'utf8-bytes', fixedLength: false }
+    })
+    expect(snapshotDisagreements(postgres)).toEqual([expect.stringMatching(/sales\.shipment\.reference type lengthUnit is "utf8-bytes", expected "code-points"/)])
+  })
+
+  // ALWAYS refuses a value and BY DEFAULT accepts one. An adapter that read
+  // attidentity as a yes or no would call them alike, and a form would treat
+  // a column that takes values as one that refuses them, or the reverse.
+  test('notices an always identity reported as by default, and the reverse', () => {
+    const wrong = snapshot('postgres', (objects) => {
+      columnOf(objects, 'country', 'id').generated = 'identity-by-default'
+      columnOf(objects, 'shipment', 'id').generated = 'identity-always'
+    })
+    expect(snapshotDisagreements(wrong)).toEqual([
+      'sales.country.id generated is identity-by-default, expected identity-always',
+      'sales.shipment.id generated is identity-always, expected identity-by-default',
+    ])
+  })
+
+  // SQL Server's sequence default numbers a row a create leaves out and takes
+  // a value given by hand, as BY DEFAULT does, and collides later the same
+  // way (measured: 2627). An adapter that reported it as an ordinary default
+  // made the shared table's id writable on SQL Server and read-only on
+  // PostgreSQL. Its default is real, so it keeps `hasDefault`.
+  test("notices SQL Server's sequence default reported as an ordinary column", () => {
+    const wrong = snapshot('sqlserver', (objects) => {
+      columnOf(objects, 'shipment', 'id').generated = 'none'
+    })
+    expect(snapshotDisagreements(wrong)).toEqual(['sales.shipment.id generated is none, expected identity-by-default'])
+    const lost = snapshot('sqlserver', (objects) => {
+      columnOf(objects, 'shipment', 'id').hasDefault = false
+    })
+    expect(snapshotDisagreements(lost)).toEqual(['sales.shipment.id hasDefault is false, expected true'])
+  })
+
+  // A disabled SQL Server check is also untrusted, so an adapter that ignored
+  // is_disabled would report it exactly like a WITH NOCHECK one — enforced —
+  // and pass, while the database checked no new row against it.
+  test('notices a check reported enforced where SQL Server disabled it', () => {
+    const wrong = snapshot('sqlserver', (objects) => {
+      const check = object(objects, 'shipment').checks.find((entry) => entry.name === 'ck_shipment_reference')
+      if (check !== undefined) check.enforced = true
+    })
+    expect(snapshotDisagreements(wrong)).toEqual(['sales.shipment ck_shipment_reference enforced is true, expected false'])
+    // PostgreSQL cannot disable one, so the same check is enforced and validated there.
+    const postgres = snapshot('postgres', (objects) => {
+      const carrier = object(objects, 'shipment').checks.find((entry) => entry.name === 'ck_shipment_carrier')
+      if (carrier !== undefined) carrier.validated = true
+    })
+    expect(snapshotDisagreements(postgres)).toEqual(['sales.shipment ck_shipment_carrier validated is true, expected false'])
   })
 
   // A composite key's order is its pairing. Reversed, a lookup would join

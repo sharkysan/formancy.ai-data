@@ -1,4 +1,5 @@
 import { TEMPORAL_SHAPES } from '@formancy/spec'
+import { textLength } from '../codecs/text.js'
 import type { NormalizedType } from '../metadata.js'
 import type { LookupKeyType } from './types.js'
 
@@ -68,13 +69,14 @@ function isDate(value: string): boolean {
 
 /**
  * Whether a decoded token value is one a key column of this type can hold,
- * spelled as an adapter reads it back. Text is taken as it is, up to the
- * column's length in UTF-16 units and without a NUL.
+ * spelled as an adapter reads it back. Text is taken as it is, without a NUL,
+ * up to the column's length in the column's own unit (0026): a token is
+ * measured as the column measures it, the codec's `textLength`.
  */
 export function isKeyValue(type: LookupKeyType, value: string): boolean {
   switch (type.kind) {
     case 'text':
-      return !value.includes('\u0000') && (type.maxLength === null || value.length <= type.maxLength)
+      return !value.includes('\u0000') && (type.maxLength === null || textLength(value, type.lengthUnit) <= type.maxLength)
     case 'integer':
       return isInteger(value, type.min, type.max)
     case 'decimal':

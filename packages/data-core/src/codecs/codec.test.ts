@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest'
-import type { ColumnMeta, NormalizedType } from '../metadata.js'
+import type { ColumnMeta, NormalizedType, TextLengthUnit } from '../metadata.js'
 import { controlFor } from '../generate/controls.js'
 import { codecFor } from './codec.js'
+import { canonicalFloat32 } from './numbers.js'
 import { decodeRowversion, encodeRowversion } from './rowversion.js'
 
 function column(type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
@@ -104,25 +105,78 @@ describe('integers', () => {
 })
 
 describe('text', () => {
-  // formancy's maxLength counts JavaScript length, UTF-16 code units. Counting
-  // the same unit means the browser and the server agree; it is also never
-  // fewer than characters, so the value fits either engine's column.
-  test('length is counted in UTF-16 code units, as the browser counts it', () => {
-    const short: NormalizedType = { kind: 'text', maxLength: 2, fixedLength: false }
-    expect(accepted(short, 'ab')).toBe('ab')
-    expect(accepted(short, 'abc')).toBe('refused:too-long')
-    // One emoji is two code units: it fits two and not one.
-    expect(accepted(short, '😀')).toBe('😀')
-    expect(accepted({ kind: 'text', maxLength: 1, fixedLength: false }, '😀')).toBe('refused:too-long')
+  const four = (lengthUnit: TextLengthUnit): NormalizedType => ({ kind: 'text', maxLength: 4, lengthUnit, fixedLength: false })
+  /** The spec's table at n = 4: éééé, 😀😀, 😀😀😀, é×5, abcd😀, each accepted or refused. */
+  const verdicts = (unit: TextLengthUnit) =>
+    ['éééé', '😀😀', '😀😀😀', 'é'.repeat(5), 'abcd😀'].map((value) => (parse(four(unit), value).ok ? 'ok' : 'too-long'))
+
+  // PostgreSQL's varchar(4) holds four characters, emoji or not (measured: four
+  // emoji, octet_length 16). Refusing a third emoji the column holds would be
+  // the browser's rule passed off as PostgreSQL's.
+  test('code-points: a PostgreSQL varchar(n) in a UTF8 database holds n characters, whatever they are', () => {
+    expect(verdicts('code-points')).toEqual(['ok', 'ok', 'ok', 'too-long', 'too-long'])
+    expect(parse(four('code-points'), 'é'.repeat(5))).toEqual({ ok: false, code: 'too-long', message: 'At most 4 characters.' })
+  })
+
+  // Mirrors the measured 2628 at nvarchar(4): two emoji fit, a third does not,
+  // because SQL Server counts byte pairs and an emoji is two of them.
+  test('utf16-code-units: an nvarchar(n) holds n code units, an emoji counting two', () => {
+    expect(verdicts('utf16-code-units')).toEqual(['ok', 'ok', 'too-long', 'too-long', 'too-long'])
+    expect(parse(four('utf16-code-units'), '😀😀😀')).toEqual({ ok: false, code: 'too-long', message: 'At most 4 characters, counting an emoji as two.' })
+  })
+
+  // Without it, three é reach SQL Server's UTF-8 varchar(4) and fail there as
+  // 2628, a database error where a field error belonged.
+  test('utf8-bytes: a UTF-8 varchar(n) holds n bytes, é taking two and an emoji four', () => {
+    expect(verdicts('utf8-bytes')).toEqual(['too-long', 'too-long', 'too-long', 'too-long', 'too-long'])
+    expect(accepted(four('utf8-bytes'), 'éé')).toBe('éé')
+    expect(accepted(four('utf8-bytes'), 'abcd')).toBe('abcd')
+    expect(accepted(four('utf8-bytes'), '😀')).toBe('😀')
+    expect(parse(four('utf8-bytes'), 'ééé')).toEqual({
+      ok: false,
+      code: 'too-long',
+      message: 'At most 4 bytes of UTF-8: a letter such as é takes two, and an emoji four.',
+    })
+    // Three bytes for a character of the Basic Multilingual Plane past U+07FF.
+    const three: NormalizedType = { kind: 'text', maxLength: 3, lengthUnit: 'utf8-bytes', fixedLength: false }
+    expect(accepted(three, '€')).toBe('€')
+    expect(accepted(three, 'a€')).toBe('refused:too-long')
+  })
+
+  // A code page's own byte count is not known here, so characters are counted:
+  // a lower bound. On a single-byte page such as 1252 it is exact; on 932 a
+  // value this accepts may still be refused when it is saved.
+  test('code-page-bytes: checked by characters, a lower bound the database finishes', () => {
+    expect(verdicts('code-page-bytes')).toEqual(['ok', 'ok', 'ok', 'too-long', 'too-long'])
+    expect(parse(four('code-page-bytes'), 'abcde')).toEqual({ ok: false, code: 'too-long', message: 'At most 4 characters.' })
   })
 
   // PostgreSQL cannot store NUL in text. Refused on both engines, so one value
   // means one thing on either.
   test('refuses NUL, and anything that is not a string', () => {
-    const any: NormalizedType = { kind: 'text', maxLength: null, fixedLength: false }
+    const any: NormalizedType = { kind: 'text', maxLength: null, lengthUnit: 'code-points', fixedLength: false }
     expect(accepted(any, 'a\u0000b')).toBe('refused:invalid-character')
     expect(accepted(any, 12)).toBe('refused:type')
     expect(accepted(any, '')).toBe('')
+  })
+
+  // Measured on PostgreSQL 17: '\ud800a' written to a varchar is stored as
+  // U+FFFD then 'a', and the write reports success. SQL Server's nvarchar keeps
+  // it as sent, and its UTF-8 varchar stores U+FFFD, which the adapter refuses
+  // as not stored. Accepted here, one value would end three ways, the first of
+  // them a silent change. A paired surrogate is one emoji, and is accepted.
+  test('refuses an unpaired UTF-16 surrogate in every unit, and accepts a paired one', () => {
+    for (const lengthUnit of ['code-points', 'utf16-code-units', 'utf8-bytes', 'code-page-bytes'] as const) {
+      const any: NormalizedType = { kind: 'text', maxLength: null, lengthUnit, fixedLength: false }
+      for (const value of ['\ud800', '\ud800a', 'a\udfff', '\udfff\ud800']) {
+        expect(parse(any, value), `${lengthUnit} ${JSON.stringify(value)}`).toEqual({
+          ok: false,
+          code: 'invalid-character',
+          message: 'Text cannot contain an unpaired UTF-16 surrogate, which UTF-8 cannot carry.',
+        })
+      }
+      expect(accepted(any, '😀')).toBe('😀')
+    }
   })
 })
 
@@ -166,6 +220,70 @@ describe('dates, times and instants', () => {
   })
 })
 
+describe('32-bit floats', () => {
+  const REAL: NormalizedType = { kind: 'float', bits: 32 }
+
+  // The database stores the nearest float32 and reads back its shortest
+  // spelling. A codec that kept 0.10000000149011612, or 0.123456789, would
+  // hand the form a value the next read contradicts: a read reported as a change.
+  test("a real's value is the shortest decimal naming the float it stores", () => {
+    expect(accepted(REAL, 0.1)).toBe(0.1)
+    expect(accepted(REAL, 0.10000000149011612)).toBe(0.1)
+    expect(accepted(REAL, 0.123456789)).toBe(0.12345679)
+    expect(accepted(REAL, 16777217)).toBe(16777216)
+    expect(accepted(REAL, 1e-45)).toBe(1e-45)
+    expect(Object.is(accepted(REAL, -0), 0)).toBe(true)
+  })
+
+  // PostgreSQL refuses 1e-50 and 3.5e38 for a real; SQL Server refuses 1e39
+  // (232) but stores 1e-50 as 0 without a word. Refused here on both engines,
+  // so neither silently stores a zero the person never wrote.
+  test('a value a real would store as infinity or zero is refused', () => {
+    expect(parse(REAL, 3.5e38)).toEqual({ ok: false, code: 'out-of-range', message: 'Too large for a 32-bit floating-point number, which holds up to about 3.4e38.' })
+    expect(parse(REAL, -3.5e38)).toMatchObject({ ok: false, code: 'out-of-range' })
+    expect(parse(REAL, 1e-50)).toEqual({ ok: false, code: 'out-of-range', message: 'Too close to zero for a 32-bit floating-point number, which would store it as 0.' })
+    expect(accepted(REAL, 1e-45)).toBe(1e-45)
+    expect(accepted(REAL, 0)).toBe(0)
+    expect(accepted(REAL, Number.POSITIVE_INFINITY)).toBe('refused:not-finite')
+  })
+
+  // The adapters canonicalise what they read with this same function. If it
+  // moved a value on a second pass, or named a different float than the one
+  // stored, an unchanged echo would read as a change.
+  test('canonicalFloat32 is idempotent and keeps the float', () => {
+    for (const value of [0.1, 0.5, 10.0152025, 3.4028235e38, -3.4028235e38, 7e-45, 1e-45, 1.1754944e-38, 16777216, 123456.789, -2.5, 1 / 3]) {
+      const once = canonicalFloat32(value)
+      expect(canonicalFloat32(once), String(value)).toBe(once)
+      expect(Math.fround(once), String(value)).toBe(Math.fround(value))
+    }
+    expect(canonicalFloat32(Number.NaN)).toBeNaN()
+    expect(canonicalFloat32(Number.POSITIVE_INFINITY)).toBe(Number.POSITIVE_INFINITY)
+  })
+
+  // Just below a power of two the gap to the next float down is half the gap
+  // up, so the nearest decimal of a length can miss the float while the one
+  // on the other side names it. 2^-96 is 1.2621774483…e-29: eight digits round
+  // to 1.2621774e-29, another float, and 1.2621775e-29 names it. Taking only the
+  // nearest, the answer was nine digits where eight do — not the shortest the
+  // contract promises (a reviewer measured 1,223 such floats against
+  // PostgreSQL 17's own text). The others pin the nearest-of-a-length choice.
+  test('canonicalFloat32 is the shortest decimal naming the float, and the nearest of that length', () => {
+    expect(canonicalFloat32(2 ** -96)).toBe(1.2621775e-29)
+    expect(canonicalFloat32(1.26217745e-29)).toBe(1.2621775e-29)
+    expect(canonicalFloat32(2 ** -12)).toBe(0.00024414063)
+    expect(canonicalFloat32(805306368)).toBe(805306400)
+    expect(canonicalFloat32(-(2 ** -96))).toBe(-1.2621775e-29)
+  })
+
+  // A double holds what JSON carries; nothing about it changes with a real's rules.
+  test('a 64-bit float is unchanged', () => {
+    const DOUBLE: NormalizedType = { kind: 'float', bits: 64 }
+    expect(accepted(DOUBLE, 0.30000000000000004)).toBe(0.30000000000000004)
+    expect(accepted(DOUBLE, 1e-50)).toBe(1e-50)
+    expect(accepted(DOUBLE, 3.5e38)).toBe(3.5e38)
+  })
+})
+
 describe('everything else', () => {
   // One UUID has one spelling, so a comparison of stored values is a comparison of values.
   test('uuids are lower-cased, floats must be finite, booleans must be booleans', () => {
@@ -180,13 +298,27 @@ describe('everything else', () => {
   // What the database writes is never written by a person, and a type with no
   // codec is never written at all. Each says why.
   test('generated, zoneless, rowversion, binary and unsupported columns are not editable, with a reason', () => {
-    expect(codecFor(column(INT64, { generated: 'identity' }))).toMatchObject({ status: 'read-only', reason: expect.stringMatching(/identity/) })
+    expect(codecFor(column(INT64, { generated: 'identity-always' }))).toMatchObject({ status: 'read-only', reason: expect.stringMatching(/identity-always/) })
     expect(codecFor(column({ kind: 'timestamp', withTimeZone: false, precision: 7 }))).toMatchObject({ status: 'read-only', reason: expect.stringMatching(/guess a zone/) })
     expect(codecFor(column({ kind: 'rowversion' }))).toMatchObject({ status: 'read-only' })
-    expect(codecFor(column({ kind: 'binary', maxLength: null }))).toMatchObject({ status: 'unsupported' })
+    expect(codecFor(column({ kind: 'binary', maxLength: null, fixedLength: false }))).toMatchObject({ status: 'unsupported' })
     const shape = codecFor(column({ kind: 'unsupported' }, { databaseType: 'geography' }))
     expect(shape).toMatchObject({ status: 'unsupported', reason: 'geography has no tested codec' })
     expect(shape.parse('POINT(0 0)')).toMatchObject({ ok: false, code: 'unsupported' })
+  })
+})
+
+describe('identity', () => {
+  // A by-default identity accepts a value, and a number chosen by hand is one
+  // the identity would later hand out again: a create then collides. So both
+  // identities are read-only, and the reason names which one this is.
+  test('both identities are read-only', () => {
+    expect(codecFor(column(INT64, { generated: 'identity-by-default' }))).toMatchObject({
+      status: 'read-only',
+      reason: 'the database writes this column (identity-by-default)',
+    })
+    expect(codecFor(column(INT64, { generated: 'identity-by-default' })).parse('7')).toMatchObject({ ok: false, code: 'read-only' })
+    expect(codecFor(column(INT64, { generated: 'identity-always' }))).toMatchObject({ status: 'read-only' })
   })
 })
 

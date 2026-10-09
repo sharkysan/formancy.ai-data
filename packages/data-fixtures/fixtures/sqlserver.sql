@@ -1,9 +1,11 @@
 -- The Formancy Data fixture, SQL Server edition.
 --
 -- The same business model as postgres.sql, in T-SQL. Read that file's header
--- for what each table is for; the differences below are the dialect's, and
--- the only one that changes a normalised type -- rowversion -- is written down
--- in src/model.ts.
+-- for what each table is for; the differences below are the dialect's. Those
+-- that change a normalised fact -- rowversion, what a text length counts,
+-- binary(32)'s padding against bytea, shipment's sequence default against an
+-- identity, and the check SQL Server disables -- are each written down in
+-- src/model.ts with byKind.
 --
 -- Batches are separated by GO on a line of its own, as sqlcmd and SSMS expect.
 -- The loader splits on it, because a driver sends one batch at a time and
@@ -69,6 +71,25 @@ create table sales.order_line (
   line_total as (quantity * unit_price) persisted,
   constraint pk_order_line primary key (order_id, line_no)
 );
+
+create sequence sales.shipment_id as int start with 1;
+create table sales.shipment (
+  id int not null constraint df_shipment_id default (next value for sales.shipment_id)
+    constraint pk_shipment primary key,
+  tenant_id int not null,
+  tracking_no uniqueidentifier not null,
+  carrier_code smallint not null,
+  reference varchar(20) collate Latin1_General_100_CI_AS_SC_UTF8 not null,
+  pickup_time time(0) not null,
+  dispatched_at datetime2(3) null,
+  weight_kg float null,
+  temperature_c real null,
+  manifest_hash binary(32) null,
+  signature varbinary(256) null,
+  constraint uq_shipment_tracking unique (tenant_id, tracking_no),
+  constraint ck_shipment_weight check (weight_kg > 0),
+  constraint ck_shipment_reference check (reference <> '')
+);
 GO
 
 create view sales.customer_summary as
@@ -98,4 +119,13 @@ set identity_insert sales.[order] off;
 
 insert into sales.order_line (order_id, line_no, quantity, unit_price)
 values (9007199254740993, 1, 3, 0.10);
+
+-- As in postgres.sql: the second shipment's carrier is 0, and the check that
+-- refuses it is added WITH NOCHECK afterwards, so it is enforced and untrusted.
+insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pickup_time, dispatched_at, weight_kg, temperature_c, manifest_hash, signature)
+values (1, 'A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11', 32767, N'Zürich-01', '09:30', '2026-10-08 12:34:56.5', 0.30000000000000004e0, 0.1e0, 0x01, 0x01),
+       (1, 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 0, N'B', '17:05', '2026-10-08 12:34:56', null, null, null, null);
+alter table sales.shipment with nocheck add constraint ck_shipment_carrier check (carrier_code > 0);
+-- Disabled: not checked for new rows, and SQL Server marks it untrusted too.
+alter table sales.shipment nocheck constraint ck_shipment_reference;
 GO

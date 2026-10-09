@@ -17,6 +17,7 @@ export type {
   ObjectMeta,
   ObjectRef,
   ReferentialAction,
+  TextLengthUnit,
 } from './metadata.js'
 export { generateForm } from './generate/generate.js'
 export type {
@@ -59,6 +60,7 @@ export type {
 
 export { codecFor } from './codecs/codec.js'
 export type { ApiValue, Codec, CodecOutcome } from './codecs/codec.js'
+export { canonicalFloat32 } from './codecs/numbers.js'
 export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
 export { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter } from './policy/evaluate.js'
 export { validatePolicy } from './policy/validate.js'

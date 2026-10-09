@@ -1,6 +1,6 @@
 # 0008 — Exact values travel as strings, are canonical, and are never rounded
 
-- **Status:** accepted
+- **Status:** accepted; text length narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md): counted in the column's own unit
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/codecs/codec.test.ts` — the fixture's
@@ -67,9 +67,11 @@ JSON client will not do by default; the error says so, but it is friction.
 Canonicalising to scale means the API changes what it was sent — `12.5` comes
 back `12.50` — which is the database's truth and still a surprise to some. The
 code-unit count is stricter than PostgreSQL needs for text outside the Basic
-Multilingual Plane. SQL Server's single-byte `varchar` can still refuse a
-character its code page lacks; the adapter translates that error rather than
-the codec modelling code pages.
+Multilingual Plane. SQL Server's single-byte `varchar` stores a character its
+code page lacks as `?` or a best fit, without an error; the adapter refuses
+that write by comparing what was stored with what was sent (0017), rather than
+the codec modelling code pages. (Corrected by 0026, which found the sentence
+said the server refused it.)
 
 **What it forecloses.** Accepting a JSON number for money, ever.
 

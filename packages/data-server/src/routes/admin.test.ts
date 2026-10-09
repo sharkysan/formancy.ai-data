@@ -69,7 +69,7 @@ const POLICY = {
 }
 
 beforeEach(async () => {
-  columns = [col('id', 1, INT32), col('name', 2, { kind: 'text', maxLength: 200, fixedLength: false }), col('row_version', 3, { kind: 'rowversion' }, { generated: 'rowversion' })]
+  columns = [col('id', 1, INT32), col('name', 2, { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', 3, { kind: 'rowversion' }, { generated: 'rowversion' })]
   reachable = true
   root = await mkdtemp(join(tmpdir(), 'formancy-data-admin-'))
   store = createFileConfigurationStore(root)

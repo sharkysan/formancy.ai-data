@@ -149,7 +149,7 @@ describe('publishing', () => {
       bindings: {
         ...generated.bindings,
         snapshotFingerprint: 'sha256:0',
-        fields: [...generated.bindings.fields, { kind: 'column', field: 'ghost', column: 'notes', type: { kind: 'text', maxLength: null, fixedLength: false }, nullable: true, writable: false }],
+        fields: [...generated.bindings.fields, { kind: 'column', field: 'ghost', column: 'notes', type: { kind: 'text', maxLength: null, lengthUnit: 'code-points', fixedLength: false }, nullable: true, writable: false }],
       },
     }
     const user = userEvent.setup()

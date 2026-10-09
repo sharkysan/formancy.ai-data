@@ -1,4 +1,5 @@
 import type { ApiValue, NormalizedType } from '@formancy/data-core'
+import { canonicalFloat32 } from '@formancy/data-core'
 import mssql from 'mssql'
 import type { Parameters } from './statement.js'
 
@@ -74,11 +75,15 @@ function noValue(type: NormalizedType): Error {
  *   which a decimal ignores, and which gives `money` its four places where
  *   its default conversion rounds to two.
  * - boolean: `1` or `0`, which `fromCanonicalText` makes `true` or `false`.
- * - float: style 3, seventeen significant digits, which a double round-trips through.
- * - date `YYYY-MM-DD`; time `HH:MM`; an instant `YYYY-MM-DDTHH:MM:SSZ` in UTC;
- *   a zoneless timestamp the same without the `Z`. Each is formancy's shape,
- *   and a time's seconds and a timestamp's fraction are cut off, not rounded,
- *   because the shapes cannot hold them (0017).
+ * - float: style 3, seventeen significant digits, which a double round-trips
+ *   through; a real's are then made its shortest decimal by
+ *   `fromCanonicalText` (0026).
+ * - date `YYYY-MM-DD`; time `HH:MM`; an instant `YYYY-MM-DDTHH:MM:SSZ` in UTC.
+ *   Each is formancy's shape, and a time's seconds and an instant's fraction
+ *   are cut off, not rounded, because the shapes cannot hold them (0017).
+ * - a zoneless timestamp: `YYYY-MM-DDTHH:MM:SS`, then its fraction with the
+ *   trailing zeros dropped, as PostgreSQL spells it (0026). See
+ *   `zonelessText`.
  * - uuid: lower case, as the codec spells it; SQL Server prints upper case.
  *
  * Text and decimals are read by the column's own type, never by the length,
@@ -108,7 +113,7 @@ export function canonicalText(type: NormalizedType, expression: string): string 
     case 'timestamp':
       return type.withTimeZone
         ? `convert(nchar(19), switchoffset(${expression}, '+00:00'), 126) + N'Z'`
-        : `convert(nchar(19), ${expression}, 126)`
+        : zonelessText(expression)
     case 'uuid':
       return `lower(convert(nchar(36), ${expression}))`
     case 'binary':
@@ -118,11 +123,38 @@ export function canonicalText(type: NormalizedType, expression: string): string 
   }
 }
 
-/** The API value for text `canonicalText` produced: a boolean and a float become JSON's own; everything else stays a string. */
+/**
+ * A zoneless timestamp as text, with its fraction and without its trailing
+ * zeros: `2026-10-08T12:34:56.5`. Style 126 prints the column's own scale with
+ * trailing zeros -- datetime2(3) holding .5 is `…56.500`, datetime2(7) holding
+ * .12 is `…50.1200000`, datetime holding .007 is `…56.007` -- and leaves the
+ * fraction out on a whole second. datetime keeps 1/300 s, so what it holds
+ * for .007 is .00666…, and style 126 spells it to the millisecond: the one
+ * read that is rounded, by SQL Server, and the contract says so. The zeros are trimmed by reversing the text
+ * and keeping it up to the first digit that is not 0. Only text past nineteen
+ * characters is trimmed -- it has a fraction, and the fraction a digit that
+ * is not 0 -- so a whole second ending in 0 keeps it: `…12:34:50`, never
+ * `…12:34:5`. Measured on SQL Server 2022 (16.0.4295) on 2026-10-09 for .12,
+ * .5, .007, .01, .0000001, .9999999 and a whole second; the records suite
+ * holds datetime2(7), datetime and smalldatetime to it. The conversion is
+ * spelled five times, which the server evaluates per column read.
+ */
+function zonelessText(expression: string): string {
+  const text = `convert(nvarchar(27), ${expression}, 126)`
+  return `case when len(${text}) > 19 then left(${text}, len(${text}) + 1 - patindex(N'%[^0]%', reverse(${text}))) else ${text} end`
+}
+
+/**
+ * The API value for text `canonicalText` produced: a boolean and a float become
+ * JSON's own; everything else stays a string. A real becomes the shortest
+ * decimal naming its float32 -- 0.1, never the 0.10000000149011612 its style 3
+ * text is -- which is what the codec returns for it and what PostgreSQL reads
+ * (0026), so a value read and sent back unchanged is unchanged.
+ */
 export function fromCanonicalText(type: NormalizedType, text: string | null): ApiValue {
   if (text === null) return null
   if (type.kind === 'boolean') return text === '1'
-  if (type.kind === 'float') return Number(text)
+  if (type.kind === 'float') return type.bits === 32 ? canonicalFloat32(Number(text)) : Number(text)
   return text
 }
 

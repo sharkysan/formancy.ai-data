@@ -1,6 +1,6 @@
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { ColumnMeta, MetadataSnapshot, ObjectMeta, ObjectRef } from '@formancy/data-core'
+import type { ColumnMeta, MetadataSnapshot, ObjectMeta, ObjectRef, TextLengthUnit } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
 import { FIXTURE_SCOPE, restrictedDisagreements, snapshotDisagreements, startSqlServerFixture } from '@formancy/data-fixtures'
@@ -87,7 +87,7 @@ describe('discovery as the owner', () => {
     const snapshot = await discoverSqlServer(owner, FIXTURE_SCOPE)
     const order = object(snapshot, 'sales', 'order')
     expect(order.checks).toEqual([
-      { name: 'ck_order_status', expression: "([status]='shipped' OR [status]='placed' OR [status]='draft')", validated: true },
+      { name: 'ck_order_status', expression: "([status]='shipped' OR [status]='placed' OR [status]='draft')", enforced: true, validated: true },
     ])
     expect(column(order, 'status')).toMatchObject({ hasDefault: true, defaultExpression: "('draft')", generated: 'none' })
     const customer = object(snapshot, 'sales', 'customer')
@@ -96,15 +96,49 @@ describe('discovery as the owner', () => {
     expect(customer.comment).toBe('A buyer, numbered within its tenant.')
   })
 
+  // The three facts of sales.shipment that only this engine has, named here as
+  // well as by the comparator, so that a failure says which one: a key
+  // numbered by a SEQUENCE default is by-default numbering, as PostgreSQL's
+  // BY DEFAULT identity is, and keeps the default it has; a UTF-8 varchar
+  // counts bytes; and a disabled check is neither enforced nor trusted, where
+  // the WITH NOCHECK one beside it is still enforced. Reported as an ordinary
+  // default, the id was writable here and read-only on PostgreSQL, and a
+  // number given by hand collided with the sequence later (2627, measured).
+  test('sales.shipment: a sequence default is by-default numbering, a UTF-8 varchar counts bytes, a disabled check is not enforced', async () => {
+    const shipment = object(await discoverSqlServer(owner, FIXTURE_SCOPE), 'sales', 'shipment')
+    expect(column(shipment, 'id')).toMatchObject({ generated: 'identity-by-default', hasDefault: true, defaultExpression: '(NEXT VALUE FOR [sales].[shipment_id])' })
+    expect(column(shipment, 'reference')).toMatchObject({
+      databaseType: 'varchar(20)',
+      type: { kind: 'text', maxLength: 20, lengthUnit: 'utf8-bytes', fixedLength: false },
+    })
+    expect(column(shipment, 'manifest_hash').type).toEqual({ kind: 'binary', maxLength: 32, fixedLength: true })
+    expect(column(shipment, 'signature').type).toEqual({ kind: 'binary', maxLength: 256, fixedLength: false })
+    expect(shipment.checks.map(({ name, enforced, validated }) => ({ name, enforced, validated }))).toEqual([
+      { name: 'ck_shipment_carrier', enforced: true, validated: false },
+      { name: 'ck_shipment_reference', enforced: false, validated: false },
+      { name: 'ck_shipment_weight', enforced: true, validated: true },
+    ])
+  })
+
   // Each type the contract names, from the catalog of a real server. The
   // classic slips are all here: nvarchar and nchar lengths in bytes, -1 for
   // max, float(24) silently being real, an alias type that hides its base,
   // rowversion catalogued under its deprecated name `timestamp`, and a period
-  // column the database writes itself.
+  // column the database writes itself. And what each length counts (0026): a
+  // varchar under a UTF-8 collation counts bytes of UTF-8, and one under any
+  // other collation bytes of its code page -- Japanese_XJIS_140 is code page
+  // 932, not 65001. An adapter that took every collation but 1252 for UTF-8,
+  // or read the unit from the type name alone, would have the codec count in
+  // the wrong unit. And the reverse: nvarchar and nchar under a UTF-8
+  // collation still count UTF-16 code units, though the catalog reports code
+  // page 65001 for them (measured: nvarchar(4) under it takes two emoji and
+  // refuses a third, 2628). A unit taken from the code page alone would call
+  // them UTF-8 and refuse four é the column holds.
   test('normalises every type the contract names', async () => {
     await asOwner(
       'create schema kinds',
       'create type kinds.amount from decimal(18, 4) not null',
+      'create sequence kinds.[tick]]et] as int start with 1',
       `create table kinds.every (
          t_tinyint tinyint null, t_smallint smallint null, t_int int null, t_bigint bigint null, t_bit bit null,
          t_decimal decimal(9, 3) null, t_numeric numeric(5, 0) null, t_money money null, t_smallmoney smallmoney null,
@@ -112,7 +146,12 @@ describe('discovery as the owner', () => {
          t_date date null, t_time time(3) null, t_datetime2 datetime2(0) null, t_datetimeoffset datetimeoffset(7) null,
          t_datetime datetime null, t_smalldatetime smalldatetime null,
          t_char char(3) null, t_varchar varchar(30) null, t_varchar_max varchar(max) null,
+         t_varchar_utf8 varchar(30) collate Latin1_General_100_CI_AS_SC_UTF8 null,
+         t_char_utf8 char(4) collate Latin1_General_100_CI_AS_SC_UTF8 null,
+         t_varchar_932 varchar(10) collate Japanese_XJIS_140_CI_AS null,
          t_nchar nchar(10) null, t_nvarchar nvarchar(40) null, t_nvarchar_max nvarchar(max) null, t_sysname sysname null,
+         t_nvarchar_utf8 nvarchar(10) collate Latin1_General_100_CI_AS_SC_UTF8 null,
+         t_nchar_utf8 nchar(4) collate Latin1_General_100_CI_AS_SC_UTF8 null,
          t_uniqueidentifier uniqueidentifier null, t_binary binary(16) null, t_varbinary varbinary(32) null,
          t_varbinary_max varbinary(max) null,
          t_xml xml null, t_sql_variant sql_variant null, t_geography geography null, t_geometry geometry null,
@@ -120,6 +159,8 @@ describe('discovery as the owner', () => {
          t_alias kinds.amount,
          t_rowversion rowversion,
          t_identity int identity(1, 1) not null,
+         t_sequenced int not null default (next value for kinds.[tick]]et]),
+         t_sequence_scaled bigint null default ((next value for kinds.[tick]]et]) * 2),
          t_computed as (t_int * 2)
        )`,
       `create table kinds.history (
@@ -140,7 +181,8 @@ describe('discovery as the owner', () => {
     expect(every.comment).toBe('Every type.')
     expect(column(every, 't_int').comment).toBe('A plain int.')
 
-    const text = (maxLength: number | null, fixedLength = false) => ({ kind: 'text', maxLength, fixedLength })
+    const text = (lengthUnit: TextLengthUnit, maxLength: number | null, fixedLength = false) => ({ kind: 'text', maxLength, lengthUnit, fixedLength })
+    const binary = (maxLength: number | null, fixedLength: boolean) => ({ kind: 'binary', maxLength, fixedLength })
     const timestamp = (withTimeZone: boolean, precision: number) => ({ kind: 'timestamp', withTimeZone, precision })
     const unsupported = { kind: 'unsupported' }
     const expected: Record<string, [string, unknown]> = {
@@ -164,17 +206,25 @@ describe('discovery as the owner', () => {
       // minutes, which neither number says; see 0007.
       t_datetime: ['datetime', timestamp(false, 3)],
       t_smalldatetime: ['smalldatetime', timestamp(false, 0)],
-      t_char: ['char(3)', text(3, true)],
-      t_varchar: ['varchar(30)', text(30)],
-      t_varchar_max: ['varchar(max)', text(null)],
-      t_nchar: ['nchar(10)', text(10, true)],
-      t_nvarchar: ['nvarchar(40)', text(40)],
-      t_nvarchar_max: ['nvarchar(max)', text(null)],
-      t_sysname: ['sysname', text(128)],
+      // The database's default collation, SQL_Latin1_General_CP1_CI_AS: code page 1252.
+      t_char: ['char(3)', text('code-page-bytes', 3, true)],
+      t_varchar: ['varchar(30)', text('code-page-bytes', 30)],
+      t_varchar_max: ['varchar(max)', text('code-page-bytes', null)],
+      t_varchar_utf8: ['varchar(30)', text('utf8-bytes', 30)],
+      t_char_utf8: ['char(4)', text('utf8-bytes', 4, true)],
+      t_varchar_932: ['varchar(10)', text('code-page-bytes', 10)],
+      // Byte pairs, under every collation.
+      t_nchar: ['nchar(10)', text('utf16-code-units', 10, true)],
+      t_nvarchar: ['nvarchar(40)', text('utf16-code-units', 40)],
+      t_nvarchar_max: ['nvarchar(max)', text('utf16-code-units', null)],
+      t_sysname: ['sysname', text('utf16-code-units', 128)],
+      t_nvarchar_utf8: ['nvarchar(10)', text('utf16-code-units', 10)],
+      t_nchar_utf8: ['nchar(4)', text('utf16-code-units', 4, true)],
       t_uniqueidentifier: ['uniqueidentifier', { kind: 'uuid' }],
-      t_binary: ['binary(16)', { kind: 'binary', maxLength: 16 }],
-      t_varbinary: ['varbinary(32)', { kind: 'binary', maxLength: 32 }],
-      t_varbinary_max: ['varbinary(max)', { kind: 'binary', maxLength: null }],
+      // binary(n) pads what it is given to n bytes; varbinary keeps it as written.
+      t_binary: ['binary(16)', binary(16, true)],
+      t_varbinary: ['varbinary(32)', binary(32, false)],
+      t_varbinary_max: ['varbinary(max)', binary(null, false)],
       t_xml: ['xml', unsupported],
       t_sql_variant: ['sql_variant', unsupported],
       t_geography: ['geography', unsupported],
@@ -186,12 +236,23 @@ describe('discovery as the owner', () => {
       t_alias: ['kinds.amount', { kind: 'decimal', precision: 18, scale: 4 }],
       t_rowversion: ['rowversion', { kind: 'rowversion' }],
       t_identity: ['int', { kind: 'integer', min: '-2147483648', max: '2147483647' }],
+      t_sequenced: ['int', { kind: 'integer', min: '-2147483648', max: '2147483647' }],
+      t_sequence_scaled: ['bigint', { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' }],
       t_computed: ['int', { kind: 'integer', min: '-2147483648', max: '2147483647' }],
     }
     const actual = Object.fromEntries(every.columns.map((entry) => [entry.name, [entry.databaseType, entry.type]]))
     expect(actual).toEqual(expected)
 
-    expect(column(every, 't_identity').generated).toBe('identity')
+    // IDENTITY refuses a value in an insert without IDENTITY_INSERT (544),
+    // which needs ALTER on the table, and in every update (8102): always.
+    expect(column(every, 't_identity').generated).toBe('identity-always')
+    // A default that IS a sequence's next value numbers a row an insert leaves
+    // out and takes one given to it: by-default numbering, with the default
+    // kept, its name's bracket escaped as SQL Server stores it. A default that
+    // computes with the next value is an ordinary one; a rule matching
+    // "contains NEXT VALUE FOR" would make that column read-only too.
+    expect(column(every, 't_sequenced')).toMatchObject({ generated: 'identity-by-default', hasDefault: true, defaultExpression: '(NEXT VALUE FOR [kinds].[tick]]et])' })
+    expect(column(every, 't_sequence_scaled')).toMatchObject({ generated: 'none', hasDefault: true })
     expect(column(every, 't_computed').generated).toBe('computed')
     expect(column(every, 't_rowversion').generated).toBe('rowversion')
     expect(column(every, 't_int').generated).toBe('none')
@@ -229,6 +290,7 @@ describe('discovery as the owner', () => {
        )`,
       'alter table rel.child nocheck constraint fk_child_set_default',
       'alter table rel.child nocheck constraint ck_child_amount',
+      'alter table rel.child with nocheck add constraint ck_child_untrusted check (amount < 1000)',
     )
     const snapshot = await discoverSqlServer(owner, { schemas: ['rel'] })
     expect(object(snapshot, 'rel', 'pair').primaryKey).toEqual({ name: 'pk_pair', columns: ['b', 'a'] })
@@ -264,9 +326,14 @@ describe('discovery as the owner', () => {
         validated: true,
       },
     ])
-    // A disabled check reads exactly like a WITH NOCHECK one: the contract has
-    // no `enforced` for checks, so this is all a consumer can be told.
-    expect(child.checks).toEqual([{ name: 'ck_child_amount', expression: '([amount]>(0))', validated: false }])
+    // A disabled check and a WITH NOCHECK one are both untrusted, and only the
+    // second is still checked for new rows: is_disabled tells them apart. An
+    // adapter that read trust alone would report the disabled check enforced,
+    // and a form would promise a rule the database is not keeping.
+    expect(child.checks).toEqual([
+      { name: 'ck_child_amount', expression: '([amount]>(0))', enforced: false, validated: false },
+      { name: 'ck_child_untrusted', expression: '([amount]<(1000))', enforced: true, validated: false },
+    ])
 
     // SQL Server pairs a foreign key with a candidate key only in that key's
     // own order: (a, b) against a key on (b, a) is refused, 1776 "no primary
@@ -395,9 +462,9 @@ describe('discovery as the restricted reader', () => {
     })
     // The rest of sales.order is all there: definitions are what is hidden.
     expect(order.primaryKey).toEqual({ name: 'pk_order', columns: ['id'] })
-    expect(order.checks).toEqual([{ name: 'ck_order_status', expression: null, validated: true }])
+    expect(order.checks).toEqual([{ name: 'ck_order_status', expression: null, enforced: true, validated: true }])
     expect(column(order, 'status')).toMatchObject({ hasDefault: true, defaultExpression: null })
-    expect(column(order, 'id').generated).toBe('identity')
+    expect(column(order, 'id').generated).toBe('identity-always')
     expect(column(order, 'row_version').generated).toBe('rowversion')
   })
 

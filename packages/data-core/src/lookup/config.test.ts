@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { ColumnMeta, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta } from '../metadata.js'
+import type { ColumnMeta, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, TextLengthUnit } from '../metadata.js'
 import { createSnapshot } from '../snapshot.js'
 import { generateForm } from '../generate/generate.js'
 import type { FieldBinding, FormBindings, LookupChoice } from '../generate/types.js'
@@ -7,7 +7,7 @@ import { buildLookupConfig, DEFAULT_MAX_PAGE_SIZE } from './config.js'
 import { validateLookupQuery } from './query.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
-const text = (maxLength: number | null): NormalizedType => ({ kind: 'text', maxLength, fixedLength: false })
+const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({ kind: 'text', maxLength, lengthUnit, fixedLength })
 
 function col(name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
   return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, ...extra }
@@ -40,7 +40,7 @@ function snapshot(edit: (objects: ObjectMeta[]) => void = () => {}): MetadataSna
         col('name', 3, text(200)),
         col('city', 4, text(100), { nullable: true }),
         col('since', 5, { kind: 'date' }),
-        col('photo', 6, { kind: 'binary', maxLength: null }, { nullable: true, databaseType: 'bytea' }),
+        col('photo', 6, { kind: 'binary', maxLength: null, fixedLength: false }, { nullable: true, databaseType: 'bytea' }),
         col('notes', 7, text(null), { nullable: true }),
       ],
       { primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] } },
@@ -50,7 +50,7 @@ function snapshot(edit: (objects: ObjectMeta[]) => void = () => {}): MetadataSna
     }),
     table(
       'order',
-      [col('id', 1, INT32, { generated: 'identity' }), col('tenant_id', 2, INT32), col('customer_no', 3, INT32), col('rate_factor', 4, { kind: 'float', bits: 64 }, { nullable: true })],
+      [col('id', 1, INT32, { generated: 'identity-always' }), col('tenant_id', 2, INT32), col('customer_no', 3, INT32), col('rate_factor', 4, { kind: 'float', bits: 64 }, { nullable: true })],
       {
         primaryKey: { name: 'pk_order', columns: ['id'] },
         foreignKeys: [fk('fk_order_customer', ['tenant_id', 'customer_no'], 'customer', ['tenant_id', 'customer_no']), fk('fk_order_rate', ['rate_factor'], 'rate', ['factor'])],
@@ -193,7 +193,7 @@ describe('buildLookupConfig', () => {
     expect(() => buildLookupConfig(rate, 'rate', { snapshot: source })).toThrow(/key column factor is double precision; a floating-point value cannot be referenced exactly/)
     const binaryKeyed = snapshot((objects) => {
       const factor = objects.find((object) => object.ref.name === 'rate')?.columns[0]
-      if (factor !== undefined) Object.assign(factor, { type: { kind: 'binary', maxLength: 16 }, databaseType: 'bytea' })
+      if (factor !== undefined) Object.assign(factor, { type: { kind: 'binary', maxLength: 16, fixedLength: false }, databaseType: 'bytea' })
     })
     const binaryRate = bindingsFor(binaryKeyed, ['name'], [{ foreignKey: 'fk_order_rate', display: ['label'] }])
     expect(() => buildLookupConfig(binaryRate, 'rate', { snapshot: binaryKeyed })).toThrow(/key column factor is bytea, which has no text form for a token/)

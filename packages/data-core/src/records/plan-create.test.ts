@@ -353,7 +353,7 @@ describe('planCreate', () => {
   test('refuses a selection whose lookup cannot be rechecked', () => {
     const binary = snapshot('postgres', (objects) => {
       const name = objects.find((object) => object.ref.name === 'employee')?.columns.find((candidate) => candidate.name === 'name')
-      if (name !== undefined) name.type = { kind: 'binary', maxLength: null }
+      if (name !== undefined) name.type = { kind: 'binary', maxLength: null, fixedLength: false }
     })
     const bindings = orderForm(binary).bindings
     expect(planCreate(binary, bindings, ORDER_POLICY, CLERK, { ...ANSWERS, employee: 'k1:1' })).toMatchObject({ ok: false, code: 'invalid-bindings' })
@@ -419,10 +419,10 @@ describe('planCreate', () => {
   // the last gate: a type with no tested codec is never written.
   test('refuses a value for a column the generator excluded, if a bindings file binds it anyway', () => {
     const attached = snapshot('postgres', (objects) => {
-      objects.find((object) => object.ref.name === 'order')?.columns.push(col('attachment', 13, { kind: 'binary', maxLength: null }, { nullable: true }))
+      objects.find((object) => object.ref.name === 'order')?.columns.push(col('attachment', 13, { kind: 'binary', maxLength: null, fixedLength: false }, { nullable: true }))
     })
     const bindings = edited(orderForm(attached).bindings, (draft) => {
-      draft.fields.push({ kind: 'column', field: 'attachment', column: 'attachment', type: { kind: 'binary', maxLength: null }, nullable: true, writable: true })
+      draft.fields.push({ kind: 'column', field: 'attachment', column: 'attachment', type: { kind: 'binary', maxLength: null, fixedLength: false }, nullable: true, writable: true })
     })
     const policy: FormPolicy = { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, attachment: CLERK_RW } }
     expect(planCreate(attached, bindings, policy, CLERK, { ...ANSWERS, attachment: 'AAAA' })).toMatchObject({ ok: false, fieldErrors: [{ field: 'attachment', code: 'unsupported' }] })
