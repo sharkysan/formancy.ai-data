@@ -19,6 +19,8 @@ import type { PublishedBundle } from '../bundle.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry, OpenConnection } from '../connections.js'
 import type { HostIdentity } from '../identity.js'
+import type { AuditEvent, AuditSink } from '../audit.js'
+import { recordReference } from '../audit.js'
 import { loadPublished } from '../published.js'
 import { planRefusal, recordFailure } from './runtime-errors.js'
 
@@ -26,6 +28,27 @@ export interface RuntimeOptions {
   registry: ConnectionRegistry
   store: ConfigurationStore
   authenticate: (request: FastifyRequest) => Promise<HostIdentity | undefined>
+  /**
+   * The operational trail (0023): one event per request, outcomes included.
+   * `key` names records by a keyed hash; without it, no record is named.
+   */
+  audit?: { sink: AuditSink; key?: string; now?: () => string }
+}
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    auditTrail?: { formVersion: number | null; record?: string; outcome?: string }
+  }
+}
+
+/** The audit name of each runtime route, by its pattern. */
+const ROUTE_OPERATIONS: Readonly<Record<string, AuditEvent['operation']>> = {
+  '/v1/forms/:id': 'form',
+  '/v1/forms/:id/records/read': 'read',
+  '/v1/forms/:id/records/create': 'create',
+  '/v1/forms/:id/records/update': 'update',
+  '/v1/forms/:id/lookups/:source/query': 'lookup-query',
+  '/v1/forms/:id/lookups/:source/resolve': 'lookup-resolve',
 }
 
 /** At most this many tokens are resolved in one request: a form holds one per lookup field, not thousands. */
@@ -86,6 +109,50 @@ function withoutEchoes(
 export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOptions): Promise<void> {
   const { registry, store } = options
 
+  app.addHook('onRequest', async (request) => {
+    request.auditTrail = { formVersion: null }
+  })
+
+  if (options.audit !== undefined) {
+    const { sink, key } = options.audit
+    const now = options.audit.now ?? (() => new Date().toISOString())
+
+    // The stable code of a refusal, read from the response itself, so every
+    // way a request can end is audited without each branch remembering to say so.
+    app.addHook('onSend', async (request, reply, payload) => {
+      if (reply.statusCode >= 400 && typeof payload === 'string' && request.auditTrail !== undefined) {
+        try {
+          const code = (JSON.parse(payload) as { code?: unknown }).code
+          if (typeof code === 'string') request.auditTrail.outcome = code
+        } catch {
+          // A body that is not JSON carries no code; the status says enough.
+        }
+      }
+      return payload
+    })
+
+    app.addHook('onResponse', async (request, reply) => {
+      const operation = ROUTE_OPERATIONS[request.routeOptions.url ?? '']
+      if (operation === undefined) return
+      const trail = request.auditTrail ?? { formVersion: null }
+      const event: AuditEvent = {
+        at: now(),
+        actor: request.identity?.actor.id ?? null,
+        operation,
+        form: (request.params as { id?: string }).id ?? '',
+        formVersion: trail.formVersion,
+        status: reply.statusCode,
+        outcome: reply.statusCode < 400 ? 'ok' : (trail.outcome ?? `http-${String(reply.statusCode)}`),
+        record: recordReference(key, trail.record),
+      }
+      try {
+        await sink(event)
+      } catch (error) {
+        request.log.error({ error: (error as Error).message }, 'an audit event could not be written')
+      }
+    })
+  }
+
   app.addHook('preHandler', async (request, reply) => {
     const identity = await options.authenticate(request)
     if (identity === undefined) {
@@ -102,7 +169,10 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
 
   async function published(id: string, reply: FastifyReply): Promise<PublishedBundle | undefined> {
     const loaded = await loadPublished(store, id, reply.log)
-    if (loaded.ok) return loaded.bundle
+    if (loaded.ok) {
+      if (reply.request.auditTrail !== undefined) reply.request.auditTrail.formVersion = loaded.version
+      return loaded.bundle
+    }
     await reply.code(loaded.status).send({ code: loaded.code, message: loaded.message })
     return undefined
   }
@@ -150,6 +220,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   app.post<{ Params: { id: string } }>('/v1/forms/:id/records/read', async (request, reply) => {
     const body = request.body
     if (!isRecord(body) || typeof body['record'] !== 'string') return reply.code(400).send({ code: 'invalid-request', message: 'Expected { record }.' })
+    if (request.auditTrail !== undefined) request.auditTrail.record = body['record']
     const bundle = await published(request.params.id, reply)
     if (bundle === undefined) return reply
     const plan = planRead(bundle.snapshot, bundle.bindings, bundle.policy, context(request), body['record'])
@@ -188,7 +259,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       const failure = recordFailure(bundle.bindings, outcome)
       return reply.code(failure.status).send(failure.body)
     }
-    return reply.code(201).send(toFormAnswers(bundle.bindings, plan.fields, outcome))
+    const created = toFormAnswers(bundle.bindings, plan.fields, outcome)
+    if (request.auditTrail !== undefined && created.record !== null) request.auditTrail.record = created.record
+    return reply.code(201).send(created)
   })
 
   app.post<{ Params: { id: string } }>('/v1/forms/:id/records/update', async (request, reply) => {
@@ -196,6 +269,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     if (!isRecord(body) || typeof body['record'] !== 'string' || typeof body['version'] !== 'string' || !isRecord(body['answers'])) {
       return reply.code(400).send({ code: 'invalid-request', message: 'Expected { record, version, answers }.' })
     }
+    if (request.auditTrail !== undefined) request.auditTrail.record = body['record']
     const bundle = await published(request.params.id, reply)
     if (bundle === undefined) return reply
     const actor = context(request)

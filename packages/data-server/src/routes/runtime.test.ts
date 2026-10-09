@@ -17,6 +17,8 @@ import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
 import type { PublishedBundle } from '../bundle.js'
+import { recordReference } from '../audit.js'
+import type { AuditEvent } from '../audit.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
 import type { IdentityVerifier } from '../identity.js'
@@ -271,5 +273,65 @@ describe('the runtime plane', () => {
     expect((await post('/v1/forms/customer/lookups/nope/query', { operation: 'create' })).statusCode).toBe(404)
     expect((await post(`/v1/forms/customer/lookups/${String(source)}/resolve`, { operation: 'create', tokens: Array.from({ length: 101 }, () => 'k1:CH') })).statusCode).toBe(400)
     expect((await post(`/v1/forms/customer/lookups/${String(source)}/query`, { operation: 'create' }, 'stranger')).statusCode).toBe(403)
+  })
+})
+
+describe('the operational audit trail', () => {
+  const KEY = 'an-audit-key-the-operator-keeps-secret'
+
+  // A key of null means none at all: undefined would bring the default back.
+  async function audited(sink: (event: AuditEvent) => void, key: string | null = KEY) {
+    const store = createFileConfigurationStore(root)
+    return createDataServer({ verifyIdentity, runtime: { registry: registry(), store, audit: { sink, ...(key === null ? {} : { key }), now: () => '2026-10-09T12:00:00.000Z' } } })
+  }
+
+  // One event per request, with what happened and against which version — and
+  // nothing the person typed. An audit log holding answers would be a second
+  // copy of the customer's data with none of its permissions.
+  test('records who did what to which version, and never a value', async () => {
+    const events: AuditEvent[] = []
+    const server = await audited((event) => events.push(event))
+    const response = await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: NEW } })
+    expect(response.statusCode).toBe(201)
+    expect(events).toEqual([
+      { at: '2026-10-09T12:00:00.000Z', actor: 'c', operation: 'create', form: 'customer', formVersion: 1, status: 201, outcome: 'ok', record: recordReference(KEY, 'k1:1,7') },
+    ])
+    expect(JSON.stringify(events)).not.toContain('Neu GmbH')
+    expect(JSON.stringify(events)).not.toContain('k1:')
+  })
+
+  // Refusals are audited too, by the stable code the response carried, and a
+  // request that never authenticated is recorded with no actor.
+  test('records refusals by their code, and an unauthenticated request with no actor', async () => {
+    const events: AuditEvent[] = []
+    const server = await audited((event) => events.push(event))
+    await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: { ...NEW, tenant_id: 2 } } })
+    await server.inject({ method: 'POST', url: '/v1/forms/customer/records/read', payload: { record: RECORD } })
+    await server.inject({ method: 'POST', url: '/v1/forms/nope/records/read', headers: as('clerk'), payload: { record: RECORD } })
+    expect(events.map(({ actor, operation, status, outcome, formVersion }) => ({ actor, operation, status, outcome, formVersion }))).toEqual([
+      { actor: 'c', operation: 'create', status: 403, outcome: 'over-posting', formVersion: 1 },
+      { actor: null, operation: 'read', status: 401, outcome: 'unauthenticated', formVersion: null },
+      { actor: 'c', operation: 'read', status: 404, outcome: 'unknown-form', formVersion: null },
+    ])
+  })
+
+  // A record token spells its key, and a key is often small. Without a key to
+  // hash with, nothing is recorded rather than a reference that only looks redacted.
+  test('names a record only by a keyed hash, and not at all without a key', async () => {
+    const events: AuditEvent[] = []
+    const server = await audited((event) => events.push(event), null)
+    await server.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: as('clerk'), payload: { record: RECORD } })
+    expect(events[0]?.record).toBeNull()
+    expect(recordReference(KEY, RECORD)).toMatch(/^[0-9a-f]{32}$/)
+    expect(recordReference(KEY, RECORD)).not.toBe(recordReference('another-key', RECORD))
+  })
+
+  // By the time the event exists the write has committed or not; refusing to
+  // answer because the trail failed would only hide which.
+  test('a sink that fails does not fail the request', async () => {
+    const server = await audited(() => {
+      throw new Error('disk full')
+    })
+    expect((await server.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: as('clerk'), payload: { record: RECORD } })).statusCode).toBe(200)
   })
 })

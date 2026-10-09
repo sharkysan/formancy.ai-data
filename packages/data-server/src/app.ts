@@ -6,6 +6,7 @@ import type { ConnectionRegistry } from './connections.js'
 import type { HostIdentity, IdentityVerifier } from './identity.js'
 import { adminRoutes } from './routes/admin.js'
 import { runtimeRoutes } from './routes/runtime.js'
+import type { RuntimeOptions } from './routes/runtime.js'
 
 export interface DataServerOptions {
   verifyIdentity: IdentityVerifier
@@ -31,7 +32,7 @@ export interface DataServerOptions {
    * The runtime plane: published forms, their records and their lookups, for
    * the host application's people. Absent, none of those routes exist.
    */
-  runtime?: { registry: ConnectionRegistry; store: ConfigurationStore }
+  runtime?: { registry: ConnectionRegistry; store: ConfigurationStore; audit?: NonNullable<RuntimeOptions['audit']> }
 }
 
 /**
