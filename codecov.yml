@@ -66,6 +66,10 @@ component_management:
       name: packages/data-sqlserver
       paths:
         - packages/data-sqlserver/**
+    - component_id: app-examples
+      name: apps/examples
+      paths:
+        - apps/examples/**
 
 comment:
   # Components first, because "which package" is the question a reader has, and

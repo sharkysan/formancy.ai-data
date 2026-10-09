@@ -117,8 +117,11 @@ not. A suite that passed without a database would be proving the mock.
 
 ## The user interface is formancy.ai's concept, applied
 
-There is no UI in this repository yet. When the Studio and the landing page
-arrive, they are formancy.ai's concept applied, not a new one:
+The first UI here is `apps/examples`, the page that previews a generated form
+under both renderers
+([0021](docs/decisions/0021-generated-forms-preview-in-both-frameworks.md)).
+It, and the Studio and the landing page when they arrive, are formancy.ai's
+concept applied, not a new one:
 
 - **The same room.** The admin, the playground and the site upstream share one
   look: a dark bench, glass panels, violet for what the person acts on and teal
@@ -136,16 +139,34 @@ arrive, they are formancy.ai's concept applied, not a new one:
   reference themes without a component change, or the headless claim is false.
 - **Keyboard first, accessible name only.** Every drag has a keyboard path
   (formancy.ai 0046). Tests find elements by role and accessible name and
-  nothing else (0034), and axe runs in the suite.
+  nothing else (0034), and axe runs in the suite. Where the accessibility
+  tree cannot answer — an element id, an element with no role — a test reads
+  the DOM, and its header says which and why rather than claiming otherwise.
 - **One shell for every page of the site** (formancy.ai 0106). The
   `formancy.ai/data` page, when it exists, is a page in that shell, built in
   that repository's `apps/site`, not a second site with a second header.
 - **A number on a page is derived.** Supported databases, field types, decision
   records: counted at build time, never typed.
 
-Nothing verifies this section yet, and it says so. The first pull request that
-adds a UI brings the guards upstream has for the same promises: the file-size
-budget test, the starter-demo test, the browser gate for what jsdom cannot see.
+What holds this section, brought with the first UI from upstream's guards for
+the same promises:
+
+- **The size budget**, `scripts/source-size.test.mjs` in `pnpm test:repo`:
+  no source file past the 600 lines below.
+- **The starter-demo test**, `apps/examples/src/examples.test.ts`: every
+  document the page shows is one the released spec accepts, places every field
+  in the layout both previews draw, and has what the page says it shows.
+- **The browser gate**, `apps/examples/scripts/browser-test.mjs`, run as
+  `pnpm test:browser` in its own CI job, for what jsdom cannot see: in
+  Chromium, no sideways scroll and nothing past either edge down to 320 pixels,
+  the first Tab on the skip link and the next on the first preview's first
+  control, and axe's colour-contrast and target-size rules, clean and after a
+  failed submit.
+
+What nothing holds yet, said: the palette is copied from `admin.css` by hand
+and nothing fails when upstream's moves; that `app.css` never reaches into a
+preview's paper is held by review; and the one-shell bullet has nothing to
+hold until the `formancy.ai/data` page exists.
 
 ## Branch names
 
@@ -214,20 +235,26 @@ would anybody find out?"**
 
 ### Size is a signal
 
-**600 lines** for a source file, tests excluded. Split by **the reason to
-change**, never by line count. The seams that will work here: one catalog
-concern per file in an adapter, one operation family per file in the core. The
-same applies below the file: a function past about 60 lines, a `switch` growing
-a case per feature, a class whose name needs "and" to describe it.
+**600 lines** for a source file, tests excluded; `scripts/source-size.test.mjs`
+fails past it. Split by **the reason to change**, never by line count. The
+seams that will work here: one catalog concern per file in an adapter, one
+operation family per file in the core. The same applies below the file, held
+by review: a function past about 60 lines, a `switch` growing a case per
+feature, a class whose name needs "and" to describe it.
 
 ## Checks before pushing
 
 CI runs `pnpm build`, `pnpm typecheck`, `pnpm test:coverage`, `pnpm check:pkg`,
-`node scripts/verify-licenses.mjs`, `pnpm test:repo`, and in its own job
-`pnpm test:e2e:install`. Run the ones for what you changed.
+`node scripts/verify-licenses.mjs`, `pnpm test:repo`, and in jobs of their own
+`pnpm test:e2e:install` and `pnpm test:browser`. Run the ones for what you
+changed.
 
 `test:coverage` needs Docker and starts both databases. The first run pulls the
 SQL Server image, which is about a gigabyte and a half.
+
+`test:browser` builds the examples page and measures it in Chromium, which
+Playwright downloads once per machine:
+`pnpm --filter @formancy/data-examples exec playwright install chromium`.
 
 `test:e2e:install` is the only gate that looks at the packages from outside. It
 packs them, installs the tarballs into a plain npm project, type-checks it with

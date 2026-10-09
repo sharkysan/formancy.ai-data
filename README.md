@@ -14,9 +14,10 @@ operates without any AI dependency.
 > both adapters discover a real database, including what a restricted
 > account cannot see, and the same model checks both. A form can be generated
 > from a snapshot; values are checked exactly; access policy, lookup tokens and
-> the record port are defined. Not yet: the adapters' record and lookup
-> operations, the HTTP routes that call them, the studio and the examples.
-> `CHANGELOG.md` says what each step found.
+> the record port are defined. A page renders generated forms in React and
+> Angular side by side, and its suite holds the two to the same fields and
+> errors. Not yet: the adapters' record and lookup operations, the HTTP routes
+> that call them, and the studio. `CHANGELOG.md` says what each step found.
 
 ## Licence, in one table
 
@@ -47,8 +48,50 @@ project, and why in a repository of its own, is decision
 | `@formancy/data-fixtures` | Private test support: one business model for both engines, a restricted reader, and the comparator both adapters answer to. Never published. |
 
 Planned and not here: the record, lookup and publication routes of the
-server, the studio for connecting a database and
-reviewing a generated form, and the Angular and React integration examples.
+server, and the studio for connecting a database and reviewing a generated
+form.
+
+## Examples
+
+`apps/examples` is a private page, never published, that shows a generated form
+the way the people filling it in will see it — under both renderers at once.
+
+```bash
+pnpm build
+pnpm --filter @formancy/data-examples dev        # http://localhost:4391
+```
+
+It reads a snapshot of the shared fixture, checks it against its fingerprint,
+runs `generateForm` **in the browser** for `sales.order` and `sales.customer`,
+and renders each with the released `@formancy/react` and `@formancy/angular`
+side by side, on white paper in the Blueprint theme, with the generator's notes
+— inferred, excluded, read-only, blocked — beside each. Its suite holds the two
+renderers to the same fields by accessible name and the same error codes
+([0021](./docs/decisions/0021-generated-forms-preview-in-both-frameworks.md)).
+
+What the suite cannot see, because jsdom performs no layout, a browser gate
+measures in Chromium: no sideways scroll down to 320 pixels, the keyboard path
+through the skip link into the first preview, and colour contrast and target
+size, clean and after a failed submit.
+
+```bash
+pnpm --filter @formancy/data-examples exec playwright install chromium   # once per machine
+pnpm test:browser                                                        # builds the page, then measures it
+```
+
+The snapshot is captured from a real PostgreSQL container, never written by
+hand. After a change to the fixture, with Docker running:
+
+```bash
+pnpm build
+pnpm --filter @formancy/data-examples snapshot
+```
+
+and commit `apps/examples/src/fixture-snapshot.json` and
+`fixture-customers.json`. The suite compares the committed snapshot with the
+fixture model and fails where they disagree, and refuses a snapshot edited by
+hand. The customer lookup is an in-memory source over the captured customers
+until the server's lookup route exists, and the page says so.
 
 ## How it relates to formancy.ai
 
@@ -79,7 +122,8 @@ client; the tests do not use it. See `.env.example`.
 
 The gates CI runs, in order: `pnpm build`, `pnpm typecheck`,
 `pnpm test:coverage`, `pnpm check:pkg`, `node scripts/verify-licenses.mjs`,
-`pnpm test:repo`, and in a job of its own `pnpm test:e2e:install`.
+`pnpm test:repo`, and in jobs of their own `pnpm test:e2e:install` and
+`pnpm test:browser`.
 [`CLAUDE.md`](./CLAUDE.md) says what each is for and what the bar is.
 
 ## Documents
