@@ -1,6 +1,6 @@
 # 0020 — Administration is a separate plane, held by a role in the host's token
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0033](0033-the-administrator-plane-is-audited.md): every request that reaches an administrator route is audited, and the identity is set before the role check so a 403 names its actor
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/routes/admin.test.ts` — no token

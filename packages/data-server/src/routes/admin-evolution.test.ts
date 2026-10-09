@@ -85,7 +85,8 @@ beforeEach(async () => {
   engine = 'sqlserver'
   root = await mkdtemp(join(tmpdir(), 'formancy-data-evolution-'))
   store = createFileConfigurationStore(root)
-  app = await createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'] } })
+  // The plane's trail is admin-audit.test.ts's subject; here it is required and discarded.
+  app = await createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'], audit: { sink: () => {} } } })
 })
 
 afterEach(async () => {

@@ -1,6 +1,6 @@
 # 0030 — Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for
 
-- **Status:** accepted
+- **Status:** accepted; narrowed by [0033](0033-the-administrator-plane-is-audited.md): a publish and a restore are audited
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

@@ -209,7 +209,8 @@ export async function startPlane(): Promise<Plane> {
   }
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-host-'))
   const store = createFileConfigurationStore(root)
-  const app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'] }, runtime: { registry, store } })
+  // The administrator's trail is the server's suites' subject; here it is required and discarded.
+  const app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
 
   const admin = async (url: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> => {
     const reply = await app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${TOKENS.admin}` }, payload })

@@ -68,9 +68,9 @@ existed would be documented and inert.
   document, written as the store writes every version, so the same bytes for
   a version this store wrote — only when drift against it blocks nothing. A
   restore brings back that version's policy and is not a database rollback.
-  Neither a restore nor a publish writes an audit event or a log line: the
-  audit trail ([0023](../../docs/decisions/0023-the-audit-trail-is-operational-not-evidence.md))
-  covers the runtime plane only.
+  Every request on the plane is audited, a publish and a restore included
+  ([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md)):
+  see the audit trail below.
 
 - **The runtime plane** — a published form, its records and its lookups, for
   the host application's people, each request asking the policy
@@ -112,14 +112,44 @@ existed would be documented and inert.
   time. The host page's browser gate measures the resend at the socket and
   fails if the order is stored twice.
 
-- **An operational audit trail** — one event per runtime request, never a
-  value, records named by a keyed hash
+- **An operational audit trail** — one event per request on both planes,
+  each naming its `plane`, never a value, records named by a keyed hash
   ([0023](../../docs/decisions/0023-the-audit-trail-is-operational-not-evidence.md)).
   Not evidence, and the record says why. A create whose answer was lost is
   named by the record it would have made, when the insert names its key; one
   the database numbers names none. A write answered with an earlier
   sending's answer is audited as `repeated`, with the record that answer
   names, so a resend is not counted as a second write (0031).
+
+  On the administrator's plane
+  ([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md))
+  an event names the actor, the operation, the connection, the form and the
+  version read, compared, regenerated from or written; a publish and a
+  restore also the base the administrator named, and a restore the version
+  it copied, which nothing on disk records. Refusals are events too: a 403
+  names the actor it refused. Never the bundle, the policy, a snapshot, a
+  drift report or a message. On both planes a connection is recorded only
+  when the allowlist knows it and a form id only when it has a form id's
+  shape, so a connection string typed into a path or a body never reaches
+  the trail. A bare host name, an IP address or a lower-case word typed
+  where a form id goes is a form id, though, and is recorded as typed.
+
+  An event is written once for every request that reaches a route of either
+  plane, however it ends: a client that disconnected while the route ran,
+  or whose request was pipelined behind another on a connection that
+  closed, included. The token is read after the body, so a body Fastify
+  refuses (400, 413 or 415, or a client gone mid-body) is audited with no
+  actor, whatever token it carried. What is answered before any route runs
+  no hook and is not audited: a path no route matches (404), a parameter
+  past the router's limit (414) or one whose percent-encoding does not
+  decode (400 `FST_ERR_BAD_URL`), the 503 Fastify sends while the server
+  closes, and what Node's HTTP parser refuses before Fastify sees a request
+  (431 for headers past its limit, 400 for a request it cannot parse). The
+  administrator's plane needs a sink
+  (`admin.audit.sink`) and does not start without one; the runtime's is
+  optional. A route registered on either plane without an audit name stops
+  the server from starting, or, registered above the plane's hooks, answers
+  500 `unaudited-route` and runs nothing.
 
 ## Running it
 
@@ -137,11 +167,19 @@ are turned on by configuration:
 | Variable | Turns on |
 | --- | --- |
 | `FORMANCY_DATA_STORE_DIR` and `FORMANCY_DATA_CONNECTIONS` | The runtime plane: published forms, records, lookups. The connections file is the allowlist (JSON); passwords in it are `env:` or `file:` references. |
-| `FORMANCY_DATA_ADMIN_ROLES` | The administrator's plane, for tokens holding one of these comma-separated roles. Needs the two above. |
+| `FORMANCY_DATA_ADMIN_ROLES` | The administrator's plane, for tokens holding one of these comma-separated roles. Needs the two above. Its requests are audited to the same log as the runtime's, one `audit` line per event, told apart by `audit.plane`. |
 | `FORMANCY_DATA_AUDIT_KEY` | Records named in the audit trail by a keyed hash. A secret reference. Without it, no record is named. |
 
 Without the store and the allowlist the server verifies tokens and nothing
 else, which is how a host is wired in before any form exists.
+
+The log is JSON lines on standard output: Fastify's lines for each request,
+and the audit trail. A request is logged by its method and the route it
+matched, never by the path, the query or the Host header it was sent with,
+because those are whatever a caller typed, token or none
+([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md));
+a 404 is logged with no route. `src/server-log.test.ts` fails when a line
+holds what was sent.
 
 ## Licence
 

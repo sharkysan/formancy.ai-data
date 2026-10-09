@@ -76,7 +76,8 @@ async function startPlane() {
   }
   const verifyIdentity = async (token) =>
     token === TOKEN ? { ok: true, identity: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } } : { ok: false, reason: 'ERR_JWS_INVALID' }
-  const server = await createDataServer({ verifyIdentity, admin: { registry, store: createFileConfigurationStore(root), adminRoles: ['data-admin'] } })
+  // The administrator's trail is the server's suites' subject; here it is required and discarded.
+  const server = await createDataServer({ verifyIdentity, admin: { registry, store: createFileConfigurationStore(root), adminRoles: ['data-admin'], audit: { sink: () => {} } } })
   return { server, databases, close: async () => { await server.close(); rmSync(root, { recursive: true, force: true }) } }
 }
 

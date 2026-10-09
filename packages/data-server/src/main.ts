@@ -1,13 +1,13 @@
 import { readFile } from 'node:fs/promises'
 import { createDataServer } from './app.js'
 import type { DataServerOptions } from './app.js'
-import { logAuditSink } from './audit.js'
 import { createFileConfigurationStore } from './config-store.js'
 import { createConnectionRegistry, parseConnections } from './connections.js'
 import type { ConnectionRegistry } from './connections.js'
 import { DRIVER_FACTORIES } from './drivers.js'
 import { createIdentityVerifier } from './identity.js'
 import type { IdentityOptions } from './identity.js'
+import { servedPlanes } from './planes.js'
 import { resolveSecret } from './secrets.js'
 
 /**
@@ -101,12 +101,8 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
   const store = createFileConfigurationStore(storeDirectory)
   const auditReference = process.env['FORMANCY_DATA_AUDIT_KEY']
   const auditKey = auditReference === undefined ? undefined : await resolveSecret(auditReference)
-  planes = {
-    // The server's own logger, looked up when an event fires: the server does
-    // not exist yet while its options are being built.
-    runtime: { registry, store, audit: { sink: (event) => logAuditSink(app.log)(event), ...(auditKey === undefined ? {} : { key: auditKey }) } },
-    ...(adminRoles.length === 0 ? {} : { admin: { registry, store, adminRoles } }),
-  }
+  // One trail for both planes, the server's own log (0033).
+  planes = servedPlanes({ registry, store, adminRoles, auditKey, log: () => app.log })
 }
 
 const app = await createDataServer({ verifyIdentity, logger: true, ...planes })

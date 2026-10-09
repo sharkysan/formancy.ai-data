@@ -1,6 +1,8 @@
 import { diffSnapshots, generateForm } from '@formancy/data-core'
 import type { MetadataSnapshot } from '@formancy/data-core'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import { auditRequests } from '../audit.js'
+import type { AuditSink } from '../audit.js'
 import { generatedProblems } from '../bundle-format2.js'
 import { validateBundle } from '../bundle.js'
 import type { PublishedBundle } from '../bundle.js'
@@ -9,6 +11,7 @@ import type { ConnectionRegistry, OpenConnection } from '../connections.js'
 import { readGeneration } from '../generation.js'
 import type { HostIdentity } from '../identity.js'
 import { FORM_ID, loadPublished } from '../published.js'
+import { ADMIN_OPERATIONS, adminTrail, describeAdmin } from './admin-audit.js'
 import { evolutionRoutes } from './admin-evolution.js'
 
 export interface AdminOptions {
@@ -17,6 +20,12 @@ export interface AdminOptions {
   /** Roles in the host's token that may connect, discover, propose and publish. */
   adminRoles: readonly string[]
   authenticate: (request: FastifyRequest) => Promise<HostIdentity | undefined>
+  /**
+   * The operational trail (0023, 0033): one event per request, refusals
+   * included. Required, unlike the runtime's: a plane that publishes and
+   * restores forms does not run without saying who did.
+   */
+  audit: { sink: AuditSink; now?: () => string }
 }
 
 /** Sends a refusal: a stable code, a sentence, and whatever else the caller can act on. */
@@ -42,16 +51,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *
  * A database that cannot be reached is 503 with no detail: a driver's message
  * names hosts and ports, which is the operator's business and not the caller's.
+ *
+ * Every request is audited, one event each (0033), by hooks installed before
+ * any route, so a route added here without an audit name stops the server.
  */
 export async function adminRoutes(app: FastifyInstance, options: AdminOptions): Promise<void> {
   const { registry, store } = options
   const admins = new Set(options.adminRoles)
+
+  // The type requires it; this is for a caller the type does not reach.
+  if (typeof (options.audit as Partial<AdminOptions['audit']> | undefined)?.sink !== 'function') {
+    throw new Error("The administrator's plane needs an audit sink: audit: { sink } (0033).")
+  }
+  auditRequests(app, { names: ADMIN_OPERATIONS, sink: options.audit.sink, now: options.audit.now, describe: describeAdmin((id) => registry.scope(id) !== undefined) })
 
   app.addHook('preHandler', async (request, reply) => {
     const identity = await options.authenticate(request)
     if (identity === undefined) {
       return reply.code(401).header('www-authenticate', 'Bearer').send({ code: 'unauthenticated', message: 'A valid host token is required.' })
     }
+    // Before the role check, so a refused attempt names who made it.
+    request.identity = identity
     if (!identity.actor.roles.some((role) => admins.has(role))) {
       return refuse(reply, 403, 'forbidden', 'This action needs an administrator role.')
     }
@@ -109,6 +129,9 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     if (!read.ok) {
       return refuse(reply, 400, 'invalid-request', 'Expected connection, root { schema, name }, a lower-case formId, title, and optional lookups, versionColumn and pinned columns.')
     }
+    const trail = adminTrail(request)
+    trail.form = read.generation.formId
+    trail.connection = read.generation.connection
     const snapshot = await discover(read.generation.connection, reply)
     if (snapshot === undefined) return reply
     try {
@@ -127,9 +150,13 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     if (!isRecord(body) || !('expectedBase' in body) || !(body['expectedBase'] === null || Number.isSafeInteger(body['expectedBase']))) {
       return refuse(reply, 400, 'invalid-request', 'Expected { expectedBase: the version you edited, or null for the first, bundle }.')
     }
+    const expectedBase = body['expectedBase'] as number | null
+    const trail = adminTrail(request)
+    trail.expectedBase = expectedBase
     const checked = validateBundle(body['bundle'])
     if (!checked.ok) return refuse(reply, 422, 'invalid-bundle', 'The bundle cannot be published.', { problems: checked.problems })
     const bundle = checked.bundle
+    trail.connection = bundle.connection
     if (bundle.format === 1) {
       return refuse(reply, 422, 'invalid-bundle', 'The bundle cannot be published.', { problems: ['publish format 2: since 0030 a version keeps its generation request, generated base and presentation'] })
     }
@@ -140,15 +167,21 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     // At publish only: on read, a later generator must not make a stored version corrupt (0030).
     const generated = generatedProblems(bundle)
     if (generated.length > 0) return refuse(reply, 422, 'invalid-bundle', 'The bundle cannot be published.', { problems: generated })
-    const outcome = await store.publish(id, body['expectedBase'] as number | null, bundle)
+    const outcome = await store.publish(id, expectedBase, bundle)
     if (!outcome.ok) return refuse(reply, 409, 'conflict', 'Somebody published first. Rebase on the current version and try again.', { current: outcome.current })
+    trail.formVersion = outcome.version
     return reply.code(201).send({ version: outcome.version })
   })
 
   /** The newest published bundle, re-validated, or a reply already sent. */
   async function latest(id: string, reply: FastifyReply): Promise<{ version: number; bundle: PublishedBundle } | undefined> {
     const loaded = await loadPublished(store, id, reply.log)
-    if (loaded.ok) return { version: loaded.version, bundle: loaded.bundle }
+    if (loaded.ok) {
+      const trail = adminTrail(reply.request)
+      trail.formVersion = loaded.version
+      trail.connection = loaded.bundle.connection
+      return { version: loaded.version, bundle: loaded.bundle }
+    }
     await refuse(reply, loaded.status, loaded.code, loaded.message)
     return undefined
   }

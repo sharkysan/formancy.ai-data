@@ -52,6 +52,8 @@ let root: string
 let store: ConfigurationStore
 let app: FastifyInstance
 let reachable: boolean
+/** The plane's trail is admin-audit.test.ts's subject; here it is required and discarded. */
+const audit = { sink: () => {} }
 
 function registry(): ConnectionRegistry {
   const adapter = {
@@ -89,7 +91,7 @@ beforeEach(async () => {
   reachable = true
   root = await mkdtemp(join(tmpdir(), 'formancy-data-admin-'))
   store = createFileConfigurationStore(root)
-  app = await createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'] } })
+  app = await createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'], audit } })
 })
 
 afterEach(async () => {
@@ -323,7 +325,7 @@ describe('the administrator plane', () => {
       }),
     }
     await publish()
-    const broken = await createDataServer({ verifyIdentity, admin: { registry: failing, store, adminRoles: ['data-admin'] } })
+    const broken = await createDataServer({ verifyIdentity, admin: { registry: failing, store, adminRoles: ['data-admin'], audit } })
     for (const [method, url] of [['POST', '/v1/connections/erp/test'], ['GET', '/v1/connections/erp/metadata'], ['POST', '/v1/forms/employee/drift']] as const) {
       const response = await broken.inject({ method, url, headers: as('admin') })
       expect(response.statusCode, url).toBe(503)

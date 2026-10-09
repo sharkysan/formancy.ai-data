@@ -21,8 +21,8 @@ import type { PublishedBundle } from '../bundle.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry, OpenConnection } from '../connections.js'
 import type { HostIdentity } from '../identity.js'
-import type { AuditEvent, AuditSink } from '../audit.js'
-import { recordReference } from '../audit.js'
+import type { AuditSink, RuntimeAuditEvent, RuntimeOperation } from '../audit.js'
+import { auditedForm, auditRequests, recordReference } from '../audit.js'
 import { loadPublished } from '../published.js'
 import { planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
 import { createWriteOnce, INVALID_WRITE_ID, writeId } from './write-once.js'
@@ -42,18 +42,22 @@ export interface RuntimeOptions {
 declare module 'fastify' {
   interface FastifyRequest {
     /** `repeated`: answered with an earlier sending's answer, and nothing asked of the database (0031). */
-    auditTrail?: { formVersion: number | null; record?: string; outcome?: string; repeated?: boolean }
+    auditTrail?: { formVersion: number | null; record?: string; repeated?: boolean }
   }
 }
 
-/** The audit name of each runtime route, by its pattern. */
-const ROUTE_OPERATIONS: Readonly<Record<string, AuditEvent['operation']>> = {
-  '/v1/forms/:id': 'form',
-  '/v1/forms/:id/records/read': 'read',
-  '/v1/forms/:id/records/create': 'create',
-  '/v1/forms/:id/records/update': 'update',
-  '/v1/forms/:id/lookups/:source/query': 'lookup-query',
-  '/v1/forms/:id/lookups/:source/resolve': 'lookup-resolve',
+/**
+ * The audit name of each runtime route, keyed `METHOD url`; a route without
+ * one stops the server, or never answers (0033). `admin-audit.test.ts` sends
+ * every route the router holds and fails on an entry no route has.
+ */
+export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
+  'GET /v1/forms/:id': 'form',
+  'POST /v1/forms/:id/records/read': 'read',
+  'POST /v1/forms/:id/records/create': 'create',
+  'POST /v1/forms/:id/records/update': 'update',
+  'POST /v1/forms/:id/lookups/:source/query': 'lookup-query',
+  'POST /v1/forms/:id/lookups/:source/resolve': 'lookup-resolve',
 }
 
 /** At most this many tokens are resolved in one request: a form holds one per lookup field, not thousands. */
@@ -119,45 +123,28 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     request.auditTrail = { formVersion: null }
   })
 
-  if (options.audit !== undefined) {
-    const { sink, key } = options.audit
-    const now = options.audit.now ?? (() => new Date().toISOString())
-
-    // The stable code of a refusal, read from the response itself, so every
-    // way a request can end is audited without each branch remembering to say so.
-    app.addHook('onSend', async (request, reply, payload) => {
-      if (reply.statusCode >= 400 && typeof payload === 'string' && request.auditTrail !== undefined) {
-        try {
-          const code = (JSON.parse(payload) as { code?: unknown }).code
-          if (typeof code === 'string') request.auditTrail.outcome = code
-        } catch {
-          // A body that is not JSON carries no code; the status says enough.
-        }
-      }
-      return payload
-    })
-
-    app.addHook('onResponse', async (request, reply) => {
-      const operation = ROUTE_OPERATIONS[request.routeOptions.url ?? '']
-      if (operation === undefined) return
+  // Before any route, so a route without an audit name stops the server,
+  // with a sink or without one (0033).
+  const key = options.audit?.key
+  auditRequests(app, {
+    names: ROUTE_OPERATIONS,
+    sink: options.audit?.sink,
+    now: options.audit?.now,
+    describe: (request, base): RuntimeAuditEvent => {
       const trail = request.auditTrail ?? { formVersion: null }
-      const event: AuditEvent = {
-        at: now(),
-        actor: request.identity?.actor.id ?? null,
-        operation,
-        form: (request.params as { id?: string }).id ?? '',
+      return {
+        at: base.at,
+        plane: 'runtime',
+        actor: base.actor,
+        operation: base.operation,
+        form: auditedForm((request.params as { id?: unknown }).id),
         formVersion: trail.formVersion,
-        status: reply.statusCode,
-        outcome: trail.repeated === true ? 'repeated' : reply.statusCode < 400 ? 'ok' : (trail.outcome ?? `http-${String(reply.statusCode)}`),
+        status: base.status,
+        outcome: trail.repeated === true ? 'repeated' : base.outcome,
         record: recordReference(key, trail.record),
       }
-      try {
-        await sink(event)
-      } catch (error) {
-        request.log.error({ error: (error as Error).message }, 'an audit event could not be written')
-      }
-    })
-  }
+    },
+  })
 
   app.addHook('preHandler', async (request, reply) => {
     const identity = await options.authenticate(request)
