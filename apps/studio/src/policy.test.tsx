@@ -85,7 +85,9 @@ describe('the policy editor', () => {
     expect(await audit()).toEqual([])
 
     const publish = await goTo(user, 'Publish')
-    expect(within(publish).getByRole('button', { name: 'Publish version 1' })).toHaveProperty('disabled', true)
+    // Found, not got: until the step has read which version is published the
+    // button names no number, and a slow machine is still reading here.
+    expect(await within(publish).findByRole('button', { name: 'Publish version 1' })).toHaveProperty('disabled', true)
     expect(within(publish).getByRole('note').textContent).toContain('The policy has 1 problem')
   })
 
