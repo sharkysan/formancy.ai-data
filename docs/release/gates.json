@@ -70,7 +70,8 @@
       "evidence": [
         { "file": "packages/data-core/src/presentation/rebase.test.ts" },
         { "file": "packages/data-server/src/routes/admin-evolution.test.ts" },
-        { "file": "packages/data-core/src/drift/compare.test.ts" }
+        { "file": "packages/data-core/src/drift/compare.test.ts" },
+        { "file": "packages/data-server/src/routes/runtime-drift.integration.test.ts" }
       ]
     },
     {

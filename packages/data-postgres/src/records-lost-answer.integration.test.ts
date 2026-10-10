@@ -1,8 +1,10 @@
 import { findObject } from '@formancy/data-core'
 import type { ApiValue, MetadataSnapshot, RecordColumn, RecordFailure, RecordOutcome, RecordTarget, RecordValue, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture, TcpHop } from '@formancy/data-fixtures'
-import { answerBytes, startPostgresFixture, startTcpHop } from '@formancy/data-fixtures'
+import { answerBytes, defined, startPostgresFixture, startTcpHop } from '@formancy/data-fixtures'
 import { randomUUID } from 'node:crypto'
+import v8 from 'node:v8'
+import vm from 'node:vm'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest'
@@ -151,7 +153,7 @@ describe('an answer lost after the write committed', () => {
     const bytes = answerBytes('postgres', notes)
     const sent = hop.countSent(bytes)
     const lost = hop.swallowAnswersFrom(bytes)
-    const pending = createPostgresRecords(viaHop).insert({ target: ORDER, values: orderValues(notes), returning: [ORDER_ID, col('sales', 'order', 'notes')] })
+    const pending = defined(createPostgresRecords(viaHop)).insert({ target: ORDER, values: orderValues(notes), returning: [ORDER_ID, col('sales', 'order', 'notes')] })
 
     await within(lost.matched, 'the marker never appeared in an answer')
     await until(() => ordersNoted(notes), 1)
@@ -168,7 +170,7 @@ describe('an answer lost after the write committed', () => {
   // version is the one sent plus one, and the adapter answered unknown, not
   // stale or unavailable.
   test('an update is unknown-outcome, its change is stored, and its version moved exactly once', async () => {
-    const created = await createPostgresRecords(owner).insert({ target: ORDER, values: orderValues(marker('before the update')), returning: [ORDER_ID] })
+    const created = await defined(createPostgresRecords(owner)).insert({ target: ORDER, values: orderValues(marker('before the update')), returning: [ORDER_ID] })
     if (!created.ok) throw new Error(created.message)
     const id = String(created.values.id)
     const version = String(created.version)
@@ -176,7 +178,7 @@ describe('an answer lost after the write committed', () => {
     const bytes = answerBytes('postgres', notes)
     const sent = hop.countSent(bytes)
     const lost = hop.swallowAnswersFrom(bytes)
-    const pending = createPostgresRecords(viaHop).update({
+    const pending = defined(createPostgresRecords(viaHop)).update({
       target: ORDER,
       key: [{ ...ORDER_ID, value: id }],
       set: [{ ...col('sales', 'order', 'notes'), value: notes }],
@@ -211,7 +213,7 @@ describe('a refusal that follows the row', () => {
     const target: RecordTarget = { table: { schema: 'lost', name: 'deferred' }, identity: [col('lost', 'deferred', 'id')], concurrency: null }
     const insert = { target, values: [{ ...col('lost', 'deferred', 'code'), value: code }], returning: [col('lost', 'deferred', 'code')] }
 
-    const refused = failed(await createPostgresRecords(viaHop).insert(insert))
+    const refused = failed(await defined(createPostgresRecords(viaHop)).insert(insert))
     expect(refused).toMatchObject({ code: 'unique-violation', constraint: 'uq_deferred_code' })
     expect(refused.message).toMatch(/23505/)
     expect(await codesTaken(code)).toBe(1)
@@ -230,7 +232,7 @@ describe('a refusal that follows the row', () => {
     await owner`insert into lost.deferred (code) values (${code})`
     const target: RecordTarget = { table: { schema: 'lost', name: 'deferred' }, identity: [col('lost', 'deferred', 'id')], concurrency: null }
     const lost = hop.swallowAnswersFrom(answerBytes('postgres', note))
-    const pending = createPostgresRecords(viaHop).insert({
+    const pending = defined(createPostgresRecords(viaHop)).insert({
       target,
       values: [
         { ...col('lost', 'deferred', 'code'), value: code },
@@ -264,7 +266,7 @@ describe('a timeout the server answers', () => {
     try {
       const held = await owner.begin(async (tx) => {
         await tx`lock table sales."order" in share mode`
-        const outcome = await createPostgresRecords(timed).insert({ target: ORDER, values: orderValues(notes), returning: [ORDER_ID] })
+        const outcome = await defined(createPostgresRecords(timed)).insert({ target: ORDER, values: orderValues(notes), returning: [ORDER_ID] })
         return { outcome }
       })
       const outcome = failed(held.outcome)
@@ -272,6 +274,130 @@ describe('a timeout the server answers', () => {
       expect(await ordersNoted(notes)).toBe(0)
     } finally {
       await timed.end()
+    }
+  })
+})
+
+describe('the lock-first path, under a default isolation other than READ COMMITTED (0041)', () => {
+  // A write decided over a REPEATABLE READ description runs in a transaction
+  // that locks the table first, through `sql.begin`. On a reserved
+  // connection instead, postgres.js 3.4.9 never answered a statement once
+  // its backend was gone and then threw outside any promise, ending the
+  // process (measured before 0041). Here the update's answer is lost before
+  // its commit was sent: the server rolls the transaction back when the
+  // connection goes, so this over-reports, but it is unknown-outcome as any
+  // write sent and not answered is, and the same driver answers afterwards.
+  test('an update whose answer is lost is unknown-outcome, and the driver answers the next request', async () => {
+    const repeatable = postgres({ ...connectionOf(fixture.admin), host: '127.0.0.1', port: hop.port, max: 1, onnotice: () => {}, connection: { default_transaction_isolation: 'repeatable read' } })
+    try {
+      const records = createPostgresRecords(repeatable)
+      const created = await defined(createPostgresRecords(owner)).insert({ target: ORDER, values: orderValues(marker('before the locked update')), returning: [ORDER_ID] })
+      if (!created.ok) throw new Error(created.message)
+      const key = [{ ...ORDER_ID, value: String(created.values.id) }]
+      const read = await records.read({ target: ORDER, key, columns: [ORDER_ID], filters: TENANT_1 })
+      if (!read.ok || read.record === null) throw new Error('the order was not read')
+      expect(read.described.definition).toMatch(/@repeatable read$/)
+      const notes = marker('locked update, answer lost')
+      const lost = hop.swallowAnswersFrom(answerBytes('postgres', notes))
+      const pending = records.update({ target: ORDER, key, set: [{ ...col('sales', 'order', 'notes'), value: notes }], expectedVersion: read.record.version as string, filters: TENANT_1, returning: [col('sales', 'order', 'notes')], definition: read.described.definition })
+      await within(lost.matched, 'the marker never appeared in an answer')
+      lost.cut()
+      expect(failed(await within(pending, 'the update never answered'))).toMatchObject({ code: 'unknown-outcome', message: expect.stringMatching(/CONNECTION_CLOSED/) })
+      expect(await within(records.read({ target: ORDER, key, columns: [ORDER_ID], filters: TENANT_1 }), 'the driver never answered again')).toMatchObject({ ok: true })
+    } finally {
+      await repeatable.end({ timeout: 1 })
+    }
+  })
+
+  // Cut while it waits for the table's lock, the write was never sent:
+  // unavailable, nothing written, and the driver answers again.
+  test('a write whose connection is lost while it waits for the lock is unavailable, and nothing is written', async () => {
+    const server = new URL(fixture.admin)
+    const repeatable = postgres({ ...connectionOf(fixture.admin), host: server.hostname, port: Number(server.port), max: 1, onnotice: () => {}, connection: { default_transaction_isolation: 'repeatable read', application_name: 'locked-and-cut' } })
+    try {
+      const records = createPostgresRecords(repeatable)
+      const described = await records.describe(ORDER.table)
+      if (!described.ok) throw new Error(described.message)
+      const notes = marker('never sent')
+      let release = (): void => {}
+      let locked = (): void => {}
+      const holding = owner.begin(async (tx) => {
+        await tx.unsafe('lock table sales."order" in access exclusive mode')
+        locked()
+        await new Promise<void>((resolve) => (release = resolve))
+      })
+      await new Promise<void>((resolve) => (locked = resolve))
+      const pending = records.insert({ target: ORDER, values: orderValues(notes), returning: [], definition: described.described.definition })
+      await until(async () => [...(await owner`select count(*)::int as n from pg_catalog.pg_stat_activity where application_name = 'locked-and-cut' and wait_event_type = 'Lock'`)][0]?.n, 1)
+      await owner`select pg_catalog.pg_terminate_backend(pid) from pg_catalog.pg_stat_activity where application_name = 'locked-and-cut'`
+      expect(failed(await within(pending, 'the insert never answered'))).toMatchObject({ code: 'unavailable', message: expect.stringMatching(/CONNECTION_CLOSED/) })
+      release()
+      await holding
+      expect(await ordersNoted(notes)).toBe(0)
+      // The server's own word for the termination, 57P01, reaches the next
+      // statement on that connection, which is unavailable; the one after
+      // reconnects. Neither waits forever, as both did before.
+      const next = await within(records.describe(ORDER.table), 'the driver never answered again')
+      expect(next.ok ? 'answered' : next.code).toMatch(/^(answered|unavailable)$/)
+      expect(await within(records.describe(ORDER.table), 'the driver never answered a second time')).toMatchObject({ ok: true })
+    } finally {
+      await repeatable.end({ timeout: 1 })
+    }
+  })
+
+  // A step kept from settling once its connection is lost keeps its
+  // transaction's frame -- the statement, and the values a person wrote --
+  // for as long as anything reachable holds the promise it waits on. One
+  // promise shared by every lost step is held by the module, so every lost
+  // transaction's values were kept for the life of the process: measured
+  // (2026-10-10), 64 MB still held after four lost writes of 16 MB each and
+  // two collections, and 0.3 MB with a promise of its own for each step.
+  test('what a write lost while it waits for the lock held is collected, while its driver lives on', async () => {
+    v8.setFlagsFromString('--expose-gc')
+    const collect = vm.runInNewContext('gc') as () => void
+    // A large string made from a buffer is external to V8's heap, so both are counted.
+    const heap = (): number => {
+      collect()
+      collect()
+      const used = process.memoryUsage()
+      return used.heapUsed + used.external
+    }
+    const server = new URL(fixture.admin)
+    const repeatable = postgres({ ...connectionOf(fixture.admin), host: server.hostname, port: Number(server.port), max: 1, onnotice: () => {}, connection: { default_transaction_isolation: 'repeatable read', application_name: 'locked-and-kept' } })
+    const LOST = 4
+    const SIZE = 16 * 1024 * 1024
+    try {
+      const records = createPostgresRecords(repeatable)
+      const described = await records.describe(ORDER.table)
+      if (!described.ok) throw new Error(described.message)
+      const before = heap()
+      for (let lost = 0; lost < LOST; lost += 1) {
+        let release = (): void => {}
+        let locked = (): void => {}
+        const holding = owner.begin(async (tx) => {
+          await tx.unsafe('lock table sales."order" in access exclusive mode')
+          locked()
+          await new Promise<void>((resolve) => (release = resolve))
+        })
+        await new Promise<void>((resolve) => (locked = resolve))
+        // A value of its own each time, never sent: the lock is all the server
+        // hears of this write. Flat, as a typed value is: a repeated string
+        // is a few nodes until something flattens it, and would weigh nothing.
+        const pending = records.insert({ target: ORDER, values: orderValues(Buffer.alloc(SIZE, 0x61 + lost).toString('latin1')), returning: [], definition: described.described.definition })
+        await until(async () => [...(await owner`select count(*)::int as n from pg_catalog.pg_stat_activity where application_name = 'locked-and-kept' and wait_event_type = 'Lock'`)][0]?.n, 1)
+        await owner`select pg_catalog.pg_terminate_backend(pid) from pg_catalog.pg_stat_activity where application_name = 'locked-and-kept'`
+        expect(failed(await within(pending, 'the insert never answered'))).toMatchObject({ code: 'unavailable' })
+        release()
+        await holding
+        // The terminated backend's 57P01 on the next statement, then a new connection.
+        await within(records.describe(ORDER.table), 'the driver never answered again')
+        expect(await within(records.describe(ORDER.table), 'the driver never answered a second time')).toMatchObject({ ok: true })
+      }
+      // Less than one lost write's values, where all of them were kept.
+      const grown = heap() - before
+      expect(grown, `${String(Math.round(grown / 1024 / 1024))} MB kept`).toBeLessThan(SIZE)
+    } finally {
+      await repeatable.end({ timeout: 1 })
     }
   })
 })

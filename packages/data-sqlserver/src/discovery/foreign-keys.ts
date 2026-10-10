@@ -3,7 +3,7 @@ import type { ConnectionPool } from 'mssql'
 import type { Found, ObjectGap } from './catalog.js'
 import { byObjectId, groupBy, queryScope } from './catalog.js'
 
-interface ForeignKeyRow {
+export interface ForeignKeyRow {
   object_id: number
   key_id: number
   name: string
@@ -28,7 +28,7 @@ interface ForeignKeyRow {
  * join would drop the key -- "no relationship", the one wrong answer -- so the
  * key is reported with an unknown target and a gap says why.
  */
-const SQL = (scoped: string): string => `
+export const FOREIGN_KEYS_SQL = (scoped: string): string => `
   select fk.parent_object_id as object_id, fk.object_id as key_id, fk.name, fk.is_disabled, fk.is_not_trusted,
     fk.delete_referential_action, fk.update_referential_action,
     rs.name as referenced_schema, ro.name as referenced_name,
@@ -95,12 +95,14 @@ function toForeignKey(rows: readonly ForeignKeyRow[], gaps: ObjectGap[]): Foreig
 }
 
 export async function readForeignKeys(pool: ConnectionPool, schemas: readonly string[]): Promise<Found<ForeignKeyMeta[]>> {
-  const rows = await queryScope<ForeignKeyRow>(pool, schemas, SQL)
+  const rows = await queryScope<ForeignKeyRow>(pool, schemas, FOREIGN_KEYS_SQL)
   const gaps: ObjectGap[] = []
   const byObject = new Map<number, ForeignKeyMeta[]>()
-  for (const [objectId, group] of groupBy(rows, byObjectId)) {
-    const byKey = groupBy(group, (row) => row.key_id)
-    byObject.set(objectId, [...byKey.values()].map((keyRows) => toForeignKey(keyRows, gaps)))
-  }
+  for (const [objectId, group] of groupBy(rows, byObjectId)) byObject.set(objectId, foreignKeysOf(group, gaps))
   return { byObject, gaps }
+}
+
+/** One object's foreign keys from its rows, in the query's order: discovery's, and the root's description's (0041), which keeps no gaps. */
+export function foreignKeysOf(rows: readonly ForeignKeyRow[], gaps: ObjectGap[]): ForeignKeyMeta[] {
+  return [...groupBy(rows, (row) => row.key_id).values()].map((keyRows) => toForeignKey(keyRows, gaps))
 }

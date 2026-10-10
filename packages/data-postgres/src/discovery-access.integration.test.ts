@@ -1,7 +1,7 @@
 import { findObject } from '@formancy/data-core'
 import type { MetadataSnapshot, ObjectMeta, RecordColumn, RecordOutcome, RecordTarget, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { accessDisagreements, covers, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startPostgresFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
+import { accessDisagreements, covers, defined, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startPostgresFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -381,7 +381,7 @@ describe('what the records operations do with what the snapshot reports', () => 
     const snapshot = await discoverPostgres(writer, { schemas: ['probe'] })
     expect(capabilities(described(snapshot, 'probe', 'serialed'))).toEqual(['id:si-', 'label:si-'])
     expect(capabilities(described(snapshot, 'probe', 'numbered'))).toEqual(['id:si-', 'label:si-'])
-    const records = createPostgresRecords(writer)
+    const records = defined(createPostgresRecords(writer))
     const create = (name: string) =>
       records.insert({
         target: { table: { schema: 'probe', name }, identity: [{ name: 'id', type: INT32 }], concurrency: null },
@@ -399,7 +399,7 @@ describe('what the records operations do with what the snapshot reports', () => 
   test('under row security, a refused insert is permission-denied and a hidden row is not-found', async () => {
     const snapshot = await discoverPostgres(writer, { schemas: ['probe'] })
     expect(described(snapshot, 'probe', 'policed').rowSecurity).toBe('applies')
-    const records = createPostgresRecords(writer)
+    const records = defined(createPostgresRecords(writer))
     const id: RecordColumn = { name: 'id', type: INT32 }
     const target = { table: { schema: 'probe', name: 'policed' }, identity: [id], concurrency: { kind: 'version-column', column: 'version' } } as const satisfies RecordTarget
     const everyRow: RowFilters = { kind: 'unrestricted' }

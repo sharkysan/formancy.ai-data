@@ -1,12 +1,13 @@
 import type { KeyMeta } from '@formancy/data-core'
 import type { TransactionSql } from 'postgres'
+import { op } from '../sql/catalog.js'
 
 export interface ObjectKeys {
   primaryKey: KeyMeta | null
   uniqueKeys: KeyMeta[]
 }
 
-interface KeyRow {
+export interface KeyRow {
   oid: number
   name: string
   is_primary: boolean
@@ -31,6 +32,26 @@ interface KeyRow {
  *
  * An index that backs a constraint is skipped, so a key is never reported twice.
  */
+/** A primary key or a unique constraint, of pg_constraint `k`. Shared with the root's definition (0041). */
+export const KEY_CONSTRAINT = `k.contype ${op('=')} any ('{p,u}'::pg_catalog."char"[])`
+
+/**
+ * A unique index, of pg_index `i`, that makes its columns a key and is no
+ * constraint's: valid, not partial, over plain columns, and backing no
+ * primary, unique or exclusion constraint, which are reported as themselves.
+ * Its first `indnkeyatts` columns, numbered `key.position`, are the key.
+ * Shared with the root's definition (0041).
+ */
+export const UNIQUE_INDEX_KEY = `i.indisunique
+      and i.indisvalid
+      and i.indpred is null
+      and i.indexprs is null
+      and not exists (
+        select from pg_catalog.pg_constraint k
+        where k.conindid ${op('=')} i.indexrelid and k.conrelid ${op('=')} i.indrelid and k.contype ${op('=')} any ('{p,u,x}'::pg_catalog."char"[])
+      )`
+export const INDEX_KEY_COLUMN = `key.position ${op('<=')} i.indnkeyatts`
+
 export async function readKeys(sql: TransactionSql, schemas: readonly string[]): Promise<Map<number, ObjectKeys>> {
   const rows = await sql<KeyRow[]>`
     select k.conrelid as oid, k.conname as name, k.contype = 'p' as is_primary, a.attname as column, key.position
@@ -40,7 +61,7 @@ export async function readKeys(sql: TransactionSql, schemas: readonly string[]):
     cross join lateral unnest(k.conkey) with ordinality as key(attnum, position)
     join pg_catalog.pg_attribute a on a.attrelid = k.conrelid and a.attnum = key.attnum
     where n.nspname = any(${schemas})
-      and k.contype in ('p', 'u')
+      and ${sql.unsafe(KEY_CONSTRAINT)}
 
     union all
 
@@ -52,33 +73,31 @@ export async function readKeys(sql: TransactionSql, schemas: readonly string[]):
     cross join lateral unnest(i.indkey::int2[]) with ordinality as key(attnum, position)
     join pg_catalog.pg_attribute a on a.attrelid = i.indrelid and a.attnum = key.attnum
     where n.nspname = any(${schemas})
-      and i.indisunique
-      and i.indisvalid
-      and i.indpred is null
-      and i.indexprs is null
-      and key.position <= i.indnkeyatts
-      and not exists (
-        select from pg_catalog.pg_constraint k
-        where k.conindid = i.indexrelid and k.conrelid = i.indrelid and k.contype in ('p', 'u', 'x')
-      )
+      and ${sql.unsafe(UNIQUE_INDEX_KEY)}
+      and ${sql.unsafe(INDEX_KEY_COLUMN)}
 
     order by oid, name, position`
 
   const byObject = new Map<number, ObjectKeys>()
   for (const row of rows) {
     const keys = byObject.get(row.oid) ?? { primaryKey: null, uniqueKeys: [] }
-    if (row.is_primary) {
-      keys.primaryKey ??= { name: row.name, columns: [] }
-      keys.primaryKey.columns.push(row.column)
-    } else {
-      let key = keys.uniqueKeys.find((candidate) => candidate.name === row.name)
-      if (key === undefined) {
-        key = { name: row.name, columns: [] }
-        keys.uniqueKeys.push(key)
-      }
-      key.columns.push(row.column)
-    }
+    addKeyColumn(keys, row)
     byObject.set(row.oid, keys)
   }
   return byObject
+}
+
+/** One key column, in key order, onto its object's keys: how discovery and the root's description (0041) assemble them alike. */
+export function addKeyColumn(keys: ObjectKeys, row: Pick<KeyRow, 'name' | 'is_primary' | 'column'>): void {
+  if (row.is_primary) {
+    keys.primaryKey ??= { name: row.name, columns: [] }
+    keys.primaryKey.columns.push(row.column)
+    return
+  }
+  let key = keys.uniqueKeys.find((candidate) => candidate.name === row.name)
+  if (key === undefined) {
+    key = { name: row.name, columns: [] }
+    keys.uniqueKeys.push(key)
+  }
+  key.columns.push(row.column)
 }

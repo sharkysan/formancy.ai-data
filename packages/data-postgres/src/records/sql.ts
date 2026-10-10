@@ -6,6 +6,8 @@ import { Statement } from '../sql/statement.js'
 import type { Param } from '../sql/statement.js'
 import { sqlTypeOf } from '../sql/types.js'
 import { bindText, canonicalText } from '../sql/values.js'
+import { digestOf, ENCODING, factsOf, ISOLATION, READ_COMMITTED, spellingsOf } from './definition.js'
+import type { Definition } from './definition.js'
 
 /** A statement ready to run: its text, and the parameters its placeholders name. */
 export interface RecordStatement {
@@ -61,40 +63,113 @@ function selectFrom(table: ObjectRef, select: readonly string[], where: readonly
   return [`select ${select.length > 0 ? select.join(', ') : 'true'}`, `from ${quoteTable(table)} as ${ROW}`, `where ${where.join(' and ')}`].join('\n')
 }
 
-/** One record's columns and version, if it exists inside the filters. */
-export function readStatement(request: ReadRequest, terms: readonly RowFilterTerm[]): RecordStatement {
-  const statement = new Statement()
-  const where = located(statement, request.key, terms)
-  return { text: selectFrom(request.target.table, outputs(request.target, request.columns), where), params: statement.params }
+/**
+ * How a guarded write is run (0041). `read-committed`: one statement, which
+ * takes its snapshot after the table's lock, guarded by the digest and by the
+ * connection's isolation being read committed. `locked`: in a transaction
+ * that locks the table first, under whatever isolation the session has, so
+ * the statement's snapshot follows the lock; guarded by the digest alone.
+ */
+export type WritePath = 'read-committed' | 'locked'
+
+/**
+ * The guard every write carries: the table's definition is the one the write
+ * was decided over -- an uncorrelated subquery, so it runs once per
+ * statement -- and, on the read-committed path, the connection's isolation
+ * is that path's. Under another isolation the statement's snapshot is taken
+ * when it is parsed, before it waits for the table's lock, and the guard
+ * would read the catalog from before an ALTER the statement is then analysed
+ * after: measured (the probes before 0041), an insert stored 1234.57 that way.
+ */
+function guard(statement: Statement, table: ObjectRef, definition: Definition, path: WritePath): string[] {
+  const moved = `${digestOf(factsOf(statement, table))} ${op('=')} ${statement.text(definition.digest)}`
+  return path === 'read-committed' ? [moved, `${ISOLATION} ${op('=')} '${READ_COMMITTED}'`] : [moved]
 }
 
 /**
- * Whether the record exists inside the filters and, when `withVersion`,
- * whether its version is still the expected one, as `true` or `false`: what
- * tells `not-found`, `stale` and a write the database declined apart after
- * an update changed nothing.
+ * The description of `table`, as one row: its facts, their digest, their
+ * spellings, the encoding and the isolation, in this order.
+ *
+ * The facts are named twice, once as themselves and once inside their
+ * digest. `offset 0` keeps the derived table that computes them from being
+ * pulled up into the statement, where each name would be its own copy of
+ * the catalog walk: measured on 17 (2026-10-10), eleven scans of
+ * pg_attribute where the facts and the spellings make six, and twice the
+ * planning and execution of every describe and read. The records-definition
+ * suite counts them.
  */
-export function existsStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], withVersion: boolean): RecordStatement {
+function described(statement: Statement, table: ObjectRef): { select: string; from: string } {
+  return {
+    select: ['"g"."facts"', digestOf('"g"."facts"'), '"g"."spellings"', ENCODING, ISOLATION].join(', '),
+    from: `(select ${factsOf(statement, table)} as "facts", ${spellingsOf(statement, table)} as "spellings" offset 0) as "g"`,
+  }
+}
+
+/** How many columns of a row `described` takes, before what the statement adds. */
+export const DESCRIBED_COLUMNS = 5
+
+/** The table's description, in one statement: always one row. */
+export function describeStatement(table: ObjectRef): RecordStatement {
   const statement = new Statement()
+  const { select, from } = described(statement, table)
+  return { text: `select ${select}\nfrom ${from}`, params: statement.params }
+}
+
+/**
+ * One record's columns and version, if it exists inside the filters, with
+ * the table as this same statement found it: the description, then `true`
+ * when the record is there, then its columns and version. One row with no
+ * record when none is inside the filters; two when the identity is not a key.
+ */
+export function readStatement(request: ReadRequest, terms: readonly RowFilterTerm[]): RecordStatement {
+  const statement = new Statement()
+  const { select, from } = described(statement, request.target.table)
+  const where = located(statement, request.key, terms)
+  const record = selectFrom(request.target.table, ['true', ...outputs(request.target, request.columns)], where)
+  return { text: `select ${select}, "record".*\nfrom ${from}\nleft join lateral (${record}) as "record" on true`, params: statement.params }
+}
+
+/**
+ * Why an update changed nothing, in one statement, on any connection: whether
+ * the table's definition is still the one it was decided over, the isolation
+ * this connection runs under, and whether the record exists inside the
+ * filters and, when `withVersion`, still has the expected version -- `true`,
+ * `false`, or NULL for no such record. The digest depends on no session
+ * (definition.ts), so any connection answers it as the write's would.
+ */
+export function nothingChangedStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], withVersion: boolean, definition: Definition): RecordStatement {
+  const statement = new Statement()
+  const same = `(${digestOf(factsOf(statement, request.target.table))} ${op('=')} ${statement.text(definition.digest)})::pg_catalog.text`
   const where = located(statement, request.key, terms)
   const unchanged = withVersion ? `(${versionIs(statement, request)})::pg_catalog.text` : `'false'`
-  return { text: selectFrom(request.target.table, [unchanged], where), params: statement.params }
+  const found = `${selectFrom(request.target.table, [`${unchanged} as "unchanged"`], where)}\nlimit 1`
+  return { text: `select ${same}, ${ISOLATION}, "found"."unchanged"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`, params: statement.params }
+}
+
+/** Whether the table's definition is still `definition`, and this connection's isolation: after a write that wrote nothing or failed. */
+export function definitionStatement(table: ObjectRef, definition: Definition): RecordStatement {
+  const statement = new Statement()
+  const same = `(${digestOf(factsOf(statement, table))} ${op('=')} ${statement.text(definition.digest)})::pg_catalog.text`
+  return { text: `select ${same}, ${ISOLATION}`, params: statement.params }
 }
 
 /**
  * An insert of exactly the given columns, so a column left out gets its
  * default and a generated one is never named, returning what was asked for
- * and the version the row starts at.
+ * and the version the row starts at -- and only while the table's definition
+ * is `definition` (0041): `insert … select … where`, which inserts nothing
+ * when the guard is false. With no columns it is `select where`, which
+ * inserts one row of defaults as `default values` does (measured on
+ * PostgreSQL 17, the probes before 0041).
  */
-export function insertStatement(request: InsertRequest): RecordStatement {
+export function insertStatement(request: InsertRequest, definition: Definition, path: WritePath): RecordStatement {
   const statement = new Statement()
   const table = `insert into ${quoteTable(request.target.table)} as ${ROW}`
-  const body =
-    request.values.length === 0
-      ? 'default values'
-      : `(${request.values.map((value) => quoteIdentifier(value.name)).join(', ')})\nvalues (${request.values.map((value) => bound(statement, value)).join(', ')})`
+  const columns = request.values.length === 0 ? '' : ` (${request.values.map((value) => quoteIdentifier(value.name)).join(', ')})`
+  const values = request.values.map((value) => bound(statement, value)).join(', ')
+  const body = `select ${values}\nwhere ${guard(statement, request.target.table, definition, path).join(' and ')}`
   const returning = outputs(request.target, request.returning)
-  const text = [table, body, returning.length > 0 ? `returning ${returning.join(', ')}` : ''].filter((part) => part !== '').join('\n')
+  const text = [`${table}${columns}`, body, returning.length > 0 ? `returning ${returning.join(', ')}` : ''].filter((part) => part !== '').join('\n')
   return { text, params: statement.params }
 }
 
@@ -102,14 +177,15 @@ export function insertStatement(request: InsertRequest): RecordStatement {
  * One guarded update (0015): the key, the trusted filters and the expected
  * version in one WHERE, and the version column moved by one in the same
  * statement, so nothing can change between the check and the write and
- * every writer through this module sees the change.
+ * every writer through this module sees the change. The same WHERE holds
+ * the table to the definition the update was decided over (0041).
  */
-export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[]): RecordStatement {
+export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], definition: Definition, path: WritePath): RecordStatement {
   const statement = new Statement()
   const version = request.target.concurrency.column
   const set = request.set.map((value) => `${quoteIdentifier(value.name)} = ${bound(statement, value)}`)
   set.push(`${quoteIdentifier(version)} = ${column(version)} ${op('+')} 1`)
-  const where = [...located(statement, request.key, terms), versionIs(statement, request)]
+  const where = [...located(statement, request.key, terms), versionIs(statement, request), ...guard(statement, request.target.table, definition, path)]
   const text = [
     `update ${quoteTable(request.target.table)} as ${ROW}`,
     `set ${set.join(', ')}`,
@@ -117,4 +193,9 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
     `returning ${outputs(request.target, request.returning).join(', ')}`,
   ].join('\n')
   return { text, params: statement.params }
+}
+
+/** The lock the locked path takes first: the one the write would take, or a read's. */
+export function lockStatement(table: ObjectRef, mode: 'access share' | 'row exclusive'): RecordStatement {
+  return { text: `lock table only ${quoteTable(table)} in ${mode} mode`, params: [] }
 }

@@ -18,6 +18,7 @@ import {
   customerForm,
   customerSource,
   DATE,
+  described,
   edited,
   fieldOf,
   INT64,
@@ -158,7 +159,7 @@ describe('planRead', () => {
     const bindings = orderForm(STAMPED).bindings
     expect(bindings.operations.update).toBe(true)
     expect(planRead(STAMPED, bindings, ORDER_POLICY, CLERK, 'k1:2026')).toMatchObject({ ok: false, code: 'operation-unavailable', message: expect.stringContaining('no settled spelling') as unknown as string })
-    expect(planUpdate(STAMPED, bindings, ORDER_POLICY, CLERK, 'k1:2026', '1', { notes: 'x' })).toMatchObject({ ok: false, code: 'operation-unavailable' })
+    expect(planUpdate(STAMPED, bindings, ORDER_POLICY, CLERK, 'k1:2026', '1', { notes: 'x' }, undefined, described(STAMPED, bindings))).toMatchObject({ ok: false, code: 'operation-unavailable' })
   })
 
   // The fingerprint covers the snapshot and not the bindings, so an edited
@@ -308,7 +309,7 @@ describe('planRead', () => {
     const asField = edited(PG_ORDER, (draft) => {
       if (draft.concurrency !== null) draft.concurrency.column = 'tenant_id'
     })
-    expect(planUpdate(PG, asField, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({
+    expect(planUpdate(PG, asField, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(PG, asField))).toMatchObject({
       ok: false,
       code: 'invalid-bindings',
       message: expect.stringContaining('tenant_id cannot be a version-column: a field is bound to it') as unknown as string,

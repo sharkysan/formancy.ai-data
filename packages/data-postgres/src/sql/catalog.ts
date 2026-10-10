@@ -20,7 +20,7 @@
  */
 
 /** The operators the adapter compares, computes and searches with. */
-type Operator = '=' | '>=' | '<=' | '%' | '+' | '~~*'
+type Operator = '=' | '>' | '>=' | '<=' | '%' | '+' | '~~*'
 
 /**
  * An operator in pg_catalog: `a operator(pg_catalog.=) b`.

@@ -117,6 +117,29 @@ existed would be documented and inert.
   commit, on both engines, and fails if the write crosses to the database a
   second time.
 
+  Every record request, and opening a form, is decided over the form's
+  table as the catalog describes it then
+  ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)),
+  with drift review's own rules, after the policy -- an actor it refuses
+  reaches no statement. A read and an update by an actor who may read take
+  the description from the read they make anyway; opening a form, a create,
+  and an update by an actor who may not read the record, or whose read
+  failed, describe the table in one statement, inside the write's sending.
+  What the description stops is 409 `drift`, with a sentence that says an
+  administrator must review the form and names no column: a read whose form
+  can no longer show its records faithfully -- its values never leave the
+  server -- and a write the form cannot make safely, with no insert, update
+  or membership check sent. The log says which changes, by kind and the
+  fields they affect. `GET /v1/forms/:id` lists only the operations the
+  database still allows, is 409 `drift` when the form cannot be read or
+  leaves the person nothing, and asks the database, so an unreachable one is
+  503. A write the adapter refuses because the table moved since its
+  description is 409 `schema-changed`, and nothing was written. Lookups are
+  searched and resolved whatever drift says. `routes/runtime.test.ts` holds
+  the order and the counts over fake ports, and
+  `routes/runtime-drift.integration.test.ts` every change of `DRIFTING`
+  (`@formancy/data-fixtures`) on both engines.
+
   An update reads the record first and removes the echo it can prove
   ([0022](../../docs/decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)):
   a field the actor may not write, equal to the record as read; and,

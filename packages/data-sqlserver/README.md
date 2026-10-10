@@ -214,10 +214,38 @@ import { createSqlServerRecords } from '@formancy/data-sqlserver'
 
 const records = createSqlServerRecords(pool)
 const read = await records.read({ target, key, columns, filters })
-// { ok: true, values: { id: '9007199254740993', amount: '99999999999999.9999', … }, version: '00000000000007d1' }
-const saved = await records.update({ target, key, set, expectedVersion: read.version, filters, returning })
-// or { ok: false, code: 'stale' | 'not-found' | 'unique-violation' | …, message }
+// { ok: true, described: { kind, columns, keys…, definition }, record: { values: { id: '9007199254740993', … }, version: '00000000000007d1' } }
+const saved = await records.update({ target, key, set, expectedVersion: read.record.version, filters, returning, definition: read.described.definition })
+// or { ok: false, code: 'stale' | 'not-found' | 'schema-changed' | 'unique-violation' | …, message }
 ```
+
+- **Every write holds the table to the definition it was decided over**
+  ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)).
+  `describe(table)` reads the root's definition in one statement, and a read
+  returns it from the statement that read the record, which holds a
+  schema-stability lock on the table while it runs. The facts are one FOR
+  JSON text read by discovery's own queries for the object's kind, its
+  column definitions, its keys and its foreign keys, without access or
+  comment; the definition is their HASHBYTES SHA-256. The write batch checks
+  it after its statement, while its locks keep an ALTER out, and again in
+  CATCH after the rollback, so a statement that failed against a moved table
+  -- 245 for `'many'` into a column retyped to int -- is answered as the
+  move: 51706, `schema-changed`, and the batch rolled the write back, its
+  triggers' work included. CATCH asks only while the transaction is still
+  the batch's own: one a trigger ended is `unknown-outcome` whatever the
+  table did, because the trigger may have committed the write (0031). The
+  facts depend on the account, which the catalog filters by permission: an
+  account without VIEW DEFINITION reads a default's definition as NULL, and
+  the definition suite holds that its definition moves exactly when the
+  owner's does. Measured on 2026-10-10 outside the suites, on one shared
+  machine: 1.4 ms of CPU for a describe, 1.7 to 2.2 ms for a read where the
+  read without the description took 0.1 ms, and 2.1 to 2.6 ms for a write
+  where its batch took 0.66 to 0.77 ms. Masking is not among the facts:
+  a column masked after publication reads as its mask to an account
+  without UNMASK, and nothing compares it. A text the client receives cut by the
+  connection's TEXTSIZE is `unavailable`, never parsed; an account the
+  catalog hides the table from cannot have it described, and is
+  `schema-changed`.
 
 - **Values leave as text the server produced**, exactly what
   `codecFor(column).parse` returns: decimals padded to their scale (money to
@@ -302,8 +330,12 @@ every column `OUTPUT` names, refusing an INSERT-only grant with 229. A grant
 it lacks is `permission-denied` for a record and a thrown error for a
 lookup. A row a security policy's block predicate refuses (33504) is
 `permission-denied` too, as PostgreSQL's row-level security refusal is
-there. An account denied `VIEW DEFINITION` on a table it writes is refused
-the write, because whether a trigger decides it cannot be seen.
+there. An account denied `VIEW DEFINITION` on a table is refused every
+request of a form over it, reads included: the catalog does not show it the
+table, so the table cannot be described, and a write decided over another
+account's description finds the table's facts NULL and is refused as a
+moved definition, so whether a trigger decides it never has to be seen
+([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)).
 
 ## What the spike found about the driver
 

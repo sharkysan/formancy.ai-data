@@ -1,6 +1,6 @@
 # 0030 — Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for
 
-- **Status:** accepted; narrowed by [0033](0033-the-administrator-plane-is-audited.md): a publish and a restore are audited; narrowed by [0039](0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md): the server refuses a publish whose policy grants on a reassigned key unless the publish confirms it, which the studio does for each key kept; narrowed by [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md): a read also holds the form and base to the spec version the generator writes, so a release that moves it must keep the old one readable
+- **Status:** accepted; narrowed by [0033](0033-the-administrator-plane-is-audited.md): a publish and a restore are audited; narrowed by [0039](0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md): the server refuses a publish whose policy grants on a reassigned key unless the publish confirms it, which the studio does for each key kept; narrowed by [0041](0041-the-runtime-refuses-what-drift-blocks.md): its "Not done here" on runtime drift is done for the form's own table; narrowed by [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md): a read also holds the form and base to the spec version the generator writes, so a release that moves it must keep the old one readable
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ApiValue, MetadataSnapshot, ObjectRef, RecordColumn, RecordConcurrency, RecordOutcome, RecordTarget, RecordValue } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
 import type { SqlServerFixture, TcpHop } from '@formancy/data-fixtures'
-import { answerBytes, startSqlServerFixture, startTcpHop } from '@formancy/data-fixtures'
+import { answerBytes, defined, startSqlServerFixture, startTcpHop } from '@formancy/data-fixtures'
 import { createSqlServerRecords, discoverSqlServer } from './index.js'
 
 /**
@@ -175,7 +175,7 @@ describe('an answer lost after the write committed', () => {
       const bytes = answerBytes('sqlserver', notes)
       const sent = hop.countSent(bytes)
       const lost = hop.swallowAnswersFrom(bytes)
-      const pending = createSqlServerRecords(pool).insert(orderInsert(notes))
+      const pending = defined(createSqlServerRecords(pool)).insert(orderInsert(notes))
       await within(lost.matched, 'the marker never appeared in an answer')
       await until(async () => (await ordersWith(notes)) === 1, 'the insert never became visible')
       lost.cut()
@@ -192,7 +192,7 @@ describe('an answer lost after the write committed', () => {
   // moved past what was sent, which is why saving again with that version is
   // stale rather than a second write (0015, 0031).
   test('an update is unknown-outcome, its change stored and its rowversion moved past the one sent', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const created = (await records.insert(orderInsert(markerText()))) as RecordOutcome & { ok: true }
     expect(created.ok).toBe(true)
     const id = created.values.id as string
@@ -203,7 +203,7 @@ describe('an answer lost after the write committed', () => {
       const bytes = answerBytes('sqlserver', notes)
       const sent = hop.countSent(bytes)
       const lost = hop.swallowAnswersFrom(bytes)
-      const pending = createSqlServerRecords(pool).update({
+      const pending = defined(createSqlServerRecords(pool)).update({
         target: orderTarget(),
         key: [valueOf(ORDER, 'id', id)],
         set: [valueOf(ORDER, 'notes', notes)],
@@ -241,7 +241,7 @@ describe('an answer lost after the write committed', () => {
       const bytes = answerBytes('sqlserver', notes)
       const sent = hop.countSent(bytes)
       const lost = hop.swallowAnswersFrom(bytes)
-      const pending = createSqlServerRecords(pool).insert(orderInsert(notes))
+      const pending = defined(createSqlServerRecords(pool)).insert(orderInsert(notes))
       await within(lost.matched, 'the marker never appeared in an answer')
       await until(async () => (await ordersWith(notes)) === 1, 'the insert never became visible')
       expect(await within(pending, 'the request never timed out')).toMatchObject({ ok: false, code: 'unknown-outcome' })
@@ -272,7 +272,7 @@ describe('a socket cut while the write waits', () => {
         .query<{ id: number; login: string }>('select @@spid as id, convert(nvarchar(30), login_time, 126) as login from sys.dm_exec_sessions where session_id = @@spid')
       const { id, login } = session.recordset[0] ?? { id: 0, login: '' }
       const sent = hop.countSent(answerBytes('sqlserver', name))
-      const pending = createSqlServerRecords(pool).insert({
+      const pending = defined(createSqlServerRecords(pool)).insert({
         target: { table: COUNTRY, identity: [columnOf(COUNTRY, 'id')], concurrency: null },
         values: [valueOf(COUNTRY, 'iso_code', 'QX'), valueOf(COUNTRY, 'name', name)],
         returning: [],

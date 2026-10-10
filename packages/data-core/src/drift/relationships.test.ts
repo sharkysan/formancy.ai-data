@@ -374,6 +374,7 @@ describe('diffSnapshots: constraints the form does not rest on', () => {
       object(objects, 'customer').columns.push(col('segment', 'nvarchar(20)', text(20), { ordinal: 5 }))
       remove(objects, 'customer_summary')
     })
-    expect(report).toEqual({ changes: [], blocking: false, writable: { create: true, update: true } })
+    const everything = { readable: true, writable: { create: true, update: true } }
+    expect(report).toEqual({ changes: [], blocking: false, ...everything, runtime: everything })
   })
 })

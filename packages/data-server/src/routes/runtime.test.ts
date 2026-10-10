@@ -1,14 +1,17 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createSnapshot, generateForm } from '@formancy/data-core'
+import { createSnapshot, describedOf, generateForm } from '@formancy/data-core'
 import type {
   ColumnMeta,
   DatabaseAdapter,
+  Described,
+  DescribedTable,
   FormPolicy,
   InsertRequest,
   LookupAdapter,
   NormalizedType,
+  ObjectRef,
   RecordAdapter,
   RecordOutcome,
   UpdateRequest,
@@ -79,31 +82,65 @@ const COUNTRY_POLICY: FormPolicy = {
   lookups: {},
 }
 
+/** A customer form an `editor` may update and not read: the update describes the table in a statement of its own (0041). */
+const BLIND_POLICY: FormPolicy = { ...POLICY, operations: { ...POLICY.operations, update: ['clerk', 'editor'] }, fields: { ...POLICY.fields, name: { read: ['clerk'], write: ['clerk', 'editor'] } } }
+
 const verifyIdentity: IdentityVerifier = async (token) =>
   token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '1' } } }
     : token === 'clerk-042' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '042' } } }
     : token === 'stranger' ? { ok: true, identity: { actor: { id: 's', roles: [] }, attributes: { tenant: '1' } } }
+    : token === 'editor' ? { ok: true, identity: { actor: { id: 'e', roles: ['editor'] }, attributes: { tenant: '1' } } }
       : { ok: false, reason: 'bad' }
 
 const STORED = { tenant_id: '1', customer_no: '7', name: 'Muster AG', country_code: 'CH', created_at: '2026-10-08T00:00:00Z' }
 const RECORD = 'k1:1,7'
 const VERSION = '00000000000007d1'
 
+/** The definition the fake description carries: what every write the port receives must carry (0041). */
+const DEFINITION = 'the definition the fake catalog described'
+
+/** A table as the fake catalog describes it: as the published snapshot does, unless a case changes it. */
+const describedAs = (table: ObjectRef, edit: (columns: DescribedTable['columns']) => void = () => {}): DescribedTable => {
+  const found = describedOf(SNAPSHOT, table)
+  if (found === undefined) throw new Error(`the snapshot has no ${table.name}`)
+  const columns = found.columns.map((column) => ({ ...column }))
+  edit(columns)
+  return { ...found, columns, definition: DEFINITION }
+}
+
+/** The customer's name narrowed to 50: every write of the form stops, and its records still read faithfully. */
+const NARROWED = describedAs(ref('customer'), (columns) => Object.assign(columns.find((column) => column.name === 'name') as object, { type: { kind: 'text', maxLength: 50, lengthUnit: 'utf16-code-units', fixedLength: false } }))
+/** The customer's name retyped to an integer: the form can no longer show its records faithfully. */
+const RETYPED = describedAs(ref('customer'), (columns) => Object.assign(columns.find((column) => column.name === 'name') as object, { type: INT32, databaseType: 'int' }))
+
 /** What the fake ports were asked, and what they answer. Each test sets what it needs. */
-let calls: { inserts: InsertRequest[]; updates: UpdateRequest[]; rejects: string[][]; lookups: number }
+let calls: { inserts: InsertRequest[]; updates: UpdateRequest[]; rejects: string[][]; lookups: number; describes: number; reads: number }
 let writeOutcome: RecordOutcome
 /** What a fake insert waits for before it answers: settled, unless a case holds it. */
 let insertGate: Promise<void>
 /** What the fake read answers; undefined is the stored customer. */
 let readOutcome: RecordOutcome | undefined
+/** What the fake catalog says of the table, to `describe` and beside a read; undefined is the published snapshot's. */
+let catalog: Described | undefined
 let rejected: string[]
 let rejectsFails: boolean
 let root: string
 let app: FastifyInstance
 
 function registry(): ConnectionRegistry {
+  const description = (table: ObjectRef): Described => catalog ?? { ok: true, described: describedAs(table) }
   const records: RecordAdapter = {
-    read: async () => readOutcome ?? { ok: true, values: { ...STORED }, version: VERSION },
+    describe: async (table) => {
+      calls.describes += 1
+      return description(table)
+    },
+    read: async (request) => {
+      calls.reads += 1
+      const outcome = readOutcome ?? { ok: true, values: { ...STORED }, version: VERSION }
+      if (!outcome.ok) return outcome
+      const described = description(request.target.table)
+      return described.ok ? { ok: true, described: described.described, record: { values: outcome.values, version: outcome.version } } : described
+    },
     insert: async (request) => {
       calls.inserts.push(request)
       await insertGate
@@ -134,10 +171,11 @@ function registry(): ConnectionRegistry {
 }
 
 beforeEach(async () => {
-  calls = { inserts: [], updates: [], rejects: [], lookups: 0 }
+  calls = { inserts: [], updates: [], rejects: [], lookups: 0, describes: 0, reads: 0 }
   writeOutcome = { ok: true, values: { ...STORED }, version: VERSION }
   insertGate = Promise.resolve()
   readOutcome = undefined
+  catalog = undefined
   rejected = []
   rejectsFails = false
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-'))
@@ -157,6 +195,7 @@ beforeEach(async () => {
   // A country, whose key the database numbers: a create names no key of its own.
   const country = generateForm(SNAPSHOT, { connection: 'erp', root: ref('country'), formId: 'country', title: 'Country', lookups: [] })
   await store.publish('country', null, { ...bundle, form: country.form, bindings: country.bindings, policy: COUNTRY_POLICY })
+  await store.publish('blind', null, { ...bundle, policy: BLIND_POLICY })
   app = await createDataServer({ verifyIdentity, runtime: { registry: registry(), store } })
 })
 
@@ -636,5 +675,134 @@ describe('the operational audit trail', () => {
       throw new Error('disk full')
     })
     expect((await server.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: as('clerk'), payload: { record: RECORD } })).statusCode).toBe(200)
+  })
+})
+
+describe('the database as each request finds it (0041)', () => {
+  const UPDATE = { record: RECORD, version: VERSION, answers: { name: 'Neuer Name' } }
+
+  // An actor the policy refuses learns nothing of the database and costs it
+  // nothing: the policy is asked before any statement, on every route.
+  test('an actor the policy refuses reaches no statement', async () => {
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('stranger') })).statusCode).toBe(403)
+    expect((await post('/v1/forms/customer/records/read', { record: RECORD }, 'stranger')).statusCode).toBe(403)
+    expect((await post('/v1/forms/customer/records/create', { answers: NEW }, 'stranger')).statusCode).toBe(403)
+    expect((await post('/v1/forms/customer/records/update', UPDATE, 'stranger')).statusCode).toBe(403)
+    expect([calls.describes, calls.reads, calls.inserts.length, calls.updates.length]).toEqual([0, 0, 0, 0])
+  })
+
+  // The read carries the description: one statement, never a second. A form
+  // it can no longer show is refused, and the values the read returned
+  // never reach the body.
+  test('a read is one statement and is decided over its own description; refused, it shows no value', async () => {
+    expect((await post('/v1/forms/customer/records/read', { record: RECORD })).statusCode).toBe(200)
+    expect([calls.reads, calls.describes]).toEqual([1, 0])
+    catalog = { ok: true, described: RETYPED }
+    const refused = await post('/v1/forms/customer/records/read', { record: RECORD })
+    expect(refused.statusCode).toBe(409)
+    expect(refused.json()).toEqual({ code: 'drift', message: expect.stringMatching(/can no longer show its records faithfully/) })
+    expect(refused.body).not.toContain('Muster AG')
+    expect(refused.body).not.toMatch(/name|int/)
+    // A read the database refused because a column it names is gone carries
+    // no description: the table is described once more, and the read is
+    // answered as drift when that is what stops it.
+    readOutcome = { ok: false, code: 'schema-changed', column: 'name', message: 'column name does not exist' }
+    expect((await post('/v1/forms/customer/records/read', { record: RECORD })).json()).toMatchObject({ code: 'drift' })
+    expect([calls.reads, calls.describes]).toEqual([3, 1])
+    catalog = undefined
+    expect((await post('/v1/forms/customer/records/read', { record: RECORD })).json()).toMatchObject({ code: 'schema-changed' })
+  })
+
+  // An update by an actor who may read is decided over its echo read's
+  // description: two statements at most, never a describe. Stopped, the read
+  // is the only statement sent.
+  test('an update by a reader reads, and updates with the description’s definition; a stopped one only reads', async () => {
+    expect((await post('/v1/forms/customer/records/update', UPDATE)).statusCode).toBe(200)
+    expect([calls.reads, calls.describes, calls.updates.length]).toEqual([1, 0, 1])
+    expect(calls.updates[0]?.definition).toBe(DEFINITION)
+    catalog = { ok: true, described: NARROWED }
+    const stopped = await post('/v1/forms/customer/records/update', UPDATE)
+    expect(stopped.statusCode).toBe(409)
+    expect(stopped.json()).toEqual({ code: 'drift', message: expect.stringMatching(/cannot save safely\. Nothing was saved/) })
+    expect([calls.reads, calls.describes, calls.updates.length]).toEqual([2, 0, 1])
+  })
+
+  // Without a read to carry it, the description is a statement of its own:
+  // for an actor who may update and not read, and after a read that failed.
+  test('an update by a non-reader, or after a failed read, describes the table once', async () => {
+    expect((await post('/v1/forms/blind/records/update', UPDATE, 'editor')).statusCode).toBe(200)
+    expect([calls.reads, calls.describes]).toEqual([0, 1])
+    readOutcome = { ok: false, code: 'unavailable', message: 'a lock it could not get in time' }
+    expect((await post('/v1/forms/customer/records/update', UPDATE)).statusCode).toBe(200)
+    expect([calls.reads, calls.describes]).toEqual([1, 2])
+    expect(calls.updates.map((update) => update.definition)).toEqual([DEFINITION, DEFINITION])
+  })
+
+  // The description is read inside the sending: a resend asks nothing,
+  // its description included. Outside it, the repeat would describe again.
+  test('a create describes once, inside the sending; a repeated write id asks nothing, on create and update', async () => {
+    const id = { ...as('clerk'), 'formancy-write-id': '0123456789abcdef0123456789abcdef' }
+    for (let n = 0; n < 2; n += 1) await app.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: id, payload: { answers: NEW } })
+    expect([calls.describes, calls.inserts.length]).toEqual([1, 1])
+    expect(calls.inserts[0]?.definition).toBe(DEFINITION)
+    const other = { ...as('clerk'), 'formancy-write-id': 'fedcba9876543210fedcba9876543210' }
+    for (let n = 0; n < 2; n += 1) await app.inject({ method: 'POST', url: '/v1/forms/customer/records/update', headers: other, payload: UPDATE })
+    expect([calls.reads, calls.updates.length]).toEqual([1, 1])
+  })
+
+  // A create the description stops sends nothing past it: no membership
+  // check, no insert.
+  test('a stopped create sends nothing past its description', async () => {
+    catalog = { ok: true, described: NARROWED }
+    const stopped = await post('/v1/forms/customer/records/create', { answers: NEW })
+    expect(stopped.statusCode).toBe(409)
+    expect(stopped.json()).toMatchObject({ code: 'drift' })
+    expect([calls.describes, calls.rejects.length, calls.inserts.length]).toEqual([1, 0, 0])
+  })
+
+  // A description that cannot be read decides nothing: the database's
+  // answer is the request's, and nothing else is asked.
+  test('a description that cannot be read is answered as the database answered it', async () => {
+    catalog = { ok: false, code: 'unavailable', message: 'no connection free' }
+    expect((await post('/v1/forms/customer/records/create', { answers: NEW })).statusCode).toBe(503)
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).statusCode).toBe(503)
+    catalog = { ok: false, code: 'schema-changed', message: 'not described' }
+    expect((await post('/v1/forms/customer/records/create', { answers: NEW })).json()).toMatchObject({ code: 'schema-changed' })
+    expect((await post('/v1/forms/customer/records/update', UPDATE)).statusCode).toBe(409)
+    expect([calls.inserts.length, calls.updates.length, calls.rejects.length]).toEqual([0, 0, 0])
+  })
+
+  // The adapter's own refusal of a moved definition is the database saying
+  // the table changed under the write: 409 schema-changed, as before.
+  test('a write the adapter refuses as a moved definition is 409 schema-changed', async () => {
+    writeOutcome = { ok: false, code: 'schema-changed', message: "The table's definition is not the one this write was decided over; nothing was written." }
+    const moved = await post('/v1/forms/customer/records/update', UPDATE)
+    expect(moved.statusCode).toBe(409)
+    expect(moved.json()).toEqual({ code: 'schema-changed', message: 'The database changed since this form was published.' })
+  })
+
+  // Opening the form offers what the runtime allows now. Ignoring the
+  // verdict, the host would offer a save the server then refuses.
+  test('opening a form offers only what the database still allows, and is refused when it can show nothing or leaves nothing', async () => {
+    catalog = { ok: true, described: NARROWED }
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).json().operations).toEqual(['read'])
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/blind', headers: as('editor') })).json()).toEqual({ code: 'drift', message: expect.stringMatching(/nothing this form offers you can be done safely/) })
+    catalog = { ok: true, described: RETYPED }
+    const unreadable = await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })
+    expect(unreadable.statusCode).toBe(409)
+    expect(unreadable.json()).toEqual({ code: 'drift', message: expect.stringMatching(/can no longer show its records faithfully/) })
+  })
+
+  // An operator learns which changes refused a request, by kind and field,
+  // from the log; the person is told only that an administrator must review.
+  test('a drift refusal is said once in the log, by kind, and never with a value', async () => {
+    const lines: Array<Record<string, unknown>> = []
+    const store = createFileConfigurationStore(root)
+    const logged = await createDataServer({ verifyIdentity, logger: { stream: { write: (line: string) => void lines.push(JSON.parse(line) as Record<string, unknown>) } }, runtime: { registry: registry(), store } })
+    catalog = { ok: true, described: NARROWED }
+    await logged.inject({ method: 'POST', url: '/v1/forms/customer/records/update', headers: as('clerk'), payload: UPDATE })
+    const refused = lines.filter((line) => line['msg'] === 'refused: the database no longer fits this form as published')
+    expect(refused).toEqual([expect.objectContaining({ form: 'customer', version: 1, operation: 'update', changes: [{ kind: 'column-tightened', affects: ['name'] }] })])
+    expect(JSON.stringify(lines)).not.toContain('Neuer Name')
   })
 })

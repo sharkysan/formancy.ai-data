@@ -26,6 +26,24 @@ function operationState(offered: boolean | undefined, writable: boolean): string
   return 'blocked by the changes below'
 }
 
+/** A list of words as a sentence says it: "read", "read and create", "read, create and update". */
+function spoken(words: readonly string[]): string {
+  return words.length <= 1 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words.at(-1) as string}`
+}
+
+/**
+ * The operations review blocks and the server still allows (0041): the
+ * server compares only the form's own table when a request arrives, so what
+ * blocks them is a change only review sees. Empty when the two agree.
+ */
+function stillAllowedByServer(drift: Drift, offered: { create: boolean; update: boolean } | undefined): string[] {
+  const runtime = drift.runtime
+  return [
+    ...(!drift.readable && runtime.readable ? ['read'] : []),
+    ...(['create', 'update'] as const).filter((operation) => offered?.[operation] !== false && !drift.writable[operation] && runtime.writable[operation]),
+  ]
+}
+
 /**
  * A check's answer. A failure names the form when it has versions to offer
  * anyway: a newest version edited on disk is not served, and restoring an
@@ -149,6 +167,7 @@ function reported(drift: Drift, regenerated: Regenerated | null): Drift {
 function DriftReportView({ drift, published, formId }: { drift: Drift; published: Published | null; formId: string }): ReactElement {
   const blocking = drift.changes.filter((change) => change.severity === 'blocking').length
   const offered = published?.bundle.bindings.operations
+  const allowedByServer = stillAllowedByServer(drift, offered)
   return (
     <section className="drift" aria-labelledby="drift-heading">
       <h3 id="drift-heading">
@@ -161,9 +180,16 @@ function DriftReportView({ drift, published, formId }: { drift: Drift; published
       </p>
       <h4 id="still-heading">What the published form may still do</h4>
       <ul aria-labelledby="still-heading" className="still">
+        <li>Read: {drift.readable ? 'still allowed' : 'blocked by the changes below'}</li>
         <li>Create: {operationState(offered?.create, drift.writable.create)}</li>
         <li>Update: {operationState(offered?.update, drift.writable.update)}</li>
         <li>{drift.blocking ? 'As a whole: not to be used as published until the blocking changes are reviewed.' : 'As a whole: usable as published.'}</li>
+        {allowedByServer.length === 0 ? null : (
+          <li>
+            The server still allows {spoken(allowedByServer)}: what blocks {allowedByServer.length === 1 ? 'it' : 'them'} is a change it does not compare when a request arrives (a
+            lookup&rsquo;s table, privileges, row security or the account). The database still refuses what the account may not do. Review the form and publish it again.
+          </li>
+        )}
       </ul>
       {SEVERITIES.map(({ severity, heading, blocks }) => {
         const changes = drift.changes.filter((change) => change.severity === severity)

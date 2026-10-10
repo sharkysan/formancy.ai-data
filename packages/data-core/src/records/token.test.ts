@@ -5,7 +5,7 @@ import type { NormalizedType } from '../metadata.js'
 import type { FormPolicy } from '../policy/types.js'
 import { toFormAnswers } from './answers.js'
 import { planCreate } from './plan.js'
-import { CLERK, CLERK_RW, CUSTOMER_POLICY, customerSource, sales, snapshot, text } from './test-support.js'
+import { CLERK, CLERK_RW, CUSTOMER_POLICY, customerSource, described, sales, snapshot, text } from './test-support.js'
 import { decodeRecordKey, intendedRecord, recordToken } from './token.js'
 import type { InsertRequest, RecordColumn, RecordValue } from './types.js'
 
@@ -128,6 +128,7 @@ describe('intendedRecord', () => {
     target: { table: { schema: 'sales', name: 'customer' }, identity, concurrency: null },
     values,
     returning: [],
+    definition: 'any',
   })
   const tenant = { name: 'tenant_id', type: INT32, value: '1' }
   const number = { name: 'customer_no', type: INT32, value: '8' }
@@ -166,7 +167,7 @@ describe('intendedRecord', () => {
     const customer = generateForm(customers, { connection: 'erp', root: sales('customer'), formId: 'c', title: 'Customer', lookups: [], pinned: ['tenant_id'] })
     const { country: _country, ...fields } = CUSTOMER_POLICY.fields
     const customerPolicy: FormPolicy = { ...CUSTOMER_POLICY, fields: { ...fields, country_code: CLERK_RW }, lookups: {} }
-    expectSameToken(planCreate(customers, customer.bindings, customerPolicy, CLERK, { customer_no: 8, name: 'Neu GmbH' }), customer.bindings, 'k1:1,8')
+    expectSameToken(planCreate(customers, customer.bindings, customerPolicy, CLERK, { customer_no: 8, name: 'Neu GmbH' }, described(customers, customer.bindings)), customer.bindings, 'k1:1,8')
 
     const coded = snapshot('postgres', (objects) => {
       const country = objects.find((object) => object.ref.name === 'country')
@@ -183,7 +184,7 @@ describe('intendedRecord', () => {
       lookups: {},
     }
     // One letter in a char(2): stored padded, read back without the pad on both engines.
-    expectSameToken(planCreate(coded, country.bindings, countryPolicy, CLERK, { iso_code: 'C', name: 'Cee' }), country.bindings, 'k1:C')
+    expectSameToken(planCreate(coded, country.bindings, countryPolicy, CLERK, { iso_code: 'C', name: 'Cee' }, described(coded, country.bindings)), country.bindings, 'k1:C')
   })
 })
 

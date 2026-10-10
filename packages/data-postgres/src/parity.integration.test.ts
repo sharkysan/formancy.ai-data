@@ -16,7 +16,7 @@ import type {
   UpdateRequest,
 } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { covers, DISPLAY_PARITY, displayCase, FILTER_PARITY, filterCase, PARITY_SCOPE, REFUSAL_PARITY, refusalCase, startPostgresFixture, TEMPORAL_PARITY, temporalCase } from '@formancy/data-fixtures'
+import { covers, defined, DISPLAY_PARITY, displayCase, FILTER_PARITY, filterCase, PARITY_SCOPE, REFUSAL_PARITY, refusalCase, startPostgresFixture, TEMPORAL_PARITY, temporalCase } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -132,7 +132,7 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
         expect(scoping).toMatchObject({ ok: false, code: entry.refused })
         const forged = { kind: 'restricted', equal: [{ column: entry.column, type: col('tenant_item', entry.column).type, value: entry.value }] } as unknown as RowFilters
         await expect(createPostgresLookups(owner).search(items(), FIRST_PAGE, forged)).rejects.toThrow(/not spelled as its column holds it/)
-        const read = createPostgresRecords(owner).read({ target: tenantItem(), key: [val('tenant_item', 'tenant_code', 'acme'), val('tenant_item', 'item_no', '1')], columns: [], filters: forged })
+        const read = defined(createPostgresRecords(owner)).read({ target: tenantItem(), key: [val('tenant_item', 'tenant_code', 'acme'), val('tenant_item', 'item_no', '1')], columns: [], filters: forged })
         await expect(read).rejects.toThrow(/not spelled as its column holds it/)
       })
       continue
@@ -156,7 +156,7 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
       expect(new Set((await lookups.resolve(items(), named, filters)).map((row) => row.token))).toEqual(expected)
       expect(new Set(await lookups.rejects(items(), named, filters))).toEqual(new Set(named.filter((token) => !expected.has(token))))
 
-      const records = createPostgresRecords(owner)
+      const records = defined(createPostgresRecords(owner))
       const before = await namedRows()
       for (const [tenant, item] of NAMED) {
         const key = [val('tenant_item', 'tenant_code', tenant), val('tenant_item', 'item_no', item)]
@@ -280,7 +280,7 @@ describe('an unconstrained numeric, which only PostgreSQL has', () => {
     const target: RecordTarget = { table: amount.ref, identity: [{ name: 'id', type: idType }], concurrency: null }
     const found: string[] = []
     for (const id of ['1', '2', '3']) {
-      const read = await createPostgresRecords(owner).read({ target, key: [{ name: 'id', type: idType, value: id }], columns: [], filters: scoping.filters })
+      const read = await defined(createPostgresRecords(owner)).read({ target, key: [{ name: 'id', type: idType, value: id }], columns: [], filters: scoping.filters })
       if (read.ok) found.push(id)
     }
     expect(found).toEqual(['1'])
@@ -372,7 +372,7 @@ describe('an instant and a time are read cut to the shape (TEMPORAL_PARITY)', ()
         columns: [col('display_kinds', 'tm'), col('display_kinds', 'ts')],
         filters: EVERY_ROW,
       }
-      for (const sql of [owner, configured]) expect(await createPostgresRecords(sql).read(request)).toEqual({ ok: true, values: TEMPORAL_PARITY, version: null })
+      for (const sql of [owner, configured]) expect(await defined(createPostgresRecords(sql)).read(request)).toEqual({ ok: true, values: TEMPORAL_PARITY, version: null })
     } finally {
       await configured.end()
     }
@@ -382,7 +382,7 @@ describe('an instant and a time are read cut to the shape (TEMPORAL_PARITY)', ()
 describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
   const guarded = () => versioned('guarded', ['id'])
   const insertGuarded = (sql: Sql, id: string, note: string) =>
-    createPostgresRecords(sql).insert({ target: guarded(), values: [val('guarded', 'id', id), val('guarded', 'note', note)], returning: [col('guarded', 'id')] })
+    defined(createPostgresRecords(sql)).insert({ target: guarded(), values: [val('guarded', 'id', id), val('guarded', 'note', note)], returning: [col('guarded', 'id')] })
   const guardedRows = async (id: number) => [...(await owner`select note, version from parity.guarded where id = ${id}`)]
 
   // A trigger's RAISE was `check-violation`, which claims a constraint the
@@ -392,7 +392,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
     expect(failed(await insertGuarded(owner, '1', 'refuse')).code).toBe(REFUSAL_PARITY.guardedInsert)
     expect(await guardedRows(1)).toEqual([])
     await owner`insert into parity.guarded (id, note) values (2, 'fine')`
-    const update = await createPostgresRecords(owner).update({
+    const update = await defined(createPostgresRecords(owner)).update({
       target: guarded(),
       key: [val('guarded', 'id', '2')],
       set: [val('guarded', 'note', 'refuse')],
@@ -419,7 +419,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
   // INSERT 0 0 with no error: taken as success it was a save that never
   // happened; as `check-violation` it claimed a constraint.
   test('an insert a trigger declines without an error is refused, and nothing is written', covers('postgres', refusalCase('declinedInsert')), async () => {
-    const outcome = await createPostgresRecords(owner).insert({
+    const outcome = await defined(createPostgresRecords(owner)).insert({
       target: { table: { schema: 'parity', name: 'declined' }, identity: [col('declined', 'id')], concurrency: null },
       values: [val('declined', 'id', '1'), val('declined', 'note', 'never written')],
       returning: [col('declined', 'id')],
@@ -431,7 +431,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
   // 428C9: the column has become generated since the bindings were made,
   // which is drift, as SQL Server's 544 is.
   test('an insert naming a generated identity is schema-changed', covers('postgres', refusalCase('generatedInsert')), async () => {
-    const outcome = await createPostgresRecords(owner).insert({
+    const outcome = await defined(createPostgresRecords(owner)).insert({
       target: { table: { schema: 'parity', name: 'generated' }, identity: [col('generated', 'id')], concurrency: null },
       values: [val('generated', 'id', '1'), val('generated', 'note', 'named the identity')],
       returning: [],
@@ -452,7 +452,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
     try {
       const held = await holder.begin(async (tx) => {
         await tx`select id from parity.contended where id = 2 for update`
-        const pending = createPostgresRecords(owner).update({
+        const pending = defined(createPostgresRecords(owner)).update({
           target: CONTENDED,
           key: [val('contended', 'id', '1')],
           set: [val('contended', 'note', 'the victim')],
@@ -490,7 +490,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
       await owner`insert into parity.guarded (id, note) values (5, 'locked')`
       const held = await owner.begin(async (tx) => {
         await tx`select id from parity.guarded where id = 5 for update`
-        const outcome = await createPostgresRecords(impatient).update({
+        const outcome = await defined(createPostgresRecords(impatient)).update({
           target: guarded(),
           key: [val('guarded', 'id', '5')],
           set: [val('guarded', 'note', 'waited')],

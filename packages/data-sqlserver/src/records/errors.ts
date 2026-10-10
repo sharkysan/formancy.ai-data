@@ -2,6 +2,8 @@ import type { RecordFailure, RecordFailureCode, RecordValue } from '@formancy/da
 import {
   DECIDED_BY_TRIGGER,
   DECIDED_BY_TRIGGER_MESSAGE,
+  DEFINITION_MOVED,
+  DEFINITION_MOVED_MESSAGE,
   NOT_ONE_ROW,
   NOT_ONE_ROW_MESSAGE,
   TEXT_NOT_STORED,
@@ -154,6 +156,9 @@ const ENDED_BY_TRIGGER = 'it may have committed, and it is not retried.'
  *   committed the write before beginning another. So is one a trigger ended
  *   and then raised an error in: the error is not a refusal of a write the
  *   COMMIT stored (0031).
+ * - A table whose definition moved is `schema-changed` (0041): the batch
+ *   found, after its statement or in CATCH, that the table is not the one
+ *   the write was decided over, and rolled it back.
  */
 function ownError(error: ServerError, written: readonly RecordValue[]): RecordFailure | undefined {
   if (error.number === NOT_ONE_ROW && error.message === NOT_ONE_ROW_MESSAGE) {
@@ -163,7 +168,7 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
   if (error.number === DECIDED_BY_TRIGGER && error.message === DECIDED_BY_TRIGGER_MESSAGE) {
     return failure(
       'refused',
-      'An INSTEAD OF trigger would decide what this write stores, or this account cannot see whether one does, so the adapter refused it; nothing was written.',
+      'An INSTEAD OF trigger would decide what this write stores, so the adapter refused it; nothing was written.',
     )
   }
   if (error.number === TRANSACTION_REPLACED && error.message === TRANSACTION_REPLACED_MESSAGE) {
@@ -171,6 +176,10 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
   }
   if (error.number === TRANSACTION_ENDED && error.message === TRANSACTION_ENDED_MESSAGE) {
     return failure('unknown-outcome', `A trigger ended the transaction of the write and then raised an error; ${ENDED_BY_TRIGGER}`)
+  }
+  if (error.number === DEFINITION_MOVED && error.message === DEFINITION_MOVED_MESSAGE) {
+    // The batch rolled the write back, its triggers' work with it (0041).
+    return failure('schema-changed', "The table's definition is not the one this write was decided over; nothing was written.")
   }
   const index = error.number === TEXT_NOT_STORED ? TEXT_NOT_STORED_MESSAGE.exec(error.message)?.[1] : undefined
   if (index === undefined) return undefined

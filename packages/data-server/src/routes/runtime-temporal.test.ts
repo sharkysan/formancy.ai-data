@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createSnapshot, generateForm, WRITE_ID_HEADER } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, FormPolicy, InsertRequest, LookupAdapter, NormalizedType, RecordAdapter, RecordFailure, RecordOutcome, UpdateRequest } from '@formancy/data-core'
+import { createSnapshot, describedOf, generateForm, WRITE_ID_HEADER } from '@formancy/data-core'
+import type { ColumnMeta, DatabaseAdapter, DescribedRoot, FormPolicy, InsertRequest, LookupAdapter, NormalizedType, RecordAdapter, RecordFailure, RecordOutcome, UpdateRequest } from '@formancy/data-core'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
@@ -99,10 +99,14 @@ let root: string
 let app: FastifyInstance
 
 function registry(): ConnectionRegistry {
+  // The table as the published snapshot describes it: nothing here is about drift (0041).
+  const described = { ...(describedOf(SNAPSHOT, { schema: 'sales', name: 'stamped' }) as DescribedRoot), definition: 'unchanged' }
   const records: RecordAdapter = {
+    describe: async () => ({ ok: true, described }),
     read: async () => {
       calls.reads += 1
-      return readOutcome ?? { ok: true, values: { ...STORED }, version: rowVersion }
+      const outcome = readOutcome ?? { ok: true, values: { ...STORED }, version: rowVersion }
+      return outcome.ok ? { ok: true, described, record: { values: outcome.values, version: outcome.version } } : outcome
     },
     insert: async (request) => {
       calls.inserts.push(request)

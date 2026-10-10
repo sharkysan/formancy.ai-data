@@ -1,4 +1,5 @@
 import type { ApiValue } from '../codecs/codec.js'
+import type { DriftChange } from '../drift/types.js'
 import type { LookupConfig, RowFilters } from '../lookup/types.js'
 import type { PolicyRefusalCode } from '../policy/types.js'
 import type { InsertRequest, ReadRequest, UpdateRequest } from './types.js'
@@ -10,7 +11,10 @@ import type { InsertRequest, ReadRequest, UpdateRequest } from './types.js'
  * The planner's own:
  *
  * - `drift` — the snapshot is not the one the bindings were generated from.
- *   Nothing in the bindings can be trusted to mean what it meant.
+ *   Nothing in the bindings can be trusted to mean what it meant. Or the
+ *   database as it is now stops this operation for the form as published
+ *   (0041): its table, as the request described it, has changed in a way
+ *   drift review's root families stop.
  * - `invalid-bindings` — bindings that do not say what their own snapshot
  *   says: a column it lacks or types differently, an identity that is not a
  *   key, a column bound twice, a concurrency column of the wrong kind, a
@@ -45,6 +49,12 @@ export interface PlanRefusal {
   code: PlanRefusalCode
   /** A sentence for a log. It names fields, columns and attributes, never a value. */
   message: string
+  /**
+   * On a `drift` refusal of the database as it is now (0041), the changes
+   * that block, for the server's log. Their messages name columns and types,
+   * so they never reach the person: the sentence above is what they are told.
+   */
+  drift?: DriftChange[]
 }
 
 /** One answer that cannot be written, by field key. The codec's code where a codec refused it. */

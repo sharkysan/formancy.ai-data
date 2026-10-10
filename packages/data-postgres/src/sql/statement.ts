@@ -1,4 +1,4 @@
-import type { Sql } from 'postgres'
+import type { Sql, TransactionSql } from 'postgres'
 
 /** One parameter's value: text the SQL casts where it stands, or NULL. */
 export type Param = string | null
@@ -51,7 +51,7 @@ export interface TextResult {
  * and rewrites every value after parsing, text included. Positional bytes
  * are beyond both. A row transform still runs, so the shape is checked.
  */
-export async function run(sql: Sql, text: string, params: readonly Param[]): Promise<TextResult> {
+export async function run(sql: Sql | TransactionSql, text: string, params: readonly Param[]): Promise<TextResult> {
   const result = await sql.unsafe(text, [...params]).raw()
   const rows = result.map((row: unknown): TextRow => {
     if (!Array.isArray(row)) throw new Error("The driver's row transform changed a raw row; this adapter reads rows by position.")

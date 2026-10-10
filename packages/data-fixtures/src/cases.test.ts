@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { READER_ACCESS, WRITER_ACCESS } from './access.js'
-import { covers, displayCase, edgeCase, filterCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase } from './cases.js'
+import { covers, displayCase, driftingCase, edgeCase, filterCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase } from './cases.js'
+import { sharedDrifting } from './drifting.js'
 import * as fixtures from './index.js'
 import { FIXTURE_MODEL } from './model.js'
 import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
@@ -28,8 +29,9 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   EDGE_VALUES: (Object.keys(EDGE_VALUES) as (keyof typeof EDGE_VALUES)[]).map(edgeCase),
   FIRST_SHIPMENT: [shipmentCase('first')],
   SECOND_SHIPMENT: [shipmentCase('second')],
+  DRIFTING: sharedDrifting().map((entry) => driftingCase(entry.name)),
   // The comparators' models, through the cases that hold an adapter to them.
-  FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted],
+  FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
   WRITER_ACCESS: [MODEL_CASES.writerAccess],
 }

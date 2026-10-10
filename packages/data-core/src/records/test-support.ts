@@ -1,10 +1,11 @@
 import type { DatabaseKind } from '../adapter.js'
+import { describedOf } from '../drift/diff.js'
 import { generateForm } from '../generate/generate.js'
 import type { FieldBinding, FormBindings, GeneratedForm } from '../generate/types.js'
 import type { ColumnAccess, ColumnMeta, DiscoveryAccount, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { createSnapshot } from '../snapshot.js'
-import type { RecordColumn, RecordValue } from './types.js'
+import type { DescribedTable, RecordColumn, RecordValue } from './types.js'
 
 /*
  * What the request planner's tests share, and nothing else uses: it is not
@@ -247,4 +248,21 @@ export const ANSWERS = {
   employee: 'k1:1',
   approved_by: 2,
   paid: 'true',
+}
+
+/**
+ * The definition every description in these suites carries, spelled so that
+ * no planner could produce it by accident: what must arrive on every request
+ * planned from that description (0041).
+ */
+export const DEFINITION = 'the definition the description was read with'
+
+/**
+ * The root as `source` describes it, as a request's `describe` would, with
+ * DEFINITION: what a planner decides over when the database is the snapshot
+ * the form was published from. A root `source` lacks is described as an empty
+ * table, which only bindings the planner refuses first can name.
+ */
+export function described(source: MetadataSnapshot, bindings: FormBindings): DescribedTable {
+  return { ...(describedOf(source, bindings.root) ?? { kind: 'table', columns: [], primaryKey: null, uniqueKeys: [], foreignKeys: [] }), definition: DEFINITION }
 }

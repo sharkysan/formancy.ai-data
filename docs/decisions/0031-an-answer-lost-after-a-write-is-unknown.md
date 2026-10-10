@@ -1,6 +1,6 @@
 # 0031 — An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here
 
-- **Status:** accepted; extended by [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md): an update's read, plan and membership checks run inside its sending, so a resend asks the database nothing
+- **Status:** accepted; extended by [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md): an update's read, plan and membership checks run inside its sending, so a resend asks the database nothing; extended by [0041](0041-the-runtime-refuses-what-drift-blocks.md): a write's description is read inside its sending, and a create's plan and membership checks moved into it
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

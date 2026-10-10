@@ -93,11 +93,25 @@ export interface DriftChange {
   message: string
 }
 
-export interface DriftReport {
+/** What may still be done with a published form: read its records, and the writes it offered less what a change stops. */
+export interface DriftVerdict {
+  /** No change breaks what the form shows: a record can still be read and shown faithfully. */
+  readable: boolean
+  writable: { create: boolean; update: boolean }
+}
+
+export interface DriftReport extends DriftVerdict {
   /** Most severe first, then by subject and kind, by codepoint, so two runs are byte-identical. */
   changes: DriftChange[]
   /** Whether any change is `blocking`. */
   blocking: boolean
-  /** What the published form may still do: what it offered, less what a change stops. */
-  writable: { create: boolean; update: boolean }
+  /**
+   * What the runtime decides about this form against the database as this
+   * report saw it (0041): the verdict of the root's kind, columns, keys and
+   * foreign keys alone, which is what a request compares. Never stricter than
+   * `readable` and `writable`; looser by what only review compares -- a
+   * lookup's table, privileges, row security and the account -- which the
+   * database still enforces where it can.
+   */
+  runtime: DriftVerdict
 }

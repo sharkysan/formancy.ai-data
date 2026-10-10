@@ -1,11 +1,12 @@
 import { expect } from 'vitest'
 import type { DatabaseKind } from '../adapter.js'
 import { generateForm } from '../generate/generate.js'
-import type { GenerationRequest } from '../generate/types.js'
+import type { FormBindings, GenerationRequest } from '../generate/types.js'
 import type { ColumnMeta, CoverageAspect, CoverageGap, CoverageSubject, DiscoveryAccount, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
 import type { FormPolicy } from '../policy/types.js'
-import { createSnapshot } from '../snapshot.js'
-import { diffSnapshots } from './diff.js'
+import { createSnapshot, findObject } from '../snapshot.js'
+import { describedOf, diffRootDefinition, diffSnapshots as review } from './diff.js'
+import type { DescribedRoot } from './diff.js'
 import type { DriftChange, DriftKind, DriftReport } from './types.js'
 
 /*
@@ -192,6 +193,57 @@ export const SUMMARY: GenerationRequest = { connection: 'erp', root: SUMMARY_REF
 
 /** The order form's fields, in its order: what a change to the whole root affects. */
 export const ORDER_FIELDS = ['id', 'customer', 'order_date', 'status', 'amount', 'notes', 'created_by', 'paid']
+
+const refKey = (ref: ObjectRef): string => `${ref.schema}\u0000${ref.name}`
+
+/**
+ * Whether `current` differs from `base` only in the root's own definition --
+ * its kind, columns, keys and foreign keys -- with the same gaps, account and
+ * scope, every other object the same, and every column the base has keeping
+ * its access and comment: what a request's description of the root holds. A
+ * lookup through the root itself is excluded, because its target is the root.
+ */
+function onlyTheRootDefinition(base: MetadataSnapshot, current: MetadataSnapshot, root: ObjectRef, targets: readonly ObjectRef[]): boolean {
+  if (base.kind !== current.kind || base.fingerprint === current.fingerprint) return false
+  if (targets.some((target) => refKey(target) === refKey(root))) return false
+  if (JSON.stringify([base.account, base.scope, base.gaps]) !== JSON.stringify([current.account, current.scope, current.gaps])) return false
+  const others = (snapshot: MetadataSnapshot) => JSON.stringify(snapshot.objects.filter((object) => refKey(object.ref) !== refKey(root)))
+  if (others(base) !== others(current)) return false
+  const was = findObject(base, root)
+  const is = findObject(current, root)
+  if (was === undefined || is === undefined) return false
+  if (was.comment !== is.comment || was.rowSecurity !== is.rowSecurity || JSON.stringify(was.checks) !== JSON.stringify(is.checks)) return false
+  return was.columns.every((column) => {
+    const now = is.columns.find((candidate) => candidate.name === column.name)
+    return now === undefined || (now.comment === column.comment && JSON.stringify(now.access) === JSON.stringify(column.access))
+  })
+}
+
+/**
+ * `diffSnapshots`, held on every call the drift suites make to what the
+ * runtime rests on (0041), so every report any of them builds is a case of
+ * both:
+ *
+ * - The runtime is never stricter than review: whatever review allows -- a
+ *   read, a create, an update -- the report's `runtime` allows. A runtime
+ *   that refused more would refuse a form review calls usable.
+ * - Where `current` differs from `base` only in the root's definition,
+ *   `diffRootDefinition` over the root as `current` describes it gives the
+ *   very report review gives: one decision, not two that agree today.
+ */
+export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings, policy: Pick<FormPolicy, 'lookups'>): DriftReport {
+  const report = review(base, current, bindings, policy)
+  const allows = (operation: 'read' | 'create' | 'update', verdict: { readable: boolean; writable: { create: boolean; update: boolean } }) =>
+    operation === 'read' ? verdict.readable : verdict.writable[operation]
+  for (const operation of ['read', 'create', 'update'] as const) {
+    expect(!allows(operation, report) || allows(operation, report.runtime), `review allows ${operation} and the runtime refuses it: ${JSON.stringify(report.changes.map((change) => change.kind))}`).toBe(true)
+  }
+  const targets = bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? [binding.target.table] : []))
+  if (onlyTheRootDefinition(base, current, bindings.root, targets)) {
+    expect(diffRootDefinition(base, describedOf(current, bindings.root) as DescribedRoot, bindings, policy)).toEqual(report)
+  }
+  return report
+}
 
 /** Publish a form from `base`, then review it against a snapshot made by `edit`. */
 export function drift(
