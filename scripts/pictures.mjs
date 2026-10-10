@@ -120,6 +120,16 @@ function run(command, args) {
   return result.status === 0
 }
 
+/** The file's text, or `undefined` when there is none: read once, with no check before it that the file could outlive. */
+function readIfPresent(path) {
+  try {
+    return readFileSync(path, 'utf8')
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return undefined
+    throw error
+  }
+}
+
 function main() {
   const scenes = readScenes()
   const options = parse(process.argv.slice(2), scenes)
@@ -127,7 +137,7 @@ function main() {
   for (const { app } of runs) {
     if (!existsSync(join(REPO, 'apps', app, 'scripts', 'pictures.mjs'))) throw new Error(`apps/${app}/scripts/pictures.mjs does not exist, so the ${app} scenes cannot be taken or checked`)
   }
-  const kept = existsSync(RECORD) ? readFileSync(RECORD, 'utf8') : undefined
+  const kept = readIfPresent(RECORD)
   const before = kept === undefined ? {} : JSON.parse(kept)
   if (fresh) {
     mkdirSync(IMAGES, { recursive: true })
