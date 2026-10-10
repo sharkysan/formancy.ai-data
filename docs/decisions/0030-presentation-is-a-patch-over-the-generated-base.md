@@ -1,6 +1,6 @@
 # 0030 — Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for
 
-- **Status:** accepted; narrowed by [0033](0033-the-administrator-plane-is-audited.md): a publish and a restore are audited
+- **Status:** accepted; narrowed by [0033](0033-the-administrator-plane-is-audited.md): a publish and a restore are audited; narrowed by [0039](0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md): the server refuses a publish whose policy grants on a reassigned key unless the publish confirms it, which the studio does for each key kept
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

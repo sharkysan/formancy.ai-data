@@ -208,10 +208,11 @@ describe('regenerating a published form', () => {
 
   // order_date renamed to "order date": the key order_date now stands for
   // another column, and the clerk's grants on it were written for the old
-  // one. The server would publish them, because the key exists; the studio
-  // holds publishing until a person keeps or removes them, and says it is
-  // the one holding it.
-  test('a key that now stands for another column holds publishing until its grants are kept', async () => {
+  // one. The studio holds publishing until a person keeps or removes them,
+  // and the server refuses them unless the publish confirms the key (0039):
+  // kept, they publish only because the studio sends the decision (watched
+  // failing, 422 keys-reassigned, with the studio sending none).
+  test('a key that now stands for another column holds publishing until its grants are kept, and the kept key is confirmed', async () => {
     const user = await signIn(plane)
     await publishOrder(user)
     plane.databases.set('fixture', renamed('order_date', 'order date'))
@@ -227,7 +228,7 @@ describe('regenerating a published form', () => {
     expect(within(publish).getByRole('note').textContent).toContain('Grants for order_date were written for another column or lookup')
     const policy = await goTo(user, 'Policy')
     const reassigned = within(policy).getByRole('region', { name: 'Keys that now stand for something else' })
-    expect(paragraphs(reassigned)).toContain('The studio holds publishing until each is decided; the server does not, because the key still exists.')
+    expect(paragraphs(reassigned)).toContain('Publishing waits until each is decided, and the server refuses grants nobody decided.')
     expect(await audit()).toEqual([])
     await pressEnter(user, within(reassigned).getByRole('button', { name: 'Keep grants for order_date' }))
     // The decision closes the list, and the button with it: the keyboard goes to the verdict.
@@ -239,9 +240,38 @@ describe('regenerating a published form', () => {
     expect(latest.ok && latest.value.bundle.policy.fields['order_date']).toEqual({ read: ['clerk'], write: ['clerk'] })
   })
 
+  // "Generate again" makes a new draft from a new proposal; the key decided
+  // on the one before stands for the same column in it, and the decision
+  // has to reach the publish with it, or the server refuses grants the
+  // person already kept (watched failing with the confirmations left behind
+  // by "Generate again": 422 keys-reassigned).
+  test('a key kept before "Generate again" is still confirmed when the draft publishes', async () => {
+    const user = await signIn(plane)
+    await publishOrder(user)
+    plane.databases.set('fixture', renamed('order_date', 'order date'))
+    await user.click(within(await regenerate(user)).getByRole('button', { name: 'Continue to presentation' }))
+    const policy = await goTo(user, 'Policy')
+    await user.click(within(policy).getByRole('button', { name: 'Keep grants for order_date' }))
+    await user.click(within(policy).getByRole('button', { name: 'Add a row filter' }))
+    await user.selectOptions(within(policy).getByLabelText('Column of row filter 2'), 'status')
+    await user.click(within(policy).getByRole('button', { name: 'Generate again with these pins' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    // status is pinned now, so its write grant is refused: filled again, the
+    // policy fits the new form. What this proves is that the confirmation
+    // reached the publish; the fill writes order_date's roles either way.
+    await user.click(within(await goTo(user, 'Policy')).getByRole('button', { name: 'Fill every field from the operations' }))
+    const publish = await goTo(user, 'Publish')
+    await user.click(within(publish).getByRole('button', { name: 'Publish version 2' }))
+    await within(publish).findByText('Published version 2 of sales-order.')
+    const latest = await admin.latest('sales-order')
+    expect(latest.ok && latest.value.bundle.policy.fields['order_date']).toEqual({ read: ['clerk'], write: ['clerk'] })
+  })
+
   // Removing them takes the grants out of the policy, so nothing written for
-  // the old column applies to the new one.
-  test('removing a reassigned key’s grants takes them out of the published policy', async () => {
+  // the old column applies to the new one -- and leaves nothing to confirm,
+  // so the publish confirms nothing: a removed key sent as confirmed would
+  // let any grant that came back after the removal through unasked.
+  test('removing a reassigned key’s grants takes them out of the published policy, and confirms nothing', async () => {
     const user = await signIn(plane)
     await publishOrder(user)
     plane.databases.set('fixture', renamed('order_date', 'order date'))
@@ -254,6 +284,40 @@ describe('regenerating a published form', () => {
     await within(publish).findByText('Published version 2 of sales-order.')
     const latest = await admin.latest('sales-order')
     expect(latest.ok && Object.hasOwn(latest.value.bundle.policy.fields, 'order_date')).toBe(false)
+    const sent = plane.requests.filter((request) => request.method === 'POST' && request.path === '/v1/forms/sales-order/versions').at(-1)
+    expect(sent?.body).not.toHaveProperty('keysConfirmed')
+  })
+
+  // A removal is a decision about the grants the key had, not about any it
+  // is given afterwards. Removed and then filled again -- one click on
+  // "Fill every field from the operations" -- the clerk's grants were back
+  // on order_date, which names "order date" now, and published unasked, as
+  // version 1 wrote them (watched failing: nothing asked about order_date
+  // again). Given grants again, the key is asked about again, and only Keep
+  // confirms it.
+  test('a reassigned key whose grants come back after Remove is asked about again', async () => {
+    const user = await signIn(plane)
+    await publishOrder(user)
+    plane.databases.set('fixture', renamed('order_date', 'order date'))
+    await user.click(within(await regenerate(user)).getByRole('button', { name: 'Continue to presentation' }))
+    let policy = await goTo(user, 'Policy')
+    await user.click(within(policy).getByRole('button', { name: 'Remove grants for order_date' }))
+    await user.click(within(policy).getByRole('button', { name: 'Fill every field from the operations' }))
+    const reassigned = within(policy).getByRole('region', { name: 'Keys that now stand for something else' })
+    expect(within(reassigned).getAllByRole('listitem')).toHaveLength(1)
+    expect(within(reassigned).getByText('Grants for order_date were written for column order_date; it now stands for column order date.')).toBeTruthy()
+    expect(within(reassigned).getByRole('button', { name: 'Keep grants for order_date' })).toBeTruthy()
+    let publish = await goTo(user, 'Publish')
+    expect(within(publish).getByRole('button', { name: 'Publish version 2' })).toHaveProperty('disabled', true)
+    expect(within(publish).getByRole('note').textContent).toContain('Grants for order_date were written for another column or lookup')
+
+    policy = await goTo(user, 'Policy')
+    await user.click(within(policy).getByRole('button', { name: 'Keep grants for order_date' }))
+    publish = await goTo(user, 'Publish')
+    await user.click(within(publish).getByRole('button', { name: 'Publish version 2' }))
+    await within(publish).findByText('Published version 2 of sales-order.')
+    const sent = plane.requests.filter((request) => request.method === 'POST' && request.path === '/v1/forms/sales-order/versions').at(-1)
+    expect(sent?.body).toMatchObject({ keysConfirmed: [{ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } }] })
   })
 
   // A regenerated draft's base is the version it was regenerated from, not

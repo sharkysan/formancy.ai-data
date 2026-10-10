@@ -39,7 +39,7 @@ export { diffSnapshots } from './drift/diff.js'
 export type { DriftChange, DriftKind, DriftReport, DriftSeverity, DriftSubject } from './drift/types.js'
 export { applyPresentation, presentationShapeProblems } from './presentation/apply.js'
 export { presentationOf } from './presentation/derive.js'
-export { reassignedKeys, rebasePresentation } from './presentation/rebase.js'
+export { describeReassigned, grantsOnKey, reassignedKeys, rebasePresentation } from './presentation/rebase.js'
 export { EMPTY_PRESENTATION, fieldAnchor, PRESENTATION_VERSION } from './presentation/types.js'
 export type {
   FieldAnchor,

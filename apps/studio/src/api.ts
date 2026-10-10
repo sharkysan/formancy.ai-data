@@ -1,4 +1,4 @@
-import type { DriftChange, DriftReport, GeneratedForm, GenerationRequest, LookupChoice, MetadataSnapshot, ObjectRef, ServerIdentity } from '@formancy/data-core'
+import type { DriftChange, DriftReport, GeneratedForm, GenerationRequest, LookupChoice, MetadataSnapshot, ObjectRef, ReassignedKey, ServerIdentity } from '@formancy/data-core'
 import type { BundleV2, HostIdentity, PublishedBundle, Regeneration, Restoration } from '@formancy/data-server'
 
 /**
@@ -69,7 +69,12 @@ export interface AdminClient {
   test(connection: string): Promise<Outcome<ServerIdentity>>
   metadata(connection: string): Promise<Outcome<MetadataSnapshot>>
   propose(request: ProposalRequest): Promise<Outcome<Proposal>>
-  publish(formId: string, expectedBase: number | null, bundle: Bundle): Promise<Outcome<{ version: number }>>
+  /**
+   * `keysConfirmed`: the keys of a regeneration's `keysReassigned` the person
+   * kept, as it reported them; the server refuses grants on one it is not
+   * told of (0039).
+   */
+  publish(formId: string, expectedBase: number | null, bundle: Bundle, keysConfirmed?: readonly ReassignedKey[]): Promise<Outcome<{ version: number }>>
   latest(formId: string): Promise<Outcome<Published>>
   drift(formId: string): Promise<Outcome<Drift>>
   /** Every published version of a form, ascending. */
@@ -161,7 +166,8 @@ export function createAdminClient({ token, fetch, base = '' }: { token: string; 
     test: (connection) => call('POST', `/v1/connections/${segment(connection)}/test`),
     metadata: (connection) => call('GET', `/v1/connections/${segment(connection)}/metadata`),
     propose: (request) => call('POST', '/v1/form-proposals', request),
-    publish: (formId, expectedBase, bundle) => call('POST', `/v1/forms/${segment(formId)}/versions`, { expectedBase, bundle }),
+    publish: (formId, expectedBase, bundle, keysConfirmed = []) =>
+      call('POST', `/v1/forms/${segment(formId)}/versions`, { expectedBase, bundle, ...(keysConfirmed.length === 0 ? {} : { keysConfirmed }) }),
     latest: (formId) => call('GET', `/v1/forms/${segment(formId)}/versions/latest`),
     drift: (formId) => call('POST', `/v1/forms/${segment(formId)}/drift`),
     versions: async (formId) => {

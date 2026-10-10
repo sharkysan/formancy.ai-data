@@ -6,8 +6,9 @@ import { addColumn, col, column, dropColumn, foreignKey, INT32, object, ORDER, r
 import { generateForm } from '../generate/generate.js'
 import type { GenerationRequest } from '../generate/types.js'
 import type { ObjectMeta } from '../metadata.js'
+import type { FormPolicy } from '../policy/types.js'
 import { presentationOf } from './derive.js'
-import { reassignedKeys, rebasePresentation } from './rebase.js'
+import { describeReassigned, grantsOnKey, reassignedKeys, rebasePresentation } from './rebase.js'
 import { EMPTY_PRESENTATION } from './types.js'
 
 /*
@@ -332,5 +333,36 @@ describe('reassignedKeys', () => {
   test('is empty when every key still names what it named', () => {
     const before = generateForm(snapshot(), ORDER).bindings
     expect(reassignedKeys(before, generateForm(snapshot(reference), ORDER).bindings)).toEqual([])
+  })
+})
+
+describe('grantsOnKey', () => {
+  const policy = (fields: FormPolicy['fields'], lookups: FormPolicy['lookups'] = {}): FormPolicy => ({ version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields, rowFilters: [], lookups })
+
+  // A role, read or write, is a grant. A lookup's filter is not one by
+  // itself: every lookup field has one, so counting it left no way to
+  // remove a lookup key's grants, and nobody without a role on the field
+  // may search its options. An entry with no roles grants nothing.
+  test('is a read or write role on the key’s field, and nothing else', () => {
+    expect(grantsOnKey(policy({ customer: { read: ['clerk'], write: [] } }), 'customer')).toBe(true)
+    expect(grantsOnKey(policy({ customer: { read: [], write: ['clerk'] } }), 'customer')).toBe(true)
+    expect(grantsOnKey(policy({}, { customer: [] }), 'customer')).toBe(false)
+    expect(grantsOnKey(policy({ customer: { read: [], write: [] } }, { customer: [{ column: 'tenant_id', attribute: 'tenant' }] }), 'customer')).toBe(false)
+    // A key is a field's, not a property every object has.
+    expect(grantsOnKey(policy({}), 'constructor')).toBe(false)
+  })
+})
+
+describe('describeReassigned', () => {
+  // The server's refusal and the studio's lists say a reassigned key in this
+  // one sentence, so they cannot say it differently; a lookup is said as a
+  // lookup, not as a column called undefined.
+  test('names what the grants were written for and what the key stands for now, column or lookup', () => {
+    expect(describeReassigned({ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } })).toBe(
+      'Grants for order_date were written for column order_date; it now stands for column order date.',
+    )
+    expect(describeReassigned({ field: 'customer', was: { kind: 'column', column: 'customer' }, now: { kind: 'lookup', foreignKey: 'fk_order_customer' } })).toBe(
+      'Grants for customer were written for column customer; it now stands for the lookup over fk_order_customer.',
+    )
   })
 })

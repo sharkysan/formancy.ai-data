@@ -113,9 +113,9 @@ export function PolicyStep({
   onPolicy: (next: FormPolicy) => void
   stale: boolean
   onRegenerate: () => Promise<string | null>
-  /** Keys whose grants were written for another column or lookup (0030), not yet kept or removed. */
+  /** Keys whose grants were written for another column or lookup (0030), not yet kept or removed, or given grants again since a removal. */
   reassigned?: readonly ReassignedKey[]
-  onDecided?: (key: string) => void
+  onDecided?: (key: string, decision: 'keep' | 'remove') => void
 }): ReactElement {
   const document = useDocument(session)
   const checked = validatePolicy(policy, bindings)
@@ -141,7 +141,7 @@ export function PolicyStep({
       delete lookups[key]
       onPolicy({ ...withFieldRoles(policy, key, [], []), lookups })
     }
-    onDecided(key)
+    onDecided(key, decision)
   }
 
   function removeStrayLookup(key: string): void {

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
+import { describeReassigned } from '@formancy/data-core'
 import type { ReassignedKey } from '@formancy/data-core'
 import { useFocusAfterRender } from './focus.js'
-import { describeAnchor } from './regenerate.js'
 
 export type Decision = 'keep' | 'remove'
 
@@ -11,9 +11,10 @@ const keep = (key: string) => `reassigned-${key}-keep`
  * Keys that stand for another column or lookup than when the policy's grants
  * were written (0030): order_date, say, once a column renamed to "order date"
  * took the key. A grant names a key, so it would now apply to the other
- * column. The server publishes it all the same -- the key exists -- so the
- * studio holds publishing until a person keeps or removes each, and says it
- * is the one holding it.
+ * column. The studio holds publishing until a person keeps or removes each,
+ * and sends each kept key with the publish: the server refuses grants on
+ * one it is not told of (0039). A key removed and then given grants again is
+ * listed again. Each is said in the sentence the server refuses it in.
  *
  * A decision takes its entry, and the buttons pressed, out of the list. The
  * keyboard goes to the next entry's Keep, and after the last to `after`, the
@@ -31,13 +32,11 @@ export function ReassignedKeys({ keys, after, onDecide }: { keys: readonly Reass
     <section className="notice reassigned" aria-labelledby="reassigned-heading">
       <h3 id="reassigned-heading">Keys that now stand for something else</h3>
       <p>Each grant below was written for what its key stood for when the policy was. Keep it for what the key stands for now, or remove it.</p>
-      <p>The studio holds publishing until each is decided; the server does not, because the key still exists.</p>
+      <p>Publishing waits until each is decided, and the server refuses grants nobody decided.</p>
       <ul aria-labelledby="reassigned-heading">
         {keys.map((entry, index) => (
           <li key={entry.field}>
-            <p>
-              Grants for <code>{entry.field}</code> were written for {describeAnchor(entry.was)}; it now stands for {describeAnchor(entry.now)}.
-            </p>
+            <p>{describeReassigned(entry)}</p>
             <p className="actions">
               <button type="button" id={keep(entry.field)} className="button" onClick={() => decide(entry, index, 'keep')}>
                 Keep grants for {entry.field}

@@ -23,7 +23,12 @@ export interface ConfigurationStore {
   latest(id: string): Promise<number | null>
   /** Every published version, ascending; `[]` for an id never published (0030). */
   versions(id: string): Promise<number[]>
-  /** One published version, or `undefined` if it does not exist. */
+  /**
+   * One published version, or `undefined` if it does not exist. A version
+   * that exists and does not parse -- edited by hand, or damaged -- throws
+   * `UnparsableVersionError`, so a caller can tell it from a read that
+   * failed.
+   */
   read(id: string, version: number): Promise<unknown>
   /**
    * Publish the next version, only if the newest is still `expectedBase`.
@@ -33,6 +38,11 @@ export interface ConfigurationStore {
   publish(id: string, expectedBase: number | null, value: unknown): Promise<PublishOutcome>
   /** Every id with at least one version, in codepoint order. */
   list(): Promise<string[]>
+}
+
+/** What `read` throws for a version that exists and does not parse. Its message names the file. */
+export class UnparsableVersionError extends Error {
+  override name = 'UnparsableVersionError'
 }
 
 /**
@@ -138,7 +148,7 @@ export function createFileConfigurationStore(root: string): ConfigurationStore {
       } catch {
         // A published version that does not parse was edited by hand or
         // damaged. Serving something in its place would be guessing.
-        throw new Error(`${path} is not valid JSON; a published version must never be edited`)
+        throw new UnparsableVersionError(`${path} is not valid JSON; a published version must never be edited`)
       }
     },
 

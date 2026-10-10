@@ -37,7 +37,11 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > the server regenerates it after a change to the database, carrying that
 > presentation by what each field stands for, and restores an older version
 > when the database still fits it — proved on both engines — and the studio
-> does both from its Drift step. A host renders, loads, saves and searches a
+> does both from its Drift step. A regeneration whose keys now name other
+> columns is published only once the grants on those keys are confirmed or
+> removed, whichever client publishes it over a version the server still
+> serves, and on both engines a test fails if the server accepts such a grant
+> unconfirmed. A host renders, loads, saves and searches a
 > published form in both renderers through `@formancy/data-client`, and the
 > host page does so against both engines in its suite. A save whose answer is
 > lost says it may have been saved, all the way to the host page, which holds

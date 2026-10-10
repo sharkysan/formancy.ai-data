@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createSnapshot, presentationOf } from '@formancy/data-core'
+import { createSnapshot, EMPTY_PRESENTATION, presentationOf } from '@formancy/data-core'
 import type { ColumnMeta, DatabaseAdapter, FormBindings, LookupAdapter, MetadataSnapshot, NormalizedType, ObjectMeta, PresentationOverrides, RecordAdapter } from '@formancy/data-core'
 import type { FormSchema, LayoutNode } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
@@ -16,8 +16,9 @@ import type { IdentityVerifier } from '../identity.js'
 /*
  * The administrator plane's evolution routes (0030): the versions list and
  * one version, a regeneration that carries the published presentation to
- * the database as it is now, and a restore that republishes an older
- * version when drift blocks nothing. The database is a fake adapter whose
+ * the database as it is now, a restore that republishes an older version
+ * when drift blocks nothing, and since 0039 the publish of a regeneration
+ * whose keys now name other columns. The database is a fake adapter whose
  * discovery the test changes; what it proves is the routes' own logic, and
  * the e2e suite proves the same journey on both real engines.
  */
@@ -331,6 +332,273 @@ describe('restoration', () => {
     await store.publish('employee', null, { format: 1, connection: 'erp', form: proposal.form, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot })
     await publish(1)
     expect((await restore({ version: 1, expectedBase: 2 })).statusCode).toBe(201)
+    expect(await file(3)).toBe(await file(1))
+  })
+})
+
+/**
+ * Two columns that sanitise to one key (0030): job_title, and "job title" as
+ * job_title_2 until the first is dropped.
+ */
+const JOB = [col('job_title', 5, TEXT, { nullable: true }), col('job title', 6, TEXT, { nullable: true })]
+const column = (name: string) => ({ kind: 'column', column: name })
+/** After `renumber()`: both keys stand for other columns than in the version published with JOB. */
+const REASSIGNED = [
+  { field: 'job_title', was: column('job_title'), now: column('job title') },
+  { field: 'job_title_2', was: column('job title'), now: column('job-title') },
+]
+
+/** The owner drops job_title and adds "job-title": job_title now stands for "job title", job_title_2 for "job-title". */
+function renumber(): void {
+  columns = [...columns.filter((entry) => entry.name !== 'job_title'), col('job-title', 7, TEXT, { nullable: true })]
+}
+
+/** The newest version regenerated, as the server answers it. */
+async function regenerated(): Promise<Record<string, unknown> & { version: number; keysReassigned: unknown[]; policy: { fields: Record<string, unknown> } }> {
+  const response = await regenerate()
+  expect(response.statusCode, response.body).toBe(200)
+  return response.json()
+}
+
+/** A regeneration published as it came, `policy` in place of the published one, `extra` beside the bundle in the body. */
+function publishRegenerated(regeneration: Record<string, unknown>, extra: Record<string, unknown> = {}, policy?: unknown, expectedBase = regeneration['version']) {
+  const { version: _version, drift: _drift, policyProblems: _problems, conflicts: _conflicts, lookupsDropped: _dropped, keysReassigned: _keys, notes: _notes, ...parts } = regeneration
+  const bundle = { format: 2, connection: 'erp', ...parts, ...(policy === undefined ? {} : { policy }) }
+  return app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase, bundle, ...extra } })
+}
+
+describe('publishing over keys that now name other columns (0039)', () => {
+  // The defect 0039 closes, at the route: a client other than the studio
+  // published the regeneration as it came, and the clerk's grants written
+  // for job_title applied to "job title". Refused, naming each key, with
+  // nothing written, until every key the policy grants on is confirmed --
+  // one confirmed is not both.
+  test('a reassigned key the policy grants on is refused until it is confirmed, and nothing is written', async () => {
+    columns.push(...JOB)
+    await publish()
+    renumber()
+    const regeneration = await regenerated()
+    expect(regeneration.keysReassigned).toEqual(REASSIGNED)
+
+    const undecided = await publishRegenerated(regeneration)
+    expect(undecided.statusCode).toBe(422)
+    expect(undecided.json()).toEqual({
+      code: 'keys-reassigned',
+      message: 'Version 1 bound job_title, job_title_2 to other columns or lookups: confirm the grants on each for what it stands for now, or remove them.',
+      keys: REASSIGNED,
+      problems: [
+        'Grants for job_title were written for column job_title; it now stands for column job title.',
+        'Grants for job_title_2 were written for column job title; it now stands for column job-title.',
+      ],
+    })
+    const one = await publishRegenerated(regeneration, { keysConfirmed: [REASSIGNED[0]] })
+    expect(one.statusCode).toBe(422)
+    expect(one.json().keys).toEqual([REASSIGNED[1]])
+    expect(await store.versions('employee')).toEqual([1])
+
+    const confirmed = await publishRegenerated(regeneration, { keysConfirmed: REASSIGNED })
+    expect(confirmed.statusCode, confirmed.body).toBe(201)
+    expect(confirmed.json()).toEqual({ version: 2 })
+  })
+
+  // A confirmation is of one reassignment: the key, the column it stood for
+  // and the one it stands for now. A studio draft generated again after its
+  // keys were decided can give a key yet another column, and a confirmation
+  // matched by key alone would carry the decision to a column nobody saw.
+  // One for a key that was not reassigned grants nothing, and is ignored.
+  test('a confirmation of another column than the key stands for now is not one; one for a key not reassigned is ignored', async () => {
+    columns.push(...JOB)
+    await publish()
+    renumber()
+    const regeneration = await regenerated()
+    const elsewhere = [REASSIGNED[0], { ...REASSIGNED[1], now: column('job title') }]
+    const wrongWas = [REASSIGNED[0], { ...REASSIGNED[1], was: column('job_title') }]
+    for (const keysConfirmed of [elsewhere, wrongWas]) {
+      const refused = await publishRegenerated(regeneration, { keysConfirmed })
+      expect(refused.statusCode).toBe(422)
+      expect(refused.json().keys).toEqual([REASSIGNED[1]])
+    }
+    const extra = await publishRegenerated(regeneration, { keysConfirmed: [...REASSIGNED, { field: 'name', was: column('name'), now: column('title') }] })
+    expect(extra.statusCode, extra.body).toBe(201)
+  })
+
+  // The other half of the studio's decision: removed, a key's grants are
+  // gone from the policy -- no role on its field, no lookup filter -- and
+  // there is nothing left to confirm. A field kept with empty roles grants
+  // nothing either.
+  test('a reassigned key with no role and no lookup filter needs no confirmation', async () => {
+    columns.push(...JOB)
+    await publish()
+    renumber()
+    const regeneration = await regenerated()
+    const { job_title: _removed, ...fields } = regeneration.policy.fields
+    const policy = { ...regeneration.policy, fields: { ...fields, job_title_2: { read: [], write: [] } } }
+    const published = await publishRegenerated(regeneration, {}, policy)
+    expect(published.statusCode, published.body).toBe(201)
+  })
+
+  // Read before anything is checked, so a client that sent a confirmation
+  // the server cannot read learns that, rather than a 422 about keys it
+  // thinks it confirmed or a 201 it did not mean.
+  test('keysConfirmed that is not a list of { field, was, now }, each a column or a lookup, is 400', async () => {
+    columns.push(...JOB)
+    await publish()
+    renumber()
+    const regeneration = await regenerated()
+    const was = column('job_title')
+    for (const keysConfirmed of [null, 'job_title', [{ field: 'job_title' }], [{ field: 'job_title', was, now: { kind: 'table', name: 'job' } }], [{ field: 7, was, now: was }], [{ field: 'job_title', was, now: { kind: 'lookup', foreignKey: 3 } }]]) {
+      const response = await publishRegenerated(regeneration, { keysConfirmed })
+      expect(response.statusCode, JSON.stringify(keysConfirmed)).toBe(400)
+      expect(response.json()).toMatchObject({ code: 'invalid-request' })
+    }
+    expect(await store.versions('employee')).toEqual([1])
+  })
+
+  // Reassigned against a version somebody has replaced since: the keys are
+  // compared with the wrong version, so the answer is the conflict, after
+  // which they are compared again with the version rebased onto.
+  test('a reassignment against a base somebody has replaced is the conflict, not the keys', async () => {
+    columns.push(...JOB)
+    await publish()
+    renumber()
+    const regeneration = await regenerated()
+    expect(await store.publish('employee', 1, JSON.parse(await file(1)))).toEqual({ ok: true, version: 2 })
+    const stale = await publishRegenerated(regeneration)
+    expect(stale.statusCode).toBe(409)
+    expect(stale.json()).toEqual({ code: 'conflict', message: expect.any(String), current: 2 })
+  })
+
+  // A version edited on the volume is not served (0019), so none of its
+  // grants is in effect, and the server cannot say what its keys stood for.
+  // Publishing over it is how the studio replaces it (publish.test.tsx);
+  // refusing would leave the form unserved until somebody edits files.
+  test('a version that cannot be read is not compared: a publish over it is accepted', async () => {
+    columns.push(...JOB)
+    await publish()
+    const damaged = JSON.parse(await file(1)) as { form: { title: string } }
+    damaged.form.title = 'Staff'
+    await writeFile(join(root, 'employee', '1.json'), JSON.stringify(damaged, null, 2))
+    renumber()
+    const proposal = await propose()
+    const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
+    const response = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase: 1, bundle } })
+    expect(response.statusCode, response.body).toBe(201)
+  })
+
+  // A file that no longer parses is damaged the same way, and no more
+  // served: the store throws on it, which before this case made the publish
+  // that replaces it a 500 naming the store's path on disk, and closed the
+  // repair path the case above keeps open (watched failing: 500).
+  test('a version whose file does not parse is not compared either: a publish over it is accepted', async () => {
+    columns.push(...JOB)
+    await publish()
+    const text = await file(1)
+    await writeFile(join(root, 'employee', '1.json'), text.slice(0, Math.floor(text.length / 2)))
+    renumber()
+    const proposal = await propose()
+    const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
+    const response = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase: 1, bundle } })
+    expect(response.statusCode, response.body).toBe(201)
+    expect(response.json()).toEqual({ version: 2 })
+  })
+
+  // Only a file that does not parse is passed over. A base the store could
+  // not read for another reason -- a volume that failed the read -- may be
+  // served a moment later with its grants in effect, so the check that
+  // cannot answer refuses, and nothing is written (watched failing with
+  // every throw passed over: 201).
+  test('a base the store fails to read for another reason refuses the publish, and nothing is written', async () => {
+    columns.push(...JOB)
+    await publish()
+    renumber()
+    const regeneration = await regenerated()
+    const failing: ConfigurationStore = {
+      ...store,
+      read: async (id, version) => {
+        if (version === 1) throw Object.assign(new Error('EIO: i/o error, read'), { code: 'EIO' })
+        return store.read(id, version)
+      },
+    }
+    const other = await createDataServer({ verifyIdentity, admin: { registry: registry(), store: failing, adminRoles: ['data-admin'], audit: { sink: () => {} } } })
+    const { version: _version, drift: _drift, policyProblems: _problems, conflicts: _conflicts, lookupsDropped: _dropped, keysReassigned: _keys, notes: _notes, ...parts } = regeneration
+    const response = await other.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase: 1, bundle: { format: 2, connection: 'erp', ...parts } } })
+    expect(response.statusCode).toBe(500)
+    expect(await store.versions('employee')).toEqual([1])
+    await other.close()
+  })
+
+  // The route takes any whole number as the base, and names no version
+  // below 1: compared, the store refused to read it and the publish was a
+  // 500 where it had been the conflict every stale base is (watched failing:
+  // 500 "0 is not a version").
+  test('a base below 1 over a published form is the conflict, as any base that is not the newest', async () => {
+    await publish()
+    const proposal = await propose()
+    const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
+    for (const expectedBase of [0, -1]) {
+      const response = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase, bundle } })
+      expect(response.statusCode, `${String(expectedBase)}: ${response.body}`).toBe(409)
+      expect(response.json()).toEqual({ code: 'conflict', message: expect.any(String), current: 1 })
+    }
+  })
+
+  // What the check does not see, held so that the limitation it is written
+  // down as stays true: it compares with the version replaced and no
+  // other. Grants removed in one version and given back in the next are not
+  // asked about -- which is also how a key's grants are given again when no
+  // client can confirm them -- so one policy file pushed twice, the first
+  // time with the reassigned keys taken out, carries version 1's grants to
+  // the columns the keys name now.
+  test('compared with the version replaced only: grants removed in one version and given back in the next are not asked about', async () => {
+    columns.push(...JOB)
+    await publish()
+    const original = JSON.parse(await file(1)) as { policy: { fields: Record<string, unknown> } }
+    renumber()
+    const regeneration = await regenerated()
+    expect(await publishRegenerated(regeneration, {}, original.policy).then((response) => response.statusCode)).toBe(422)
+    const { job_title: _one, job_title_2: _two, ...fields } = original.policy.fields
+    const without = await publishRegenerated(regeneration, {}, { ...original.policy, fields })
+    expect(without.statusCode, without.body).toBe(201)
+    const again = await publishRegenerated(regeneration, {}, original.policy, 2)
+    expect(again.statusCode, again.body).toBe(201)
+    expect((JSON.parse(await file(3)) as { policy: unknown }).policy).toEqual(original.policy)
+  })
+
+  // Anchors are a column's or a lookup's name within the form's root, so a
+  // publish that moves the form to another table carries every grant by key
+  // to the same-named column there, unasked. Held so that the limitation it
+  // is written down as stays true; the studio starts such a draft from an
+  // empty policy.
+  test('a publish that moves the form to another table is not compared across tables', async () => {
+    department = { name: TEXT, foreignKey: false }
+    await publish()
+    const proposal = await propose({ root: { schema: 'sales', name: 'dept' } })
+    expect(proposal.bindings.root).toEqual({ schema: 'sales', name: 'dept' })
+    const policy = { ...policyFor(proposal.bindings), operations: { read: ['clerk'], create: proposal.bindings.operations.create ? ['clerk'] : [], update: proposal.bindings.operations.update ? ['clerk'] : [] } }
+    const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy, snapshot: proposal.snapshot }
+    const response = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase: 1, bundle } })
+    expect(response.statusCode, response.body).toBe(201)
+  })
+
+  // A restore republishes a version's policy with the bindings it was
+  // published with, so its grants apply to the columns they were written
+  // and confirmed for. Here version 1's job_title is the column job_title
+  // again, though version 2 bound the key to "job title": checked like a
+  // publish, the restore could not be confirmed and would be refused.
+  test('a restore is not asked about keys: the policy comes back with the bindings it was written for', async () => {
+    columns.push(...JOB)
+    await publish()
+    const original = columns
+    columns = columns.filter((entry) => entry.name !== 'job_title')
+    const regeneration = await regenerated()
+    expect(regeneration.keysReassigned).toEqual([REASSIGNED[0]])
+    const { job_title_2: _gone, ...fields } = regeneration.policy.fields
+    const v2 = await publishRegenerated(regeneration, { keysConfirmed: [REASSIGNED[0]] }, { ...regeneration.policy, fields })
+    expect(v2.statusCode, v2.body).toBe(201)
+
+    columns = original
+    const restored = await restore({ version: 1, expectedBase: 2 })
+    expect(restored.statusCode, restored.body).toBe(201)
     expect(await file(3)).toBe(await file(1))
   })
 })

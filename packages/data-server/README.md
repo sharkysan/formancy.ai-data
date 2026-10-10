@@ -11,6 +11,10 @@ existed would be documented and inert.
   versioned JSON files. Compare-and-swap is a hard link, so of two
   administrators publishing from one base exactly one wins
   ([0013](../../docs/decisions/0013-published-configuration-is-files-with-link-based-swap.md)).
+  A version whose file does not parse throws `UnparsableVersionError` from
+  `read`, so a publish over it can tell a damaged file from a read that
+  failed
+  ([0039](../../docs/decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md)).
 - **`createIdentityVerifier(options)`** — the host application's JWT, verified
   offline with a pinned algorithm, becomes an actor, roles and attributes such
   as the tenant ([0014](../../docs/decisions/0014-host-identity-is-verified-offline.md)).
@@ -68,6 +72,21 @@ existed would be documented and inert.
   document, written as the store writes every version, so the same bytes for
   a version this store wrote — only when drift against it blocks nothing. A
   restore brings back that version's policy and is not a database rollback.
+  Since [0039](../../docs/decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md),
+  `POST /v1/forms/:id/versions` refuses, 422 `keys-reassigned` with the
+  `keys` and a sentence for each, a version whose policy gives a role, read
+  or write, on a key the version it replaces bound to another column or
+  lookup, unless the body's `keysConfirmed` lists that key exactly as the
+  regeneration's `keysReassigned` reported it. A key with no role left
+  needs nothing, which is what removing its grants looks like — a lookup's
+  filter, which every lookup field has, is not a grant by itself; a stale
+  base is still 409 `conflict` first; a restore is not asked, because it
+  brings a policy back with the bindings it was written for; and a publish
+  over a version the server no longer serves, because its file does not
+  parse or does not validate, is not checked. It compares with the version
+  replaced and no other, and by column or foreign-key name: grants removed
+  in one version and given back in the next, or carried to another table by
+  a publish that moves the form there, are not asked about.
   Every request on the plane is audited, a publish and a restore included
   ([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md)):
   see the audit trail below.
