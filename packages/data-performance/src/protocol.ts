@@ -28,8 +28,20 @@ export const PUBLISH_PROTOCOL: Protocol = {
   concurrency: [1, 8],
   // D: several times the loopback floor and Node's 1 ms timer granularity,
   // so the difference measured is the delay's and not noise. It stands for
-  // no particular network. 200 samples per pass; P14 checks that is enough.
-  latency: { delayMs: 5, warmup: { requests: 100, seconds: 5, atLeast: 10 }, samples: 200 },
+  // no particular network.
+  // The count is P14's. The first publish run, 2026-10-10 16:41 to 18:20
+  // UTC on the Docker Sandbox VM (Linux x86_64, 20 vCPUs, about 15 GiB) on
+  // the user's Windows 11 workstation, took 200 samples a pass: the rounds'
+  // differences spread past a tenth of D for 11 of the 22 requests, up to
+  // 4.63 ms (SQL Server, a search no customer matches). Resampling each of
+  // its passes 400 times put the spread the median's sampling error alone
+  // would give under a tenth of D at about 930 samples a pass for the
+  // slowest to settle, SQL Server's first lookup page. 1,000 is that,
+  // rounded up to what a one-at-a-time block takes a round. The measured
+  // spreads were two to five times that resampled figure, so some of it is
+  // the machine drifting between the two passes, which no count removes;
+  // P14 in 0034 says what this count gave.
+  latency: { delayMs: 5, warmup: { requests: 100, seconds: 5, atLeast: 10 }, samples: 1000 },
   components: { warmup: 200, samples: 2000 },
   // The probe slows under the run's own load as well as under someone
   // else's (0034 has what was measured, and when), so it judges a block only
