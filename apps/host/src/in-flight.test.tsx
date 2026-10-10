@@ -5,15 +5,15 @@ import { EDGES, ENGINES, holdingWrites, startPlane, TOKENS } from './test-plane.
 import type { Engine, Holding, Plane } from './test-plane.js'
 
 /*
- * A save the server has not answered yet, through the page. Neither 0.3.0
- * renderer holds the form during a submit, so in that moment a person goes
- * on typing, presses Save again, or opens another record -- and on
+ * A save the server has not answered yet, through the page. Neither renderer
+ * holds the form during a submit, at 0.3.0 or at 0.4.0, so in that moment a
+ * person goes on typing, presses Save again, or opens another record -- and on
  * `app.inject` the moment is too short to reach, so the writes here are held
  * after the server has made them (`holdingWrites`) and answered when the test
- * says. What the page owes the person then: their newer typing kept and said
- * to be unsaved, a second press that says it sent nothing, every answer heard
- * even when its words repeat, and the answer for a form they have left still
- * said rather than dropped (0029, D7).
+ * says. What the page owes the person then: their newer typing kept and said to
+ * be unsaved, a second press that says it sent nothing, every answer heard even
+ * when its words repeat, and the answer for a form they have left still said
+ * rather than dropped (0029, D7).
  *
  * Both renderers, on both engines: the decisions are the session's, and each
  * pane is where one of them could be lost on the way to the person.

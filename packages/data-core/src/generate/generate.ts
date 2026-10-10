@@ -5,7 +5,7 @@ import { assertReadableLookup, assertReadableRoot, identityFor, rowSecurityNotes
 import { controlFor } from './controls.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, sourceNameFor } from './names.js'
 import type { ConcurrencyBinding, FieldBinding, FormBindings, GeneratedForm, GenerationNote, GenerationRequest, LookupChoice } from './types.js'
-import { BINDINGS_VERSION } from './version.js'
+import { BINDINGS_VERSION, GENERATED_SPEC_VERSION } from './version.js'
 
 /** formancy's form id rule. */
 const FORM_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
@@ -89,7 +89,7 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     .map((entry) => ({ target: entry.field.key, kind: 'disabled', cel: 'true' }))
 
   const form: FormSchema = {
-    specVersion: '3',
+    specVersion: GENERATED_SPEC_VERSION,
     id: request.formId,
     title: request.title,
     model: { fields: planned.map((entry) => entry.field) },

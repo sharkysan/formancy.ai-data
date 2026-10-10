@@ -27,6 +27,9 @@ browser.
   ([0027](../../docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).
 - **Form generation**: `generateForm(snapshot, request)` returns a spec 3
   formancy document, its `FormBindings`, and a note on every choice it made.
+  `GENERATED_SPEC_VERSION` is that `"3"`, which the data server also holds
+  every stored version to
+  ([0042](../../docs/decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)).
 - **Codecs**: `codecFor(column)` checks and canonicalises one API value for a
   column — decimals as strings, never rounded; integers past 2^53 as strings;
   formancy's date and time shapes on real days

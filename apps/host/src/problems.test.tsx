@@ -15,8 +15,11 @@ import type { Plane } from './test-plane.js'
  *
  * What a person must then see is the server's sentence where the renderers
  * put a field's problems: beside Customer, as its description, and in the
- * error summary, which takes the focus. Sentences, not codes: the 0.3.0
- * renderers print an entry verbatim.
+ * error summary, which takes the focus. Sentences, not codes: the renderers
+ * print an entry verbatim. The summary names it by the field's own label,
+ * which both renderers read from the document since 0.4.0; at 0.3.0 the page
+ * passed its labels itself. A summary handed the keys as labels fails here,
+ * watched in each renderer on both engines.
  */
 
 let plane: Plane

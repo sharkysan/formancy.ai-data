@@ -11,7 +11,7 @@
       ]
     },
     "0002": {
-      "reviewed": "sha256:88c6bdd7d4cb8298464ee60adf907e007da7276b7f91d7e40ec59d1a3c23dca4",
+      "reviewed": "sha256:db101b6820695b7847c1f8ac6c0694dd2f675d55f75cd0534cb4a144bda9745b",
       "limitations": [
         {
           "area": "operations",
@@ -96,15 +96,11 @@
       ]
     },
     "0009": {
-      "reviewed": "sha256:cb6cb0de6ede714f52fe7fd1ab72ce3136fb90cd9a8a8ca1db3aacec7f7df35e",
+      "reviewed": "sha256:4faca24b615da13b0365e062d3d806e2afc59be9444610b7d580a63e00d45ad0",
       "limitations": [
         {
           "area": "forms",
           "says": "Decimal fields are text inputs, with no numeric keyboard hint and no spinner, and totals over money are not offered, because formancy has no decimal-safe expression."
-        },
-        {
-          "area": "forms",
-          "says": "The whole-number rule is checked on one side only until formancy's spec 4 ships."
         },
         {
           "area": "forms",
@@ -368,7 +364,7 @@
       ]
     },
     "0019": {
-      "reviewed": "sha256:1941d45f9c55ae08eee4ea2d7d3f44f41edf51574f45aa4904b0248b427407f9",
+      "reviewed": "sha256:4305aa2aacb607c7df7f43e8c27a535fe2dd09ccca8937e4d2f2f26da868b9c3",
       "limitations": [
         {
           "area": "operations",
@@ -402,7 +398,7 @@
       "limitations": [
         {
           "area": "forms",
-          "says": "In `@formancy/core` 0.3.0 an answer is checked once `validate()` has run and on every change after that, so a person typing into an untouched form sees nothing until they press Validate."
+          "says": "In `@formancy/core`, at 0.3.0 and again at 0.4.0, an answer is checked once `validate()` has run and on every change after that, so a person typing into an untouched form sees nothing until they press Validate."
         }
       ]
     },
@@ -639,7 +635,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:efa308a6423b57b324b3a215d15b4ba0538ec3fdb50e52b3b03281655564cb3a",
+      "reviewed": "sha256:0b607cc667c0ec9d8c094ef757a62e5d43eb8c10b7d573ee943e8e96d4a586b7",
       "limitations": [
         {
           "area": "studio",
@@ -945,8 +941,26 @@
         },
         {
           "area": "forms",
-          "says": "An instant changed in `@formancy/react` 0.3.0's datetime control is saved as the local minute the control holds, its seconds and fraction gone; Angular's control was not measured.",
+          "says": "An instant changed in `@formancy/react`'s datetime control is saved as the local minute the control holds, its seconds and fraction gone; Angular's control was not measured.",
           "heldBy": "apps/host/src/temporal-round-trip-page.test.ts"
+        }
+      ]
+    },
+    "0042": {
+      "reviewed": "sha256:11d9091935a344dd1895954ae9fcaabb757576df631fef9ff726a329781b29f9",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A whole-number field accepts a fraction in the browser and only the server's codec refuses it, because generated forms stay on spec 3, which has no `step`.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A TypeScript host whose renderer is at `@formancy/*` 0.3.0 casts `@formancy/data-client`'s published form to its own `FormSchema` or moves to 0.4.0, because the client's types are `@formancy/spec` 0.4.0's, whose `specVersion` admits `\"4\"`."
+        },
+        {
+          "area": "testing",
+          "says": "That a host whose reader is at `@formancy/*` 0.3.0 reads every generated form was measured once, on 2026-10-10, and nothing here runs a 0.3.0 renderer."
         }
       ]
     }

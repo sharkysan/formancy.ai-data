@@ -1,5 +1,6 @@
 import { createSnapshot, EMPTY_PRESENTATION, generateForm } from '@formancy/data-core'
 import type { ColumnMeta, FormPolicy, GenerationRequest, MetadataSnapshot, NormalizedType } from '@formancy/data-core'
+import type { FormSchema } from '@formancy/spec'
 import { schemaHash } from '@formancy/spec'
 import { describe, expect, test } from 'vitest'
 import type { BundleV1, BundleV2, PublishedBundle } from './bundle.js'
@@ -257,6 +258,52 @@ describe('validateBundle', () => {
     const invalid = copy(before0030()) as unknown as { form: { specVersion: string } }
     invalid.form.specVersion = '99'
     expect(validateBundle(invalid)).toMatchObject({ ok: false, problems: [expect.stringMatching(/^form: /)] })
+  })
+
+  // A stored version is held to the spec version the generator writes, on
+  // every read as at publish (0042). @formancy/spec 0.4.0's validator accepts
+  // a spec 4 document, and a host page whose renderer is at 0.3.0 refuses one
+  // outright, so a version edited on the volume to spec 4 -- its base and form
+  // alike, which every other read check compares -- would be served to it;
+  // at 0.3.0 it was refused as corrupt. A spec 4 construct in a spec 3
+  // document is refused with this server's reason, not upstream's advice to
+  // change the document to "4", which this server would then refuse.
+  // Watched failing before the check: the first edit validated, the second
+  // was refused only as a form that is not its base, and the last two
+  // carried upstream's advice.
+  test('a form or base in a spec version other than the one the generator writes is refused', () => {
+    const only = 'and this server publishes and serves only spec "3", the version it generates (0042)'
+    const stepped = (form: FormSchema) => {
+      const id = form.model.fields.find((field) => field.key === 'id')
+      if (id !== undefined) id.step = 1
+    }
+    const four = copy(good())
+    for (const form of [four.base, four.form]) {
+      form.specVersion = '4'
+      stepped(form)
+    }
+    expect(validateBundle(four)).toEqual({ ok: false, problems: [`form: is spec "4", ${only}`] })
+    const base = copy(good())
+    base.base.specVersion = '4'
+    expect(validateBundle(base)).toEqual({ ok: false, problems: [`base: is spec "4", ${only}`] })
+    const construct = copy(good())
+    for (const form of [construct.base, construct.form]) stepped(form)
+    expect(validateBundle(construct)).toEqual({ ok: false, problems: [`form: /model/fields/0/step needs spec "4", ${only}`] })
+    const masked = copy(good())
+    const name = masked.base.model.fields.find((field) => field.key === 'name')
+    if (name !== undefined) name.mask = 'aaa'
+    expect(validateBundle(masked)).toEqual({ ok: false, problems: [`base: /model/fields/2/mask needs spec "4", ${only}`] })
+    // Every other refusal is still the validator's own sentence, and a form
+    // that is not an object, or says no version, is the validator's to name.
+    const misspelt = copy(good()) as unknown as { form: Record<string, unknown> }
+    misspelt.form['colour'] = 'red'
+    expect(validateBundle(misspelt)).toEqual({ ok: false, problems: ['form: Unknown property "colour". Check the spelling, or remove it.'] })
+    const unversioned = copy(good()) as unknown as { base: Record<string, unknown> }
+    delete unversioned.base['specVersion']
+    expect(validateBundle(unversioned)).toEqual({ ok: false, problems: ['base: Missing required property "specVersion".'] })
+    const absent = copy(good()) as unknown as { form: unknown }
+    absent.form = null
+    expect(validateBundle(absent)).toMatchObject({ ok: false, problems: [expect.stringMatching(/^form: /)] })
   })
 
   // Shapes a hand edit or a bad client could produce, each refused with a reason.

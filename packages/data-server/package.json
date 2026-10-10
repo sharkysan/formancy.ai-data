@@ -27,7 +27,7 @@
     "@formancy/data-core": "workspace:*",
     "@formancy/data-postgres": "workspace:*",
     "@formancy/data-sqlserver": "workspace:*",
-    "@formancy/spec": "0.3.0",
+    "@formancy/spec": "0.4.0",
     "fastify": "^5.12.5",
     "jose": "^6.2.12"
   },

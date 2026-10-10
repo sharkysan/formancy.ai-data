@@ -25,11 +25,11 @@
   },
   "dependencies": {
     "@formancy/data-core": "workspace:*",
-    "@formancy/spec": "0.3.0"
+    "@formancy/spec": "0.4.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",
-    "@formancy/core": "0.3.0",
+    "@formancy/core": "0.4.0",
     "@formancy/data-fixtures": "workspace:*",
     "@formancy/data-server": "workspace:*",
     "@types/mssql": "^12.3.0",
