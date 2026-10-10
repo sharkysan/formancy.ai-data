@@ -1,6 +1,6 @@
 # 0002 — Depend on released upstream packages at exact versions; never copy them
 
-- **Status:** accepted
+- **Status:** accepted; the spec 4 window its costs name closed on 2026-10-09 without an exact-decimal type, see [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `scripts/upstream-deps.mjs`, through

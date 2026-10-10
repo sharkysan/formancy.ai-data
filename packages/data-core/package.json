@@ -24,11 +24,11 @@
     "check:pkg": "publint && attw --pack . --profile esm-only"
   },
   "dependencies": {
-    "@formancy/spec": "0.3.0"
+    "@formancy/spec": "0.4.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",
-    "@formancy/core": "0.3.0",
+    "@formancy/core": "0.4.0",
     "@vitest/coverage-v8": "catalog:",
     "publint": "catalog:",
     "tsdown": "catalog:",

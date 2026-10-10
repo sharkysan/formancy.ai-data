@@ -93,10 +93,11 @@ handlers are checked against the same declarations.
   page, when the connection it reused closed before any answer; the server
   answers that copy with the first one's answer instead of applying it
   twice (0031). The client itself still never sends anything again.
-- **Field problems are sentences.** The 0.3.0 renderers, as observed on
-  2026-10-09, print an error entry as it is, beside the field and in the error summary, so `fieldProblems`
-  hands them the server's sentence, which never echoes a value. The code
-  stays on the refusal for a program.
+- **Field problems are sentences.** The renderers print an error entry as
+  it is, beside the field and in the error summary, as observed at 0.3.0 on
+  2026-10-09 and at 0.4.0 on 2026-10-10, so `fieldProblems` hands them the
+  server's sentence, which never echoes a value. The code stays on the
+  refusal for a program.
 
 ## In React
 
@@ -159,9 +160,19 @@ to update asks under update's filter without a new application.
   What the browser sends again on its own is answered by the server once per
   write id, in its process only: a copy that reaches another replica is
   applied again.
-- **`hasMore` and `omitted` do not reach the person.** A renderer's 0.3.0
-  option contract, as read on 2026-10-09, is a list of `{ value, label }`, so a list of exactly one
-  page looks complete. A typeahead keeps narrowing; a plain select does not.
+- **`hasMore` and `omitted` do not reach the person.** A renderer's option
+  contract, as read at 0.3.0 on 2026-10-09 and unchanged at 0.4.0, is a list
+  of `{ value, label }`, so a list of exactly one page looks complete. A
+  typeahead keeps narrowing; a plain select does not.
+- **Its types are `@formancy/spec` 0.4.0's.** `PublishedForm.form` is the
+  `FormSchema` of the `@formancy/spec` this package pins exactly (0002), and
+  there `specVersion` may be `"4"`, so a host whose engine is
+  `@formancy/core` 0.3.0 does not compile the React snippet above: TS2322 at
+  `createFormEngine`, measured with TypeScript 6.0.3 and `skipLibCheck` off
+  on 2026-10-10. The document itself is spec 3
+  ([0042](../../docs/decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)),
+  so such a host casts it to its own `@formancy/spec`'s `FormSchema`, or
+  moves its renderer to 0.4.0. Nothing here type-checks a 0.3.0 host.
 - **Records are addressed by token only.** The definition does not name the
   identity columns, so a host keeps the tokens that create, read and lookups
   return, or encodes its own key with data-core's `encodeKeyToken`.

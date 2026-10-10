@@ -47,7 +47,12 @@ existed would be documented and inert.
   confirmed version column, pins over written fields and lookups — against
   the base and bindings, because a regeneration generates from that request;
   a pin taken out by hand is the one edit to it that no check short of the
-  generator can see.
+  generator can see. Publish and reads alike refuse a form or base that is
+  not in the spec version the generator writes, data-core's
+  `GENERATED_SPEC_VERSION`, or that carries a later version's construct,
+  because formancy's validator accepts every version its release speaks and
+  a host page's renderer may not
+  ([0042](../../docs/decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)).
 - **`DRIVER_FACTORIES`** — one connection factory per engine, opening every
   connection through the adapter package's own `connect…` function, so a host
   embedding the server never builds a pool from another copy of a driver

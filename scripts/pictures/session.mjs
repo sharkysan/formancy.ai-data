@@ -96,10 +96,11 @@ export function said(error, secrets) {
 
 /**
  * The renderers search a lookup DEBOUNCE_MS after its text changes -- 250 in
- * @formancy/react and @formancy/angular 0.3.0, with no minimum length, so a
- * Load that fills a lookup starts one -- and mark its box `aria-busy="true"`
- * while the answer is out (react dist/index.mjs, the typeahead's input;
- * angular fesm2022, both lookup boxes), when they also say "Searching…".
+ * @formancy/react and @formancy/angular, at 0.3.0 and at 0.4.0, with no minimum
+ * length, so a Load that fills a lookup starts one -- and mark its box
+ * `aria-busy="true"` while the answer is out (react dist/index.mjs, the
+ * typeahead's input; angular fesm2022, both lookup boxes), when they also say
+ * "Searching…".
  * Measured: a --check read the host page's Angular pane with "Searching…" in
  * it, which its picture did not show; with every lookup answer delayed by a
  * second, the host's check failed without this wait -- on host-stale in each

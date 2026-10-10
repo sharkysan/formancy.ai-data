@@ -13,16 +13,16 @@ import { drawLookupsAsTypeaheads } from './widgets.js'
  * - **created / saved**: the same engine is kept, and each stored answer is
  *   set back into it, so the stored spelling shows (`12.5` is `12.5000` in a
  *   numeric(18,4)). The session takes the record and the new version. The
- *   form stays editable while a save is in flight -- neither 0.3.0 renderer
- *   holds input -- so an answer the person changed since pressing Save is
- *   newer than the stored one: it is left as it is, and the result says that
- *   changes are not saved yet.
+ *   form stays editable while a save is in flight -- neither renderer holds
+ *   input, at 0.3.0 or at 0.4.0 -- so an answer the person changed since
+ *   pressing Save is newer than the stored one: it is left as it is, and the
+ *   result says that changes are not saved yet.
  * - **stale** (409): nothing is touched. The person's draft stays in the
  *   form; `reload()` is the one way to the saved record, and it discards the
  *   draft. Nothing merges.
  * - **invalid**: the server named fields, and its sentences go onto them
- *   through `applyServerErrors` -- sentences, because the 0.3.0 renderers print
- *   an entry verbatim (`fieldProblems`).
+ *   through `applyServerErrors` -- sentences, because the renderers print an
+ *   entry verbatim, at 0.3.0 and at 0.4.0 (`fieldProblems`).
  * - **refused**: anything else is the server's sentence, verbatim, and is not
  *   sent again (0015).
  * - **unknown**: the answer was lost -- by the database, said in the server's

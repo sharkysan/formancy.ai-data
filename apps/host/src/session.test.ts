@@ -254,13 +254,13 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
   })
 
   // A save is a request in flight, and the form stays editable meanwhile:
-  // neither 0.3.0 renderer holds input during a submit. What the person types
-  // then is theirs, and newer than what was sent -- a session that set every
-  // stored answer back would replace it, and then say "Created" over the loss.
-  // Only the answers still as they were sent take the stored spelling; the
-  // newer one stays, and the result says it is not saved. A second press
-  // while the first is unanswered sends nothing and says so, rather than
-  // handing back the first press's result as if it were its own.
+  // neither renderer holds input during a submit, at 0.3.0 or at 0.4.0. What
+  // the person types then is theirs, and newer than what was sent -- a session
+  // that set every stored answer back would replace it, and then say "Created"
+  // over the loss. Only the answers still as they were sent take the stored
+  // spelling; the newer one stays, and the result says it is not saved. A
+  // second press while the first is unanswered sends nothing and says so,
+  // rather than handing back the first press's result as if it were its own.
   test('an edit made while a save is in flight is kept, and a second press says nothing was sent', async () => {
     const { session, holding } = await heldSession(formId)
     const { engine } = session.opened()

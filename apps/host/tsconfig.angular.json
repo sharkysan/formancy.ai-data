@@ -23,5 +23,5 @@
     "noEmit": false,
     "outDir": "out-tsc"
   },
-  "include": ["src/angular-form.ts", "src/angular-save.ts", "src/angular-bootstrap.ts", "src/labels.ts"]
+  "include": ["src/angular-form.ts", "src/angular-save.ts", "src/angular-bootstrap.ts"]
 }

@@ -3,10 +3,10 @@ import type { Refusal } from './client.js'
 import { fieldProblems } from './problems.js'
 
 /*
- * What a host hands `engine.applyServerErrors`. The 0.3.0 renderers print an
- * error entry verbatim -- beside the field and in the summary -- so an entry
- * has to be a sentence a person can read, and the server's is the one that
- * promises never to echo a value (0029).
+ * What a host hands `engine.applyServerErrors`. The renderers print an error
+ * entry verbatim, at 0.3.0 and at 0.4.0 -- beside the field and in the summary
+ * -- so an entry has to be a sentence a person can read, and the server's is
+ * the one that promises never to echo a value (0029).
  */
 
 const refusal = (fieldErrors?: Refusal['fieldErrors']): Refusal => ({

@@ -9,6 +9,18 @@
 export const BINDINGS_VERSION = 2
 
 /**
+ * The formancy spec version every generated document says, and the only one
+ * the data server publishes or serves.
+ *
+ * Spec 3 after spec 4's release, because a host page whose renderer is still
+ * at `@formancy/*` 0.3.0 refuses a spec 4 document outright (0042). The
+ * server holds every stored version to it on read, so a release that moves
+ * it must keep the version before it readable, or every version stored
+ * before that release is refused as corrupt.
+ */
+export const GENERATED_SPEC_VERSION = '3'
+
+/**
  * Why bindings of this version cannot be read, or `null`.
  *
  * One function for every reader — the planner, the lookup configuration,

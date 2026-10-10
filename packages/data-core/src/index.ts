@@ -24,7 +24,7 @@ export type {
   TextLengthUnit,
 } from './metadata.js'
 export { generateForm } from './generate/generate.js'
-export { BINDINGS_VERSION, bindingsVersionProblem } from './generate/version.js'
+export { BINDINGS_VERSION, bindingsVersionProblem, GENERATED_SPEC_VERSION } from './generate/version.js'
 export type {
   ConcurrencyBinding,
   FieldBinding,

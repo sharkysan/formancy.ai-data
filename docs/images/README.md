@@ -159,7 +159,8 @@ Filed, not hidden, because a picture is the product as it is:
   administrator plane -- it draws a sentence in place of the control, so
   nothing in the field carries `aria-required`, which is what the Blueprint
   theme draws the `*` from; the field still says "required" after Validate.
-  That is `@formancy/react` 0.3.0's fallback and the themes, upstream.
+  That is `@formancy/react`'s fallback, at 0.3.0 and at 0.4.0 alike, and
+  the themes, upstream.
 
 ## What nothing checks
 

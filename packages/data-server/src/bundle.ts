@@ -1,8 +1,8 @@
 import { bindingsVersionProblem, createSnapshot, findObject, rowFilterColumnProblem, validatePolicy } from '@formancy/data-core'
 import type { FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
-import { validateSchema } from '@formancy/spec/validate'
 import { format2Problems } from './bundle-format2.js'
+import { servedSchema } from './served-schema.js'
 
 /**
  * Everything one published version of a form needs at runtime, as one
@@ -55,7 +55,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * files on a volume and a file can be edited by hand (0013). Each check is one
  * a hand edit could break silently:
  *
- * - the form must be one formancy's own validator accepts;
+ * - the form must be one formancy's own validator accepts, in the spec
+ *   version the generator writes (`servedSchema`, 0042) -- the validator
+ *   alone accepts every version its release speaks;
  * - the snapshot must still hash to its own fingerprint — an edited column
  *   type would otherwise reach the planner, which trusts it;
  * - the bindings must have been generated from that snapshot;
@@ -77,8 +79,8 @@ export function validateBundle(document: unknown): BundleValidation {
   if (format !== 1 && format !== 2) problems.push('format must be 1 or 2')
   if (typeof document['connection'] !== 'string' || document['connection'] === '') problems.push('connection must name a connection')
 
-  const form = validateSchema(document['form'])
-  if (!form.valid) problems.push(...form.errors.map((error) => `form: ${error.message}`))
+  const form = servedSchema('form', document['form'])
+  if (!form.valid) problems.push(...form.problems)
 
   const snapshot = document['snapshot'] as MetadataSnapshot | undefined
   const bindings = document['bindings'] as FormBindings | undefined

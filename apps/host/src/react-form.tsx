@@ -2,7 +2,6 @@ import type { ReactElement } from 'react'
 import type { FormEngine } from '@formancy/core'
 import { ErrorSummary, FormancyForm, FormancyProvider, OptionsSourcesProvider } from '@formancy/react'
 import type { OptionsSources, SubmitOutcome } from '@formancy/react'
-import { fieldLabels } from './labels.js'
 
 /**
  * The React renderer's half of a pane: the error summary, then the form, with
@@ -10,8 +9,9 @@ import { fieldLabels } from './labels.js'
  *
  * The summary is the host's to place: `FormancyForm` includes none. It focuses
  * itself when errors appear, after the engine refuses a submit and after the
- * server names a field. The layout is the document's own, as the Angular half
- * reads it.
+ * server names a field, and names each problem by its field's label, which
+ * both renderers read from the document since 0.4.0. The layout is the
+ * document's own, as the Angular half reads it.
  *
  * `sources` is `lookupSources(...)` from `@formancy/data-client`, typed here as
  * this renderer's own `OptionsSources`: this file's type check is the one that
@@ -30,7 +30,7 @@ export function ReactForm({
   return (
     <OptionsSourcesProvider value={sources}>
       <FormancyProvider engine={engine}>
-        <ErrorSummary labels={fieldLabels(engine)} />
+        <ErrorSummary />
         <FormancyForm {...(layout === undefined ? {} : { layout })} submitLabel="Save" onSubmit={onSubmit} />
       </FormancyProvider>
     </OptionsSourcesProvider>

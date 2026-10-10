@@ -91,8 +91,9 @@ export function controlFor(type: NormalizedType, nullable: boolean): ControlPlan
     case 'integer':
       if (isSafe(type.min) && isSafe(type.max)) {
         // Whole numbers are checked by the server's codec. formancy's `step`
-        // would let the browser check it too, and it arrives with spec 4,
-        // which the released @formancy/spec does not speak yet.
+        // would let the browser check it too, and it needs spec 4, which a
+        // host's renderer still at 0.3.0 refuses outright; generated forms stay
+        // on spec 3 until that is worth the cost (0042).
         return { field: { type: 'number', min: Number(type.min), max: Number(type.max) }, describe: 'a whole number' }
       }
       return {

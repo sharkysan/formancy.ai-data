@@ -630,6 +630,29 @@ describe('versions', () => {
     expect((await restore({ version: 1, expectedBase: 2 })).statusCode).toBe(500)
   })
 
+  // A version edited on the volume to spec 4, its base and form alike, so
+  // every comparison a read makes still agrees: @formancy/spec 0.4.0's
+  // validator accepts it, and at 0.3.0 it was refused as corrupt. Read and
+  // restore both go through loadVersion, which holds it to the version the
+  // generator writes (0042), so neither serves nor republishes it to a host
+  // page whose renderer would refuse it. Watched failing before that check:
+  // the read answered 200 and the restore 201.
+  test('a version edited on disk to another spec version is refused on read and on restore', async () => {
+    await publish()
+    await publish(1)
+    const edited = JSON.parse(await file(1)) as { base: { specVersion: string }; form: { specVersion: string } }
+    edited.base.specVersion = '4'
+    edited.form.specVersion = '4'
+    await writeFile(join(root, 'employee', '1.json'), JSON.stringify(edited, null, 2))
+    const read = await app.inject({ method: 'GET', url: '/v1/forms/employee/versions/1', headers: ADMIN })
+    expect(read.statusCode).toBe(500)
+    expect(read.json()).toMatchObject({ code: 'corrupt-bundle' })
+    const restored = await restore({ version: 1, expectedBase: 2 })
+    expect(restored.statusCode).toBe(500)
+    expect(restored.json()).toMatchObject({ code: 'corrupt-bundle' })
+    expect(await store.latest('employee')).toBe(2)
+  })
+
   // The routes are on the administrator plane, behind its role check.
   test('every evolution route needs an administrator', async () => {
     for (const [method, url] of [['GET', '/v1/forms/employee/versions'], ['GET', '/v1/forms/employee/versions/1'], ['POST', '/v1/forms/employee/regenerations'], ['POST', '/v1/forms/employee/restorations']] as const) {

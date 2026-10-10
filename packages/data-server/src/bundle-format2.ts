@@ -2,9 +2,9 @@ import { applyPresentation, findObject, generateForm, presentationShapeProblems 
 import type { FormBindings, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
-import { validateSchema } from '@formancy/spec/validate'
 import type { BundleV2 } from './bundle.js'
 import { readGeneration } from './generation.js'
+import { servedSchema } from './served-schema.js'
 
 /*
  * What a format-2 bundle carries beyond format 1 (0030), and what holds it:
@@ -21,14 +21,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * What format 2 adds (0030): a generation request in the form the proposal
  * route reads one, for this bundle's connection and form; a base formancy
- * accepts; and a presentation that applies to that base and gives exactly
- * the stored form. Not whether the generator would write that base — that
- * is `generatedProblems`, at publish only.
+ * accepts, in the generator's spec version (`servedSchema`); and a
+ * presentation that applies to that base and gives exactly the stored form.
+ * Not whether the generator would write that base — that is
+ * `generatedProblems`, at publish only.
  */
 export function format2Problems(document: Record<string, unknown>, form: FormSchema, bindings: FormBindings, snapshot: MetadataSnapshot | null): string[] {
   const problems: string[] = []
   const read = readGeneration(document['generation'])
-  const base = validateSchema(document['base'])
+  const base = servedSchema('base', document['base'])
   if (!read.ok) problems.push(...read.problems.map((problem) => `generation: ${problem}`))
   else if (canonicalize(read.generation) !== canonicalize(document['generation'])) {
     problems.push('generation: is not in its normalised form (lookups and pinned as lists, versionColumn only when given, nothing else)')
@@ -37,7 +38,7 @@ export function format2Problems(document: Record<string, unknown>, form: FormSch
     if (base.valid && read.generation.formId !== base.schema.id) problems.push(`generation: names form ${read.generation.formId}, and the base is ${base.schema.id}`)
     if (base.valid) problems.push(...requestProblems(read.generation, base.schema, bindings, snapshot))
   }
-  if (!base.valid) problems.push(...base.errors.map((error) => `base: ${error.message}`))
+  if (!base.valid) problems.push(...base.problems)
 
   const shape = presentationShapeProblems(document['presentation'])
   if (shape.length > 0) return [...problems, ...shape.map((problem) => `presentation: ${problem}`)]
