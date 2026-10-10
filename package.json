@@ -16,6 +16,7 @@
     "test:e2e:install": "node scripts/install-test.mjs",
     "test:browser": "turbo run test:browser",
     "test:getting-started": "node scripts/getting-started.mjs",
+    "pictures": "node scripts/pictures.mjs",
     "typecheck": "turbo run typecheck",
     "check:pkg": "turbo run check:pkg"
   },
