@@ -40,8 +40,10 @@ added unvalidated beside one SQL Server disables.
   that is `AB` for three of them and `ab` for the fourth; one row with a value
   of every kind a label shows, its floats ones whose text a session's
   `extra_float_digits` changes; and tables whose triggers refuse, decline,
-  sleep and deadlock. `FILTER_PARITY`, `DISPLAY_PARITY` and `REFUSAL_PARITY`
-  are what both adapters' parity suites expect of it, written once:
+  sleep and deadlock. `FILTER_PARITY`, `DISPLAY_PARITY`, `TEMPORAL_PARITY`
+  -- that row's time and instant as the record reader returns them, cut to
+  the minute and the second (0040) -- and `REFUSAL_PARITY` are what both
+  adapters' parity suites expect of it, written once:
   `FILTER_PARITY` is checked against the stored rows on both engines by this
   package's own suite. `PARITY_SCOPE` is the scope that discovers it.
 - `renamedColumn(snapshot, table, from, to)` is a snapshot as discovery
@@ -100,9 +102,10 @@ fails when something does. The adapters' own typed variables take
 
 `sharedCases()` is every case both adapters are held to, by id: the model's
 comparators, each `FILTER_PARITY` entry, each `DISPLAY_PARITY` column, each
-`REFUSAL_PARITY` refusal, each `EDGE_VALUES` value and the two shipments. The
-ids are derived from the shared data -- `filterCase(entry)`,
-`displayCase(column)`, `refusalCase(name)`, `edgeCase(name)`,
+`TEMPORAL_PARITY` column, each `REFUSAL_PARITY` refusal, each `EDGE_VALUES`
+value and the two shipments. The ids are derived from the shared data --
+`filterCase(entry)`, `displayCase(column)`, `temporalCase(column)`,
+`refusalCase(name)`, `edgeCase(name)`,
 `shipmentCase('first')`, `MODEL_CASES.owner` -- so no test types one.
 
 An adapter test that asserts a case through its adapter says so with

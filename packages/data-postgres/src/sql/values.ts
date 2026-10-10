@@ -39,37 +39,46 @@ function dateText(column: string): string {
  * A timestamp as `YYYY-MM-DDTHH:MM:SS`, with `Z` when it is an instant.
  *
  * An instant is first moved to UTC with `at time zone 'UTC'`, which does not
- * depend on the session's TimeZone. formancy's instant has whole seconds; a
- * value with a fraction — what `now()` writes — keeps it, trailing zeros
- * dropped, rather than being truncated into a value a save would then write
- * over the real one. Outside years 1 to 9999 the era is spelled, as for a date.
+ * depend on the session's TimeZone, and read to the second: formancy's
+ * instant has whole seconds, and SQL Server reads its own to the second too
+ * (0040). A fraction -- what `now()` writes -- is cut, never rounded, so the
+ * read is a value its field accepts; `planUpdate` removes an unedited echo
+ * of it from an update, so the fraction the row holds is never written
+ * over. Outside years 1 to 9999 the era is spelled with the fraction, as for
+ * a date, and `infinity` as itself: text the codec refuses, which no cut
+ * could make true.
  *
- * A zoneless timestamp is spelled the same, without the `Z`: its fraction,
- * trailing zeros dropped, never rounded, and none on a whole second. That is
- * the spelling both adapters give it (0026), held by the shared
- * FIRST_SHIPMENT and SECOND_SHIPMENT; SQL Server reaches it with a trim over
- * style 126, this one with `rtrim` over the microseconds.
+ * A zoneless timestamp is spelled the same, without the `Z`, and keeps its
+ * fraction, trailing zeros dropped, never rounded, and none on a whole
+ * second. That is the spelling both adapters give it (0026), held by the
+ * shared FIRST_SHIPMENT and SECOND_SHIPMENT; SQL Server reaches it with a
+ * trim over style 126, this one with `rtrim` over the microseconds. It has
+ * no field that writes it, so nothing is cut.
  */
 function timestampText(column: string, withTimeZone: boolean): string {
   const at = withTimeZone ? `(${column} at time zone 'UTC')` : column
   const zone = withTimeZone ? 'Z' : ''
-  const fraction = `case
+  // to_char's SS is the seconds field, which the fraction never carries into.
+  const spelled = withTimeZone
+    ? `pg_catalog.to_char(${at}, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`
+    : `pg_catalog.concat(pg_catalog.to_char(${at}, 'YYYY-MM-DD"T"HH24:MI:SS'), case
         when (extract(microseconds from ${at}) ${op('%')} 1000000) ${op('=')} 0 then ''
-        else pg_catalog.concat('.', pg_catalog.rtrim(pg_catalog.to_char(${at}, 'US'), '0')) end`
+        else pg_catalog.concat('.', pg_catalog.rtrim(pg_catalog.to_char(${at}, 'US'), '0')) end)`
   return `case
-    when ${at} ${op('>=')} ${FIRST_DAY}::pg_catalog.timestamp and ${at} ${op('<=')} '9999-12-31 23:59:59.999999'::pg_catalog.timestamp then
-      pg_catalog.concat(pg_catalog.to_char(${at}, 'YYYY-MM-DD"T"HH24:MI:SS'), ${fraction}, '${zone}')
+    when ${at} ${op('>=')} ${FIRST_DAY}::pg_catalog.timestamp and ${at} ${op('<=')} '9999-12-31 23:59:59.999999'::pg_catalog.timestamp then ${spelled}
     when pg_catalog.isfinite(${at}) then pg_catalog.to_char(${at}, 'YYYY-MM-DD"T"HH24:MI:SS.US"${zone}" BC')
     else ${at}::pg_catalog.text end`
 }
 
 /**
- * A time as `HH:MM`, formancy's shape, when it holds no seconds; with its
- * seconds and fraction otherwise, rather than rounded to the minute. `time`
- * spells itself the same way in every DateStyle.
+ * A time as `HH:MM`, formancy's shape, read to the minute as SQL Server reads
+ * one (0040): seconds and a fraction are cut, never rounded, and
+ * `planUpdate` removes an unedited echo from an update, so the seconds the
+ * row holds are never written over. `time` spells itself the same way in every
+ * DateStyle. PostgreSQL's `24:00:00` reads `24:00`, which the codec refuses.
  */
 function timeText(column: string): string {
-  return `case when extract(second from ${column}) ${op('=')} 0 then pg_catalog.substr(${column}::pg_catalog.text, 1, 5) else ${column}::pg_catalog.text end`
+  return `pg_catalog.substr(${column}::pg_catalog.text, 1, 5)`
 }
 
 /**

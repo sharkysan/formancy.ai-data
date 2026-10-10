@@ -23,6 +23,11 @@ import type { InsertRequest, ReadRequest, UpdateRequest } from './types.js'
  * - `invalid-version` — an expected version this target's concurrency could
  *   never have returned.
  * - `nothing-to-update` — an update whose answers change no column.
+ * - `record-not-read` — an update carrying an instant or a time the actor
+ *   may read, planned without the record as read, or with another record's:
+ *   both adapters read those cut to formancy's shape, and only that read
+ *   tells an unedited one from a change (0040). A caller's mistake, never a
+ *   person's.
  */
 export type PlanRefusalCode =
   | PolicyRefusalCode
@@ -33,6 +38,7 @@ export type PlanRefusalCode =
   | 'invalid-record-token'
   | 'invalid-version'
   | 'nothing-to-update'
+  | 'record-not-read'
 
 export interface PlanRefusal {
   ok: false

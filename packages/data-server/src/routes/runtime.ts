@@ -14,9 +14,9 @@ import {
   toFormAnswers,
   validateLookupQuery,
 } from '@formancy/data-core'
-import type { FieldError, MembershipCheck, ObjectMeta, PolicyContext, PolicyOperation, PublishedForm, ResolvedLookup } from '@formancy/data-core'
+import type { FieldError, FormRecord, MembershipCheck, ObjectMeta, PolicyContext, PolicyOperation, PublishedForm, RecordFailure, ResolvedLookup } from '@formancy/data-core'
 import { canonicalize } from '@formancy/spec'
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry, OpenConnection } from '../connections.js'
@@ -85,7 +85,9 @@ function contextOf(identity: HostIdentity): PolicyContext {
  * policy grants nobody. The echo is removed on create when it is empty, and on
  * update when it equals what the record holds. Anything else in such a field
  * still reaches the planner and is refused: a changed value there is tampering
- * or a stale client, and either way is not saved.
+ * or a stale client, and either way is not saved (0022). An unedited instant
+ * or time the actor may write is the planner's to remove, against the same
+ * read (0040).
  */
 function withoutEchoes(
   bundle: PublishedBundle,
@@ -217,8 +219,12 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     return reply.code(answer.status).send(answer.body)
   }
 
-  /** Runs every membership check; returns field errors for rejected tokens, or a reply already sent. */
-  async function memberships(open: OpenConnection, checks: readonly MembershipCheck[], reply: FastifyReply): Promise<FieldError[] | undefined> {
+  /**
+   * Runs every membership check: undefined when every selection is a member,
+   * otherwise the refusal to answer. Answered rather than sent, so an
+   * update's checks run inside the sending they belong to (0031).
+   */
+  async function memberships(open: OpenConnection, checks: readonly MembershipCheck[], log: FastifyBaseLogger): Promise<WriteAnswer | undefined> {
     const errors: FieldError[] = []
     for (const check of checks) {
       try {
@@ -226,12 +232,49 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
         if (rejected.length > 0) errors.push(rejectedSelection(check.field))
       } catch (error) {
         // Fails closed, as formancy's own membership port does (formancy.ai 0077).
-        reply.log.warn({ field: check.field, error: (error as Error).message }, 'a lookup could not vouch for a selection')
-        await reply.code(503).send({ code: 'unavailable', message: 'A selection could not be checked. Nothing was saved.' })
-        return undefined
+        log.warn({ field: check.field, error: (error as Error).message }, 'a lookup could not vouch for a selection')
+        return { status: 503, body: { code: 'unavailable', message: 'A selection could not be checked. Nothing was saved.' } }
       }
     }
-    return errors
+    return errors.length === 0 ? undefined : { status: 422, body: { code: 'invalid-values', message: 'A selection is not one of the options.', fieldErrors: errors } }
+  }
+
+  /**
+   * One update, from the read that tells an echo from a change to the write,
+   * answered rather than sent: the update route runs it once per sending, so
+   * a write id that arrives again is answered with this answer and asks the
+   * database nothing, its read included (0031).
+   *
+   * The record as it stands is read first. Against it 0022 removes an
+   * unchanged echo of a field the actor may not write, and the planner one of
+   * an instant or a time they may (0040). An actor who may update and not
+   * read gets no echo removed, and the planner needs no read for them. When
+   * the planner cannot tell an echo from a change because the read failed,
+   * whatever the failure, that failure is the answer: sent anyway, a read
+   * that failed and a write that did not would store the cut value.
+   */
+  async function updated(request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, open: OpenConnection, record: string, version: string, answers: Record<string, unknown>): Promise<WriteAnswer> {
+    const actor = context(request)
+    let current: FormRecord | undefined
+    let unread: RecordFailure | undefined
+    const reading = planRead(bundle.snapshot, bundle.bindings, bundle.policy, actor, record)
+    if (reading.ok) {
+      const stored = await open.records.read(reading.request)
+      if (stored.ok) current = toFormAnswers(bundle.bindings, reading.fields, stored)
+      else unread = stored
+    }
+    const plan = planUpdate(bundle.snapshot, bundle.bindings, bundle.policy, actor, record, version, withoutEchoes(bundle, actor, 'update', answers, current?.answers), current)
+    if (!plan.ok) {
+      if (plan.code === 'invalid-values') return { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }
+      if (plan.code === 'record-not-read' && unread !== undefined) return recordFailure(bundle.bindings, unread)
+      return planRefusal(plan.code, plan.message)
+    }
+    const refused = await memberships(open, plan.memberships, request.log)
+    if (refused !== undefined) return refused
+    const outcome = await open.records.update(plan.request)
+    if (!outcome.ok && outcome.code === 'unknown-outcome') return lost(request, 'update', record, version, outcome.message)
+    if (!outcome.ok) return recordFailure(bundle.bindings, outcome)
+    return { status: 200, body: toFormAnswers(bundle.bindings, plan.fields, outcome) }
   }
 
   app.get<{ Params: { id: string } }>('/v1/forms/:id', async (request, reply) => {
@@ -280,9 +323,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     }
     const open = await connection(bundle, reply)
     if (open === undefined) return reply
-    const rejected = await memberships(open, plan.memberships, reply)
-    if (rejected === undefined) return reply
-    if (rejected.length > 0) return reply.code(422).send({ code: 'invalid-values', message: 'A selection is not one of the options.', fieldErrors: rejected })
+    const refused = await memberships(open, plan.memberships, request.log)
+    if (refused !== undefined) return reply.code(refused.status).send(refused.body)
     const answer = await sendOnce(request, 'create', id, async () => {
       const outcome = await open.records.insert(plan.request)
       if (!outcome.ok && outcome.code === 'unknown-outcome') return lost(request, 'create', intendedRecord(plan.request), null, outcome.message)
@@ -303,37 +345,10 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     if (id === null) return answered(reply, INVALID_WRITE_ID)
     const bundle = await published(request.params.id, reply)
     if (bundle === undefined) return reply
-    const actor = context(request)
     const open = await connection(bundle, reply)
     if (open === undefined) return reply
-
-    // The record as it stands, to tell an echoed read-only field from a changed
-    // one. An actor who may update and not read gets no echo removed, and the
-    // planner refuses whatever read-only field they sent.
-    let current: Record<string, unknown> | undefined
-    const reading = planRead(bundle.snapshot, bundle.bindings, bundle.policy, actor, body['record'])
-    if (reading.ok) {
-      const stored = await open.records.read(reading.request)
-      if (stored.ok) current = toFormAnswers(bundle.bindings, reading.fields, stored).answers
-    }
-
-    const plan = planUpdate(bundle.snapshot, bundle.bindings, bundle.policy, actor, body['record'], body['version'], withoutEchoes(bundle, actor, 'update', body['answers'], current))
-    if (!plan.ok) {
-      if (plan.code === 'invalid-values') return reply.code(422).send({ code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors })
-      const refusal = planRefusal(plan.code, plan.message)
-      return reply.code(refusal.status).send(refusal.body)
-    }
-    const rejected = await memberships(open, plan.memberships, reply)
-    if (rejected === undefined) return reply
-    if (rejected.length > 0) return reply.code(422).send({ code: 'invalid-values', message: 'A selection is not one of the options.', fieldErrors: rejected })
-    const { record, version } = body
-    const answer = await sendOnce(request, 'update', id, async () => {
-      const outcome = await open.records.update(plan.request)
-      if (!outcome.ok && outcome.code === 'unknown-outcome') return lost(request, 'update', record, version, outcome.message)
-      if (!outcome.ok) return recordFailure(bundle.bindings, outcome)
-      return { status: 200, body: toFormAnswers(bundle.bindings, plan.fields, outcome) }
-    })
-    return answered(reply, answer)
+    const { record, version, answers } = body
+    return answered(reply, await sendOnce(request, 'update', id, () => updated(request, bundle, open, record, version, answers)))
   })
 
   /** The lookup field a source name stands for, its config and the actor's filter for it — or a reply already sent. */

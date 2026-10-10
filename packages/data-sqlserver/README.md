@@ -229,8 +229,15 @@ const saved = await records.update({ target, key, set, expectedVersion: read.ver
   a `datetime`, which keeps 1/300 s, to the millisecond, rounded as SQL
   Server spells it —
   UUIDs in lower case. A time's seconds and an instant's fraction are cut
-  off, because formancy's shapes cannot hold them; update only the fields a
-  person changed. Text and
+  off, because formancy's shapes cannot hold them, as the PostgreSQL adapter
+  now cuts them too. `planUpdate` in `@formancy/data-core`, given the record
+  as read, removes an unedited echo of either from an update and refuses to
+  plan one without that read, so a save planned by it does not write the
+  shorter value
+  ([0040](../../docs/decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)); a caller that builds an
+  update request itself, as above, must set only the fields a person
+  changed.
+  Text and
   decimals are read by the column's own type, not the snapshot's, so a
   column widened since discovery reads what it holds.
 - **Values arrive as text the server converts**, never through the driver's

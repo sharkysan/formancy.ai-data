@@ -1,6 +1,6 @@
 # 0016 — Convert every PostgreSQL value on the server, bind it as text, and never let the driver's configuration decide an answer
 
-- **Status:** accepted; narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): a filter is a typed parameter compared again under `collate "C"`, labels are read by the record reader, and a refusal with no code of its own is `refused`; extended by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): an answer lost after the commit is `unknown-outcome`, proved through a TCP hop, and `close()` is bounded at five seconds
+- **Status:** accepted; narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): a filter is a typed parameter compared again under `collate "C"`, labels are read by the record reader, and a refusal with no code of its own is `refused`; extended by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): an answer lost after the commit is `unknown-outcome`, proved through a TCP hop, and `close()` is bounded at five seconds; narrowed by [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md): an instant is read to the second and a time to the minute, cut as SQL Server reads them, and only what no shape names keeps a spelling the codec refuses
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-postgres/src/lookups.integration.test.ts` and
@@ -24,8 +24,9 @@
   the search path change no answer*. Records: *reads
   every edge value of the fixture back exactly*, *reads every kind as the
   value its codec would return*, *reads a value the canonical shapes cannot
-  carry faithfully*, *reads the same values however the driver and the
-  session are configured*, *reads a real as the shortest decimal naming
+  carry faithfully* (renamed by 0040, which reads an instant and a time to
+  the shape), *reads the same values however the driver and the session
+  are configured*, *reads a real as the shortest decimal naming
   its float, never longer than PostgreSQL prints it* (renamed by 0026, which
   found PostgreSQL's own text is not always that decimal), *a record outside the filters is not-found*, *a
   filter on a table with a domain that refuses NULL reads, updates and

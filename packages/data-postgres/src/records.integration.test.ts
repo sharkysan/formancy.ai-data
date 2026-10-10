@@ -253,24 +253,34 @@ describe('reading', () => {
     expect(succeeded(await records.read({ target: KINDS, key: idKey('8'), columns: [col('kinds', 'b')], filters: EVERY_ROW })).values).toEqual({ b: false })
   })
 
-  // Values PostgreSQL holds and formancy's shapes cannot: an instant with
-  // microseconds — what now() writes into the fixture's own created_at — a
-  // time with seconds, infinite and BC dates, a NaN. Rounded to the shape,
-  // a form would save the rounded value over the real one; nulled, it would
-  // erase it. Read faithfully, the codec refuses them on the way back.
-  test('reads a value the canonical shapes cannot carry faithfully, never rounded, never null', async () => {
+  // Values PostgreSQL holds and formancy's shapes cannot. An instant with
+  // microseconds -- what now() writes into the fixture's own created_at --
+  // and a time with seconds are read cut to the shape, as SQL Server reads
+  // them (0040): to the second, in UTC, and to the minute, cut and never
+  // rounded, so `.789012` carries into nothing. Read faithfully, as before
+  // 0040, neither was a value its field accepts, and a host that sends every
+  // field back could not save the record. What no shape can name -- an
+  // infinite or BC date or instant, a five-digit year, 24:00, a NaN -- keeps
+  // a spelling the codec refuses: cut, it would read as a value it is not;
+  // nulled, a save would erase it.
+  test('reads an instant to the second and a time to the minute, and what no shape names in a spelling the codec refuses', async () => {
     await owner.unsafe(`
-      insert into rec.kinds (id, ts, tm, d, f8, tsl) values (2, '2026-10-08 12:34:56.789012+02', '10:30:15.5', 'infinity', 'NaN', '2026-10-08 23:59:59');
-      insert into rec.kinds (id, ts, d, f4) values (3, '0044-03-15 12:00:00+00 BC', '0044-03-15 BC', '-Infinity');
-      insert into rec.kinds (id, ts, d) values (4, 'infinity', '10000-01-01')`)
+      insert into rec.kinds (id, ts, tm, d, f8, tsl) values (2, '2026-10-08 12:34:56.789012+02', '10:30:59.999999', 'infinity', 'NaN', '2026-10-08 23:59:59');
+      insert into rec.kinds (id, ts, d, f4) values (3, '0044-03-15 12:00:00.5+00 BC', '0044-03-15 BC', '-Infinity');
+      insert into rec.kinds (id, ts, tm, d) values (4, 'infinity', '24:00:00', '10000-01-01');
+      insert into rec.kinds (id, ts, tm) values (9, '9999-12-31 23:59:59.999999+00', '23:59:59.999999')`)
     const records = createPostgresRecords(owner)
     const read = async (id: string): Promise<Record<string, ApiValue>> =>
       succeeded(await records.read({ target: KINDS, key: idKey(id), columns: ['ts', 'tm', 'd', 'f8', 'f4', 'tsl'].map((name) => col('kinds', name)), filters: EVERY_ROW })).values
-    expect(await read('2')).toEqual({ ts: '2026-10-08T10:34:56.789012Z', tm: '10:30:15.5', d: 'infinity', f8: 'NaN', f4: null, tsl: '2026-10-08T23:59:59' })
-    expect(await read('3')).toEqual({ ts: '0044-03-15T12:00:00.000000Z BC', tm: null, d: '0044-03-15 BC', f8: null, f4: '-Infinity', tsl: null })
-    expect(await read('4')).toEqual({ ts: 'infinity', tm: null, d: '10000-01-01 AD', f8: null, f4: null, tsl: null })
-    for (const [name, value] of [['ts', '2026-10-08T10:34:56.789012Z'], ['tm', '10:30:15.5'], ['d', 'infinity'], ['f8', 'NaN']] as const) {
-      expect(codecFor(meta('kinds', name)).parse(value).ok, name).toBe(false)
+    expect(await read('2')).toEqual({ ts: '2026-10-08T10:34:56Z', tm: '10:30', d: 'infinity', f8: 'NaN', f4: null, tsl: '2026-10-08T23:59:59' })
+    expect(await read('3')).toEqual({ ts: '0044-03-15T12:00:00.500000Z BC', tm: null, d: '0044-03-15 BC', f8: null, f4: '-Infinity', tsl: null })
+    expect(await read('4')).toEqual({ ts: 'infinity', tm: '24:00', d: '10000-01-01 AD', f8: null, f4: null, tsl: null })
+    expect(await read('9')).toEqual({ ts: '9999-12-31T23:59:59Z', tm: '23:59', d: null, f8: null, f4: null, tsl: null })
+    for (const [name, value] of [['ts', '2026-10-08T10:34:56Z'], ['tm', '10:30'], ['ts', '9999-12-31T23:59:59Z'], ['tm', '23:59']] as const) {
+      expect(codecFor(meta('kinds', name)).parse(value), `${name} ${value}`).toEqual({ ok: true, value })
+    }
+    for (const [name, value] of [['ts', '0044-03-15T12:00:00.500000Z BC'], ['ts', 'infinity'], ['tm', '24:00'], ['d', 'infinity'], ['d', '10000-01-01 AD'], ['f8', 'NaN']] as const) {
+      expect(codecFor(meta('kinds', name)).parse(value).ok, `${name} ${value}`).toBe(false)
     }
   })
 
@@ -850,7 +860,7 @@ describe('objects planted on the search path', () => {
   // A shadowed `=(bigint, numeric)` accepted a stale write; a shadowed
   // jsonb_populate_record returned another tenant's order through the tenant
   // filter; a shadowed to_char and `%` rewrote a date and dropped the
-  // fraction of an instant. With pg_catalog last, every operator, function
+  // fraction of an instant, which since 0040 is a zoneless timestamp's. With pg_catalog last, every operator, function
   // and type name the SQL spelled was the planted one. Each name is
   // qualified now, so neither path changes an answer.
   test('change no answer, whether pg_catalog is searched first or last', async () => {
@@ -858,7 +868,12 @@ describe('objects planted on the search path', () => {
     const theirs = await newOrder('theirs', '2')
     const createdAt = { target: CUSTOMER, key: customerKey('1', '1001'), columns: [col('customer', 'created_at')], filters: TENANT_1 }
     const instant = succeeded(await createPostgresRecords(owner).read(createdAt)).values
-    expect(instant.created_at).toMatch(/\.[0-9]+Z$/)
+    expect(instant.created_at).toMatch(/T\d{2}:\d{2}:\d{2}Z$/)
+    // An instant is cut to the second (0040), so the fraction a planted `%`
+    // dropped is now a zoneless timestamp's: the first shipment's, `.5`.
+    const shipment = { table: { schema: 'sales', name: 'shipment' }, identity: [ID], concurrency: null }
+    const dispatched = { target: shipment, key: [val('shipment', 'id', '1')], columns: [col('shipment', 'dispatched_at')], filters: EVERY_ROW }
+    expect(succeeded(await createPostgresRecords(owner).read(dispatched)).values).toEqual({ dispatched_at: EDGE_VALUES.localTimestamp })
 
     await owner.begin(async (tx) => {
       await tx.unsafe('create role planter; grant create on schema public to planter; grant usage on schema sales to planter')
@@ -881,6 +896,7 @@ describe('objects planted on the search path', () => {
         const edge = { target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'order_date'), col('order', 'amount')], filters: TENANT_1 }
         expect(succeeded(await records.read(edge)).values, path).toEqual({ order_date: EDGE_VALUES.orderDate, amount: EDGE_VALUES.largestAmount })
         expect(succeeded(await records.read(createdAt)).values, path).toEqual(instant)
+        expect(succeeded(await records.read(dispatched)).values, path).toEqual({ dispatched_at: EDGE_VALUES.localTimestamp })
         const inserted = succeeded(await records.insert({ target: ORDER, values: orderValues({ notes: path }), returning: [col('order', 'order_date')] }))
         expect(inserted, path).toEqual({ ok: true, values: { order_date: '2026-10-09' }, version: '1' })
       }

@@ -251,7 +251,7 @@
       ]
     },
     "0016": {
-      "reviewed": "sha256:365820a4363cc860b250e89200b484973ccc37087686457e9e844a0a8b812680",
+      "reviewed": "sha256:7b050753c370f4ec9b8828938ea3576893998cbab95d0ad392c73d1703d764ca",
       "limitations": [
         {
           "area": "databases",
@@ -259,7 +259,8 @@
         },
         {
           "area": "forms",
-          "says": "A PostgreSQL value outside formancy's shapes, such as a `created_at` from `now()`, reaches the form as text its field refuses, so a host that sends every field back on save cannot save that record until the person changes the value."
+          "says": "A PostgreSQL value no shape of formancy's names -- `infinity`, a BC or five-digit year, a time of `24:00`, a NaN -- reaches the form as text the codec refuses, so a date or a number of this kind sent back on save is refused until the person changes it.",
+          "heldBy": "packages/data-postgres/src/records.integration.test.ts"
         },
         {
           "area": "forms",
@@ -292,12 +293,8 @@
       ]
     },
     "0017": {
-      "reviewed": "sha256:4c5f74f88d0a58413e84c82d507a7a87b895d563750915f52935b581dbf79b48",
+      "reviewed": "sha256:4d38ecdad65ee07e13bc4f989939e63a8021c53dd1bfb59db6dae34f84560380",
       "limitations": [
-        {
-          "area": "writes",
-          "says": "SQL Server reads a time cut to the minute and an instant to the second, so a host that writes back an unedited value writes the shorter one."
-        },
         {
           "area": "writes",
           "says": "On SQL Server, `returning` is the row as the statement wrote it, before an AFTER trigger changed it; only the version is read back after one."
@@ -342,7 +339,7 @@
       ]
     },
     "0018": {
-      "reviewed": "sha256:563217ade9f4f13d167dae50cf43f09bd729180d70c47a240df231556cb1c8ac",
+      "reviewed": "sha256:f04775dd437b31113919b4056ce03eddcbde478f6a8ba6b110fb723de8e90162",
       "limitations": [
         {
           "area": "access",
@@ -410,7 +407,7 @@
       ]
     },
     "0022": {
-      "reviewed": "sha256:a8dc7d61d75b5d4c167f80b4206580d509829534d387259691762006de6c574a",
+      "reviewed": "sha256:ca5d60f92f867ff0774fbee624229773533087eff87efb2de9dd73aee3f2c3d2",
       "limitations": [
         {
           "area": "writes",
@@ -466,7 +463,7 @@
       ]
     },
     "0026": {
-      "reviewed": "sha256:b6cbd26a18217dc65db494deeff1263885417f37643dc32ff80dc4188d892e1c",
+      "reviewed": "sha256:26d6fa0a003848594741f8dbd8848125cc452578e50482a28c33bb34b7ceff3e",
       "limitations": [
         {
           "area": "forms",
@@ -492,10 +489,6 @@
           "area": "writes",
           "says": "A 32-bit float's answer is not always what was sent: `0.123456789` comes back `0.12345679`.",
           "heldBy": "packages/data-core/src/codecs/codec.test.ts"
-        },
-        {
-          "area": "databases",
-          "says": "Instants and times differ between the engines: PostgreSQL keeps a fraction, and SQL Server cuts an instant to the second and a time to the minute."
         },
         {
           "area": "forms",
@@ -699,7 +692,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:4637bc02384c6df587d4fc8b59164cc3c310115da8fcbc8d89eb12fb1264c17f",
+      "reviewed": "sha256:a9839b7a7f2e8d99a4cc5917e9db1811bb7781a282114897329cd00bd7d04378",
       "limitations": [
         {
           "area": "writes",
@@ -900,6 +893,60 @@
         {
           "area": "studio",
           "says": "The studio offers Keep and Remove only for the keys its regeneration reported, so a draft proposed afresh, or generated again after a key renumbered once more, whose policy gives a role on such a key is refused with the server's sentences, a Keep left from the regeneration confirming the column it reported and not the one the key names now; it is published by removing those grants or by regenerating from the Drift step."
+        }
+      ]
+    },
+    "0040": {
+      "reviewed": "sha256:a2f5a2419f353b7868bd137062dfabab5c84e7bc14ed2ad6742c79b8d8abb29f",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A form shows an instant to the second and a time to the minute on both engines, PostgreSQL now as SQL Server already did, so a stored fraction and seconds stay in the database and are not shown.",
+          "heldBy": "packages/data-postgres/src/parity.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "An instant or a time that differs from the stored value only below the second or the minute cannot be written through a form: it is taken for an unedited echo and removed from the update.",
+          "heldBy": "packages/data-core/src/records/plan-update-echo.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "An actor who may write an instant or a time and not read it, or who may update a record and not read it, has nothing removed, so a cut value they send back replaces the stored fraction or seconds.",
+          "heldBy": "apps/host/src/temporal-round-trip.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "An instant the person changes is written in UTC, so SQL Server stores it at +00:00 whatever offset the row held.",
+          "heldBy": "apps/host/src/temporal-round-trip.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "An instant of `infinity` or a time of `24:00`, which PostgreSQL holds and no shape names, cannot be submitted through either renderer until the person changes it; a client of its own that sends it back unedited saves, and the value is kept.",
+          "heldBy": "apps/host/src/temporal-round-trip.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A form whose only writable fields are instants and times, saved unedited, is refused as `nothing-to-update` and writes nothing, which the host page shows under \"Not saved\".",
+          "heldBy": "apps/host/src/temporal-round-trip-page.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "An update carrying an instant or a time the actor may write and read is refused with the read's own answer when the read before it failed, whatever the failure, though the write itself might have succeeded.",
+          "heldBy": "packages/data-server/src/routes/runtime-temporal.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A caller of `planUpdate` that sends an instant or a time the actor may read must pass the record as read, or the update is refused `record-not-read`; an update request built for an adapter without the planner is held to no echo rule.",
+          "heldBy": "packages/data-core/src/records/plan-update-echo.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A write that arrives again with its write id is answered with a refusal of its own, not the first sending's answer, when the form cannot be loaded or the connection opened, and on create when a lookup cannot vouch for a selection: those answers come before the sending."
+        },
+        {
+          "area": "forms",
+          "says": "An instant changed in `@formancy/react` 0.3.0's datetime control is saved as the local minute the control holds, its seconds and fraction gone; Angular's control was not measured.",
+          "heldBy": "apps/host/src/temporal-round-trip-page.test.ts"
         }
       ]
     }

@@ -43,7 +43,12 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > serves, and on both engines a test fails if the server accepts such a grant
 > unconfirmed. A host renders, loads, saves and searches a
 > published form in both renderers through `@formancy/data-client`, and the
-> host page does so against both engines in its suite. A save whose answer is
+> host page does so against both engines in its suite. An instant and a time
+> read alike on both engines, to the second and to the minute, and a save
+> that did not change one the person may read never writes it back, so a
+> `created_at` from `now()` saves unedited on PostgreSQL and keeps its
+> fraction on SQL Server, proved through the page in both renderers.
+> A save whose answer is
 > lost says it may have been saved, all the way to the host page, which holds
 > a create until it is checked or the person confirms; on both engines a test
 > drops the database's answer after the commit and fails if anything sends the
@@ -313,6 +318,14 @@ load the saved record. A selection the server refuses is said on the field.
 The form stays editable while a save is out: what is typed meanwhile is kept
 and said to be unsaved, a second press sends nothing and says so, and an
 answer that arrives after Load or New is said on the pane's line.
+An instant or a time the person may read and did not change is never written
+back: both engines read one to the second or the minute, and the planner
+removes the unedited echo from the update, compared with the record the
+server reads first
+([0040](./docs/decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)),
+so a save keeps the fraction and the seconds the database holds; a form whose
+only change was such a field says it was not saved, because nothing changed,
+and a save whose read failed is refused rather than sent.
 In a real host the application's own session supplies the token; the page asks
 for one because it has none, holds it in memory only, and forgets it on a
 reload. As with the studio, the page is served from the server's origin: in

@@ -37,6 +37,13 @@ export function planRefusal(code: PlanRefusalCode, message: string): HttpRefusal
     case 'invalid-version':
     case 'nothing-to-update':
       return { status: 400, body: { code, message } }
+    case 'record-not-read':
+      // The update route plans with the record it read and answers a read
+      // that failed itself (0040), so only a read that came back as another
+      // record's token reaches this -- a key spelled otherwise than the
+      // database holds it, under a collation that matched it anyway. Nothing
+      // was sent, and a 500 would tell the client it may have been saved.
+      return { status: 409, body: { code, message: 'This update could not be compared with the record as read. Nothing was saved.' } }
   }
 }
 
