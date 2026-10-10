@@ -21,6 +21,6 @@ describe('codecov.yml', () => {
   // never merge with a package of the same name.
   test('names every package that produces coverage', () => {
     const ids = coveredPackages().map((entry) => entry.id)
-    expect(ids).toEqual(['data-client', 'data-core', 'data-fixtures', 'data-postgres', 'data-server', 'data-sqlserver', 'app-examples', 'app-host', 'app-studio'])
+    expect(ids).toEqual(['data-client', 'data-core', 'data-fixtures', 'data-performance', 'data-postgres', 'data-server', 'data-sqlserver', 'app-examples', 'app-host', 'app-studio'])
   })
 })

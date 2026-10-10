@@ -8,6 +8,7 @@ import { DRIVER_FACTORIES } from './drivers.js'
 import { createIdentityVerifier } from './identity.js'
 import type { IdentityOptions } from './identity.js'
 import { servedPlanes } from './planes.js'
+import { rateLimitSetting } from './rate-limit.js'
 import { resolveSecret } from './secrets.js'
 
 /**
@@ -22,6 +23,7 @@ import { resolveSecret } from './secrets.js'
  *   FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE         or a PEM public key, with
  *   FORMANCY_DATA_IDENTITY_ALGORITHM               RS256, ES256 or EdDSA
  *   FORMANCY_DATA_ATTRIBUTES                       e.g. "tenant=tid,region=reg"
+ *   FORMANCY_DATA_RATE_LIMIT                       requests a minute per client address, default 600
  *   PORT                                           default 4390
  */
 function required(name: string): string {
@@ -60,6 +62,14 @@ async function identityKey(): Promise<IdentityOptions['key']> {
     process.exit(1)
   }
   return { kind: 'public-key', pem: await readFile(publicKeyFile ?? '', 'utf8'), algorithm }
+}
+
+// Read before anything opens: a limit nobody chose stops the process here,
+// not after the planes have connected.
+const limit = rateLimitSetting(process.env['FORMANCY_DATA_RATE_LIMIT'])
+if (!limit.ok) {
+  console.error(limit.problem)
+  process.exit(1)
 }
 
 const verifyIdentity = await createIdentityVerifier({
@@ -105,7 +115,7 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
   planes = servedPlanes({ registry, store, adminRoles, auditKey, log: () => app.log })
 }
 
-const app = await createDataServer({ verifyIdentity, logger: true, ...planes })
+const app = await createDataServer({ verifyIdentity, logger: true, rateLimit: limit.rateLimit, ...planes })
 app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, connections: registry?.ids() ?? [] }, 'planes')
 
 // On SIGTERM a container stops taking requests, finishes the ones in flight,

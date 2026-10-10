@@ -66,7 +66,12 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > written, on both engines. Every CI run ends in a report of what it was
 > tested on -- each server's own version, the dependencies the suites
 > loaded, every shared case on both engines -- which a release checks, signs
-> and attaches.
+> and attaches. Performance is measured, not promised:
+> [`docs/performance.md`](./docs/performance.md) publishes figures for every
+> runtime request through the shipped server on both engines against a sized
+> customer table, with the database's size, the machine, the network path and
+> the date; CI holds the rows each lookup reads and the round trips each
+> operation makes, never a time.
 > `CHANGELOG.md` says what each step found.
 
 ## Licence, in one table
@@ -97,6 +102,7 @@ project, and why in a repository of its own, is decision
 | `@formancy/data-client` | The browser's side of the runtime plane: a `fetch`-based client for a published form's definition, records and lookups, and the option sources both formancy renderers take. Source-available, framework-neutral, no Node. |
 | `@formancy/data-server` | The server: configuration store, host identity, the administrator and runtime planes over HTTP, the audit trail, and the composition root that starts them from configuration. Fastify, like formancy's. |
 | `@formancy/data-fixtures` | Private test support: one business model for both engines, a restricted reader, and the comparator both adapters answer to. Never published. |
+| `@formancy/data-performance` | Private: the harness that measures the shipped server against both engines and renders `docs/performance.md` from what it measured. Never published. |
 
 ## What it is tested on
 
@@ -438,9 +444,14 @@ versions — and a picture taken on another is refused until `pnpm pictures
 and fails when a pictured element says something else
 ([0038](./docs/decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 
+`pnpm performance` measures the shipped server on a quiet Linux machine and
+rewrites [`docs/performance.md`](./docs/performance.md); it refuses while any
+other container runs.
+
 ## Documents
 
 - [`docs/getting-started.md`](./docs/getting-started.md) — from an empty machine with Docker and git to a published form on both engines; CI runs it as written.
+- [`docs/performance.md`](./docs/performance.md) — what each runtime request costs through the shipped server on both engines, with the database's size, the machine, the network path and the date, and what holds each claim.
 - [`docs/decisions/`](./docs/decisions/README.md) — every decision somebody could helpfully undo, with what verifies it.
 - [`docs/release/`](./docs/release/README.md) — the report every CI run and every release builds of what it was tested on, the register of the limitations the decisions state, and the release gates' evidence.
 - [`docs/images/README.md`](./docs/images/README.md) — how the README's pictures are taken, and what holds them and what does not.

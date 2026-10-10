@@ -17,9 +17,16 @@ added unvalidated beside one SQL Server disables.
   the fixture, create `formancy_reader` — who may read `sales.order` and nothing
   else — and `formancy_writer`, the order form's account (`WRITER`), and return
   connection settings for all three principals and the account the owner
-  discovers as. A row-level security policy on `sales.customer` shows the
-  writer tenant 1 only; it binds nobody else, though SQL Server applies it to
-  `dbo` too (0027).
+  discovers as, and the container's `containerId`, which the performance
+  harness reads CPU, memory and limits by (0034). A row-level security
+  policy on `sales.customer` shows the writer tenant 1 only; it binds nobody
+  else, though SQL Server applies it to `dbo` too (0027).
+- `connectDocker()` reads Docker through testcontainers' own runtime client:
+  the daemon's facts, the running containers, whether an image is present,
+  a container's image, digests and limits, and its cumulative CPU and
+  memory. It starts, stops and changes nothing. It is here, not in the
+  performance harness that uses it (0034), because nothing else may declare
+  testcontainers (below).
 - `FIXTURE_MODEL` is the database-neutral truth. Where the engines genuinely
   differ, it says so per engine rather than smoothing it over.
 - `snapshotDisagreements(snapshot)` reports every way a discovered snapshot
@@ -75,6 +82,42 @@ added unvalidated beside one SQL Server disables.
   of a commit -- PostgreSQL sends a deferred constraint's refusal after the
   row -- so a suite polls a connection of its own until the write is visible
   before it cuts.
+  Since 0034 it also counts and delays. `countRoundTrips()` counts turns
+  from the call on, on every connection: each time the client speaks again
+  after it last heard the server, so two writes before an answer are one turn
+  and an answer in several reads is one. That is what a network's latency
+  multiplies, and the measurement's added-latency block is what shows it
+  does. `delayAnswers(ms, schedule)` holds every answer for `ms` before
+  passing it on, in order, a close from the server behind it; 0 passes them
+  on at once. The scheduler is injectable, so its tests need no clock. One
+  fixed wait per answer after loopback: no bandwidth, loss or congestion
+  window. Nagle's algorithm is off on both of its sockets, as tedious and
+  docker-proxy turn it off on theirs: left on, a SQL Server answer of
+  several packets waited on a delayed acknowledgement through the hop that
+  it never waits for directly, and the hop measured itself.
+
+- **The sized customers** (0034), opt-in: `loadSizedCustomers({ kind, admin })`
+  fills `sales.customer` with a million generated customers beside the
+  fixture's own two, in key order, a tenth of them in tenant 1, as the
+  database's owner. Both engines are fed the same JSON text per chunk, from
+  one generator (`jsonb_to_recordset` and `openjson`), so the two cannot
+  be loaded with different data and agree by accident; then statistics are
+  maintained, the database checkpoints, and every row is read back and
+  compared with the generator, refusing at the first difference by its key
+  (`sizedReadBack`, `verifySizedCustomers`). The start functions never call
+  it, so a suite that does not ask never waits for it: this package's own
+  sized suite, both adapters' `lookups-sized.integration.test.ts` and the
+  performance harness each load it into containers of their own. On the
+  Docker Sandbox VM on a Windows 11 workstation (2026-10-09), a load took
+  about 35 s on PostgreSQL and 15 s on SQL Server, read-back included.
+  `sized.ts` is the generator and every expectation, pure: names unique
+  case-insensitively, in an alphabet whose code-point order and
+  case-insensitive order agree, so PostgreSQL on musl and SQL Server's CI
+  collation order them alike; `sizedTerms()`, a search many customers match,
+  one matches and none matches; `sizedLookupPage()`, the page both engines
+  must answer; `sizedRowsRead()`, the rows a lookup reads, which both
+  adapters' sized suites pin and the performance page prints;
+  `sizedResolveKeys()`; and `sizedDigest()` of what was loaded.
 
 Every adapter's suite asserts both lists are empty. That is how "both adapters
 pass the same mandatory suite" is something a test checks.
@@ -95,7 +138,8 @@ from every job and lists every image a run started, with what each server
 answered and which tests ran on it (0035). A suite that started a container
 any other way would leave no record, so nothing else in the workspace
 declares testcontainers, and `scripts/release-report/tested-on.test.mjs`
-fails when something does. The adapters' own typed variables take
+fails when something does; a package that only reads Docker, as the
+performance harness does, uses `connectDocker()`. The adapters' own typed variables take
 `StartedPostgreSqlContainer` and `StartedMSSQLServerContainer` from here.
 
 ## Shared cases

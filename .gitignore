@@ -20,6 +20,10 @@ test-results/
 .idea/
 .pnpm-store/
 
+# A measurement's raw samples, the server's log and its store (0034): local,
+# megabytes per run; what is published is docs/performance/results.json.
+packages/data-performance/runs/
+
 # Copied into each package at build time by scripts/sync-licenses.mjs so the
 # tarballs carry them. The root LICENSE.md and NOTICE are the only real ones.
 packages/*/LICENSE.md

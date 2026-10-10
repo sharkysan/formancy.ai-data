@@ -237,6 +237,50 @@ where six, which the definition suite counts.
 - **A refused write still fires the table's statement-level triggers**, and
   in autocommit what they did is kept.
 
+### What a lookup reads
+
+[0034](../../docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)
+holds this without a clock, on the sized `sales.customer` of
+`@formancy/data-fixtures`: `lookups-sized.integration.test.ts` captures the
+statement the adapter actually sent, through postgres.js's `debug` hook, and
+replays it under `EXPLAIN (ANALYZE)` as the writer. The counts it pins are
+`sizedRowsRead()` of `@formancy/data-fixtures`, which the SQL Server suite
+and the performance page read too. What it pins:
+
+- **Rows sent.** A search asks for the page and one more row, `limit …
+  offset` in SQL, and `lookups.ts` trims to the page: the server never
+  receives more.
+- **Rows read.** With the order form's tenant row filter, `tenant_id = $n`
+  is an index condition on `pk_customer`, so a search reads exactly that
+  tenant's rows -- and every one of them, for every search and for the first
+  page, because a leading-wildcard `~~*` and an order by `name` have no
+  index to use. On a form with no tenant row filter it reads the whole
+  table: row-level security's predicate, `current_user <> … or tenant_id =
+  1`, is not an index condition. A resolve and the membership check read at
+  most one row per key, through `pk_customer`.
+- **What the plans were** (P3, P9; 2026-10-09, PostgreSQL 17.11 on musl, a
+  Docker Sandbox VM on a Windows 11 workstation): a tenant's search is a
+  Bitmap Heap Scan over a Bitmap Index Scan of `pk_customer` on
+  `tenant_id`, parallel under the default settings; an unfiltered search is
+  a sequential scan, parallel too. JIT never fired: no plan cost reached
+  `jit_above_cost`. The searches' exact counts come from a session with
+  parallel workers off, where each search's scan runs once; under the
+  defaults the test holds the plan shape and the count within PostgreSQL
+  17's per-loop rounding. A resolve probes the index once per key, so its
+  scan runs once per key in either session, and resolving 100 keys or one
+  and checking one are held to at most a row per key in both.
+- **What an index would change** (P5, an index on `(tenant_id, name,
+  customer_no)` created and dropped by the probe, never shipped): the first
+  page and a search many customers match become an ordered index-only scan
+  that stops early; a search that matches one customer or none still reads
+  the whole tenant, and an unfiltered search the whole table.
+
+Every statement is two round trips: `sql.unsafe` sends an unprepared
+statement with parameters as Parse, Describe and Flush, waits for the
+server's description of the parameters, then binds and executes. The
+measurement's counting pass counts it through a TCP hop on every run, and
+[`docs/performance.md`](../../docs/performance.md) has the figures.
+
 ### An answer lost after a write
 
 [0031](../../docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)
@@ -434,6 +478,9 @@ The suites start `postgres:17-alpine` unless a test names another image, through
   filters, literal search, order, NULL and unrepresentable keys, membership,
   the restricted reader, a driver configured every way it can be, and
   objects planted on the search path.
+- `lookups-sized.integration.test.ts` — what a lookup reads and sends on the
+  sized customers, in containers of its own: the plan of each statement the
+  adapter sent, serially and under the defaults (0034).
 - `parity.integration.test.ts` — the cases 0028 holds both engines to, from
   `@formancy/data-fixtures`, over its `parity` schema: every row filter in a
   lookup's page, resolve and membership, a read and an update; the filter

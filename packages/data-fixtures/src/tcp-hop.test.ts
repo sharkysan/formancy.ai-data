@@ -1,6 +1,6 @@
 import net from 'node:net'
 import type { AddressInfo } from 'node:net'
-import { afterEach, describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { answerBytes, startTcpHop } from './tcp-hop.js'
 import type { TcpHop } from './tcp-hop.js'
 
@@ -145,6 +145,29 @@ describe('a TCP hop', () => {
     expect(ends.atClient().toString('latin1')).toBe('hello, client')
   })
 
+  // A Node socket holds a small write back while an earlier one is not yet
+  // acknowledged (Nagle's algorithm), and Linux's delayed ACK can hold that
+  // acknowledgement for 40 ms. tedious turns it off on its own socket and
+  // docker-proxy on its own, so a hop that left it on would stall a SQL
+  // Server answer of several packets where the direct path never does: in
+  // review, a 100-key resolve took 92 ms through the hop and 13.7 ms direct,
+  // and the added-latency table would have published the hop. Asked of the
+  // sockets, by the call that sets it, because no test here reads a clock.
+  test("turns Nagle's algorithm off on both of its sockets", async () => {
+    const calls = vi.spyOn(net.Socket.prototype, 'setNoDelay')
+    try {
+      const { hop, connect } = await setUp()
+      const ends = await connect()
+      await fromClient(ends, text('request'))
+      await fromServer(ends, text('answer'))
+      const off = calls.mock.contexts.filter((_, index) => calls.mock.calls[index]?.[0] !== false) as net.Socket[]
+      expect(off.filter((socket) => socket.localPort === hop.port), 'the side the driver connects to').toHaveLength(1)
+      expect(off.filter((socket) => socket.remotePort === ends.server.localPort), 'the side to the database').toHaveLength(1)
+    } finally {
+      calls.mockRestore()
+    }
+  })
+
   // A server that answers and then closes -- a FATAL ErrorResponse and its
   // FIN, a large answer before a close -- must reach the driver whole, then
   // closed. A hop that tore both sockets down on the first close threw away
@@ -261,6 +284,214 @@ describe('a TCP hop', () => {
     const later = await connect()
     await fromClient(later, text('a new connection'))
     await fromServer(later, MARKER)
+  })
+})
+
+describe('round trips through a hop', () => {
+  // A round trip is a turn: the client speaking again after the server last
+  // did. A driver that sends Parse, Describe and Flush in one write and Bind
+  // and Execute in a second, after the answer, has made two; one that pipes
+  // both in one write has made one. Counting the request, then the reply, then
+  // the next request as anything but two would make every pinned count in the
+  // adapter suites mean something else.
+  test('a request, its reply and the next request are two', async () => {
+    const { hop, connect } = await setUp()
+    const ends = await connect()
+    const turns = hop.countRoundTrips()
+    await fromClient(ends, text('request'))
+    await fromServer(ends, text('reply'))
+    await fromClient(ends, text('request'))
+    expect(turns()).toBe(2)
+  })
+
+  // A client that writes twice before the server answers has not waited for
+  // anything: the latency it pays is one round trip's. Counting client chunks
+  // would count it twice, and a driver's write buffering would change a pin.
+  test('two client writes before a reply are one', async () => {
+    const { hop, connect } = await setUp()
+    const ends = await connect()
+    const turns = hop.countRoundTrips()
+    await fromClient(ends, text('parse'))
+    await fromClient(ends, text('bind'))
+    await fromServer(ends, text('ready'))
+    expect(turns()).toBe(1)
+  })
+
+  // A long answer arrives in several reads -- a page of rows, a TDS answer
+  // past one packet. The client's next request is still one turn after it.
+  test('a reply split into two server chunks is one turn before the next request', async () => {
+    const { hop, connect } = await setUp()
+    const ends = await connect()
+    const turns = hop.countRoundTrips()
+    await fromClient(ends, text('select'))
+    await fromServer(ends, text('rows 1-25;'))
+    await fromServer(ends, text('rows 26-51;'))
+    expect(turns()).toBe(1)
+    await fromClient(ends, text('select'))
+    expect(turns()).toBe(2)
+  })
+
+  // A pool spreads statements over several connections; an operation's
+  // round trips are all of them, wherever each ran.
+  test('turns on two connections sum', async () => {
+    const { hop, connect } = await setUp()
+    const one = await connect()
+    const two = await connect()
+    const turns = hop.countRoundTrips()
+    await fromClient(one, text('a'))
+    await fromServer(one, text('b'))
+    await fromClient(two, text('c'))
+    await fromServer(two, text('d'))
+    await fromClient(two, text('e'))
+    expect(turns()).toBe(3)
+  })
+
+  // The counting pass warms a connection up first and counts one request
+  // after it. What went before the call must not be in the count, and a turn
+  // already begun -- the client spoke last -- is not a new one.
+  test('a counter started later counts only from then', async () => {
+    const { hop, connect } = await setUp()
+    const ends = await connect()
+    await fromClient(ends, text('warm-up'))
+    await fromServer(ends, text('warm'))
+    await fromClient(ends, text('still the same turn'))
+    const turns = hop.countRoundTrips()
+    await fromClient(ends, text('and again'))
+    expect(turns()).toBe(0)
+    await fromServer(ends, text('answer'))
+    await fromClient(ends, text('next'))
+    expect(turns()).toBe(1)
+  })
+})
+
+/** A scheduler the test runs by hand: what the hop asked to run, and when, without a clock. */
+function manualScheduler(): { schedule: (callback: () => void, ms: number) => unknown; pending: Array<{ callback: () => void; ms: number }> } {
+  const pending: Array<{ callback: () => void; ms: number }> = []
+  return {
+    pending,
+    schedule: (callback, ms) => {
+      pending.push({ callback, ms })
+      return undefined
+    },
+  }
+}
+
+describe('delayed answers', () => {
+  // The added-latency block holds every answer for D before the driver sees
+  // it. An answer forwarded first and timed afterwards would measure nothing:
+  // no byte may reach the client until the scheduled callback runs. Absence
+  // has no event, so after the hop has asked for the callback the test gives
+  // loopback 200 ms, as `swallowed` does, before it looks.
+  test('nothing reaches the client until the scheduler runs', async () => {
+    const { hop, connect } = await setUp()
+    const ends = await connect()
+    const scheduler = manualScheduler()
+    hop.delayAnswers(5, scheduler.schedule)
+    ends.server.write(text('held'))
+    await until(() => scheduler.pending.length === 1, 'the hop scheduled the answer')
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(ends.atClient().length).toBe(0)
+    expect(scheduler.pending[0]?.ms).toBe(5)
+    scheduler.pending[0]?.callback()
+    await until(() => ends.atClient().toString('latin1') === 'held', 'the client received the held answer')
+  })
+
+  // A delay that reordered two reads of one answer would hand the driver a
+  // corrupt protocol stream. Order is kept even when the callbacks run in the
+  // opposite order to the one they were asked for.
+  test('two chunks arrive in order, whichever callback runs first', async () => {
+    const { hop, connect } = await setUp()
+    const ends = await connect()
+    const scheduler = manualScheduler()
+    hop.delayAnswers(5, scheduler.schedule)
+    ends.server.write(text('first;'))
+    await until(() => scheduler.pending.length === 1, 'the hop scheduled the first chunk')
+    ends.server.write(text('second;'))
+    await until(() => scheduler.pending.length === 2, 'the hop scheduled the second chunk')
+    scheduler.pending[1]?.callback()
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(ends.atClient().length).toBe(0)
+    scheduler.pending[0]?.callback()
+    await until(() => ends.atClient().toString('latin1') === 'first;second;', 'the client received both chunks in order')
+  })
+
+  // The undelayed pass of the same block goes through the same hop: with a
+  // delay of zero nothing is scheduled at all, so it measures the hop and not
+  // a timer's granularity.
+  test('delayAnswers(0) forwards at once, without scheduling', async () => {
+    const { hop, connect } = await setUp()
+    const ends = await connect()
+    const scheduler = manualScheduler()
+    hop.delayAnswers(0, scheduler.schedule)
+    await fromServer(ends, text('straight through'))
+    expect(scheduler.pending).toEqual([])
+  })
+
+  // The latency block switches the delay off between its passes; an answer
+  // arriving then must still wait behind the one held from before, or the
+  // driver reads the second half of a message before its first.
+  test('an answer after the delay is lowered to 0 waits behind the ones still held', async () => {
+    const { hop, connect } = await setUp()
+    const ends = await connect()
+    const scheduler = manualScheduler()
+    hop.delayAnswers(5, scheduler.schedule)
+    ends.server.write(text('held;'))
+    await until(() => scheduler.pending.length === 1, 'the hop scheduled the first chunk')
+    hop.delayAnswers(0, scheduler.schedule)
+    ends.server.write(text('after;'))
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(ends.atClient().length).toBe(0)
+    expect(scheduler.pending).toHaveLength(1)
+    scheduler.pending[0]?.callback()
+    await until(() => ends.atClient().toString('latin1') === 'held;after;', 'the client received both chunks in order')
+    await fromServer(ends, text('straight through'))
+  })
+
+  // `setTimeout` reads a negative or NaN delay as one millisecond, so a
+  // block configured with one would publish a "delay" nobody chose.
+  test('refuses a delay that is not a number of milliseconds, at least 0', async () => {
+    const { hop } = await setUp()
+    for (const ms of [-1, Number.NaN, Number.POSITIVE_INFINITY]) expect(() => hop.delayAnswers(ms)).toThrow(/at least 0/)
+  })
+
+  // A server's last words and its FIN: the FIN must wait behind the answers
+  // the delay is holding, or the driver sees a closed socket before the
+  // error that explains it.
+  test('a close waits for the held answers before it', async () => {
+    const { hop, connect } = await setUp()
+    const ends = await connect()
+    const scheduler = manualScheduler()
+    hop.delayAnswers(5, scheduler.schedule)
+    const clientEnded = new Promise<void>((resolve) => ends.client.once('end', () => resolve()))
+    let ended = false
+    void clientEnded.then(() => (ended = true))
+    ends.server.end(text('last words'))
+    await until(() => scheduler.pending.length === 1, 'the hop scheduled the last answer')
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(ended).toBe(false)
+    scheduler.pending[0]?.callback()
+    await bounded(clientEnded, 'the client never saw the end')
+    expect(ends.atClient().toString('latin1')).toBe('last words')
+  })
+
+  // The turn counter and the delay together, as the latency block uses them:
+  // a turn is counted when the client speaks after hearing the server, so an
+  // answer still held by the hop has not been heard.
+  test('an answer the hop still holds has not ended the turn', async () => {
+    const { hop, connect } = await setUp()
+    const ends = await connect()
+    const scheduler = manualScheduler()
+    const turns = hop.countRoundTrips()
+    await fromClient(ends, text('request'))
+    hop.delayAnswers(5, scheduler.schedule)
+    ends.server.write(text('reply'))
+    await until(() => scheduler.pending.length === 1, 'the hop scheduled the reply')
+    await fromClient(ends, text('pipelined, before the reply was heard'))
+    expect(turns()).toBe(1)
+    scheduler.pending[0]?.callback()
+    await until(() => ends.atClient().toString('latin1') === 'reply', 'the client received the reply')
+    await fromClient(ends, text('after the reply'))
+    expect(turns()).toBe(2)
   })
 })
 

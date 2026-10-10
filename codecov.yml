@@ -58,6 +58,10 @@ component_management:
       name: packages/data-fixtures
       paths:
         - packages/data-fixtures/**
+    - component_id: data-performance
+      name: packages/data-performance
+      paths:
+        - packages/data-performance/**
     - component_id: data-postgres
       name: packages/data-postgres
       paths:

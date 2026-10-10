@@ -5,6 +5,7 @@ import { CONFIGURATION_ID_MAX_LENGTH } from './config-store.js'
 import type { ConfigurationStore } from './config-store.js'
 import type { ConnectionRegistry } from './connections.js'
 import type { HostIdentity, IdentityVerifier } from './identity.js'
+import { DEFAULT_RATE_LIMIT } from './rate-limit.js'
 import { adminRoutes } from './routes/admin.js'
 import type { AdminOptions } from './routes/admin.js'
 import { runtimeRoutes } from './routes/runtime.js'
@@ -20,11 +21,13 @@ export interface DataServerOptions {
   /**
    * Requests per client address per window, on every route but `/health`.
    *
-   * Default 600 a minute. Generous on purpose: a lookup is a request per pause
-   * in typing, and a host's reverse proxy can put a whole office behind one
-   * address — an operator behind a proxy sets Fastify's `trustProxy` and a
-   * limit to match. What it is for is the other case: somebody replaying
-   * tokens at the verifier as fast as the network allows.
+   * Default 600 a minute (`DEFAULT_RATE_LIMIT`). Generous on purpose: a lookup
+   * is a request per pause in typing. What it is for is the other case:
+   * somebody replaying tokens at the verifier as fast as the network allows.
+   * The runnable server reads `FORMANCY_DATA_RATE_LIMIT` for it (main.ts).
+   * Fastify's `trustProxy` is not offered, so behind a reverse proxy every
+   * client shares the proxy's address and one bucket: the setting raises that
+   * bucket, it does not split it.
    */
   rateLimit?: { max: number; timeWindowMs: number }
   /**
@@ -111,7 +114,7 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   // Global, unlike formancy's server, where the management plane is
   // authenticated by its own sessions: every route here except /health is
   // reachable by anybody holding a browser and does work before refusing.
-  const limit = options.rateLimit ?? { max: 600, timeWindowMs: 60_000 }
+  const limit = options.rateLimit ?? DEFAULT_RATE_LIMIT
   await app.register(rateLimit, { global: true, max: limit.max, timeWindow: limit.timeWindowMs })
 
   const authenticate = async (request: FastifyRequest): Promise<HostIdentity | undefined> => {

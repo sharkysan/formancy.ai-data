@@ -21,6 +21,13 @@ import type { DatabaseKind } from '@formancy/data-core'
  * A matched marker is not proof of a commit: PostgreSQL sends a deferred
  * constraint's refusal after the row (P2b). A suite polls a connection of its
  * own until the write is visible before it calls `cut()`.
+ *
+ * Since 0034 the hop also counts round trips and can delay answers, for the
+ * performance measurement and the adapters' pinned counts. A round trip is a
+ * turn -- the client speaking again after it last heard the server -- which
+ * is what a network's latency multiplies; the measurement's added-latency
+ * block is what shows that it does. The delay is one fixed wait per answer,
+ * added after loopback: no bandwidth, no loss, no congestion window.
  */
 
 /** One armed marker: what its match resolves, and the connections it has silenced. */
@@ -42,6 +49,22 @@ export interface TcpHop {
   swallowAnswersFrom(marker: Buffer): LostAnswer
   /** How many times the client has sent `marker`, on every connection, since this call -- across reads. */
   countSent(marker: Buffer): () => number
+  /**
+   * Turns since this call, on every connection: each time a client chunk
+   * arrives on a connection whose last word, as the client heard it, was not
+   * the client's. Two writes before an answer are one turn; an answer in
+   * several reads is one. An answer the hop is still delaying has not been
+   * heard. What a network's latency multiplies, measured by the delay block.
+   */
+  countRoundTrips(): () => number
+  /**
+   * Holds every server-to-client chunk on every connection for `ms` before
+   * forwarding it, in arrival order, from this call on; 0 forwards at once and
+   * schedules nothing. A close from the server waits behind what is held.
+   * `schedule` is injectable so a test needs no clock. One fixed delay per
+   * answer, after loopback: no bandwidth, loss or congestion window.
+   */
+  delayAnswers(ms: number, schedule?: Schedule): void
   /** Destroys every connection, both sides, and disarms every marker; later connections are forwarded. */
   cut(): void
   close(): Promise<void>
@@ -96,11 +119,20 @@ function watcher(marker: Buffer): (chunk: Buffer) => number {
   }
 }
 
+/** Runs `callback` after `ms`: `setTimeout`, unless a test hands the hop its own. */
+export type Schedule = (callback: () => void, ms: number) => unknown
+
 interface Pair {
   client: net.Socket
   upstream: net.Socket
   /** Set once an answer on this connection matched: nothing more reaches the client. */
   swallowing: boolean
+  /** Who last spoke on this connection as the client heard it: the client's chunk arriving, or a server chunk forwarded to it. */
+  lastSpoke: 'client' | 'server' | undefined
+  /** Server chunks held by a delay, oldest first; `due` once their wait is over. */
+  held: Array<{ chunk: Buffer; due: boolean }>
+  /** The server ended its half while chunks were held: the client's end waits for them. */
+  endHeld: boolean
 }
 
 interface Arm {
@@ -134,6 +166,36 @@ export async function startTcpHop(target: { host: string; port: number }): Promi
   const pairs = new Set<Pair>()
   const arms = new Set<Arm>()
   const counts: Count[] = []
+  const turnCounters: Array<{ total: number }> = []
+  let delay: { ms: number; schedule: Schedule } = { ms: 0, schedule: setTimeout }
+
+  /** A chunk the client hears: the server has spoken, as far as the client knows. */
+  function deliver(pair: Pair, chunk: Buffer): void {
+    pair.lastSpoke = 'server'
+    pair.client.write(chunk)
+  }
+
+  /** Forwards every held chunk whose wait is over, oldest first, stopping at the first still waiting; then a held end. */
+  function release(pair: Pair): void {
+    while (pair.held[0]?.due === true) deliver(pair, (pair.held.shift() as { chunk: Buffer }).chunk)
+    if (pair.held.length === 0 && pair.endHeld) {
+      pair.endHeld = false
+      pair.client.end()
+    }
+  }
+
+  function forward(pair: Pair, chunk: Buffer): void {
+    // Behind anything already held, even with no delay now: order is the protocol.
+    if (delay.ms === 0 && pair.held.length === 0) return deliver(pair, chunk)
+    const entry = { chunk, due: delay.ms === 0 }
+    pair.held.push(entry)
+    if (entry.due) return release(pair)
+    delay.schedule(() => {
+      // After a cut the writes below fail on a destroyed socket, and the hop ignores a socket's errors.
+      entry.due = true
+      release(pair)
+    }, delay.ms)
+  }
 
   function fromServer(pair: Pair, chunk: Buffer): void {
     if (pair.swallowing) return
@@ -143,10 +205,12 @@ export async function startTcpHop(target: { host: string; port: number }): Promi
       arm.swallowed.add(pair)
       arm.found()
     }
-    if (!pair.swallowing) pair.client.write(chunk)
+    if (!pair.swallowing) forward(pair, chunk)
   }
 
   function fromClient(pair: Pair, chunk: Buffer): void {
+    if (pair.lastSpoke !== 'client') for (const counter of turnCounters) counter.total += 1
+    pair.lastSpoke = 'client'
     pair.upstream.write(chunk)
     for (const count of counts) count.total += watcherFor(count.watchers, pair, count.marker)(chunk)
   }
@@ -156,12 +220,23 @@ export async function startTcpHop(target: { host: string; port: number }): Promi
   // Only an error -- a reset, a refused connection -- tears the other side
   // down at once, as the network would. A cut is a `destroy()` on purpose,
   // and loses what was in flight, which is what it is for.
+  //
+  // Nagle's algorithm off on both sockets, as tedious turns it off on its own
+  // and docker-proxy on its: a Node socket holds a small write back while an
+  // earlier one is unacknowledged, and the receiver's delayed ACK made a SQL
+  // Server answer of several packets wait about 40 ms here that it never waits
+  // on the direct path. A hop that adds a stall of its own is measuring itself.
   const server = net.createServer({ allowHalfOpen: true }, (client) => {
     const upstream = net.connect({ port: target.port, host: target.host, allowHalfOpen: true })
-    const pair: Pair = { client, upstream, swallowing: false }
+    client.setNoDelay(true)
+    upstream.setNoDelay(true)
+    const pair: Pair = { client, upstream, swallowing: false, lastSpoke: undefined, held: [], endHeld: false }
     pairs.add(pair)
     client.on('end', () => upstream.end())
-    upstream.on('end', () => client.end())
+    upstream.on('end', () => {
+      if (pair.held.length === 0) client.end()
+      else pair.endHeld = true
+    })
     for (const socket of [client, upstream]) {
       // A cut is the point; its errors are the drivers' to report, not the hop's.
       socket.on('error', () => {})
@@ -199,6 +274,15 @@ export async function startTcpHop(target: { host: string; port: number }): Promi
       const count: Count = { marker, watchers: new WeakMap(), total: 0 }
       counts.push(count)
       return () => count.total
+    },
+    countRoundTrips() {
+      const counter = { total: 0 }
+      turnCounters.push(counter)
+      return () => counter.total
+    },
+    delayAnswers(ms, schedule = setTimeout) {
+      if (!Number.isFinite(ms) || ms < 0) throw new Error(`a delay is a number of milliseconds, at least 0, not ${String(ms)}`)
+      delay = { ms, schedule }
     },
     cut: cutAll,
     close: () => {

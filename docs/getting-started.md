@@ -261,7 +261,11 @@ This is an evaluation stack on your own machine, not a production deployment:
   be applied again ([0031](./decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
 - **One rate-limit bucket.** Every request reaches the server from nginx, and
   the server has no setting to trust a proxy's forwarded address, so everybody
-  shares one limit.
+  shares one limit. The server reads how many requests a minute that limit
+  allows from `FORMANCY_DATA_RATE_LIMIT` in its own environment, which in
+  this stack is the `server` service's `environment` in `compose.yaml`;
+  [the data server's README](../packages/data-server/README.md) has its
+  default. It raises the one bucket and does not split it.
 - **SQL Server's Developer edition**, which is not licensed for production.
 - **Fixture data**, loaded with the databases' administrator accounts.
 - **Fonts from Google.** The studio and the host page load their fonts from

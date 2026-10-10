@@ -239,6 +239,13 @@ are turned on by configuration:
 Without the store and the allowlist the server verifies tokens and nothing
 else, which is how a host is wired in before any form exists.
 
+| Variable | Sets |
+| --- | --- |
+| `FORMANCY_DATA_RATE_LIMIT` | Requests a minute each client address may send to every route but `/health`: a whole number of at least 1, 600 when unset. Anything else stops the process with a sentence naming the setting. Behind a reverse proxy every client shares the proxy's address, so the limit is one bucket for all of them: Fastify's `trustProxy` is not offered, and the setting raises that bucket rather than splitting it. |
+| `PORT` | The port it listens on, 4390 when unset. |
+
+`src/rate-limit.test.ts` holds what the rate-limit setting accepts and refuses.
+
 The log is JSON lines on standard output: Fastify's lines for each request,
 and the audit trail. A request is logged by its method and the route it
 matched, never by the path, the query or the Host header it was sent with,
@@ -264,6 +271,11 @@ through it, and CI runs that guide as written
 ([0032](../../docs/decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
 It is an evaluation stack, not a deployment: the guide's section 8 says what
 a deployment changes.
+
+What each runtime request costs through `dist/main.mjs`, configured this way,
+on both engines and with the machine, the database's size and the date it was
+measured on, is in [`docs/performance.md`](../../docs/performance.md)
+([0034](../../docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
 
 ## Licence
 

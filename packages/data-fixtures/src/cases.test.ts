@@ -47,6 +47,9 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   FIXTURE_SCOPE: 'a discovery scope',
   PARITY_SCOPE: 'a discovery scope',
   MODEL_CASES: 'the ids themselves',
+  SIZED_CUSTOMERS: "what the sized table is generated from (0034); what a lookup on it reads is sizedRowsRead()'s, a function",
+  FIXTURE_CUSTOMERS: "the fixture's own customers, which the sized table holds beside the generated ones",
+  SIZED_CHUNK_ROWS: 'how many rows one statement of the sized load carries',
 }
 
 /** What a call made while a file is collected gave: its options, or the sentence it threw. */

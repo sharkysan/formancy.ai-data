@@ -58,6 +58,8 @@ export interface PostgresFixture {
   owner: DiscoveryAccount
   /** What the server said about itself, as recorded for the release report. */
   server: ServerRecord
+  /** The container's id, so the performance harness can read its CPU and limits from Docker (0034). */
+  containerId: string
   stop(): Promise<void>
 }
 
@@ -69,6 +71,8 @@ export interface SqlServerFixture {
   owner: DiscoveryAccount
   /** What the server said about itself, as recorded for the release report. */
   server: ServerRecord
+  /** The container's id, as for PostgreSQL. */
+  containerId: string
   stop(): Promise<void>
 }
 
@@ -146,6 +150,7 @@ export async function startPostgresFixture(): Promise<PostgresFixture> {
     writer: as(WRITER.user, WRITER.postgresPassword),
     owner: { user: owner, login: owner },
     server,
+    containerId: container.getId(),
     stop: async () => {
       await container.stop()
     },
@@ -274,6 +279,7 @@ export async function startSqlServerFixture(): Promise<SqlServerFixture> {
     writer: { ...base, user: WRITER.user, password: WRITER.sqlServerPassword, database: SQLSERVER_DATABASE },
     owner: { user: 'dbo', login: String(owner.user) },
     server,
+    containerId: container.getId(),
     stop: async () => {
       await container.stop()
     },

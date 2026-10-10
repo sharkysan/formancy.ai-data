@@ -1,0 +1,37 @@
+{
+  "name": "@formancy/data-performance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Measures the shipped data server through @formancy/data-client against a sized customer table on PostgreSQL and SQL Server, and renders docs/performance.md from what it measured. Never published.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "test:coverage": "vitest run --coverage",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "measure": "node dist/measure.mjs --publish",
+    "render": "node dist/render-cli.mjs --write",
+    "calibrate": "node dist/calibrate.mjs"
+  },
+  "dependencies": {
+    "@formancy/data-client": "workspace:*",
+    "@formancy/data-core": "workspace:*",
+    "@formancy/data-fixtures": "workspace:*",
+    "@formancy/data-postgres": "workspace:*",
+    "@formancy/data-server": "workspace:*",
+    "@formancy/data-sqlserver": "workspace:*",
+    "@types/mssql": "^12.3.0",
+    "jose": "^6.2.12",
+    "mssql": "^12.0.0",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "unrun": "^0.3.1",
+    "vitest": "catalog:"
+  }
+}

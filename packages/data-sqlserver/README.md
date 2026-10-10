@@ -203,6 +203,47 @@ fixed-length key has the token PostgreSQL gives it. An integer search column
 is matched as its canonical text; text as itself, so its collation folds case
 and accents.
 
+### What a lookup reads
+
+[0034](../../docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)
+holds this without a clock, on the sized `sales.customer` of
+`@formancy/data-fixtures`: `lookups-sized.integration.test.ts` runs each
+statement through `createSqlServerLookups` as the writer and reads the actual
+plan of exactly that statement, `ActualRowsRead` summed over every operator
+and thread on `[customer]`. The counts it pins are `sizedRowsRead()` of
+`@formancy/data-fixtures`, which the PostgreSQL suite and the performance
+page read too. What it pins:
+
+- **Rows sent.** A search asks for the page and one more row, `offset …
+  fetch` in SQL: the server never receives more.
+- **Rows read.** With the order form's tenant row filter, a search is a
+  Clustered Index Seek on the tenant and reads exactly that tenant's rows --
+  every one of them, for every search and for the first page, because a
+  leading-wildcard `like` and the order by name have no index to use. On a
+  form with no tenant row filter it is a Clustered Index Scan of the whole
+  table: the row-security predicate is not a seek. A resolve and the
+  membership check read at most one row per key.
+- **What the plans were** (2026-10-09, SQL Server 2022 CU27 Developer,
+  SQL_Latin1_General_CP1_CI_AS, a Docker Sandbox VM on a Windows 11
+  workstation): the tenant's seek runs in parallel; the generated names
+  sort as the generator says they do (P1).
+- **How the rows read are seen** (P2): `sys.dm_exec_query_plan_stats`
+  reports `ActualRows` per thread but no `ActualRowsRead` on this build,
+  so the test reads the actual plan from an Extended Events session on
+  `query_post_execution_showplan`, limited to the writer's statements. Not
+  `SET STATISTICS XML` over text the test builds: a limit raised in
+  `lookups.ts` would never show there.
+- **What an index would not change** (P5, an index on `(tenant_id, name,
+  customer_no)` created and dropped by the probe, never shipped): the
+  `CASE … IS NULL` before each sort column keeps it from serving the order,
+  so the first page still reads and sorts the whole tenant.
+
+Every statement is two round trips: mssql's pool checks each connection with
+`SELECT 1;` before handing it out (`validateConnection`, on by default and
+not set by `connectSqlServer`), then sends the statement. The measurement's
+counting pass counts it through a TCP hop on every run, and
+[`docs/performance.md`](../../docs/performance.md) has the figures.
+
 ### Records
 
 `createSqlServerRecords(pool)` reads, inserts and updates one record
@@ -372,9 +413,10 @@ checked once, by hand, on 2026-10-09, and is not a test.
 ## Tests
 
 `pnpm test` starts SQL Server through `@formancy/data-fixtures`, once per
-test file, and runs the suite against it: discovery,
-the spike, lookups, records, the ways a record operation fails, and a write
-whose answer is lost on the way back. It needs Docker and, the first time, a
+test file, and runs the suite against it: discovery, the spike, lookups,
+what a lookup reads on the sized customers (0034), records, the ways a
+record operation fails, and a write whose answer is lost on the way back. It
+needs Docker and, the first time, a
 pull of about a gigabyte and a half. There is no mocked driver to fall back
 to — database semantics are what this package is for (0003).
 

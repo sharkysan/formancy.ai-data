@@ -130,7 +130,8 @@ jobs:
   # byte for byte, one per published package, each at the release's version
   # and carrying its licence; the release body exists and fits; the SBOM
   # names both drivers, and every runtime dependency and upstream package it
-  # names at the version the suites loaded.
+  # names at the version the suites loaded; and the published performance
+  # figures were measured on this product (0034).
   #
   # It is not a job that can write nothing: like every job of a run it can
   # write to the run's artefacts, and it uploads the SBOM. So what it checked
@@ -156,8 +157,23 @@ jobs:
           node-version: 22
       - run: corepack enable pnpm
 
-      # cdxgen reads the installed tree.
+      # cdxgen reads the installed tree, and so does the figures' check.
       - run: pnpm install --frozen-lockfile
+
+      # docs/performance.md publishes what the measurement recorded about the
+      # product it ran: the source files it ran, found by following its
+      # imports, the server's and the client's installed dependencies by
+      # version, and the build inputs (0034). A release whose product differs
+      # is not cut until somebody re-measures on a quiet machine and commits
+      # the figures, and a rehearsal says so before a tag is pushed. It reads
+      # the source and node_modules, so it needs the install and not the
+      # build. Nothing here measures: a runner is shared, and a time taken on
+      # one is not a figure. CI does not run it, so a pull request that changes
+      # the product is not held until somebody re-measures (0034).
+      # performance-stale.test.mjs fails when `publish` stops waiting for it.
+      - name: The published performance figures describe this product
+        id: performance-figures
+        run: node scripts/performance-stale.mjs
 
       - uses: actions/download-artifact@v4
         with:
