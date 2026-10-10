@@ -6,7 +6,7 @@ import type { Protocol } from './results.js'
  * names its protocol, so it can never validate as a published one.
  *
  * Every value is a choice, with its reason beside it; none is a measurement
- * except the calibration tolerance, which P13 sets before the publish run.
+ * except the calibration tolerance, which P13 set before the publish run.
  */
 
 export const PUBLISH_PROTOCOL: Protocol = {
@@ -38,10 +38,18 @@ export const PUBLISH_PROTOCOL: Protocol = {
   // rather than one; the gaps also read the database's idle CPU.
   // The tolerance is P13's: how far a gap's median strayed from a baseline
   // window's over ten idle minutes on the quiet machine,
-  // `pnpm --filter @formancy/data-performance run calibrate`. Until it is
-  // measured and written here with that output beside it, a publish run
-  // refuses to start.
-  calibration: { intervalMs: 500, gapMs: 2000, tolerance: null },
+  // `pnpm --filter @formancy/data-performance run calibrate`. Without it a
+  // publish run refuses to start.
+  // Measured 2026-10-10, 16:30:49 to 16:40:49 UTC, on the Docker Sandbox VM
+  // (Linux x86_64, 20 vCPUs, about 15 GiB) on the user's Windows 11
+  // workstation, with no container running and nothing else at work:
+  //   { "intervalMs": 500, "probes": 1199, "medianMs": 9.6044,
+  //     "baselineMs": 10000, "baselineWindows": 59, "gapMs": 2000,
+  //     "gapWindows": 299, "worstRatio": 1.6057747103146964 }
+  // The slowest idle gap ran 1.606 times the fastest baseline window with
+  // nobody else on the machine; the tolerance is that, rounded up to the
+  // hundredth, so it clears what idle did on its own and nothing more.
+  calibration: { intervalMs: 500, gapMs: 2000, tolerance: 1.61 },
   // One rationale, a choice: nothing else holds a whole CPU.
   quiet: { enforced: true, loadAverageBelow: 1, busyVcpusAtMost: 1, windowSeconds: 10, giveUpSeconds: 180 },
   // Longer than a round; a round that outlived it ends with a 401 naming the scenario.
