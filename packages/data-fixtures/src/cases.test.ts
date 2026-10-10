@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import { READER_ACCESS, WRITER_ACCESS } from './access.js'
-import { covers, displayCase, edgeCase, filterCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase } from './cases.js'
+import { covers, displayCase, edgeCase, filterCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase } from './cases.js'
 import * as fixtures from './index.js'
 import { FIXTURE_MODEL } from './model.js'
-import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY } from './parity.js'
+import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 import type { RefusalParityCase } from './parity.js'
 import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 
@@ -23,6 +23,7 @@ import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   FILTER_PARITY: FILTER_PARITY.map(filterCase),
   DISPLAY_PARITY: Object.keys(DISPLAY_PARITY).map(displayCase),
+  TEMPORAL_PARITY: (Object.keys(TEMPORAL_PARITY) as (keyof typeof TEMPORAL_PARITY)[]).map(temporalCase),
   REFUSAL_PARITY: (Object.keys(REFUSAL_PARITY) as RefusalParityCase[]).map(refusalCase),
   EDGE_VALUES: (Object.keys(EDGE_VALUES) as (keyof typeof EDGE_VALUES)[]).map(edgeCase),
   FIRST_SHIPMENT: [shipmentCase('first')],

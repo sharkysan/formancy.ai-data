@@ -112,6 +112,25 @@ existed would be documented and inert.
   commit, on both engines, and fails if the write crosses to the database a
   second time.
 
+  An update reads the record first and removes the echo it can prove
+  ([0022](../../docs/decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)):
+  a field the actor may not write, equal to the record as read; and,
+  through `planUpdate`, an instant or a time the actor may write and read,
+  equal to the record as read at the version the update names
+  ([0040](../../docs/decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).
+  Both adapters read those cut to formancy's shape, so written back they
+  would replace the stored fraction or seconds. A form whose only change was
+  such an echo is 400 `nothing-to-update`; an update carrying one is
+  answered with the read's own failure when the read before it failed, 503
+  for `unavailable`, 404 for `not-found`; and the read runs inside the
+  update's sending, so a resend is answered before anything is asked.
+  `routes/runtime-temporal.test.ts` holds each of these over fake ports. The
+  host suite's `temporal-round-trip*.test.ts` holds, on both engines, what
+  each engine then stores: the echo removed, a change written, nothing
+  written for echoes alone, and what a field or a record the clerk may not
+  read stores; the stale echo, the failed read and the resend run over the
+  fake ports only.
+
   A write that arrives again is answered, not applied. Chromium resends a
   request -- a POST too -- when the connection it reused closed before any
   answer, below the page, so a create whose answer the network lost after

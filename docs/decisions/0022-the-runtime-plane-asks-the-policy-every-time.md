@@ -1,6 +1,6 @@
 # 0022 — The runtime plane asks the policy on every request, and removes only the echo it can prove
 
-- **Status:** accepted; narrowed by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): a lost write's 502 names the record and version it addressed, a read never answers one, and a write that arrives again with its write id is answered with the first sending's answer
+- **Status:** accepted; narrowed by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): a lost write's 502 names the record and version it addressed, a read never answers one, and a write that arrives again with its write id is answered with the first sending's answer; narrowed by [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md): the planner removes an unedited instant or time the actor may write too, when it equals the record as read at the version the update names, and an update carrying one is refused with the read's own answer when that read failed
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/routes/runtime.test.ts` — no token

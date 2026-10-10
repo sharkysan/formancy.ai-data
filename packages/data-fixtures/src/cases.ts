@@ -3,7 +3,7 @@ import { DATABASE_KINDS } from '@formancy/data-core'
 import type { TestOptions } from 'vitest'
 import { TestRunner } from 'vitest'
 import type { FilterParityCase, RefusalParityCase } from './parity.js'
-import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY } from './parity.js'
+import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 import { EDGE_VALUES } from './values.js'
 
 declare module 'vitest' {
@@ -38,13 +38,15 @@ export const MODEL_CASES = {
 
 export const filterCase = (entry: FilterParityCase): string => `filter: ${entry.column} = ${JSON.stringify(entry.value)}`
 export const displayCase = (column: keyof typeof DISPLAY_PARITY): string => `display: ${column}`
+export const temporalCase = (column: keyof typeof TEMPORAL_PARITY): string => `read: ${column}`
 export const refusalCase = (name: RefusalParityCase): string => `refusal: ${name}`
 export const edgeCase = (name: keyof typeof EDGE_VALUES): string => `edge: ${name}`
 export const shipmentCase = (which: 'first' | 'second'): string => `shipment: ${which}`
 
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
- * every filter, label, refusal and edge value, then the two shipments.
+ * every filter, label, temporal read, refusal and edge value, then the two
+ * shipments.
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -53,6 +55,7 @@ export function sharedCases(): string[] {
     ...Object.values(MODEL_CASES),
     ...FILTER_PARITY.map(filterCase),
     ...Object.keys(DISPLAY_PARITY).map(displayCase),
+    ...(Object.keys(TEMPORAL_PARITY) as (keyof typeof TEMPORAL_PARITY)[]).map(temporalCase),
     ...(Object.keys(REFUSAL_PARITY) as RefusalParityCase[]).map(refusalCase),
     ...(Object.keys(EDGE_VALUES) as (keyof typeof EDGE_VALUES)[]).map(edgeCase),
     shipmentCase('first'),

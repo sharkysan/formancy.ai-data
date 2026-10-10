@@ -76,6 +76,20 @@ export const DISPLAY_PARITY: Readonly<Record<string, string>> = {
   u: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
 }
 
+/**
+ * What the record reader returns for parity.display_kinds' time and instant
+ * (0040): each cut to formancy's shape, a time to the minute and an instant
+ * to the second in UTC, though the row holds milliseconds of both and the
+ * instant was written at +02:00. Cut, never rounded: `.789` does not carry
+ * into the next second or minute. Before 0040 PostgreSQL read both
+ * faithfully, `10:34:56.789` and `2026-10-08T08:34:56.789Z`, which no form
+ * field accepts, and SQL Server read them as they are here.
+ */
+export const TEMPORAL_PARITY: Readonly<Record<'tm' | 'ts', string>> = {
+  tm: '10:34',
+  ts: '2026-10-08T08:34:56Z',
+}
+
 /** A write against the parity schema whose refusal both engines must name alike. */
 export type RefusalParityCase = 'guardedInsert' | 'guardedUpdate' | 'oddInsert' | 'declinedInsert' | 'generatedInsert' | 'deadlockVictim'
 

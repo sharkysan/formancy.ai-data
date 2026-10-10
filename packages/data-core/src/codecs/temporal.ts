@@ -1,4 +1,5 @@
 import { TEMPORAL_SHAPES } from '@formancy/spec'
+import type { NormalizedType } from '../metadata.js'
 
 /**
  * Dates and times in formancy's own shapes, read from `@formancy/spec` rather
@@ -44,4 +45,20 @@ export function isTime(text: string): boolean {
 
 export function isInstant(text: string): boolean {
   return INSTANT.test(text) && realDay(text.slice(0, 10))
+}
+
+/**
+ * Whether both adapters read a column of this type cut to formancy's shape
+ * (0040): an instant to the second, in UTC, and a time to the minute. Each
+ * engine stores more -- PostgreSQL microseconds, SQL Server seven digits and
+ * an offset -- so an answer equal to what was read can stand for a stored
+ * value it does not spell, and written back it would replace that value
+ * with the cut one. `planUpdate` removes such an answer when it is an
+ * unchanged echo of the record as read, and needs that read to tell.
+ *
+ * A zoneless timestamp is read with its fraction (0026) and is never written
+ * through a form; every other kind is read exactly.
+ */
+export function readsCutToShape(type: NormalizedType): boolean {
+  return type.kind === 'time' || (type.kind === 'timestamp' && type.withTimeZone)
 }

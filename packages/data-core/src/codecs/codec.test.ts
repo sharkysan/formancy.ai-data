@@ -3,6 +3,7 @@ import type { ColumnMeta, NormalizedType, TextLengthUnit } from '../metadata.js'
 import { controlFor } from '../generate/controls.js'
 import { codecFor } from './codec.js'
 import { canonicalFloat32 } from './numbers.js'
+import { readsCutToShape } from './temporal.js'
 import { decodeRowversion, encodeRowversion } from './rowversion.js'
 
 /** U+00A0, which neither engine treats as padding (C1b). Spelled by its code point so the source shows it. */
@@ -240,6 +241,29 @@ describe('dates, times and instants', () => {
     for (const text of ['2026-10-08T12:34Z', '2026-10-08T12:34:56+02:00', '2026-10-08T12:34:56.5Z', '2026-02-30T00:00:00Z']) {
       expect(accepted(zoned, text), text).toBe('refused:not-an-instant')
     }
+  })
+
+  // The kinds both adapters read cut to the shape (0040), which `planUpdate`
+  // may therefore find echoed shorter than they are stored. Left out,
+  // an unedited instant or time is written back cut, as SQL Server's was
+  // (0017). Put in, a kind read exactly would stop being written when it is
+  // unchanged, which no record decided for it. A zoneless timestamp keeps its
+  // fraction on both engines (0026) and is never written through a form.
+  test('an instant and a time are the kinds read cut to the shape, and nothing else', () => {
+    expect(readsCutToShape({ kind: 'timestamp', withTimeZone: true, precision: 7 })).toBe(true)
+    expect(readsCutToShape({ kind: 'timestamp', withTimeZone: true, precision: null })).toBe(true)
+    expect(readsCutToShape({ kind: 'time', precision: 0 })).toBe(true)
+    const exact: NormalizedType[] = [
+      { kind: 'timestamp', withTimeZone: false, precision: 6 },
+      { kind: 'date' },
+      AMOUNT,
+      INT64,
+      { kind: 'float', bits: 32 },
+      { kind: 'text', maxLength: 10, lengthUnit: 'code-points', fixedLength: false },
+      { kind: 'boolean' },
+      { kind: 'uuid' },
+    ]
+    for (const type of exact) expect(readsCutToShape(type), type.kind).toBe(false)
   })
 })
 

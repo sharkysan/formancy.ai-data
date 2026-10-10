@@ -71,13 +71,22 @@ in short:
   so neither the driver's parsers nor its `transform` option (which renames
   columns and rewrites values, text included) is involved, and neither
   DateStyle, TimeZone nor `extra_float_digits` changes a value.
-- **A value formancy's shapes cannot carry is read faithfully, not rounded.**
-  An instant with a fraction of a second — anything `now()` wrote — reads as
-  `2026-10-08T10:34:56.789012Z`; a time with seconds as `10:30:15.5`; an
-  infinite or BC date as `infinity` or `0044-03-15 BC`; a NaN as `NaN`. The
-  codec refuses each on the way back, so a form cannot save it unchanged as
-  something else. A host that sends every field back on save cannot save such
-  a record until the value is changed.
+- **An instant is read to the second and a time to the minute, as SQL Server
+  reads them**
+  ([0040](../../docs/decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).
+  A fraction — anything `now()` wrote — and a time's seconds are cut, never
+  rounded: `12:34:56.789012+02` reads `2026-10-08T10:34:56Z`, `10:30:59.999999`
+  reads `10:30`. `planUpdate` in `@formancy/data-core`, given the record as
+  read, removes an unedited echo of either from an update and refuses to
+  plan one without that read, so a save planned by it never writes the
+  stored fraction and seconds over; a caller that builds an update request
+  itself must set only the fields a person changed. What no shape can name
+  is read in a spelling the codec refuses, never cut and never NULL: an
+  infinite or BC date or instant as `infinity` or `0044-03-15 BC`, a
+  five-digit year with its era, `24:00:00` as `24:00`, a NaN as `NaN`.
+  Neither renderer submits such a record until the value is changed; sent
+  back unedited, an instant or a time of these is an echo the planner
+  removes and keeps, and a date or a number is refused by the codec.
 - **Values are bound as text and converted by the server.** Every parameter
   is `$n::pg_catalog.text`, then cast to the column's exact type. postgres.js
   would otherwise serialise an untyped parameter through its serializer for
@@ -364,7 +373,8 @@ The suites start `postgres:17-alpine` unless a test names another image, through
   served by the primary key, and unchanged by a planted `public."C"` and
   `public.bpchar`; an unconstrained `numeric` filter; every label under an
   unusual TimeZone, DateStyle and float digits, which the test reads back
-  from the session first — postgres.js drops a startup parameter whose value
+  from the session first, and the time and instant `TEMPORAL_PARITY` names
+  under another — postgres.js drops a startup parameter whose value
   is falsy, and `extra_float_digits: 0` had never arrived; and every refusal, a
   deadlock victim, the timeouts and a terminated backend included.
 - `records.integration.test.ts` — the record port over the fixture: every
@@ -373,7 +383,8 @@ The suites start `postgres:17-alpine` unless a test names another image, through
   value against PostgreSQL's own text, the zoneless spelling, why a
   by-default identity stays read-only, and the U+FFFD an unpaired surrogate
   would silently become),
-  faithful reads, concurrency between real
+  instants and times read to the shape and what no shape names refused,
+  concurrency between real
   connections, every refusal the fixture can provoke, writes a trigger or a
   rule declines, objects planted on the search path, and a connection cut
   through a TCP hop after a write was sent.

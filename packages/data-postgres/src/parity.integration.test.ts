@@ -16,7 +16,7 @@ import type {
   UpdateRequest,
 } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { covers, DISPLAY_PARITY, displayCase, FILTER_PARITY, filterCase, PARITY_SCOPE, REFUSAL_PARITY, refusalCase, startPostgresFixture } from '@formancy/data-fixtures'
+import { covers, DISPLAY_PARITY, displayCase, FILTER_PARITY, filterCase, PARITY_SCOPE, REFUSAL_PARITY, refusalCase, startPostgresFixture, TEMPORAL_PARITY, temporalCase } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -349,6 +349,33 @@ describe('a label is spelled once, from the canonical value (DISPLAY_PARITY)', (
     expect(config.search.map((column) => column.name)).toEqual(['i'])
     expect((await lookups.search(config, { search: '9007199254740993', offset: 0, limit: 50 }, EVERY_ROW)).rows).toEqual([{ token: tokenOf('1'), label: '9007199254740993' }])
     expect((await lookups.search(config, { search: '9007199254740992', offset: 0, limit: 50 }, EVERY_ROW)).rows).toEqual([])
+  })
+})
+
+describe('an instant and a time are read cut to the shape (TEMPORAL_PARITY)', () => {
+  // The row holds milliseconds of both, and the instant was written at
+  // +02:00. Read faithfully, as this adapter read before 0040, neither is a
+  // value its field accepts, so a host that sends every field back could not
+  // save the record; rounded, .789 would carry into the next second and
+  // minute. Under a session that would spell either differently -- another
+  // TimeZone, another DateStyle -- the answer is the same. The session is
+  // asked what it has first, as the label case above does: a setting the
+  // driver dropped on the way would leave that half proving nothing.
+  test('to the second in UTC and to the minute, cut and never rounded, whatever the session', covers('postgres', ...(Object.keys(TEMPORAL_PARITY) as (keyof typeof TEMPORAL_PARITY)[]).map(temporalCase)), async () => {
+    const configured = postgres(fixture.admin, { onnotice: () => {}, connection: { TimeZone: 'Pacific/Chatham', DateStyle: 'SQL, DMY' } })
+    try {
+      const [settings] = await configured<{ zone: string; style: string }[]>`select current_setting('TimeZone') as zone, current_setting('DateStyle') as style`
+      expect(settings).toEqual({ zone: 'Pacific/Chatham', style: 'SQL, DMY' })
+      const request = {
+        target: { table: { schema: 'parity', name: 'display_kinds' }, identity: [col('display_kinds', 'id')], concurrency: null },
+        key: [val('display_kinds', 'id', '1')],
+        columns: [col('display_kinds', 'tm'), col('display_kinds', 'ts')],
+        filters: EVERY_ROW,
+      }
+      for (const sql of [owner, configured]) expect(await createPostgresRecords(sql).read(request)).toEqual({ ok: true, values: TEMPORAL_PARITY, version: null })
+    } finally {
+      await configured.end()
+    }
   })
 })
 

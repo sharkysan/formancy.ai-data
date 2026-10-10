@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ApiValue, LookupConfig, LookupQuery, MetadataSnapshot, ObjectMeta, ObjectRef, RecordColumn, RecordTarget, RecordValue, RowFilters, UpdateRequest } from '@formancy/data-core'
 import { buildLookupConfig, encodeKeyToken, findObject, generateForm, scopeRowFilters } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { covers, DISPLAY_PARITY, displayCase, FILTER_PARITY, filterCase, PARITY_SCOPE, REFUSAL_PARITY, refusalCase, startSqlServerFixture } from '@formancy/data-fixtures'
+import { covers, DISPLAY_PARITY, displayCase, FILTER_PARITY, filterCase, PARITY_SCOPE, REFUSAL_PARITY, refusalCase, startSqlServerFixture, TEMPORAL_PARITY, temporalCase } from '@formancy/data-fixtures'
 import { createSqlServerLookups, createSqlServerRecords, discoverSqlServer } from './index.js'
 
 /**
@@ -288,6 +288,24 @@ describe('DISPLAY_PARITY: a label is spelled from the canonical value', () => {
       filters: EVERY_ROW,
     })
     expect(read).toEqual({ ok: true, values: { fixed: 'AB', t: 'Text' }, version: null })
+  })
+})
+
+describe('TEMPORAL_PARITY: an instant and a time are read cut to the shape', () => {
+  // The row holds milliseconds of both, and the instant was written at
+  // +02:00. Read faithfully, as PostgreSQL read before 0040, neither is a
+  // value its field accepts; rounded, .789 would carry into the next second
+  // and minute, and a save would write a value nobody held. What the
+  // planner then compares an unedited answer with is this cut (0040), the
+  // same on both engines.
+  test('to the second in UTC and to the minute, cut and never rounded', covers('sqlserver', ...(Object.keys(TEMPORAL_PARITY) as (keyof typeof TEMPORAL_PARITY)[]).map(temporalCase)), async () => {
+    const read = await createSqlServerRecords(owner).read({
+      target: { table: DISPLAY_KINDS, identity: [columnOf(parity, DISPLAY_KINDS, 'id')], concurrency: null },
+      key: [parityValue(DISPLAY_KINDS, 'id', '1')],
+      columns: [columnOf(parity, DISPLAY_KINDS, 'tm'), columnOf(parity, DISPLAY_KINDS, 'ts')],
+      filters: EVERY_ROW,
+    })
+    expect(read).toEqual({ ok: true, values: TEMPORAL_PARITY, version: null })
   })
 })
 

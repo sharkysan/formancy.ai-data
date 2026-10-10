@@ -1,6 +1,6 @@
 export { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
 export type { ExpectedAccess, ExpectedCapability, ExpectedObjectAccess, ExpectedObjectFacts } from './access.js'
-export { displayCase, edgeCase, filterCase, covers, MODEL_CASES, refusalCase, sharedCases, shipmentCase } from './cases.js'
+export { displayCase, edgeCase, filterCase, covers, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase } from './cases.js'
 export {
   DEFAULT_IMAGES,
   POSTGRES_IMAGE,
@@ -27,7 +27,7 @@ export type {
   ExpectedObject,
   ExpectedType,
 } from './model.js'
-export { DISPLAY_PARITY, FILTER_PARITY, PARITY_SCOPE, REFUSAL_PARITY } from './parity.js'
+export { DISPLAY_PARITY, FILTER_PARITY, PARITY_SCOPE, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 export type { FilterParityCase, ParityFilterColumn, RefusalParityCase } from './parity.js'
 export { renamedColumn } from './rename.js'
 export { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'

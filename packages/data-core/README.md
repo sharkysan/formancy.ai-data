@@ -36,6 +36,10 @@ browser.
   decimal for its float, and refused where a real would store infinity or a
   zero nobody wrote
   ([0026](../../docs/decisions/0026-name-every-column-fact-the-engines-disagree-on.md)).
+  Both adapters read an instant to the second and a time to the minute,
+  shorter than either engine stores them, so `planUpdate` removes an
+  unedited echo of one
+  ([0040](../../docs/decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md), below).
   The snapshot names what the engines disagree on about a column — a text's
   length unit, a binary's padding, an identity ALWAYS or BY DEFAULT, a check
   enforced or not — and `createSnapshot` refuses one stored before it did.
@@ -259,6 +263,16 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   concurrency token. A version column, which every update increments, is
   never the key, a field's column or a generated one, and never pinned by a
   row filter.
+- **An update takes the record as read.** An instant or a time read cut to
+  the shape and sent back unedited would, set, replace the stored fraction
+  or seconds. `planUpdate(…, answers, asRead)` takes what `toFormAnswers`
+  made of the record `planRead` and the adapter read for this actor just
+  before the update, and does not set an instant or a time the actor may
+  write and read that equals it at the version named; at another version
+  nothing is removed, and the version guard answers. Without that read, or with
+  another record's, an update carrying one is refused `record-not-read`. A
+  field the actor may not read is never compared, and needs no read
+  ([0040](../../docs/decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).
 - **Membership is the database's.** A lookup token whose key carries the tenant
   is refused when the tenant is not the context's; one that does not — a
   surrogate id — cannot be judged without a query. Every selection comes back

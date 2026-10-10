@@ -1,6 +1,7 @@
 import type { ApiValue } from '../codecs/codec.js'
 import { codecFor } from '../codecs/codec.js'
 import { decodeRowversion } from '../codecs/rowversion.js'
+import { readsCutToShape } from '../codecs/temporal.js'
 import type { FormBindings } from '../generate/types.js'
 import { buildLookupConfig } from '../lookup/config.js'
 import { scopeRowFilters } from '../lookup/filters.js'
@@ -11,7 +12,7 @@ import { checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, ro
 import type { FormPolicy, PolicyContext, RowFilter } from '../policy/types.js'
 import { findObject } from '../snapshot.js'
 import { columnAnswer, lookupAnswer } from './answers.js'
-import type { FieldError, InvalidValues, MembershipCheck, PlannedInsert, PlannedRead, PlannedUpdate, PlanRefusal } from './plan-types.js'
+import type { FieldError, FormRecord, InvalidValues, MembershipCheck, PlannedInsert, PlannedRead, PlannedUpdate, PlanRefusal } from './plan-types.js'
 import { columnsOf, inCatalogOrder, prepare, type Prepared, refuse } from './prepare.js'
 import { decodeRecordKey } from './token.js'
 import type { RecordColumn, RecordValue } from './types.js'
@@ -252,6 +253,48 @@ function versionFits(prepared: Prepared, kind: 'rowversion' | 'version-column', 
 }
 
 /**
+ * The answers less every unedited echo of an instant or a time (0040).
+ *
+ * Both adapters read an instant cut to the second and a time to the minute
+ * (`readsCutToShape`), so an answer equal to what was read can stand for a
+ * stored value it does not spell, and set, it would replace that value with
+ * the cut one. It is removed when the actor may read the field and it equals
+ * `asRead`, the record as read for this actor, at the version the update is
+ * guarded by: the guard then makes the read and the write one state, or the
+ * write stale. Read at another version it is the person's older read, kept,
+ * and the guard answers it as stale. A field the actor may not read is never
+ * compared: it has no value of theirs to echo, and the comparison would tell
+ * them whether they had guessed one. Without the read, nothing here can tell
+ * an echo from a change, so the update is refused rather than risk the cut.
+ */
+function withoutCutEchoes(
+  bindings: FormBindings,
+  readable: readonly string[],
+  answers: ReadonlyMap<string, unknown>,
+  recordToken: string,
+  expectedVersion: string,
+  asRead: FormRecord | undefined,
+): { ok: true; answers: ReadonlyMap<string, unknown> } | PlanRefusal {
+  const cut = bindings.fields
+    .filter((binding) => binding.kind === 'column' && readsCutToShape(binding.type) && answers.has(binding.field) && readable.includes(binding.field))
+    .map((binding) => binding.field)
+  if (cut.length === 0) return { ok: true, answers }
+  if (asRead === undefined) {
+    const are = cut.length === 1 ? 'is' : 'are'
+    return refuse('record-not-read', `${cut.join(', ')} ${are} read cut to the shape, so only the record as read tells an unedited one from a change: plan the update with it.`)
+  }
+  if (asRead.record !== recordToken) return refuse('record-not-read', 'The record as read is not the record this update addresses.')
+  if (asRead.version !== expectedVersion) return { ok: true, answers }
+  const kept = new Map(answers)
+  for (const field of cut) {
+    if (!Object.hasOwn(asRead.answers, field)) return refuse('record-not-read', `The record as read does not hold ${field}, which this actor may read.`)
+    // What is read for an instant or a time is text or null, so equal is the same primitive.
+    if ((answers.get(field) ?? null) === asRead.answers[field]) kept.delete(field)
+  }
+  return { ok: true, answers: kept }
+}
+
+/**
  * The update for a person's answers, guarded by the key, the actor's filters
  * and the version they read — or why not, or which fields are wrong.
  *
@@ -259,6 +302,11 @@ function versionFits(prepared: Prepared, kind: 'rowversion' | 'version-column', 
  * the column allows it. The key and the pinned columns are never set: a key
  * field equal to the record's is accepted and dropped, a different one is
  * refused, and a selection that carries the tenant must carry this one.
+ *
+ * `asRead` is the record as `planRead` and the adapter read it for this
+ * actor, just before the update: an instant or a time equal to it at the
+ * version named is an unedited echo and is not set, and an update carrying
+ * one the actor may read is refused `record-not-read` without it (0040).
  */
 export function planUpdate(
   snapshot: MetadataSnapshot,
@@ -268,6 +316,7 @@ export function planUpdate(
   recordToken: string,
   expectedVersion: string,
   answers: unknown,
+  asRead?: FormRecord,
 ): PlannedUpdate {
   const ready = prepare(snapshot, bindings)
   if (!ready.ok) return ready
@@ -295,16 +344,21 @@ export function planUpdate(
     return refuse('invalid-version', `This is not a version a ${concurrency.kind} returns.`)
   }
 
+  const { fields, returning } = readBack(prepared, bindings, policy, context)
+  // Before any codec: an unedited echo of what no shape names, `infinity` or
+  // `24:00`, is the stored value kept, not a spelling to refuse.
+  const unechoed = withoutCutEchoes(bindings, fields, submitted.answers, recordToken, expectedVersion, asRead)
+  if (!unechoed.ok) return unechoed
+
   const fixed = new Map<string, ApiValue>(filters.filter.map((term) => [term.column, term.value]))
   for (const part of key.key) if (!fixed.has(part.name)) fixed.set(part.name, part.value)
-  const decoded = decodeAnswers(prepared, bindings, submitted.answers, fixed, 'update')
+  const decoded = decodeAnswers(prepared, bindings, unechoed.answers, fixed, 'update')
   if (decoded.errors.length > 0) return invalid(decoded.errors)
   // No statement sets nothing alike on both engines, so an empty patch is refused here, once.
   if (decoded.values.length === 0) return refuse('nothing-to-update', 'These answers change no column.')
   const memberships = membershipChecks(snapshot, bindings, policy, context, 'update', decoded.selections)
   if (!memberships.ok) return memberships
 
-  const { fields, returning } = readBack(prepared, bindings, policy, context)
   return {
     ok: true,
     request: {

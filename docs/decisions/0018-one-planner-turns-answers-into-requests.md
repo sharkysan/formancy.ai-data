@@ -1,6 +1,6 @@
 # 0018 — One planner turns answers into requests, and leaves membership to the database
 
-- **Status:** accepted; narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): a lookup's filter is scoped as a request's is, by `scopeRowFilters`
+- **Status:** accepted; narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): a lookup's filter is scoped as a request's is, by `scopeRowFilters`; extended by [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md): `planUpdate` takes the record as read, removes an unedited instant or time the actor may write and read, and refuses `record-not-read` an update carrying one without that read
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/records/token.test.ts` — a record

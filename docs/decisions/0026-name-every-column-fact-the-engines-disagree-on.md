@@ -1,6 +1,6 @@
 # 0026 — Name every column fact the two engines disagree on, and check values in the column's own unit
 
-- **Status:** accepted
+- **Status:** accepted; narrowed by [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md): instants and times are read alike on both engines, an instant to the second and a time to the minute
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**
