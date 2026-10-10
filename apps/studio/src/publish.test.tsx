@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
@@ -98,6 +98,15 @@ describe('publishing', () => {
       `Version 1: “Order”, ${String((await proposal()).form.model.fields.length)} fields, bound to sales.order on fixture.`,
     ])
     expect(await audit()).toEqual([])
+    // What the step learned, said above the alert too: it went on saying no
+    // version was published and offering "Publish version 1" beside the alert
+    // that version 1 is somebody else's -- a press the server refuses again.
+    // Publishing waits for the rebase, and the keyboard, on the button that
+    // turned disabled, goes to the rebase rather than to the top of the page.
+    expect(within(publish).getByText(/is published now/).textContent).toBe("Version 1 of sales-order is published now, and it is somebody else's. Publishing waits until you rebase on it.")
+    expect(within(publish).queryByRole('button', { name: 'Publish version 1' })).toBeNull()
+    expect(within(publish).getByRole('button', { name: 'Publish' })).toHaveProperty('disabled', true)
+    expect(focusedName()).toBe('Rebase on version 1')
     await pressEnter(user, within(alert).getByRole('button', { name: 'Rebase on version 1' }))
     // Rebasing closes the conflict, and the button pressed with it. The
     // keyboard goes to what there is left to do -- publish, on top -- rather
@@ -113,6 +122,24 @@ describe('publishing', () => {
     await within(publish).findByText('Published version 2 of sales-order.')
     expect(await notesLabel(1)).toBe('Their notes')
     expect(await notesLabel(2)).toBe('Notes')
+  })
+
+  // The versions the studio read were taken off the server's volume while
+  // the administrator worked, so the 409 names no current version. The step
+  // says so instead of the version it read, waits for the rebase, and the
+  // rebase onto nothing publishes version 1 again.
+  test('a conflict that names no current version', async () => {
+    await publishedElsewhere(null)
+    const user = await signIn(plane)
+    const publish = await toPublish(user)
+    await rm(join(plane.root, 'sales-order'), { recursive: true })
+    await user.click(within(publish).getByRole('button', { name: 'Publish version 2' }))
+    const alert = await within(publish).findByRole('alert')
+    expect(within(publish).getByText(/changed while you worked/).textContent).toBe('Which version of sales-order is published changed while you worked. Publishing waits until you rebase on what is there.')
+    expect(within(publish).getByRole('button', { name: 'Publish' })).toHaveProperty('disabled', true)
+    await user.click(within(alert).getByRole('button', { name: 'Rebase on what is there' }))
+    await user.click(within(publish).getByRole('button', { name: 'Publish version 1' }))
+    await within(publish).findByText('Published version 1 of sales-order.')
   })
 
   // A version edited on the server's volume is not served (0019), so the

@@ -1,0 +1,589 @@
+{
+  "host-loaded": {
+    "file": "docs/images/readme/host-loaded.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 1200,
+      "height": 1141
+    },
+    "bytes": 104628,
+    "sha256": "78adeef8cc7694f41f84bf196282b48bc68d542fe7531605a11425186accc290",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
+    "stylesheet": "sha256 2d8d4b0c11c8de46d0ad3a070431f1c19d915af6eab0e4646384168201e954ba of src/host.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Record": "- region \"Record\":\n  - heading \"Record\" [level=2]\n  - text: Record token\n  - textbox \"Record token\": k1:9007199254740993\n  - button \"Load\"\n  - button \"New record\"\n  - status: Loaded record k1:9007199254740993 into both forms.",
+      "Allowed": "- paragraph:\n  - code: pg-order\n  - text: \": you may read, create and update records with this form.\"\n- button \"Sign out\"",
+      "React": "- region \"React\":\n  - heading \"React\" [level=2]\n  - status\n  - form \"Order, React\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\": Muster AG\n      - status\n      - text: Order date*\n      - textbox \"Order date*\": 2026-10-08\n      - text: Status\n      - textbox \"Status\": placed\n      - text: Amount*\n      - textbox \"Amount*\": \"99999999999999.9999\"\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\": A\n      - text: Created by\n      - spinbutton \"Created by\": \"1\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]: \"9007199254740993\"\n    - button \"Save\"",
+      "Angular": "- region \"Angular\":\n  - heading \"Angular\" [level=2]\n  - status\n  - form \"Order, Angular\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\": Muster AG\n      - status\n      - text: Order date*\n      - textbox \"Order date*\": 2026-10-08\n      - text: Status\n      - textbox \"Status\": placed\n      - text: Amount*\n      - textbox \"Amount*\": \"99999999999999.9999\"\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\": A\n      - text: Created by\n      - spinbutton \"Created by\": \"1\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]: \"9007199254740993\"\n    - button \"Save\""
+    }
+  },
+  "examples-order": {
+    "file": "docs/images/readme/examples-order.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1300,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 922,
+      "height": 851
+    },
+    "bytes": 63476,
+    "sha256": "82c2d05f923f12df711b95f169bff4c033c4e9e538e224a6f2a630c3006373e5",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshot apps/examples/src/fixture-snapshot.json (PostgreSQL 17.11)",
+    "stylesheet": "sha256 c59974079510d56d3d2b561395f64ab94585dacde46ab73e50e7f81e13cec84d of src/app.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "React": "- region \"sales.order React\":\n  - heading \"React\" [level=3]\n  - form \"sales.order, React preview\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [invalid]:\n        - option [selected]\n        - option \"Muster AG\"\n        - option \"Other Tenant GmbH\"\n      - status\n      - paragraph: required\n      - text: Order date*\n      - textbox \"Order date*\" [invalid]\n      - paragraph: required\n      - text: Status\n      - textbox \"Status\": placed\n      - text: Amount*\n      - textbox \"Amount*\" [invalid]: \"12.34567\"\n      - paragraph: pattern\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\"\n      - text: Created by\n      - spinbutton \"Created by\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]\n    - button \"Validate\"",
+      "Angular": "- region \"sales.order Angular\":\n  - heading \"Angular\" [level=3]\n  - form \"sales.order, Angular preview\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [invalid]:\n        - option [selected]\n        - option \"Muster AG\"\n        - option \"Other Tenant GmbH\"\n      - status\n      - paragraph: required\n      - text: Order date*\n      - textbox \"Order date*\" [invalid]\n      - paragraph: required\n      - text: Status\n      - textbox \"Status\": placed\n      - text: Amount*\n      - textbox \"Amount*\" [invalid]: \"12.34567\"\n      - paragraph: pattern\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\"\n      - text: Created by\n      - spinbutton \"Created by\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]\n    - button \"Validate\""
+    }
+  },
+  "studio-connect": {
+    "file": "docs/images/readme/studio-connect.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 874,
+      "height": 640
+    },
+    "bytes": 146738,
+    "sha256": "17ec757dad75f2b7c4270df9a46e992af26f5b75ffd547314cc1693fd0c7ddb2",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Seen": "- region \"What ms-reader can see\":\n  - heading \"What ms-reader can see\" [level=3]\n  - paragraph:\n    - text: \"SQL Server 16.0.4295.3, schemas sales: 1 table and 0 views. Discovered as\"\n    - code: formancy_reader\n    - text: . Fingerprint\n    - code: a7bab9aaa431\n    - text: .\n  - region \"What this connection could not see\":\n    - heading \"What this connection could not see\" [level=4]\n    - paragraph:\n      - text: Each of these is\n      - strong: cannot tell\n      - text: \", not\"\n      - strong: does not exist\n      - text: \": a table, key or relationship missing below may be there, out of this account’s sight.\"\n    - list \"What this connection could not see\":\n      - listitem:\n        - code: The whole scope\n        - text: row-security this account lacks VIEW DEFINITION on the database, which is what lists every security policy, so a security policy it cannot see may filter any table or view in scope\n      - listitem:\n        - code: Schema sales\n        - text: objects without VIEW DEFINITION on schema sales, the catalog lists only the tables and views this account holds a permission on, so one it cannot see is absent without trace\n      - listitem:\n        - code: sales.order\n        - text: \"checks ck_order_status: the expression is hidden without VIEW DEFINITION\"\n      - listitem:\n        - code: sales.order\n        - text: \"defaults status: the definition of its default df_order_status is hidden without VIEW DEFINITION\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_approved_by references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_created_by references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_customer references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n  - heading \"Tables and views\" [level=4]\n  - list \"Tables and views\":\n    - listitem:\n      - group:\n        - code: sales.order\n        - text: table"
+    }
+  },
+  "studio-choose": {
+    "file": "docs/images/readme/studio-choose.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 874,
+      "height": 634
+    },
+    "bytes": 96180,
+    "sha256": "59b200732cc8e54d45f55b932ce236c3fee0f904f32b672191afeae86addbb26",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Lookups": "- group \"Foreign keys to offer as lookups\":\n  - text: Foreign keys to offer as lookups\n  - checkbox \"Offer fk_order_approved_by as a lookup\" [disabled]\n  - text: Offer fk_order_approved_by as a lookup\n  - paragraph: approved_by → sales.employee. id of sales.employee cannot be read by this connection, so its rows cannot be offered.\n  - checkbox \"Offer fk_order_created_by as a lookup\" [disabled]\n  - text: Offer fk_order_created_by as a lookup\n  - paragraph: created_by → sales.employee. id of sales.employee cannot be read by this connection, so its rows cannot be offered.\n  - checkbox \"Offer fk_order_customer as a lookup\" [checked]\n  - text: Offer fk_order_customer as a lookup\n  - paragraph: tenant_id, customer_no → sales.customer.\n  - group \"Columns to show for fk_order_customer\":\n    - text: Columns to show for fk_order_customer\n    - paragraph: What a person recognises a customer by. The first text column is suggested; confirm or change it.\n    - checkbox \"tenant_id\"\n    - text: tenant_id\n    - checkbox \"customer_no\"\n    - text: customer_no\n    - checkbox \"name\" [checked]\n    - text: name\n    - checkbox \"country_code\" [disabled]\n    - text: country_code This connection may not read it, so it cannot be shown.\n    - checkbox \"credit_limit\" [disabled]\n    - text: credit_limit This connection may not read it, so it cannot be shown.\n    - checkbox \"active\" [disabled]\n    - text: active This connection may not read it, so it cannot be shown.\n    - checkbox \"created_at\" [disabled]\n    - text: created_at This connection may not read it, so it cannot be shown."
+    }
+  },
+  "studio-generate": {
+    "file": "docs/images/readme/studio-generate.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 874,
+      "height": 1051
+    },
+    "bytes": 213178,
+    "sha256": "c9f5f24c7407064cf9fca3714656c762156eb9be51400e8da9d5ab123838c7a6",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Chose": "- region \"What the generator chose\":\n  - heading \"What the generator chose\" [level=3]\n  - heading \"Operations\" [level=4]\n  - list \"Operations\":\n    - listitem:\n      - text: \"Create:\"\n      - strong: offered\n    - listitem:\n      - text: \"Update:\"\n      - strong: offered\n  - heading \"Blocked 0\" [level=4]\n  - paragraph: An operation the form cannot offer, and why.\n  - paragraph: No operation is blocked.\n  - heading \"Read-only 5\" [level=4]\n  - paragraph: A field shown and not written, on every operation or on the one named.\n  - list \"Read-only\":\n    - listitem:\n      - code: id\n      - text: The database numbers this value (identity-always) and refuses one given to it.\n    - listitem:\n      - code: customer\n      - text: \"Read-only on update: this connection's account may not UPDATE tenant_id, customer_no.\"\n    - listitem:\n      - code: order_date\n      - text: \"Read-only on update: this connection's account may not UPDATE order_date.\"\n    - listitem:\n      - code: amount\n      - text: \"Read-only on update: this connection's account may not UPDATE amount.\"\n    - listitem:\n      - code: created_by\n      - text: \"Read-only on update: this connection's account may not UPDATE created_by.\"\n  - heading \"Excluded 0\" [level=4]\n  - paragraph: A column with no field.\n  - paragraph: No column was left without a field.\n  - heading \"Inferred 11\" [level=4]\n  - paragraph: Decided from the metadata, and editable.\n  - list \"Inferred\":\n    - listitem:\n      - code: id\n      - text: A whole number held as text, because it can exceed what JavaScript represents exactly from bigint; label from the column name.\n    - listitem:\n      - code: customer\n      - text: A lookup over fk_order_customer (tenant_id, customer_no), showing name of customer; label from the table name.\n    - listitem:\n      - code: order_date\n      - text: A calendar date from date; label from the column name.\n    - listitem:\n      - code: status\n      - text: Text from character varying(20); label from the column name.\n    - listitem:\n      - code: status\n      - text: \"The browser's maxLength of 20 counts UTF-16 code units and the column counts characters: an emoji counts twice in the browser, so the form can refuse a value the column would hold, never the reverse.\"\n    - listitem:\n      - code: amount\n      - text: An exact decimal held as text, never as a floating-point number from numeric(18,4); label from the column name.\n    - listitem:\n      - code: notes\n      - text: Multi-line text from text; label from the column name.\n    - listitem:\n      - code: group\n      - text: Text from character varying(50); label from the column name.\n    - listitem:\n      - code: group\n      - text: \"The browser's maxLength of 50 counts UTF-16 code units and the column counts characters: an emoji counts twice in the browser, so the form can refuse a value the column would hold, never the reverse.\"\n    - listitem:\n      - code: created_by\n      - text: A whole number from integer; label from the column name.\n    - listitem:\n      - code: approved_by\n      - text: A whole number from integer; label from the column name.\n  - heading \"Access 1\" [level=4]\n  - paragraph: \"What the database itself limits for this connection: row-level security.\"\n  - list \"Access\":\n    - listitem:\n      - code: customer\n      - text: \"Row-level security applies to this connection on sales.customer: records outside its policies read as not found, a write its policies refuse is refused, and this module sets no session state a policy may read (0011).\""
+    }
+  },
+  "studio-policy": {
+    "file": "docs/images/readme/studio-policy.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 874,
+      "height": 530
+    },
+    "bytes": 59628,
+    "sha256": "08064a21e57e8dabaa4a3d30633fc54a885d1d52d9207f22377ea17ddc307a78",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Rows": "- group \"Row filters on sales.order\":\n  - text: Row filters on sales.order\n  - paragraph: \"Which rows of sales.order this form reaches: on read and update the filter, on create the values the pinned columns are written with, from the signed-in person’s attributes and never from the form.\"\n  - list:\n    - listitem:\n      - text: Column of row filter 1\n      - combobox \"Column of row filter 1\":\n        - option \"id\"\n        - option \"row_version\"\n        - option \"tenant_id\" [selected]\n        - option \"customer_no\"\n        - option \"order_date\"\n        - option \"status\"\n        - option \"amount\"\n        - option \"notes\"\n        - option \"group\"\n        - option \"created_by\"\n        - option \"approved_by\"\n      - text: Trusted attribute of row filter 1\n      - textbox \"Trusted attribute of row filter 1\": tenant\n      - button \"Remove row filter 1\"\n  - paragraph:\n    - button \"Add a row filter\"",
+      "Lookup": "- group \"Rows the Customer list may offer\":\n  - text: Rows the Customer list may offer\n  - paragraph: The Customer field chooses a row of sales.customer. A choice is checked again on save against these filters, so a row they exclude cannot be submitted even by somebody who knows its key.\n  - list:\n    - listitem:\n      - text: Column of Customer filter 1\n      - combobox \"Column of Customer filter 1\":\n        - option \"tenant_id\" [selected]\n        - option \"customer_no\"\n        - option \"name\"\n      - text: Trusted attribute of Customer filter 1\n      - textbox \"Trusted attribute of Customer filter 1\": tenant\n      - button \"Remove Customer filter 1\"\n  - paragraph:\n    - button \"Add a filter to the Customer list\""
+    }
+  },
+  "studio-presentation": {
+    "file": "docs/images/readme/studio-presentation.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 874,
+      "height": 1100
+    },
+    "bytes": 87742,
+    "sha256": "bf10074f692ba650e131cbbd0265f44bb8b4f2e11a5044fee129b4e99fa30058",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Undo": "- button \"Undo\"",
+      "Redo": "- button \"Redo\"",
+      "Said": "- status: Moved Customer down.",
+      "Order": "- region \"Order\":\n  - heading \"Order\" [level=3]\n  - text: Section label of Order\n  - textbox \"Section label of Order\": Order\n  - list:\n    - listitem:\n      - text: Label of order_date\n      - textbox \"Label of order_date\": Order date\n      - paragraph:\n        - text: Bound field\n        - code: order_date\n      - button \"Move up Order date\" [disabled]\n      - button \"Move down Order date\"\n      - checkbox \"Full width for Order date\"\n      - text: Full width for Order date\n    - listitem:\n      - text: Label of customer\n      - textbox \"Label of customer\": Customer\n      - paragraph:\n        - text: Bound field\n        - code: customer\n      - button \"Move up Customer\"\n      - button \"Move down Customer\"\n      - checkbox \"Full width for Customer\"\n      - text: Full width for Customer\n    - listitem:\n      - text: Label of status\n      - textbox \"Label of status\" [invalid]\n      - paragraph: A label needs words a person can read. Until it has some, it stays “Status”.\n      - paragraph:\n        - text: Bound field\n        - code: status\n      - button \"Move up Status\"\n      - button \"Move down Status\"\n      - checkbox \"Full width for Status\"\n      - text: Full width for Status\n    - listitem:\n      - text: Label of amount\n      - textbox \"Label of amount\": Amount\n      - paragraph:\n        - text: Bound field\n        - code: amount\n      - button \"Move up Amount\"\n      - button \"Move down Amount\"\n      - checkbox \"Full width for Amount\"\n      - text: Full width for Amount\n    - listitem:\n      - text: Label of notes\n      - textbox \"Label of notes\": Remarks\n      - paragraph:\n        - text: Bound field\n        - code: notes\n      - button \"Move up Remarks\"\n      - button \"Move down Remarks\"\n      - checkbox \"Full width for Remarks\" [checked]\n      - text: Full width for Remarks\n    - listitem:\n      - text: Label of group\n      - textbox \"Label of group\": Group\n      - paragraph:\n        - text: Bound field\n        - code: group\n      - button \"Move up Group\"\n      - button \"Move down Group\"\n      - checkbox \"Full width for Group\"\n      - text: Full width for Group\n    - listitem:\n      - text: Label of created_by\n      - textbox \"Label of created_by\": Created by\n      - paragraph:\n        - text: Bound field\n        - code: created_by\n      - button \"Move up Created by\"\n      - button \"Move down Created by\"\n      - checkbox \"Full width for Created by\"\n      - text: Full width for Created by\n    - listitem:\n      - text: Label of approved_by\n      - textbox \"Label of approved_by\": Approved by\n      - paragraph:\n        - text: Bound field\n        - code: approved_by\n      - button \"Move up Approved by\"\n      - button \"Move down Approved by\" [disabled]\n      - checkbox \"Full width for Approved by\"\n      - text: Full width for Approved by"
+    }
+  },
+  "studio-preview": {
+    "file": "docs/images/readme/studio-preview.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 916,
+      "height": 1088
+    },
+    "bytes": 92756,
+    "sha256": "3eaa6f926f022cb156d4220dc5ff1e41a8948dca2157f3024f3719ae4dfd8eff",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Preview": "- main \"Preview\":\n  - heading \"Preview\" [level=2]\n  - paragraph:\n    - strong: Validate\n    - text: \"runs the formancy engine in this browser against the document you are about to publish. Nothing is saved: the studio writes forms, never records.\"\n  - note:\n    - text: The\n    - strong: Customer\n    - text: list is filled by the runtime plane once the form is published, from sales.customer under its lookup filters. The studio speaks only the administrator plane, so here the renderer says where the list would be.\n  - form \"Order preview\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Order date*\n      - textbox \"Order date*\" [invalid]\n      - paragraph: required\n      - text: Customer\n      - paragraph: This field's answers come from \"pg-sales-order-fk-order-customer\", which this application has not provided.\n      - paragraph: required\n      - text: Status\n      - textbox \"Status\"\n      - text: Amount*\n      - textbox \"Amount*\" [invalid]\n      - paragraph: required\n      - text: Remarks\n      - textbox \"Remarks\"\n      - text: Group\n      - textbox \"Group\"\n      - text: Created by\n      - spinbutton \"Created by\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]\n    - button \"Validate\""
+    }
+  },
+  "studio-publish-conflict": {
+    "file": "docs/images/readme/studio-publish-conflict.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 916,
+      "height": 422
+    },
+    "bytes": 70004,
+    "sha256": "57bcc862c824c6822c8574f0a8073b7ce531864a89f6a2472da50708eb461777",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Publish": "- main \"Publish\":\n  - heading \"Publish\" [level=2]\n  - paragraph:\n    - text: \"One bundle: the form as the presentation step left it, its bindings to sales.order on\"\n    - code: pg\n    - text: \", the policy, and the snapshot they were generated from. The server checks all of it again before it writes anything, and keeps every version it has published.\"\n  - paragraph: Version 2 of pg-order is published now, and it is somebody else's. Publishing waits until you rebase on it.\n  - paragraph:\n    - button \"Publish\" [disabled]\n  - alert:\n    - paragraph: Somebody published version 2 while you worked. Yours was not published, and theirs is untouched.\n    - paragraph: \"Version 2: “Order”, 9 fields, bound to sales.order on pg.\"\n    - button \"Rebase on version 2\""
+    }
+  },
+  "studio-drift": {
+    "file": "docs/images/readme/studio-drift.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 916,
+      "height": 1381
+    },
+    "bytes": 213806,
+    "sha256": "cc2ccce08df0bd1007f398d09979ee91dd016d886de408a854ec1d1ae108d441",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Drift": "- main \"Drift\":\n  - heading \"Drift\" [level=2]\n  - paragraph: \"Compare a published form with its database as it is now. Only what the form rests on is compared: its table and its lookups’ targets. Something this connection can no longer see is an access change, never a deletion.\"\n  - text: Form id\n  - textbox \"Form id\": pg-order\n  - button \"Check drift\"\n  - region \"Version 3 of pg-order, against the database now\":\n    - heading \"Version 3 of pg-order, against the database now\" [level=3]\n    - status: 3 changes, 1 blocking.\n    - heading \"What the published form may still do\" [level=4]\n    - list \"What the published form may still do\":\n      - listitem: \"Create: blocked by the changes below\"\n      - listitem: \"Update: blocked by the changes below\"\n      - listitem: \"As a whole: not to be used as published until the blocking changes are reviewed.\"\n    - heading \"Blocking\" [level=4]\n    - paragraph: \"Blocks the form as published: a write it offers is stopped, or a field it shows can no longer be read, until it is reviewed.\"\n    - list \"Blocking\":\n      - listitem:\n        - paragraph:\n          - text: blocking\n          - code: column-dropped\n          - text: on sales.order, column notes\n        - paragraph: notes is gone, and the form binds it to notes. The form is blocked until it is reviewed.\n        - paragraph: Affects Remarks (notes).\n    - heading \"Review\" [level=4]\n    - paragraph: Blocks nothing. A person has something to decide.\n    - list \"Review\":\n      - listitem:\n        - paragraph:\n          - text: review\n          - code: column-added\n          - text: on sales.order, column memo\n        - paragraph: memo is new (text, nullable). It can be added to the form; the published form is unchanged.\n        - paragraph: Affects no field of this form.\n      - listitem:\n        - paragraph:\n          - text: review\n          - code: possible-rename\n          - text: on sales.order, column notes\n        - paragraph: \"notes is gone and memo is new with the same definition (text). If it is notes renamed, confirm it: nothing is inferred, and until then they are reported as a dropped column and a new one.\"\n        - paragraph: Affects Remarks (notes).\n  - paragraph:\n    - button \"Regenerate, keeping your presentation\"\n  - region \"Versions of pg-order\":\n    - heading \"Versions of pg-order\" [level=3]\n    - paragraph: Restoring publishes an older version again as version 4, with the policy it had, when the database can still serve it. It changes no table.\n    - text: Version to restore\n    - combobox \"Version to restore\":\n      - option \"Version 1\" [selected]\n      - option \"Version 2\"\n    - button \"Restore version 1\"\n    - paragraph: \"Version 1: “Order”, 9 fields, bound to sales.order on pg.\"\n    - alert:\n      - paragraph: \"Version 1 cannot be restored: the database has changed in a way it cannot serve.\"\n      - heading \"What blocks it\" [level=4]\n      - list \"What blocks it\":\n        - listitem:\n          - paragraph:\n            - text: blocking\n            - code: column-dropped\n            - text: on sales.order, column notes\n          - paragraph: notes is gone, and the form binds it to notes. The form is blocked until it is reviewed.\n          - paragraph: Affects Remarks (notes)."
+    }
+  },
+  "studio-regenerated": {
+    "file": "docs/images/readme/studio-regenerated.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 874,
+      "height": 427
+    },
+    "bytes": 66590,
+    "sha256": "84ce31c9c423d4d33ffe35e6dc0754b9c89292b7c49d45fef4fd25b80574efa1",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Regenerated": "- region \"Regenerated from version 3\":\n  - heading \"Regenerated from version 3\" [level=3]\n  - status: Generated again from the database now, with your presentation carried by the column or lookup each choice was made for. Nothing is published until you publish it.\n  - heading \"Presentation not carried as it was\" [level=4]\n  - list \"Presentation not carried as it was\":\n    - listitem: \"The label \\\"Remarks\\\" you chose for notes was dropped: column notes is not in the regenerated form.\"\n  - heading \"Lookups left out\" [level=4]\n  - paragraph: Every lookup is still offered.\n  - heading \"Keys that now stand for something else\" [level=4]\n  - paragraph: Every key stands for what it did.\n  - heading \"What the published policy no longer fits\" [level=4]\n  - list \"What the published policy no longer fits\":\n    - listitem: \"policy: fields.notes: the form has no field notes\"\n  - paragraph:\n    - button \"Continue to presentation\""
+    }
+  },
+  "studio-carried": {
+    "file": "docs/images/readme/studio-carried.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 874,
+      "height": 225
+    },
+    "bytes": 30224,
+    "sha256": "f4de2c6172fab6f16ab81278937d6bfac69446377d1a2497ac5241de8db35de0",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Carried": "- region \"Carried from version 3\":\n  - heading \"Carried from version 3\" [level=3]\n  - paragraph: What could not be carried as it was, and what was done instead. A choice here is one edit, which Undo takes back.\n  - list \"Carried from version 3\":\n    - listitem:\n      - paragraph: \"The label \\\"Remarks\\\" you chose for notes was dropped: column notes is not in the regenerated form.\"\n      - text: Give “Remarks” to\n      - combobox \"Give “Remarks” to\":\n        - option \"Memo (memo)\" [selected]\n      - button \"Give “Remarks”\""
+    }
+  },
+  "studio-restored": {
+    "file": "docs/images/readme/studio-restored.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 874,
+      "height": 210
+    },
+    "bytes": 42090,
+    "sha256": "99a25399a3684cb3218d23463027fe2842eeaa81f2ebba2e0c0d1ac543fcf11b",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Versions": "- region \"Versions of pg-order\":\n  - heading \"Versions of pg-order\" [level=3]\n  - paragraph: Restoring publishes an older version again as version 5, with the policy it had, when the database can still serve it. It changes no table.\n  - text: Version to restore\n  - combobox \"Version to restore\":\n    - option \"Version 1\" [selected]\n    - option \"Version 2\"\n    - option \"Version 3\"\n  - button \"Restore version 1\"\n  - paragraph: \"Version 1: “Order”, 9 fields, bound to sales.order on pg.\"\n  - status: \"Restored version 1 as version 4: the runtime serves it from now on, with the policy it had. The database was not changed.\""
+    }
+  },
+  "host-stale": {
+    "file": "docs/images/readme/host-stale.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 1200,
+      "height": 1034
+    },
+    "bytes": 98358,
+    "sha256": "224d88a5ccfb57acab66b637de990c47ca4571758ea8b8bd25ae295c5c8e6824",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
+    "stylesheet": "sha256 2d8d4b0c11c8de46d0ad3a070431f1c19d915af6eab0e4646384168201e954ba of src/host.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "React": "- region \"React\":\n  - heading \"React\" [level=2]\n  - status: Saved.\n  - form \"Order, React\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\": Muster AG\n      - status\n      - text: Order date*\n      - textbox \"Order date*\": 2026-10-08\n      - text: Status\n      - textbox \"Status\": shipped\n      - text: Amount*\n      - textbox \"Amount*\": \"99999999999999.9999\"\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\": A\n      - text: Created by\n      - spinbutton \"Created by\": \"1\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]: \"9007199254740993\"\n    - button \"Save\"",
+      "Angular": "- region \"Angular\":\n  - heading \"Angular\" [level=2]\n  - status\n  - region \"Angular Not saved\":\n    - heading \"Not saved\" [level=3]\n    - paragraph: The record changed since it was read. Reload it, review the changes, and save again.\n    - paragraph: Your changes are still in the form.\n    - button \"Load the saved record\"\n  - form \"Order, Angular\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\": Muster AG\n      - status\n      - text: Order date*\n      - textbox \"Order date*\": 2026-10-08\n      - text: Status\n      - textbox \"Status\": placed\n      - text: Amount*\n      - textbox \"Amount*\": \"99999999999999.9999\"\n      - text: Notes\n      - textbox \"Notes\": Deliver to the side door\n      - text: Group\n      - textbox \"Group\": A\n      - text: Created by\n      - spinbutton \"Created by\": \"1\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]: \"9007199254740993\"\n    - button \"Save\""
+    }
+  },
+  "host-unknown": {
+    "file": "docs/images/readme/host-unknown.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 576,
+      "height": 1005
+    },
+    "bytes": 57684,
+    "sha256": "504be67a66ca1821990655151dddccad86db35942db6a261afde38a273d9281d",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
+    "stylesheet": "sha256 2d8d4b0c11c8de46d0ad3a070431f1c19d915af6eab0e4646384168201e954ba of src/host.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "React": "- region \"React\":\n  - heading \"React\" [level=2]\n  - status\n  - region \"React It may have been saved\":\n    - heading \"It may have been saved\" [level=3]\n    - paragraph: The answer to this save was lost between this page and the data server. It may have been saved.\n    - status\n    - button \"Check whether it was saved\"\n  - form \"Order, React\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\": Muster AG\n      - status\n      - text: Order date*\n      - textbox \"Order date*\": 2026-10-08\n      - text: Status\n      - textbox \"Status\": shipped\n      - text: Amount*\n      - textbox \"Amount*\": \"99999999999999.9999\"\n      - text: Notes\n      - textbox \"Notes\": Deliver to the side door\n      - text: Group\n      - textbox \"Group\": A\n      - text: Created by\n      - spinbutton \"Created by\": \"1\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]: \"9007199254740993\"\n    - button \"Save\""
+    }
+  },
+  "host-typeahead": {
+    "file": "docs/images/readme/host-typeahead.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 576,
+      "height": 851
+    },
+    "bytes": 29264,
+    "sha256": "b68649e1a5d28d0e1c115ec4b22c94b8b12cdffcbdce23af979b46e0e3684bb0",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
+    "stylesheet": "sha256 2d8d4b0c11c8de46d0ad3a070431f1c19d915af6eab0e4646384168201e954ba of src/host.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "React": "- region \"React\":\n  - heading \"React\" [level=2]\n  - status\n  - form \"Order, React\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [expanded]: er\n      - listbox \"Customer suggestions\":\n        - option \"Muster AG\"\n      - status\n      - text: Order date*\n      - textbox \"Order date*\"\n      - text: Status\n      - textbox \"Status\"\n      - text: Amount*\n      - textbox \"Amount*\"\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\"\n      - text: Created by\n      - spinbutton \"Created by\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]\n    - button \"Save\"",
+      "List": "- listbox \"Customer suggestions\":\n  - option \"Muster AG\""
+    }
+  },
+  "host-refused": {
+    "file": "docs/images/readme/host-refused.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 576,
+      "height": 1019
+    },
+    "bytes": 54758,
+    "sha256": "0763bc66baaa5b300acc04650866fe73b67acb44fdaae26d7f4a9a355dc91e86",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
+    "stylesheet": "sha256 2d8d4b0c11c8de46d0ad3a070431f1c19d915af6eab0e4646384168201e954ba of src/host.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "React": "- region \"React\":\n  - heading \"React\" [level=2]\n  - status: Not saved. A selection is not one of the options.\n  - form \"Order, React\":\n    - heading \"There is 1 problem to fix\" [level=2]\n    - list:\n      - listitem:\n        - 'link \"Customer: This is not one of the options this form offers.\"':\n          - /url: \"#f:pg-order-react:customer:control\"\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [invalid]: Brunner Logistik AG\n      - status\n      - paragraph: This is not one of the options this form offers.\n      - text: Order date*\n      - textbox \"Order date*\": 2026-10-01\n      - text: Status\n      - textbox \"Status\": placed\n      - text: Amount*\n      - textbox \"Amount*\": \"5\"\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\"\n      - text: Created by\n      - spinbutton \"Created by\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]\n    - button \"Save\""
+    }
+  },
+  "host-other-tenant": {
+    "file": "docs/images/readme/host-other-tenant.webp",
+    "captured": "2026-10-10",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 1200,
+      "height": 329
+    },
+    "bytes": 29866,
+    "sha256": "3824a92cfc8e2b281ea8e5e821d63a043b2e1bb93acc0dca26d3260e65df220a",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo": "v25",
+        "IBM Plex Mono": "v20",
+        "IBM Plex Sans": "v23"
+      }
+    },
+    "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
+    "stylesheet": "sha256 2d8d4b0c11c8de46d0ad3a070431f1c19d915af6eab0e4646384168201e954ba of src/host.css with its imports, and @formancy/themes 0.3.0",
+    "text": {
+      "Record": "- region \"Record\":\n  - heading \"Record\" [level=2]\n  - text: Record token\n  - textbox \"Record token\": k1:9007199254740993\n  - button \"Load\"\n  - button \"New record\"\n  - status\n  - alert: No such record.",
+      "Allowed": "- paragraph:\n  - code: pg-order\n  - text: \": you may read, create and update records with this form.\"\n- button \"Sign out\""
+    }
+  }
+}

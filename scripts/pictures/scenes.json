@@ -1,0 +1,233 @@
+[
+  {
+    "id": "host-loaded",
+    "app": "host",
+    "placement": "hero",
+    "title": "One record, both renderers",
+    "caption": "`pg-order`, generated from `sales.order` on PostgreSQL as the order form's own account and published through the administrator plane with the getting-started guide's request and policy, drawn by `@formancy/react` and `@formancy/angular` from one definition through `@formancy/data-client`. The order is the fixture's edge case: its id, “9007199254740993”, is 2^53+1, which a JavaScript number reads back as …992, and its amount, “99999999999999.9999”, is the largest `numeric(18,4)` holds. Both panes show both digit for digit, because exact values travel as strings ([0008](./docs/decisions/0008-exact-values-travel-as-strings.md)).",
+    "alt": "The host page's record bar saying “Loaded record k1:9007199254740993 into both forms.”, a line saying of pg-order that “you may read, create and update records with this form.” beside a Sign out button, and below them the same order form twice, React on the left and Angular on the right, each showing customer “Muster AG”, id 9007199254740993 and amount 99999999999999.9999.",
+    "quotes": {
+      "9007199254740993": ["React", "Angular"],
+      "99999999999999.9999": ["React", "Angular"],
+      "Muster AG": ["React", "Angular"],
+      "Loaded record k1:9007199254740993 into both forms.": ["Record"],
+      "you may read, create and update records with this form.": ["Allowed"]
+    }
+  },
+  {
+    "id": "examples-order",
+    "app": "examples",
+    "placement": "inline",
+    "title": "Both renderers, before any server",
+    "caption": "The examples page runs the generator in the browser over a snapshot captured from PostgreSQL, with no server, and renders `sales.order` with both renderers. An amount with five decimals for a `numeric(18,4)` column is refused in both with the same code, “pattern”, and the empty required fields with “required” ([0021](./docs/decisions/0021-generated-forms-preview-in-both-frameworks.md)).",
+    "alt": "Two order forms on white paper, labelled React and Angular, each with Status placed, Amount 12.34567 marked pattern, and Customer and Order date marked required.",
+    "quotes": {
+      "pattern": ["React", "Angular"],
+      "required": ["React", "Angular"]
+    }
+  },
+  {
+    "id": "studio-connect",
+    "app": "studio",
+    "placement": "inline",
+    "title": "Connect",
+    "step": "1. Connect",
+    "caption": "On SQL Server, as an account without VIEW DEFINITION. What the catalog hid from it comes first, each gap “cannot tell”, not “does not exist”, so a table or key missing below is never taken as absent ([0004](./docs/decisions/0004-a-snapshot-says-what-it-could-not-see.md), [0007](./docs/decisions/0007-sqlserver-discovery-and-what-it-hides.md)).",
+    "alt": "The studio's Connect step for ms-reader: “SQL Server 16.0.4295.3”, discovered as formancy_reader, and a panel “What this connection could not see” listing gaps in row security, objects, checks, defaults and foreign keys.",
+    "quotes": {
+      "cannot tell": ["Seen"],
+      "does not exist": ["Seen"],
+      "SQL Server 16.0.4295.3": ["Seen"],
+      "What this connection could not see": ["Seen"]
+    }
+  },
+  {
+    "id": "studio-choose",
+    "app": "studio",
+    "placement": "more",
+    "title": "Choose",
+    "step": "2. Choose",
+    "caption": "As the order form's own account. A foreign key is offered as a lookup only where this account may read its target: `approved_by` and `created_by` point at `sales.employee`, whose rows “cannot be offered”, and the customer columns it may not read “cannot be shown” ([0027](./docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).",
+    "alt": "The lookups group of the Choose step: two employee keys refused because sales.employee cannot be read by this connection, and the customer lookup ticked with name as the column to show and four columns this connection may not read.",
+    "quotes": {
+      "cannot be offered": ["Lookups"],
+      "cannot be shown": ["Lookups"]
+    }
+  },
+  {
+    "id": "studio-generate",
+    "app": "studio",
+    "placement": "inline",
+    "title": "Generate",
+    "step": "3. Generate",
+    "caption": "The generator says what it chose and what it refused, kind by kind, from what this account may do: a column it may not update is “Read-only on update”, and “Row-level security applies” to it on `sales.customer`, named as the database's own limit ([0009](./docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md), [0027](./docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).",
+    "alt": "The generator's notes: create and update offered, nothing blocked, read-only notes for id, customer, order_date, amount and created_by, the inferred controls with their column types, and an access note that row-level security applies on sales.customer.",
+    "quotes": {
+      "Read-only on update": ["Chose"],
+      "Row-level security applies": ["Chose"]
+    }
+  },
+  {
+    "id": "studio-policy",
+    "app": "studio",
+    "placement": "more",
+    "title": "Policy",
+    "step": "4. Policy",
+    "caption": "The tenant pin becomes a row filter on the orders this form reaches and on the customers its list may offer, taken from the signed-in person's attributes “and never from the form”; a customer outside the filter is refused on save “even by somebody who knows its key” ([0011](./docs/decisions/0011-every-operation-carries-a-trusted-policy-context.md)).",
+    "alt": "Two policy groups, each with tenant_id equal to the trusted attribute tenant: the row filters on sales.order and the rows the Customer list may offer.",
+    "quotes": {
+      "and never from the form": ["Rows"],
+      "even by somebody who knows its key": ["Lookup"]
+    }
+  },
+  {
+    "id": "studio-presentation",
+    "app": "studio",
+    "placement": "more",
+    "title": "Presentation",
+    "step": "5. Presentation",
+    "caption": "Labels, order and width are a patch over the generated form: every row names the column it is bound to, nothing here adds, removes or renames a field, and an empty label is refused: “A label needs words a person can read.” ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).",
+    "alt": "The Presentation step's Order section below Undo, Redo and the status “Moved Customer down.”: its section label, then a row each for Order date, Customer, Status with its label emptied and refused, Amount, notes labelled Remarks at full width, Group, Created by and Approved by, each naming the column it is bound to.",
+    "quotes": {
+      "A label needs words a person can read.": ["Order"],
+      "Moved Customer down.": ["Said"]
+    }
+  },
+  {
+    "id": "studio-preview",
+    "app": "studio",
+    "placement": "more",
+    "title": "Preview",
+    "step": "6. Preview",
+    "caption": "The form as the people filling it in will see it, on white paper in the Blueprint theme and checked by the released engine; the studio's browser gate fails if any rule of the studio's own stylesheet selects an element on the paper. The Customer list is filled only by the runtime plane, so “the renderer says where the list would be”.",
+    "alt": "The Preview step: a note that the Customer list is filled by the runtime plane once published, and the order form on white paper after Validate, with Order date, Customer and Amount marked required.",
+    "quotes": {
+      "the renderer says where the list would be": ["Preview"]
+    }
+  },
+  {
+    "id": "studio-publish-conflict",
+    "app": "studio",
+    "placement": "more",
+    "title": "A conflicting publish",
+    "step": "7. Publish",
+    "caption": "Another administrator, grace, published version 2 while ada worked; the capture script sends grace's request to the same server. Nothing is overwritten: “Yours was not published, and theirs is untouched.” The step says which version is published now, and “Publishing waits until you rebase on it.” ([0013](./docs/decisions/0013-published-configuration-is-files-with-link-based-swap.md)).",
+    "alt": "The Publish step saying that version 2 of pg-order is published now and is somebody else's, its Publish button disabled, and an alert that somebody published version 2 while you worked, with a button “Rebase on version 2”.",
+    "quotes": {
+      "Yours was not published, and theirs is untouched.": ["Publish"],
+      "Publishing waits until you rebase on it.": ["Publish"],
+      "Rebase on version 2": ["Publish"]
+    }
+  },
+  {
+    "id": "studio-drift",
+    "app": "studio",
+    "placement": "inline",
+    "title": "Drift",
+    "step": "8. Drift",
+    "caption": "After the capture script renamed `notes` to `memo` in the captured snapshot, which is what discovery reports after a column is renamed in the database, on both engines. The published form may not be used until the change is reviewed, the rename is a “possible-rename” for a person to confirm and not a guess, and restoring version 1, which still binds `notes`, is refused with what blocks it: “Version 1 cannot be restored: the database has changed in a way it cannot serve.” ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md), [0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).",
+    "alt": "The Drift step: “3 changes, 1 blocking.”; create and update blocked; a blocking column-dropped change for notes, review changes for the new column memo and a possible rename; and a refused restore of version 1 with what blocks it.",
+    "quotes": {
+      "possible-rename": ["Drift"],
+      "Version 1 cannot be restored: the database has changed in a way it cannot serve.": ["Drift"],
+      "3 changes, 1 blocking.": ["Drift"]
+    }
+  },
+  {
+    "id": "studio-regenerated",
+    "app": "studio",
+    "placement": "more",
+    "title": "Regenerated",
+    "caption": "Regenerated from the database as it is now, keeping the presentation, and saying before anything is published what it could not carry: the label chosen for `notes`, and the policy entry that names it. “Nothing is published until you publish it.”",
+    "alt": "A panel “Regenerated from version 3” listing the label Remarks dropped because notes is not in the regenerated form, and a policy entry for notes that no longer fits.",
+    "quotes": {
+      "Nothing is published until you publish it.": ["Regenerated"],
+      "Regenerated from version 3": ["Regenerated"]
+    }
+  },
+  {
+    "id": "studio-carried",
+    "app": "studio",
+    "placement": "more",
+    "title": "Carried",
+    "caption": "Back in Presentation, the dropped label is offered to the new column as one edit, “which Undo takes back”; nothing carries it by guessing that `memo` is `notes`.",
+    "alt": "A panel “Carried from version 3” offering to give the label Remarks to Memo (memo).",
+    "quotes": {
+      "which Undo takes back": ["Carried"],
+      "Carried from version 3": ["Carried"]
+    }
+  },
+  {
+    "id": "studio-restored",
+    "app": "studio",
+    "placement": "more",
+    "title": "Restored",
+    "caption": "Once the database fits version 1 again, it is restored as the next version with the policy it had: “The database was not changed.”",
+    "alt": "The versions panel saying “Restored version 1 as version 4” and that the database was not changed.",
+    "quotes": {
+      "The database was not changed.": ["Versions"],
+      "Restored version 1 as version 4": ["Versions"]
+    }
+  },
+  {
+    "id": "host-stale",
+    "app": "host",
+    "placement": "inline",
+    "title": "A stale save",
+    "caption": "Two drafts of one record. React saved first; Angular's save, made against the version it read, is refused as stale instead of overwriting it: “Your changes are still in the form.”, with a button to “Load the saved record” ([0015](./docs/decisions/0015-a-record-operation-is-one-guarded-statement.md)).",
+    "alt": "The order form twice: the React pane says “Saved.”; the Angular pane shows a notice “Not saved”, that the record changed since it was read, that the changes are still in the form, and a button “Load the saved record”.",
+    "quotes": {
+      "Saved.": ["React"],
+      "Your changes are still in the form.": ["Angular"],
+      "Load the saved record": ["Angular"],
+      "Not saved": ["Angular"]
+    }
+  },
+  {
+    "id": "host-unknown",
+    "app": "host",
+    "placement": "inline",
+    "title": "A save whose answer was lost",
+    "caption": "A save whose answer was lost after the server stored it: the capture script lets the server store it and then tells the page the connection was reset. The page cannot know whether it was saved, so it says so, offers to check, and holds the save; nothing sends it again ([0031](./docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).",
+    "alt": "The React pane with a notice “It may have been saved”, the sentence that the answer was lost between this page and the data server, and a button “Check whether it was saved”.",
+    "quotes": {
+      "It may have been saved": ["React"],
+      "Check whether it was saved": ["React"]
+    }
+  },
+  {
+    "id": "host-typeahead",
+    "app": "host",
+    "placement": "more",
+    "title": "The customer typeahead",
+    "caption": "The customer field is a typeahead the host page draws over the published lookup. As clara, a clerk of tenant 1, types, the page asks the runtime plane as her, and the server answers with the rows she may choose: “Muster AG”, and not tenant 2's Other Tenant GmbH, which matches too and has the same customer number. Each option travels under a token that is a reference, not a permission ([0012](./docs/decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md)).",
+    "alt": "The React pane of a new order with er typed into Customer and a list offering Muster AG alone.",
+    "quotes": {
+      "Muster AG": ["List"]
+    }
+  },
+  {
+    "id": "host-refused",
+    "app": "host",
+    "placement": "more",
+    "title": "A refused choice",
+    "caption": "A customer chosen from the list and deleted by somebody else before Save; the capture script inserts and deletes it through the database's owner. The server checks the choice again when the order is saved and refuses it on the field: “This is not one of the options this form offers.”",
+    "alt": "The React pane of a new order with an error summary “There is 1 problem to fix” and, under Customer, the refusal.",
+    "quotes": {
+      "This is not one of the options this form offers.": ["React"],
+      "There is 1 problem to fix": ["React"]
+    }
+  },
+  {
+    "id": "host-other-tenant",
+    "app": "host",
+    "placement": "more",
+    "title": "Another tenant's record",
+    "caption": "otto, a clerk of tenant 2, may read records with this form; with tenant 1's record token he is told “No such record.”, the answer a token that names no record gets, so the page learns nothing about another tenant's orders ([0022](./docs/decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)).",
+    "alt": "The record bar with token k1:9007199254740993 and an alert “No such record.”, with the line saying of pg-order that “you may read, create and update records with this form.” and a Sign out button.",
+    "quotes": {
+      "No such record.": ["Record"],
+      "you may read, create and update records with this form.": ["Allowed"]
+    }
+  }
+]

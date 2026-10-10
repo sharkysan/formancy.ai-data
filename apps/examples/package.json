@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test:coverage": "vitest run --coverage",
     "test": "vitest run",
-    "test:browser": "node scripts/browser-test.mjs",
+    "test:browser": "node scripts/browser-test.mjs && node scripts/pictures.mjs --check",
+    "pictures": "node scripts/pictures.mjs",
     "snapshot": "node scripts/capture-snapshot.mjs"
   },
   "dependencies": {

@@ -865,6 +865,10 @@
     "0036": {
       "reviewed": "sha256:4463042a110e470eac46550dc3965682323994fb60edb78026a20e330481e760",
       "none": "A rule for this repository's branches; nobody who installs, integrates or operates the module meets it."
+    },
+    "0038": {
+      "reviewed": "sha256:3a71785e58666cc6986db9106567345bf844921884f71097908289199d2f0c61",
+      "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the browser job's time. Nobody who installs, integrates or operates the module meets them."
     }
   }
 }

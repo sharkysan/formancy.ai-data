@@ -258,13 +258,19 @@ the same promises:
 - **The palette guard**, `scripts/palette.test.mjs` in `pnpm test:repo`:
   every stylesheet that copies `admin.css`'s variables says the same value for
   each.
+- **The README's pictures**, `scripts/pictures/readme.test.mjs` in
+  `pnpm test:repo` and each app's `pictures.mjs --check` in
+  `pnpm test:browser`: every picture is whole elements of a state the page
+  reaches, and a caption quotes only text those elements hold
+  ([0038](docs/decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 
 What nothing holds yet, said: the palette is copied from `admin.css` by hand,
 into `app.css`, the studio's `styles/room.css` and the host's
 `styles/room.css`, and the palette guard holds them to each other but nothing
 fails when upstream's moves; that the examples' `app.css` never reaches into a
-preview's paper is held by review; and the one-shell bullet has nothing to
-hold until the `formancy.ai/data` page exists.
+preview's paper is held by review; what a README picture looks like, which
+review alone holds; and the one-shell bullet has nothing to hold until the
+`formancy.ai/data` page exists.
 
 ## Branch names
 
