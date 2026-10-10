@@ -2,7 +2,7 @@ import type { KeyMeta } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
 import { byObjectId, groupBy, queryScope } from './catalog.js'
 
-interface KeyRow {
+export interface KeyRow {
   object_id: number
   key_id: number
   name: string
@@ -26,7 +26,7 @@ export interface Keys {
  * Unique constraints only, not unique indexes: a unique index may be filtered,
  * and a filtered index is not a key.
  */
-const SQL = (scoped: string): string => `
+export const KEYS_SQL = (scoped: string): string => `
   select kc.parent_object_id as object_id, kc.object_id as key_id, kc.name,
     cast(case kc.type when 'PK' then 1 else 0 end as bit) as is_primary_key,
     c.name as column_name
@@ -41,17 +41,20 @@ const SQL = (scoped: string): string => `
  * visible with it, so there is never a gap to report here.
  */
 export async function readKeys(pool: ConnectionPool, schemas: readonly string[]): Promise<Map<number, Keys>> {
-  const rows = await queryScope<KeyRow>(pool, schemas, SQL)
+  const rows = await queryScope<KeyRow>(pool, schemas, KEYS_SQL)
   const byObject = new Map<number, Keys>()
-  for (const [objectId, group] of groupBy(rows, byObjectId)) {
-    const keys: Keys = { primaryKey: null, uniqueKeys: [] }
-    for (const keyRows of groupBy(group, (row) => row.key_id).values()) {
-      const [first] = keyRows as [KeyRow, ...KeyRow[]]
-      const key: KeyMeta = { name: first.name, columns: keyRows.map((row) => row.column_name) }
-      if (first.is_primary_key) keys.primaryKey = key
-      else keys.uniqueKeys.push(key)
-    }
-    byObject.set(objectId, keys)
-  }
+  for (const [objectId, group] of groupBy(rows, byObjectId)) byObject.set(objectId, keysOf(group))
   return byObject
+}
+
+/** One object's keys from its rows, in the query's order: discovery's, and the root's description's (0041). */
+export function keysOf(rows: readonly KeyRow[]): Keys {
+  const keys: Keys = { primaryKey: null, uniqueKeys: [] }
+  for (const keyRows of groupBy(rows, (row) => row.key_id).values()) {
+    const [first] = keyRows as [KeyRow, ...KeyRow[]]
+    const key: KeyMeta = { name: first.name, columns: keyRows.map((row) => row.column_name) }
+    if (first.is_primary_key) keys.primaryKey = key
+    else keys.uniqueKeys.push(key)
+  }
+  return keys
 }

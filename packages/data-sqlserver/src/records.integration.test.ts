@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { ApiValue, MetadataSnapshot, ObjectMeta, ObjectRef, RecordAdapter, RecordColumn, RecordOutcome, RecordTarget, RecordValue, RowFilters, RowFilterType, UpdateRequest } from '@formancy/data-core'
+import type { ApiValue, MetadataSnapshot, ObjectMeta, ObjectRef, RecordColumn, RecordOutcome, RecordTarget, RecordValue, RowFilters, RowFilterType, UpdateRequest } from '@formancy/data-core'
 import { codecFor, findObject } from '@formancy/data-core'
-import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { covers, EDGE_VALUES, edgeCase, FIRST_SHIPMENT, SECOND_SHIPMENT, shipmentCase, startSqlServerFixture } from '@formancy/data-fixtures'
+import type { DefinedRecords, SqlServerFixture, Undefined } from '@formancy/data-fixtures'
+import { covers, defined, EDGE_VALUES, edgeCase, FIRST_SHIPMENT, SECOND_SHIPMENT, shipmentCase, startSqlServerFixture } from '@formancy/data-fixtures'
 import { createSqlServerRecords, discoverSqlServer } from './index.js'
 
 /**
@@ -32,6 +32,8 @@ const AUDITED: ObjectRef = { schema: 'ops', name: 'audited' }
 const HEAP: ObjectRef = { schema: 'ops', name: 'heap' }
 const ZONELESS: ObjectRef = { schema: 'ops', name: 'zoneless' }
 const FIXTURE_ORDER = EDGE_VALUES.beyondSafeInteger
+/** A definition this adapter could have made, of no table: for a write whose test is not about the guard (0041). */
+const ANY_DEFINITION = '0'.repeat(64)
 
 beforeAll(async () => {
   fixture = await startSqlServerFixture()
@@ -153,11 +155,11 @@ function ok(outcome: RecordOutcome): Extract<RecordOutcome, { ok: true }> {
   return outcome
 }
 
-async function readOrder(records: RecordAdapter, id: string = FIXTURE_ORDER, filters: RowFilters = tenant('1')): Promise<RecordOutcome> {
+async function readOrder(records: DefinedRecords, id: string = FIXTURE_ORDER, filters: RowFilters = tenant('1')): Promise<RecordOutcome> {
   return records.read({ target: target(ORDER), key: [valueOf(ORDER, 'id', id)], columns: readable(ORDER), filters })
 }
 
-function orderUpdate(set: RecordValue[], expectedVersion: string, filters: RowFilters = tenant('1')): UpdateRequest {
+function orderUpdate(set: RecordValue[], expectedVersion: string, filters: RowFilters = tenant('1')): Undefined<UpdateRequest> {
   const orderTarget = target(ORDER)
   if (orderTarget.concurrency === null) throw new Error('sales.order has a rowversion')
   return {
@@ -176,7 +178,7 @@ function orderUpdate(set: RecordValue[], expectedVersion: string, filters: RowFi
  * either runs; then the row is released and their outcomes returned. Each
  * update gets a pool of one connection, so its session is the one it uses.
  */
-async function race(hold: (request: mssql.Request) => Promise<unknown>, update: (records: RecordAdapter, index: number) => Promise<RecordOutcome>): Promise<RecordOutcome[]> {
+async function race(hold: (request: mssql.Request) => Promise<unknown>, update: (records: DefinedRecords, index: number) => Promise<RecordOutcome>): Promise<RecordOutcome[]> {
   const pools = await Promise.all([1, 2, 3].map(() => new mssql.ConnectionPool({ ...fixture.admin, pool: { max: 1 } }).connect()))
   const [first, second, holder] = pools
   if (first === undefined || second === undefined || holder === undefined) throw new Error('three pools were asked for')
@@ -185,7 +187,7 @@ async function race(hold: (request: mssql.Request) => Promise<unknown>, update: 
     const transaction = new mssql.Transaction(holder)
     await transaction.begin()
     await hold(new mssql.Request(transaction))
-    const racing = [first, second].map((pool, index) => update(createSqlServerRecords(pool), index))
+    const racing = [first, second].map((pool, index) => update(defined(createSqlServerRecords(pool)), index))
     for (let attempt = 0; ; attempt += 1) {
       // Blocked by the holder, or the second queued behind the first: either way, inside the server and waiting.
       const waiting = await owner
@@ -228,7 +230,7 @@ describe('reading a record', () => {
   // driver's own parsing, the amount becomes 100000000000000 and the date
   // midnight UTC (the spike); converted to text by the server, none moves.
   test('every edge value reads back exactly, as its codec spells it', covers('sqlserver', edgeCase('beyondSafeInteger'), edgeCase('largestAmount'), edgeCase('orderDate'), edgeCase('largestCreditLimit'), edgeCase('smallestCreditLimit'), edgeCase('computedLineTotal')), async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const order = ok(await readOrder(records))
     expect(order.values).toEqual({
       id: EDGE_VALUES.beyondSafeInteger,
@@ -281,7 +283,7 @@ describe('reading a record', () => {
   // minutes, an instant to its seconds -- because formancy's shapes cannot hold
   // more (0017).
   test('every other kind reads as its codec spells it, and what the shapes cannot hold is cut off', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const kinds = ok(await records.read({ target: target(KINDS), key: [valueOf(KINDS, 'id', '1')], columns: readable(KINDS), filters: EVERY_ROW }))
     expect(kinds.values).toEqual({
       id: '1',
@@ -306,7 +308,7 @@ describe('reading a record', () => {
   // 1.2346 for 1.234567. PostgreSQL reads ::text, which loses nothing, and the
   // engines must not disagree about what a row holds.
   test('a column widened since the snapshot reads back exactly, not at the snapshot’s width', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const widened: ObjectRef = { schema: 'ops', name: 'widened' }
     const columns = [columnOf(widened, 'name'), columnOf(widened, 'amount')]
     expect(columns.map((column) => column.type)).toMatchObject([
@@ -327,7 +329,7 @@ describe('reading a record', () => {
   // case-insensitive collation the tenant 'acme' would otherwise read the rows
   // of 'ACME', which an application may hold to be another tenant.
   test("a text filter matches its value exactly, not by the column's collation", async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const tenanted: ObjectRef = { schema: 'ops', name: 'tenanted' }
     const acme = filterOn(tenanted, 'tenant', 'acme')
     const read = (id: string) => records.read({ target: target(tenanted), key: [valueOf(tenanted, 'id', id)], columns: [columnOf(tenanted, 'note')], filters: acme })
@@ -339,7 +341,7 @@ describe('reading a record', () => {
   // that does not exist get the same answer, word for word, so the answer
   // discloses nothing about rows outside the filters.
   test('a record outside the filters is not-found, exactly as one that does not exist', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const otherTenant = await readOrder(records, FIXTURE_ORDER, tenant('2'))
     const missing = await readOrder(records, '1', tenant('1'))
     expect(otherTenant).toMatchObject({ ok: false, code: 'not-found' })
@@ -350,8 +352,8 @@ describe('reading a record', () => {
   // sales.order exactly as the owner does, and sales.customer — which it may
   // not read — is a refusal with a code, never an exception or an empty record.
   test('the restricted reader reads sales.order, and is refused sales.customer as permission-denied', async () => {
-    const asReader = createSqlServerRecords(reader)
-    const asOwner = createSqlServerRecords(owner)
+    const asReader = defined(createSqlServerRecords(reader))
+    const asOwner = defined(createSqlServerRecords(owner))
     expect(await readOrder(asReader)).toEqual(await readOrder(asOwner))
     const customer = await asReader.read({
       target: target(CUSTOMER),
@@ -369,7 +371,7 @@ describe('inserting a record', () => {
   // them. The fixture's order is 2^53 + 1, so the next identity is 2^53 + 2:
   // a JavaScript number cannot even tell the two apart.
   test('an insert into sales.order returns its identity and its default status', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const inserted = ok(
       await records.insert({
         target: target(ORDER),
@@ -395,7 +397,7 @@ describe('inserting a record', () => {
       .query<{ amount: string }>('select convert(nvarchar(40), @amount) as amount')
     expect(byDriver.recordset[0]?.amount).toBe('1234567890123.4568')
 
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     for (const amount of [value, EDGE_VALUES.largestAmount]) {
       const inserted = ok(
         await records.insert({
@@ -412,7 +414,7 @@ describe('inserting a record', () => {
   // trigger (error 334), and audit triggers are common in the databases this
   // module is pointed at. The insert must still return what it wrote.
   test('a table with a trigger still returns what was inserted', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const inserted = ok(
       await records.insert({
         target: { table: AUDITED, identity: [columnOf(AUDITED, 'id')], concurrency: null },
@@ -433,7 +435,7 @@ describe('writing every kind', () => {
   // largest money fits only because it travels as decimal(19,4) text; NULL is
   // a typed NULL for every kind.
   test('every kind a codec writes reads back as it was written, NULL included', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const writable = readable(KINDS).filter((column) => column.name !== 'ts')
     const sent: Record<string, ApiValue> = {
       id: '2',
@@ -469,7 +471,7 @@ describe('writing every kind', () => {
       (await request.query<{ settings: number }>('select @@options & (16384 | 512) as settings')).recordset[0]?.settings
     try {
       const defaults: ObjectRef = { schema: 'ops', name: 'defaults' }
-      expect(await createSqlServerRecords(single).insert({ target: target(defaults), values: [], returning: readable(defaults) })).toEqual({
+      expect(await defined(createSqlServerRecords(single)).insert({ target: target(defaults), values: [], returning: readable(defaults) })).toEqual({
         ok: true,
         values: { id: '1', label: 'unnamed' },
         version: null,
@@ -491,7 +493,7 @@ describe('writing every kind', () => {
   // stored must not become SQL: a precision of `19, 4), @p1)); insert …; --`
   // ran its insert, and committed it with the write.
   test('a tampered decimal type is refused before it is spliced, and runs nothing', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const precision = "19, 4), @p1)); insert into ops.victim (note) values (N'precision'); --" as unknown as number
     const tampered = records.insert({
       target: target(KINDS),
@@ -510,14 +512,17 @@ describe('writing every kind', () => {
   // type — is a programming error. It is thrown before anything is sent: the
   // pool here is closed, and a request that reached it would come back as
   // `unavailable` instead.
+  //
+  // Each write carries a definition of its own, so the helper reads none
+  // first: what is under test is that the write throws before it is sent.
   test('a request no codec could have produced is thrown before anything is sent', async () => {
     const closed = await new mssql.ConnectionPool(fixture.admin).connect()
     await closed.close()
-    const records = createSqlServerRecords(closed)
+    const records = defined(createSqlServerRecords(closed))
     const orderKey = [valueOf(ORDER, 'id', FIXTURE_ORDER)]
-    const read = (overrides: Partial<Parameters<RecordAdapter['read']>[0]>) =>
+    const read = (overrides: Partial<Parameters<DefinedRecords['read']>[0]>) =>
       records.read({ target: target(ORDER), key: orderKey, columns: [columnOf(ORDER, 'status')], filters: EVERY_ROW, ...overrides })
-    const insert = (values: RecordValue[]) => records.insert({ target: target(ORDER), values, returning: [] })
+    const insert = (values: RecordValue[]) => records.insert({ target: target(ORDER), values, returning: [], definition: ANY_DEFINITION })
 
     await expect(read({ key: [valueOf(ORDER, 'tenant_id', '1')] })).rejects.toThrow(/names exactly its identity/)
     await expect(read({ key: [...orderKey, ...orderKey] })).rejects.toThrow(/names exactly its identity/)
@@ -527,7 +532,7 @@ describe('writing every kind', () => {
     await expect(read({ columns: [{ name: '', type: { kind: 'boolean' } }] })).rejects.toThrow(/An identifier is/)
     await expect(insert([valueOf(ORDER, 'amount', 12.5)])).rejects.toThrow(/not the canonical value/)
     await expect(insert([valueOf(ORDER, 'tenant_id', 2 ** 53)])).rejects.toThrow(/not the canonical value/)
-    await expect(records.insert({ target: target(COUNTRY), values: [valueOf(COUNTRY, 'flag', 'ff')], returning: [] })).rejects.toThrow(/no canonical API value/)
+    await expect(records.insert({ target: target(COUNTRY), values: [valueOf(COUNTRY, 'flag', 'ff')], returning: [], definition: ANY_DEFINITION })).rejects.toThrow(/no canonical API value/)
     await expect(insert([valueOf(ORDER, 'amount', '1.0000'), valueOf(ORDER, 'amount', '2.0000')])).rejects.toThrow(/each column once/)
     await expect(insert([{ ...columnOf(KINDS, 'ts'), value: '2026-10-08T12:34:56Z' }])).rejects.toThrow(/no canonical API value/)
     await expect(insert([{ name: 'amount', type: { kind: 'decimal', precision: null, scale: null }, value: '1' }])).rejects.toThrow(/precision and a scale/)
@@ -545,8 +550,11 @@ describe('writing every kind', () => {
       await expect(insert([{ name: 'amount', type: { kind: 'decimal', precision: precision as number, scale }, value: '1' }])).rejects.toThrow(/precision is 1 to 38/)
     }
     await expect(insert([{ name: 'id', type: { kind: 'integer', min: '0', max: '99999999999999999999' }, value: '1' }])).rejects.toThrow(/No SQL Server integer type/)
-    await expect(records.update(orderUpdate([], '0000000000000001'))).rejects.toThrow(/at least one column/)
-    await expect(records.update(orderUpdate([{ name: 'row_version', type: { kind: 'text', maxLength: 16, lengthUnit: 'code-page-bytes', fixedLength: true }, value: 'x' }], '0000000000000001'))).rejects.toThrow(
+    await expect(records.update({ ...orderUpdate([], '0000000000000001'), definition: ANY_DEFINITION })).rejects.toThrow(/at least one column/)
+    // A definition this adapter did not make -- PostgreSQL's, or one typed by hand -- guards nothing (0041).
+    await expect(records.update({ ...orderUpdate([valueOf(ORDER, 'notes', 'x')], '0000000000000001'), definition: `${'0'.repeat(64)}@read committed` })).rejects.toThrow(/definition this adapter described/)
+    await expect(records.insert({ target: target(ORDER), values: [], returning: [], definition: 'by hand' })).rejects.toThrow(/definition this adapter described/)
+    await expect(records.update({ ...orderUpdate([{ name: 'row_version', type: { kind: 'text', maxLength: 16, lengthUnit: 'code-page-bytes', fixedLength: true }, value: 'x' }], '0000000000000001'), definition: ANY_DEFINITION })).rejects.toThrow(
       /concurrency column/,
     )
     // And the same closed pool, asked something well-formed — a safe integer may
@@ -560,7 +568,7 @@ describe('updating a record', () => {
   // The update names the key, the filters and the version it read in one
   // statement, and returns what it wrote with the version a next update needs.
   test('changes exactly what it sets, and returns the new version', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const before = ok(await readOrder(records))
     const updated = ok(await records.update(orderUpdate([valueOf(ORDER, 'notes', 'first edit')], before.version ?? '')))
     expect(updated.values).toEqual({ notes: 'first edit', status: before.values.status })
@@ -577,7 +585,7 @@ describe('updating a record', () => {
   // changed, and changes nothing. Without the version in the WHERE, the second
   // would overwrite the first.
   test('of two concurrent updates with the same version, one wins, one is stale, and the winner’s change remains', async () => {
-    const before = ok(await readOrder(createSqlServerRecords(owner)))
+    const before = ok(await readOrder(defined(createSqlServerRecords(owner))))
     const outcomes = await race(
       (request) => request.input('id', mssql.BigInt, FIXTURE_ORDER).query('select id from sales.[order] with (updlock, holdlock) where id = @id'),
       (records, index) => records.update(orderUpdate([valueOf(ORDER, 'notes', `from writer ${String(index)}`)], before.version ?? '')),
@@ -585,7 +593,7 @@ describe('updating a record', () => {
     const winners = outcomes.filter((outcome) => outcome.ok)
     expect(winners).toHaveLength(1)
     expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([expect.objectContaining({ ok: false, code: 'stale' })])
-    const after = ok(await readOrder(createSqlServerRecords(owner)))
+    const after = ok(await readOrder(defined(createSqlServerRecords(owner))))
     expect(after.values.notes).toBe(winners[0]?.ok === true ? winners[0].values.notes : undefined)
     expect(after.version).toBe(winners[0]?.version)
   })
@@ -594,7 +602,7 @@ describe('updating a record', () => {
   // when the record is still there for this actor: a malformed token cannot
   // be bound, and needs the same answer as a token that does not match.
   test('a stale version, or one that is not a version at all, is stale and changes nothing', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const before = ok(await readOrder(records))
     for (const version of ['0000000000000001', 'not a version', before.version?.toUpperCase() ?? '']) {
       expect(await records.update(orderUpdate([valueOf(ORDER, 'notes', 'stale')], version))).toMatchObject({ ok: false, code: 'stale' })
@@ -606,7 +614,7 @@ describe('updating a record', () => {
   // its current version in hand: the answer is not-found, the same as for a
   // record that was never there, and nothing changes.
   test('an update outside the tenant filter is not-found and changes nothing', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const before = ok(await readOrder(records))
     const outcome = await records.update(orderUpdate([valueOf(ORDER, 'notes', 'cross-tenant')], before.version ?? '', tenant('2')))
     expect(outcome).toMatchObject({ ok: false, code: 'not-found' })
@@ -618,7 +626,7 @@ describe('updating a record', () => {
   // the token a read returned is stale the moment anyone saves. One save
   // after another, here; the race is the next test.
   test('a version column is compared, incremented, and stale once anyone saved', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const versioned = target(VERSIONED, 'version')
     const concurrency = versioned.concurrency
     if (concurrency === null) throw new Error('the version column was given')
@@ -651,7 +659,7 @@ describe('updating a record', () => {
   // finds 1, and changes nothing. Compared in one statement and incremented
   // in another, both would have matched 0, and both would "win".
   test('of two concurrent updates of a version column with the same version, one wins and one is stale', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const versioned = target(VERSIONED, 'version')
     const concurrency = { kind: 'version-column', column: 'version' } as const
     const key = [valueOf(VERSIONED, 'id', '2')]
@@ -684,7 +692,7 @@ describe('updating a record', () => {
   // an identity the insert generated, text under a binary collation — it is
   // the version that save must name.
   test('the version returned is the row’s after its AFTER triggers, so the next save is not stale', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const stamped: ObjectRef = { schema: 'ops', name: 'stamped' }
     const coded: ObjectRef = { schema: 'ops', name: 'coded' }
     const cases = [
@@ -732,7 +740,7 @@ describe('updating a record', () => {
   // Such a target, and one with no identity to look by, keeps the version
   // its statement saw, and is still written.
   test('a row whose key text is not exact, or which has no identity, keeps the version its statement saw', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const timed: ObjectRef = { schema: 'ops', name: 'timed' }
     const versionAt = async (at: string) =>
       (
@@ -754,7 +762,7 @@ describe('updating a record', () => {
   // it changed and rolls back past one; the adapter throws, because that is a
   // programming error and not a refusal. A read says the same.
   test('an identity that is not a key changes nothing, and is a programming error', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const concurrency = { kind: 'version-column', column: 'version' } as const
     const heap = { table: HEAP, identity: [columnOf(HEAP, 'tenant_id')], concurrency }
     await expect(records.read({ target: heap, key: [valueOf(HEAP, 'tenant_id', '1')], columns: [columnOf(HEAP, 'note')], filters: EVERY_ROW })).rejects.toThrow(
@@ -808,7 +816,7 @@ describe('the column facts the engines disagree on', () => {
   // temperature as 0.10000000149011612, the double its 32 bits are, where
   // PostgreSQL reads '…56.5' and 0.1: the same row, two answers.
   test('the shipments read back exactly as both adapters must return them', covers('sqlserver', shipmentCase('first'), shipmentCase('second'), edgeCase('largestSmallint'), edgeCase('localTimestamp'), edgeCase('localTimestampWholeSecond')), async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const read = async (id: string) =>
       ok(await records.read({ target: target(SHIPMENT), key: [valueOf(SHIPMENT, 'id', id)], columns: readable(SHIPMENT), filters: tenant('1') }))
     const [first, second] = await Promise.all([read('1'), read('2')])
@@ -822,7 +830,7 @@ describe('the column facts the engines disagree on', () => {
   // codec counting code units would pass the eleventh to the server and get
   // its 2628; counting bytes, it refuses first, with a message in bytes.
   test('a UTF-8 varchar(20) holds 20 bytes, and the codec counts the same', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const codec = codecOf(SHIPMENT, 'reference')
     const ten = 'é'.repeat(10)
     expect(codec.parse(ten)).toEqual({ ok: true, value: ten })
@@ -841,7 +849,7 @@ describe('the column facts the engines disagree on', () => {
   // two, so twenty-five fill it and a twenty-sixth is refused, though it makes
   // only twenty-six characters. The codec's count and the server's agree.
   test('an nvarchar(50) holds 50 code units, and the codec counts the same', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const codec = codecOf(ORDER, 'group')
     const fill = '\u{1F600}'.repeat(25)
     expect(codec.parse(fill)).toEqual({ ok: true, value: fill })
@@ -863,7 +871,7 @@ describe('the column facts the engines disagree on', () => {
   // 0.10000000149011612, it is not the 0.1 the codec gave, and a form that
   // sends back what it read would report a change nobody made.
   test('a real written as 0.1 reads back as 0.1', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const parsed = codecOf(SHIPMENT, 'temperature_c').parse(0.1)
     expect(parsed).toEqual({ ok: true, value: 0.1 })
     const inserted = ok(
@@ -899,7 +907,7 @@ describe('the column facts the engines disagree on', () => {
   // millisecond, .00666… as .007: rounded by SQL Server, the one exception the
   // contract names. smalldatetime keeps its minute.
   test('a zoneless timestamp keeps its fraction, trailing zeros dropped', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const read = async (id: string) =>
       ok(await records.read({ target: target(ZONELESS), key: [valueOf(ZONELESS, 'id', id)], columns: readable(ZONELESS).slice(1), filters: EVERY_ROW })).values
     expect(await read('1')).toEqual({ d7: '2026-10-08T12:34:50.12', dt: '2026-10-08T12:34:56.007', sdt: '2026-10-08T12:35:00' })
@@ -913,7 +921,7 @@ describe('the column facts the engines disagree on', () => {
   // hand does not move the sequence, so the next create that leaves the
   // column out is handed that same number and collides with it (2627).
   test('a sequence default numbers a create that leaves it out, and a number chosen by hand collides later', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     expect(meta(SHIPMENT).columns.find((column) => column.name === 'id')?.generated).toBe('identity-by-default')
     expect(codecOf(SHIPMENT, 'id')).toMatchObject({ status: 'read-only', reason: expect.stringMatching(/identity-by-default/) as unknown })
     const numbered = ok(await records.insert({ target: target(SHIPMENT), values: newShipment({ reference: 'numbered' }), returning: [columnOf(SHIPMENT, 'id')] }))

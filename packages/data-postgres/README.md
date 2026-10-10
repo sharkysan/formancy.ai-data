@@ -27,7 +27,7 @@ snapshot.gaps // what this release could not describe: a foreign table
 snapshot.fingerprint // changes when the structure, the account's privileges, or the account changes
 
 const lookups = createPostgresLookups(sql) // LookupAdapter: search, resolve, rejects
-const records = createPostgresRecords(sql) // RecordAdapter: read, insert, update
+const records = createPostgresRecords(sql) // RecordAdapter: describe, read, insert, update
 await adapter.close()
 ```
 
@@ -169,6 +169,73 @@ in short:
   `unknown-outcome` — the tests show such a write committing after the client
   gave up — and it is never retried. A malformed request, filters that say
   nothing, or a syntax error in this adapter's own SQL is thrown.
+
+### Every write holds the table to the definition it was decided over
+
+[0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md).
+`describe(table)` reads the root's definition in one statement, and every
+read returns it from the statement that read the record. The facts are one
+jsonb of what no session setting changes -- the relation's kind and oid,
+each column's attnum, name, type oid, typmod, type name and schema, NOT
+NULL, identity and generation flags and stored default tree (`adbin`), the
+keys and the foreign keys with their actions, validation and trigger state
+-- read by discovery's own conditions (`DESCRIBED_RELATION`,
+`DECLARED_COLUMN`, `KEY_CONSTRAINT`, `UNIQUE_INDEX_KEY`,
+`DECLARED_FOREIGN_KEY`, `TRIGGERS_ENABLED`) and made metadata by discovery's
+own functions, the kind through `kindOf`. The oid is what tells a table
+dropped and created again under the same definition from the one a write
+was decided over. The definition is their SHA-256, with the isolation they
+were read under.
+`format_type` and `pg_get_expr`, which follow `search_path` and DateStyle,
+travel beside the facts for the description and are never digested: the
+digest was the same under every setting 0016's suites vary (the settings
+test). A describe and a read compute the facts once, in a derived table the
+planner is kept from pulling up (`offset 0`), and digest that one text:
+pulled up, the walk was planned and run twice, eleven scans of pg_attribute
+where six, which the definition suite counts.
+
+- **What it costs.** Measured on 2026-10-10 outside the suites, on one
+  shared machine against `postgres:17-alpine`: a describe or a read takes
+  4.3 to 6.2 ms of the server's planning and execution where the read
+  without the description took 0.14 to 0.17 ms, a guarded write 3.3 to 5
+  ms where it took 0.14 to 0.25 ms, more than half of it planning, which
+  an unnamed statement does every time
+  ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)
+  has the method).
+
+- **Under READ COMMITTED**, which takes a statement's snapshot after the
+  table's lock, an update's one WHERE gains the digest and a requirement
+  that the connection's isolation is read committed, and an insert is
+  `insert … select … where` the same. A write that wrote nothing, or failed
+  -- a value the moved column refuses fails while the statement is planned,
+  before its WHERE runs -- asks the definition in one more statement, which
+  answers `schema-changed` when it moved and `unavailable` when this
+  connection's isolation is not read committed, before `not-found`,
+  `stale` or the failure. That statement runs on any connection of the
+  pool: a reserved one never answers once its backend is gone, and
+  postgres.js 3.4.9 then throws outside any promise (measured).
+- **Under another isolation**, whose statements take their snapshot before
+  they wait for the lock, a read that reports one is set aside and asked
+  again in a transaction that takes `access share` first, and a write
+  decided over such a definition runs in one that takes `row exclusive`
+  first; `LOCK` takes no snapshot, so the statement's follows it. Counted
+  on this adapter on 2026-10-10: a read is then seven round trips and a
+  write five, where both are two under READ COMMITTED. A describe, which
+  has no guard, takes no lock. An account granted columns of the table and
+  nothing on the table is refused the lock, `permission-denied`.
+- **The lock-first transaction is kept from settling once its connection is
+  lost.** postgres.js 3.4.9 rejects `sql.begin` when the transaction's
+  connection closes and then writes its ROLLBACK or COMMIT to the closed
+  connection: a TypeError outside any promise, which ends the process, and
+  a pool whose next query never answers (measured). Every step inside the
+  transaction therefore never settles on a lost connection, so nothing more
+  is sent, and `begin`'s rejection is the answer: `unknown-outcome` once the
+  write was sent, `unavailable` before. Each step waits on a promise of its
+  own that nothing holds, so the abandoned transaction is collected; one
+  promise shared by every lost step kept their values for the life of the
+  process. `records-lost-answer` holds all three.
+- **A refused write still fires the table's statement-level triggers**, and
+  in autocommit what they did is kept.
 
 ### An answer lost after a write
 

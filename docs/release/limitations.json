@@ -113,7 +113,7 @@
       ]
     },
     "0010": {
-      "reviewed": "sha256:0c20728141d81895fc2d2638f09f5f2a7920f73ec0229614813df75d10ea8c12",
+      "reviewed": "sha256:41ad7dad6e2925cbad437d4aed11ccbc24dbc9db412934a9bd4c6d5a299f4192",
       "limitations": [
         {
           "area": "forms",
@@ -141,7 +141,7 @@
         },
         {
           "area": "forms",
-          "says": "Drift does not compare triggers, check expressions as validation, or DDL that lands after the rescan."
+          "says": "Drift review does not compare triggers or check expressions as validation, and between rescans only the runtime's comparison of the form's own table at each request (0041) sees a change."
         },
         {
           "area": "forms",
@@ -234,7 +234,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:5a62305654e9b1cfdfd4496679621c23f2c3b18474f1408bcabc5d3ab2a6d8d9",
+      "reviewed": "sha256:b6581d589081306a76a64fcf460ba8aa247a00cd0b2ed7ffd1c1c4d001e94234",
       "limitations": [
         {
           "area": "databases",
@@ -247,7 +247,7 @@
       ]
     },
     "0016": {
-      "reviewed": "sha256:7b050753c370f4ec9b8828938ea3576893998cbab95d0ad392c73d1703d764ca",
+      "reviewed": "sha256:b4668c80fccd7a58c58bf32f3852394971224e3739089bef5920efbc0662e953",
       "limitations": [
         {
           "area": "databases",
@@ -289,7 +289,7 @@
       ]
     },
     "0017": {
-      "reviewed": "sha256:4d38ecdad65ee07e13bc4f989939e63a8021c53dd1bfb59db6dae34f84560380",
+      "reviewed": "sha256:d670962f022582c3afcc209eb7626c4cf8f7c8faf797947999e55ea43ad2eb90",
       "limitations": [
         {
           "area": "writes",
@@ -335,7 +335,7 @@
       ]
     },
     "0018": {
-      "reviewed": "sha256:f04775dd437b31113919b4056ce03eddcbde478f6a8ba6b110fb723de8e90162",
+      "reviewed": "sha256:1c30455dda790a95e44ae0cc6ae80b3d02bd75321e6e0647983cd9828c3b9047",
       "limitations": [
         {
           "area": "access",
@@ -364,7 +364,7 @@
       ]
     },
     "0019": {
-      "reviewed": "sha256:4305aa2aacb607c7df7f43e8c27a535fe2dd09ccca8937e4d2f2f26da868b9c3",
+      "reviewed": "sha256:f2c1fc91e7b12557ce979caafdd9565ba17b4d8e7d0ee294090516029a5348c1",
       "limitations": [
         {
           "area": "operations",
@@ -403,7 +403,7 @@
       ]
     },
     "0022": {
-      "reviewed": "sha256:ca5d60f92f867ff0774fbee624229773533087eff87efb2de9dd73aee3f2c3d2",
+      "reviewed": "sha256:2261942b55be3c982afb53d759c807cca87ad0e4f5bdb3a07fc017db2e68b2f8",
       "limitations": [
         {
           "area": "writes",
@@ -635,7 +635,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:0b607cc667c0ec9d8c094ef757a62e5d43eb8c10b7d573ee943e8e96d4a586b7",
+      "reviewed": "sha256:4c5801fded1504d9a89183dbf08d4e524623a8a5846f007588f6d826aee904b4",
       "limitations": [
         {
           "area": "studio",
@@ -675,7 +675,7 @@
         },
         {
           "area": "forms",
-          "says": "The runtime does not stop writes on drift."
+          "says": "The runtime stops what drift blocks in the form's own table only; what drift blocks for a lookup's table, privileges, row security or the account is stopped at review alone (0041)."
         },
         {
           "area": "studio",
@@ -688,7 +688,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:a9839b7a7f2e8d99a4cc5917e9db1811bb7781a282114897329cd00bd7d04378",
+      "reviewed": "sha256:435c952bf7ccaee062f9ce86bc8c1cb3baec412046603966ce36f892776daa80",
       "limitations": [
         {
           "area": "writes",
@@ -893,7 +893,7 @@
       ]
     },
     "0040": {
-      "reviewed": "sha256:a2f5a2419f353b7868bd137062dfabab5c84e7bc14ed2ad6742c79b8d8abb29f",
+      "reviewed": "sha256:a63b57243c8cadf468c792bba73e2f673f417a513c19c51a0483cd3480eff75e",
       "limitations": [
         {
           "area": "forms",
@@ -943,6 +943,96 @@
           "area": "forms",
           "says": "An instant changed in `@formancy/react`'s datetime control is saved as the local minute the control holds, its seconds and fraction gone; Angular's control was not measured.",
           "heldBy": "apps/host/src/temporal-round-trip-page.test.ts"
+        }
+      ]
+    },
+    "0041": {
+      "reviewed": "sha256:1c54db7162c6c1e9010d70062bd2b35092c34419df69a5551478a9ef3e9f7e21",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "The runtime compares only a form's own table -- its kind, columns, keys and foreign keys -- with the database at each request; what drift review blocks for a lookup's table, a privilege, row security or the account is stopped at review alone, the database still enforcing privileges and row security itself, and the studio says which blocked operations the server still allows.",
+          "heldBy": "packages/data-server/src/routes/runtime-drift.integration.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "Drift refuses per operation at runtime as in review: a tightened field stops every update of the form, including one that does not touch it, until the form is republished.",
+          "heldBy": "packages/data-server/src/routes/runtime-drift.integration.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "Lookups are searched and resolved whatever drift says of the form's table."
+        },
+        {
+          "area": "forms",
+          "says": "A column dropped and added again under the same name and definition, a version column included, or the table dropped and created again so, is seen neither by drift review nor by the runtime; a write in flight across it is refused, and the next is not.",
+          "heldBy": "packages/data-postgres/src/records-definition.integration.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "Drift review calls a form unreadable when its confirmed concurrency token is out of sight behind a gap, as it does when the token is dropped.",
+          "heldBy": "packages/data-core/src/drift/diff.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "Opening a form, creating, and updating as someone who may not read the record each make one more database statement than before, to read the table's definition, and every write checks the definition again inside its statement.",
+          "heldBy": "packages/data-server/src/routes/runtime.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "Every describe, read and write reads the form's table's catalog inside its statement: measured on 2026-10-10 on one shared machine, on PostgreSQL 4.3 to 6.2 ms of the server's time for a describe or a read where a read took 0.14 to 0.17 ms, and 3.3 to 5 ms for a write where it took 0.14 to 0.25 ms; on SQL Server 1.4 to 2.6 ms of CPU where a read took 0.1 ms and a write 0.66 to 0.77 ms. Nothing pins the figures until 0034's harness measures them."
+        },
+        {
+          "area": "writes",
+          "says": "A change to the form's table that lands between that description and the write refuses the request with `schema-changed`, even when drift review would call it harmless; sending it again is answered.",
+          "heldBy": "packages/data-postgres/src/records-definition.integration.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "Opening a form asks the database, so a form whose database cannot be reached is refused with 503 instead of opened.",
+          "heldBy": "packages/data-server/src/routes/runtime.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL under a default isolation other than READ COMMITTED, every read and write takes the table's lock first in a transaction of its own, and an account granted columns of the table and nothing on the table cannot take that lock and is refused `permission-denied`.",
+          "heldBy": "packages/data-postgres/src/records-definition.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL under a default isolation other than READ COMMITTED a request makes more round trips than under READ COMMITTED -- counted through the server on 2026-10-10, a read 7 where it is 2, a create 9 where it is 6, and an update by someone who may read 12 where it is 4 -- and nothing pins the figures."
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL a pooled connection whose isolation differs from the one a request was described on refuses its write as `unavailable`, and nothing is written.",
+          "heldBy": "packages/data-postgres/src/records-definition.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL, in a pool whose connections differ in isolation, a write that wrote nothing can be answered with another cause than the one that refused it, because the statement that tells them apart runs on any connection; nothing is written either way."
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL the runtime spells a column's type as discovery does, under its connection's `search_path`; a pool whose connections differ in it can see a changed type drift review did not, and refuses that form's requests with `drift`."
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL a refused write still fires the table's statement-level triggers, and what they did is kept; SQL Server rolls it back.",
+          "heldBy": "packages/data-postgres/src/records-definition.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server an account the catalog hides the form's table from, denied VIEW DEFINITION, cannot have the table described, so every request of a form running as it is refused `schema-changed`, reads included.",
+          "heldBy": "packages/data-sqlserver/src/records-failures.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a connection whose TEXTSIZE is shorter than a table's description cannot describe it, and every request of the form is refused `unavailable`.",
+          "heldBy": "packages/data-sqlserver/src/records-definition.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a column given dynamic data masking after the form was published is read as its mask by an account without UNMASK, and neither drift review nor the runtime compares masking, so a save that sends every field writes the mask over the stored value.",
+          "heldBy": "packages/data-sqlserver/src/records-definition.integration.test.ts"
         }
       ]
     },

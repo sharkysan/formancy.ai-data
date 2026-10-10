@@ -1,14 +1,17 @@
 import { describe, expect, test } from 'vitest'
 import { generateForm } from '../generate/generate.js'
 import type { FormBindings } from '../generate/types.js'
-import type { ObjectMeta } from '../metadata.js'
-import { diffSnapshots } from './diff.js'
+import type { ColumnMeta, ObjectMeta } from '../metadata.js'
+import { describedOf, diffRootDefinition } from './diff.js'
+import type { DescribedRoot } from './diff.js'
 import {
   addColumn,
   col,
   CUSTOMER_REF,
+  diffSnapshots,
   drift,
   dropColumn,
+  dropForeignKey,
   EMPLOYEE,
   EMPLOYEE_REF,
   foreignKey,
@@ -23,6 +26,7 @@ import {
   ORDER_FIELDS,
   ORDER_REF,
   remove,
+  retype,
   snapshot,
   SUMMARY,
   SUMMARY_REF,
@@ -37,16 +41,18 @@ describe('diffSnapshots: what is compared, and the root', () => {
   test('identical snapshots give an empty report, and the form keeps what it offered', () => {
     const base = snapshot()
     const { bindings } = generateForm(base, ORDER)
-    expect(diffSnapshots(base, snapshot(undefined, { serverVersion: '16.0.4135' }), bindings, NO_FILTERS)).toEqual({
-      changes: [],
-      blocking: false,
-      writable: { create: true, update: true },
-    })
+    const everything = { readable: true, writable: { create: true, update: true } }
+    expect(diffSnapshots(base, snapshot(undefined, { serverVersion: '16.0.4135' }), bindings, NO_FILTERS)).toEqual({ changes: [], blocking: false, ...everything, runtime: everything })
     expect(diffSnapshots(base, base, generateForm(base, EMPLOYEE).bindings, NO_FILTERS).writable).toEqual({ create: true, update: false })
 
     // Equal fingerprints are createSnapshot's promise that two snapshots
-    // describe the same thing, so the objects are not walked at all.
-    expect(diffSnapshots(base, { ...base, objects: [] }, bindings, NO_FILTERS).changes).toEqual([])
+    // describe the same thing, so the objects are not walked at all -- and
+    // the runtime's verdict is the shortcut's, decided before anything is
+    // described: walked, this snapshot has no root, and the runtime would
+    // refuse what review allows.
+    const shortcut = diffSnapshots(base, { ...base, objects: [] }, bindings, NO_FILTERS)
+    expect(shortcut.changes).toEqual([])
+    expect(shortcut.runtime).toEqual(everything)
   })
 
   // Bindings judged against a snapshot they were not generated from would be
@@ -212,14 +218,18 @@ describe('diffSnapshots: access', () => {
   // puts the lookup's target key in doubt as well as the identity. Said only
   // on the token or the key, create stayed open, and more drift left the form
   // more writable than the gap alone.
+  //
+  // And the confirmed token out of sight breaks reads, as the token gone
+  // does: every read names it (0027). Before 0041 the gap branch said
+  // readable, and the runtime -- which describes the root without the gap,
+  // and so sees the token gone -- refused reads review allowed. The token's
+  // change now stops everything the gap does, so it speaks for the gap.
   test('a gap that explains something gone still stops everything it puts in doubt', () => {
     const columns = [gap(ORDER_REF, 'columns')]
     const token = drift((objects) => dropColumn(objects, 'order', 'row_version'), { gaps: columns })
     expect(token.writable).toEqual(drift(undefined, { gaps: columns }).writable)
-    expect(token.changes.map((change) => [change.kind, change.subject.kind, named(change), change.affects])).toEqual([
-      ['access-narrowed', 'object', '', ORDER_FIELDS],
-      ['access-narrowed', 'column', 'row_version', []],
-    ])
+    expect(token.readable).toBe(false)
+    expect(token.changes.map((change) => [change.kind, change.subject.kind, named(change), change.affects])).toEqual([['access-narrowed', 'column', 'row_version', ORDER_FIELDS]])
 
     const keys = [gap(null, 'keys')]
     const identity = drift((objects) => (object(objects, 'order').primaryKey = null), { gaps: keys })
@@ -314,5 +324,72 @@ describe('diffSnapshots: the report', () => {
       ['lookup-changed', { kind: 'object', object: EMPLOYEE_REF }, ['employee']],
       ['lookup-changed', { kind: 'object', object: EMPLOYEE_REF }, ['employee_2']],
     ])
+  })
+})
+
+describe('the runtime’s verdict (0041)', () => {
+  // `readable` is what the runtime refuses a read by. Computed as
+  // `!blocking`, it would refuse the read of a form whose only change
+  // tightened a column -- every value it shows still fits -- and so every
+  // form whose writes a narrowing stopped could not even be opened.
+  test('readable is false exactly when a change breaks what the form shows', () => {
+    expect(drift((objects) => retype(objects, 'order', 'amount', 'nvarchar(20)', text(20))).readable).toBe(false)
+    expect(drift((objects) => dropColumn(objects, 'order', 'notes')).readable).toBe(false)
+    expect(drift((objects) => dropColumn(objects, 'order', 'row_version')).readable).toBe(false)
+    expect(drift((objects) => dropForeignKey(objects, 'fk_order_customer')).readable).toBe(false)
+
+    const tightened = drift((objects) => retype(objects, 'order', 'status', 'nvarchar(10)', text(10)))
+    expect(tightened).toMatchObject({ blocking: true, readable: true, writable: { create: false, update: false } })
+    expect(drift((objects) => retype(objects, 'order', 'status', 'nvarchar(40)', text(40))).readable).toBe(true)
+  })
+
+  // The case the runtime is looser by: the change is in the lookup's own
+  // table, which a request does not describe. Review blocks the form; the
+  // runtime leaves it to review and the database, and the report says so,
+  // so the studio can tell the administrator which blocked operations the
+  // server still allows.
+  test('a lookup target’s retyped display column blocks review and not the runtime', () => {
+    const report = drift((objects) => retype(objects, 'customer', 'name', 'nvarchar(400)', text(400)))
+    expect(report).toMatchObject({ blocking: true, readable: false, writable: { create: false, update: false } })
+    expect(report.changes.map((change) => [change.kind, named(change)])).toEqual([['lookup-changed', 'name']])
+    expect(report.runtime).toEqual({ readable: true, writable: { create: true, update: true } })
+  })
+
+  // A described column the base never had: nothing is assumed of it. Given
+  // a default it does not have, a NOT NULL column no field writes would let
+  // every create through to a database that refuses them all; and one that
+  // is nullable is for review, never a stop.
+  test('a described column the base lacks stops create when it must be given and nobody can, and is for review otherwise', () => {
+    const base = snapshot()
+    const { bindings } = generateForm(base, ORDER)
+    const root = describedOf(base, ORDER_REF) as DescribedRoot
+    const added = (extra: Partial<ColumnMeta>): DescribedRoot => {
+      const { access: _access, comment: _comment, ...region } = col('region', 'int', INT32, { ordinal: 20, ...extra })
+      return { ...root, columns: [...root.columns, region] }
+    }
+
+    const required = diffRootDefinition(base, added({ nullable: false, hasDefault: false }), bindings, NO_FILTERS)
+    expect(only(required)).toMatchObject({ kind: 'column-added', severity: 'blocking' })
+    expect(required.writable).toEqual({ create: false, update: true })
+    expect(required.runtime).toEqual({ readable: true, writable: { create: false, update: true } })
+
+    const optional = diffRootDefinition(base, added({ nullable: true }), bindings, NO_FILTERS)
+    expect(only(optional)).toMatchObject({ kind: 'column-added', severity: 'review' })
+    expect(optional.runtime).toEqual({ readable: true, writable: { create: true, update: true } })
+  })
+
+  // The runtime's report and review's are one decision over one root: a
+  // dropped identity key stops update in both, because the root's keys are
+  // part of what a request describes.
+  test('the root’s keys and foreign keys are the runtime’s too', () => {
+    const report = drift((objects) => (object(objects, 'order').primaryKey = null))
+    expect(report.writable).toEqual({ create: true, update: false })
+    expect(report.runtime).toEqual({ readable: true, writable: { create: true, update: false } })
+  })
+
+  // A root review cannot find is a root a request cannot describe: refused,
+  // whatever the reason review gives.
+  test('a missing root leaves the runtime nothing', () => {
+    expect(drift((objects) => remove(objects, 'order')).runtime).toEqual({ readable: false, writable: { create: false, update: false } })
   })
 })

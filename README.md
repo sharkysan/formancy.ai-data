@@ -37,7 +37,12 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > the server regenerates it after a change to the database, carrying that
 > presentation by what each field stands for, and restores an older version
 > when the database still fits it — proved on both engines — and the studio
-> does both from its Drift step. A regeneration whose keys now name other
+> does both from its Drift step. The runtime refuses what drift review blocks
+> in the form's own table: each record request, and opening a form, is
+> decided with drift's rules over the table as the catalog describes it then,
+> and every write checks that the table is still what was described, on both
+> engines, where before a narrowed column rounded what a published form
+> saved. A regeneration whose keys now name other
 > columns is published only once the grants on those keys are confirmed or
 > removed, whichever client publishes it over a version the server still
 > serves, and on both engines a test fails if the server accepts such a grant
@@ -242,7 +247,7 @@ an older version.
 
 </details>
 
-<img src="./docs/images/readme/studio-drift.webp" width="916" alt="The Drift step: “3 changes, 1 blocking.”; create and update blocked; a blocking column-dropped change for notes, review changes for the new column memo and a possible rename; and a refused restore of version 1 with what blocks it.">
+<img src="./docs/images/readme/studio-drift.webp" width="916" alt="The Drift step: “3 changes, 1 blocking.”; read, create and update blocked; a blocking column-dropped change for notes, review changes for the new column memo and a possible rename; and a refused restore of version 1 with what blocks it.">
 
 **Step 8, Drift.** *After the capture script renamed `notes` to `memo` in the captured snapshot, which is what discovery reports after a column is renamed in the database, on both engines. The published form may not be used until the change is reviewed, the rename is a “possible-rename” for a person to confirm and not a guess, and restoring version 1, which still binds `notes`, is refused with what blocks it: “Version 1 cannot be restored: the database has changed in a way it cannot serve.” ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md), [0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).*
 

@@ -11,6 +11,7 @@ import {
   CLERK,
   CLERK_FIELDS as ALL_FIELDS,
   col,
+  described,
   edited,
   fk,
   ORDER_ID,
@@ -188,7 +189,7 @@ describe('a round trip', () => {
   ])('answers -> planCreate -> the stored row -> toFormAnswers returns what went in on %s', (kind, version) => {
     const source = snapshot(kind)
     const { bindings } = orderForm(source)
-    const planned = planCreate(source, bindings, POLICY, CLERK, ANSWERS)
+    const planned = planCreate(source, bindings, POLICY, CLERK, ANSWERS, described(source, bindings))
     if (!planned.ok) throw new Error(planned.message)
     const back = toFormAnswers(bindings, planned.fields, stored(planned.request, { id: ORDER_ID, status: 'draft' }, version))
 
@@ -199,14 +200,14 @@ describe('a round trip', () => {
     const again = planRead(source, bindings, POLICY, CLERK, back.record ?? '')
     expect(again).toMatchObject({ ok: true, request: { key: [{ name: 'id', value: ORDER_ID }] } })
     const { id: _id, ...writable } = back.answers
-    expect(planUpdate(source, bindings, POLICY, CLERK, back.record ?? '', back.version ?? '', writable)).toMatchObject({ ok: true })
+    expect(planUpdate(source, bindings, POLICY, CLERK, back.record ?? '', back.version ?? '', writable, undefined, described(source, bindings))).toMatchObject({ ok: true })
   })
 
   // A decimal is stored at its column's scale, so it comes back padded: the
   // database's truth (0008), and the one place the round trip does not
   // return the person's spelling.
   test('returns a decimal at its column’s scale', () => {
-    const planned = planCreate(PG, PG_FORM.bindings, POLICY, CLERK, { ...ANSWERS, amount: '12.5' })
+    const planned = planCreate(PG, PG_FORM.bindings, POLICY, CLERK, { ...ANSWERS, amount: '12.5' }, described(PG, PG_FORM.bindings))
     if (!planned.ok) throw new Error(planned.message)
     const back = toFormAnswers(PG_FORM.bindings, planned.fields, stored(planned.request, { id: ORDER_ID, status: 'draft' }, '1'))
     expect(back.answers.amount).toBe('12.5000')

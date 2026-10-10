@@ -1,5 +1,6 @@
 import type { CoverageGap, ObjectMeta, ObjectRef, RowSecurity } from '@formancy/data-core'
 import type { TransactionSql } from 'postgres'
+import { op } from '../sql/catalog.js'
 
 /** A table or view this snapshot describes, with the oid every other concern is keyed by. */
 export interface DescribedObject {
@@ -51,6 +52,27 @@ interface ObjectRow {
  * its parent and is described through it. Indexes, sequences and composite
  * types are pg_class rows too, and are not objects.
  */
+/**
+ * The relations discovery describes, of a relation `c`: tables, partitioned
+ * tables, views and materialized views -- and no partition, which is storage
+ * for its parent and described through it. The root's definition (0041)
+ * describes exactly these, so a relation discovery would not describe is not
+ * described there either: a foreign table, a partition.
+ */
+export const DESCRIBED_RELATION = `c.relkind ${op('=')} any ('{r,p,v,m}'::pg_catalog."char"[]) and not c.relispartition`
+
+/**
+ * What a described relation is, by its relkind: a view or a materialized
+ * view is a view, a table or a partitioned table a table. One function, so
+ * the root's definition (0041) maps its facts to the kind review saw.
+ */
+export function kindOf(relkind: string): ObjectMeta['kind'] {
+  return relkind === 'v' || relkind === 'm' ? 'view' : 'table'
+}
+
+/** A foreign table: in scope, and a gap rather than an object. */
+const FOREIGN_TABLE = `c.relkind ${op('=')} 'f' and not c.relispartition`
+
 export async function readObjects(sql: TransactionSql, schemas: readonly string[]): Promise<ObjectsInScope> {
   const rows = await sql<ObjectRow[]>`
     select
@@ -62,8 +84,7 @@ export async function readObjects(sql: TransactionSql, schemas: readonly string[
     from pg_catalog.pg_class c
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
     where n.nspname = any(${schemas})
-      and c.relkind in ('r', 'p', 'v', 'm', 'f')
-      and not c.relispartition`
+      and ((${sql.unsafe(DESCRIBED_RELATION)}) or (${sql.unsafe(FOREIGN_TABLE)}))`
 
   const described: DescribedObject[] = []
   const gaps: CoverageGap[] = []
@@ -82,7 +103,7 @@ export async function readObjects(sql: TransactionSql, schemas: readonly string[
     described.push({
       oid: row.oid,
       ref,
-      kind: row.relkind === 'v' || row.relkind === 'm' ? 'view' : 'table',
+      kind: kindOf(row.relkind),
       rowSecurity: row.row_security ? 'applies' : 'none',
     })
   }

@@ -103,10 +103,29 @@ fails when something does. The adapters' own typed variables take
 `sharedCases()` is every case both adapters are held to, by id: the model's
 comparators, each `FILTER_PARITY` entry, each `DISPLAY_PARITY` column, each
 `TEMPORAL_PARITY` column, each `REFUSAL_PARITY` refusal, each `EDGE_VALUES`
-value and the two shipments. The ids are derived from the shared data --
+value, the two shipments, and each change of `DRIFTING` both engines run.
+The ids are derived from the shared data --
 `filterCase(entry)`, `displayCase(column)`, `temporalCase(column)`,
 `refusalCase(name)`, `edgeCase(name)`,
-`shipmentCase('first')`, `MODEL_CASES.owner` -- so no test types one.
+`shipmentCase('first')`, `driftingCase(name)`, `MODEL_CASES.owner` -- so no
+test types one.
+
+`DRIFTING` is the table of changes to a form's own table after it was
+published ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)):
+each a table of its own in schema `drifting`, its DDL on each engine, the
+ALTER its owner makes, whether the table's definition must move, drift
+review's verdict by operation and the runtime's where it differs, and what
+a person sends after it. Both adapters' `records-definition` suites and the
+server's `runtime-drift` suite run it, so the three cannot hold the same
+change to different expectations; a change only one engine has stays that
+adapter's own test and is no shared case. A case can hold a limitation
+rather than a refusal -- a column dropped and added again, the table
+dropped and created again, SQL Server's masking -- each saying so beside
+it. `defined(records)` is the record port as the suites written before 0041
+call it, each write given the definition `describe` reads just before it,
+unless it carries one of its own: a test whose subject is the write itself
+on a table or a pool that cannot be described passes one, so that the write
+is what is sent.
 
 An adapter test that asserts a case through its adapter says so with
 `covers()`: `test(title, covers('sqlserver', filterCase(entry)), async () =>

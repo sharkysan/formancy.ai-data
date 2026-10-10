@@ -1,6 +1,6 @@
 export { DATABASE_KINDS, isDatabaseKind } from './adapter.js'
 export type { DatabaseAdapter, DatabaseKind, ServerIdentity } from './adapter.js'
-export { createSnapshot, findObject, gapCovers, isComplete } from './snapshot.js'
+export { createSnapshot, findObject, gapCovers, inSnapshotOrder, isComplete } from './snapshot.js'
 export type {
   CheckMeta,
   ColumnAccess,
@@ -35,8 +35,9 @@ export type {
   GenerationRequest,
   LookupChoice,
 } from './generate/types.js'
-export { diffSnapshots } from './drift/diff.js'
-export type { DriftChange, DriftKind, DriftReport, DriftSeverity, DriftSubject } from './drift/types.js'
+export { describedOf, diffRootDefinition, diffSnapshots, ROOT_DEFINITION } from './drift/diff.js'
+export type { DescribedRoot } from './drift/diff.js'
+export type { DriftChange, DriftKind, DriftReport, DriftSeverity, DriftSubject, DriftVerdict } from './drift/types.js'
 export { applyPresentation, presentationShapeProblems } from './presentation/apply.js'
 export { presentationOf } from './presentation/derive.js'
 export { describeReassigned, grantsOnKey, reassignedKeys, rebasePresentation } from './presentation/rebase.js'
@@ -109,6 +110,10 @@ export type {
   RowFilterRule,
 } from './policy/types.js'
 export type {
+  DescribedColumn,
+  Described,
+  DescribedRead,
+  DescribedTable,
   InsertRequest,
   ReadRequest,
   RecordAdapter,
@@ -123,6 +128,7 @@ export type {
   UpdateRequest,
 } from './records/types.js'
 export { planCreate, planRead, planUpdate } from './records/plan.js'
+export { driftRefusal, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './records/drift.js'
 export { rejectedSelection, toFormAnswers } from './records/answers.js'
 export { decodeRecordKey, intendedRecord, recordToken } from './records/token.js'
 export type { RecordKeyDecoding, RecordTokenEncoding, RecordTokenErrorCode, RecordTokenRefusal } from './records/token.js'

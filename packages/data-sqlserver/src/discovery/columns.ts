@@ -1,4 +1,4 @@
-import type { ColumnMeta, Generation } from '@formancy/data-core'
+import type { ColumnMeta, DescribedColumn, Generation } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
 import type { AccessRow } from './access.js'
 import { ACCESS_COLUMNS, toAccess } from './access.js'
@@ -6,7 +6,8 @@ import type { Found, ObjectGap } from './catalog.js'
 import { byObjectId, groupBy, queryScope } from './catalog.js'
 import { normalizeType } from './types.js'
 
-interface ColumnRow extends AccessRow {
+/** A column's definition, as the definition's columns are read (0041): everything discovery reads of it but its access and its comment. */
+export interface ColumnDefinitionRow {
   object_id: number
   column_id: number
   name: string
@@ -24,8 +25,11 @@ interface ColumnRow extends AccessRow {
   is_computed: boolean
   generated_always_type: number
   default_object_id: number
-  default_name: string | null
   default_definition: string | null
+}
+
+interface ColumnRow extends ColumnDefinitionRow, AccessRow {
+  default_name: string | null
   comment: string | null
 }
 
@@ -54,23 +58,34 @@ interface ColumnRow extends AccessRow {
  * (access.ts, 0027).
  */
 const SQL = (scoped: string): string => `
-  select c.object_id, c.column_id, c.name,
+  select ${COLUMN_DEFINITION},
+    object_name(c.default_object_id) as default_name,
+    cast(ep.value as nvarchar(max)) as comment,
+    ${ACCESS_COLUMNS}
+  from ${COLUMN_SOURCE}
+  left join sys.extended_properties ep
+    on ep.class = 1 and ep.major_id = c.object_id and ep.minor_id = c.column_id and ep.name = N'MS_Description'
+  where c.object_id in ${scoped}
+  order by c.object_id, c.column_id`
+
+/**
+ * What a column's definition is read from, of sys.columns `c`: its type, how
+ * it is generated, its default. Shared with the root's definition (0041),
+ * which reads exactly these, so a fact added here is the definition's too;
+ * discovery adds the access, the comment and the default's name.
+ */
+export const COLUMN_DEFINITION = `c.object_id, c.column_id, c.name,
     t.name as type_name, schema_name(t.schema_id) as type_schema, t.is_user_defined,
     st.name as system_name,
     c.max_length, c.precision, c.scale,
     convert(int, collationproperty(c.collation_name, 'CodePage')) as code_page,
     c.is_nullable, c.is_identity, c.is_computed, c.generated_always_type,
-    c.default_object_id, object_name(c.default_object_id) as default_name,
-    object_definition(c.default_object_id) as default_definition,
-    cast(ep.value as nvarchar(max)) as comment,
-    ${ACCESS_COLUMNS}
-  from sys.columns c
+    c.default_object_id,
+    object_definition(c.default_object_id) as default_definition`
+
+export const COLUMN_SOURCE = `sys.columns c
   left join sys.types t on t.user_type_id = c.user_type_id
-  left join sys.types st on st.user_type_id = c.system_type_id
-  left join sys.extended_properties ep
-    on ep.class = 1 and ep.major_id = c.object_id and ep.minor_id = c.column_id and ep.name = N'MS_Description'
-  where c.object_id in ${scoped}
-  order by c.object_id, c.column_id`
+  left join sys.types st on st.user_type_id = c.system_type_id`
 
 /** The name sys.types gives rowversion's system type: its deprecated synonym. */
 const ROWVERSION_SYSTEM_TYPE = 'timestamp'
@@ -103,7 +118,7 @@ const NEXT_VALUE = new RegExp(String.raw`^\(NEXT VALUE FOR (?:${BRACKETED}\.){0,
  * database and refused in an insert, which is what `computed` tells a form
  * generator; `none` would offer it as an input.
  */
-function generation(row: ColumnRow): Generation {
+function generation(row: ColumnDefinitionRow): Generation {
   if (row.is_identity) return 'identity-always'
   if (row.system_name === ROWVERSION_SYSTEM_TYPE) return 'rowversion'
   if (row.is_computed || row.generated_always_type !== 0) return 'computed'
@@ -111,8 +126,27 @@ function generation(row: ColumnRow): Generation {
   return 'none'
 }
 
-function toColumn(row: ColumnRow, gaps: ObjectGap[]): ColumnMeta {
-  const { databaseType, type, hidden } = normalizeType({
+/**
+ * A column as its definition describes it, without access, comment or gaps:
+ * what the root's description reports of it (0041), and what discovery
+ * reports with those added.
+ */
+export function describedColumn(row: ColumnDefinitionRow): DescribedColumn {
+  const { databaseType, type } = typed(row)
+  return {
+    name: row.name,
+    ordinal: row.column_id,
+    databaseType,
+    type,
+    nullable: row.is_nullable,
+    hasDefault: row.default_object_id !== 0,
+    defaultExpression: row.default_definition,
+    generated: generation(row),
+  }
+}
+
+function typed(row: ColumnDefinitionRow): ReturnType<typeof normalizeType> {
+  return normalizeType({
     typeName: row.type_name,
     typeSchema: row.type_schema,
     isUserDefined: row.is_user_defined,
@@ -122,41 +156,31 @@ function toColumn(row: ColumnRow, gaps: ObjectGap[]): ColumnMeta {
     scale: row.scale,
     codePage: row.code_page,
   })
-  if (hidden) {
+}
+
+function toColumn(row: ColumnRow, gaps: ObjectGap[]): ColumnMeta {
+  const column = describedColumn(row)
+  if (typed(row).hidden) {
     gaps.push({
       objectId: row.object_id,
       aspect: 'columns',
       detail:
-        type.kind === 'unsupported'
+        column.type.kind === 'unsupported'
           ? `${row.name}: its type is hidden from this account, so it is reported as unsupported`
-          : `${row.name}: its user-defined type is hidden from this account, so it is reported as its base type ${databaseType}`,
+          : `${row.name}: its user-defined type is hidden from this account, so it is reported as its base type ${column.databaseType}`,
     })
   }
-
-  const hasDefault = row.default_object_id !== 0
   // A default always has a definition. NULL means this account may not read
   // it -- SQL Server returns NULL rather than refusing -- and that is a gap,
   // not an absence.
-  if (hasDefault && row.default_definition === null) {
+  if (column.hasDefault && row.default_definition === null) {
     gaps.push({
       objectId: row.object_id,
       aspect: 'defaults',
       detail: `${row.name}: the definition of its default ${row.default_name ?? '(unnamed)'} is hidden without VIEW DEFINITION`,
     })
   }
-
-  return {
-    name: row.name,
-    ordinal: row.column_id,
-    databaseType,
-    type,
-    nullable: row.is_nullable,
-    hasDefault,
-    defaultExpression: row.default_definition,
-    generated: generation(row),
-    comment: row.comment,
-    access: toAccess(row),
-  }
+  return { ...column, comment: row.comment, access: toAccess(row) }
 }
 
 export async function readColumns(pool: ConnectionPool, schemas: readonly string[]): Promise<Found<ColumnMeta[]>> {

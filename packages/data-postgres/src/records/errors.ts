@@ -85,6 +85,12 @@ const NOT_SENT: ReadonlySet<string> = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI
  */
 const IN_FLIGHT: ReadonlySet<string> = new Set(['CONNECTION_CLOSED', 'CONNECTION_DESTROYED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT'])
 
+/** Whether a driver error is the connection failing, rather than the server refusing: what `recordFailure` answers as unavailable or unknown. */
+export function connectionLost(error: unknown): boolean {
+  const code = error instanceof Error ? (error as { code?: unknown }).code : undefined
+  return typeof code === 'string' && (IN_FLIGHT.has(code) || NOT_SENT.has(code))
+}
+
 const SQLSTATE = /^[0-9A-Z]{5}$/
 
 interface ServerError {

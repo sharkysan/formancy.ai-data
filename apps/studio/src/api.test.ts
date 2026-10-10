@@ -59,7 +59,9 @@ describe('the administrator plane, through the studio client', () => {
     expect(await admin.publish('sales-order', null, await bundle())).toEqual({ ok: true, value: { version: 1 } })
     const latest = await admin.latest('sales-order')
     expect(latest.ok && latest.value.version).toBe(1)
-    expect(await admin.drift('sales-order')).toEqual({ ok: true, value: { version: 1, changes: [], blocking: false, writable: { create: true, update: true } } })
+    // Nothing changed: the report says so, and that the runtime refuses nothing either (0041).
+    const everything = { readable: true, writable: { create: true, update: true } }
+    expect(await admin.drift('sales-order')).toEqual({ ok: true, value: { version: 1, changes: [], blocking: false, ...everything, runtime: everything } })
   })
 
   // A refusal is the server's own code and sentence, with what it carries:
@@ -122,7 +124,7 @@ describe('the administrator plane, through the studio client', () => {
     expect(await admin.restore('sales-order', 1, 1)).toMatchObject({ ok: false, status: 409, code: 'conflict', current: 2 })
     expect(await admin.restore('sales-order', 1, 2)).toEqual({
       ok: true,
-      value: { version: 3, restoredFrom: 1, drift: { changes: [], blocking: false, writable: { create: true, update: true } } },
+      value: { version: 3, restoredFrom: 1, drift: { changes: [], blocking: false, readable: true, writable: { create: true, update: true }, runtime: { readable: true, writable: { create: true, update: true } } } },
     })
     expect(await admin.version('sales-order', 9)).toMatchObject({ ok: false, status: 404, code: 'unknown-version' })
     expect(await admin.versions('nothing-here')).toMatchObject({ ok: false, status: 404, code: 'unknown-form' })

@@ -2,19 +2,36 @@ import {
   authorizeOperation,
   buildLookupConfig,
   checkSubmittedFields,
+  driftRefusal,
   findObject,
   intendedRecord,
   lookupRowFilter,
+  NOTHING_LEFT,
   planCreate,
   planRead,
   planUpdate,
+  READ_REFUSED,
   readableFields,
   rejectedSelection,
+  runtimeOperations,
   scopeRowFilters,
   toFormAnswers,
   validateLookupQuery,
 } from '@formancy/data-core'
-import type { FieldError, FormRecord, MembershipCheck, ObjectMeta, PolicyContext, PolicyOperation, PublishedForm, RecordFailure, ResolvedLookup } from '@formancy/data-core'
+import type {
+  DescribedTable,
+  DriftChange,
+  FieldError,
+  FormRecord,
+  MembershipCheck,
+  ObjectMeta,
+  PlanRefusal,
+  PolicyContext,
+  PolicyOperation,
+  PublishedForm,
+  RecordFailure,
+  ResolvedLookup,
+} from '@formancy/data-core'
 import { canonicalize } from '@formancy/spec'
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
@@ -62,6 +79,9 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
 
 /** At most this many tokens are resolved in one request: a form holds one per lookup field, not thousands. */
 const MAX_RESOLVE = 100
+
+/** A read that found no record inside the filters, as the port's failure, for the answers that need one. */
+const NOT_FOUND: RecordFailure = { ok: false, code: 'not-found', message: 'No such record exists inside the filters.' }
 
 const OPERATIONS = new Set<PolicyOperation>(['read', 'create', 'update'])
 
@@ -211,6 +231,31 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     return writes.once({ actor, form: request.params.id, operation, id, body: request.body }, perform)
   }
 
+  /**
+   * A drift refusal of the database as it is now (0041), said once in the
+   * log with what blocks, by kind and the fields it affects -- never a value,
+   * and never the change's message, which names columns and types the person
+   * is not told -- and answered with the planner's sentence.
+   */
+  function driftAnswer(request: FastifyRequest<{ Params: { id: string } }>, operation: PolicyOperation | 'form', changes: readonly DriftChange[] | undefined, message: string): WriteAnswer {
+    request.log.warn(
+      { form: request.params.id, version: request.auditTrail?.formVersion ?? null, operation, changes: (changes ?? []).map((change) => ({ kind: change.kind, affects: change.affects })) },
+      'refused: the database no longer fits this form as published',
+    )
+    return planRefusal('drift', message)
+  }
+
+  /** A planner's refusal as the answer, its drift said in the log first. */
+  function refusal(request: FastifyRequest<{ Params: { id: string } }>, operation: PolicyOperation, plan: PlanRefusal): WriteAnswer {
+    return plan.code === 'drift' && plan.drift !== undefined ? driftAnswer(request, operation, plan.drift, plan.message) : planRefusal(plan.code, plan.message)
+  }
+
+  /** The root as the catalog describes it now, or the answer when it cannot be described: 503 when the database cannot say, 409 when the table is not one it describes. */
+  async function describedRoot(bundle: PublishedBundle, open: OpenConnection): Promise<{ ok: true; described: DescribedTable } | { ok: false; answer: WriteAnswer }> {
+    const found = await open.records.describe(bundle.bindings.root)
+    return found.ok ? { ok: true, described: found.described } : { ok: false, answer: recordFailure(bundle.bindings, found) }
+  }
+
   /** A write's answer, sent, with what the audit names: its record, and whether it was a repeat. */
   async function answered(reply: FastifyReply, answer: WriteAnswer & { repeated?: boolean }): Promise<FastifyReply> {
     const trail = reply.request.auditTrail
@@ -240,34 +285,82 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   }
 
   /**
+   * One create, from the description it is decided over to the insert,
+   * answered rather than sent: the create route runs it once per sending, so
+   * a write id that arrives again is answered with this answer and asks the
+   * database nothing (0031). The mirror of `updated`.
+   *
+   * The policy is asked before any statement, so an actor it refuses reaches
+   * none (0041). Then the root is described, the one statement before the
+   * planner: a create the description stops is refused there, with no
+   * membership check and no insert sent, and the insert carries the
+   * definition it was decided over.
+   */
+  async function created(request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, open: OpenConnection, answers: Record<string, unknown>): Promise<WriteAnswer> {
+    const actor = context(request)
+    const authorized = authorizeOperation(bundle.policy, actor, 'create')
+    if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
+    const root = await describedRoot(bundle, open)
+    if (!root.ok) return root.answer
+    const plan = planCreate(bundle.snapshot, bundle.bindings, bundle.policy, actor, withoutEchoes(bundle, actor, 'create', answers), root.described)
+    if (!plan.ok) {
+      if (plan.code === 'invalid-values') return { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }
+      return refusal(request, 'create', plan)
+    }
+    const refused = await memberships(open, plan.memberships, request.log)
+    if (refused !== undefined) return refused
+    const outcome = await open.records.insert(plan.request)
+    if (!outcome.ok && outcome.code === 'unknown-outcome') return lost(request, 'create', intendedRecord(plan.request), null, outcome.message)
+    if (!outcome.ok) return recordFailure(bundle.bindings, outcome)
+    const done = toFormAnswers(bundle.bindings, plan.fields, outcome)
+    return { status: 201, body: done, record: done.record ?? undefined }
+  }
+
+  /**
    * One update, from the read that tells an echo from a change to the write,
    * answered rather than sent: the update route runs it once per sending, so
    * a write id that arrives again is answered with this answer and asks the
    * database nothing, its read included (0031).
    *
-   * The record as it stands is read first. Against it 0022 removes an
-   * unchanged echo of a field the actor may not write, and the planner one of
-   * an instant or a time they may (0040). An actor who may update and not
-   * read gets no echo removed, and the planner needs no read for them. When
-   * the planner cannot tell an echo from a change because the read failed,
-   * whatever the failure, that failure is the answer: sent anyway, a read
-   * that failed and a write that did not would store the cut value.
+   * The policy is asked first, before any statement (0041). The record as it
+   * stands is read next, and the read carries the table's description, which
+   * the update is decided over. Against the record 0022 removes an unchanged
+   * echo of a field the actor may not write, and the planner one of an
+   * instant or a time they may (0040). An actor who may update and not read
+   * gets no echo removed, and the planner needs no read for them: the table
+   * is described for them in a statement of its own, as it is after a read
+   * that failed. When the planner cannot tell an echo from a change because
+   * the read failed, whatever the failure, that failure is the answer: sent
+   * anyway, a read that failed and a write that did not would store the cut
+   * value.
    */
   async function updated(request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, open: OpenConnection, record: string, version: string, answers: Record<string, unknown>): Promise<WriteAnswer> {
     const actor = context(request)
+    const authorized = authorizeOperation(bundle.policy, actor, 'update')
+    if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
     let current: FormRecord | undefined
     let unread: RecordFailure | undefined
+    let described: DescribedTable | undefined
     const reading = planRead(bundle.snapshot, bundle.bindings, bundle.policy, actor, record)
     if (reading.ok) {
       const stored = await open.records.read(reading.request)
-      if (stored.ok) current = toFormAnswers(bundle.bindings, reading.fields, stored)
-      else unread = stored
+      if (!stored.ok) unread = stored
+      else {
+        described = stored.described
+        if (stored.record === null) unread = NOT_FOUND
+        else current = toFormAnswers(bundle.bindings, reading.fields, { ok: true, ...stored.record })
+      }
     }
-    const plan = planUpdate(bundle.snapshot, bundle.bindings, bundle.policy, actor, record, version, withoutEchoes(bundle, actor, 'update', answers, current?.answers), current)
+    if (described === undefined) {
+      const root = await describedRoot(bundle, open)
+      if (!root.ok) return root.answer
+      described = root.described
+    }
+    const plan = planUpdate(bundle.snapshot, bundle.bindings, bundle.policy, actor, record, version, withoutEchoes(bundle, actor, 'update', answers, current?.answers), current, described)
     if (!plan.ok) {
       if (plan.code === 'invalid-values') return { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }
       if (plan.code === 'record-not-read' && unread !== undefined) return recordFailure(bundle.bindings, unread)
-      return planRefusal(plan.code, plan.message)
+      return refusal(request, 'update', plan)
     }
     const refused = await memberships(open, plan.memberships, request.log)
     if (refused !== undefined) return refused
@@ -277,16 +370,44 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     return { status: 200, body: toFormAnswers(bundle.bindings, plan.fields, outcome) }
   }
 
+  /**
+   * The form, what this person may do with it now, and which fields they may
+   * see. The policy first, before any statement; then the root is described,
+   * and only what the database as it is now still allows is offered (0041):
+   * a form whose records it can no longer show faithfully is refused, and so
+   * is one that leaves this person nothing. Opening a form therefore asks the
+   * database, and one that cannot be reached is 503.
+   */
   app.get<{ Params: { id: string } }>('/v1/forms/:id', async (request, reply) => {
     const bundle = await published(request.params.id, reply)
     if (bundle === undefined) return reply
     const actor = context(request)
     const allowed = (['read', 'create', 'update'] as const).filter((operation) => bundle.bindings.operations[operation as 'create' | 'update'] !== false && authorizeOperation(bundle.policy, actor, operation).ok)
     if (allowed.length === 0) return reply.code(403).send({ code: 'operation-denied', message: 'This form is not available to you.' })
+    const open = await connection(bundle, reply)
+    if (open === undefined) return reply
+    const root = await describedRoot(bundle, open)
+    if (!root.ok) return answered(reply, root.answer)
+    const decided = runtimeOperations(bundle.snapshot, bundle.bindings, bundle.policy, root.described)
+    if (!decided.ok) return answered(reply, planRefusal(decided.code, decided.message))
+    const { verdict } = decided
+    if (!verdict.readable) return answered(reply, driftAnswer(request, 'form', decided.drift, READ_REFUSED))
+    const operations = allowed.filter((operation) => operation === 'read' || verdict.writable[operation])
+    if (operations.length === 0) return answered(reply, driftAnswer(request, 'form', decided.drift, NOTHING_LEFT))
     const readable = readableFields(bundle.policy, actor, bundle.bindings)
-    return { form: bundle.form, operations: allowed, readable: readable.ok ? readable.fields : [] } satisfies PublishedForm
+    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [] } satisfies PublishedForm
   })
 
+  /**
+   * One record. The policy and the token are decided before any statement;
+   * the read statement returns the table's description beside the record,
+   * and the read is decided over it after it ran (0041): refused, its values
+   * are discarded and never reach the body. A read the database refused as
+   * `schema-changed` -- it names a column that is gone -- returned no
+   * description, so the table is described once more and the read decided
+   * over that: a form drift stops is answered as drift, whichever statement
+   * found it out.
+   */
   app.post<{ Params: { id: string } }>('/v1/forms/:id/records/read', async (request, reply) => {
     const body = request.body
     if (!isRecord(body) || typeof body['record'] !== 'string') return reply.code(400).send({ code: 'invalid-request', message: 'Expected { record }.' })
@@ -294,18 +415,19 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const bundle = await published(request.params.id, reply)
     if (bundle === undefined) return reply
     const plan = planRead(bundle.snapshot, bundle.bindings, bundle.policy, context(request), body['record'])
-    if (!plan.ok) {
-      const refusal = planRefusal(plan.code, plan.message)
-      return reply.code(refusal.status).send(refusal.body)
-    }
+    if (!plan.ok) return answered(reply, planRefusal(plan.code, plan.message))
     const open = await connection(bundle, reply)
     if (open === undefined) return reply
     const outcome = await open.records.read(plan.request)
     if (!outcome.ok) {
-      const failure = recordFailure(bundle.bindings, outcome)
-      return reply.code(failure.status).send(failure.body)
+      const root = outcome.code === 'schema-changed' ? await describedRoot(bundle, open) : undefined
+      const refused = root?.ok === true ? driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'read') : undefined
+      return answered(reply, refused === undefined ? recordFailure(bundle.bindings, outcome) : refusal(request, 'read', refused))
     }
-    return toFormAnswers(bundle.bindings, plan.fields, outcome)
+    const refused = driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, outcome.described, 'read')
+    if (refused !== undefined) return answered(reply, refusal(request, 'read', refused))
+    if (outcome.record === null) return answered(reply, recordFailure(bundle.bindings, NOT_FOUND))
+    return toFormAnswers(bundle.bindings, plan.fields, { ok: true, ...outcome.record })
   })
 
   app.post<{ Params: { id: string } }>('/v1/forms/:id/records/create', async (request, reply) => {
@@ -315,24 +437,10 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     if (id === null) return answered(reply, INVALID_WRITE_ID)
     const bundle = await published(request.params.id, reply)
     if (bundle === undefined) return reply
-    const plan = planCreate(bundle.snapshot, bundle.bindings, bundle.policy, context(request), withoutEchoes(bundle, context(request), 'create', body['answers']))
-    if (!plan.ok) {
-      if (plan.code === 'invalid-values') return reply.code(422).send({ code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors })
-      const refusal = planRefusal(plan.code, plan.message)
-      return reply.code(refusal.status).send(refusal.body)
-    }
     const open = await connection(bundle, reply)
     if (open === undefined) return reply
-    const refused = await memberships(open, plan.memberships, request.log)
-    if (refused !== undefined) return reply.code(refused.status).send(refused.body)
-    const answer = await sendOnce(request, 'create', id, async () => {
-      const outcome = await open.records.insert(plan.request)
-      if (!outcome.ok && outcome.code === 'unknown-outcome') return lost(request, 'create', intendedRecord(plan.request), null, outcome.message)
-      if (!outcome.ok) return recordFailure(bundle.bindings, outcome)
-      const created = toFormAnswers(bundle.bindings, plan.fields, outcome)
-      return { status: 201, body: created, record: created.record ?? undefined }
-    })
-    return answered(reply, answer)
+    const answers = body['answers']
+    return answered(reply, await sendOnce(request, 'create', id, () => created(request, bundle, open, answers)))
   })
 
   app.post<{ Params: { id: string } }>('/v1/forms/:id/records/update', async (request, reply) => {

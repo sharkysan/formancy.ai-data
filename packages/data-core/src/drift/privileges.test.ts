@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import { generateForm } from '../generate/generate.js'
 import type { ObjectMeta } from '../metadata.js'
-import { diffSnapshots } from './diff.js'
 import {
   CUSTOMER_REF,
+  diffSnapshots,
   drift,
   kinds,
   named,

@@ -12,10 +12,11 @@ import { checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, ro
 import type { FormPolicy, PolicyContext, RowFilter } from '../policy/types.js'
 import { findObject } from '../snapshot.js'
 import { columnAnswer, lookupAnswer } from './answers.js'
+import { driftRefusal } from './drift.js'
 import type { FieldError, FormRecord, InvalidValues, MembershipCheck, PlannedInsert, PlannedRead, PlannedUpdate, PlanRefusal } from './plan-types.js'
 import { columnsOf, inCatalogOrder, prepare, type Prepared, refuse } from './prepare.js'
 import { decodeRecordKey } from './token.js'
-import type { RecordColumn, RecordValue } from './types.js'
+import type { DescribedTable, RecordColumn, RecordValue } from './types.js'
 
 /*
  * The one place a request from a browser becomes a request to an adapter:
@@ -25,9 +26,13 @@ import type { RecordColumn, RecordValue } from './types.js'
  *
  * Each planner checks, in this order: the bindings against their snapshot,
  * whether the form offers the operation, the shape of the answers, the
- * policy, the record token and the version, and then every answer through its
- * column's codec. A refusal at any step is the answer; nothing is planned from
- * a partial check.
+ * policy, whether the database as the request described it still fits the
+ * form (0041), the record token and the version, and then every answer
+ * through its column's codec. A refusal at any step is the answer; nothing is
+ * planned from a partial check. Who may act is decided before whether the
+ * database fits, and both before what was sent: a drifted form refuses an
+ * invalid answer as drift, and an actor the policy refuses is refused by the
+ * policy whatever the database says.
  *
  * The policy is asked for the root's filter first, which authorises the
  * operation and scopes it to the tenant, and then for the fields — which also
@@ -216,8 +221,12 @@ function pinnedValues(prepared: Prepared, policy: FormPolicy, context: PolicyCon
  * from the context; an omitted field is left out so the database's default
  * applies; every selection is returned in `memberships`, to be rechecked
  * under the actor's filters before the insert runs.
+ *
+ * `described` is the root as the catalog described it in this request
+ * (0041): a create it stops is refused `drift`, and the insert carries its
+ * definition, so it runs only while the table still has it.
  */
-export function planCreate(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy, context: PolicyContext, answers: unknown): PlannedInsert {
+export function planCreate(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy, context: PolicyContext, answers: unknown, described: DescribedTable): PlannedInsert {
   const ready = prepare(snapshot, bindings)
   if (!ready.ok) return ready
   const { prepared } = ready
@@ -228,6 +237,8 @@ export function planCreate(snapshot: MetadataSnapshot, bindings: FormBindings, p
   if (!pinned.ok) return pinned
   const allowed = checkSubmittedFields(policy, context, bindings, 'create', [...submitted.answers.keys()])
   if (!allowed.ok) return allowed
+  const drifted = driftRefusal(snapshot, bindings, policy, described, 'create')
+  if (drifted !== undefined) return drifted
 
   const fixed = new Map(pinned.values.map((entry) => [entry.name, entry.value]))
   const decoded = decodeAnswers(prepared, bindings, submitted.answers, fixed, 'create')
@@ -238,7 +249,7 @@ export function planCreate(snapshot: MetadataSnapshot, bindings: FormBindings, p
   const { fields, returning } = readBack(prepared, bindings, policy, context)
   return {
     ok: true,
-    request: { target: prepared.target, values: inCatalogValues(prepared.root, [...pinned.values, ...decoded.values]), returning },
+    request: { target: prepared.target, values: inCatalogValues(prepared.root, [...pinned.values, ...decoded.values]), returning, definition: described.definition },
     fields,
     memberships: memberships.checks,
   }
@@ -307,6 +318,12 @@ function withoutCutEchoes(
  * actor, just before the update: an instant or a time equal to it at the
  * version named is an unedited echo and is not set, and an update carrying
  * one the actor may read is refused `record-not-read` without it (0040).
+ * Undefined for an actor who may not read, or when the read failed.
+ *
+ * `described` is the root as the catalog described it in this request -- by
+ * that read, or by `describe` (0041): an update it stops is refused `drift`,
+ * and the update carries its definition, so it runs only while the table
+ * still has it.
  */
 export function planUpdate(
   snapshot: MetadataSnapshot,
@@ -316,7 +333,8 @@ export function planUpdate(
   recordToken: string,
   expectedVersion: string,
   answers: unknown,
-  asRead?: FormRecord,
+  asRead: FormRecord | undefined,
+  described: DescribedTable,
 ): PlannedUpdate {
   const ready = prepare(snapshot, bindings)
   if (!ready.ok) return ready
@@ -338,6 +356,8 @@ export function planUpdate(
   }
   const allowed = checkSubmittedFields(policy, context, bindings, 'update', [...submitted.answers.keys()])
   if (!allowed.ok) return allowed
+  const drifted = driftRefusal(snapshot, bindings, policy, described, 'update')
+  if (drifted !== undefined) return drifted
   const key = decodeRecordKey(prepared.target.identity, recordToken)
   if (!key.ok) return refuse('invalid-record-token', key.message)
   if (!versionFits(prepared, concurrency.kind, concurrency.column, expectedVersion)) {
@@ -368,6 +388,7 @@ export function planUpdate(
       expectedVersion,
       filters: filters.filters,
       returning,
+      definition: described.definition,
     },
     fields,
     memberships: memberships.checks,

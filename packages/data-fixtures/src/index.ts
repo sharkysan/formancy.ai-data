@@ -1,6 +1,6 @@
 export { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
 export type { ExpectedAccess, ExpectedCapability, ExpectedObjectAccess, ExpectedObjectFacts } from './access.js'
-export { displayCase, edgeCase, filterCase, covers, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase } from './cases.js'
+export { displayCase, driftingCase, edgeCase, filterCase, covers, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase } from './cases.js'
 export {
   DEFAULT_IMAGES,
   POSTGRES_IMAGE,
@@ -15,6 +15,10 @@ export {
 } from './containers.js'
 export type { PostgresFixture, SqlServerFixture, StartedServer } from './containers.js'
 export { restrictedDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'
+export { defined } from './defined.js'
+export type { DefinedRecords, Undefined } from './defined.js'
+export { DRIFTING, driftingOn, runtimeOf, sharedDrifting } from './drifting.js'
+export type { DriftingCase, DriftSend, DriftVerdict } from './drifting.js'
 export { readFixture, splitBatches } from './load.js'
 export type { FixtureFile } from './load.js'
 export { FIXTURE_MODEL, FIXTURE_SCOPE } from './model.js'

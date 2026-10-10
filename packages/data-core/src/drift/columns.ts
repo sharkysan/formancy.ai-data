@@ -79,14 +79,25 @@ function droppedColumn(comparison: Comparison, was: ColumnMeta): Draft | null {
   }
 
   const stops: readonly Operation[] = token ? ['update'] : []
+  // A confirmed token is named by every read and by every create's RETURNING
+  // or OUTPUT (0027), so gone or out of sight, it fails them all; a suggested
+  // one is named by nothing, and update was never offered over it.
+  const named = token && bindings.concurrency?.confirmed === true
   if (gaps.length > 0) {
-    return cite(comparison, gaps, { kind: 'access-narrowed', subject, affects: fields, stops, breaksReads: fields.length > 0, otherwise: 'review', message: unseen(`Column ${was.name} of ${describe(root)}`, gaps) })
+    // Out of sight fails a read as gone does. Before 0041 a gap here left the
+    // form readable where the same token dropped did not, and the runtime,
+    // which describes the root without the gap, was stricter than review.
+    return cite(comparison, gaps, {
+      kind: 'access-narrowed',
+      subject,
+      affects: named ? allFields(bindings) : fields,
+      stops,
+      breaksReads: fields.length > 0 || named,
+      otherwise: 'review',
+      message: unseen(`Column ${was.name} of ${describe(root)}`, gaps),
+    })
   }
   if (token) {
-    // A confirmed token is named by every read and by every create's
-    // RETURNING or OUTPUT (0027), so gone, it fails them all; a suggested
-    // one is named by nothing, and update was never offered over it.
-    const named = bindings.concurrency?.confirmed === true
     return {
       kind: 'concurrency-changed',
       subject,

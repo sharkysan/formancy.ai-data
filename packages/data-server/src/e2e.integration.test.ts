@@ -346,19 +346,33 @@ const STEP_8 = {
   },
 } as const
 
-/** Runs statements as the owner, one batch each, on a connection of its own that the suite closes. */
-async function owner(connection: 'pg' | 'ms'): Promise<{ run(statements: readonly string[]): Promise<void>; close(): Promise<void> }> {
+/**
+ * Runs statements as the owner, one batch each, on a connection of its own
+ * that the suite closes, and reads an order back as it is stored: the whole
+ * row as JSON text, so a write the runtime refused can be shown to have left
+ * it as it was.
+ */
+async function owner(connection: 'pg' | 'ms'): Promise<{ run(statements: readonly string[]): Promise<void>; order(id: string): Promise<string | null>; close(): Promise<void> }> {
   if (connection === 'pg') {
     const url = new URL(pg.admin)
     const sql = connectPostgres({
       host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: decodeURIComponent(url.password), tls: { enabled: false, rejectUnauthorized: false },
     })
-    return { run: async (statements) => { for (const statement of statements) await sql.unsafe(statement) }, close: () => sql.end({ timeout: 5 }) }
+    return {
+      run: async (statements) => { for (const statement of statements) await sql.unsafe(statement) },
+      order: async (id) => (await sql.unsafe<Array<{ row: string | null }>>('select (select pg_catalog.row_to_json(o)::text from sales."order" o where o.id = $1::text::bigint) as row', [id]))[0]?.row ?? null,
+      close: () => sql.end({ timeout: 5 }),
+    }
   }
   const pool = await connectSqlServer({
     host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true,
   })
-  return { run: async (statements) => { for (const statement of statements) await pool.request().batch(statement) }, close: () => pool.close() }
+  return {
+    run: async (statements) => { for (const statement of statements) await pool.request().batch(statement) },
+    order: async (id) =>
+      (await pool.request().input('id', id).query<{ row: string | null }>('select (select * from sales.[order] where id = convert(bigint, @id) for json path, without_array_wrapper, include_null_values) as row')).recordset[0]?.row ?? null,
+    close: () => pool.close(),
+  }
 }
 
 type Grid = { kind: 'table'; columns: number; children: Array<{ kind: 'field'; path: string; span?: 'all' }> }
@@ -431,7 +445,12 @@ describe.each([
   // Step 4: a compatible change. Measured on both servers: a nullable
   // column, a wider text column and a replaced check are, for this form, one
   // thing to review and two to note — nothing it rests on stops.
-  test('a compatible change to the table is reviewed and blocks nothing', async () => {
+  //
+  // And version 1 keeps saving over it (0041): the runtime decides with
+  // drift's rules over the table as it is now, which call a widening and a
+  // new nullable column information. A runtime that refused any change from
+  // the published snapshot would refuse this save.
+  test('a compatible change to the table is reviewed and blocks nothing, and version 1 still saves', async () => {
     await ddl.run(STEP_8[connection].compatible)
     const drift = (await call('POST', `/v1/forms/${formId}/drift`, admin)).json()
     expect(drift.blocking).toBe(false)
@@ -440,6 +459,13 @@ describe.each([
       ['check-changed', 'info'],
       ['column-loosened', 'info'],
     ])
+    expect(drift.runtime).toEqual({ readable: true, writable: { create: true, update: true } })
+    const record = `k1:${EDGE_VALUES.beyondSafeInteger}`
+    const read = await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record })
+    expect(read.statusCode, read.body).toBe(200)
+    const saved = await call('POST', `/v1/forms/${formId}/records/update`, clerk, { record, version: read.json().version, answers: { status: 'shipped' } })
+    expect(saved.statusCode, saved.body).toBe(200)
+    expect(saved.json().answers.status).toBe('shipped')
   })
 
   // Steps 5 and 6: regenerated, the person's four edits come through
@@ -475,13 +501,28 @@ describe.each([
   // Steps 8 and 9: an incompatible change. Version 2 binds approved_by, so
   // restoring it would publish a form whose writes fail: refused, with the
   // change that blocks it, and nothing written.
-  test('after approved_by is dropped, restoring version 2 is refused as incompatible', async () => {
+  //
+  // And version 3, which is served and binds approved_by, is refused at
+  // runtime (0041): opening it and saving through it are 409 drift, and the
+  // record is as the drop left it. Before 0041 it opened, and its save went
+  // to the database, which refused it for the column alone.
+  test('after approved_by is dropped, restoring version 2 is refused as incompatible, and the served version 3 is refused at runtime', async () => {
+    const record = `k1:${EDGE_VALUES.beyondSafeInteger}`
+    const before = (await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record })).json()
     await ddl.run(STEP_8[connection].incompatible)
     const refused = await call('POST', `/v1/forms/${formId}/restorations`, admin, { version: 2, expectedBase: 3 })
     expect(refused.statusCode).toBe(409)
     expect(refused.json()).toMatchObject({ code: 'incompatible', changes: [{ kind: 'column-dropped', severity: 'blocking', subject: { name: 'approved_by' } }] })
     expect(refused.json().changes).toHaveLength(1)
     expect(await versions()).toEqual([1, 2, 3])
+
+    expect((await call('GET', `/v1/forms/${formId}`, clerk)).json()).toMatchObject({ code: 'drift' })
+    const stored = await ddl.order(EDGE_VALUES.beyondSafeInteger)
+    expect(stored).not.toBeNull()
+    const save = await call('POST', `/v1/forms/${formId}/records/update`, clerk, { record, version: before.version, answers: { status: 'cancelled' } })
+    expect([save.statusCode, save.json().code]).toEqual([409, 'drift'])
+    expect(await ddl.order(EDGE_VALUES.beyondSafeInteger)).toBe(stored)
+    expect((await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record })).json()).toMatchObject({ code: 'drift' })
   })
 
   // Steps 10 and 11: regenerated from version 3 — version 1's content — the

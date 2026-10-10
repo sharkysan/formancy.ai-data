@@ -24,6 +24,11 @@ import type { DriftKind, DriftSubject } from './types.js'
  * The relationships a form rests on — the key that identifies a record, and
  * the foreign key, target key, target table and display columns behind each
  * lookup — and the root's other constraints, which it does not.
+ *
+ * Three families, because the runtime compares only the first (0041): the
+ * root's own relationships, which a request's description of the root holds;
+ * what lies past each lookup's foreign key, in another table; and the root's
+ * checks, which are information only.
  */
 
 type Lookup = Extract<FieldBinding, { kind: 'lookup' }>
@@ -31,17 +36,24 @@ type Lookup = Extract<FieldBinding, { kind: 'lookup' }>
 /** A change about something with a name: a column, a key, a foreign key or a check. */
 type NamedDraft = Draft & { subject: Extract<DriftSubject, { name: string }> }
 
-export function relationshipChanges(comparison: Comparison): Draft[] {
+/** The root's own: the identity's key, each lookup's own foreign key, and the root's keys and foreign keys nothing rests on. */
+export function rootRelationshipChanges(comparison: Comparison): Draft[] {
   const identity = identityChanges(comparison)
   const reported = new Set(identity.map((draft) => draft.subject.name))
   const used = new Set(lookups(comparison.bindings).map((lookup) => lookup.foreignKey))
   return [
     ...identity,
-    ...lookups(comparison.bindings).flatMap((lookup) => lookupChanges(comparison, lookup)),
+    ...lookups(comparison.bindings).flatMap((lookup) => lookupKeyChanges(comparison, lookup)),
     ...keyChanges(comparison, reported),
     ...foreignKeyChanges(comparison, used),
-    ...checkChanges(comparison),
   ]
+}
+
+/** The far side of every lookup whose own foreign key is unchanged: its target, the key it points at, its display and filter columns. */
+export function lookupTargetChanges(comparison: Comparison): Draft[] {
+  return lookups(comparison.bindings)
+    .filter((lookup) => ownKeyUnchanged(comparison, lookup))
+    .flatMap((lookup) => targetChanges(comparison, lookup, blockedBy(lookup)))
 }
 
 /**
@@ -113,15 +125,28 @@ function differences<T>(properties: ReadonlyArray<Property<T>>, before: T, after
   return properties.flatMap(([label, show, same]) => (same(before, after) ? [] : [`${label} from ${show(before)} to ${show(after)}`]))
 }
 
+/** What a change behind a lookup does, whichever side of its foreign key it is on: the lookup is blocked. */
+function blockedBy(lookup: Lookup): Pick<Draft, 'affects' | 'stops' | 'breaksReads' | 'otherwise'> {
+  return { affects: [lookup.field], stops: [], breaksReads: true, otherwise: 'review' }
+}
+
+/** The lookup's foreign key as it is now, visible with its target and with every property it had: the one test both families decide by. */
+function ownKeyUnchanged(comparison: Comparison, lookup: Lookup): boolean {
+  const now = comparison.after.foreignKeys.find((candidate) => candidate.name === lookup.foreignKey)
+  return now !== undefined && now.references !== null && differences(FOREIGN_KEY, foreignKeyIn(comparison.before, lookup.foreignKey), now).length === 0
+}
+
 /**
  * Plan section 14: a changed foreign key or candidate key behind a lookup
  * requires relationship review. Whatever moved, the lookup is blocked: a
  * selection would store a key that means something else, or one the lookup can
- * no longer resolve.
+ * no longer resolve. This is the root's side of it; what lies past an
+ * unchanged key is `lookupTargetChanges`'.
  */
-function lookupChanges(comparison: Comparison, lookup: Lookup): Draft[] {
+function lookupKeyChanges(comparison: Comparison, lookup: Lookup): Draft[] {
+  if (ownKeyUnchanged(comparison, lookup)) return []
   const { before, after } = comparison
-  const blocked = { affects: [lookup.field], stops: [], breaksReads: true, otherwise: 'review' as const }
+  const blocked = blockedBy(lookup)
   const subject: DriftSubject = { kind: 'foreign-key', object: after.ref, name: lookup.foreignKey }
   const was = foreignKeyIn(before, lookup.foreignKey)
   const now = after.foreignKeys.find((candidate) => candidate.name === lookup.foreignKey)
@@ -136,10 +161,7 @@ function lookupChanges(comparison: Comparison, lookup: Lookup): Draft[] {
   }
 
   const changed = differences(FOREIGN_KEY, was, now)
-  if (changed.length > 0) {
-    return [{ ...blocked, kind: 'lookup-changed', subject, message: `${lookup.foreignKey} changed: ${changed.join('; ')}. The ${lookup.field} lookup selects through it, so it is blocked until the form is reviewed.` }]
-  }
-  return targetChanges(comparison, lookup, blocked)
+  return [{ ...blocked, kind: 'lookup-changed', subject, message: `${lookup.foreignKey} changed: ${changed.join('; ')}. The ${lookup.field} lookup selects through it, so it is blocked until the form is reviewed.` }]
 }
 
 /** The far side of an unchanged foreign key: the target table, the key it points at, and the display columns. */
@@ -308,7 +330,8 @@ function foreignKeyChanges(comparison: Comparison, used: ReadonlySet<string>): D
   })
 }
 
-function checkChanges(comparison: Comparison): Draft[] {
+/** The root's checks: information only, and a family of its own, which the runtime does not compare (0041). */
+export function checkChanges(comparison: Comparison): Draft[] {
   return unboundChanges(comparison, comparison.before.checks, comparison.after.checks, new Set(), {
     kind: 'check-changed',
     subject: 'check',

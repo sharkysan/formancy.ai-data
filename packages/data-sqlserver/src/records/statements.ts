@@ -6,6 +6,7 @@ import type { Statement } from '../sql/statement.js'
 import { exactText, filterPredicate } from '../sql/filters.js'
 import { bindValue, canonicalText, fromText, isExactKey } from '../sql/values.js'
 import type { ExactKey } from '../sql/values.js'
+import { digestOf, factsOf } from './definition.js'
 
 /**
  * The SQL of each record operation. Every statement selects the same shape —
@@ -24,15 +25,18 @@ export const TEXT_NOT_STORED_MESSAGE = /^formancy: text not stored as sent: ([0-
 /** Raised when an update matched more than one row: an identity that is not a key. */
 export const NOT_ONE_ROW = 51702
 export const NOT_ONE_ROW_MESSAGE = 'formancy: the identity matched more than one row'
-/** Raised when an enabled INSTEAD OF trigger decides what the write stores, or the account cannot see whether one does. */
+/** Raised when an enabled INSTEAD OF trigger decides what the write stores. An account that cannot see the table is refused before, by the definition's check (0041). */
 export const DECIDED_BY_TRIGGER = 51703
-export const DECIDED_BY_TRIGGER_MESSAGE = 'formancy: an INSTEAD OF trigger decides what this write stores, or the account cannot see whether one does'
+export const DECIDED_BY_TRIGGER_MESSAGE = 'formancy: an INSTEAD OF trigger decides what this write stores'
 /** Raised when a trigger ended the write's transaction and began another. */
 export const TRANSACTION_REPLACED = 51704
 export const TRANSACTION_REPLACED_MESSAGE = 'formancy: a trigger ended the transaction of the write and began another'
 /** Raised from CATCH when the error came after a trigger had ended the write's transaction: it may have committed (0031). */
 export const TRANSACTION_ENDED = 51705
 export const TRANSACTION_ENDED_MESSAGE = 'formancy: a trigger ended the transaction of the write and then raised an error'
+/** Raised when the table's definition is not the one the write was decided over (0041), after the statement or in CATCH. */
+export const DEFINITION_MOVED = 51706
+export const DEFINITION_MOVED_MESSAGE = 'formancy: table definition moved'
 
 /** A version as it is compared: the 8 bytes of a rowversion, or a version column's decimal string. */
 export type ExpectedVersion = { kind: 'rowversion'; bytes: Buffer } | { kind: 'version-column'; value: string }
@@ -76,19 +80,49 @@ function filterPredicates(parameters: Parameters, terms: readonly RowFilterTerm[
   return terms.map((term) => filterPredicate(parameters, quoteName(term.column), term))
 }
 
-/** One record under the filters. `top (2)`, so an identity that matched more than one row is noticed without reading every row it matched. */
-export function readStatement(request: ReadRequest, terms: readonly RowFilterTerm[]): Statement {
-  const parameters = new Parameters()
-  const where = [...keyPredicates(parameters, request.key), ...filterPredicates(parameters, terms)]
-  const select = selection(request.columns, request.target.concurrency, '').map((column) => `${column.expression} as ${column.name}`)
-  return parameters.statement(`select top (2) ${select.join(', ')} from ${quoteTable(request.target.table)} where ${where.join(' and ')}`)
+/** The table's quoted name, bound as `object_id` reads it. */
+function tableName(parameters: Parameters, table: ObjectRef): string {
+  return parameters.add(mssql.NVarChar(mssql.MAX), quoteTable(table))
 }
 
-/** Whether a record is there for this actor: what tells a stale update from one aimed at nothing. */
-export function existsStatement(table: ObjectRef, key: readonly RecordValue[], terms: readonly RowFilterTerm[]): Statement {
+/** The table's facts and their digest, as `[facts]` and `[digest]` of a derived table `[f]`. */
+function described(parameters: Parameters, table: ObjectRef): { select: string; from: string } {
+  return { select: `[f].[facts], ${digestOf('[f].[facts]')} as [digest]`, from: `(select ${factsOf(tableName(parameters, table))} as [facts]) as [f]` }
+}
+
+/** The table's description, in one statement: its facts and their digest. */
+export function describeStatement(table: ObjectRef): Statement {
   const parameters = new Parameters()
+  const { select, from } = described(parameters, table)
+  return parameters.statement(`select ${select} from ${from}`)
+}
+
+/**
+ * One record under the filters, with the table as this same statement found
+ * it (0041): one statement, which holds a schema-stability lock on the table
+ * while it runs, so no ALTER lands between the facts and the record.
+ * `top (2)`, so an identity that matched more than one row is noticed
+ * without reading every row it matched; one row with a NULL `[found]` when
+ * none is inside the filters.
+ */
+export function readStatement(request: ReadRequest, terms: readonly RowFilterTerm[]): Statement {
+  const parameters = new Parameters()
+  const { select, from } = described(parameters, request.target.table)
+  const where = [...keyPredicates(parameters, request.key), ...filterPredicates(parameters, terms)]
+  const record = selection(request.columns, request.target.concurrency, '').map((column) => `${column.expression} as ${column.name}`)
+  return parameters.statement(`select ${select}, [r].* from ${from} outer apply (select top (2) ${record.join(', ')} from ${quoteTable(request.target.table)} where ${where.join(' and ')}) as [r]`)
+}
+
+/**
+ * Whether a record is there for this actor -- what tells a stale update from
+ * one aimed at nothing -- and whether the table's definition is still the
+ * one the update was decided over (0041), which comes first.
+ */
+export function existsStatement(table: ObjectRef, key: readonly RecordValue[], terms: readonly RowFilterTerm[], definition: Buffer): Statement {
+  const parameters = new Parameters()
+  const same = `case when ${digestOf(factsOf(tableName(parameters, table)))} = ${parameters.add(mssql.VarBinary(32), definition)} then 1 else 0 end`
   const where = [...keyPredicates(parameters, key), ...filterPredicates(parameters, terms)]
-  return parameters.statement(`select count(*) as [found] from ${quoteTable(table)} where ${where.join(' and ')}`)
+  return parameters.statement(`select (select count(*) from ${quoteTable(table)} where ${where.join(' and ')}) as [found], ${same} as [same]`)
 }
 
 /** A value a write assigns — an insert's VALUES or an update's SET — and the SQL it was bound as. */
@@ -144,22 +178,36 @@ function versionAfterTriggers(target: RecordTarget): Refind {
  * batch reads says what the trigger stored, and the write is refused.
  *
  * Asked of the catalog after the statement, so a table that is not there has
- * already failed it as schema-changed (208). A table the account writes but
- * cannot see in the catalog — denied VIEW DEFINITION — is refused too, because
- * whether a trigger decides its writes cannot be told: fail closed. The
- * table's name is bound, as `object_id` reads it.
+ * already failed it as schema-changed (208), and after the definition's
+ * check, so a table the account writes but cannot see in the catalog --
+ * denied VIEW DEFINITION, `object_id` NULL to it -- has already failed that
+ * as a moved definition (51706): its facts are NULL. Whether a trigger
+ * decides such a write cannot be told, and it is refused either way: fail
+ * closed. Before 0041 this check refused it itself, by `object_id` being
+ * NULL; that branch could no longer be reached and is gone. The table's
+ * name is bound, as `object_id` reads it.
  */
-function insteadOfGuard(parameters: Parameters, table: ObjectRef, operation: 'INSERT' | 'UPDATE'): string {
-  const name = parameters.add(mssql.NVarChar(mssql.MAX), quoteTable(table))
+function insteadOfGuard(name: string, operation: 'INSERT' | 'UPDATE'): string {
   const deciding =
     'select 1 from sys.triggers as [t] join sys.trigger_events as [e] on [e].[object_id] = [t].[object_id] ' +
     `where [t].[parent_id] = object_id(${name}) and [t].[is_instead_of_trigger] = 1 and [t].[is_disabled] = 0 and [e].[type_desc] = N'${operation}'`
-  return `if object_id(${name}) is null or exists (${deciding}) throw ${String(DECIDED_BY_TRIGGER)}, N'${DECIDED_BY_TRIGGER_MESSAGE}', 1;`
+  return `if exists (${deciding}) throw ${String(DECIDED_BY_TRIGGER)}, N'${DECIDED_BY_TRIGGER_MESSAGE}', 1;`
+}
+
+/**
+ * Whether the table still has the definition the write was decided over
+ * (0041), as a statement: NULL-safe, because `NULL <> x` is not true and a
+ * table the catalog no longer shows hashes to NULL.
+ */
+function definitionGuard(table: string, definition: string): string[] {
+  return [`set @d = ${digestOf(factsOf(table))};`, `if @d is null or @d <> ${definition} throw ${String(DEFINITION_MOVED)}, N'${DEFINITION_MOVED_MESSAGE}', 1;`]
 }
 
 /** One write: the statement given its OUTPUT clause, what it assigns, what it returns, and what is checked straight after it. */
 interface Write {
   target: RecordTarget
+  /** The definition it was decided over (0041). */
+  definition: Buffer
   operation: 'INSERT' | 'UPDATE'
   statement: (output: string) => string
   assigned: readonly Assigned[]
@@ -207,8 +255,20 @@ interface Write {
  *   runs, after `begin transaction`, and without xact_abort its 208 leaves
  *   the transaction open on the pooled connection. Both settings end with the
  *   request, which runs inside `sp_executesql` (../sql/statement.ts).
+ * - The table's definition is the one the write was decided over (0041),
+ *   read after the statement, while its locks keep any ALTER out: ALTER
+ *   needs a schema-modification lock, which waits for this transaction. And
+ *   again in CATCH, after the rollback: a statement that failed against a
+ *   moved table -- 'many' into a column retyped to int, 245 -- is answered
+ *   as the move. Only while the transaction is still the batch's own: one a
+ *   trigger ended is answered as ended, 3609, 51704 or 51705, before the
+ *   catalog is read, because the trigger may have committed the write
+ *   (0031). Measured: asked first, the definition answered "nothing was
+ *   written" over a row a trigger's COMMIT had stored. The catalog reads in
+ *   CATCH even when the transaction was doomed, once it is rolled back
+ *   (measured, the probes before 0041).
  */
-function writeBatch(parameters: Parameters, { target, operation, statement, assigned, returned, afterWrite }: Write): string {
+function writeBatch(parameters: Parameters, { target, definition, operation, statement, assigned, returned, afterWrite }: Write): string {
   const guarded = assigned.flatMap(({ value, sql }, index) => (value.type.kind === 'text' && value.value !== null ? [{ value, sql, index }] : []))
   const stored = guarded.map(({ value }, position) => ({
     name: `[w${String(position)}]`,
@@ -216,6 +276,8 @@ function writeBatch(parameters: Parameters, { target, operation, statement, assi
     expression: canonicalText(value.type, `inserted.${quoteName(value.name)}`),
   }))
   const refind = versionAfterTriggers(target)
+  const table = tableName(parameters, target.table)
+  const moved = definitionGuard(table, parameters.add(mssql.VarBinary(32), definition))
   const captured = [...returned, ...stored, ...refind.captured]
   const output = `output ${captured.map((column) => column.expression).join(', ')} into @written (${captured.map((column) => column.name).join(', ')})`
   const checks = guarded.map(
@@ -227,7 +289,7 @@ function writeBatch(parameters: Parameters, { target, operation, statement, assi
     'set nocount on;',
     'set xact_abort on;',
     `declare @written table (${captured.map((column) => `${column.name} ${column.declared}`).join(', ')});`,
-    'declare @transaction bigint, @rows int, @ended bit;',
+    'declare @transaction bigint, @rows int, @ended bit, @d varbinary(32);',
     ...refind.declared,
     'begin try',
     'begin transaction;',
@@ -235,17 +297,20 @@ function writeBatch(parameters: Parameters, { target, operation, statement, assi
     `${statement(output)};`,
     'set @rows = @@rowcount;',
     `if coalesce(current_transaction_id(), 0) <> @transaction throw ${String(TRANSACTION_REPLACED)}, N'${TRANSACTION_REPLACED_MESSAGE}', 1;`,
-    insteadOfGuard(parameters, target.table, operation),
+    ...moved,
+    insteadOfGuard(table, operation),
     ...afterWrite,
     ...checks,
     ...refind.statements,
     'commit transaction;',
     'end try',
     'begin catch',
-    'set @ended = case when coalesce(current_transaction_id(), 0) <> @transaction and error_number() <> 3609 ' +
-      `and not (error_number() = ${String(TRANSACTION_REPLACED)} and error_message() = N'${TRANSACTION_REPLACED_MESSAGE}') then 1 else 0 end;`,
+    'set @ended = case when coalesce(current_transaction_id(), 0) <> @transaction then 1 else 0 end;',
     'if @@trancount > 0 rollback transaction;',
-    `if @ended = 1 throw ${String(TRANSACTION_ENDED)}, N'${TRANSACTION_ENDED_MESSAGE}', 1;`,
+    `if @ended = 1 and error_number() <> 3609 and not (error_number() = ${String(TRANSACTION_REPLACED)} and error_message() = N'${TRANSACTION_REPLACED_MESSAGE}') ` +
+      `throw ${String(TRANSACTION_ENDED)}, N'${TRANSACTION_ENDED_MESSAGE}', 1;`,
+    'if @ended = 1 throw;',
+    ...moved,
     'throw;',
     'end catch;',
     `select ${returned.map((column) => column.name).join(', ')} from @written;`,
@@ -253,7 +318,7 @@ function writeBatch(parameters: Parameters, { target, operation, statement, assi
 }
 
 /** Exactly the given columns, so a column with a default gets it and a generated one is never named. */
-export function insertStatement(request: InsertRequest): Statement {
+export function insertStatement(request: InsertRequest, definition: Buffer): Statement {
   const parameters = new Parameters()
   const assigned = request.values.map((value) => ({ value, sql: bindValue(parameters, value.type, value.value) }))
   const table = quoteTable(request.target.table)
@@ -261,6 +326,7 @@ export function insertStatement(request: InsertRequest): Statement {
   const values = assigned.map(({ sql }) => sql).join(', ')
   const sql = writeBatch(parameters, {
     target: request.target,
+    definition,
     operation: 'INSERT',
     statement: (output) => (assigned.length === 0 ? `insert into ${table} ${output} default values` : `insert into ${table} (${columns}) ${output} values (${values})`),
     assigned,
@@ -278,7 +344,7 @@ export function insertStatement(request: InsertRequest): Statement {
  * even with its current version in hand. More than one row matched means the
  * identity is not a key, and the batch rolls back rather than change several.
  */
-export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], expected: ExpectedVersion): Statement {
+export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], expected: ExpectedVersion, definition: Buffer): Statement {
   const parameters = new Parameters()
   const { target } = request
   const assigned = request.set.map((value) => ({ value, sql: bindValue(parameters, value.type, value.value) }))
@@ -293,6 +359,7 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
   )
   const sql = writeBatch(parameters, {
     target,
+    definition,
     operation: 'UPDATE',
     statement: (output) => `update ${quoteTable(target.table)} set ${set.join(', ')} ${output} where ${where.join(' and ')}`,
     assigned,

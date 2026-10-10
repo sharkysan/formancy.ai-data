@@ -21,9 +21,12 @@ interface ObjectRow {
  * can see them: no gap is needed for comments, which was found by asking a
  * real server as a reader with SELECT only.
  */
+/** An object's kind, of sys.objects `o`: discovery's mapping, and the root's definition's (0041). `o.type` is char(2), so 'V' is compared as 'V '. */
+export const OBJECT_KIND = `case o.type when 'V' then 'view' else 'table' end`
+
 const SQL = (scoped: string): string => `
   select o.object_id, s.name as schema_name, o.name as object_name,
-    case o.type when 'V' then 'view' else 'table' end as kind,
+    ${OBJECT_KIND} as kind,
     cast(ep.value as nvarchar(max)) as comment
   from sys.objects o
   join sys.schemas s on s.schema_id = o.schema_id

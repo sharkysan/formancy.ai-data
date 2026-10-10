@@ -1,9 +1,9 @@
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { ApiValue, MetadataSnapshot, ObjectRef, RecordAdapter, RecordColumn, RecordOutcome, RecordTarget, RecordValue, RowFilters, RowFilterType, UpdateRequest } from '@formancy/data-core'
+import type { ApiValue, MetadataSnapshot, ObjectRef, RecordColumn, RecordOutcome, RecordTarget, RecordValue, RowFilters, RowFilterType, UpdateRequest } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
-import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { EDGE_VALUES, startSqlServerFixture } from '@formancy/data-fixtures'
+import type { DefinedRecords, SqlServerFixture, Undefined } from '@formancy/data-fixtures'
+import { defined, EDGE_VALUES, startSqlServerFixture } from '@formancy/data-fixtures'
 import { createSqlServerRecords, discoverSqlServer } from './index.js'
 
 /**
@@ -129,11 +129,22 @@ function newOrder(overrides: Record<string, ApiValue> = {}, without: string[] = 
     .map(([name, value]) => valueOf(ORDER, name, value))
 }
 
-const insertOrder = (records: RecordAdapter, values: RecordValue[]): Promise<RecordOutcome> =>
+const insertOrder = (records: DefinedRecords, values: RecordValue[]): Promise<RecordOutcome> =>
   records.insert({ target: orderTarget(), values, returning: [columnOf(ORDER, 'id')] })
 
-function versioned(ref: ObjectRef, set: RecordValue[], expectedVersion: string, key: RecordValue[] = [valueOf(ref, 'id', '1')]): UpdateRequest {
+function versioned(ref: ObjectRef, set: RecordValue[], expectedVersion: string, key: RecordValue[] = [valueOf(ref, 'id', '1')]): Undefined<UpdateRequest> {
   return { target: { ...target(ref), concurrency: { kind: 'version-column', column: 'version' } }, key, set, expectedVersion, filters: EVERY_ROW, returning: [] }
+}
+
+/**
+ * The definition the owner describes `table` with: for a write whose own pool
+ * cannot describe anything, so that the write itself is what is sent and
+ * answered, as one decided before the pool failed is (0041).
+ */
+async function ownersDefinition(table: ObjectRef): Promise<string> {
+  const described = await createSqlServerRecords(owner).describe(table)
+  if (!described.ok) throw new Error(`the owner describes ${table.schema}.${table.name}`)
+  return described.described.definition
 }
 
 /** A login and a user of its own, granted exactly `grants` (constants of this file, so spliced), and a pool connected as it. */
@@ -155,7 +166,7 @@ describe('each constraint the fixture can be made to break', () => {
   // most migration tools emit instead. All three are the same refusal to a
   // person: that value is taken.
   test('a duplicate key is unique-violation, naming the key', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     expect(
       await records.insert({ target: target(COUNTRY), values: [valueOf(COUNTRY, 'iso_code', 'CH'), valueOf(COUNTRY, 'name', 'Again')], returning: [] }),
     ).toMatchObject({ ok: false, code: 'unique-violation', constraint: 'uq_country_iso_code' })
@@ -172,7 +183,7 @@ describe('each constraint the fixture can be made to break', () => {
   // refuses get different codes — and so does a parent row whose key is still
   // referenced, which SQL Server calls a REFERENCE constraint.
   test('error 547 is foreign-key-violation or check-violation, by the constraint it names', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     expect(await insertOrder(records, newOrder({ customer_no: '9999' }))).toMatchObject({
       ok: false,
       code: 'foreign-key-violation',
@@ -192,7 +203,7 @@ describe('each constraint the fixture can be made to break', () => {
   // survived on the keyword alone and the constraint a form should mark was
   // lost.
   test('a foreign key to its own table names the constraint, whichever way it is broken', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const node: ObjectRef = { schema: 'ops', name: 'node' }
     const broken = { ok: false, code: 'foreign-key-violation', constraint: 'fk_node_parent' }
     expect(await records.insert({ target: target(node), values: [valueOf(node, 'id', '3'), valueOf(node, 'parent_id', '99')], returning: [] })).toMatchObject(broken)
@@ -203,7 +214,7 @@ describe('each constraint the fixture can be made to break', () => {
   // out is the database's refusal, and so is an explicit null: both name the
   // column a form should mark.
   test('a missing required value is not-null-violation, naming the column', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     expect(await insertOrder(records, newOrder({}, ['amount']))).toMatchObject({ ok: false, code: 'not-null-violation', column: 'amount' })
     expect(await insertOrder(records, newOrder({ amount: null }))).toMatchObject({ ok: false, code: 'not-null-violation', column: 'amount' })
   })
@@ -212,7 +223,7 @@ describe('each constraint the fixture can be made to break', () => {
   // (2628); a database at an older compatibility level says only that
   // something would be truncated (8152). Both are too-long.
   test('a value longer than its column is too-long, under either message', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     expect(
       await records.insert({ target: target(COUNTRY), values: [valueOf(COUNTRY, 'iso_code', 'ABC'), valueOf(COUNTRY, 'name', 'Long')], returning: [] }),
     ).toMatchObject({ ok: false, code: 'too-long', column: 'iso_code' })
@@ -225,7 +236,7 @@ describe('each constraint the fixture can be made to break', () => {
       const oldSnapshot = await discoverSqlServer(old, { schemas: ['dbo'] })
       const code = findObject(oldSnapshot, { schema: 'dbo', name: 'code' })?.columns ?? []
       const values = code.map((column) => ({ name: column.name, type: column.type, value: column.name === 'id' ? '1' : 'ABC' }))
-      const outcome = await createSqlServerRecords(old).insert({ target: { table: { schema: 'dbo', name: 'code' }, identity: [], concurrency: null }, values, returning: [] })
+      const outcome = await defined(createSqlServerRecords(old)).insert({ target: { table: { schema: 'dbo', name: 'code' }, identity: [], concurrency: null }, values, returning: [] })
       expect(outcome).toMatchObject({ ok: false, code: 'too-long' })
       expect(outcome).not.toHaveProperty('column')
     } finally {
@@ -240,7 +251,7 @@ describe('each constraint the fixture can be made to break', () => {
   // server any more (0028): scopeRowFilters refuses it as invalid-context,
   // and a term that skipped it is thrown before anything is sent.
   test('a value its column cannot hold is out-of-range, and nothing is written', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     expect(await records.update(versioned(WALLET, [valueOf(WALLET, 'm', '999999999999999.9999')], '0'))).toMatchObject({ ok: false, code: 'out-of-range' })
     const full = [valueOf(WALLET, 'id', '2')]
     expect(await records.update(versioned(WALLET, [valueOf(WALLET, 'm', '2.0000')], '2147483647', full))).toMatchObject({ ok: false, code: 'out-of-range' })
@@ -263,7 +274,7 @@ describe('each constraint the fixture can be made to break', () => {
   // column could not store: `refused`, with the number to find it by, because
   // the same write would be refused again. Never thrown, never unknown-outcome.
   test("a generated column written is schema-changed, and a trigger's own number is refused", async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const outcome = await insertOrder(records, [valueOf(ORDER, 'id', '5'), ...newOrder()])
     expect(outcome).toMatchObject({ ok: false, code: 'schema-changed', message: expect.stringContaining('544') })
     const thrower: ObjectRef = { schema: 'ops', name: 'thrower' }
@@ -278,7 +289,7 @@ describe('each constraint the fixture can be made to break', () => {
   // did commit, a person would be told a record was not saved that was. Any
   // error the batch is told of rolls it back, so the refusal is true.
   test("a trigger's RAISERROR without a rollback is refused, and nothing is written", async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const warned: ObjectRef = { schema: 'ops', name: 'warned' }
     const inserted = await records.insert({ target: target(warned), values: [valueOf(warned, 'id', '2'), valueOf(warned, 'note', 'new')], returning: [] })
     expect(inserted).toMatchObject({ ok: false, code: 'refused', message: expect.stringContaining('50000') })
@@ -292,7 +303,7 @@ describe('each constraint the fixture can be made to break', () => {
   // a truncation the truncated one. A failure is logged; the person's values
   // must not be, so the sentence is the adapter's own.
   test("a failure's message never repeats a value the person entered", async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const duplicate = await records.insert({ target: target(UNIQ), values: [valueOf(UNIQ, 'id', '3'), valueOf(UNIQ, 'code', 'taken')], returning: [] })
     const truncated = await records.insert({ target: target(UNIQ), values: [valueOf(UNIQ, 'id', '4'), valueOf(UNIQ, 'code', 'much-too-long-code')], returning: [] })
     expect(duplicate).toMatchObject({ ok: false, code: 'unique-violation' })
@@ -322,7 +333,7 @@ describe('a character the column cannot store', () => {
   // transaction, and refuses the difference: the country 'ŁA' is not quietly
   // saved as 'LA', a code nobody entered.
   test('an insert is refused as out-of-range and writes nothing', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     for (const code of ['ŁA', '中Z']) {
       const outcome = await records.insert({
         target: target(COUNTRY),
@@ -339,7 +350,7 @@ describe('a character the column cannot store', () => {
   // check constraint accepts. Without the comparison the update succeeds and
   // stores a status the person never chose.
   test('an update is refused as out-of-range and changes nothing', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const key = [valueOf(ORDER, 'id', FIXTURE_ORDER)]
     const read = () => records.read({ target: orderTarget(), key, columns: [columnOf(ORDER, 'status')], filters: tenant('1') })
     const before = await read()
@@ -361,7 +372,7 @@ describe("the account's own grants", () => {
   // The restricted reader may select sales.order and nothing else. A write it
   // is not granted is a refusal with a code, whatever the form offered.
   test('a write the account may not make is permission-denied', async () => {
-    const records = createSqlServerRecords(reader)
+    const records = defined(createSqlServerRecords(reader))
     expect(await insertOrder(records, newOrder())).toMatchObject({ ok: false, code: 'permission-denied' })
     const read = await records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', FIXTURE_ORDER)], columns: [columnOf(ORDER, 'notes')], filters: tenant('1') })
     if (!read.ok || read.version === null) throw new Error('the reader can read the order and its version')
@@ -381,7 +392,7 @@ describe("the account's own grants", () => {
   test('a column the account may not read is permission-denied, naming the column', async () => {
     const narrow = await account('probe_columns', 'grant select on sales.[order] to probe_columns; deny select (amount) on sales.[order] to probe_columns')
     try {
-      const records = createSqlServerRecords(narrow)
+      const records = defined(createSqlServerRecords(narrow))
       const read = (column: string) =>
         records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', FIXTURE_ORDER)], columns: [columnOf(ORDER, column)], filters: tenant('1') })
       expect(await read('amount')).toMatchObject({ ok: false, code: 'permission-denied', column: 'amount' })
@@ -400,7 +411,7 @@ describe("the account's own grants", () => {
   test('an account that may write a table but not read it is refused the write', async () => {
     const writer = await account('probe_writer', 'grant insert, update on ops.uniq to probe_writer')
     try {
-      const records = createSqlServerRecords(writer)
+      const records = defined(createSqlServerRecords(writer))
       const insert = (id: string) => records.insert({ target: target(UNIQ), values: [valueOf(UNIQ, 'id', id), valueOf(UNIQ, 'code', `w${id}`)], returning: [] })
       expect(await insert('10')).toMatchObject({ ok: false, code: 'permission-denied' })
       await owner.request().batch('grant select on ops.uniq to probe_writer')
@@ -434,7 +445,7 @@ describe('a security policy that blocks a write', () => {
     const INT32 = { kind: 'integer', min: '-2147483648', max: '2147483647' } as const
     const column = (name: string, value: string): RecordValue => ({ name, type: INT32, value })
     const kept: RecordTarget = { table: { schema: 'blk', name: 'kept' }, identity: [{ name: 'id', type: INT32 }], concurrency: null }
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
 
     expect(await records.insert({ target: kept, values: [column('id', '2'), column('tenant_id', '1')], returning: [] })).toMatchObject({ ok: true })
     expect(await records.insert({ target: kept, values: [column('id', '3'), column('tenant_id', '2')], returning: [] })).toMatchObject({
@@ -467,7 +478,7 @@ describe('a trigger that decides what a write stores', () => {
   // stored, so the write is refused and rolled back rather than reported done:
   // `refused`, not `unavailable`, because it would be refused again (0028).
   test('an enabled INSTEAD OF trigger for the operation refuses the write, and nothing is stored', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const ignored: ObjectRef = { schema: 'ops', name: 'ignored' }
     const rewritten: ObjectRef = { schema: 'ops', name: 'rewritten' }
     const refused = { ok: false, code: 'refused', message: expect.stringContaining('INSTEAD OF') }
@@ -485,7 +496,7 @@ describe('a trigger that decides what a write stores', () => {
   // write, which stores exactly what it reports. Refusing every table that
   // has one would refuse writes that are true.
   test('an INSTEAD OF trigger for another operation, or a disabled one, leaves the write alone', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     for (const ref of [
       { schema: 'ops', name: 'update_only' },
       { schema: 'ops', name: 'dormant' },
@@ -505,12 +516,29 @@ describe('a trigger that decides what a write stores', () => {
   // NULL to it). Whether a trigger decides its write cannot be told, so the
   // write is refused: fail closed. Without that, this account's insert into a
   // table whose trigger ignores it was `ok: true` with nothing stored.
+  //
+  // Since 0041 the table is not described for it either, so a request is
+  // refused before any write is sent; a write decided over the owner's
+  // description is refused by the batch as a moved definition, because the
+  // facts the account can read of the table are NULL. That check is what
+  // refuses it now, before the INSTEAD OF check, which no longer asks
+  // whether the account sees the table: without its NULL branch, this
+  // write was `ok: true` with nothing stored again.
   test("an account that cannot see the table's triggers is refused the write, and nothing is stored", async () => {
     const blind = await account('probe_blind', 'grant insert, select on ops.ignored to probe_blind; deny view definition on ops.ignored to probe_blind')
     try {
       const ignored: ObjectRef = { schema: 'ops', name: 'ignored' }
-      const outcome = await createSqlServerRecords(blind).insert({ target: target(ignored), values: [valueOf(ignored, 'note', 'unseen')], returning: [] })
-      expect(outcome).toMatchObject({ ok: false, code: 'refused', message: expect.stringContaining('INSTEAD OF') })
+      const records = createSqlServerRecords(blind)
+      expect(await records.describe(ignored)).toMatchObject({ ok: false, code: 'schema-changed' })
+      // A read too, though the account holds SELECT: its description is the same NULL facts, so no form over the table is served to it.
+      expect(await records.read({ target: target(ignored), key: [valueOf(ignored, 'id', '1')], columns: [columnOf(ignored, 'note')], filters: EVERY_ROW })).toMatchObject({
+        ok: false,
+        code: 'schema-changed',
+      })
+      const seen = await createSqlServerRecords(owner).describe(ignored)
+      if (!seen.ok) throw new Error('the owner sees ops.ignored')
+      const outcome = await records.insert({ target: target(ignored), values: [valueOf(ignored, 'note', 'unseen')], returning: [], definition: seen.described.definition })
+      expect(outcome).toMatchObject({ ok: false, code: 'schema-changed' })
     } finally {
       await blind.close()
     }
@@ -526,7 +554,7 @@ describe('a trigger that decides what a write stores', () => {
   // which of the two the trigger did, so both are unknown-outcome — neither a
   // success nor a refusal that invites a retry.
   test("a trigger that ends the write's transaction and begins another is unknown-outcome", async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const restarted: ObjectRef = { schema: 'ops', name: 'restarted' }
     const reopened: ObjectRef = { schema: 'ops', name: 'reopened' }
     const unknown = { ok: false, code: 'unknown-outcome' }
@@ -542,7 +570,7 @@ describe('a trigger that decides what a write stores', () => {
   // the row and was reported `unavailable`, a refusal over a committed write
   // that invites the retry storing it twice. So 3609 is unknown-outcome.
   test("a trigger that ends the write's transaction without beginning another is unknown-outcome", async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const ended: ObjectRef = { schema: 'ops', name: 'ended' }
     for (const [id, note] of [
       ['1', 'commit'],
@@ -566,7 +594,7 @@ describe('a trigger that decides what a write stores', () => {
 // raises is unknown-outcome too, which over-reports and is safe.
 describe('a trigger that ends the transaction and then raises an error', () => {
   test('is unknown-outcome whether it committed, committed and began another, or rolled back, and only the commits are stored', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const raised: ObjectRef = { schema: 'ops', name: 'raised' }
     for (const note of ['commit', 'reopen', 'rollback']) {
       const outcome = await records.insert({ target: target(raised), values: [valueOf(raised, 'note', note)], returning: [] })
@@ -580,7 +608,7 @@ describe('a trigger that ends the transaction and then raises an error', () => {
   // customer's refusal, rolled back -- the check is the transaction, not the
   // error.
   test('a trigger that only raises is still refused, and nothing is stored', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const raised: ObjectRef = { schema: 'ops', name: 'raised' }
     const outcome = await records.insert({ target: target(raised), values: [valueOf(raised, 'note', 'only raise')], returning: [] })
     expect(outcome).toMatchObject({ ok: false, code: 'refused' })
@@ -594,7 +622,7 @@ describe('a schema that moved under the binding', () => {
   // column or a table that is no longer there. That is schema-changed, so drift
   // review can be suggested, and never a generic failure.
   test('a dropped column or a renamed table is schema-changed', async () => {
-    const records = createSqlServerRecords(owner)
+    const records = defined(createSqlServerRecords(owner))
     const read = (columns: RecordColumn[]) => records.read({ target: target(MOVING), key: [valueOf(MOVING, 'id', '1')], columns, filters: EVERY_ROW })
     const note = columnOf(MOVING, 'note')
     expect(await read([note])).toMatchObject({ ok: true, values: { note: 'here' } })
@@ -611,16 +639,21 @@ describe('a schema that moved under the binding', () => {
   // count, last — on a connection the pool hands to the next write, whose
   // commit would only close the inner level and be rolled back later. The
   // write is schema-changed, the connection holds no transaction, and the
-  // next write on it commits.
+  // next write on it commits. Decided before the rename, as a write in
+  // flight is: described after it, the table is not there and no batch is
+  // sent (0041), so the statement would never meet the missing table.
   test('a write to a renamed table is schema-changed, and leaves no transaction on its connection', async () => {
     const single = await new mssql.ConnectionPool({ ...fixture.admin, pool: { max: 1 } }).connect()
     const drifting: ObjectRef = { schema: 'ops', name: 'drifting' }
     const note = (value: string): RecordValue => valueOf(drifting, 'note', value)
     try {
-      const records = createSqlServerRecords(single)
+      const records = defined(createSqlServerRecords(single))
+      const before = await records.describe(drifting)
+      if (!before.ok) throw new Error('ops.drifting is described before the rename')
+      const { definition } = before.described
       await owner.request().batch("exec sp_rename 'ops.drifting', 'drifted'")
-      expect(await records.update(versioned(drifting, [note('lost')], '0'))).toMatchObject({ ok: false, code: 'schema-changed' })
-      expect(await records.insert({ target: target(drifting), values: [valueOf(drifting, 'id', '2'), note('lost')], returning: [] })).toMatchObject({
+      expect(await records.update({ ...versioned(drifting, [note('lost')], '0'), definition })).toMatchObject({ ok: false, code: 'schema-changed' })
+      expect(await records.insert({ target: target(drifting), values: [valueOf(drifting, 'id', '2'), note('lost')], returning: [], definition })).toMatchObject({
         ok: false,
         code: 'schema-changed',
       })
@@ -648,7 +681,7 @@ describe('messages in another language', () => {
     try {
       const language = await german.request().query<{ language: string }>('select @@language as language')
       expect(language.recordset[0]?.language).toBe('Deutsch')
-      const records = createSqlServerRecords(german)
+      const records = defined(createSqlServerRecords(german))
       const foreignKey = await insertOrder(records, newOrder({ customer_no: '9999' }))
       expect(foreignKey).toMatchObject({ ok: false, code: 'foreign-key-violation' })
       expect(foreignKey).not.toHaveProperty('constraint')
@@ -663,12 +696,15 @@ describe('messages in another language', () => {
 
 describe('when the connection fails', () => {
   // A pool that cannot hand out a connection sent nothing, so even a write is
-  // `unavailable`: it certainly did not commit, and a retry is safe.
+  // `unavailable`: it certainly did not commit, and a retry is safe. The
+  // write carries a definition, so the write is what meets the closed pool,
+  // not a description before it.
   test('a pool that cannot connect is unavailable, for a write too', async () => {
     const closed = await new mssql.ConnectionPool(fixture.admin).connect()
     await closed.close()
-    const records = createSqlServerRecords(closed)
-    expect(await insertOrder(records, newOrder())).toMatchObject({ ok: false, code: 'unavailable' })
+    const records = defined(createSqlServerRecords(closed))
+    const definition = await ownersDefinition(ORDER)
+    expect(await records.insert({ target: orderTarget(), values: newOrder(), returning: [columnOf(ORDER, 'id')], definition })).toMatchObject({ ok: false, code: 'unavailable' })
     expect(
       await records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', FIXTURE_ORDER)], columns: [columnOf(ORDER, 'status')], filters: tenant('1') }),
     ).toMatchObject({ ok: false, code: 'unavailable' })
@@ -711,13 +747,15 @@ describe('when the connection fails', () => {
   // ConnectionError, and the same error every waiter after the first gets
   // while the server is down. No connection was handed out, so nothing was
   // sent: it is `unavailable`, never an exception the port promises not to throw.
+  // With a definition, so the write is what waits for the connection.
   test('a pool that hands out no connection in time is unavailable, for a write too', async () => {
     const busy = await new mssql.ConnectionPool({ ...fixture.admin, pool: { max: 1, acquireTimeoutMillis: 500 } }).connect()
+    const definition = await ownersDefinition(COUNTRY)
     const holding = new mssql.Transaction(busy)
     await holding.begin()
     try {
-      const records = createSqlServerRecords(busy)
-      expect(await records.insert(countryInsert('Never sent'))).toMatchObject({ ok: false, code: 'unavailable' })
+      const records = defined(createSqlServerRecords(busy))
+      expect(await records.insert({ ...countryInsert('Never sent'), definition })).toMatchObject({ ok: false, code: 'unavailable' })
       expect(await records.read({ target: target(COUNTRY), key: [valueOf(COUNTRY, 'id', '1')], columns: [columnOf(COUNTRY, 'name')], filters: EVERY_ROW })).toMatchObject({
         ok: false,
         code: 'unavailable',
@@ -740,7 +778,7 @@ describe('when the connection fails', () => {
     try {
       const session = await pool.request().query<{ id: number }>('select @@spid as id')
       const id = session.recordset[0]?.id ?? 0
-      const pending = createSqlServerRecords(pool).insert(countryInsert('Killed'))
+      const pending = defined(createSqlServerRecords(pool)).insert(countryInsert('Killed'))
       await held.waiting(id)
       await owner.request().batch(`kill ${String(id)}`)
       expect(await pending).toMatchObject({ ok: false, code: 'unknown-outcome' })
@@ -759,7 +797,7 @@ describe('when the connection fails', () => {
     const impatient = await new mssql.ConnectionPool({ ...fixture.admin, requestTimeout: 1000 }).connect()
     const held = await holdCountry()
     try {
-      const records = createSqlServerRecords(impatient)
+      const records = defined(createSqlServerRecords(impatient))
       expect(await records.insert(countryInsert('Timed out'))).toMatchObject({ ok: false, code: 'unknown-outcome' })
       expect(await records.read({ target: target(COUNTRY), key: [valueOf(COUNTRY, 'id', '1')], columns: [columnOf(COUNTRY, 'name')], filters: EVERY_ROW })).toMatchObject({
         ok: false,

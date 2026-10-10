@@ -126,7 +126,7 @@
     "title": "Drift",
     "step": "8. Drift",
     "caption": "After the capture script renamed `notes` to `memo` in the captured snapshot, which is what discovery reports after a column is renamed in the database, on both engines. The published form may not be used until the change is reviewed, the rename is a “possible-rename” for a person to confirm and not a guess, and restoring version 1, which still binds `notes`, is refused with what blocks it: “Version 1 cannot be restored: the database has changed in a way it cannot serve.” ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md), [0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).",
-    "alt": "The Drift step: “3 changes, 1 blocking.”; create and update blocked; a blocking column-dropped change for notes, review changes for the new column memo and a possible rename; and a refused restore of version 1 with what blocks it.",
+    "alt": "The Drift step: “3 changes, 1 blocking.”; read, create and update blocked; a blocking column-dropped change for notes, review changes for the new column memo and a possible rename; and a refused restore of version 1 with what blocks it.",
     "quotes": {
       "possible-rename": ["Drift"],
       "Version 1 cannot be restored: the database has changed in a way it cannot serve.": ["Drift"],

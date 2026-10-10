@@ -102,6 +102,18 @@ column, a new one and a hint, never inferred. Tables the form neither binds nor
 looks up are left out, so an empty report means nothing this form rests on
 changed. See [0010](../../docs/decisions/0010-drift-is-classified-against-the-bindings.md).
 
+The report also says `readable` -- no change breaks what the form shows --
+and `runtime`, what a request decides against this database (0041): the
+verdict of the root's own definition alone, its kind, columns, keys and
+foreign keys, which is all a request compares. `runtime` is never stricter
+than review, and looser by what only review compares: a lookup's table,
+privileges, row security and the account. `ROOT_DEFINITION` is the families
+that compare that definition; `diffSnapshots` runs them first, and
+`diffRootDefinition(base, described, bindings, policy)` runs only them,
+over a root as a request described it, so a rule added to one reaches both.
+`describedOf(snapshot, ref)` is a root as a snapshot would describe it, and
+`inSnapshotOrder` puts a description in a snapshot's order.
+
 ## Presentation over a generated base
 
 A person's edits to a generated form are kept as a patch beside the base the
@@ -243,7 +255,9 @@ same typed request for the same answers. Pure — no I/O, no clock — and
 ```ts
 import { planCreate, planUpdate, rejectedSelection, toFormAnswers } from '@formancy/data-core'
 
-const planned = planCreate(snapshot, bindings, policy, context, body)
+const described = await records.describe(bindings.root) // the table as the catalog has it now (0041)
+if (!described.ok) return described
+const planned = planCreate(snapshot, bindings, policy, context, body, described.described)
 if (!planned.ok) return planned // a refusal with a stable code, or { code: 'invalid-values', fieldErrors }
 for (const check of planned.memberships) {
   if ((await lookups.rejects(check.config, check.tokens, check.filters)).length > 0) {
@@ -266,9 +280,20 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   concurrency token. A version column, which every update increments, is
   never the key, a field's column or a generated one, and never pinned by a
   row filter.
+- **The write planners take the table as the request described it**
+  (0041). `planCreate(…, answers, described)` and `planUpdate(…, answers,
+  asRead, described)` refuse `drift` a write the description stops, by
+  `driftRefusal` -- drift review's root families over it, after the policy
+  and before the token, the version and the codecs -- and put
+  `described.definition` on the request, so the adapter writes only while
+  the table still has it. A read is decided after its statement, over the
+  description the read returned; `runtimeOperations` is what opening a form
+  may offer. The refusals' sentences (`READ_REFUSED`, `WRITE_REFUSED`,
+  `NOTHING_LEFT`) name no column; a refusal's `drift` lists the blocking
+  changes for a log.
 - **An update takes the record as read.** An instant or a time read cut to
   the shape and sent back unedited would, set, replace the stored fraction
-  or seconds. `planUpdate(…, answers, asRead)` takes what `toFormAnswers`
+  or seconds. `planUpdate(…, answers, asRead, described)` takes what `toFormAnswers`
   made of the record `planRead` and the adapter read for this actor just
   before the update, and does not set an instant or a time the actor may
   write and read that equals it at the version named; at another version
@@ -282,6 +307,13 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   as a `MembershipCheck` for the caller to run against `rejects` before it
   writes, and every non-member, forged or foreign, gets the same
   `rejectedSelection`.
+- **The record port describes the table** (0041): `describe(table)` reads
+  the root's kind, columns, keys and foreign keys in one statement, `read`
+  answers the same description beside the record, or beside `null` when no
+  row is inside the filters, and every `InsertRequest` and `UpdateRequest`
+  carries the `definition` the decision was made over. An insert or an
+  update runs only while the table's definition is that one; otherwise it is
+  `schema-changed`, and the record was not written.
 - **A database's refusal** is a `RecordFailure` with a stable code. `refused`
   is a refusal this port has no code for — a trigger's own error, a write
   declined without one, an error the adapter does not recognise — and is

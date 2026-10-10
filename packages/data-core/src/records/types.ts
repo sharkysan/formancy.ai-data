@@ -1,6 +1,6 @@
 import type { ApiValue } from '../codecs/codec.js'
 import type { RowFilters } from '../lookup/types.js'
-import type { NormalizedType, ObjectRef } from '../metadata.js'
+import type { ColumnMeta, NormalizedType, ObjectMeta, ObjectRef } from '../metadata.js'
 
 /**
  * One column of a record operation: its name, which comes from approved
@@ -55,6 +55,21 @@ export interface ReadRequest {
   filters: RowFilters
 }
 
+/** A column as `describe` reads it: what discovery says of its definition, without what the account may do or a comment. */
+export type DescribedColumn = Omit<ColumnMeta, 'access' | 'comment'>
+
+/**
+ * A form's root as the catalog describes it within one request (0041): its
+ * kind, columns, keys and foreign keys, normalised as discovery normalises
+ * them, and `definition`, the adapter's own token for the catalog facts it
+ * read them from. The core passes `definition` through to the writes decided
+ * over this description and never parses or compares it.
+ */
+export type DescribedTable = Pick<ObjectMeta, 'kind' | 'primaryKey' | 'uniqueKeys' | 'foreignKeys'> & {
+  columns: DescribedColumn[]
+  definition: string
+}
+
 /**
  * Insert one record. `values` already holds every pinned column — the tenant —
  * from trusted context; the adapter writes exactly these columns and no others,
@@ -65,6 +80,8 @@ export interface InsertRequest {
   values: readonly RecordValue[]
   /** What to read back from the inserted row: generated keys, defaults, computed columns. */
   returning: readonly RecordColumn[]
+  /** The `definition` of the description this insert was decided over: it runs only while the table still has it (0041). */
+  definition: string
 }
 
 /**
@@ -80,6 +97,8 @@ export interface UpdateRequest {
   expectedVersion: string
   filters: RowFilters
   returning: readonly RecordColumn[]
+  /** The `definition` of the description this update was decided over: it runs only while the table still has it (0041). */
+  definition: string
 }
 
 /** A record as the API carries it: canonical values by column, and its current version token. */
@@ -113,7 +132,12 @@ export interface RecordRead {
  *   security did: a PostgreSQL policy's WITH CHECK (42501), a SQL Server
  *   block predicate (33504).
  * - `schema-changed` — a column or table the binding names is gone, or no
- *   longer takes what the binding writes: a generated column written (0028).
+ *   longer takes what the binding writes: a generated column written (0028);
+ *   or the table's definition is no longer the one the request was decided
+ *   over (0041), and the record was not written. A table the catalog does
+ *   not show as discovery would describe it — gone, out of sight, a foreign
+ *   table, a partition — is this too: the runtime never says which (0010),
+ *   drift review does.
  * - `refused` — the database refused the statement for a reason this port has no code for:
  *   a trigger's own error, a write it declined without one, an INSTEAD OF trigger this
  *   adapter cannot verify, an error it does not recognise. Nothing was written. The same
@@ -153,6 +177,16 @@ export interface RecordFailure {
 
 export type RecordOutcome = RecordRead | RecordFailure
 
+/** A table described, or why it could not be: `schema-changed` for one the catalog does not show as discovery would describe it. */
+export type Described = { ok: true; described: DescribedTable } | RecordFailure
+
+/**
+ * A read, with the table as that same statement found it: `record` is `null`
+ * when no row is inside the filters, and the description is answered either
+ * way, because the statement ran (0041).
+ */
+export type DescribedRead = { ok: true; described: DescribedTable; record: Omit<RecordRead, 'ok'> | null } | RecordFailure
+
 /**
  * The record half of the database port, which both adapters implement and one
  * conformance suite holds them to.
@@ -167,9 +201,17 @@ export type RecordOutcome = RecordRead | RecordFailure
  *
  * A database error is translated to a `RecordFailure`, never thrown; only a
  * programming error throws.
+ *
+ * And the table is described where it is used (0041). `describe` reads the
+ * root's definition in one statement, and every read returns it from the
+ * statement that read the record. An insert or an update runs only while the
+ * table's definition is `definition`; otherwise it is `schema-changed`, and
+ * the record was not written. A read's description is of the table as that
+ * read statement found it.
  */
 export interface RecordAdapter {
-  read(request: ReadRequest): Promise<RecordOutcome>
+  describe(table: ObjectRef): Promise<Described>
+  read(request: ReadRequest): Promise<DescribedRead>
   insert(request: InsertRequest): Promise<RecordOutcome>
   update(request: UpdateRequest): Promise<RecordOutcome>
 }

@@ -197,12 +197,24 @@ function assertConsistent(object: ObjectMeta): void {
   }
 }
 
-function sortObject(object: ObjectMeta): ObjectMeta {
+/**
+ * An object's columns, unique keys and foreign keys in the order a snapshot
+ * holds them: columns by catalog position, keys by name in codepoint order.
+ * `createSnapshot` sorts every object so, and an adapter's description of a
+ * root (0041) is put in the same order, so the two read alike.
+ */
+export function inSnapshotOrder<T extends { columns: ReadonlyArray<{ ordinal: number }>; uniqueKeys: ReadonlyArray<{ name: string }>; foreignKeys: ReadonlyArray<{ name: string }> }>(object: T): T {
   return {
     ...object,
     columns: [...object.columns].sort((a, b) => a.ordinal - b.ordinal),
     uniqueKeys: [...object.uniqueKeys].sort((a, b) => byCodepoint(a.name, b.name)),
     foreignKeys: [...object.foreignKeys].sort((a, b) => byCodepoint(a.name, b.name)),
+  }
+}
+
+function sortObject(object: ObjectMeta): ObjectMeta {
+  return {
+    ...inSnapshotOrder(object),
     checks: [...object.checks].sort((a, b) => byCodepoint(a.name, b.name)),
   }
 }

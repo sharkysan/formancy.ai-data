@@ -22,6 +22,8 @@ import {
   customerForm,
   customerSource,
   DATE,
+  DEFINITION,
+  described,
   edited,
   fk,
   INT32,
@@ -51,7 +53,7 @@ describe('planCreate', () => {
   // omitted `status` is absent, so the database's default applies; and every
   // lookup selection is handed back to be rechecked under the actor's filters.
   test('turns answers into exactly the insert, with the tenant from the context and every selection to recheck', () => {
-    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, ANSWERS)).toEqual({
+    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, ANSWERS, described(PG, PG_ORDER))).toEqual({
       ok: true,
       request: {
         target: ORDER_TARGET.postgres,
@@ -67,6 +69,7 @@ describe('planCreate', () => {
           value('paid', BOOLEAN, true),
         ],
         returning: CLERK_COLUMNS,
+        definition: DEFINITION,
       },
       fields: CLERK_FIELDS,
       memberships: [
@@ -79,8 +82,8 @@ describe('planCreate', () => {
   // The same answers make the same request on the other engine, except for
   // what the engines genuinely differ in: the version is a rowversion.
   test('makes the same request for SQL Server, but for the concurrency the table has', () => {
-    const pg = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, ANSWERS)
-    const ms = planCreate(MS, MS_ORDER, ORDER_POLICY, CLERK, ANSWERS)
+    const pg = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, ANSWERS, described(PG, PG_ORDER))
+    const ms = planCreate(MS, MS_ORDER, ORDER_POLICY, CLERK, ANSWERS, described(MS, MS_ORDER))
     expect(ms).toMatchObject({ ok: true, request: { target: ORDER_TARGET.sqlserver } })
     if (pg.ok && ms.ok) expect(ms.request.values).toEqual(pg.request.values)
   })
@@ -98,26 +101,26 @@ describe('planCreate', () => {
     const { bindings } = orderForm(keyless)
     expect(bindings).toMatchObject({ identity: null, concurrency: { kind: 'version-column', column: 'row_version', confirmed: true } })
     const createOnly = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, update: [] } }
-    expect(planCreate(keyless, bindings, createOnly, CLERK, ANSWERS)).toMatchObject({ ok: true, request: { target: { identity: [], concurrency: { column: 'row_version' } } } })
+    expect(planCreate(keyless, bindings, createOnly, CLERK, ANSWERS, described(keyless, bindings))).toMatchObject({ ok: true, request: { target: { identity: [], concurrency: { column: 'row_version' } } } })
   })
 
   // Over-posting. The tenant is the context's: on the order form it is not a
   // field at all, on the customer form it is a pinned one; an identity or a
   // version column is the database's. Each is refused before a value is read.
   test('refuses an over-posted tenant column, key or version, before looking at any value', () => {
-    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, tenant_id: '2', amount: 12.5 })).toMatchObject({
+    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, tenant_id: '2', amount: 12.5 }, described(PG, PG_ORDER))).toMatchObject({
       ok: false,
       code: 'over-posting',
       message: 'tenant_id is not a field of this form',
     })
     const source = customerSource()
-    expect(planCreate(source, customerForm(source).bindings, CUSTOMER_POLICY, CLERK, { tenant_id: '2', customer_no: 7, name: 'X' })).toMatchObject({
+    expect(planCreate(source, customerForm(source).bindings, CUSTOMER_POLICY, CLERK, { tenant_id: '2', customer_no: 7, name: 'X' }, described(source, customerForm(source).bindings))).toMatchObject({
       ok: false,
       code: 'over-posting',
       message: expect.stringContaining('tenant_id is pinned by a row filter') as unknown as string,
     })
     for (const key of ['id', 'row_version']) {
-      expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, [key]: '1' }), key).toMatchObject({ ok: false, code: 'over-posting' })
+      expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, [key]: '1' }, described(PG, PG_ORDER)), key).toMatchObject({ ok: false, code: 'over-posting' })
     }
   })
 
@@ -125,13 +128,13 @@ describe('planCreate', () => {
   // field that cannot be written is reported at once, in the form's order,
   // with the codec's own code, so a person fixes them in one pass.
   test('refuses a decimal sent as a number, and reports every bad field in the form’s order', () => {
-    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, amount: 12.5 })).toEqual({
+    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, amount: 12.5 }, described(PG, PG_ORDER))).toEqual({
       ok: false,
       code: 'invalid-values',
       message: 'amount cannot be written',
       fieldErrors: [{ field: 'amount', code: 'type', message: 'Send an exact decimal as a string, such as "1234.56".' }],
     })
-    const outcome = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, paid: 'yes', group: 'x'.repeat(51), amount: '1.23456', order_date: '2026-02-30', customer: 'garbage' })
+    const outcome = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, paid: 'yes', group: 'x'.repeat(51), amount: '1.23456', order_date: '2026-02-30', customer: 'garbage' }, described(PG, PG_ORDER))
     expect(outcome).toMatchObject({ ok: false, code: 'invalid-values' })
     if (!outcome.ok && outcome.code === 'invalid-values') {
       expect(outcome.fieldErrors.map(({ field, code }) => `${field}:${code}`)).toEqual([
@@ -151,7 +154,7 @@ describe('planCreate', () => {
   // to be asked about.
   test('refuses a forged lookup token with the answer every non-member gets', () => {
     for (const token of ['garbage', 'k1:1', 'k1:1,1001,9', 'k1:1,01001', 'k1:1,abc', 'k1:1,1e3', 'k2:1,1001', '', 1001, true, ['k1:1,1001']]) {
-      const outcome = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, customer: token })
+      const outcome = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, customer: token }, described(PG, PG_ORDER))
       expect(outcome, JSON.stringify(token)).toEqual({
         ok: false,
         code: 'invalid-values',
@@ -187,9 +190,9 @@ describe('planCreate', () => {
     const policy: FormPolicy = { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, project: CLERK_RW }, lookups: { ...ORDER_POLICY.lookups, project: [] } }
     expect(validatePolicy(policy, bindings)).toEqual({ ok: true })
     const lower = '0f8fad5b-d9cb-469f-a165-70867728950e'
-    const planned = planCreate(projects, bindings, policy, CLERK, { ...ANSWERS, project: `k1:${lower}` })
+    const planned = planCreate(projects, bindings, policy, CLERK, { ...ANSWERS, project: `k1:${lower}` }, described(projects, bindings))
     expect(planned.ok && planned.request.values.find((entry) => entry.name === 'project_id')).toEqual(value('project_id', { kind: 'uuid' }, lower))
-    expect(planCreate(projects, bindings, policy, CLERK, { ...ANSWERS, project: `k1:${lower.toUpperCase()}` })).toMatchObject({
+    expect(planCreate(projects, bindings, policy, CLERK, { ...ANSWERS, project: `k1:${lower.toUpperCase()}` }, described(projects, bindings))).toMatchObject({
       ok: false,
       fieldErrors: [{ field: 'project', code: 'not-an-option' }],
     })
@@ -201,7 +204,7 @@ describe('planCreate', () => {
   // person never chose; written as given, another tenant's customer in this
   // tenant's order. Neither: it is refused as every non-member is.
   test('refuses another tenant’s customer, whose key carries the tenant, as a non-member', () => {
-    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, customer: 'k1:2,1001' })).toMatchObject({
+    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, customer: 'k1:2,1001' }, described(PG, PG_ORDER))).toMatchObject({
       ok: false,
       code: 'invalid-values',
       fieldErrors: [{ field: 'customer', code: 'not-an-option' }],
@@ -215,7 +218,7 @@ describe('planCreate', () => {
   // dropped this check because the token looked well formed would write a
   // cross-tenant reference the foreign key happily accepts.
   test('cannot tell another tenant’s employee by its token, and hands it to the membership check with the actor’s filters', () => {
-    const planned = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, employee: 'k1:7' })
+    const planned = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, employee: 'k1:7' }, described(PG, PG_ORDER))
     expect(planned).toMatchObject({ ok: true })
     if (!planned.ok) return
     expect(planned.request.values).toContainEqual(value('created_by', INT32, '7'))
@@ -231,10 +234,10 @@ describe('planCreate', () => {
   // pins, which is still the tenant. A selection that cannot be cleared —
   // the customer number is NOT NULL — is required, as the codec says.
   test('clears a lookup to NULL where its columns allow it, and never the pinned tenant', () => {
-    const planned = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, employee: null })
+    const planned = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, employee: null }, described(PG, PG_ORDER))
     expect(planned).toMatchObject({ ok: true, memberships: [{ field: 'customer' }] })
     if (planned.ok) expect(planned.request.values).toContainEqual(value('created_by', INT32, null))
-    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, customer: null })).toMatchObject({
+    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, customer: null }, described(PG, PG_ORDER))).toMatchObject({
       ok: false,
       fieldErrors: [{ field: 'customer', code: 'required' }],
     })
@@ -250,11 +253,11 @@ describe('planCreate', () => {
       ['false', false],
       [null, null],
     ] as const) {
-      const planned = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, paid: answer })
+      const planned = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, paid: answer }, described(PG, PG_ORDER))
       expect(planned.ok && planned.request.values.find((entry) => entry.name === 'paid')?.value, String(answer)).toBe(held)
     }
     for (const answer of [true, 'True', 'yes', '', 1]) {
-      expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, paid: answer }), String(answer)).toMatchObject({
+      expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, paid: answer }, described(PG, PG_ORDER)), String(answer)).toMatchObject({
         ok: false,
         fieldErrors: [{ field: 'paid', code: 'type' }],
       })
@@ -269,7 +272,7 @@ describe('planCreate', () => {
     const source = customerSource()
     const { form, bindings } = customerForm(source)
     for (const answer of ['true', 'abc', 1]) expect(engineErrors(form, { active: answer }), String(answer)).not.toHaveProperty('active')
-    expect(planCreate(source, bindings, CUSTOMER_POLICY, CLERK, { customer_no: 7, name: 'X', active: 'true' })).toMatchObject({
+    expect(planCreate(source, bindings, CUSTOMER_POLICY, CLERK, { customer_no: 7, name: 'X', active: 'true' }, described(source, bindings))).toMatchObject({
       ok: false,
       fieldErrors: [{ field: 'active', code: 'type' }],
     })
@@ -293,11 +296,11 @@ describe('planCreate', () => {
       pinned: ['tenant_id'],
     })
     expect(engineErrors(form, { customer_no: 7, name: 'X' })).toEqual({})
-    expect(planCreate(source, bindings, CUSTOMER_POLICY, CLERK, { customer_no: 7, name: 'X' })).toMatchObject({
+    expect(planCreate(source, bindings, CUSTOMER_POLICY, CLERK, { customer_no: 7, name: 'X' }, described(source, bindings))).toMatchObject({
       ok: true,
       request: { values: [value('tenant_id', INT32, '1'), value('customer_no', INT32, '7'), value('name', text(200), 'X')] },
     })
-    expect(planCreate(source, bindings, CUSTOMER_POLICY, CLERK, { tenant_id: 1, customer_no: 7, name: 'X' })).toMatchObject({ ok: false, code: 'over-posting' })
+    expect(planCreate(source, bindings, CUSTOMER_POLICY, CLERK, { tenant_id: 1, customer_no: 7, name: 'X' }, described(source, bindings))).toMatchObject({ ok: false, code: 'over-posting' })
   })
 
   // Without being told, the generator cannot know, and the old conflict is
@@ -313,10 +316,10 @@ describe('planCreate', () => {
   // with a default can, and that is how the default applies.
   test('reports an omitted field the database requires, and lets one with a default be omitted', () => {
     const { order_date: _date, amount: _amount, customer: _customer, ...rest } = ANSWERS
-    const outcome = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, rest)
+    const outcome = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, rest, described(PG, PG_ORDER))
     expect(outcome).toMatchObject({ ok: false, code: 'invalid-values' })
     if (!outcome.ok && outcome.code === 'invalid-values') expect(outcome.fieldErrors.map(({ field, code }) => `${field}:${code}`)).toEqual(['customer:required', 'order_date:required', 'amount:required'])
-    const planned = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, ANSWERS)
+    const planned = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, ANSWERS, described(PG, PG_ORDER))
     expect(planned.ok && planned.request.values.some((entry) => entry.name === 'status')).toBe(false)
   })
 
@@ -324,7 +327,7 @@ describe('planCreate', () => {
   // address of what it made — a reference number — and nothing else the
   // database filled in: no default, no computed value, no other column.
   test('returns only the key to an actor who may create and not read', () => {
-    const planned = planCreate(PG, PG_ORDER, ORDER_POLICY, INTAKE, { customer: 'k1:1,1001', order_date: '2026-10-08', amount: '1.00' })
+    const planned = planCreate(PG, PG_ORDER, ORDER_POLICY, INTAKE, { customer: 'k1:1,1001', order_date: '2026-10-08', amount: '1.00' }, described(PG, PG_ORDER))
     expect(planned).toMatchObject({ ok: true, fields: [], request: { returning: [column('id', INT64)] } })
   })
 
@@ -332,19 +335,19 @@ describe('planCreate', () => {
   // codec, so a record created is one the same actor can read back. '042'
   // would be written as 42 and the actor's filter compare '042'.
   test('refuses a trusted tenant not spelled as the column holds it', () => {
-    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, actor(['clerk'], { tenant: '042' }), ANSWERS)).toMatchObject({ ok: false, code: 'invalid-context' })
+    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, actor(['clerk'], { tenant: '042' }), ANSWERS, described(PG, PG_ORDER))).toMatchObject({ ok: false, code: 'invalid-context' })
   })
 
   // Three ways a create cannot even start, each of which would otherwise
   // reach the policy or the codecs with something they were not built for.
   test('refuses a stale snapshot, a form that does not create, and answers that are not an object', () => {
     // Drift: the stored bindings were generated from a snapshot the database no longer matches.
-    expect(planCreate(PG, MS_ORDER, ORDER_POLICY, CLERK, ANSWERS)).toMatchObject({ ok: false, code: 'drift' })
+    expect(planCreate(PG, MS_ORDER, ORDER_POLICY, CLERK, ANSWERS, described(PG, MS_ORDER))).toMatchObject({ ok: false, code: 'drift' })
     // A view offers no create, whatever a policy grants.
     const view = generateForm(PG, { connection: 'erp', root: sales('customer_summary'), formId: 'summary', title: 'Summary', lookups: [] }).bindings
-    expect(planCreate(PG, view, ORDER_POLICY, CLERK, {})).toMatchObject({ ok: false, code: 'operation-unavailable' })
+    expect(planCreate(PG, view, ORDER_POLICY, CLERK, {}, described(PG, view))).toMatchObject({ ok: false, code: 'operation-unavailable' })
     // A body that is not an object of answers has no keys to check for over-posting.
-    for (const body of [null, [], 'customer', 7]) expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, body), JSON.stringify(body)).toMatchObject({ ok: false, code: 'invalid-request' })
+    for (const body of [null, [], 'customer', 7]) expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, body, described(PG, PG_ORDER)), JSON.stringify(body)).toMatchObject({ ok: false, code: 'invalid-request' })
   })
 
   // A lookup that cannot be configured — here, labelled by a binary column —
@@ -356,7 +359,7 @@ describe('planCreate', () => {
       if (name !== undefined) name.type = { kind: 'binary', maxLength: null, fixedLength: false }
     })
     const bindings = orderForm(binary).bindings
-    expect(planCreate(binary, bindings, ORDER_POLICY, CLERK, { ...ANSWERS, employee: 'k1:1' })).toMatchObject({ ok: false, code: 'invalid-bindings' })
+    expect(planCreate(binary, bindings, ORDER_POLICY, CLERK, { ...ANSWERS, employee: 'k1:1' }, described(binary, bindings))).toMatchObject({ ok: false, code: 'invalid-bindings' })
   })
 
   // A lookup's filter is the actor's as much as the root's is: scoped by an
@@ -366,12 +369,12 @@ describe('planCreate', () => {
   // approved.
   test('refuses a selection whose lookup filter cannot be built for this actor', () => {
     const byBranch: FormPolicy = { ...ORDER_POLICY, lookups: { ...ORDER_POLICY.lookups, employee: [{ column: 'tenant_id', attribute: 'branch' }] } }
-    expect(planCreate(PG, PG_ORDER, byBranch, CLERK, ANSWERS)).toMatchObject({ ok: false, code: 'missing-attribute' })
-    expect(planUpdate(PG, PG_ORDER, byBranch, CLERK, ORDER_TOKEN, '1', { employee: 'k1:1' })).toMatchObject({ ok: false, code: 'missing-attribute' })
+    expect(planCreate(PG, PG_ORDER, byBranch, CLERK, ANSWERS, described(PG, PG_ORDER))).toMatchObject({ ok: false, code: 'missing-attribute' })
+    expect(planUpdate(PG, PG_ORDER, byBranch, CLERK, ORDER_TOKEN, '1', { employee: 'k1:1' }, undefined, described(PG, PG_ORDER))).toMatchObject({ ok: false, code: 'missing-attribute' })
     // Without a selection there is nothing to recheck, and nothing to refuse.
-    expect(planCreate(PG, PG_ORDER, byBranch, CLERK, { ...ANSWERS, employee: null })).toMatchObject({ ok: true })
+    expect(planCreate(PG, PG_ORDER, byBranch, CLERK, { ...ANSWERS, employee: null }, described(PG, PG_ORDER))).toMatchObject({ ok: true })
     const byRegion: FormPolicy = { ...ORDER_POLICY, lookups: { ...ORDER_POLICY.lookups, employee: [{ column: 'region', attribute: 'tenant' }] } }
-    expect(planCreate(PG, PG_ORDER, byRegion, CLERK, ANSWERS)).toMatchObject({ ok: false, code: 'invalid-policy', message: expect.stringContaining('employee has no column region') as unknown as string })
+    expect(planCreate(PG, PG_ORDER, byRegion, CLERK, ANSWERS, described(PG, PG_ORDER))).toMatchObject({ ok: false, code: 'invalid-policy', message: expect.stringContaining('employee has no column region') as unknown as string })
   })
 
   // The tenant can be a reference too: customer.tenant_id offered as a
@@ -399,11 +402,11 @@ describe('planCreate', () => {
     }
     expect(validatePolicy(policy, bindings)).toEqual({ ok: true })
 
-    const planned = planCreate(source, bindings, policy, CLERK, { tenant: 'k1:1', customer_no: 7, name: 'X' })
+    const planned = planCreate(source, bindings, policy, CLERK, { tenant: 'k1:1', customer_no: 7, name: 'X' }, described(source, bindings))
     expect(planned).toMatchObject({ ok: true, memberships: [{ field: 'tenant', tokens: ['k1:1'], filters: { kind: 'restricted', equal: [{ column: 'id', value: '1' }] } }] })
     if (planned.ok) expect(planned.request.values.filter((entry) => entry.name === 'tenant_id')).toEqual([value('tenant_id', INT32, '1')])
-    expect(planCreate(source, bindings, policy, CLERK, { tenant: 'k1:2', customer_no: 7, name: 'X' })).toMatchObject({ ok: false, fieldErrors: [{ field: 'tenant', code: 'not-an-option' }] })
-    expect(planCreate(source, bindings, policy, CLERK, { tenant: null, customer_no: 7, name: 'X' })).toMatchObject({ ok: false, fieldErrors: [{ field: 'tenant', code: 'required' }] })
+    expect(planCreate(source, bindings, policy, CLERK, { tenant: 'k1:2', customer_no: 7, name: 'X' }, described(source, bindings))).toMatchObject({ ok: false, fieldErrors: [{ field: 'tenant', code: 'not-an-option' }] })
+    expect(planCreate(source, bindings, policy, CLERK, { tenant: null, customer_no: 7, name: 'X' }, described(source, bindings))).toMatchObject({ ok: false, fieldErrors: [{ field: 'tenant', code: 'required' }] })
   })
 
   // A pinned column is written from the context, through its codec like any
@@ -411,8 +414,8 @@ describe('planCreate', () => {
   // something no insert may name.
   test('refuses a row filter that pins a column the database writes', () => {
     const onIdentity: FormPolicy = { ...ORDER_POLICY, rowFilters: [{ column: 'id', attribute: 'tenant' }] }
-    expect(planCreate(PG, PG_ORDER, onIdentity, CLERK, ANSWERS)).toMatchObject({ ok: false, code: 'invalid-policy', message: expect.stringContaining('id cannot be written from the context') as unknown as string })
-    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, AUDITOR, ANSWERS)).toMatchObject({ ok: false, code: 'operation-denied' })
+    expect(planCreate(PG, PG_ORDER, onIdentity, CLERK, ANSWERS, described(PG, PG_ORDER))).toMatchObject({ ok: false, code: 'invalid-policy', message: expect.stringContaining('id cannot be written from the context') as unknown as string })
+    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, AUDITOR, ANSWERS, described(PG, PG_ORDER))).toMatchObject({ ok: false, code: 'operation-denied' })
   })
 
   // A bindings file can bind a column the generator excluded. The codec is
@@ -425,14 +428,14 @@ describe('planCreate', () => {
       draft.fields.push({ kind: 'column', field: 'attachment', column: 'attachment', type: { kind: 'binary', maxLength: null, fixedLength: false }, nullable: true, writes: { create: true, update: true } })
     })
     const policy: FormPolicy = { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, attachment: CLERK_RW } }
-    expect(planCreate(attached, bindings, policy, CLERK, { ...ANSWERS, attachment: 'AAAA' })).toMatchObject({ ok: false, fieldErrors: [{ field: 'attachment', code: 'unsupported' }] })
+    expect(planCreate(attached, bindings, policy, CLERK, { ...ANSWERS, attachment: 'AAAA' }, described(attached, bindings))).toMatchObject({ ok: false, fieldErrors: [{ field: 'attachment', code: 'unsupported' }] })
   })
 
   // A record keyed by a timestamp can be created, and has no address
   // afterwards: what the insert reads back is what the actor may see, without
   // a key nobody could send back.
   test('creates a record whose key no token can carry, and reads back no key for it', () => {
-    const planned = planCreate(STAMPED, orderForm(STAMPED).bindings, ORDER_POLICY, CLERK, ANSWERS)
+    const planned = planCreate(STAMPED, orderForm(STAMPED).bindings, ORDER_POLICY, CLERK, ANSWERS, described(STAMPED, orderForm(STAMPED).bindings))
     expect(planned).toMatchObject({ ok: true })
     if (planned.ok) expect(planned.request.returning.map((entry) => entry.name)).not.toContain('created_at')
   })

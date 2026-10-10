@@ -2,6 +2,7 @@ import type { DatabaseKind } from '@formancy/data-core'
 import { DATABASE_KINDS } from '@formancy/data-core'
 import type { TestOptions } from 'vitest'
 import { TestRunner } from 'vitest'
+import { sharedDrifting } from './drifting.js'
 import type { FilterParityCase, RefusalParityCase } from './parity.js'
 import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 import { EDGE_VALUES } from './values.js'
@@ -34,6 +35,7 @@ export const MODEL_CASES = {
   restricted: 'model: the restricted reader discovers what it may use',
   readerAccess: "access: the reader's privileges",
   writerAccess: "access: the order form's account's privileges",
+  described: 'model: describe reads each fixture table as discovery does',
 } as const
 
 export const filterCase = (entry: FilterParityCase): string => `filter: ${entry.column} = ${JSON.stringify(entry.value)}`
@@ -42,11 +44,12 @@ export const temporalCase = (column: keyof typeof TEMPORAL_PARITY): string => `r
 export const refusalCase = (name: RefusalParityCase): string => `refusal: ${name}`
 export const edgeCase = (name: keyof typeof EDGE_VALUES): string => `edge: ${name}`
 export const shipmentCase = (which: 'first' | 'second'): string => `shipment: ${which}`
+export const driftingCase = (name: string): string => `drifting: ${name}`
 
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
  * every filter, label, temporal read, refusal and edge value, then the two
- * shipments.
+ * shipments, then every change to a form's own table both engines run (0041).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -60,6 +63,7 @@ export function sharedCases(): string[] {
     ...(Object.keys(EDGE_VALUES) as (keyof typeof EDGE_VALUES)[]).map(edgeCase),
     shipmentCase('first'),
     shipmentCase('second'),
+    ...sharedDrifting().map((entry) => driftingCase(entry.name)),
   ]
   const seen = new Set<string>()
   for (const id of ids) {

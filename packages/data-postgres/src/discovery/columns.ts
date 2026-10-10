@@ -1,8 +1,9 @@
 import type { ColumnMeta, Generation, TextLengthUnit } from '@formancy/data-core'
 import type { TransactionSql } from 'postgres'
+import { op } from '../sql/catalog.js'
 import { normalizeType } from './types.js'
 
-interface ColumnRow {
+export interface ColumnRow {
   oid: number
   name: string
   ordinal: number
@@ -34,6 +35,22 @@ export type UncommentedColumn = Omit<ColumnMeta, 'comment' | 'access'>
  * itself, not parsed back out of that spelling. A text's length unit is the
  * database's, from its encoding, and passed in (see `textUnitOf`).
  */
+/**
+ * The columns of a relation anybody declared, of pg_attribute `a`: neither a
+ * system column nor a dropped one. Shared with the root's definition (0041).
+ */
+export const DECLARED_COLUMN = `a.attnum ${op('>')} 0 and not a.attisdropped`
+
+/**
+ * A column's default, from pg_attrdef `d`, spelled as PostgreSQL deparses it
+ * for this session. A stored generated column's expression is filed in
+ * pg_attrdef, with atthasdef set, exactly like a default. It is not one:
+ * nothing can be written to the column, so there is nothing for a default to
+ * fill. Shared with the root's description (0041), which spells it beside
+ * the facts it digests and never digests the spelling.
+ */
+export const DEFAULT_EXPRESSION = `case when a.attgenerated ${op('=')} '' then pg_catalog.pg_get_expr(d.adbin, d.adrelid) end`
+
 export async function readColumns(sql: TransactionSql, schemas: readonly string[], textUnit: TextLengthUnit): Promise<Map<number, UncommentedColumn[]>> {
   const rows = await sql<ColumnRow[]>`
     select
@@ -47,10 +64,7 @@ export async function readColumns(sql: TransactionSql, schemas: readonly string[
       a.attnotnull as not_null,
       a.attidentity as identity,
       a.attgenerated as generated,
-      -- A stored generated column's expression is filed in pg_attrdef, with
-      -- atthasdef set, exactly like a default. It is not one: nothing can be
-      -- written to the column, so there is nothing for a default to fill.
-      case when a.attgenerated = '' then pg_catalog.pg_get_expr(d.adbin, d.adrelid) end as default_expression
+      ${sql.unsafe(DEFAULT_EXPRESSION)} as default_expression
     from pg_catalog.pg_attribute a
     join pg_catalog.pg_class c on c.oid = a.attrelid
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
@@ -58,26 +72,30 @@ export async function readColumns(sql: TransactionSql, schemas: readonly string[
     join pg_catalog.pg_namespace tn on tn.oid = t.typnamespace
     left join pg_catalog.pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
     where n.nspname = any(${schemas})
-      and a.attnum > 0
-      and not a.attisdropped
+      and ${sql.unsafe(DECLARED_COLUMN)}
     order by a.attrelid, a.attnum`
 
   const byObject = new Map<number, UncommentedColumn[]>()
   for (const row of rows) {
     const columns = byObject.get(row.oid) ?? []
-    columns.push({
-      name: row.name,
-      ordinal: row.ordinal,
-      databaseType: row.database_type,
-      type: normalizeType({ name: row.type_name, schema: row.type_schema, modifier: row.type_modifier }, textUnit),
-      nullable: !row.not_null,
-      hasDefault: row.default_expression !== null,
-      defaultExpression: row.default_expression,
-      generated: generation(row),
-    })
+    columns.push(columnOf(row, textUnit))
     byObject.set(row.oid, columns)
   }
   return byObject
+}
+
+/** One column from its catalog row: what discovery reports, and what the root's description reports of it (0041). */
+export function columnOf(row: Omit<ColumnRow, 'oid'>, textUnit: TextLengthUnit): UncommentedColumn {
+  return {
+    name: row.name,
+    ordinal: row.ordinal,
+    databaseType: row.database_type,
+    type: normalizeType({ name: row.type_name, schema: row.type_schema, modifier: row.type_modifier }, textUnit),
+    nullable: !row.not_null,
+    hasDefault: row.default_expression !== null,
+    defaultExpression: row.default_expression,
+    generated: generation(row),
+  }
 }
 
 /**

@@ -76,7 +76,7 @@ describe('drift', () => {
     await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
     const report = await within(drift).findByRole('region', { name: 'Version 1 of sales-order, against the database now' })
     expect(within(report).getByRole('status').textContent).toBe('Nothing this form rests on has changed since version 1 was published.')
-    expect(items(report, 'What the published form may still do')).toEqual(['Create: still allowed', 'Update: still allowed', 'As a whole: usable as published.'])
+    expect(items(report, 'What the published form may still do')).toEqual(['Read: still allowed', 'Create: still allowed', 'Update: still allowed', 'As a whole: usable as published.'])
     expect(await audit()).toEqual([])
   })
 
@@ -92,7 +92,10 @@ describe('drift', () => {
     expect(server.changes.map((change) => [change.kind, change.severity])).toEqual([['column-dropped', 'blocking']])
     expect(items(report, 'Blocking')).toEqual(server.changes.map((change) => written(change, { notes: 'Notes' })))
     expect(paragraphs(report)).toContain('Blocks the form as published: a write it offers is stopped, or a field it shows can no longer be read, until it is reviewed.')
+    // The Read line is the report's `readable` (0041): a dropped bound column breaks reads.
+    expect(server.readable).toBe(false)
     expect(items(report, 'What the published form may still do')).toEqual([
+      'Read: blocked by the changes below',
       `Create: ${server.writable.create ? 'still allowed' : 'blocked by the changes below'}`,
       `Update: ${server.writable.update ? 'still allowed' : 'blocked by the changes below'}`,
       'As a whole: not to be used as published until the blocking changes are reviewed.',
@@ -124,11 +127,32 @@ describe('drift', () => {
     plane.databases.set('fixture', READER_SNAPSHOT)
     await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
     const report = await within(drift).findByRole('region', { name: 'Version 1 of sales-order, against the database now' })
-    const kinds = (await serverReport()).changes.map((change) => change.kind)
+    const server = await serverReport()
+    const kinds = server.changes.map((change) => change.kind)
     expect(kinds).toContain('account-changed')
     expect(kinds).toContain('privilege-narrowed')
     expect(kinds).not.toContain('root-dropped')
     expect(items(report, 'Blocking').join(' ')).toContain('privilege-narrowed')
+    // Only review sees an account and a privilege: what it blocks and the
+    // server still allows is said, so an administrator does not take a
+    // blocked form for one nobody can use (0041).
+    const blockedHere = [...(!server.readable && server.runtime.readable ? ['read'] : []), ...(['create', 'update'] as const).filter((operation) => !server.writable[operation] && server.runtime.writable[operation])]
+    expect(blockedHere.length).toBeGreaterThan(0)
+    const said = items(report, 'What the published form may still do').filter((item) => item.startsWith('The server still allows'))
+    expect(said).toEqual([expect.stringContaining(`The server still allows ${blockedHere.length === 1 ? blockedHere[0] : `${blockedHere.slice(0, -1).join(', ')} and ${blockedHere.at(-1) as string}`}: what blocks`)])
+    expect(said[0]).toMatch(/a lookup’s table, privileges, row security or the account\)\. The database still refuses what the account may not do\. Review the form and publish it again\.$/)
+  })
+
+  // Where review and the server agree, nothing more is said: a line that
+  // appeared for every blocked form would teach an administrator to skip it.
+  test('says nothing of the server when it refuses what review blocks', async () => {
+    const user = await signIn(plane)
+    const drift = await published(user)
+    plane.databases.set('fixture', withoutColumn(OWNER_SNAPSHOT, 'order', 'notes'))
+    await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
+    const report = await within(drift).findByRole('region', { name: 'Version 1 of sales-order, against the database now' })
+    expect((await serverReport()).runtime).toEqual({ readable: false, writable: { create: false, update: false } })
+    expect(items(report, 'What the published form may still do').some((item) => item.startsWith('The server still allows'))).toBe(false)
   })
 
   // A form id nobody published is the server's 404, in its words; one that

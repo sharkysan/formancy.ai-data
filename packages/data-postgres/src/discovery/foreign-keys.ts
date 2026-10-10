@@ -1,5 +1,6 @@
 import type { ForeignKeyMeta, ForeignKeyTarget, ReferentialAction } from '@formancy/data-core'
 import type { TransactionSql } from 'postgres'
+import { op } from '../sql/catalog.js'
 
 interface ForeignKeyRow {
   oid: number
@@ -28,7 +29,7 @@ const ACTIONS = new Map<string, ReferentialAction>([
   ['d', 'set-default'],
 ])
 
-function action(code: string, constraint: string): ReferentialAction {
+export function action(code: string, constraint: string): ReferentialAction {
   const found = ACTIONS.get(code)
   // Never reached on PostgreSQL 17, whose catalog has exactly the five codes
   // above. Kept so that a sixth, in some later release, fails discovery with
@@ -55,6 +56,30 @@ function action(code: string, constraint: string): ReferentialAction {
  * They are also where the triggers are, which is why enforcement is read
  * over the declared constraint and every clone descended from it.
  */
+/** A foreign key somebody declared, of pg_constraint `k`, not one of the clones PostgreSQL makes for partitions. Shared with the root's definition (0041). */
+export const DECLARED_FOREIGN_KEY = `k.contype ${op('=')} 'f' and k.conparentid ${op('=')} 0::pg_catalog.oid`
+
+/**
+ * Whether the foreign key `k` is checked in an ordinary session. A trigger
+ * fires in an ordinary session when it is enabled for origin (O) or always
+ * (A). Disabled (D) or replica-only (R), it does not. The triggers of a
+ * partitioned side belong to each partition's clone, and a sub-partition's
+ * clone is a clone's clone, so the family is walked down conparentid to the
+ * leaves. Shared with the root's definition (0041).
+ */
+export const TRIGGERS_ENABLED = `not exists (
+        with recursive family(oid) as (
+          select k.oid
+          union all
+          select clone.oid
+          from pg_catalog.pg_constraint clone
+          join family on clone.conparentid ${op('=')} family.oid
+        )
+        select from pg_catalog.pg_trigger t
+        join family on t.tgconstraint ${op('=')} family.oid
+        where not (t.tgenabled ${op('=')} any ('{O,A}'::pg_catalog."char"[]))
+      )`
+
 export async function readForeignKeys(sql: TransactionSql, schemas: readonly string[]): Promise<Map<number, ForeignKeyMeta[]>> {
   const rows = await sql<ForeignKeyRow[]>`
     select
@@ -63,23 +88,7 @@ export async function readForeignKeys(sql: TransactionSql, schemas: readonly str
       k.confupdtype as on_update,
       k.confdeltype as on_delete,
       k.convalidated as validated,
-      -- A trigger fires in an ordinary session when it is enabled for origin
-      -- (O) or always (A). Disabled (D) or replica-only (R), it does not. The
-      -- triggers of a partitioned side belong to each partition's clone, and
-      -- a sub-partition's clone is a clone's clone, so the family is walked
-      -- down conparentid to the leaves.
-      not exists (
-        with recursive family(oid) as (
-          select k.oid
-          union all
-          select clone.oid
-          from pg_catalog.pg_constraint clone
-          join family on clone.conparentid = family.oid
-        )
-        select from pg_catalog.pg_trigger t
-        join family on t.tgconstraint = family.oid
-        where t.tgenabled not in ('O', 'A')
-      ) as triggers_enabled,
+      ${sql.unsafe(TRIGGERS_ENABLED)} as triggers_enabled,
       tn.nspname as target_schema,
       tc.relname as target_name,
       a.attname as column,
@@ -93,8 +102,7 @@ export async function readForeignKeys(sql: TransactionSql, schemas: readonly str
     join pg_catalog.pg_attribute a on a.attrelid = k.conrelid and a.attnum = pair.attnum
     join pg_catalog.pg_attribute ta on ta.attrelid = k.confrelid and ta.attnum = pair.target_attnum
     where n.nspname = any(${schemas})
-      and k.contype = 'f'
-      and k.conparentid = 0
+      and ${sql.unsafe(DECLARED_FOREIGN_KEY)}
     order by k.conrelid, k.conname, pair.position`
 
   const byObject = new Map<number, KnownTargetKey[]>()

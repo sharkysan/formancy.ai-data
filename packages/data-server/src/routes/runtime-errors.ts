@@ -22,8 +22,11 @@ export function planRefusal(code: PlanRefusalCode, message: string): HttpRefusal
     case 'operation-unavailable':
       return { status: 403, body: { code, message } }
     case 'drift':
-      // The bundle's snapshot no longer matches what it was published with: an
-      // administrator reviews drift, a person filling in a form cannot.
+      // The bundle's snapshot no longer matches what it was published with, or
+      // the database as it is now stops this operation for the form as
+      // published (0041): an administrator reviews drift, a person filling in
+      // a form cannot. The message is the planner's sentence, which names no
+      // column; what changed is in the server's log and in drift review.
       return { status: 409, body: { code, message } }
     case 'invalid-context':
       // The host's token verified, and still did not produce a context the

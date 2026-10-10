@@ -15,6 +15,8 @@ import {
   CUSTOMER_POLICY,
   customerForm,
   customerSource,
+  DEFINITION,
+  described,
   edited,
   fieldOf,
   INT32,
@@ -43,7 +45,7 @@ describe('planUpdate', () => {
   // erase a column. The customer selection sets only the customer number:
   // the tenant it carries is pinned, and equals the context's.
   test('sets exactly what was submitted, never the tenant, guarded by the key, the filter and the version', () => {
-    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { customer: 'k1:1,1002', notes: null, paid: 'false' })).toEqual({
+    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { customer: 'k1:1,1002', notes: null, paid: 'false' }, undefined, described(PG, PG_ORDER))).toEqual({
       ok: true,
       request: {
         target: ORDER_TARGET.postgres,
@@ -52,6 +54,7 @@ describe('planUpdate', () => {
         expectedVersion: '1',
         filters: TENANT_ONE,
         returning: CLERK_COLUMNS,
+        definition: DEFINITION,
       },
       fields: CLERK_FIELDS,
       memberships: [{ field: 'customer', config: buildLookupConfig(PG_ORDER, 'customer', { snapshot: PG }), tokens: ['k1:1,1002'], filters: TENANT_ONE }],
@@ -60,7 +63,7 @@ describe('planUpdate', () => {
 
   // Clearing is subject to nullability: amount is NOT NULL.
   test('refuses to clear a column that cannot be NULL', () => {
-    expect(planUpdate(MS, MS_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '00000000000007d1', { amount: null })).toMatchObject({
+    expect(planUpdate(MS, MS_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '00000000000007d1', { amount: null }, undefined, described(MS, MS_ORDER))).toMatchObject({
       ok: false,
       fieldErrors: [{ field: 'amount', code: 'required', message: 'A value is required.' }],
     })
@@ -69,7 +72,7 @@ describe('planUpdate', () => {
   // Moving an order to another tenant's customer would move it into that
   // tenant's books through the customer key; refused as a non-member.
   test('refuses another tenant’s customer as a non-member', () => {
-    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { customer: 'k1:2,1001' })).toMatchObject({
+    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { customer: 'k1:2,1001' }, undefined, described(PG, PG_ORDER))).toMatchObject({
       ok: false,
       fieldErrors: [{ field: 'customer', code: 'not-an-option' }],
     })
@@ -82,14 +85,14 @@ describe('planUpdate', () => {
   test('refuses an update the form does not offer, or whose concurrency nobody confirmed', () => {
     const unconfirmed = orderForm(PG, false).bindings
     expect(unconfirmed.concurrency).toEqual({ kind: 'version-column', column: 'row_version', confirmed: false })
-    expect(planUpdate(PG, unconfirmed, { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, update: [] } }, CLERK, ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({
+    expect(planUpdate(PG, unconfirmed, { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, update: [] } }, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(PG, unconfirmed))).toMatchObject({
       ok: false,
       code: 'operation-unavailable',
     })
     const claimed = edited(unconfirmed, (draft) => {
       draft.operations.update = true
     })
-    expect(planUpdate(PG, claimed, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({
+    expect(planUpdate(PG, claimed, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(PG, claimed))).toMatchObject({
       ok: false,
       code: 'operation-unavailable',
       message: expect.stringContaining('concurrency') as unknown as string,
@@ -97,12 +100,12 @@ describe('planUpdate', () => {
     const none = edited(PG_ORDER, (draft) => {
       draft.concurrency = null
     })
-    expect(planUpdate(PG, none, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({ ok: false, code: 'operation-unavailable' })
+    expect(planUpdate(PG, none, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(PG, none))).toMatchObject({ ok: false, code: 'operation-unavailable' })
     // And the other way: bindings that withhold update are obeyed, though a key and a confirmed version are there.
     const withheld = edited(PG_ORDER, (draft) => {
       draft.operations.update = false
     })
-    expect(planUpdate(PG, withheld, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({
+    expect(planUpdate(PG, withheld, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(PG, withheld))).toMatchObject({
       ok: false,
       code: 'operation-unavailable',
       message: 'This form does not offer update.',
@@ -115,15 +118,15 @@ describe('planUpdate', () => {
   // canonical integer in its column's range.
   test('refuses a version this target could never have returned', () => {
     for (const version of ['1.0', '01', '-0', 'abc', '', '9223372036854775808', 1]) {
-      expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, version as string, { notes: 'x' }), String(version)).toMatchObject({
+      expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, version as string, { notes: 'x' }, undefined, described(PG, PG_ORDER)), String(version)).toMatchObject({
         ok: false,
         code: 'invalid-version',
       })
     }
     for (const version of ['00000000000007D1', '7d1', '00000000000007d1 ', 'zz000000000007d1', '1']) {
-      expect(planUpdate(MS, MS_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, version, { notes: 'x' }), version).toMatchObject({ ok: false, code: 'invalid-version' })
+      expect(planUpdate(MS, MS_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, version, { notes: 'x' }, undefined, described(MS, MS_ORDER)), version).toMatchObject({ ok: false, code: 'invalid-version' })
     }
-    expect(planUpdate(MS, MS_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '00000000000007d1', { notes: 'x' })).toMatchObject({
+    expect(planUpdate(MS, MS_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '00000000000007d1', { notes: 'x' }, undefined, described(MS, MS_ORDER))).toMatchObject({
       ok: true,
       request: { target: ORDER_TARGET.sqlserver, expectedVersion: '00000000000007d1' },
     })
@@ -136,7 +139,7 @@ describe('planUpdate', () => {
   test('never sets the key: an unchanged key field is accepted, a changed one refused', () => {
     const source = customerSource()
     const { bindings } = customerForm(source)
-    const planned = planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', { customer_no: 1001, name: 'Muster AG', credit_limit: '12.5' })
+    const planned = planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', { customer_no: 1001, name: 'Muster AG', credit_limit: '12.5' }, undefined, described(source, bindings))
     expect(planned).toMatchObject({
       ok: true,
       request: {
@@ -146,12 +149,12 @@ describe('planUpdate', () => {
         // The shared country table: the policy says so with [].
       },
     })
-    expect(planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', { customer_no: 1002 })).toMatchObject({
+    expect(planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', { customer_no: 1002 }, undefined, described(source, bindings))).toMatchObject({
       ok: false,
       fieldErrors: [{ field: 'customer_no', code: 'read-only' }],
     })
-    expect(planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', { tenant_id: '1' })).toMatchObject({ ok: false, code: 'over-posting' })
-    const country = planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', { country: 'k1:CH' })
+    expect(planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', { tenant_id: '1' }, undefined, described(source, bindings))).toMatchObject({ ok: false, code: 'over-posting' })
+    const country = planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', { country: 'k1:CH' }, undefined, described(source, bindings))
     expect(country).toMatchObject({ ok: true, memberships: [{ field: 'country', tokens: ['k1:CH'], filters: { kind: 'unrestricted' } }] })
   })
 
@@ -173,13 +176,13 @@ describe('planUpdate', () => {
     }
     expect(validatePolicy(policy, bindings)).toEqual({ ok: true })
     expect(planRead(PG, bindings, policy, CLERK, 'k1:5')).toMatchObject({ ok: true, request: { filters: TENANT_ONE } })
-    expect(planUpdate(PG, bindings, policy, CLERK, 'k1:5', '1', { name: 'Muster' })).toMatchObject({
+    expect(planUpdate(PG, bindings, policy, CLERK, 'k1:5', '1', { name: 'Muster' }, undefined, described(PG, bindings))).toMatchObject({
       ok: false,
       code: 'invalid-policy',
       message: expect.stringContaining('tenant_id is the version column') as unknown as string,
     })
     // The same form unfiltered: the version column alone is no reason to refuse.
-    expect(planUpdate(PG, bindings, { ...policy, rowFilters: [] }, CLERK, 'k1:5', '1', { name: 'Muster' })).toMatchObject({
+    expect(planUpdate(PG, bindings, { ...policy, rowFilters: [] }, CLERK, 'k1:5', '1', { name: 'Muster' }, undefined, described(PG, bindings))).toMatchObject({
       ok: true,
       request: { target: { concurrency: { kind: 'version-column', column: 'tenant_id' } }, filters: { kind: 'unrestricted' } },
     })
@@ -192,7 +195,7 @@ describe('planUpdate', () => {
     const source = customerSource()
     const { bindings } = customerForm(source)
     for (const answers of [{}, { customer_no: 1001 }]) {
-      expect(planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', answers), JSON.stringify(answers)).toMatchObject({
+      expect(planUpdate(source, bindings, CUSTOMER_POLICY, CLERK, 'k1:1,1001', '00000000000007d1', answers, undefined, described(source, bindings)), JSON.stringify(answers)).toMatchObject({
         ok: false,
         code: 'nothing-to-update',
       })
@@ -203,15 +206,15 @@ describe('planUpdate', () => {
   // skipped one would write where a read of the same record is refused.
   test('refuses a bad record token, a stale snapshot, a forbidden actor and answers that are not an object', () => {
     // A token whose value an integer key cannot hold names no record.
-    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, 'k1:x', '1', { notes: 'x' })).toMatchObject({ ok: false, code: 'invalid-record-token' })
+    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, 'k1:x', '1', { notes: 'x' }, undefined, described(PG, PG_ORDER))).toMatchObject({ ok: false, code: 'invalid-record-token' })
     // Bindings generated from the SQL Server snapshot, applied to the PostgreSQL one.
-    expect(planUpdate(MS, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({ ok: false, code: 'drift' })
+    expect(planUpdate(MS, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(MS, PG_ORDER))).toMatchObject({ ok: false, code: 'drift' })
     // An auditor may read orders and not change them.
-    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, AUDITOR, ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({ ok: false, code: 'operation-denied' })
+    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, AUDITOR, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(PG, PG_ORDER))).toMatchObject({ ok: false, code: 'operation-denied' })
     // A tenant no integer column can hold would be a conversion error on both engines.
-    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, actor(['clerk'], { tenant: 'acme' }), ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({ ok: false, code: 'invalid-context' })
+    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, actor(['clerk'], { tenant: 'acme' }), ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(PG, PG_ORDER))).toMatchObject({ ok: false, code: 'invalid-context' })
     // No body, no keys to check for over-posting.
-    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', null)).toMatchObject({ ok: false, code: 'invalid-request' })
+    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', null, undefined, described(PG, PG_ORDER))).toMatchObject({ ok: false, code: 'invalid-request' })
   })
 })
 
@@ -224,11 +227,11 @@ describe('bindings that claim more than the account may do (0027)', () => {
     const narrowed = snapshot('postgres', (objects) => restrict(objects, 'order', 'amount', { update: false }))
     const bindings = orderForm(narrowed).bindings
     expect(fieldOf(bindings, 'amount').writes).toEqual({ create: true, update: false })
-    expect(planUpdate(narrowed, bindings, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' })).toMatchObject({ ok: true })
+    expect(planUpdate(narrowed, bindings, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(narrowed, bindings))).toMatchObject({ ok: true })
     const claimed = edited(bindings, (draft) => {
       fieldOf(draft, 'amount').writes.update = true
     })
-    expect(planUpdate(narrowed, claimed, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' })).toEqual({
+    expect(planUpdate(narrowed, claimed, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(narrowed, claimed))).toEqual({
       ok: false,
       code: 'invalid-bindings',
       message: "The bindings do not fit their snapshot: amount is written on update, and this connection's account may not UPDATE amount.",
@@ -236,7 +239,7 @@ describe('bindings that claim more than the account may do (0027)', () => {
     const inserted = edited(orderForm(snapshot('postgres', (objects) => restrict(objects, 'order', 'notes', { insert: false }))).bindings, (draft) => {
       fieldOf(draft, 'notes').writes.create = true
     })
-    expect(planCreate(snapshot('postgres', (objects) => restrict(objects, 'order', 'notes', { insert: false })), inserted, ORDER_POLICY, CLERK, {})).toMatchObject({
+    expect(planCreate(snapshot('postgres', (objects) => restrict(objects, 'order', 'notes', { insert: false })), inserted, ORDER_POLICY, CLERK, {}, described(snapshot('postgres', (objects) => restrict(objects, 'order', 'notes', { insert: false })), inserted))).toMatchObject({
       ok: false,
       code: 'invalid-bindings',
       message: expect.stringContaining("notes is written on create, and this connection's account may not INSERT notes") as unknown as string,

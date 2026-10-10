@@ -18,6 +18,9 @@ export interface Found<T> {
   gaps: ObjectGap[]
 }
 
+/** The objects discovery describes, of sys.objects `o`: user tables and views. Shared with the root's definition (0041). */
+export const DESCRIBED_OBJECT = `o.type in ('U', 'V') and o.is_ms_shipped = 0`
+
 /**
  * Runs one catalog query over the tables and views in scope.
  *
@@ -48,7 +51,7 @@ export async function queryScope<Row>(
   })
   const schemaList = names.join(', ')
   const scoped = `(select o.object_id from sys.objects o join sys.schemas s on s.schema_id = o.schema_id
-    where o.type in ('U', 'V') and o.is_ms_shipped = 0 and s.name in (${schemaList}))`
+    where ${DESCRIBED_OBJECT} and s.name in (${schemaList}))`
   const result = await request.query<Row>(sql(scoped, schemaList))
   return result.recordset
 }
