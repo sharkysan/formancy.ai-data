@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
-import type { DriftReport, FieldAnchor } from '@formancy/data-core'
+import { describeReassigned } from '@formancy/data-core'
+import type { DriftReport } from '@formancy/data-core'
 import type { Regeneration } from '@formancy/data-server'
 import type { AdminClient } from './api.js'
 import { freshFields } from './carry.js'
@@ -22,10 +23,6 @@ export async function regenerateForm(client: AdminClient, formId: string): Promi
   // let a label land on one that already has its own.
   const from = await client.version(formId, regeneration.version)
   return { ok: true, regeneration, fresh: from.ok ? freshFields(from.value.bundle.bindings, regeneration.bindings) : [] }
-}
-
-export function describeAnchor(anchor: FieldAnchor): string {
-  return anchor.kind === 'column' ? `column ${anchor.column}` : `the lookup over ${anchor.foreignKey}`
 }
 
 /** What a refusal means for the person, beyond the server's sentence. */
@@ -92,7 +89,7 @@ export function RegenerationView({ regenerated, onContinue }: { regenerated: Reg
       <Findings
         id="regeneration-keys"
         heading="Keys that now stand for something else"
-        items={regeneration.keysReassigned.map((key) => `Grants for ${key.field} were written for ${describeAnchor(key.was)}; it now stands for ${describeAnchor(key.now)}.`)}
+        items={regeneration.keysReassigned.map(describeReassigned)}
         none="Every key stands for what it did."
       />
       <Findings id="regeneration-policy" heading="What the published policy no longer fits" items={regeneration.policyProblems} none="The published policy fits the regenerated form." />

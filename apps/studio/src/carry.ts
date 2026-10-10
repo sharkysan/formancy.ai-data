@@ -1,5 +1,5 @@
-import { fieldAnchor, presentationOf, rebasePresentation } from '@formancy/data-core'
-import type { FormBindings, PresentationConflict, ReassignedKey } from '@formancy/data-core'
+import { fieldAnchor, grantsOnKey, presentationOf, rebasePresentation } from '@formancy/data-core'
+import type { FormBindings, FormPolicy, PresentationConflict, ReassignedKey } from '@formancy/data-core'
 import { canonicalize } from '@formancy/spec'
 import type { FormSchema } from '@formancy/spec'
 import type { Proposal } from './api.js'
@@ -22,6 +22,37 @@ export interface Carried {
   fresh: string[]
   /** Keys whose grants were written for another column or lookup, and not yet kept or removed. */
   undecided: ReassignedKey[]
+  /** Those kept: sent with the publish as `keysConfirmed`, without which the server refuses grants on them (0039). */
+  kept: ReassignedKey[]
+  /**
+   * Those removed, which leaves nothing to confirm. A removal is about the
+   * grants the key had: one that has grants again is asked about again
+   * (`asked`), and never confirmed by having been removed.
+   */
+  removed: ReassignedKey[]
+}
+
+/**
+ * The keys a draft still asks about: those undecided, and those removed
+ * whose field has been given a role since -- by hand, or by filling every
+ * field from the operations -- by the test the server refuses with,
+ * `grantsOnKey` (0039).
+ */
+export function asked(carried: Carried | null, policy: FormPolicy): ReassignedKey[] {
+  if (carried === null) return []
+  return [...carried.undecided, ...carried.removed.filter((entry) => grantsOnKey(policy, entry.field))]
+}
+
+/** `key` kept or removed: out of the list it was asked from -- undecided, or removed and granted again -- into the decision's. */
+export function decide(carried: Carried, key: string, decision: 'keep' | 'remove'): Carried {
+  const others = (list: readonly ReassignedKey[]) => list.filter((candidate) => candidate.field !== key)
+  const entry = [...carried.undecided, ...carried.removed].filter((candidate) => candidate.field === key).slice(0, 1)
+  return {
+    ...carried,
+    undecided: others(carried.undecided),
+    kept: decision === 'keep' ? [...others(carried.kept), ...entry] : others(carried.kept),
+    removed: decision === 'remove' ? [...others(carried.removed), ...entry] : others(carried.removed),
+  }
 }
 
 /** The fields of `after` whose column or lookup `before` did not have, in `after`'s order. */
@@ -68,5 +99,5 @@ export function carriedAgain(earlier: Carried | null, before: FormBindings, draf
   const followed = new Set((earlier?.fresh ?? []).flatMap((key) => anchorOf.get(key) ?? []))
   const fresh = after.fields.filter((binding) => draft.fresh.includes(binding.field) || followed.has(canonicalize(fieldAnchor(binding)))).map((binding) => binding.field)
   const from = earlier === null || earlier.from.endsWith('your earlier draft') ? (earlier?.from ?? 'your earlier draft') : `${earlier.from}, then your earlier draft`
-  return { from, version: earlier?.version ?? null, conflicts: [...lost, ...draft.conflicts], fresh, undecided: earlier?.undecided ?? [] }
+  return { from, version: earlier?.version ?? null, conflicts: [...lost, ...draft.conflicts], fresh, undecided: earlier?.undecided ?? [], kept: earlier?.kept ?? [], removed: earlier?.removed ?? [] }
 }

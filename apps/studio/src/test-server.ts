@@ -67,8 +67,8 @@ export interface TestPlane {
   unreachable: Set<string>
   /** Connections the operator has taken out of the allowlist since the server started. */
   removed: Set<string>
-  /** Every request the studio made, as method and path, in order. */
-  requests: Array<{ method: string; path: string }>
+  /** Every request the studio made, as method and path, in order, with the JSON body it sent, if any. */
+  requests: Array<{ method: string; path: string; body?: unknown }>
   /**
    * Hold every request whose path matches until `release` is called: the
    * server is slow, and the studio is seen while it waits.
@@ -133,7 +133,7 @@ export async function startPlane(options: { administrator?: boolean } = {}): Pro
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input), 'http://studio.test')
     const method = (init?.method ?? 'GET').toUpperCase()
-    requests.push({ method, path: url.pathname })
+    requests.push({ method, path: url.pathname, ...(typeof init?.body === 'string' ? { body: JSON.parse(init.body) as unknown } : {}) })
     if (held?.path.test(url.pathname) === true) await held.until
     const headers: Record<string, string> = {}
     new Headers(init?.headers).forEach((value, name) => {

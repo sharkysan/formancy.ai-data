@@ -1,6 +1,7 @@
 import type { FormSchema, Text } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
 import type { FormBindings } from '../generate/types.js'
+import type { FormPolicy } from '../policy/types.js'
 import { applyPresentation } from './apply.js'
 import type { GeneratedSection } from './layout.js'
 import { describeSection, describeText, readGeneratedLayout, same } from './layout.js'
@@ -228,5 +229,25 @@ export function reassignedKeys(before: FormBindings, after: FormBindings): Reass
     if (previous !== undefined && !same(previous, now)) reassigned.push({ field: binding.field, was: previous, now })
   }
   return reassigned
+}
+
+/**
+ * Whether a policy grants anything on a key: a read or write role on its
+ * field. A lookup's filter is not a grant by itself -- every lookup field
+ * must have one, `[]` for every row (`validatePolicy`), and an actor who may
+ * neither read nor write the field is refused its options
+ * (`lookupRowFilter`'s `field-denied`) -- so a key whose roles are gone
+ * reaches nothing, which is what removing its grants leaves. The server's
+ * refusal of an unconfirmed key and the studio's question about one are
+ * this function (0039).
+ */
+export function grantsOnKey(policy: FormPolicy, key: string): boolean {
+  const entry = Object.hasOwn(policy.fields, key) ? policy.fields[key] : undefined
+  return entry !== undefined && (entry.read.length > 0 || entry.write.length > 0)
+}
+
+/** A reassigned key in one sentence, the one the server refuses it in and the studio lists it in (0039). */
+export function describeReassigned(key: ReassignedKey): string {
+  return `Grants for ${key.field} were written for ${describeAnchor(key.was)}; it now stands for ${describeAnchor(key.now)}.`
 }
 

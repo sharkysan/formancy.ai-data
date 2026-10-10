@@ -5,7 +5,7 @@ import type { BuilderSession } from '@formancy/builder-core'
 import type { FormPolicy, MetadataSnapshot } from '@formancy/data-core'
 import type { Regeneration } from '@formancy/data-server'
 import type { Failure, Proposal, ProposalRequest } from './api.js'
-import { carriedAgain, carryDraft } from './carry.js'
+import { asked, carriedAgain, carryDraft, decide } from './carry.js'
 import type { Carried } from './carry.js'
 import { ChooseStep } from './choose.js'
 import type { Choice } from './choice.js'
@@ -134,7 +134,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
    * The Policy step's "Generate again": a new proposal with the draft's
    * presentation carried onto it, as a regeneration carries a published one.
    * A draft regenerated from a version keeps that version as its base, and
-   * its undecided keys.
+   * its reassigned keys, decided or not.
    */
   async function generateAgain(previous: Generated, request: ProposalRequest): Promise<string | null> {
     const outcome = await client.propose(request)
@@ -170,17 +170,15 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       request,
       proposal: { form: base, bindings, notes, snapshot, generation },
       session: createBuilderSession(form),
-      carried: { from: `version ${String(version)}`, version, conflicts: regeneration.conflicts, fresh, undecided: regeneration.keysReassigned },
+      carried: { from: `version ${String(version)}`, version, conflicts: regeneration.conflicts, fresh, undecided: regeneration.keysReassigned, kept: [], removed: [] },
     })
     setPublishedId(formId)
     setCurrent('presentation')
   }
 
-  /** A reassigned key kept or removed: one fewer for the Publish step to wait on. */
-  function decided(key: string): void {
-    setGenerated((previous) =>
-      previous === null || previous.carried === null ? previous : { ...previous, carried: { ...previous.carried, undecided: previous.carried.undecided.filter((entry) => entry.field !== key) } },
-    )
+  /** A reassigned key kept or removed: one fewer for the Publish step to wait on; kept, one more for it to confirm. */
+  function decided(key: string, decision: 'keep' | 'remove'): void {
+    setGenerated((previous) => (previous === null || previous.carried === null ? previous : { ...previous, carried: decide(previous.carried, key, decision) }))
   }
 
   /** Published: the draft's base is now whatever is newest, read when the Publish step opens again. */
@@ -223,6 +221,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     }
     if (generated === null) return null
     const { proposal, session, request, carried } = generated
+    const open = asked(carried, policy)
     switch (current) {
       case 'generate':
         return <GenerateStep proposal={proposal} onNext={() => setCurrent('policy')} />
@@ -239,7 +238,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
               if (chosen === null) return 'nothing is chosen to generate from.'
               return generateAgain(generated, proposalFor(request.connection, chosen.choice, policy.rowFilters))
             }}
-            reassigned={carried?.undecided ?? []}
+            reassigned={open}
             onDecided={decided}
           />
         )
@@ -257,7 +256,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             policy={policy}
             stale={stale}
             regeneratedFrom={carried?.version ?? null}
-            undecided={carried?.undecided.map((entry) => entry.field) ?? []}
+            undecided={open.map((entry) => entry.field)}
+            confirmed={carried?.kept ?? []}
             onPublished={published}
             onDrift={() => setCurrent('drift')}
           />

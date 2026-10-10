@@ -122,7 +122,14 @@ conflict: a field gone, a field under another key, a field the generator put
 in another section, a section gone, a label the generator also changed (the
 person's is kept). `applyPresentation` is what the server checks a stored
 form against; `reassignedKeys` names keys that now stand for another column,
-whose grants somebody has to confirm.
+whose grants somebody has to confirm — and the server refuses a publish that
+grants on one without confirming it
+([0039](../../docs/decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md)).
+`grantsOnKey(policy, key)` is what grants on one means there: a read or
+write role on its field, a lookup's filter alone being no grant, since every
+lookup field has one and nobody without a role may search it.
+`describeReassigned(key)` is the one sentence the server's refusal and the
+studio's lists say a reassigned key in.
 
 What it does not do: a renamed column reads as one gone and one new, and its
 overrides are reported dropped rather than guessed across; a root whose own

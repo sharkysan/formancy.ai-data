@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
 import { presentationOf, validatePolicy } from '@formancy/data-core'
-import type { FormPolicy } from '@formancy/data-core'
+import type { FormPolicy, ReassignedKey } from '@formancy/data-core'
 import type { AdminClient, Bundle, Proposal, Published } from './api.js'
 import { describeRef } from './choice.js'
 import { useDocument } from './document.js'
@@ -102,6 +102,7 @@ export function PublishStep({
   stale,
   regeneratedFrom = null,
   undecided = [],
+  confirmed = [],
   onPublished,
   onDrift,
 }: {
@@ -113,8 +114,10 @@ export function PublishStep({
   stale: boolean
   /** The version the draft was regenerated from, which is its base; `null` for a draft generated afresh. */
   regeneratedFrom?: number | null
-  /** Keys whose grants were written for another column, not yet kept or removed in the Policy step. */
+  /** Keys whose grants were written for another column, not yet kept or removed in the Policy step, or given grants again since a removal. */
   undecided?: readonly string[]
+  /** Keys kept there, confirmed with the publish: the server refuses grants on one it is not told of (0039). */
+  confirmed?: readonly ReassignedKey[]
   onPublished: (formId: string, version: number) => void
   onDrift: () => void
 }): ReactElement {
@@ -147,7 +150,7 @@ export function PublishStep({
     stale ? 'The row filters changed since the form was generated: generate it again from the Policy step.' : null,
     undecided.length === 0
       ? null
-      : `Grants for ${undecided.join(', ')} were written for another column or lookup: keep or remove them in the Policy step. The studio asks this; the server would publish them.`,
+      : `Grants for ${undecided.join(', ')} were written for another column or lookup: keep or remove them in the Policy step.`,
     ...(derived.ok ? [] : derived.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`)),
   ].filter((blocker): blocker is string => blocker !== null)
   const expected = base.state === 'known' ? base.version : null
@@ -164,7 +167,7 @@ export function PublishStep({
     const bundle: Bundle = { format: 2, connection, generation, base: form, presentation: derived.presentation, form: session.exportDocument(), bindings, policy, snapshot }
     setPending(true)
     setResult(null)
-    const outcome = await client.publish(formId, expected, bundle)
+    const outcome = await client.publish(formId, expected, bundle, confirmed)
     if (outcome.ok) {
       setResult({ kind: 'published', version: outcome.value.version })
       // The next publish from here goes on top of this one.

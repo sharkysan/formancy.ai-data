@@ -646,7 +646,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:29de6a24ecef5d194108d923b9ca2cfdc78333d1cc70e271312957a764bcd3e3",
+      "reviewed": "sha256:efa308a6423b57b324b3a215d15b4ba0538ec3fdb50e52b3b03281655564cb3a",
       "limitations": [
         {
           "area": "studio",
@@ -683,10 +683,6 @@
         {
           "area": "operations",
           "says": "A restore brings back that version's policy; it is not a database rollback."
-        },
-        {
-          "area": "access",
-          "says": "Only the studio holds `keysReassigned`: the server does not refuse a publish that ignores keys that now stand for another column."
         },
         {
           "area": "forms",
@@ -869,6 +865,43 @@
     "0038": {
       "reviewed": "sha256:3a71785e58666cc6986db9106567345bf844921884f71097908289199d2f0c61",
       "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the browser job's time. Nobody who installs, integrates or operates the module meets them."
+    },
+    "0039": {
+      "reviewed": "sha256:834cdc0a05684b5dd48130cc01150ffabcd1f5e81342781a7db530d86313cb76",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A client that publishes a regeneration sends back in `keysConfirmed` each reassigned key whose grants it keeps, or the server refuses the version, so a client that ignored `keysReassigned` is refused whenever its policy gives a role on such a key.",
+          "heldBy": "packages/data-server/src/routes/admin-keys-reassigned.integration.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "The check compares a publish with the version it replaces and no other: grants removed in one version and given back in the next are not asked about, so one policy file pushed twice, the first time without the reassigned keys, carries the first version's grants to the columns those keys name now.",
+          "heldBy": "packages/data-server/src/routes/admin-evolution.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "Keys are compared by the name of the column or foreign key they stand for, not its table: a publish that moves a form to another root table or connection carries every grant to the same-named column there, unasked. The studio starts such a draft from an empty policy.",
+          "heldBy": "packages/data-server/src/routes/admin-evolution.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Which reassigned keys an administrator confirmed is kept in neither the version file nor the audit trail."
+        },
+        {
+          "area": "operations",
+          "says": "A publish over a version the server no longer serves, because its file does not parse or does not validate, a stricter validator after an upgrade included, is not checked for reassigned keys.",
+          "heldBy": "packages/data-server/src/routes/admin-evolution.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Versions published before this check are not checked again, and a restore of one brings back whatever grants its publish let through."
+        },
+        {
+          "area": "studio",
+          "says": "The studio offers Keep and Remove only for the keys its regeneration reported, so a draft proposed afresh, or generated again after a key renumbered once more, whose policy gives a role on such a key is refused with the server's sentences, a Keep left from the regeneration confirming the column it reported and not the one the key names now; it is published by removing those grants or by regenerating from the Drift step."
+        }
+      ]
     }
   }
 }

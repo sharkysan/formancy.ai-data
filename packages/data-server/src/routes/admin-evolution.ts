@@ -49,7 +49,12 @@ export interface Regeneration {
   conflicts: PresentationConflict[]
   /** Lookups the runtime would refuse now, each with the sentence that refuses it. */
   lookupsDropped: Array<{ foreignKey: string; message: string }>
-  /** Keys that now stand for another column or lookup: the grants written for them need confirming. */
+  /**
+   * Keys that now stand for another column or lookup: the grants written for
+   * them need confirming. A publish whose policy grants on one is refused,
+   * 422 `keys-reassigned`, unless its body lists it, as given here, in
+   * `keysConfirmed` (0039).
+   */
   keysReassigned: ReassignedKey[]
 }
 

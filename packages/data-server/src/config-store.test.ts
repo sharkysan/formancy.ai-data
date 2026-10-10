@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import type { ConfigurationStore } from './config-store.js'
-import { createFileConfigurationStore } from './config-store.js'
+import { createFileConfigurationStore, UnparsableVersionError } from './config-store.js'
 
 let root: string
 let store: ConfigurationStore
@@ -86,6 +86,8 @@ describe('the file configuration store', () => {
     await store.publish('sales-order', null, {})
     await writeFile(join(root, 'sales-order', '1.json'), '{ broken')
     await expect(store.read('sales-order', 1)).rejects.toThrow(/must never be edited/)
+    // Its own kind, which a publish over it tells from a read that failed (0039).
+    await expect(store.read('sales-order', 1)).rejects.toBeInstanceOf(UnparsableVersionError)
   })
 
   // An id becomes a directory name. One that could climb out of the root, or
