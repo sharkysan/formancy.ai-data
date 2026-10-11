@@ -5,7 +5,8 @@
 -- that change a normalised fact -- rowversion, what a text length counts,
 -- binary(32)'s padding against bytea, shipment's sequence default against an
 -- identity, and the check SQL Server disables -- are each written down in
--- src/model.ts with byKind.
+-- src/model.ts with byKind. delivery's key default is newsequentialid()
+-- where PostgreSQL's is gen_random_uuid(): both a default, and the same fact.
 --
 -- Batches are separated by GO on a line of its own, as sqlcmd and SSMS expect.
 -- The loader splits on it, because a driver sends one batch at a time and
@@ -81,6 +82,32 @@ create table sales.order_line (
   constraint pk_order_line primary key (order_id, line_no)
 );
 
+-- As in postgres.sql (0056). newsequentialid() may only be a default, and it
+-- hands out keys that rise in SQL Server's own order of uniqueidentifier.
+-- The key is nonclustered, so the rows are a heap in the order they went in,
+-- as PostgreSQL's are: clustered on the key, a scan would return them in the
+-- key's order already, and a lookup that dropped the key from the end of its
+-- order would still offer options tied on their label in that order --
+-- `uuid: lookup` could not tell. Discovery does not report the difference.
+create table sales.delivery (
+  id uniqueidentifier not null constraint df_delivery_id default newsequentialid()
+    constraint pk_delivery primary key nonclustered,
+  tenant_id int not null,
+  order_id bigint not null
+    constraint fk_delivery_order references sales.[order] (id) on delete cascade,
+  carrier nvarchar(40) not null,
+  shipped_at datetimeoffset null,
+  -- As order's: SQL Server writes it.
+  row_version rowversion not null
+);
+
+create table sales.parcel (
+  id int identity(1, 1) not null constraint pk_parcel primary key,
+  delivery_id uniqueidentifier not null
+    constraint fk_parcel_delivery references sales.delivery (id) on delete cascade,
+  label nvarchar(40) not null
+);
+
 create sequence sales.shipment_id as int start with 1;
 create table sales.shipment (
   id int not null constraint df_shipment_id default (next value for sales.shipment_id)
@@ -134,6 +161,16 @@ values (9007199254740993, 1, 3, 0.10);
 insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pickup_time, dispatched_at, weight_kg, temperature_c, manifest_hash, signature)
 values (1, 'A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11', 32767, N'Zürich-01', '09:30', '2026-10-08 12:34:56.5', 0.30000000000000004e0, 0.1e0, 0x01, 0x01),
        (1, 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 0, N'B', '17:05', '2026-10-08 12:34:56', null, null, null, null);
+-- The deliveries of postgres.sql, with the same keys; SQL Server stores the
+-- upper-case one as the same uniqueidentifier, and prints every one in upper case.
+insert into sales.delivery (id, tenant_id, order_id, carrier, shipped_at)
+values ('1D3E5A70-9C2B-4F61-8E44-3C0A7D9B2E51', 1, 9007199254740993, N'Express', '2026-10-09 08:00:00 +00:00'),
+       ('6a9f0c12-4b8e-4d27-b3c5-0e7f1a2d4c90', 1, 9007199254740993, N'Freight', null),
+       ('c4b81e2f-7a3d-4e95-a06b-91d2f5e8a7c3', 1, 9007199254740993, N'Post', null);
+insert into sales.parcel (delivery_id, label)
+values ('1d3e5a70-9c2b-4f61-8e44-3c0a7d9b2e51', N'Box 1'),
+       ('c4b81e2f-7a3d-4e95-a06b-91d2f5e8a7c3', N'Box 2');
+
 alter table sales.shipment with nocheck add constraint ck_shipment_carrier check (carrier_code > 0);
 -- Disabled: not checked for new rows, and SQL Server marks it untrusted too.
 alter table sales.shipment nocheck constraint ck_shipment_reference;

@@ -550,7 +550,7 @@ describe('discovery as the restricted reader', () => {
     expect(snapshot.objects.map((entry) => entry.ref)).toEqual([ORDER])
     const on = { kind: 'object', object: ORDER }
     expect(snapshot.gaps).toEqual([
-      // fk_order_line_order is on order_line, which the reader cannot see: what refers to the order is "cannot tell" (0049).
+      // fk_order_line_order and fk_delivery_order are on tables the reader cannot see: what refers to the order is "cannot tell" (0049).
       { subject: { kind: 'scope' }, aspect: 'referenced-by', detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database, which is what lists every foreign key/) },
       { subject: { kind: 'scope' }, aspect: 'row-security', detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database/) },
       { subject: { kind: 'schema', schema: 'sales' }, aspect: 'objects', detail: expect.stringMatching(/VIEW DEFINITION on schema sales/) },
@@ -720,10 +720,10 @@ describe('discovery as the restricted reader', () => {
     try {
       const referrers = (snapshot: MetadataSnapshot) => (object(snapshot, 'sales', 'order').referencedBy ?? []).map((key) => `${key.table.schema}.${key.table.name} ${key.name} ${key.onDelete}`)
       const seen = await discoverSqlServer(byDatabase, FIXTURE_SCOPE)
-      expect(referrers(seen)).toEqual(['beyond.copy fk_copy_order cascade', 'sales.order_line fk_order_line_order cascade'])
+      expect(referrers(seen)).toEqual(['beyond.copy fk_copy_order cascade', 'sales.delivery fk_delivery_order cascade', 'sales.order_line fk_order_line_order cascade'])
       expect(seen.gaps).toEqual([])
       const schemaOnly = await discoverSqlServer(bySchema, FIXTURE_SCOPE)
-      expect(referrers(schemaOnly)).toEqual(['sales.order_line fk_order_line_order cascade'])
+      expect(referrers(schemaOnly)).toEqual(['sales.delivery fk_delivery_order cascade', 'sales.order_line fk_order_line_order cascade'])
       expect(schemaOnly.gaps.filter((gap) => gap.aspect === 'referenced-by')).toEqual([
         { subject: { kind: 'scope' }, aspect: 'referenced-by', detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database, which is what lists every foreign key/) },
       ])

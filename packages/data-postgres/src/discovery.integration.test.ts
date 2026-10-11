@@ -4,6 +4,7 @@ import type { PostgresFixture } from '@formancy/data-fixtures'
 import {
   accessDisagreements,
   covers,
+  FIXTURE_MODEL,
   FIXTURE_SCOPE,
   MODEL_CASES,
   READER_ACCESS,
@@ -172,7 +173,7 @@ describe('discovery as the owner', () => {
   test('reads on-update and enforcement for every foreign key', async () => {
     const snapshot = await discoverPostgres(owner, FIXTURE_SCOPE)
     const keys = snapshot.objects.flatMap((object) => object.foreignKeys)
-    expect(keys).toHaveLength(6)
+    expect(keys).toHaveLength(FIXTURE_MODEL.flatMap((object) => object.foreignKeys).length)
     for (const key of keys) expect(key).toMatchObject({ onUpdate: 'no-action', enforced: true })
   })
 
@@ -205,9 +206,11 @@ describe('discovery as the restricted reader', () => {
       'sales.country',
       'sales.customer',
       'sales.customer_summary',
+      'sales.delivery',
       'sales.employee',
       'sales.order',
       'sales.order_line',
+      'sales.parcel',
       'sales.shipment',
     ])
     expect(snapshot.gaps).toEqual([])
@@ -370,7 +373,7 @@ describe('the discovery scope', () => {
   // of its table is read. pg_catalog shows it to the reader too, who has no
   // USAGE on that schema (P2), so a PostgreSQL snapshot needs no gap for it.
   // An adapter that read only the keys of tables in scope would say a delete
-  // of an order reaches order_line and nothing else.
+  // of an order reaches its deliveries and lines and nothing else.
   test('a key from a schema outside the scope that refers to a table in it is named there, and its table is not described', async () => {
     await owner.unsafe('create schema elsewhere; create table elsewhere.order_copy (id integer primary key, order_id bigint constraint fk_copy_order references sales."order" (id) on delete set null)')
     try {
@@ -379,6 +382,7 @@ describe('the discovery scope', () => {
         expect(names(snapshot).every((name) => name.startsWith('sales.'))).toBe(true)
         expect(described(snapshot, 'sales', 'order').referencedBy).toEqual([
           { table: { schema: 'elsewhere', name: 'order_copy' }, name: 'fk_copy_order', columns: ['order_id'], referencedColumns: ['id'], onDelete: 'set-null', onUpdate: 'no-action', enforced: true },
+          { table: { schema: 'sales', name: 'delivery' }, name: 'fk_delivery_order', columns: ['order_id'], referencedColumns: ['id'], onDelete: 'cascade', onUpdate: 'no-action', enforced: true },
           { table: { schema: 'sales', name: 'order_line' }, name: 'fk_order_line_order', columns: ['order_id'], referencedColumns: ['id'], onDelete: 'cascade', onUpdate: 'no-action', enforced: true },
         ])
         expect(snapshot.gaps).toEqual([])

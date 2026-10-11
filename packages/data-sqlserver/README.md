@@ -182,7 +182,15 @@ await lookups.rejects(config, ['k1:1,1001', 'k1:2,1001'], tenant) // ['k1:2,1001
 A search is a literal: `%`, `_` and `[` match themselves. How it matches case
 and accents, and how text is ordered, is the column's collation — on a
 case-insensitive database `muster` finds `Muster AG` and `apple` sorts before
-`Banana` — which is SQL Server's rule and not code-point order. NULLs sort
+`Banana` — which is SQL Server's rule and not code-point order. A
+`uniqueidentifier` is ordered by no collation and not by its text: SQL Server
+stores the text's first three groups little-endian and compares the bytes it
+stores group by group from the last, so through the text it compares the last
+six bytes first, then the two before them, then the first eight from the
+right, where PostgreSQL compares a `uuid`'s bytes in turn. So
+options tied on their label, and a list ordered by a uuid key, come in
+another order on each engine, total and stable on both
+([0056](../../docs/decisions/0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md)). NULLs sort
 where the configuration says, though SQL Server has no `NULLS LAST`. A row
 whose key holds a NULL is never offered. Membership is the re-encoded row's,
 because SQL Server's `=` finds `CH` for `ch` and `A` for `A `. Tokens are
@@ -441,7 +449,13 @@ checked once, by hand, on 2026-10-09, and is not a test.
 `pnpm test` starts SQL Server through `@formancy/data-fixtures`, once per
 test file, and runs the suite against it: discovery, the spike, lookups,
 what a lookup reads on the sized customers (0034), records, the ways a
-record operation fails, and a write whose answer is lost on the way back. It
+record operation fails, a write whose answer is lost on the way back, and a
+uuid key end to end (`uuid.integration.test.ts`, 0056: discovered, generated
+read-only, its token in lower case, created, updated, listed in this
+engine's order and offered by a lookup, tied options in that order too,
+each case `UUID_PARITY`'s; and, this engine's own, how it stores and orders
+a uniqueidentifier, and that `newsequentialid()`'s keys rise across
+tenants). It
 needs Docker and, the first time, a
 pull of about a gigabyte and a half. There is no mocked driver to fall back
 to — database semantics are what this package is for (0003).

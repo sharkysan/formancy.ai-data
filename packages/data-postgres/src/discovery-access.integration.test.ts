@@ -1,7 +1,7 @@
 import { findObject } from '@formancy/data-core'
 import type { MetadataSnapshot, ObjectMeta, RecordColumn, RecordOutcome, RecordTarget, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { accessDisagreements, covers, defined, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startPostgresFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
+import { accessDisagreements, covers, defined, FIXTURE_MODEL, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startPostgresFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -133,13 +133,14 @@ function deletable(snapshot: MetadataSnapshot, schema: string): string[] {
 describe('whether the account may delete (0049)', () => {
   // A form offers a delete only where the account may make it. The owner may
   // delete from every table and view; the reader from none; the writer from
-  // orders and their lines -- a delete of an order cascades into
-  // order_line -- and not from customer, whose columns it reads. An adapter
-  // that asked INSERT would say order and not order_line; one that dropped
-  // the USAGE check would say the writer may delete from sealed.inside,
-  // whose table grant says DELETE and whose schema it cannot use, so every
-  // delete there fails "permission denied for schema" (P1).
-  test('the owner may delete from every object, the reader from none, the writer from order and order_line only', async () => {
+  // orders, their lines and deliveries, and the deliveries' parcels -- a
+  // delete of an order cascades into order_line and delivery, and from there
+  // into parcel (0056) -- and not from customer, whose columns it reads. An
+  // adapter that asked INSERT would say order and not order_line; one that
+  // dropped the USAGE check would say the writer may delete from
+  // sealed.inside, whose table grant says DELETE and whose schema it cannot
+  // use, so every delete there fails "permission denied for schema" (P1).
+  test('the owner may delete from every object, the reader from none, the writer from order, order_line, delivery and parcel only', async () => {
     const [asOwner, asReader, asWriter, sealed] = await Promise.all([
       discoverPostgres(owner, FIXTURE_SCOPE),
       discoverPostgres(reader, FIXTURE_SCOPE),
@@ -148,7 +149,7 @@ describe('whether the account may delete (0049)', () => {
     ])
     expect(deletable(asOwner, 'sales')).toEqual(asOwner.objects.map((object) => object.ref.name))
     expect(deletable(asReader, 'sales')).toEqual([])
-    expect(deletable(asWriter, 'sales')).toEqual(['order', 'order_line'])
+    expect(deletable(asWriter, 'sales')).toEqual(['delivery', 'order', 'order_line', 'parcel'])
     expect(described(asWriter, 'sales', 'customer').access).toEqual({ delete: false })
     expect(described(sealed, 'sealed', 'inside').access).toEqual({ delete: false })
     expect(await answers(writer, ['delete from sealed.inside where false', 'delete from sales.customer where false', 'delete from sales.order_line where false'])).toEqual(['42501', '42501', 'ok'])
@@ -327,7 +328,7 @@ describe('row-level security', () => {
     expect(described(asReader, 'sales', 'customer').rowSecurity).toBe('applies')
     expect(described(asWriter, 'sales', 'customer').rowSecurity).toBe('applies')
     for (const snapshot of [asOwner, asReader, asWriter]) {
-      expect(snapshot.objects.filter((object) => object.ref.name !== 'customer').map((object) => object.rowSecurity)).toEqual(Array(6).fill('none'))
+      expect(snapshot.objects.filter((object) => object.ref.name !== 'customer').map((object) => object.rowSecurity)).toEqual(Array(FIXTURE_MODEL.length - 1).fill('none'))
     }
     expect(await writer`select tenant_id from sales.customer`).toEqual([{ tenant_id: 1 }])
     expect(await owner`select tenant_id from sales.customer order by tenant_id`).toEqual([{ tenant_id: 1 }, { tenant_id: 2 }])

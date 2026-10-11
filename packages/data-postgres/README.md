@@ -538,6 +538,14 @@ The suites start `postgres:17-alpine` unless a test names another image, through
   integer and over a `char(2)` foreign key, a child's lines through their
   order, every row its read, and a page refused once its own description
   says the key can be NULL or is not unique.
+- `uuid.integration.test.ts` — a uuid key end to end (0056), each case
+  `UUID_PARITY`'s, as the order form's own account: `sales.delivery`'s key
+  and its `gen_random_uuid()` default discovered, the key read-only in the
+  generated form, its token, a create answered with the key the database
+  chose, an update and a stale one, another tenant's delivery not found, a
+  list under an order in PostgreSQL's order of uuid -- its bytes in turn,
+  where SQL Server's is its byte groups -- and `sales.parcel`'s lookup onto
+  the uuid, whose options tied on one carrier come in that same order.
 - `records-lost-answer.integration.test.ts` — an insert and an update whose
   answer the hop drops after the commit, counted at the wire; a deferred
   unique constraint refused after the row was sent, with and without the

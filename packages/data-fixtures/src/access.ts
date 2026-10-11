@@ -40,7 +40,12 @@ export const READER_ACCESS: ExpectedAccess = {
  * writes itself — and reads three columns of customer, whose policy shows it
  * tenant 1 only. It may delete orders and their lines (0049): a delete of an
  * order cascades into order_line, and a delete that reaches a table is to be
- * held to the account's DELETE on it.
+ * held to the account's DELETE on it. A delivery and a parcel are granted as
+ * an order is (0056): read and inserted; a delivery's carrier and shipping
+ * time updated, and on PostgreSQL its version, never its key, tenant or
+ * order; a parcel's delivery and label updated; and both deleted, so a
+ * delete of an order that cascades through its deliveries into their
+ * parcels reaches no table the account may not delete from.
  */
 export const WRITER_ACCESS: ExpectedAccess = {
   order: {
@@ -52,6 +57,14 @@ export const WRITER_ACCESS: ExpectedAccess = {
   },
   order_line: { delete: true },
   customer: { select: ['tenant_id', 'customer_no', 'name'], rowSecurity: 'applies' },
+  delivery: {
+    select: 'all',
+    insert: 'all',
+    update: ['carrier', 'shipped_at'],
+    delete: true,
+    byKind: { postgres: { update: ['carrier', 'shipped_at', 'row_version'] } },
+  },
+  parcel: { select: 'all', insert: 'all', update: ['delivery_id', 'label'], delete: true },
 }
 
 const CAPABILITIES: ReadonlyArray<keyof ColumnAccess> = ['select', 'insert', 'update']

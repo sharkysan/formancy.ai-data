@@ -466,6 +466,186 @@
     {
       "ref": {
         "schema": "sales",
+        "name": "delivery"
+      },
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "databaseType": "uuid",
+          "type": {
+            "kind": "uuid"
+          },
+          "nullable": false,
+          "hasDefault": true,
+          "defaultExpression": "gen_random_uuid()",
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": false
+          }
+        },
+        {
+          "name": "tenant_id",
+          "ordinal": 2,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": false
+          }
+        },
+        {
+          "name": "order_id",
+          "ordinal": 3,
+          "databaseType": "bigint",
+          "type": {
+            "kind": "integer",
+            "min": "-9223372036854775808",
+            "max": "9223372036854775807"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": false
+          }
+        },
+        {
+          "name": "carrier",
+          "ordinal": 4,
+          "databaseType": "character varying(40)",
+          "type": {
+            "kind": "text",
+            "maxLength": 40,
+            "lengthUnit": "code-points",
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
+        },
+        {
+          "name": "shipped_at",
+          "ordinal": 5,
+          "databaseType": "timestamp with time zone",
+          "type": {
+            "kind": "timestamp",
+            "withTimeZone": true,
+            "precision": null
+          },
+          "nullable": true,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
+        },
+        {
+          "name": "row_version",
+          "ordinal": 6,
+          "databaseType": "bigint",
+          "type": {
+            "kind": "integer",
+            "min": "-9223372036854775808",
+            "max": "9223372036854775807"
+          },
+          "nullable": false,
+          "hasDefault": true,
+          "defaultExpression": "1",
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_delivery",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "name": "fk_delivery_order",
+          "columns": [
+            "order_id"
+          ],
+          "references": {
+            "table": {
+              "schema": "sales",
+              "name": "order"
+            },
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "no-action",
+          "onDelete": "cascade",
+          "enforced": true,
+          "validated": true
+        }
+      ],
+      "checks": [],
+      "rowSecurity": "none",
+      "access": {
+        "delete": true
+      },
+      "referencedBy": [
+        {
+          "table": {
+            "schema": "sales",
+            "name": "parcel"
+          },
+          "name": "fk_parcel_delivery",
+          "columns": [
+            "delivery_id"
+          ],
+          "referencedColumns": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no-action",
+          "enforced": true
+        }
+      ]
+    },
+    {
+      "ref": {
+        "schema": "sales",
         "name": "employee"
       },
       "kind": "table",
@@ -931,6 +1111,22 @@
         {
           "table": {
             "schema": "sales",
+            "name": "delivery"
+          },
+          "name": "fk_delivery_order",
+          "columns": [
+            "order_id"
+          ],
+          "referencedColumns": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no-action",
+          "enforced": true
+        },
+        {
+          "table": {
+            "schema": "sales",
             "name": "order_line"
           },
           "name": "fk_order_line_order",
@@ -1093,6 +1289,109 @@
             "table": {
               "schema": "sales",
               "name": "order"
+            },
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "no-action",
+          "onDelete": "cascade",
+          "enforced": true,
+          "validated": true
+        }
+      ],
+      "checks": [],
+      "rowSecurity": "none",
+      "access": {
+        "delete": true
+      },
+      "referencedBy": []
+    },
+    {
+      "ref": {
+        "schema": "sales",
+        "name": "parcel"
+      },
+      "kind": "table",
+      "comment": null,
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "databaseType": "integer",
+          "type": {
+            "kind": "integer",
+            "min": "-2147483648",
+            "max": "2147483647"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "identity-always",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": false
+          }
+        },
+        {
+          "name": "delivery_id",
+          "ordinal": 2,
+          "databaseType": "uuid",
+          "type": {
+            "kind": "uuid"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
+        },
+        {
+          "name": "label",
+          "ordinal": 3,
+          "databaseType": "character varying(40)",
+          "type": {
+            "kind": "text",
+            "maxLength": 40,
+            "lengthUnit": "code-points",
+            "fixedLength": false
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
+        }
+      ],
+      "primaryKey": {
+        "name": "pk_parcel",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "name": "fk_parcel_delivery",
+          "columns": [
+            "delivery_id"
+          ],
+          "references": {
+            "table": {
+              "schema": "sales",
+              "name": "delivery"
             },
             "columns": [
               "id"
@@ -1380,5 +1679,5 @@
     }
   ],
   "gaps": [],
-  "fingerprint": "0b78a8ae43ca3bda93601ab50362984905a3d4f687913a88233ce0972fd91ced"
+  "fingerprint": "7542817175e1dcbd28a2b0f241a15f2108531d663362f0fb532f6c267af952bd"
 }

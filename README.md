@@ -59,6 +59,12 @@ is not licensed for production.
 - **Generates a form deterministically**, and says what it inferred, made
   read-only, excluded and blocked, and why
   ([0009](./docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)).
+  A key the database numbers or fills -- an identity, or a column with a
+  default that is all of the key the policy does not pin, such as a uuid
+  from `gen_random_uuid()` or `newsequentialid()` alone or beside a pinned
+  tenant -- is shown and never written
+  ([0026](./docs/decisions/0026-name-every-column-fact-the-engines-disagree-on.md),
+  [0056](./docs/decisions/0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md)).
 - **Writes a policy the server asks on every request.** Who may read, create
   and update which fields; row filters taken from the signed-in person's
   trusted attributes, never from the form
@@ -121,6 +127,10 @@ is not licensed for production.
   throughs, through the runtime plane and `@formancy/data-client`. No page
   here draws a list yet
   ([0044](./docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)).
+  Ordered by a uuid key, a list comes in each engine's own order of uuid --
+  PostgreSQL's bytes in turn, SQL Server's byte groups -- total and stable on
+  both, and not the same
+  ([0056](./docs/decisions/0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md)).
 - **A person is shown the forms they may read**, and nothing about any
   other, each with the forms whose rows a page may list below one of its
   records, derived from the published forms' foreign keys and types without
@@ -446,7 +456,7 @@ customer options from the runtime plane, as the host page above shows.
 | `@formancy/data-sqlserver` | The SQL Server adapter, on `mssql` over `tedious` — pure JavaScript, no ODBC. |
 | `@formancy/data-client` | The browser's side of the runtime plane: a `fetch`-based client for the forms a person may read, a published form's definition, its records -- one by its token or a page at a time -- and its lookups, and the option sources both formancy renderers take. Source-available, framework-neutral, no Node. |
 | `@formancy/data-server` | The server: configuration store, host identity, the administrator and runtime planes over HTTP, the audit trail, and the composition root that starts them from configuration. Fastify, like formancy's. |
-| `@formancy/data-fixtures` | Private test support: one business model for both engines, with its restricted reader and the order form's own account; the comparator both adapters' discovery answers to; the cases both engines share -- parity and drift -- each with one expectation; the sized table the performance harness reads; and `renamedColumn`, a snapshot as discovery reports it after a rename. Never published. |
+| `@formancy/data-fixtures` | Private test support: one business model for both engines, a table keyed by a uuid the database fills among its edge cases, with its restricted reader and the order form's own account; the comparator both adapters' discovery answers to; the cases both engines share -- parity and drift -- each with one expectation; the sized table the performance harness reads; and `renamedColumn`, a snapshot as discovery reports it after a rename. Never published. |
 | `@formancy/data-performance` | Private: the harness that measures the shipped server against both engines and renders `docs/performance.md` from what it measured. Never published. |
 
 ## How it relates to formancy.ai

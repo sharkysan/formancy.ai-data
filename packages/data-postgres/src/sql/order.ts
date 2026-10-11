@@ -4,6 +4,17 @@ import { quoteIdentifier } from './identifiers.js'
  * An ORDER BY on PostgreSQL, for a lookup's options and a form's records
  * (0044): one spelling, each column's direction and NULL placement taken
  * from a fixed table rather than copied from what it was handed.
+ *
+ * Each column is ordered by its own type's rule. Where SQL Server's differs
+ * it is not smoothed over here (0056): a uuid is ordered by its sixteen bytes
+ * in turn, which is the order of its text, and SQL Server orders a
+ * uniqueidentifier by its last six bytes first. A list ordered by a uuid key,
+ * and a lookup's options tied on their label, are total and stable on each
+ * engine and in a different order on each, as the shared cases `uuid: order`
+ * and `uuid: lookup` hold -- measured on PostgreSQL 17.11 on 2026-10-11 with
+ * sixteen keys that each set one byte and with 1000 random keys; reordering
+ * one engine to the other's would sort by an expression no index on the key
+ * serves.
  */
 
 /**

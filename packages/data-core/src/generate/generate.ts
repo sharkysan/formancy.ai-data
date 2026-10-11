@@ -78,7 +78,7 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
       if (lookup.foreignKey.columns[0] === column.name) planned.push(planLookup(root, lookup, request, allocate, isView, notes))
       continue
     }
-    const plan = planColumn(root, column, allocate, isView, pinned.has(column.name), notes)
+    const plan = planColumn(root, column, allocate, isView, pinned.has(column.name), filledKey(identity, pinned, column), notes)
     if (plan !== null) planned.push(plan)
   }
 
@@ -208,6 +208,25 @@ function generatedNote(generated: Exclude<Generation, 'none'>): string {
 }
 
 /**
+ * Whether `column` is a key the database fills by its default: all of the
+ * form's identity that the policy's pins leave, not generated, and with a
+ * default -- a uuid from `gen_random_uuid()` or `newsequentialid()`, alone or
+ * beside a pinned tenant (0056). The catalog does not call it generated,
+ * because the column would take a value; the table says the database chooses
+ * it, and a person typing the record's address would be choosing it instead.
+ * A pinned column is the context's, never the person's, so it does not count.
+ * One column only: where the pins leave more, a default on one part -- a line
+ * number that starts at 1 -- is a first value, and the person gives the others.
+ */
+function filledKey(identity: readonly string[] | null, pinned: ReadonlySet<string>, column: ColumnMeta): boolean {
+  const left = (identity ?? []).filter((name) => !pinned.has(name))
+  return left.length === 1 && left[0] === column.name && column.generated === 'none' && column.hasDefault
+}
+
+/** Why a key the database fills by default is shown and never written (0056). */
+const FILLED_KEY = "The database fills this key by its default when a create leaves it out, and the form never gives it: a record's address is the database's to choose, as an identity's is."
+
+/**
  * The generator's own wording, opening a sentence: its first letter raised and
  * nothing else touched. Not `labelFor`, which turns an identifier into words
  * and would read "JavaScript" as "java script", "UTC" as "utc" and drop commas.
@@ -222,6 +241,7 @@ function planColumn(
   allocate: (wanted: string) => string,
   isView: boolean,
   pinned: boolean,
+  filled: boolean,
   notes: GenerationNote[],
 ): Planned | null {
   if (!column.access.select) {
@@ -236,11 +256,12 @@ function planColumn(
 
   const key = allocate(fieldKeyFor(column.name))
   const generated = column.generated !== 'none'
-  const possible = !isView && !generated && !pinned && control.readOnly === undefined
+  const possible = !isView && !generated && !filled && !pinned && control.readOnly === undefined
 
   notes.push({ subject: key, kind: 'inferred', message: `${sentence(control.describe)} from ${column.databaseType}; label from the column name.` })
   if (control.caveat !== undefined) notes.push({ subject: key, kind: 'inferred', message: control.caveat })
   if (column.generated !== 'none') notes.push({ subject: key, kind: 'read-only', message: generatedNote(column.generated) })
+  if (filled) notes.push({ subject: key, kind: 'read-only', message: FILLED_KEY })
   if (control.readOnly !== undefined) notes.push({ subject: key, kind: 'read-only', message: `Shown, never written: ${control.readOnly}.` })
   if (isView) notes.push({ subject: key, kind: 'read-only', message: `${root.ref.name} is a view.` })
   if (pinned) notes.push({ subject: key, kind: 'read-only', message: 'Pinned by the policy: its value comes from the trusted context, never from the person filling the form.' })
@@ -251,7 +272,7 @@ function planColumn(
     ordinal: column.ordinal,
     field: { key, label: labelFor(column.name), ...control.field, ...(required ? { required: true } : {}) },
     binding: { kind: 'column', field: key, column: column.name, type: column.type, nullable: column.nullable, writes },
-    system: generated,
+    system: generated || filled,
     multiline: control.field.type === 'textarea',
     privilegeOnly: possible,
   }
