@@ -115,7 +115,7 @@ async function run(gate) {
   const { http, port } = await serve(plane)
   // Between Chromium and the page's origin: every byte the browser sends and
   // receives crosses it, so what the browser itself does is counted there.
-  const hop = await startTcpHop({ host: '127.0.0.1', port })
+  const hop = await startTcpHop({ kind: 'http', host: '127.0.0.1', port })
   console.log(`PostgreSQL and the server started in ${String(Math.round((Date.now() - started) / 1000))} s`)
   try {
     let pass = 0

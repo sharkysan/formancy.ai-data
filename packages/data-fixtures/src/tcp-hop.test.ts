@@ -2,7 +2,7 @@ import net from 'node:net'
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { answerBytes, startTcpHop } from './tcp-hop.js'
-import type { TcpHop } from './tcp-hop.js'
+import type { HopKind, TcpHop } from './tcp-hop.js'
 
 /*
  * The hop's own rules, with no database: a tiny `node:net` server plays the
@@ -81,9 +81,10 @@ async function until(condition: () => boolean, what: string): Promise<void> {
   }
 }
 
-async function setUp({ halfOpen = false }: { halfOpen?: boolean } = {}): Promise<{ hop: TcpHop; connect: () => Promise<Ends> }> {
+/** A hop in front of a target playing `kind`; PostgreSQL unless a case is about what crosses it. */
+async function setUp({ halfOpen = false, kind = 'postgres' }: { halfOpen?: boolean; kind?: HopKind } = {}): Promise<{ hop: TcpHop; connect: () => Promise<Ends> }> {
   const target = await startTarget(halfOpen)
-  const hop = await startTcpHop({ host: '127.0.0.1', port: target.port })
+  const hop = await startTcpHop({ kind, host: '127.0.0.1', port: target.port })
   closing.push(() => hop.close())
   const connect = async (): Promise<Ends> => {
     const client = net.connect(hop.port, '127.0.0.1')
@@ -222,11 +223,11 @@ describe('a TCP hop', () => {
   })
 
   // A TDS packet is at most 4096 bytes behind an 8-byte header, so a marker
-  // in a long answer can be cut by one. Exactly eight bytes are tolerated,
-  // across a read boundary too; seven or nine are another text, and the hop
-  // must not swallow an answer that does not carry the marker.
-  test('matches through one gap of exactly eight bytes, and through no other', async () => {
-    const { hop, connect } = await setUp()
+  // in a long SQL Server answer can be cut by one. Exactly eight bytes are
+  // tolerated, across a read boundary too; seven or nine are another text,
+  // and the hop must not swallow an answer that does not carry the marker.
+  test('on SQL Server, matches through one gap of exactly eight bytes, and through no other', async () => {
+    const { hop, connect } = await setUp({ kind: 'sqlserver' })
     const header = await connect()
     const lost = hop.swallowAnswersFrom(MARKER)
     await fromServer(header, Buffer.concat([MARKER.subarray(0, 5), HEADER.subarray(0, 3)]))
@@ -260,6 +261,52 @@ describe('a TCP hop', () => {
     const another = await connect()
     await fromClient(another, Buffer.concat([MARKER, text('|'), MARKER]))
     expect(sent()).toBe(3)
+  })
+
+  // PostgreSQL puts a bound value whole inside its Bind message: nothing on
+  // its wire cuts a marker. A hop that let eight bytes cut it there anyway
+  // found a second, phantom sending in the first: the marker less its
+  // last byte, eight bytes, and that byte again. In a PostgreSQL insert the
+  // parameter bound after the notes is `sales`, whose `e` is the eighth byte
+  // after the notes end, so every marker ending in `e` was counted twice --
+  // measured on 2026-10-11 against postgres:17-alpine, 12 of 200 inserts
+  // through the hop, each one's UUID ending in e, and the no-replay proof
+  // failed one run in sixteen with "expected 2 to be 1".
+  test('on PostgreSQL, counts a marker ending in e, before a bound `sales`, as the one sending it is', async () => {
+    const { hop, connect } = await setUp({ kind: 'postgres' })
+    const ends = await connect()
+    const notes = text('inserted, answer lost 1f0c2a4b-9d3e-4c5f-8a6b-7c8d9e0f1a2e')
+    const sent = hop.countSent(notes)
+    const length = (bytes: Buffer): Buffer => Buffer.from([0, 0, 0, bytes.length])
+    await fromClient(ends, Buffer.concat([length(notes), notes, length(text('sales')), text('sales')]))
+    expect(sent()).toBe(1)
+  })
+
+  // The same rule from the other side, on PostgreSQL and on HTTP, which has
+  // no 8-byte packet header either: on a wire that cannot cut a marker, a
+  // text interrupted by eight bytes is another text. Swallowing on it would
+  // drop an answer that does not carry the write's marker, and counting it
+  // would count a sending that never happened.
+  test.each<HopKind>(['postgres', 'http'])('on %s, matches a marker only whole', async (kind) => {
+    const { hop, connect } = await setUp({ kind })
+    const ends = await connect()
+    const cut = Buffer.concat([MARKER.subarray(0, 4), HEADER, MARKER.subarray(4)])
+    const sent = hop.countSent(MARKER)
+    const lost = hop.swallowAnswersFrom(MARKER)
+    let matched = false
+    void lost.matched.then(() => (matched = true))
+    await fromClient(ends, cut)
+    expect(sent(), 'counted').toBe(0)
+    // Swallowed, it never reaches the client, and this times out saying so.
+    await fromServer(ends, cut)
+    expect(matched).toBe(false)
+  })
+
+  // The browser gate is a script, not type-checked: a hop it started without
+  // saying what crosses it must not quietly pick a rule for it.
+  test('refuses to start without knowing what crosses it', async () => {
+    await expect(startTcpHop({ host: '127.0.0.1', port: 1 } as never)).rejects.toThrow(/postgres, sqlserver or http/)
+    await expect(startTcpHop({ kind: 'mysql', host: '127.0.0.1', port: 1 } as never)).rejects.toThrow(/not mysql/)
   })
 
   // A pool keeps other connections open beside the one that carried the

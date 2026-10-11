@@ -74,8 +74,8 @@ beforeAll(async () => {
   ;[pg, ms] = await Promise.all([startPostgresFixture(), startSqlServerFixture()])
   const pgUrl = new URL(pg.admin)
   hops = {
-    pg: await startTcpHop({ host: pgUrl.hostname, port: Number(pgUrl.port) }),
-    ms: await startTcpHop({ host: String(ms.admin.server), port: Number(ms.admin.port) }),
+    pg: await startTcpHop({ kind: 'postgres', host: pgUrl.hostname, port: Number(pgUrl.port) }),
+    ms: await startTcpHop({ kind: 'sqlserver', host: String(ms.admin.server), port: Number(ms.admin.port) }),
   }
   // The registry reaches each database through its hop, by the address an operator would write.
   const connections: ConnectionConfig[] = [

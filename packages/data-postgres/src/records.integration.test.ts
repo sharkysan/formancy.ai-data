@@ -1150,5 +1150,5 @@ async function closedPort(): Promise<number> {
  */
 async function startProxy(): Promise<TcpHop> {
   const target = new URL(fixture.admin)
-  return startTcpHop({ host: target.hostname, port: Number(target.port) })
+  return startTcpHop({ kind: 'postgres', host: target.hostname, port: Number(target.port) })
 }
