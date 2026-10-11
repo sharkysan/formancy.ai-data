@@ -25,6 +25,7 @@ node scripts/performance-stale.mjs
 pnpm build && pnpm typecheck && pnpm test:coverage && pnpm check:pkg && pnpm test:repo
 node scripts/verify-licenses.mjs
 pnpm test:getting-started   # docs/getting-started.md as written; needs Docker, not the build
+pnpm test:cloudflare        # docs/deploy/cloudflare.md's overlay, offline; needs Docker and the server's build
 
 # 4. Get the release commit onto main, through a pull request like any other.
 

@@ -744,17 +744,23 @@ describe('the operational audit trail', () => {
   // administrator's plane records it: anybody who can reach the port could
   // otherwise write any text into the trail under `form`, a pasted
   // connection string included, naming a form that cannot exist (0033).
+  // Encoded, as a client would send it, the path is not plain and is refused
+  // before the route (0037); typed raw it reaches the route, and the form
+  // id's shape is what keeps it out.
   test('records a path that is not a form id as no form', async () => {
     const events: RuntimeAuditEvent[] = []
     const server = await audited(collect(events))
-    const forged = encodeURIComponent('Server=10.0.0.5;Password=S3cret-pw-e81')
-    await server.inject({ method: 'POST', url: `/v1/forms/${forged}/records/read`, headers: as('clerk'), payload: { record: RECORD } })
-    await server.inject({ method: 'GET', url: `/v1/forms/${forged}` })
+    for (const forged of [encodeURIComponent('Server=10.0.0.5;Password=S3cret-pw-e81'), 'Server=10.0.0.5;Password=S3cret-pw-e81']) {
+      await server.inject({ method: 'POST', url: `/v1/forms/${forged}/records/read`, headers: as('clerk'), payload: { record: RECORD } })
+      await server.inject({ method: 'GET', url: `/v1/forms/${forged}` })
+    }
     await server.inject({ method: 'GET', url: '/v1/forms/Customer', headers: as('clerk') })
-    expect(events.map(({ operation, form, status }) => ({ operation, form, status }))).toEqual([
-      { operation: 'read', form: null, status: 404 },
-      { operation: 'form', form: null, status: 401 },
-      { operation: 'form', form: null, status: 404 },
+    expect(events.map(({ operation, form, status, outcome }) => ({ operation, form, status, outcome }))).toEqual([
+      { operation: 'read', form: null, status: 400, outcome: 'path-not-plain' },
+      { operation: 'form', form: null, status: 400, outcome: 'path-not-plain' },
+      { operation: 'read', form: null, status: 404, outcome: 'unknown-form' },
+      { operation: 'form', form: null, status: 401, outcome: 'unauthenticated' },
+      { operation: 'form', form: null, status: 404, outcome: 'unknown-form' },
     ])
     expect(JSON.stringify(events)).not.toContain('S3cret-pw-e81')
     expect(JSON.stringify(events)).not.toContain('10.0.0.5')

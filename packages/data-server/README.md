@@ -216,7 +216,8 @@ existed would be documented and inert.
   closed, included. The token is read after the body, so a body Fastify
   refuses (400, 413 or 415, or a client gone mid-body) is audited with no
   actor, whatever token it carried. What is answered before any route runs
-  no hook and is not audited: a path no route matches (404), a parameter
+  no hook of either plane and is not audited: a path no route matches (404,
+  or 400 `path-not-plain` when it is not plain, below), a parameter
   past the router's limit (414) or one whose percent-encoding does not
   decode (400 `FST_ERR_BAD_URL`), the 503 Fastify sends while the server
   closes, and what Node's HTTP parser refuses before Fastify sees a request
@@ -263,6 +264,46 @@ because those are whatever a caller typed, token or none
 ([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md));
 a 404 is logged with no route. `src/server-log.test.ts` fails when a line
 holds what was sent.
+
+A path is routed only when it is plain
+([0037](../../docs/decisions/0037-cloudflare-is-the-edge-not-the-runtime.md),
+which [the Cloudflare guide](../../docs/deploy/cloudflare.md) rests on):
+a `/`, then segments that are not empty, not `.` or `..`, and made of
+letters, digits and `-._~!$&'()*+,;=:@` only -- no `%` escape, no backslash,
+no doubled or trailing slash. Every other path is 400 `path-not-plain`
+before any route's work: before the token is read and before either plane's
+hooks, so an administrator's token sent with it runs nothing. The reason is
+a proxy that chooses where to forward by the path after decoding it,
+resolving its dot segments and collapsing its slashes, as cloudflared
+2026.10.0 was measured doing, while the router routes the path as sent: a
+door that forwards only the runtime plane's routes would otherwise forward
+`/v1/forms/a/versions/..%2F..%2Fb`, which the router runs as an
+administrator's version read. No name the server accepts needs any of it,
+because the studio and `@formancy/data-client` send names through
+`encodeURIComponent`, which leaves a valid name as it is; a name that is not
+valid and needed escaping now gets this 400 where it used to get the
+route's 400, 401 or 404. The query is not looked at, since nothing routes by
+it. A refusal counts against the rate limit, and on a path that matched a
+route it is that plane's one audit event, status 400, outcome
+`path-not-plain` and no actor; on a path that matched none it is no event.
+An escape that does not decode is still the router's own 400
+`FST_ERR_BAD_URL`, answered before this check and not counted.
+`src/paths.test.ts` holds what is plain, and derives from the store's and
+the allowlist's own checks that every form and connection id is.
+`src/app.test.ts` sends the paths cloudflared read differently over a real
+socket, because light-my-request resolves dot segments and backslashes
+before the router would see them, and fails when one reaches a route, a
+token is read for one, or one escapes the limit.
+
+Every answer that runs the server's hooks says `Cache-Control: no-store`,
+success, refusal or error alike, over anything a route set: a form id may
+end in `.js`, which a CDN caches by extension, and a cache that does not
+treat `Authorization` as private would hand one person's form or record to
+the next. What is written before any hook carries none: the router's 400
+for an escape that does not decode and its 414 for a parameter past its
+limit, which `src/app.test.ts` holds, and, not exercised there, the 503
+while the server closes and what Node's parser refuses. None of those holds
+a form or a record.
 
 The image (`packages/data-server/Dockerfile`) runs as `node` and owns
 `/var/lib/formancy-data`, the directory to mount the store's volume on and to

@@ -401,6 +401,20 @@ describe("the administrator plane's events", () => {
     ])
   })
 
+  // A path a proxy could read differently is refused before the plane's
+  // hooks run (0037), the token unread whatever it was. On a path that
+  // matched a route it is still that route's one event, by its status and
+  // code, with no actor: a door that forwarded it is visible in the trail.
+  // On a path no route matches it is none, as a 404 is none.
+  test('a path that is not plain is one event with no actor on a route, and none off one', async () => {
+    const server = await serve()
+    const refused = await server.inject({ method: 'GET', url: '/v1/forms/a/versions/..%2F..%2Fb', headers: as('admin') })
+    expect({ status: refused.statusCode, code: (refused.json() as { code: string }).code }).toEqual({ status: 400, code: 'path-not-plain' })
+    const nowhere = await server.inject({ method: 'GET', url: '/v1/forms/employee/nothing%2F..', headers: as('admin') })
+    expect({ status: nowhere.statusCode, code: (nowhere.json() as { code: string }).code }).toEqual({ status: 400, code: 'path-not-plain' })
+    expect(events).toEqual([event({ operation: 'version-read', actor: null, form: 'a', status: 400, outcome: 'path-not-plain' })])
+  })
+
   // By the time the event exists the version is written; refusing to answer
   // because the trail failed would hide that it was. The failure goes to the
   // operator's log instead.
@@ -426,45 +440,56 @@ describe('what a caller cannot write into the trail', () => {
   // A connection named in the path is recorded only once the allowlist knows
   // it. Anybody who can reach the port, with or without a token, could
   // otherwise put a connection string -- host, user and password -- into
-  // the trail by pasting it where a connection's name goes.
+  // the trail by pasting it where a connection's name goes. Encoded, as a
+  // client would send it, the path is not plain and is refused before the
+  // route (0037); typed raw, where nothing needs encoding, it reaches the
+  // route, and the allowlist's filter is what keeps it out.
   test('a connection string in the path is never recorded, with a token or without', async () => {
     const server = await serve()
-    for (const address of [`postgres://sa:${PASSWORD}@${HOST}:5432/erp`, `Server=${HOST};User Id=sa;Password=${PASSWORD}`]) {
-      const id = encodeURIComponent(address)
+    const encoded = [`postgres://sa:${PASSWORD}@${HOST}:5432/erp`, `Server=${HOST};User Id=sa;Password=${PASSWORD}`].map(encodeURIComponent)
+    for (const id of [...encoded, `Server=${HOST};Password=${PASSWORD}`]) {
       for (const headers of [{}, as('admin')]) {
         await server.inject({ method: 'POST', url: `/v1/connections/${id}/test`, headers })
         await server.inject({ method: 'GET', url: `/v1/connections/${id}/metadata`, headers })
       }
     }
-    expect(events.map(({ operation, connection, status }) => ({ operation, connection, status }))).toEqual(
-      Array.from({ length: 2 }, () => [
-        { operation: 'connection-test', connection: null, status: 401 },
-        { operation: 'discovery', connection: null, status: 401 },
-        { operation: 'connection-test', connection: null, status: 404 },
-        { operation: 'discovery', connection: null, status: 404 },
+    expect(events.map(({ operation, connection, status, outcome }) => ({ operation, connection, status, outcome }))).toEqual([
+      ...Array.from({ length: 4 }, () => [
+        { operation: 'connection-test', connection: null, status: 400, outcome: 'path-not-plain' },
+        { operation: 'discovery', connection: null, status: 400, outcome: 'path-not-plain' },
       ]).flat(),
-    )
+      { operation: 'connection-test', connection: null, status: 401, outcome: 'unauthenticated' },
+      { operation: 'discovery', connection: null, status: 401, outcome: 'unauthenticated' },
+      { operation: 'connection-test', connection: null, status: 404, outcome: 'unknown-connection' },
+      { operation: 'discovery', connection: null, status: 404, outcome: 'unknown-connection' },
+    ])
     expect(JSON.stringify(events)).not.toContain(PASSWORD)
     expect(JSON.stringify(events)).not.toContain(HOST)
   })
 
   // A form id is recorded only when it has the store's shape, as the
   // runtime's is: otherwise any text up to the router's limit lands in the
-  // trail under `form`, naming a form that cannot exist.
+  // trail under `form`, naming a form that cannot exist. Encoded, the path
+  // is refused before the route (0037); raw, it reaches the route.
   test('a path that is not a form id is recorded as no form, with a token or without', async () => {
     const server = await serve()
-    const forged = encodeURIComponent(`Server=${HOST};Password=${PASSWORD}`)
-    for (const headers of [{}, as('admin')]) {
-      await server.inject({ method: 'POST', url: `/v1/forms/${forged}/versions`, headers, payload: { expectedBase: null } })
-      await server.inject({ method: 'GET', url: `/v1/forms/${forged}/versions/latest`, headers })
+    for (const forged of [encodeURIComponent(`Server=${HOST};Password=${PASSWORD}`), `Server=${HOST};Password=${PASSWORD}`]) {
+      for (const headers of [{}, as('admin')]) {
+        await server.inject({ method: 'POST', url: `/v1/forms/${forged}/versions`, headers, payload: { expectedBase: null } })
+        await server.inject({ method: 'GET', url: `/v1/forms/${forged}/versions/latest`, headers })
+      }
     }
     await server.inject({ method: 'POST', url: '/v1/forms/Employee/drift', headers: as('admin') })
-    expect(events.map(({ operation, form, status }) => ({ operation, form, status }))).toEqual([
-      { operation: 'publish', form: null, status: 401 },
-      { operation: 'version-latest', form: null, status: 401 },
-      { operation: 'publish', form: null, status: 400 },
-      { operation: 'version-latest', form: null, status: 404 },
-      { operation: 'drift', form: null, status: 404 },
+    expect(events.map(({ operation, form, status, outcome }) => ({ operation, form, status, outcome }))).toEqual([
+      ...Array.from({ length: 2 }, () => [
+        { operation: 'publish', form: null, status: 400, outcome: 'path-not-plain' },
+        { operation: 'version-latest', form: null, status: 400, outcome: 'path-not-plain' },
+      ]).flat(),
+      { operation: 'publish', form: null, status: 401, outcome: 'unauthenticated' },
+      { operation: 'version-latest', form: null, status: 401, outcome: 'unauthenticated' },
+      { operation: 'publish', form: null, status: 400, outcome: 'invalid-request' },
+      { operation: 'version-latest', form: null, status: 404, outcome: 'unknown-form' },
+      { operation: 'drift', form: null, status: 404, outcome: 'unknown-form' },
     ])
     expect(JSON.stringify(events)).not.toContain(PASSWORD)
     expect(JSON.stringify(events)).not.toContain(HOST)

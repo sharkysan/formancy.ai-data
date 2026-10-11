@@ -386,7 +386,12 @@ suites sharing one runner timed out a test that takes two seconds alone
 disagree); in jobs of their own `pnpm test:e2e:install`, `pnpm test:browser`
 and the server image; and `pnpm test:getting-started` in the
 `getting-started` job, run once with the runner's Compose and once with the
-oldest release `docs/getting-started.md` names. The last job, `report`,
+oldest release `docs/getting-started.md` names; and `pnpm test:cloudflare` in
+the `cloudflare` job, likewise with both Compose releases, which needs Docker
+and the server's `pnpm build`, and holds `deploy/cloudflare/` to
+`docs/deploy/cloudflare.md` offline
+([0037](docs/decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)). The
+last job, `report`,
 builds the release report from what every other job found
 ([0035](docs/decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md))
 and fails the run when a job ended other than success or left no results, a

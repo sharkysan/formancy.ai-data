@@ -1,0 +1,159 @@
+{
+  "generated": "by scripts/cloudflare/doors.mjs from the routes the built data server registers; do not edit, run node scripts/cloudflare/doors.mjs --write",
+  "runtimePattern": "^(?:/v1/forms/[^/]+|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/update)$",
+  "serverLimitPerMinute": 600,
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "plane": "shared",
+      "sample": "/health",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/connections",
+      "plane": "administrator",
+      "sample": "/v1/connections",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/connections/:id/metadata",
+      "plane": "administrator",
+      "sample": "/v1/connections/erp/metadata",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/connections/:id/test",
+      "plane": "administrator",
+      "sample": "/v1/connections/erp/test",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/form-proposals",
+      "plane": "administrator",
+      "sample": "/v1/form-proposals",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/forms/:id",
+      "plane": "runtime",
+      "sample": "/v1/forms/order",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/drift",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/drift",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/lookups/:source/query",
+      "plane": "runtime",
+      "sample": "/v1/forms/order/lookups/customer/query",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/lookups/:source/resolve",
+      "plane": "runtime",
+      "sample": "/v1/forms/order/lookups/customer/resolve",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/records/create",
+      "plane": "runtime",
+      "sample": "/v1/forms/order/records/create",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/records/read",
+      "plane": "runtime",
+      "sample": "/v1/forms/order/records/read",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/records/update",
+      "plane": "runtime",
+      "sample": "/v1/forms/order/records/update",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/regenerations",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/regenerations",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/restorations",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/restorations",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/forms/:id/versions",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/versions",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/versions",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/versions",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/forms/:id/versions/:version",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/versions/1",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/forms/:id/versions/latest",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/versions/latest",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/whoami",
+      "plane": "shared",
+      "sample": "/v1/whoami",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    }
+  ]
+}

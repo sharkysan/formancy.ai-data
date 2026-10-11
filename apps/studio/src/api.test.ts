@@ -93,9 +93,11 @@ describe('the administrator plane, through the studio client', () => {
 
   // A connection name is one path segment. Unencoded, a name with a slash
   // would reach a different route -- or none -- and the answer would be
-  // about something else.
+  // about something else. Encoded, the escape makes a path the server
+  // refuses before any route (0037), with its own code and sentence.
   test('keeps a name with a slash in one path segment', async () => {
-    expect(await admin.metadata('a/b')).toMatchObject({ ok: false, status: 404, code: 'unknown-connection' })
+    expect(await admin.metadata('a/b')).toMatchObject({ ok: false, status: 400, code: 'path-not-plain' })
+    expect(plane.requests).toEqual([{ method: 'GET', path: '/v1/connections/a%2Fb/metadata' }])
   })
 
   // The four routes of 0030 -- versions, one version, a regeneration and a

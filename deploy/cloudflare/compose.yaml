@@ -1,0 +1,125 @@
+# The composed stack behind Cloudflare (0037): a locally-managed Cloudflare
+# Tunnel in front of compose.yaml's web front, with Access on the
+# administrator's hostname. docs/deploy/cloudflare.md walks through it:
+#
+#   docker compose -f compose.yaml -f deploy/cloudflare/compose.yaml run --rm --build tunnel-setup --admin formancy.example.com --team example-team --aud <the Access application's AUD tag>
+#   docker compose -f compose.yaml -f deploy/cloudflare/compose.yaml --profile stack --profile cloudflare up -d --build --wait --wait-timeout 900
+#   docker compose -f compose.yaml -f deploy/cloudflare/compose.yaml run --rm --build doors-check --admin formancy.example.com --team example-team
+#
+# Every command for this stack names both files. This file only adds
+# services: it changes no service of compose.yaml, and the CI job
+# `cloudflare` fails when one resolves differently with it. A command that
+# names compose.yaml alone therefore recreates nothing, but sees `cloudflared`
+# as an orphan, and its `down` leaves `cloudflared` running.
+#
+# Paths here are relative to the first file's directory, the checkout's
+# root, as Compose resolves every file named after it.
+#
+# Nothing here holds a secret: the tunnel's credentials are created into the
+# formancy-data-tunnel volume by setup, and the account login setup needs is
+# kept in a tmpfs that goes with its container, when cloudflared fetches it
+# (when it cannot, it leaves it to the browser, and setup says what then).
+# No TUNNEL_* setting, no --token: each would put a secret in the
+# configuration `docker compose config` and `docker inspect` print.
+
+services:
+  # The tunnel, pinned by tag and digest. Outbound only -- port 7844 to
+  # Cloudflare's edge -- and no published port. The image's entrypoint is
+  # `cloudflared --no-autoupdate`; each flag below has its reason:
+  #   --loglevel info: debug writes every request header to this container's
+  #     log, every host token in it;
+  #   --metrics 127.0.0.1:20241: the default listens on every interface,
+  #     here the network it shares with the web front;
+  #   --management-diagnostics=false: the default serves pprof and metrics
+  #     over Cloudflare's management service.
+  # No flag stops log streaming: anybody with Cloudflare Tunnel edit
+  # permission can stream this tunnel's log at debug level, every header
+  # included, which the guide says.
+  cloudflared:
+    profiles: [cloudflare]
+    image: cloudflare/cloudflared:2026.10.0@sha256:9b49eed8f62806d5d45ddf59ecefb5710429598ea6d3fcccd2af938f621b2b07
+    command: ["tunnel", "--loglevel", "info", "--metrics", "127.0.0.1:20241", "--management-diagnostics=false", "--config", "/etc/formancy-cloudflare/config.yml", "run"]
+    # compose.yaml's `edge` alone, beside the web front and nothing else of
+    # the stack: whatever its ingress says, and whatever private network
+    # route anybody adds to the tunnel, it reaches neither the server past
+    # nginx nor the databases. It still reaches Docker's host and what that
+    # routes to, which the guide says.
+    networks: [edge]
+    volumes:
+      - formancy-data-tunnel:/etc/formancy-cloudflare:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    # Healthy once the tunnel holds a connection to the edge, so `up --wait`
+    # fails naming this service when it cannot connect. The timings are
+    # web's, copied, not measured for cloudflared: nothing here has an
+    # account to measure how long a tunnel takes to connect.
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:20241", "ready"]
+      start_period: 60s
+      start_interval: 2s
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Logs in, creates the tunnel, routes its hostnames and writes its
+  # configuration; see setup.mjs. As root, to make the files in the volume
+  # cloudflared's (65532) and readable by it alone. On Docker's default
+  # bridge, beside neither the server nor the databases. The login's cert.pem
+  # is written under HOME, a tmpfs.
+  tunnel-setup:
+    profiles: [tools]
+    build:
+      context: ./deploy/cloudflare
+    image: formancy/data-cloudflare-tools:compose
+    user: "0"
+    network_mode: bridge
+    environment:
+      HOME: /tmp/login
+    tmpfs:
+      - /tmp/login
+    entrypoint: ["node", "/deploy/cloudflare/setup.mjs"]
+    volumes:
+      - formancy-data-tunnel:/etc/formancy-cloudflare
+      - ./deploy/cloudflare/setup.mjs:/deploy/cloudflare/setup.mjs:ro
+      - ./deploy/cloudflare/configure.mjs:/deploy/cloudflare/configure.mjs:ro
+      - ./deploy/cloudflare/ingress.mjs:/deploy/cloudflare/ingress.mjs:ro
+      - ./deploy/cloudflare/doors.json:/deploy/cloudflare/doors.json:ro
+
+  # Writes and checks the configuration again, with no login and no network:
+  # for hostnames already routed, after a change to doors.json or to the
+  # inputs. See configure.mjs.
+  tunnel-config:
+    profiles: [tools]
+    build:
+      context: ./deploy/cloudflare
+    image: formancy/data-cloudflare-tools:compose
+    user: "0"
+    network_mode: none
+    entrypoint: ["node", "/deploy/cloudflare/configure.mjs"]
+    volumes:
+      - formancy-data-tunnel:/etc/formancy-cloudflare
+      - ./deploy/cloudflare/configure.mjs:/deploy/cloudflare/configure.mjs:ro
+      - ./deploy/cloudflare/ingress.mjs:/deploy/cloudflare/ingress.mjs:ro
+      - ./deploy/cloudflare/doors.json:/deploy/cloudflare/doors.json:ro
+
+  # What the live hostnames answer, from outside; see check.mjs. Unprivileged,
+  # with no volume: it holds nothing and is given no credential.
+  doors-check:
+    profiles: [tools]
+    build:
+      context: ./deploy/cloudflare
+    image: formancy/data-cloudflare-tools:compose
+    user: node
+    network_mode: bridge
+    entrypoint: ["node", "/deploy/cloudflare/check.mjs"]
+    volumes:
+      - ./deploy/cloudflare/check.mjs:/deploy/cloudflare/check.mjs:ro
+      - ./deploy/cloudflare/ingress.mjs:/deploy/cloudflare/ingress.mjs:ro
+      - ./deploy/cloudflare/doors.json:/deploy/cloudflare/doors.json:ro
+
+volumes:
+  # The tunnel's credentials and configuration. Cloudflare holds no copy:
+  # back it up with the store, as a secret, since the credentials do not
+  # expire.
+  formancy-data-tunnel:

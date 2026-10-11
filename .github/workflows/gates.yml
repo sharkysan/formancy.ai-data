@@ -440,6 +440,62 @@ jobs:
             exit 1
           fi
 
+      # A path a proxy could read differently from the router is refused
+      # before any route's work (0037): cloudflared 2026.10.0 was measured
+      # sending /v1/forms/a/versions/..%2F..%2Fb to a door meant for the
+      # runtime route /v1/forms/b, while Fastify, routing the path as sent,
+      # ran the administrator's version read for it. paths.test.ts and
+      # app.test.ts hold the rule on the source; only the running image
+      # shows main.ts serves the server they test. --path-as-is, so curl
+      # sends the path exactly as written.
+      - name: A path that is not plain is answered 400 path-not-plain
+        run: |
+          docker run -d --name data-server-paths -p 127.0.0.1:4390:4390 \
+            -e FORMANCY_DATA_ISSUER=https://host.example \
+            -e FORMANCY_DATA_AUDIENCE=formancy-data \
+            -e FORMANCY_DATA_IDENTITY_SECRET=env:HOST_SECRET \
+            -e HOST_SECRET=a-shared-secret-of-at-least-thirty-two-bytes \
+            formancy/data-server:ci
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4390/health && break
+            sleep 1
+          done
+          answer=$(curl -s --path-as-is -w ' %{http_code}' 'http://127.0.0.1:4390/v1/forms/a/versions/..%2F..%2Fb')
+          docker rm -f data-server-paths
+          echo "$answer"
+          if [ "${answer##* }" != "400" ] || ! echo "$answer" | grep -q '"code":"path-not-plain"'; then
+            echo "::error::A path holding ..%2F was not answered 400 path-not-plain"
+            exit 1
+          fi
+
+      # Every answer says Cache-Control: no-store (0037): a form id may end
+      # in .js, which a CDN caches by extension, and a cache that does not
+      # treat Authorization as private would hand one person's form to the
+      # next. app.test.ts holds it for every kind of answer; this holds the
+      # image's.
+      - name: Every answer says Cache-Control no-store
+        run: |
+          docker run -d --name data-server-no-store -p 127.0.0.1:4390:4390 \
+            -e FORMANCY_DATA_ISSUER=https://host.example \
+            -e FORMANCY_DATA_AUDIENCE=formancy-data \
+            -e FORMANCY_DATA_IDENTITY_SECRET=env:HOST_SECRET \
+            -e HOST_SECRET=a-shared-secret-of-at-least-thirty-two-bytes \
+            formancy/data-server:ci
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4390/health && break
+            sleep 1
+          done
+          health=$(curl -s -i http://127.0.0.1:4390/health)
+          refused=$(curl -s -i http://127.0.0.1:4390/v1/whoami)
+          docker rm -f data-server-no-store
+          for answer in "$health" "$refused"; do
+            echo "$answer" | head -n 1
+            if ! echo "$answer" | tr -d '\r' | grep -qi '^cache-control: no-store$'; then
+              echo "::error::An answer of the server carried no Cache-Control: no-store"
+              exit 1
+            fi
+          done
+
       - name: Keep what this job found, for the report
         id: collect
         if: ${{ !cancelled() }}
@@ -524,6 +580,89 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
+  # docs/deploy/cloudflare.md's overlay, offline (0037): `pnpm
+  # test:cloudflare` resolves both Compose files and holds the overlay to
+  # what the guide says of it, builds the tools image, runs the guide's
+  # configure step with a random fake tunnel, asks the pinned cloudflared
+  # what the configuration it wrote means, starts cloudflared as the overlay
+  # does with no network to see it read its files, and sends a corpus of
+  # paths cloudflared reads differently from the router or from nginx
+  # through cloudflared and, where it is forwarded, to the built server,
+  # which must refuse each, and through deploy/web/nginx.conf's server for
+  # the runtime door in the web front's own nginx, which must end each at
+  # that refusal or its own 404, never a file. No Cloudflare account is
+  # reached: nothing here can. Twice, with the
+  # runner's Compose and with 2.20.3, the oldest getting-started names,
+  # which resolved both files alike when this was written.
+  #
+  # The limit is verify's: the gate alone took 43 to 71 s on 2026-10-11,
+  # with both images cached, on the shared Docker Sandbox VM 0037 names, and it
+  # has not been measured on CI; three green runs give a slowest time to
+  # triple, as the report job's comment says of its own.
+  cloudflare:
+    name: cloudflare (Compose ${{ matrix.compose }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compose: runner
+          - compose: 2.20.3
+            # The release's own docker-compose-linux-x86_64.sha256.
+            sha256: f45e4cb687df8b48a57f656097ce7175fa8e8bef70be407b011e29ff663f475f
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Compose ${{ matrix.compose }}
+        if: matrix.compose != 'runner'
+        env:
+          COMPOSE: ${{ matrix.compose }}
+          COMPOSE_SHA256: ${{ matrix.sha256 }}
+        run: |
+          mkdir -p ~/.docker/cli-plugins
+          curl -fsSL -o ~/.docker/cli-plugins/docker-compose "https://github.com/docker/compose/releases/download/v${COMPOSE}/docker-compose-linux-x86_64"
+          echo "${COMPOSE_SHA256}  $HOME/.docker/cli-plugins/docker-compose" | sha256sum -c
+          chmod +x ~/.docker/cli-plugins/docker-compose
+          test "$(docker compose version --short)" = "${COMPOSE}"
+
+      # The server the differential sends its paths to, as every other job
+      # builds it.
+      - run: pnpm exec turbo run build --filter=@formancy/data-server
+
+      - run: pnpm test:cloudflare
+
+      - name: Keep what this job found, for the report
+        id: collect
+        if: ${{ !cancelled() }}
+        run: node scripts/release-report/collect.mjs --job cloudflare --variant "$COMPOSE"
+        env:
+          COMPOSE: ${{ matrix.compose }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: release-results-${{ steps.collect.outputs.key }}
+          path: release-results/
+          if-no-files-found: error
+          overwrite: true
+
   # The release report (0035), built from what every job above found: what
   # this run was tested on, every package's results, every shared case on
   # both engines, the build identity of what a release publishes, the release
@@ -541,7 +680,7 @@ jobs:
   # triple (0035 says so). The checkout keeps the whole history, for a
   # document's last change when a gate's evidence is a document.
   report:
-    needs: [verify, test, browser, install, container, getting-started]
+    needs: [verify, test, browser, install, container, getting-started, cloudflare]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -149,13 +149,15 @@ describe.each(ENGINES)('lookups on $engine', ({ connection }) => {
 
   // (g) A document is untrusted input to the route: a name that tries to
   // climb out of the lookups path stays one encoded segment, under this form's
-  // lookups, and the server answers that it has no such lookup. No records
-  // route is reached, whatever the name says.
+  // lookups. The escape makes it a path the server refuses before any route's
+  // work, 400 `path-not-plain` (0037), so no records route is reached, nor
+  // the lookup's, whatever the name says, and the rejection carries the
+  // server's sentence.
   test('a source name is one path segment under this form’s lookups', async () => {
     const { form } = await published()
     const climbing: FormSchema = { ...form, model: { ...form.model, fields: [{ key: 'customer', type: 'select', optionsSource: '../records/read' }] } }
     const sources = lookupSources(plane.client(), formId, climbing, 'create')
-    await expect(sources['../records/read']?.resolve(request('search'))).rejects.toThrow('This form has no lookup called ../records/read.')
+    await expect(sources['../records/read']?.resolve(request('search'))).rejects.toThrow(/^This path holds an encoded character, an empty or a dot segment/)
     expect(plane.sent.map((sent) => sent.url)).toEqual([`${plane.base}/v1/forms/${formId}/lookups/..%2Frecords%2Fread/query`])
   })
 

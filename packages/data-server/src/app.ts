@@ -5,6 +5,7 @@ import { CONFIGURATION_ID_MAX_LENGTH } from './config-store.js'
 import type { ConfigurationStore } from './config-store.js'
 import type { ConnectionRegistry } from './connections.js'
 import type { HostIdentity, IdentityVerifier } from './identity.js'
+import { PATH_NOT_PLAIN, plainPath } from './paths.js'
 import { DEFAULT_RATE_LIMIT } from './rate-limit.js'
 import { adminRoutes } from './routes/admin.js'
 import type { AdminOptions } from './routes/admin.js'
@@ -111,11 +112,42 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
     routerOptions: { maxParamLength: CONFIGURATION_ID_MAX_LENGTH },
   })
 
+  // Nothing this server answers may be kept by a cache (0037). A form id may
+  // end in `.js` or `.css`, which a CDN caches by extension, and a cache that
+  // does not treat Authorization as private would hand one person's form or
+  // record to the next. Set on every answer that runs the hooks, refusals
+  // and errors included, and over anything a route set: a route that wanted
+  // to be cached would be a decision, not a header. What is written before
+  // any hook -- the router's 400 for an escape that does not decode and its
+  // 414, the 503 while closing, what Node's parser refuses -- carries none,
+  // and holds no form or record.
+  app.addHook('onSend', async (_request, reply, payload) => {
+    reply.header('cache-control', 'no-store')
+    return payload
+  })
+
   // Global, unlike formancy's server, where the management plane is
   // authenticated by its own sessions: every route here except /health is
   // reachable by anybody holding a browser and does work before refusing.
   const limit = options.rateLimit ?? DEFAULT_RATE_LIMIT
   await app.register(rateLimit, { global: true, max: limit.max, timeWindow: limit.timeWindowMs })
+
+  // A path a proxy could read differently from the router is answered here,
+  // before any route's work (paths.ts, 0037): before a plane's hooks, before
+  // the token is read, before the audit's own onRequest. A route that
+  // matched still writes its plane's one event, by this status, since the
+  // plane's onSend and onResponse run for any answer its route gives (0033).
+  // The limiter puts its hook on each route, and a route's own hooks run
+  // after every hook added here, so it would never see this refusal: it is
+  // asked here instead, and a request it has counted is not counted again.
+  // `request.url` is the target as sent: Fastify reads it from the raw
+  // request, and nothing here rewrites URLs.
+  const counted = app.rateLimit()
+  app.addHook('onRequest', async (request, reply) => {
+    if (plainPath(request.url)) return undefined
+    await counted.call(app, request, reply)
+    return reply.code(400).send(PATH_NOT_PLAIN)
+  })
 
   const authenticate = async (request: FastifyRequest): Promise<HostIdentity | undefined> => {
     const token = bearer(request)
