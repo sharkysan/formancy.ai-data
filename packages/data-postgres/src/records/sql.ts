@@ -16,14 +16,14 @@ export interface RecordStatement {
 }
 
 /** The alias of the target table in every record statement. */
-const ROW = '"r"'
+export const ROW = '"r"'
 
-function column(name: string): string {
+export function column(name: string): string {
   return `${ROW}.${quoteIdentifier(name)}`
 }
 
 /** A value from canonical text, converted by the server to its column's type (`sql/statement.ts`). */
-function bound(statement: Statement, value: RecordValue): string {
+export function bound(statement: Statement, value: RecordValue): string {
   return statement.as(bindText(value.value, value.type), sqlTypeOf(value.type))
 }
 
@@ -32,7 +32,7 @@ function bound(statement: Statement, value: RecordValue): string {
  * version column as text when the target has one. Positional, and
  * `decodeOutputs` reads it in the same order.
  */
-function outputs(target: RecordTarget, columns: readonly RecordColumn[]): string[] {
+export function outputs(target: RecordTarget, columns: readonly RecordColumn[]): string[] {
   const list = columns.map((entry) => canonicalText(entry.type, column(entry.name)))
   if (target.concurrency !== null) list.push(`${column(target.concurrency.column)}::pg_catalog.text`)
   return list
@@ -61,7 +61,7 @@ const PARENT = '"p"'
  * never a row with itself. A record whose foreign key is NULL matches no
  * parent, and is outside.
  */
-function throughSql(statement: Statement, through: ThroughTerms): string {
+export function throughSql(statement: Statement, through: ThroughTerms): string {
   const pairs = through.pairs.map((pair) => `${PARENT}.${quoteIdentifier(pair.references)} ${op('=')} ${column(pair.column)}`)
   return `exists (select from ${quoteTable(through.target)} as ${PARENT} where ${[...pairs, ...filterSql(statement, PARENT, through.terms)].join(' and ')})`
 }
@@ -130,9 +130,9 @@ function guard(statement: Statement, table: ObjectRef, definition: Definition, p
  * planning and execution of every describe and read. The records-definition
  * suite counts them.
  */
-function described(statement: Statement, table: ObjectRef): { select: string; from: string } {
+export function described(statement: Statement, table: ObjectRef): { columns: string[]; from: string } {
   return {
-    select: ['"g"."facts"', digestOf('"g"."facts"'), '"g"."spellings"', ENCODING, ISOLATION].join(', '),
+    columns: ['"g"."facts"', digestOf('"g"."facts"'), '"g"."spellings"', ENCODING, ISOLATION],
     from: `(select ${factsOf(statement, table)} as "facts", ${spellingsOf(statement, table)} as "spellings" offset 0) as "g"`,
   }
 }
@@ -143,8 +143,8 @@ export const DESCRIBED_COLUMNS = 5
 /** The table's description, in one statement: always one row. */
 export function describeStatement(table: ObjectRef): RecordStatement {
   const statement = new Statement()
-  const { select, from } = described(statement, table)
-  return { text: `select ${select}\nfrom ${from}`, params: statement.params }
+  const { columns, from } = described(statement, table)
+  return { text: `select ${columns.join(', ')}\nfrom ${from}`, params: statement.params }
 }
 
 /**
@@ -155,10 +155,10 @@ export function describeStatement(table: ObjectRef): RecordStatement {
  */
 export function readStatement(request: ReadRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): RecordStatement {
   const statement = new Statement()
-  const { select, from } = described(statement, request.target.table)
+  const { columns, from } = described(statement, request.target.table)
   const where = located(statement, request.key, terms, through)
   const record = selectFrom(request.target.table, ['true', ...outputs(request.target, request.columns)], where)
-  return { text: `select ${select}, "record".*\nfrom ${from}\nleft join lateral (${record}) as "record" on true`, params: statement.params }
+  return { text: `select ${columns.join(', ')}, "record".*\nfrom ${from}\nleft join lateral (${record}) as "record" on true`, params: statement.params }
 }
 
 /**

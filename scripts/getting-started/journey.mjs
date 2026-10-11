@@ -249,8 +249,18 @@ async function use(base, tokens, form, journey) {
   expectStatus(`${at} records/update at the version before the save`, stale, 409)
   expectEqual(`${at} the code of an update at the version before the save`, stale.json?.code, 'stale')
 
+  // A page of the orders, as a host's grid asks for one (0044): tenant 1's
+  // holds the order just created, and tenant 2's does not.
+  const listed = async (token) => {
+    const page = await call(base, 'POST', path('records/list'), { token, body: { sort: [{ field: 'order_date', direction: 'desc' }] } })
+    expectStatus(`${at} records/list`, page, 200)
+    return page.json.rows.map((row) => row.record)
+  }
+  if (!(await listed(tokens.clerk1)).includes(record)) throw new Error(`${at} tenant 1's list of orders does not hold the order tenant 1 created`)
+
   // Another tenant: the order does not exist for them, and the writer's
   // row-level security on customer shows that account tenant 1's rows only.
+  if ((await listed(tokens.clerk2)).includes(record)) throw new Error(`${at} tenant 2's list of orders holds tenant 1's order`)
   const hidden = await call(base, 'POST', path('records/read'), { token: tokens.clerk2, body: { record } })
   expectStatus(`${at} tenant 2 reading tenant 1's order`, hidden, 404)
   const theirs = await call(base, 'POST', path(`lookups/${source}/query`), { token: tokens.clerk2, body: { operation: 'create', search: '' } })

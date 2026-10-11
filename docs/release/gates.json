@@ -49,7 +49,9 @@
         { "file": "packages/data-server/src/e2e.integration.test.ts" },
         { "file": "packages/data-client/src/lookups.integration.test.ts" },
         { "file": "packages/data-postgres/src/through.integration.test.ts" },
-        { "file": "packages/data-sqlserver/src/through.integration.test.ts" }
+        { "file": "packages/data-sqlserver/src/through.integration.test.ts" },
+        { "file": "packages/data-postgres/src/list.integration.test.ts" },
+        { "file": "packages/data-sqlserver/src/list.integration.test.ts" }
       ]
     },
     {

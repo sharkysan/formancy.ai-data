@@ -57,7 +57,9 @@ export type {
 
 export { decodeKeyToken, encodeKeyToken, KEY_TOKEN_MAX_LENGTH } from './lookup/token.js'
 export type { KeyTokenDecoding, KeyTokenEncoding, KeyTokenErrorCode, KeyTokenRefusal } from './lookup/token.js'
-export { MAX_SEARCH_LENGTH, validateLookupQuery } from './lookup/query.js'
+export { validateLookupQuery } from './lookup/query.js'
+export { checkPage, checkSearch, MAX_SEARCH_LENGTH } from './lookup/search.js'
+export type { PageCheck, PageErrorCode, SearchCheck, SearchErrorCode } from './lookup/search.js'
 export type { LookupQueryCheck, LookupQueryErrorCode } from './lookup/query.js'
 export { formatLabel, LABEL_SEPARATOR } from './lookup/label.js'
 export { buildLookupConfig, DEFAULT_MAX_PAGE_SIZE } from './lookup/config.js'
@@ -94,7 +96,7 @@ export { canonicalFloat32 } from './codecs/numbers.js'
 export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
 export { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter, throughFilters } from './policy/evaluate.js'
 export { validatePolicy } from './policy/validate.js'
-export { isThroughKeyType, throughProblems } from './policy/through.js'
+export { isThroughKeyType, throughProblems, unscopedLookups } from './policy/through.js'
 export type { ThroughKeyType } from './policy/through.js'
 export type {
   FieldPolicy,
@@ -118,6 +120,9 @@ export type {
   DescribedRead,
   DescribedTable,
   InsertRequest,
+  ListOutcome,
+  ListRequest,
+  ListSearch,
   ReadRequest,
   RecordAdapter,
   RecordColumn,
@@ -127,14 +132,21 @@ export type {
   RecordOutcome,
   RecordRead,
   RecordTarget,
+  RecordSort,
   RecordValue,
   Through,
   UpdateRequest,
 } from './records/types.js'
 export { planCreate, planRead, planUpdate } from './records/plan.js'
+export { listable, listColumns, listOrder, planList, recordPage } from './records/list.js'
+export type { Listable } from './records/list.js'
+export { validateListQuery } from './records/list-query.js'
+export type { ListQueryCheck, ListQueryErrorCode, ListQueryRefusal } from './records/list-query.js'
+export { listTerms } from './records/list-terms.js'
+export type { ListTerms } from './records/list-terms.js'
 export { throughTerms } from './records/through.js'
 export type { ThroughTerms } from './records/through.js'
-export { driftRefusal, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './records/drift.js'
+export { driftRefusal, LIST_REFUSED, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './records/drift.js'
 export { rejectedSelection, toFormAnswers } from './records/answers.js'
 export { decodeRecordKey, intendedRecord, recordToken } from './records/token.js'
 export type { RecordKeyDecoding, RecordTokenEncoding, RecordTokenErrorCode, RecordTokenRefusal } from './records/token.js'
@@ -144,10 +156,11 @@ export type {
   InvalidValues,
   MembershipCheck,
   PlannedInsert,
+  PlannedList,
   PlannedRead,
   PlannedUpdate,
   PlanRefusal,
   PlanRefusalCode,
 } from './records/plan-types.js'
-export type { PublishedForm, ResolvedLookup, RuntimeRefusal, UnknownOutcome } from './runtime.js'
-export { WRITE_ID_HEADER } from './runtime.js'
+export type { ListColumns, ListSortTerm, PublishedForm, RecordList, RecordListQuery, ResolvedLookup, RuntimeRefusal, UnknownOutcome } from './runtime.js'
+export { LIST_PAGE_SIZE, WRITE_ID_HEADER } from './runtime.js'

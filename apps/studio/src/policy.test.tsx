@@ -318,7 +318,8 @@ describe('rows reached through a lookup (0043)', () => {
   // undecided or offers every row -- a through over [] scopes nothing, and
   // publishing refuses it -- and from the moment the list is filtered. Until
   // it is ticked, a note says that nothing scopes the lines though their
-  // order list is filtered; ticked, the policy names the lookup in `through`
+  // order list is filtered, and that the server lists none of them for that
+  // reason (0044); ticked, the policy names the lookup in `through`
   // and publishes with it. Every control is named and axe passes in the
   // state the note and the box are both in.
   test('offers the box only once the list is filtered, notes what nothing scopes, and publishes the through', async () => {
@@ -337,7 +338,7 @@ describe('rows reached through a lookup (0043)', () => {
     expect(box).toHaveProperty('checked', false)
     expect(paragraphs(within(policy).getByRole('note', { name: 'Nothing scopes these rows' }))).toEqual([
       'Nothing scopes these rows',
-      'sales.order_line has no row filter and is reached through no lookup, so every one of its rows is in reach of anybody an operation names, though the Order list is filtered. Where a row belongs to the tenant of the row it names, tick the box under its list.',
+      'sales.order_line has no row filter and is reached through no lookup, so every one of its rows is in reach of anybody an operation names, though the Order list is filtered, and the server offers no list of them. Where a row belongs to the tenant of the row it names, tick the box under its list.',
     ])
     expect(await audit()).toEqual([])
     expect(unnamed()).toEqual([])

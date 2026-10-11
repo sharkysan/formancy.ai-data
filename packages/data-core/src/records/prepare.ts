@@ -22,6 +22,16 @@ export function refuse(code: PlanRefusalCode, message: string): PlanRefusal {
   return { ok: false, code, message }
 }
 
+/** The refusal of a record operation on a form whose records have no address a token can carry. */
+export function unaddressable(prepared: Prepared): PlanRefusal {
+  return refuse(
+    'operation-unavailable',
+    prepared.target.identity.length === 0
+      ? 'This form identifies no record: the table has no primary or unique key.'
+      : 'This form cannot address a record: a key column has no settled spelling for a token.',
+  )
+}
+
 /** The root, its columns by name, and the target every request of this form names. */
 export interface Prepared {
   root: ObjectMeta
@@ -75,6 +85,14 @@ function fieldProblem(root: ObjectMeta, columns: ReadonlyMap<string, ColumnMeta>
   return null
 }
 
+/** A table's keys and its columns' nullability: as the snapshot has the root, or as a request's description of it says (0041). */
+export type KeyedTable = Pick<ObjectMeta, 'primaryKey' | 'uniqueKeys'> & { columns: ReadonlyArray<Pick<ColumnMeta, 'name' | 'nullable'>> }
+
+/** Whether the table's primary key or one of its unique keys is over exactly these columns, in this order. */
+function isKey(table: KeyedTable, columns: readonly string[]): boolean {
+  return [...(table.primaryKey === null ? [] : [table.primaryKey]), ...table.uniqueKeys].some((key) => sameList(key.columns, columns))
+}
+
 /**
  * The identity is a key of the root: its primary key or one of its unique
  * keys, column for column. Anything else could name more than one row, and
@@ -82,8 +100,21 @@ function fieldProblem(root: ObjectMeta, columns: ReadonlyMap<string, ColumnMeta>
  */
 function identityProblem(root: ObjectMeta, identity: readonly string[] | null): string | null {
   if (identity === null) return null
-  const keys = [...(root.primaryKey === null ? [] : [root.primaryKey]), ...root.uniqueKeys]
-  return keys.some((key) => sameList(key.columns, identity)) ? null : `the identity (${identity.join(', ')}) is not a key of the table`
+  return isKey(root, identity) ? null : `the identity (${identity.join(', ')}) is not a key of the table`
+}
+
+/**
+ * Why the table does not order the form's records totally by its identity,
+ * or `null` (0044): `nullable` when an identity column can hold NULL -- a
+ * nullable unique key, which PostgreSQL lets hold many NULLs, or a column
+ * the table no longer has -- and `not-unique` when no primary or unique key
+ * is over exactly the identity's columns, so two rows can share one. Either
+ * way rows tied on a page's sort have no order the engine defines, and
+ * offset paging repeats or skips them.
+ */
+export function keyOrderProblem(table: KeyedTable, identity: readonly string[]): 'nullable' | 'not-unique' | null {
+  if (identity.some((name) => table.columns.find((column) => column.name === name)?.nullable !== false)) return 'nullable'
+  return isKey(table, identity) ? null : 'not-unique'
 }
 
 /**

@@ -1,7 +1,8 @@
 import type { FormSchema } from '@formancy/spec'
+import { DEFAULT_MAX_PAGE_SIZE } from './lookup/config.js'
 import type { LookupRow } from './lookup/types.js'
 import type { PolicyOperation } from './policy/types.js'
-import type { FieldError } from './records/plan-types.js'
+import type { FieldError, FormRecord } from './records/plan-types.js'
 
 /*
  * The runtime plane's replies that have no type of their own elsewhere in the
@@ -17,18 +18,85 @@ import type { FieldError } from './records/plan-types.js'
  */
 
 /**
+ * What a list of a form's records may be searched and sorted by, for one
+ * person (0044): field keys in the bindings' order, from `listColumns`.
+ * `sortable` holds the readable column fields whose kind has canonical text,
+ * `searchable` those of kind text or integer, matched as a lookup's search
+ * matches. A lookup field is neither: a list holds its token, not its label.
+ */
+export interface ListColumns {
+  searchable: string[]
+  sortable: string[]
+}
+
+/**
  * `GET /v1/forms/:id`: the published document, what this person may do with
  * it, and which of its fields they may see.
  *
  * `operations` is never empty: a person the policy grants nothing is refused
  * with 403 rather than handed a form they cannot use. `readable` is the field
  * keys the policy lets them read, in the bindings' order; a field outside it
- * arrives in no record.
+ * arrives in no record. `list` is what a list of its records may be searched
+ * and sorted by, or `null` when `listable` refuses this person a list -- a
+ * key that can be NULL, or one held in a field they may not read -- so a
+ * page never offers a grid the server would refuse (0044).
  */
 export interface PublishedForm {
   form: FormSchema
   operations: PolicyOperation[]
   readable: string[]
+  list: ListColumns | null
+}
+
+/**
+ * The most records one list page holds (0044), and the limit a request that
+ * names none gets.
+ *
+ * Equal to `DEFAULT_MAX_PAGE_SIZE`, so that no page the runtime plane returns
+ * -- a lookup's options or a form's records -- is longer than one bound; and
+ * at most the server's `MAX_RESOLVE`, which a test holds, so one page's
+ * tokens for one lookup field fit one resolve. Not measured for a grid's
+ * rows: the lookup's own number is formancy's select default, and nothing
+ * here has timed a page of wide records. 0044 names what would measure it.
+ */
+export const LIST_PAGE_SIZE = DEFAULT_MAX_PAGE_SIZE
+
+/** One term of a list's requested order: a field key and a direction. */
+export interface ListSortTerm {
+  field: string
+  direction: 'asc' | 'desc'
+}
+
+/**
+ * `POST /v1/forms/:id/records/list`: one page of a form's records (0044), as
+ * `validateListQuery` returns it from a body. A POST, so the search never
+ * appears in a URL a proxy logs. In a body every property may be left out:
+ * `search` is then `''`, `sort` `[]`, `parent` `null`, `offset` 0 and
+ * `limit` `LIST_PAGE_SIZE`.
+ *
+ * `parent` narrows the list to the rows whose lookup field `field` holds
+ * `record`, a token of the row it references -- the children of one parent.
+ * It is a narrowing and never a permission: the form's own read filter and
+ * throughs still decide which rows exist.
+ */
+export interface RecordListQuery {
+  search: string
+  sort: ListSortTerm[]
+  parent: { field: string; record: string } | null
+  offset: number
+  limit: number
+}
+
+/**
+ * One page of records: each row exactly what `records/read` returns for its
+ * token, in the requested order, and whether more rows follow. No total: a
+ * COUNT would read every admitted row on every page. A row whose key does
+ * not fit a token is in its place with `record: null`, so the page's
+ * arithmetic holds; it cannot be opened.
+ */
+export interface RecordList {
+  rows: FormRecord[]
+  hasMore: boolean
 }
 
 /**

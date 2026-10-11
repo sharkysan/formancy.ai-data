@@ -14,16 +14,17 @@ import { findObject } from '../snapshot.js'
 import { columnAnswer, lookupAnswer } from './answers.js'
 import { driftRefusal } from './drift.js'
 import type { FieldError, FormRecord, InvalidValues, MembershipCheck, PlannedInsert, PlannedRead, PlannedUpdate, PlanRefusal } from './plan-types.js'
-import { columnsOf, prepare, type Prepared, refuse } from './prepare.js'
+import { columnsOf, prepare, type Prepared, refuse, unaddressable } from './prepare.js'
 import { filtersFor, readColumns, throughFields, throughFor } from './scope.js'
 import { decodeRecordKey } from './token.js'
 import type { DescribedTable, RecordColumn, RecordValue } from './types.js'
 
 /*
- * The one place a request from a browser becomes a request to an adapter:
- * where the policy, the codecs, the tokens and the bindings meet, so both
- * adapters receive the same typed request for the same answers, and neither
- * decides anything this file decides.
+ * The one place a request for one record from a browser becomes a request
+ * to an adapter -- a page of records is `list.ts`'s, from the same scope
+ * (0044): where the policy, the codecs, the tokens and the bindings meet, so
+ * both adapters receive the same typed request for the same answers, and
+ * neither decides anything this file decides.
  *
  * Each planner checks, in this order: the bindings against their snapshot,
  * whether the form offers the operation, the shape of the answers, the
@@ -52,15 +53,6 @@ function readAnswers(answers: unknown): { ok: true; answers: ReadonlyMap<string,
     return refuse('invalid-request', 'The answers are an object of field keys and values.')
   }
   return { ok: true, answers: new Map(Object.entries(answers)) }
-}
-
-function unaddressable(prepared: Prepared): PlanRefusal {
-  return refuse(
-    'operation-unavailable',
-    prepared.target.identity.length === 0
-      ? 'This form identifies no record: the table has no primary or unique key.'
-      : 'This form cannot address a record: a key column has no settled spelling for a token.',
-  )
 }
 
 function invalid(errors: FieldError[]): InvalidValues {

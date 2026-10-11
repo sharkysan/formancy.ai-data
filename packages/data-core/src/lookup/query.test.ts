@@ -1,6 +1,7 @@
 import { narrowOptionsByLabel } from '@formancy/spec'
 import { describe, expect, test } from 'vitest'
-import { MAX_SEARCH_LENGTH, validateLookupQuery } from './query.js'
+import { validateLookupQuery } from './query.js'
+import { MAX_SEARCH_LENGTH } from './search.js'
 import type { LookupConfig } from './types.js'
 
 const CONFIG: LookupConfig = {

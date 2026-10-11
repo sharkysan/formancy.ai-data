@@ -1,6 +1,8 @@
-import type { LookupConfig, LookupQuery, LookupSearchColumn, RowFilterTerm } from '@formancy/data-core'
+import type { LookupConfig, LookupQuery, RowFilterTerm } from '@formancy/data-core'
 import mssql from 'mssql'
+import { orderBy } from '../sql/order.js'
 import { quoteName, quoteTable } from '../sql/quote.js'
+import { searchPredicate } from '../sql/search.js'
 import { Parameters } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
 import { filterPredicate } from '../sql/filters.js'
@@ -52,50 +54,6 @@ function filtered(parameters: Parameters, terms: readonly RowFilterTerm[]): stri
 }
 
 /**
- * What a search column is matched as: text as itself, so the column's
- * collation folds case and accents as it does in an index; an integer as its
- * canonical text, the digits its label shows, converted explicitly rather
- * than by LIKE's implicit conversion (0028).
- */
-function searched(search: LookupSearchColumn): string {
-  return search.type.kind === 'integer' ? canonicalText(search.type, column(search.name)) : column(search.name)
-}
-
-/**
- * The search as a LIKE pattern that matches only itself: `\` is the escape,
- * and the escape, `%`, `_` and `[` are escaped by it. `[` too, because
- * SQL Server reads `[a-c]` as a character class; `]`, `^` and `-` mean
- * something only inside one.
- */
-export function containsPattern(search: string): string {
-  return `%${search.replace(/[\\%_[]/g, (character) => `\\${character}`)}%`
-}
-
-/**
- * The configured order, made explicit about NULLs: SQL Server puts them first
- * in an ascending order and has no NULLS LAST, so each column is preceded by
- * a CASE that places them where the configuration says. Text is ordered by
- * the column's collation — the server's rule, not code-point order — and the
- * key that ends every order makes it total, because a key is unique under that
- * same collation.
- *
- * The direction is spliced, because SQL Server takes no parameter for ASC or
- * DESC, so it is checked to be one of the two first: `buildLookupConfig` only
- * writes those, but this is handed a configuration, and one read from a
- * bundle altered where it is stored must not run as a statement.
- */
-function orderBy(config: LookupConfig): string {
-  return config.sort
-    .flatMap((sort) => {
-      if (sort.direction !== 'asc' && sort.direction !== 'desc') throw new Error(`${config.source}: ${sort.column} sorts asc or desc`)
-      const name = column(sort.column)
-      const [nullRank, valueRank] = sort.nulls === 'first' ? ['0', '1'] : ['1', '0']
-      return [`case when ${name} is null then ${nullRank} else ${valueRank} end`, `${name} ${sort.direction}`]
-    })
-    .join(', ')
-}
-
-/**
  * One page: up to `limit + 1` rows, so `lookupPage` can tell whether there is
  * more without a COUNT. The search is one parameter, matched against each
  * search column with LIKE.
@@ -103,17 +61,17 @@ function orderBy(config: LookupConfig): string {
 export function pageStatement(config: LookupConfig, query: LookupQuery, terms: readonly RowFilterTerm[]): Statement {
   const parameters = new Parameters()
   const where = [...keysPresent(config), ...filtered(parameters, terms)]
+  // Matched as a record list matches (sql/search.ts), and ordered as one is ordered (sql/order.ts).
   if (query.search !== '') {
     if (config.search.length === 0) throw new Error(`${config.source} has no searchable column`)
-    const pattern = parameters.add(mssql.NVarChar(mssql.MAX), containsPattern(query.search))
-    where.push(`(${config.search.map((search) => `${searched(search)} like ${pattern} escape N'\\'`).join(' or ')})`)
+    where.push(searchPredicate(parameters, TARGET, config.search, query.search))
   }
   const offset = parameters.add(mssql.BigInt, query.offset)
   const fetch = parameters.add(mssql.Int, query.limit + 1)
   return parameters.statement(
     `select ${[...keySelect(config), ...displaySelect(config)].join(', ')} from ${quoteTable(config.target)} as ${TARGET}
     where ${where.join(' and ')}
-    order by ${orderBy(config)}
+    order by ${orderBy(TARGET, config.sort)}
     offset ${offset} rows fetch next ${fetch} rows only`,
   )
 }

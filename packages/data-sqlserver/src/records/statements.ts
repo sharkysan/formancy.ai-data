@@ -42,7 +42,7 @@ export const DEFINITION_MOVED_MESSAGE = 'formancy: table definition moved'
 export type ExpectedVersion = { kind: 'rowversion'; bytes: Buffer } | { kind: 'version-column'; value: string }
 
 /** One column of what a statement returns: its name in the result, its type in a table variable, and the SQL that computes it. */
-interface Selected {
+export interface Selected {
   name: string
   declared: string
   expression: string
@@ -55,7 +55,7 @@ interface Selected {
  * `encodeRowversion` spells, so the adapter and the core cannot spell a token
  * two ways; a version column as its decimal text.
  */
-function selection(columns: readonly RecordColumn[], concurrency: RecordConcurrency | null, source: string): Selected[] {
+export function selection(columns: readonly RecordColumn[], concurrency: RecordConcurrency | null, source: string): Selected[] {
   const selected: Selected[] = [{ name: '[found]', declared: 'int', expression: '1' }]
   columns.forEach((column, index) => {
     selected.push({ name: `[c${String(index)}]`, declared: 'nvarchar(max)', expression: canonicalText(column.type, `${source}${quoteName(column.name)}`) })
@@ -77,18 +77,18 @@ function versionOf(concurrency: RecordConcurrency, source: string): Selected {
  * correlated subquery over another table, or over the same one, can then
  * never bind a bare name to the wrong row.
  */
-const ROW = '[r]'
+export const ROW = '[r]'
 
 function column(name: string): string {
   return `${ROW}.${quoteName(name)}`
 }
 
-function keyPredicates(parameters: Parameters, key: readonly RecordValue[]): string[] {
+export function keyPredicates(parameters: Parameters, key: readonly RecordValue[]): string[] {
   return key.map((value) => `${column(value.name)} = ${bindValue(parameters, value.type, value.value)}`)
 }
 
 /** The trusted filters, each comparing the column's canonical value exactly (../sql/filters.ts, 0028). */
-function filterPredicates(parameters: Parameters, terms: readonly RowFilterTerm[]): string[] {
+export function filterPredicates(parameters: Parameters, terms: readonly RowFilterTerm[]): string[] {
   return terms.map((term) => filterPredicate(parameters, column(term.column), term))
 }
 
@@ -104,7 +104,7 @@ const PARENT = '[p]'
  * same table compares the parent's key with the record's column and never a
  * row with itself. A record whose foreign key is NULL matches no parent.
  */
-function throughPredicate(parameters: Parameters, through: ThroughTerms): string {
+export function throughPredicate(parameters: Parameters, through: ThroughTerms): string {
   const pairs = through.pairs.map((pair) => `${PARENT}.${quoteName(pair.references)} = ${column(pair.column)}`)
   const terms = through.terms.map((term) => filterPredicate(parameters, `${PARENT}.${quoteName(term.column)}`, term))
   return `exists (select 1 from ${quoteTable(through.target)} as ${PARENT} where ${[...pairs, ...terms].join(' and ')})`
@@ -120,16 +120,33 @@ function tableName(parameters: Parameters, table: ObjectRef): string {
   return parameters.add(mssql.NVarChar(mssql.MAX), quoteTable(table))
 }
 
+/** One column of a table's description: its name in the result, and the SQL that computes it. */
+export interface DescribedColumnSql {
+  name: string
+  expression: string
+}
+
 /** The table's facts and their digest, as `[facts]` and `[digest]` of a derived table `[f]`. */
-function described(parameters: Parameters, table: ObjectRef): { select: string; from: string } {
-  return { select: `[f].[facts], ${digestOf('[f].[facts]')} as [digest]`, from: `(select ${factsOf(tableName(parameters, table))} as [facts]) as [f]` }
+export function described(parameters: Parameters, table: ObjectRef): { columns: DescribedColumnSql[]; from: string } {
+  return {
+    columns: [
+      { name: '[facts]', expression: '[f].[facts]' },
+      { name: '[digest]', expression: digestOf('[f].[facts]') },
+    ],
+    from: `(select ${factsOf(tableName(parameters, table))} as [facts]) as [f]`,
+  }
+}
+
+/** A description's columns as a select list. */
+function describedSelect(columns: readonly DescribedColumnSql[]): string {
+  return columns.map((column) => `${column.expression} as ${column.name}`).join(', ')
 }
 
 /** The table's description, in one statement: its facts and their digest. */
 export function describeStatement(table: ObjectRef): Statement {
   const parameters = new Parameters()
-  const { select, from } = described(parameters, table)
-  return parameters.statement(`select ${select} from ${from}`)
+  const { columns, from } = described(parameters, table)
+  return parameters.statement(`select ${describedSelect(columns)} from ${from}`)
 }
 
 /**
@@ -142,11 +159,11 @@ export function describeStatement(table: ObjectRef): Statement {
  */
 export function readStatement(request: ReadRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): Statement {
   const parameters = new Parameters()
-  const { select, from } = described(parameters, request.target.table)
+  const { columns, from } = described(parameters, request.target.table)
   const where = located(parameters, request.key, terms, through)
   const record = selection(request.columns, request.target.concurrency, `${ROW}.`).map((selected) => `${selected.expression} as ${selected.name}`)
   return parameters.statement(
-    `select ${select}, [record].* from ${from} outer apply (select top (2) ${record.join(', ')} from ${quoteTable(request.target.table)} as ${ROW} where ${where.join(' and ')}) as [record]`,
+    `select ${describedSelect(columns)}, [record].* from ${from} outer apply (select top (2) ${record.join(', ')} from ${quoteTable(request.target.table)} as ${ROW} where ${where.join(' and ')}) as [record]`,
   )
 }
 

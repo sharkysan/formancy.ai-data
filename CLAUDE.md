@@ -49,21 +49,22 @@ One path runs through the packages, and most changes touch one step of it.
    where compare-and-swap is a hard link (0013). `validateBundle` checks it on
    publish and on every read (0019).
 5. **Run.** The runtime plane serves a published form's records and lookups.
-   `data-core/src/records/plan.ts` is the one place a browser's request meets
-   the policy, the codecs, the tokens and the bindings and becomes a typed
-   request to an adapter (0018, 0022). The adapter runs it as one guarded
-   statement and never retries it (0015).
+   `data-core/src/records/plan.ts` -- and `records/list.ts` for a page of
+   records (0044) -- is where a browser's request meets the policy, the
+   codecs, the tokens and the bindings and becomes a typed request to an
+   adapter (0018, 0022). The adapter runs it as one guarded statement and
+   never retries it (0015).
 6. **Review drift.** `diffSnapshots` (`drift/`) classifies a fresh snapshot
    against what a published form's bindings and lookups rest on (0010).
 
 The ports, each implemented by `data-postgres` and `data-sqlserver`:
-`DatabaseAdapter` (ping, discover), `RecordAdapter` (read, insert, update) and
-`LookupAdapter` (search, resolve, rejects). Each adapter package exports
-`connect…`, `create…Adapter`, `create…Records` and `create…Lookups` and owns
-its driver (0025); `data-server/src/drivers.ts` is the one place the server
-meets them. Inside an adapter, `discovery/` holds one catalog concern per file,
-`sql/` the quoting, binding and statement building, and `records/` and
-`lookups/` the operations.
+`DatabaseAdapter` (ping, discover), `RecordAdapter` (describe, read, list,
+insert, update) and `LookupAdapter` (search, resolve, rejects). Each adapter
+package exports `connect…`, `create…Adapter`, `create…Records` and
+`create…Lookups` and owns its driver (0025); `data-server/src/drivers.ts` is
+the one place the server meets them. Inside an adapter, `discovery/` holds one
+catalog concern per file, `sql/` the quoting, binding and statement building,
+and `records/` and `lookups/` the operations.
 
 `data-server` is Fastify. `createDataServer` registers the administrator
 plane (`routes/admin*.ts`) only when given a connection registry, a store and

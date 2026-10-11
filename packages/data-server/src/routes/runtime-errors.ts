@@ -39,6 +39,8 @@ export function planRefusal(code: PlanRefusalCode, message: string): HttpRefusal
     case 'invalid-record-token':
     case 'invalid-version':
     case 'nothing-to-update':
+    case 'not-sortable':
+    case 'not-searchable':
       return { status: 400, body: { code, message } }
     case 'record-not-read':
       // The update route plans with the record it read and answers a read

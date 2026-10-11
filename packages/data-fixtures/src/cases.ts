@@ -3,6 +3,8 @@ import { DATABASE_KINDS } from '@formancy/data-core'
 import type { TestOptions } from 'vitest'
 import { TestRunner } from 'vitest'
 import { sharedDrifting } from './drifting.js'
+import { LIST_PARITY } from './lists.js'
+import type { ListCase } from './lists.js'
 import type { FilterParityCase, RefusalParityCase } from './parity.js'
 import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 import { EDGE_VALUES } from './values.js'
@@ -63,11 +65,15 @@ export const THROUGH_CASES = ['read', 'update', 'self-reference', 'composite', '
 export type ThroughCase = (typeof THROUGH_CASES)[number]
 export const throughCase = (name: ThroughCase): string => `through: ${name}`
 
+/** What a list of a form's records shows on each engine (0044), by the name of its entry in LIST_PARITY. */
+export const listCase = (name: ListCase): string => `list: ${name}`
+
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
  * every filter, label, temporal read, refusal and edge value, then the two
  * shipments, then every change to a form's own table both engines run (0041),
- * then what a form scoped through a parent shows (0043).
+ * then what a form scoped through a parent shows (0043), then what a list of
+ * a form's records shows (0044).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -83,6 +89,7 @@ export function sharedCases(): string[] {
     shipmentCase('second'),
     ...sharedDrifting().map((entry) => driftingCase(entry.name)),
     ...THROUGH_CASES.map(throughCase),
+    ...(Object.keys(LIST_PARITY) as ListCase[]).map(listCase),
   ]
   const seen = new Set<string>()
   for (const id of ids) {

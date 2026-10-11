@@ -35,7 +35,14 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > kept to its parent's tenant: a policy's `through` scopes its rows by a
 > lookup's filter, in the statements that decide "not found", so another
 > tenant's line is not found on read or update, whatever version is sent,
-> on both engines. A page
+> on both engines. A form's records can be listed a page at a time under the
+> same read policy and throughs, searched and paged as a lookup is, each row
+> what a read of its token returns -- only where every key column cannot be
+> NULL and is one the person may read or is pinned to them, and only where
+> something scopes the rows wherever a lookup's options are filtered, so a
+> child form published before `through` has no list; a page over a table
+> that no longer holds its key unique and NOT NULL is refused as drift, and
+> a host page does not show a list yet. A page
 > renders generated forms in React and Angular side by side, and the studio
 > walks an administrator from a connection to a published form and its drift.
 > A published form keeps the presentation chosen over its generated base, and
@@ -76,10 +83,11 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > loaded, every shared case on both engines -- which a release checks, signs
 > and attaches. Performance is measured, not promised:
 > [`docs/performance.md`](./docs/performance.md) publishes figures for every
-> runtime request through the shipped server on both engines against a sized
-> customer table, with the database's size, the machine, the network path and
-> the date; CI holds the rows each lookup reads and the round trips each
-> operation makes, never a time. A
+> runtime request but a page of records, which came after them, through the
+> shipped server on both engines against a sized customer table, with the
+> database's size, the machine, the network path and the date; CI holds the
+> rows each lookup reads and the round trips each measured operation makes,
+> never a time. A
 > [guide](./docs/deploy/cloudflare.md) puts that stack behind Cloudflare: a
 > locally-managed tunnel whose configuration is generated from the server's
 > routes and checked against cloudflared, Access in front of the studio, and
@@ -126,7 +134,7 @@ dist, which the notices take as this repository's own.
 | `@formancy/data-core` | The database-neutral port and metadata contract: what discovery returns, including what it could not see. No driver, no HTTP, no Node. |
 | `@formancy/data-postgres` | The PostgreSQL adapter, on the `postgres` driver. |
 | `@formancy/data-sqlserver` | The SQL Server adapter, on `mssql` over `tedious` — pure JavaScript, no ODBC. |
-| `@formancy/data-client` | The browser's side of the runtime plane: a `fetch`-based client for a published form's definition, records and lookups, and the option sources both formancy renderers take. Source-available, framework-neutral, no Node. |
+| `@formancy/data-client` | The browser's side of the runtime plane: a `fetch`-based client for a published form's definition, its records -- one by its token or a page at a time -- and its lookups, and the option sources both formancy renderers take. Source-available, framework-neutral, no Node. |
 | `@formancy/data-server` | The server: configuration store, host identity, the administrator and runtime planes over HTTP, the audit trail, and the composition root that starts them from configuration. Fastify, like formancy's. |
 | `@formancy/data-fixtures` | Private test support: one business model for both engines, a restricted reader, and the comparator both adapters answer to. Never published. |
 | `@formancy/data-performance` | Private: the harness that measures the shipped server against both engines and renders `docs/performance.md` from what it measured. Never published. |
@@ -486,7 +494,7 @@ other container runs.
 
 - [`docs/getting-started.md`](./docs/getting-started.md) — from an empty machine with Docker and git to a published form on both engines; CI runs it as written.
 - [`docs/deploy/cloudflare.md`](./docs/deploy/cloudflare.md) — the composed stack behind a Cloudflare Tunnel, with Access in front of the studio and a door for a host application: what Cloudflare does here and what it cannot, every setting, and what nobody has measured.
-- [`docs/performance.md`](./docs/performance.md) — what each runtime request costs through the shipped server on both engines, with the database's size, the machine, the network path and the date, and what holds each claim.
+- [`docs/performance.md`](./docs/performance.md) — what each runtime request but a page of records costs through the shipped server on both engines, with the database's size, the machine, the network path and the date, and what holds each claim.
 - [`docs/decisions/`](./docs/decisions/README.md) — every decision somebody could helpfully undo, with what verifies it.
 - [`docs/release/`](./docs/release/README.md) — the report every CI run and every release builds of what it was tested on, the register of the limitations the decisions state, and the release gates' evidence.
 - [`docs/images/README.md`](./docs/images/README.md) — how the README's pictures are taken, and what holds them and what does not.

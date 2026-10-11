@@ -334,6 +334,23 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   sent. A through field is required on create, omitted or null, and may not
   be cleared on update, whatever its column allows: a row whose foreign key
   is NULL references no parent, and nobody could reach it again.
+- **A page of records** (0044). `listable(snapshot, bindings, policy,
+  context)` decides whether this person is offered a list at all: the
+  policy first, then a key a token can carry and the snapshot holds NOT
+  NULL, rows something scopes where a lookup's options are filtered
+  (`unscopedLookups`), and every key column in a field the person may read
+  or pinned by their filter. `listColumns(bindings, fields)` is what a list
+  may be sorted and searched by, which `GET /v1/forms/:id` sends as `list`.
+  `validateListQuery` checks a body from a browser; `planList` plans a
+  `ListRequest` -- the read's columns, filters and throughs, the order
+  `listOrder` makes total with the key, the search and the parent -- and
+  `recordPage` builds `{ rows, hasMore }` from the `limit + 1` rows an
+  adapter fetched, each row what `toFormAnswers` makes of a read of it. An
+  adapter reads a request through `listTerms`, which throws on anything
+  `planList` would not have produced. A page is decided over the
+  description its own statement carried by `driftRefusal(…, 'list')`: a
+  read's refusal, and `LIST_REFUSED` when the table no longer holds the key
+  unique and NOT NULL.
 - **Membership is the database's.** A lookup token whose key carries the tenant
   is refused when the tenant is not the context's; one that does not — a
   surrogate id — cannot be judged without a query. Every selection comes back
@@ -343,8 +360,9 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
 - **The record port describes the table** (0041): `describe(table)` reads
   the root's kind, columns, keys and foreign keys in one statement, `read`
   answers the same description beside the record, or beside `null` when no
-  row is inside the filters, and every `InsertRequest` and `UpdateRequest`
-  carries the `definition` the decision was made over. An insert or an
+  row is inside the filters, `list` answers it beside a page, and every
+  `InsertRequest` and `UpdateRequest` carries the `definition` the decision
+  was made over. An insert or an
   update runs only while the table's definition is that one; otherwise it is
   `schema-changed`, and the record was not written.
 - **A database's refusal** is a `RecordFailure` with a stable code. `refused`

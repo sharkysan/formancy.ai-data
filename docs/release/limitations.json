@@ -167,7 +167,7 @@
       ]
     },
     "0012": {
-      "reviewed": "sha256:08e8a5fdd64e2944eb523829334a685423ed02158d026f88b521a9935f9a611a",
+      "reviewed": "sha256:2e663bc1695384c8ddb77e6ae980431aa73ae2064204f32292680fcae3480168",
       "limitations": [
         {
           "area": "forms",
@@ -234,7 +234,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:c8dbac08ca8ae5459a6a4f39498b697fbafe0ae71949f72e91c532a1d2dccbf8",
+      "reviewed": "sha256:755ef40da917e5f1e37a38d9cddb71252e8e124d8e18d002277345be7782ca9e",
       "limitations": [
         {
           "area": "databases",
@@ -247,7 +247,7 @@
       ]
     },
     "0016": {
-      "reviewed": "sha256:969ebd4b79729057aa84905e515da4c55e08594e3603fc7789c347a0627894ae",
+      "reviewed": "sha256:be2346c91bc2aa6c0acc546356ccab174da9296f5c32abc4e933e820d1e43d55",
       "limitations": [
         {
           "area": "databases",
@@ -289,7 +289,7 @@
       ]
     },
     "0017": {
-      "reviewed": "sha256:c7c8914ef4591cf14869c14a0e998e4c4d336f3fc5fc15b885ab383a7f9e1f07",
+      "reviewed": "sha256:9c9bd74c4e790e894297b67f9d753f93e98cab4991cd087da13437638cf20b50",
       "limitations": [
         {
           "area": "writes",
@@ -335,7 +335,7 @@
       ]
     },
     "0018": {
-      "reviewed": "sha256:dcd281277cc87709dbc6299d7951e72c8ffff63c4854c950d98b52a2fbbaa753",
+      "reviewed": "sha256:0abf948e2975e3aec7eb922b9676720bde2b5123405d5026f07a52e8d73e074f",
       "limitations": [
         {
           "area": "access",
@@ -403,7 +403,7 @@
       ]
     },
     "0022": {
-      "reviewed": "sha256:2261942b55be3c982afb53d759c807cca87ad0e4f5bdb3a07fc017db2e68b2f8",
+      "reviewed": "sha256:4a3d155fd55f1fd7bd34ab34731d1ed504a11610dc886cc19fd4d282c249beb3",
       "limitations": [
         {
           "area": "writes",
@@ -416,7 +416,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:b329ace8bb3e206236d82979a8d6b7dd8ccf755c2be37482b006db451c69daa3",
+      "reviewed": "sha256:39bfe61cec4635ef5212e891b7177c563d172bbd70f2f258c8aabb45a55cc899",
       "limitations": [
         {
           "area": "operations",
@@ -1050,7 +1050,7 @@
       ]
     },
     "0041": {
-      "reviewed": "sha256:1c54db7162c6c1e9010d70062bd2b35092c34419df69a5551478a9ef3e9f7e21",
+      "reviewed": "sha256:3aa676c8679bcadafcab488301c8558a587c58fb3ff09116aa6eede60455f06e",
       "limitations": [
         {
           "area": "forms",
@@ -1158,7 +1158,7 @@
       ]
     },
     "0043": {
-      "reviewed": "sha256:c8bafc5bbfe0b5c877a73d1e4e64fa4be3fac87ee9a0d883eaae7e2a0ff86899",
+      "reviewed": "sha256:c104bc5bac9b62590249ccb9b2410ee3d2c331d3f10d43f926031061e8c2c609",
       "limitations": [
         {
           "area": "access",
@@ -1204,6 +1204,64 @@
           "area": "access",
           "says": "A key a through names is a grant for 0039's check, so a publish that re-points it to another foreign key is refused until confirmed even when nobody holds a role on its field.",
           "heldBy": "packages/data-server/src/reassigned.test.ts"
+        }
+      ]
+    },
+    "0044": {
+      "reviewed": "sha256:2af59b155399d0a90d8b0ac92a47b0f9027761a42032623c204732c63f9e04a0",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "By how both engines run an offset and a sort, and not measured here, a list page reads every row before its offset, and a page sorted by a column no index serves reads every row its filters admit -- the whole table on a form with no tenant row filter."
+        },
+        {
+          "area": "forms",
+          "says": "A list has no total, and a row inserted or removed before the offset between two pages shows one row twice or skips one."
+        },
+        {
+          "area": "forms",
+          "says": "A list is sorted and searched by the form's own column fields only, never by a lookup's label."
+        },
+        {
+          "area": "forms",
+          "says": "A list's text is ordered by each engine's collation, and so is a uuid on SQL Server, so a page of non-ASCII names can come in a different order on each engine."
+        },
+        {
+          "area": "forms",
+          "says": "A form whose key can be NULL, or whose key is held in a field the person may not read, offers that person no list, only a record by its token.",
+          "heldBy": "packages/data-core/src/records/plan-list.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A form whose policy has no row filter and no through while a lookup's options are filtered offers no list -- every child form published before through existed, until it is republished with one, and a policy that means its rows are shared, which has no way to say so.",
+          "heldBy": "packages/data-core/src/records/plan-list.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A row whose key does not fit a token is listed in its place and cannot be opened.",
+          "heldBy": "packages/data-core/src/records/plan-list.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "Nothing bounds a list's statement: on SQL Server the driver's default request timeout, which this module does not set, is expected to end a long one as `unavailable` as it ends a read -- inferred for a list, not tested -- on PostgreSQL it runs to its end, and on both the database finishes a list the browser abandoned."
+        },
+        {
+          "area": "databases",
+          "says": "A list sorted by a column outside the key that was made nullable since its snapshot places its NULLs as each engine does until drift is reviewed: last ascending on PostgreSQL, first ascending on SQL Server."
+        },
+        {
+          "area": "forms",
+          "says": "A key column made nullable, or a key dropped, since a form was published refuses every page of its records as drift until the form is reviewed, though drift review reports a nullable key column only as a note.",
+          "heldBy": "packages/data-server/src/routes/runtime-lists.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A list narrowed to a parent over a text foreign key matches as the database's equality does: case-insensitively under a case-insensitive collation on SQL Server, exactly under PostgreSQL's default collation.",
+          "heldBy": "packages/data-postgres/src/list.integration.test.ts"
+        },
+        {
+          "area": "testing",
+          "says": "No list is in the published performance figures: what a page reads, its round trips and its time are not measured."
         }
       ]
     },

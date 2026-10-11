@@ -1,4 +1,4 @@
-import type { FieldError, FormRecord, LookupResult, LookupRow, PublishedForm } from '@formancy/data-core'
+import type { FieldError, FormRecord, LookupResult, LookupRow, PublishedForm, RecordList } from '@formancy/data-core'
 import type { Refusal } from './client.js'
 
 /*
@@ -27,12 +27,33 @@ function isRows(value: unknown): value is LookupRow[] {
   return Array.isArray(value) && value.every((row) => isRecord(row) && typeof row['token'] === 'string' && typeof row['label'] === 'string')
 }
 
+function isStrings(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string')
+}
+
+/** What a form's list may be searched and sorted by, or `null` for no list (0044): a reply without one is from no server that has lists. */
+function isListColumns(value: unknown): value is PublishedForm['list'] {
+  return value === null || (isRecord(value) && isStrings(value['searchable']) && isStrings(value['sortable']))
+}
+
 export function isPublishedForm(body: unknown): body is PublishedForm {
-  return isRecord(body) && isRecord(body['form']) && isRecord(body['form']['model']) && Array.isArray(body['operations']) && Array.isArray(body['readable'])
+  return (
+    isRecord(body) &&
+    isRecord(body['form']) &&
+    isRecord(body['form']['model']) &&
+    Array.isArray(body['operations']) &&
+    Array.isArray(body['readable']) &&
+    isListColumns(body['list'])
+  )
 }
 
 export function isFormRecord(body: unknown): body is FormRecord {
   return isRecord(body) && isNullableString(body['record']) && isNullableString(body['version']) && isRecord(body['answers'])
+}
+
+/** A page of records (0044): every row a record, and whether more follow. */
+export function isRecordList(body: unknown): body is RecordList {
+  return isRecord(body) && Array.isArray(body['rows']) && body['rows'].every(isFormRecord) && typeof body['hasMore'] === 'boolean'
 }
 
 export function isLookupResult(body: unknown): body is LookupResult {

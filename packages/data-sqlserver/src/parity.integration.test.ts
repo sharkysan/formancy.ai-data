@@ -163,8 +163,9 @@ describe('FILTER_PARITY: a row filter compares the canonical value exactly', () 
   // under every SQL Server collation it ignores trailing spaces. Before 0028
   // the filter compared under BIN2 alone, so tenant `acme` read the rows of
   // `acme ` (C2-table) where PostgreSQL did not. Each case is asked of every
-  // operation a filter scopes: a lookup's page, resolve and membership, and a
-  // record's read and guarded update.
+  // operation a filter scopes: a lookup's page, resolve and membership, a
+  // list of the table's records (0044), and a record's read and guarded
+  // update.
   for (const parityCase of FILTER_PARITY) {
     test(`${parityCase.column} = ${JSON.stringify(parityCase.value)}`, covers('sqlserver', filterCase(parityCase)), async () => {
       const scoped = scopeRowFilters(meta(parity, TENANT_ITEM), [{ column: parityCase.column, value: parityCase.value }], 'parity')
@@ -197,6 +198,21 @@ describe('FILTER_PARITY: a row filter compares the canonical value exactly', () 
       expect((await lookups.resolve(config, named, filters)).map((row) => row.token).sort()).toEqual(expected)
       const rejected = await lookups.rejects(config, named, filters)
       expect(named.filter((candidate) => !rejected.includes(candidate)).sort()).toEqual(expected)
+
+      // A list of the table under the same filter lists exactly those rows (0044).
+      const listed = await createSqlServerRecords(owner).list({
+        target: versioned(parity, TENANT_ITEM),
+        columns: [columnOf(parity, TENANT_ITEM, 'tenant_code'), columnOf(parity, TENANT_ITEM, 'item_no')],
+        filters,
+        through: [],
+        equal: [],
+        search: null,
+        sort: [{ column: 'tenant_code', direction: 'asc', nulls: null }, { column: 'item_no', direction: 'asc', nulls: null }],
+        offset: 0,
+        limit: 50,
+      })
+      if (!listed.ok) throw new Error(`expected a page, got ${listed.code}`)
+      expect(listed.rows.map((row) => token([String(row.values['tenant_code']), String(row.values['item_no'])])).sort()).toEqual(expected)
 
       const records = defined(createSqlServerRecords(owner))
       const target = versioned(parity, TENANT_ITEM)

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
-import { findObject, rowFilterColumnProblem, validatePolicy } from '@formancy/data-core'
+import { findObject, rowFilterColumnProblem, unscopedLookups, validatePolicy } from '@formancy/data-core'
 import type { FormBindings, FormPolicy, MetadataSnapshot, ReassignedKey } from '@formancy/data-core'
 import { describeRef, throughBlocker } from './choice.js'
 import { labelOf, useDocument } from './document.js'
@@ -91,10 +91,13 @@ function PolicyCheck({ problems }: { problems: readonly string[] }): ReactElemen
  * through no lookup, though a lookup's list is filtered -- which is what a
  * child table with no tenant of its own looks like before its rows are tied
  * to its parent's. `rowFilters: []` is a statement a policy may make (0011),
- * so nothing here blocks publishing.
+ * so nothing here blocks publishing -- but the server lists no records of
+ * such a form (0044), and the note says so. `filtered` is
+ * `unscopedLookups`'s answer, the one the server refuses that list by, so
+ * the note and the server cannot disagree about which forms have this shape.
  */
-function UnscopedNote({ root, policy, filtered }: { root: string; policy: FormPolicy; filtered: readonly string[] }): ReactElement | null {
-  if (policy.rowFilters.length > 0 || (policy.through ?? []).length > 0 || filtered.length === 0) return null
+function UnscopedNote({ root, filtered }: { root: string; filtered: readonly string[] }): ReactElement | null {
+  if (filtered.length === 0) return null
   const lists = `${filtered.join(' and ')} ${filtered.length === 1 ? 'list is' : 'lists are'}`
   return (
     <div className="notice" role="note" aria-labelledby="unscoped-title">
@@ -103,7 +106,8 @@ function UnscopedNote({ root, policy, filtered }: { root: string; policy: FormPo
       </p>
       <p>
         {root} has no row filter and is reached through no lookup, so every one of its rows is in reach of anybody an operation
-        names, though the {lists} filtered. Where a row belongs to the tenant of the row it names, tick the box under its list.
+        names, though the {lists} filtered, and the server offers no list of them. Where a row belongs to the tenant of the row it
+        names, tick the box under its list.
       </p>
     </div>
   )
@@ -287,7 +291,7 @@ export function PolicyStep({
         onLookups={(lookups) => onPolicy({ ...policy, lookups })}
         onThrough={(through) => onPolicy(withThrough(policy, through))}
       />
-      <UnscopedNote root={describeRef(bindings.root)} policy={policy} filtered={lookupBindings(bindings).filter((binding) => (policy.lookups[binding.field]?.length ?? 0) > 0).map((binding) => labels[binding.field] ?? binding.field)} />
+      <UnscopedNote root={describeRef(bindings.root)} filtered={unscopedLookups(bindings, policy).map((field) => labels[field] ?? field)} />
       {strayLookups.length === 0 ? null : (
         <div className="notice" role="note">
           <p>The policy filters, or reaches rows through, lookups this form does not have:</p>

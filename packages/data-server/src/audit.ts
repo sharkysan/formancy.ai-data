@@ -17,7 +17,7 @@ interface AuditEventBase {
   outcome: string
 }
 
-export type RuntimeOperation = 'form' | 'read' | 'create' | 'update' | 'lookup-query' | 'lookup-resolve'
+export type RuntimeOperation = 'form' | 'read' | 'list' | 'create' | 'update' | 'lookup-query' | 'lookup-resolve'
 
 export type AdminOperation =
   | 'connection-list'

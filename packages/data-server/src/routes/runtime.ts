@@ -5,6 +5,8 @@ import {
   driftRefusal,
   findObject,
   intendedRecord,
+  listable,
+  listColumns,
   lookupRowFilter,
   NOTHING_LEFT,
   planCreate,
@@ -42,6 +44,7 @@ import type { AuditSink, RuntimeAuditEvent, RuntimeOperation } from '../audit.js
 import { auditedForm, auditRequests, recordReference } from '../audit.js'
 import { loadPublished } from '../published.js'
 import { planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
+import { registerListRoute } from './runtime-lists.js'
 import { createWriteOnce, INVALID_WRITE_ID, writeId } from './write-once.js'
 import type { WriteAnswer } from './write-once.js'
 
@@ -71,14 +74,19 @@ declare module 'fastify' {
 export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'GET /v1/forms/:id': 'form',
   'POST /v1/forms/:id/records/read': 'read',
+  'POST /v1/forms/:id/records/list': 'list',
   'POST /v1/forms/:id/records/create': 'create',
   'POST /v1/forms/:id/records/update': 'update',
   'POST /v1/forms/:id/lookups/:source/query': 'lookup-query',
   'POST /v1/forms/:id/lookups/:source/resolve': 'lookup-resolve',
 }
 
-/** At most this many tokens are resolved in one request: a form holds one per lookup field, not thousands. */
-const MAX_RESOLVE = 100
+/**
+ * At most this many tokens are resolved in one request: a form holds one per
+ * lookup field, not thousands. A list page's tokens for one lookup field fit
+ * one resolve: `LIST_PAGE_SIZE` is at most this, which a test holds (0044).
+ */
+export const MAX_RESOLVE = 100
 
 /** A read that found no record inside the filters, as the port's failure, for the answers that need one. */
 const NOT_FOUND: RecordFailure = { ok: false, code: 'not-found', message: 'No such record exists inside the filters.' }
@@ -237,7 +245,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    * and never the change's message, which names columns and types the person
    * is not told -- and answered with the planner's sentence.
    */
-  function driftAnswer(request: FastifyRequest<{ Params: { id: string } }>, operation: PolicyOperation | 'form', changes: readonly DriftChange[] | undefined, message: string): WriteAnswer {
+  function driftAnswer(request: FastifyRequest<{ Params: { id: string } }>, operation: PolicyOperation | 'list' | 'form', changes: readonly DriftChange[] | undefined, message: string): WriteAnswer {
     request.log.warn(
       { form: request.params.id, version: request.auditTrail?.formVersion ?? null, operation, changes: (changes ?? []).map((change) => ({ kind: change.kind, affects: change.affects })) },
       'refused: the database no longer fits this form as published',
@@ -245,8 +253,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     return planRefusal('drift', message)
   }
 
-  /** A planner's refusal as the answer, its drift said in the log first. */
-  function refusal(request: FastifyRequest<{ Params: { id: string } }>, operation: PolicyOperation, plan: PlanRefusal): WriteAnswer {
+  /** A planner's refusal as the answer, its drift said in the log first, under the operation the audit names. */
+  function refusal(request: FastifyRequest<{ Params: { id: string } }>, operation: PolicyOperation | 'list', plan: PlanRefusal): WriteAnswer {
     return plan.code === 'drift' && plan.drift !== undefined ? driftAnswer(request, operation, plan.drift, plan.message) : planRefusal(plan.code, plan.message)
   }
 
@@ -371,6 +379,31 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   }
 
   /**
+   * A read the database refused, a record's or a page's: one that names a
+   * column that is gone -- `schema-changed` -- returned no description, so
+   * the table is described once more and the read decided over that, and a
+   * form drift stops is answered as drift whichever statement found it out
+   * (0041). Any other failure is the database's. A page is decided as a
+   * list (0044), and said in the log as one.
+   */
+  async function unread(request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, open: OpenConnection, failure: RecordFailure, operation: 'read' | 'list'): Promise<WriteAnswer> {
+    const root = failure.code === 'schema-changed' ? await describedRoot(bundle, open) : undefined
+    const refused = root?.ok === true ? driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, operation) : undefined
+    return refused === undefined ? recordFailure(bundle.bindings, failure) : refusal(request, operation, refused)
+  }
+
+  /**
+   * A read decided over the description its own statement carried (0041):
+   * the refusal when drift stops reading this form -- or, for a page, when
+   * the table no longer holds its key to a total order (0044) -- or
+   * `undefined`.
+   */
+  function undecided(request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, described: DescribedTable, operation: 'read' | 'list'): WriteAnswer | undefined {
+    const refused = driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, described, operation)
+    return refused === undefined ? undefined : refusal(request, operation, refused)
+  }
+
+  /**
    * The form, what this person may do with it now, and which fields they may
    * see. The policy first, before any statement; then the root is described,
    * and only what the database as it is now still allows is offered (0041):
@@ -395,7 +428,12 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const operations = allowed.filter((operation) => operation === 'read' || verdict.writable[operation])
     if (operations.length === 0) return answered(reply, driftAnswer(request, 'form', decided.drift, NOTHING_LEFT))
     const readable = readableFields(bundle.policy, actor, bundle.bindings)
-    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [] } satisfies PublishedForm
+    // What `planList` will accept, from the function it asks, and what a page
+    // over this description would be decided as, so the page never offers a
+    // grid it would be refused (0044).
+    const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, actor)
+    const list = listed.ok && driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'list') === undefined ? listColumns(bundle.bindings, listed.fields) : null
+    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list } satisfies PublishedForm
   })
 
   /**
@@ -419,16 +457,15 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const open = await connection(bundle, reply)
     if (open === undefined) return reply
     const outcome = await open.records.read(plan.request)
-    if (!outcome.ok) {
-      const root = outcome.code === 'schema-changed' ? await describedRoot(bundle, open) : undefined
-      const refused = root?.ok === true ? driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'read') : undefined
-      return answered(reply, refused === undefined ? recordFailure(bundle.bindings, outcome) : refusal(request, 'read', refused))
-    }
-    const refused = driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, outcome.described, 'read')
-    if (refused !== undefined) return answered(reply, refusal(request, 'read', refused))
+    if (!outcome.ok) return answered(reply, await unread(request, bundle, open, outcome, 'read'))
+    const drifted = undecided(request, bundle, outcome.described, 'read')
+    if (drifted !== undefined) return answered(reply, drifted)
     if (outcome.record === null) return answered(reply, recordFailure(bundle.bindings, NOT_FOUND))
     return toFormAnswers(bundle.bindings, plan.fields, { ok: true, ...outcome.record })
   })
+
+  // A page of records is a read of many (0044): its steps are the read's, and so is every decision between them.
+  registerListRoute(app, { published, connection, context, unread, undecided, answered })
 
   app.post<{ Params: { id: string } }>('/v1/forms/:id/records/create', async (request, reply) => {
     const body = request.body

@@ -70,6 +70,28 @@ describe('when the data server is not what answers', () => {
     expect(await createDataClient({ token: () => 't', base }).form('pg-order')).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
   })
 
+  // A form's `list` says whether a grid may be offered (0044). A reply
+  // without one -- a server older than lists -- is not this server's form:
+  // taken for one, `list !== null` would hold for `undefined`, and a host
+  // would offer a grid the server cannot serve. `null` and the columns are
+  // both the server's. Watched failing with `list` left unchecked.
+  test("a form without the server's list is unexpected, and a list of null or columns is the server's", async () => {
+    const FORM = { form: { model: {} }, operations: ['read'], readable: ['id'] }
+    let body: unknown = FORM
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    for (const list of [undefined, 'yes', { searchable: ['id'] }, { searchable: 'id', sortable: [] }, { searchable: [], sortable: [1] }]) {
+      body = { ...FORM, list }
+      expect(await client.form('pg-order'), JSON.stringify(list)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
+    for (const list of [null, { searchable: [], sortable: ['id'] }]) {
+      body = { ...FORM, list }
+      expect(await client.form('pg-order'), JSON.stringify(list)).toEqual({ ok: true, value: body })
+    }
+  })
+
   // A refusal without a code still carries its sentence, under `http-<status>`,
   // so a host can show what was said without the client pretending to know why.
   test('a refusal with a sentence and no code is http-<status>', async () => {
