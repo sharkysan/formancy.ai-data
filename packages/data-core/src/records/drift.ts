@@ -1,8 +1,8 @@
 import { diffRootDefinition } from '../drift/diff.js'
+import type { DriftPolicy } from '../drift/context.js'
 import type { DriftReport, DriftVerdict } from '../drift/types.js'
 import type { FormBindings } from '../generate/types.js'
 import type { MetadataSnapshot } from '../metadata.js'
-import type { FormPolicy } from '../policy/types.js'
 import type { PlanRefusal } from './plan-types.js'
 import { keyOrderProblem, refuse } from './prepare.js'
 import type { DescribedTable } from './types.js'
@@ -25,9 +25,10 @@ export const READ_REFUSED = 'The database changed since this form was published,
 export const WRITE_REFUSED = 'The database changed since this form was published, in a way this form cannot save safely. Nothing was saved; an administrator must review the form.'
 export const NOTHING_LEFT = 'The database changed since this form was published, and nothing this form offers you can be done safely until an administrator reviews it.'
 export const LIST_REFUSED = 'The database changed since this form was published, and its records no longer have an order a page can rely on. An administrator must review it.'
+export const DELETE_REFUSED = 'The database changed since this form was published, in a way this form cannot delete safely. Nothing was deleted; an administrator must review the form.'
 
 /** The report a request decides by, or `invalid-bindings` when the bindings cannot be compared with their own snapshot. */
-function reportOf(snapshot: MetadataSnapshot, bindings: FormBindings, policy: Pick<FormPolicy, 'lookups'>, described: DescribedTable): { ok: true; report: DriftReport } | PlanRefusal {
+function reportOf(snapshot: MetadataSnapshot, bindings: FormBindings, policy: DriftPolicy, described: DescribedTable): { ok: true; report: DriftReport } | PlanRefusal {
   const { definition: _definition, ...root } = described
   try {
     return { ok: true, report: diffRootDefinition(snapshot, root, bindings, policy) }
@@ -46,7 +47,10 @@ function refused(message: string, report: DriftReport): PlanRefusal {
 /**
  * The refusal of `operation` on the form as the database is described now,
  * or `undefined` when the description allows it: a read when a change breaks
- * what the form shows, a create or an update when a change stops it.
+ * what the form shows, a create, an update or a delete when a change stops
+ * it. A delete is decided over the root's description as every write is
+ * (0041, 0050): what refers to the root is not in it, and is the delete
+ * statement's own guard's.
  *
  * A list (0044) is refused as a read is, and also when the description no
  * longer holds the identity to a total order (`keyOrderProblem`): a key
@@ -60,9 +64,9 @@ function refused(message: string, report: DriftReport): PlanRefusal {
 export function driftRefusal(
   snapshot: MetadataSnapshot,
   bindings: FormBindings,
-  policy: Pick<FormPolicy, 'lookups'>,
+  policy: DriftPolicy,
   described: DescribedTable,
-  operation: 'read' | 'list' | 'create' | 'update',
+  operation: 'read' | 'list' | 'create' | 'update' | 'delete',
 ): PlanRefusal | undefined {
   const found = reportOf(snapshot, bindings, policy, described)
   if (!found.ok) return found
@@ -77,7 +81,7 @@ export function driftRefusal(
     const moved = report.changes.filter((change) => change.kind === 'identity-key-changed' || (change.subject.kind === 'column' && key.has(change.subject.name)))
     return { ...refuse('drift', LIST_REFUSED), drift: moved }
   }
-  return report.writable[operation] ? undefined : refused(WRITE_REFUSED, report)
+  return report.writable[operation] ? undefined : refused(operation === 'delete' ? DELETE_REFUSED : WRITE_REFUSED, report)
 }
 
 /**
@@ -89,7 +93,7 @@ export function driftRefusal(
 export function runtimeOperations(
   snapshot: MetadataSnapshot,
   bindings: FormBindings,
-  policy: Pick<FormPolicy, 'lookups'>,
+  policy: DriftPolicy,
   described: DescribedTable,
 ): { ok: true; verdict: DriftVerdict; drift: DriftReport['changes'] } | PlanRefusal {
   const found = reportOf(snapshot, bindings, policy, described)

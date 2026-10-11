@@ -67,7 +67,8 @@ function identityChanges(comparison: Comparison): NamedDraft[] {
   const key = identityKeyIn(before, bindings.identity)
   if (candidateKeys(after).some((candidate) => sameList(candidate.columns, key.columns))) return []
 
-  const shared = { subject: { kind: 'key', object: after.ref, name: key.name } as const, affects: fieldsOver(bindings, key.columns), stops: ['update'] as const, breaksReads: false, otherwise: 'info' as const }
+  // A delete removes the record its key names, as an update changes it (0050).
+  const shared = { subject: { kind: 'key', object: after.ref, name: key.name } as const, affects: fieldsOver(bindings, key.columns), stops: ['update', 'delete'] as const, breaksReads: false, otherwise: 'info' as const }
   const gaps = hiding(comparison.current.gaps, after.ref, 'keys')
   if (gaps.length > 0) {
     return [cite(comparison, gaps, { ...shared, kind: 'access-narrowed', message: unseen(`Key ${key.name} of ${describe(after.ref)}`, gaps) })]
@@ -77,7 +78,7 @@ function identityChanges(comparison: Comparison): NamedDraft[] {
     {
       ...shared,
       kind: 'identity-key-changed',
-      message: `${now === undefined ? `${key.name} is gone` : `${key.name} is over (${list(now.columns)}) where it was over (${list(key.columns)})`}, and no key covers (${list(key.columns)}) any more. Update finds a record by those columns, so it is blocked until the form is reviewed.`,
+      message: `${now === undefined ? `${key.name} is gone` : `${key.name} is over (${list(now.columns)}) where it was over (${list(key.columns)})`}, and no key covers (${list(key.columns)}) any more. Update and delete find a record by those columns, so they are blocked until the form is reviewed.`,
     },
   ]
 }

@@ -1,8 +1,8 @@
-import { createSecretKey } from 'node:crypto'
+import { createSecretKey, randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { EMPTY_PRESENTATION } from '@formancy/data-core'
+import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
 import type { DatabaseKind, FieldBinding, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
 import { answerBytes, EDGE_VALUES, startPostgresFixture, startSqlServerFixture, startTcpHop } from '@formancy/data-fixtures'
 import type { PostgresFixture, SqlServerFixture, TcpHop } from '@formancy/data-fixtures'
@@ -62,6 +62,8 @@ let pg: PostgresFixture
 let ms: SqlServerFixture
 let hops: Record<'pg' | 'ms', TcpHop>
 let count: Count
+/** A row of lost.removable inserted by the owner, around the hop: its id. */
+let insertRemovable: (connection: 'pg' | 'ms', code: string) => Promise<string>
 let closeOwners: () => Promise<void>
 let root: string
 let registry: ConnectionRegistry
@@ -86,6 +88,8 @@ beforeAll(async () => {
       id: 'ms', kind: 'sqlserver', host: '127.0.0.1', port: hops.ms.port, database: String(ms.admin.database), user: String(ms.admin.user), password: 'env:MS_PASSWORD', schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true },
     },
   ]
+  // A table whose key holds a text a delete's answer echoes (0050), in a schema of its own: `lost`.
+  connections.push({ ...(connections[0] as ConnectionConfig), id: 'pg-lost', schemas: ['lost'] }, { ...(connections[1] as ConnectionConfig), id: 'ms-lost', schemas: ['lost'] })
   registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: { PG_PASSWORD: decodeURIComponent(pgUrl.password), MS_PASSWORD: String(ms.admin.password) },
     readFile: async () => '',
@@ -98,6 +102,13 @@ beforeAll(async () => {
   const msOwner = await connectSqlServer({
     host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true,
   })
+  await pgOwner.unsafe('create schema lost; create table lost.removable (id integer generated always as identity, code varchar(100) not null, version integer not null default 1, primary key (id, code))')
+  await msOwner.request().batch('create schema lost')
+  await msOwner.request().batch('create table lost.removable (id int identity(1, 1) not null, code nvarchar(100) not null, version int not null constraint df_lost_removable_version default 1, constraint pk_lost_removable primary key (id, code))')
+  insertRemovable = async (connection, code) => {
+    if (connection === 'pg') return (await pgOwner.unsafe<Array<{ id: string }>>('insert into lost.removable (code) values ($1) returning id::text as id', [code]))[0]?.id ?? ''
+    return String((await msOwner.request().input('code', code).query<{ id: number }>('insert into lost.removable (code) output inserted.id values (@code)')).recordset[0]?.id)
+  }
   count = async (connection, statement, text) => {
     if (connection === 'pg') return (await pgOwner.unsafe<Array<{ n: number }>>(statement.pg, [text]))[0]?.n ?? 0
     return (await msOwner.request().input('text', text).query<{ n: number }>(statement.ms)).recordset[0]?.n ?? 0
@@ -170,6 +181,23 @@ async function publish(connection: string, formId: string, generation: Record<st
   expect(published.statusCode, published.body).toBe(201)
 }
 
+/** A form whose clerks may read and delete every row: lost.removable has no tenant (0050). */
+async function publishDeleting(connection: string, formId: string, generation: Record<string, unknown>): Promise<void> {
+  const proposal = await call('/v1/form-proposals', admin, { connection, formId, ...generation })
+  expect(proposal.statusCode, proposal.body).toBe(200)
+  const proposed = proposal.json() as Proposal
+  expect(proposed.bindings.operations.delete).toBe(true)
+  const policy: FormPolicy = {
+    version: 1,
+    operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] },
+    fields: Object.fromEntries((proposed.bindings.fields as FieldBinding[]).map((binding) => [binding.field, { read: ['clerk'], write: [] }])),
+    rowFilters: [],
+    lookups: {},
+  }
+  const published = await call(`/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, policy) })
+  expect(published.statusCode, published.body).toBe(201)
+}
+
 /** `promise`, or a failure that says what never happened -- a hop that never matched is a reason, not a timeout. */
 async function bounded<T>(promise: Promise<T>, what: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined
@@ -195,6 +223,7 @@ async function eventually(check: () => Promise<void>): Promise<void> {
   }
 }
 
+const REMOVABLE_CODED = { pg: 'select count(*)::int as n from lost.removable where code = $1', ms: 'select count(*) as n from lost.removable where code = @text' }
 const ORDERS_WITH_NOTES = { pg: 'select count(*)::int as n from sales."order" where notes = $1', ms: 'select count(*) as n from sales.[order] where notes = @text' }
 const CUSTOMERS_NAMED = { pg: 'select count(*)::int as n from sales.customer where name = $1', ms: 'select count(*) as n from sales.customer where name = @text' }
 
@@ -328,6 +357,42 @@ describe.each([
     expect(trail.map(({ operation, status, outcome }) => ({ operation, status, outcome }))).toEqual([
       { operation: 'create', status: 502, outcome: 'unknown-outcome' },
       { operation: 'read', status: 200, outcome: 'ok' },
+    ])
+  })
+
+  // A delete protects itself as an update does (0050): the version it sent
+  // is in the one guarded statement, and the key it names -- a numbered id
+  // and a fresh UUID, the marker the statement's answer echoes -- is never
+  // another record's. The 502 hands back both, the row is gone, the
+  // database was asked once, and deleting again with that version is not
+  // found and deletes nothing else. The trail names the record twice, by
+  // its keyed hash (watched failing with the route asking the adapter again
+  // after a lost answer: the second statement found nothing, and the person
+  // was told 404 about a record the first one had deleted).
+  test('a delete is 502 with its record and version, sent once, the row gone, and a resend is not found', async () => {
+    const formId = `${connection}-removable-lost`
+    await publishDeleting(`${connection}-lost`, formId, { root: { schema: 'lost', name: 'removable' }, title: 'Removable', lookups: [], versionColumn: 'version' })
+    const code = randomUUID()
+    const id = await insertRemovable(connection, code)
+    const token = recordToken(['id', 'code'], { id, code })
+    if (!token.ok) throw new Error(token.message)
+    const record = token.token
+    const { response, sent } = await sentAndLost(
+      code,
+      async () => expect(await count(connection, REMOVABLE_CODED, code)).toBe(0),
+      () => call(`/v1/forms/${formId}/records/delete`, clerk, { record, version: '1' }),
+    )
+    expect(response.statusCode, response.body).toBe(502)
+    expect(response.json()).toMatchObject({ code: 'unknown-outcome', operation: 'delete', record, version: '1' })
+    expect(sent()).toBe(1)
+
+    const again = await call(`/v1/forms/${formId}/records/delete`, clerk, { record, version: '1' })
+    expect([again.statusCode, again.json()]).toEqual([404, { code: 'not-found', message: 'No such record.' }])
+    expect(await count(connection, REMOVABLE_CODED, code)).toBe(0)
+    const trail = events.filter((event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === formId && event.record === recordReference(AUDIT_KEY, record))
+    expect(trail.map(({ operation, status, outcome }) => ({ operation, status, outcome }))).toEqual([
+      { operation: 'delete', status: 502, outcome: 'unknown-outcome' },
+      { operation: 'delete', status: 404, outcome: 'not-found' },
     ])
   })
 })

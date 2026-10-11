@@ -41,9 +41,9 @@ describe('diffSnapshots: what is compared, and the root', () => {
   test('identical snapshots give an empty report, and the form keeps what it offered', () => {
     const base = snapshot()
     const { bindings } = generateForm(base, ORDER)
-    const everything = { readable: true, writable: { create: true, update: true } }
+    const everything = { readable: true, writable: { create: true, update: true, delete: false } }
     expect(diffSnapshots(base, snapshot(undefined, { serverVersion: '16.0.4135' }), bindings, NO_FILTERS)).toEqual({ changes: [], blocking: false, ...everything, runtime: everything })
-    expect(diffSnapshots(base, base, generateForm(base, EMPLOYEE).bindings, NO_FILTERS).writable).toEqual({ create: true, update: false })
+    expect(diffSnapshots(base, base, generateForm(base, EMPLOYEE).bindings, NO_FILTERS).writable).toEqual({ create: true, update: false, delete: false })
 
     // Equal fingerprints are createSnapshot's promise that two snapshots
     // describe the same thing, so the objects are not walked at all -- and
@@ -114,7 +114,7 @@ describe('diffSnapshots: what is compared, and the root', () => {
       },
     ])
     expect(report.blocking).toBe(true)
-    expect(report.writable).toEqual({ create: false, update: false })
+    expect(report.writable).toEqual({ create: false, update: false, delete: false })
   })
 
   // The case 0004 built gaps for. A permission-filtered catalog drops a table
@@ -131,7 +131,7 @@ describe('diffSnapshots: what is compared, and the root', () => {
       affects: ORDER_FIELDS,
       message: expect.stringMatching(/SELECT on sales\.order was revoked\..*access problem, not a deletion/),
     })
-    expect(own.writable).toEqual({ create: false, update: false })
+    expect(own.writable).toEqual({ create: false, update: false, delete: false })
 
     // Any gap about the object explains it, and so does one about every object in scope.
     expect(kinds(drift(gone, { gaps: [gap(ORDER_REF, 'columns')] }))).toEqual(['access-narrowed'])
@@ -156,7 +156,7 @@ describe('diffSnapshots: what is compared, and the root', () => {
   test('a root outside a narrowed scope is not reported as dropped', () => {
     const report = drift((objects) => objects.splice(0), { schemas: ['audit'] })
     expect(only(report)).toMatchObject({ kind: 'scope-narrowed', severity: 'blocking', affects: ORDER_FIELDS, message: expect.stringMatching(/sales is no longer/) })
-    expect(report.writable).toEqual({ create: false, update: false })
+    expect(report.writable).toEqual({ create: false, update: false, delete: false })
   })
 
   // A view has no write path in this release (0009). A table turned into a
@@ -164,7 +164,7 @@ describe('diffSnapshots: what is compared, and the root', () => {
   test('a root that became a view blocks writes; a view that became a table is for review', () => {
     const toView = drift((objects) => (object(objects, 'order').kind = 'view'))
     expect(only(toView)).toMatchObject({ kind: 'root-kind-changed', severity: 'blocking', subject: { kind: 'object', object: ORDER_REF }, affects: ORDER_FIELDS })
-    expect(toView.writable).toEqual({ create: false, update: false })
+    expect(toView.writable).toEqual({ create: false, update: false, delete: false })
 
     const toTable = drift((objects) => (object(objects, 'customer_summary').kind = 'table'), {}, SUMMARY)
     expect(only(toTable)).toMatchObject({ kind: 'root-kind-changed', severity: 'review', message: expect.stringMatching(/stays read-only/) })
@@ -186,24 +186,24 @@ describe('diffSnapshots: access', () => {
       affects: ORDER_FIELDS,
       message: expect.stringMatching(/columns of sales\.order: "Hidden from this account\."\. .*not a schema change/),
     })
-    expect(columns.writable).toEqual({ create: false, update: false })
+    expect(columns.writable).toEqual({ create: false, update: false, delete: false })
     // Two details about one aspect are one doubt, said once with both reasons.
     expect(only(drift(undefined, { gaps: [gap(ORDER_REF, 'columns', 'One.'), gap(ORDER_REF, 'columns', 'Two.')] })).message).toMatch(/"One\."; "Two\."/)
 
     // Keys are the identity, which only update uses.
     const keys = drift(undefined, { gaps: [gap(ORDER_REF, 'keys')] })
     expect(only(keys)).toMatchObject({ severity: 'blocking', affects: ['id'] })
-    expect(keys.writable).toEqual({ create: true, update: false })
+    expect(keys.writable).toEqual({ create: true, update: false, delete: false })
 
     // Foreign keys are the lookup's, and so are its target's columns.
     expect(only(drift(undefined, { gaps: [gap(ORDER_REF, 'foreign-keys')] }))).toMatchObject({ severity: 'blocking', affects: ['customer'] })
-    expect(drift(undefined, { gaps: [gap(CUSTOMER_REF, 'columns')] }).writable).toEqual({ create: false, update: false })
+    expect(drift(undefined, { gaps: [gap(CUSTOMER_REF, 'columns')] }).writable).toEqual({ create: false, update: false, delete: false })
     expect(only(drift(undefined, { gaps: [gap(null, 'columns')] }))).toMatchObject({ subject: { kind: 'scope' }, affects: ORDER_FIELDS })
 
     // Nothing the form does rests on these.
     const checks = drift(undefined, { gaps: [gap(ORDER_REF, 'checks')] })
     expect(only(checks)).toMatchObject({ kind: 'access-narrowed', severity: 'info', affects: [] })
-    expect(checks).toMatchObject({ blocking: false, writable: { create: true, update: true } })
+    expect(checks).toMatchObject({ blocking: false, writable: { create: true, update: true, delete: false } })
     expect(only(drift(undefined, { gaps: [gap(ORDER_REF, 'foreign-keys')] }, { ...ORDER, lookups: [] }))).toMatchObject({ severity: 'info' })
     expect(only(drift(undefined, { gaps: [gap(SUMMARY_REF, 'keys')] }, SUMMARY))).toMatchObject({ severity: 'info' })
 
@@ -233,7 +233,7 @@ describe('diffSnapshots: access', () => {
 
     const keys = [gap(null, 'keys')]
     const identity = drift((objects) => (object(objects, 'order').primaryKey = null), { gaps: keys })
-    expect(identity.writable).toEqual({ create: false, update: false })
+    expect(identity.writable).toEqual({ create: false, update: false, delete: false })
     expect(identity.changes.map((change) => [change.kind, change.subject.kind, named(change), change.affects])).toEqual([
       ['access-narrowed', 'scope', '', ['id', 'customer']],
       ['access-narrowed', 'key', 'pk_order', ['id']],
@@ -249,7 +249,7 @@ describe('diffSnapshots: access', () => {
   test('a row-security gap that appeared is for review, not blocking', () => {
     const report = drift(undefined, { gaps: [gap(null, 'row-security', 'No VIEW DEFINITION on the database.')] })
     expect(only(report)).toMatchObject({ kind: 'access-narrowed', severity: 'review', subject: { kind: 'scope' }, message: expect.stringMatching(/row security of anything in scope/) })
-    expect(report.writable).toEqual({ create: true, update: true })
+    expect(report.writable).toEqual({ create: true, update: true, delete: false })
     expect(only(drift(undefined, { gaps: [gap({ kind: 'schema', schema: 'crm' }, 'row-security')] }))).toMatchObject({ severity: 'review', subject: { kind: 'schema', schema: 'crm' }, affects: ['customer'] })
   })
 
@@ -259,7 +259,9 @@ describe('diffSnapshots: access', () => {
   // every SQL Server form published as an account without database VIEW
   // DEFINITION would report an access problem nobody caused. Between two
   // snapshots that both record what refers to each table, a gap that
-  // appeared is said, and nothing a form does yet rests on it.
+  // appeared is said, and since 0050 it stops delete, which rests on it:
+  // for review here, where the policy lets nobody delete, and blocking
+  // where it does (delete.test.ts).
   test('a referenced-by gap is compared only when both snapshots record what refers to each table', () => {
     const recording = (objects: ObjectMeta[]): void => {
       for (const target of objects) {
@@ -274,9 +276,16 @@ describe('diffSnapshots: access', () => {
     const appeared = { gaps: [gap(null, 'referenced-by', 'No VIEW DEFINITION on the database.')] }
     expect(drift(recording, appeared).changes).toEqual([])
     const recorded = snapshot(recording)
-    expect(only(drift(recording, appeared, ORDER, recorded))).toMatchObject({ kind: 'access-narrowed', severity: 'info', subject: { kind: 'scope' }, affects: [] })
-    // And the other way: a base that recorded the gap, against a snapshot an older server took.
-    expect(drift(undefined, {}, ORDER, snapshot(recording, appeared)).changes).toEqual([])
+    const narrowed = drift(recording, appeared, ORDER, recorded)
+    expect(only(narrowed)).toMatchObject({ kind: 'access-narrowed', severity: 'review', subject: { kind: 'scope' }, affects: [] })
+    expect(narrowed.writable).toEqual({ create: true, update: true, delete: false })
+    // And the other way: a base that recorded the gap, against a snapshot an
+    // older server took. The gap is not compared; that the facts a delete
+    // rests on are no longer recorded at all stops delete (0050), and is
+    // said once, on the root.
+    const older = drift(undefined, {}, ORDER, snapshot(recording, appeared))
+    expect(only(older)).toMatchObject({ kind: 'access-narrowed', severity: 'review', subject: { kind: 'object', object: ORDER_REF }, message: expect.stringMatching(/a server older than 0049 took it/) })
+    expect(older.writable).toEqual({ create: true, update: true, delete: false })
   })
 
   // A gap that disappeared means the connection sees more than it did when
@@ -285,7 +294,7 @@ describe('diffSnapshots: access', () => {
     const base = snapshot(undefined, { gaps: [gap(ORDER_REF, 'foreign-keys')] })
     const report = drift(undefined, {}, ORDER, base)
     expect(only(report)).toMatchObject({ kind: 'access-widened', severity: 'info', subject: { kind: 'object', object: ORDER_REF } })
-    expect(report.writable).toEqual({ create: true, update: true })
+    expect(report.writable).toEqual({ create: true, update: true, delete: false })
 
     // A gap whose wording changed is the same gap: not narrowed, not widened.
     const reworded = drift(undefined, { gaps: [gap(ORDER_REF, 'foreign-keys', 'Reworded by a newer adapter.')] }, ORDER, base)
@@ -365,7 +374,7 @@ describe('the runtime’s verdict (0041)', () => {
     expect(drift((objects) => dropForeignKey(objects, 'fk_order_customer')).readable).toBe(false)
 
     const tightened = drift((objects) => retype(objects, 'order', 'status', 'nvarchar(10)', text(10)))
-    expect(tightened).toMatchObject({ blocking: true, readable: true, writable: { create: false, update: false } })
+    expect(tightened).toMatchObject({ blocking: true, readable: true, writable: { create: false, update: false, delete: false } })
     expect(drift((objects) => retype(objects, 'order', 'status', 'nvarchar(40)', text(40))).readable).toBe(true)
   })
 
@@ -376,9 +385,9 @@ describe('the runtime’s verdict (0041)', () => {
   // server still allows.
   test('a lookup target’s retyped display column blocks review and not the runtime', () => {
     const report = drift((objects) => retype(objects, 'customer', 'name', 'nvarchar(400)', text(400)))
-    expect(report).toMatchObject({ blocking: true, readable: false, writable: { create: false, update: false } })
+    expect(report).toMatchObject({ blocking: true, readable: false, writable: { create: false, update: false, delete: false } })
     expect(report.changes.map((change) => [change.kind, named(change)])).toEqual([['lookup-changed', 'name']])
-    expect(report.runtime).toEqual({ readable: true, writable: { create: true, update: true } })
+    expect(report.runtime).toEqual({ readable: true, writable: { create: true, update: true, delete: false } })
   })
 
   // A described column the base never had: nothing is assumed of it. Given
@@ -396,12 +405,12 @@ describe('the runtime’s verdict (0041)', () => {
 
     const required = diffRootDefinition(base, added({ nullable: false, hasDefault: false }), bindings, NO_FILTERS)
     expect(only(required)).toMatchObject({ kind: 'column-added', severity: 'blocking' })
-    expect(required.writable).toEqual({ create: false, update: true })
-    expect(required.runtime).toEqual({ readable: true, writable: { create: false, update: true } })
+    expect(required.writable).toEqual({ create: false, update: true, delete: false })
+    expect(required.runtime).toEqual({ readable: true, writable: { create: false, update: true, delete: false } })
 
     const optional = diffRootDefinition(base, added({ nullable: true }), bindings, NO_FILTERS)
     expect(only(optional)).toMatchObject({ kind: 'column-added', severity: 'review' })
-    expect(optional.runtime).toEqual({ readable: true, writable: { create: true, update: true } })
+    expect(optional.runtime).toEqual({ readable: true, writable: { create: true, update: true, delete: false } })
   })
 
   // The runtime's report and review's are one decision over one root: a
@@ -409,13 +418,13 @@ describe('the runtime’s verdict (0041)', () => {
   // part of what a request describes.
   test('the root’s keys and foreign keys are the runtime’s too', () => {
     const report = drift((objects) => (object(objects, 'order').primaryKey = null))
-    expect(report.writable).toEqual({ create: true, update: false })
-    expect(report.runtime).toEqual({ readable: true, writable: { create: true, update: false } })
+    expect(report.writable).toEqual({ create: true, update: false, delete: false })
+    expect(report.runtime).toEqual({ readable: true, writable: { create: true, update: false, delete: false } })
   })
 
   // A root review cannot find is a root a request cannot describe: refused,
   // whatever the reason review gives.
   test('a missing root leaves the runtime nothing', () => {
-    expect(drift((objects) => remove(objects, 'order')).runtime).toEqual({ readable: false, writable: { create: false, update: false } })
+    expect(drift((objects) => remove(objects, 'order')).runtime).toEqual({ readable: false, writable: { create: false, update: false, delete: false } })
   })
 })

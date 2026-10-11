@@ -277,6 +277,47 @@ export const PG_ORDER = orderForm(PG).bindings
 export const MS = snapshot('sqlserver')
 export const MS_ORDER = orderForm(MS).bindings
 
+/**
+ * 0049's facts on every object, as discovery records them since: whether
+ * the account may delete from it -- yes from every table, unless `mayDelete`
+ * says no -- and every key that refers to it, derived from the foreign keys
+ * as the fixture's comparators derive them, beside any an edit placed from
+ * a table outside the snapshot, in codepoint order.
+ */
+export function withDeleteFacts(objects: ObjectMeta[], mayDelete: (object: ObjectMeta) => boolean = () => true): void {
+  const key = (entry: { table: ObjectRef; name: string }) => `${entry.table.schema}\u0000${entry.table.name}\u0000${entry.name}`
+  const within = (ref: ObjectRef) => objects.some((object) => object.ref.schema === ref.schema && object.ref.name === ref.name)
+  for (const object of objects) {
+    object.access = { delete: object.kind === 'table' && mayDelete(object) }
+    const outside = (object.referencedBy ?? []).filter((entry) => !within(entry.table))
+    object.referencedBy = objects
+      .flatMap((referrer) => referrer.foreignKeys.map((foreignKey) => ({ referrer, foreignKey })))
+      .filter(({ foreignKey }) => foreignKey.references?.table.schema === object.ref.schema && foreignKey.references.table.name === object.ref.name)
+      .map(({ referrer, foreignKey }) => ({
+        table: { ...referrer.ref },
+        name: foreignKey.name,
+        columns: [...foreignKey.columns],
+        referencedColumns: [...(foreignKey.references?.columns ?? [])],
+        onDelete: foreignKey.onDelete,
+        onUpdate: foreignKey.onUpdate,
+        enforced: foreignKey.enforced,
+      }))
+      .concat(outside)
+      .sort((left, right) => (key(left) < key(right) ? -1 : key(left) > key(right) ? 1 : 0))
+  }
+}
+
+/** The test snapshot as discovery takes one since 0049, after `edit`: see `withDeleteFacts`. */
+export function factsSnapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}, mayDelete?: (object: ObjectMeta) => boolean): MetadataSnapshot {
+  return snapshot(kind, (objects) => {
+    edit(objects)
+    withDeleteFacts(objects, mayDelete)
+  })
+}
+
+export const PG_FACTS = factsSnapshot('postgres')
+export const MS_FACTS = factsSnapshot('sqlserver')
+
 /** An order keyed by a timestamp: a key the generator accepts and no token can carry. */
 export const STAMPED = snapshot('postgres', (objects) => {
   const order = objects.find((object) => object.ref.name === 'order') as ObjectMeta

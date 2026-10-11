@@ -51,7 +51,7 @@ describe('the forms and policies these tests use', () => {
     expect(validatePolicy(ORDER_POLICY, MS_ORDER)).toEqual({ ok: true })
     expect(validatePolicy(CUSTOMER_POLICY, customerForm(customerSource()).bindings)).toEqual({ ok: true })
     expect(PG_ORDER.fields.map((binding) => binding.field)).toEqual(CLERK_FIELDS)
-    expect(PG_ORDER.operations).toEqual({ create: true, update: true })
+    expect(PG_ORDER.operations).toEqual({ create: true, update: true, delete: false })
   })
 })
 

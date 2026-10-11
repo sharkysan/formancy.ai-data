@@ -1,5 +1,5 @@
 import { findObject } from '@formancy/data-core'
-import type { ApiValue, MetadataSnapshot, RecordColumn, RecordFailure, RecordOutcome, RecordTarget, RecordValue, RowFilters } from '@formancy/data-core'
+import type { ApiValue, DeleteOutcome, MetadataSnapshot, RecordColumn, RecordFailure, RecordOutcome, RecordTarget, RecordValue, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture, TcpHop } from '@formancy/data-fixtures'
 import { answerBytes, defined, startPostgresFixture, startTcpHop } from '@formancy/data-fixtures'
 import { randomUUID } from 'node:crypto'
@@ -58,6 +58,12 @@ beforeAll(async () => {
       note text,
       constraint uq_deferred_code unique (code) deferrable initially deferred
     );
+    create table lost.removable (
+      id integer generated always as identity,
+      code text not null,
+      version integer not null default 1,
+      primary key (id, code)
+    );
   `)
   snapshot = await discoverPostgres(owner, { schemas: ['sales', 'lost'] })
 })
@@ -95,7 +101,7 @@ function orderValues(notes: string): RecordValue[] {
   }))
 }
 
-function failed(outcome: RecordOutcome): RecordFailure {
+function failed(outcome: RecordOutcome | DeleteOutcome): RecordFailure {
   if (outcome.ok) throw new Error(`expected a failure, got ${JSON.stringify(outcome)}`)
   return outcome
 }
@@ -129,6 +135,11 @@ async function until<T>(read: () => Promise<T>, expected: T): Promise<void> {
 
 async function ordersNoted(notes: string): Promise<number> {
   const [row] = await owner<{ n: number }[]>`select count(*)::int as n from sales."order" where notes = ${notes}`
+  return row?.n ?? 0
+}
+
+async function removableCoded(code: string): Promise<number> {
+  const [row] = await owner<{ n: number }[]>`select count(*)::int as n from lost.removable where code = ${code}`
   return row?.n ?? 0
 }
 
@@ -203,6 +214,45 @@ describe('an answer lost after the write committed', () => {
     expect([outcome.code, outcome.message]).toEqual(['unknown-outcome', expect.stringMatching(/CONNECTION_CLOSED/)])
     expect(sent()).toBe(1)
     expect(await stored()).toEqual(after)
+  })
+})
+
+describe('an answer lost after a delete committed', () => {
+  // A delete names the version its person read, so sent again after its
+  // answer was lost it deletes nothing else (0050). The marker is the key's
+  // own text -- a fresh UUID beside a numbered id, which a version proves a
+  // record by -- bound towards the server and echoed by the statement's
+  // RETURNING: it crossed once, the row is gone, and the adapter answered
+  // unknown, never not-found or unavailable (watched failing with the cut
+  // answered as a read's: unavailable).
+  test('a delete is unknown-outcome, was sent once, and the row is gone', async () => {
+    const code = marker('delete')
+    const [row] = await owner<{ id: string }[]>`insert into lost.removable (code) values (${code}) returning id::text as id`
+    const table = { schema: 'lost', name: 'removable' }
+    const target = { table, identity: [col('lost', 'removable', 'id'), col('lost', 'removable', 'code')], concurrency: { kind: 'version-column', column: 'version' } } as const
+    const bytes = answerBytes('postgres', code)
+    const sent = hop.countSent(bytes)
+    const lost = hop.swallowAnswersFrom(bytes)
+    const pending = defined(createPostgresRecords(viaHop)).delete({
+      target,
+      key: [
+        { ...col('lost', 'removable', 'id'), value: row?.id ?? null },
+        { ...col('lost', 'removable', 'code'), value: code },
+      ],
+      expectedVersion: '1',
+      filters: { kind: 'unrestricted' },
+      through: [],
+      reach: { removed: [table], cleared: [], accepted: [] },
+    })
+
+    await within(lost.matched, 'the marker never appeared in an answer')
+    await until(() => removableCoded(code), 0)
+    lost.cut()
+
+    const outcome = failed(await pending)
+    expect([outcome.code, outcome.message]).toEqual(['unknown-outcome', expect.stringMatching(/CONNECTION_CLOSED/)])
+    expect(sent()).toBe(1)
+    expect(await removableCoded(code)).toBe(0)
   })
 })
 

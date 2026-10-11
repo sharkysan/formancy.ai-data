@@ -26,6 +26,8 @@ export type {
   TextLengthUnit,
 } from './metadata.js'
 export { generateForm } from './generate/generate.js'
+export { deleteUnoffered, offers, versionProvesRecord } from './generate/offers.js'
+export type { OfferedOperation } from './generate/offers.js'
 export { BINDINGS_VERSION, bindingsVersionProblem, GENERATED_SPEC_VERSION } from './generate/version.js'
 export type {
   ConcurrencyBinding,
@@ -40,6 +42,7 @@ export type {
 export { describedOf, diffRootDefinition, diffSnapshots, ROOT_DEFINITION } from './drift/diff.js'
 export type { DescribedRoot } from './drift/diff.js'
 export type { DriftChange, DriftKind, DriftReport, DriftSeverity, DriftSubject, DriftVerdict } from './drift/types.js'
+export type { DriftPolicy } from './drift/context.js'
 export { applyPresentation, presentationShapeProblems } from './presentation/apply.js'
 export { presentationOf } from './presentation/derive.js'
 export { describeReassigned, grantsOnKey, reassignedKeys, rebasePresentation } from './presentation/rebase.js'
@@ -99,6 +102,8 @@ export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
 export { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter, throughFilters } from './policy/evaluate.js'
 export { validatePolicy } from './policy/validate.js'
 export { isThroughKeyType, throughProblems, unscopedLookups } from './policy/through.js'
+export { actsOnDelete, deleteEffects, deleteProblems, deleteReach, grantsDelete, unaccepted } from './policy/cascades.js'
+export type { DeleteReachFacts } from './policy/cascades.js'
 export type { ThroughKeyType } from './policy/through.js'
 export type {
   FieldPolicy,
@@ -117,6 +122,9 @@ export type {
   ThroughFilters,
 } from './policy/types.js'
 export type {
+  DeleteOutcome,
+  DeleteReach,
+  DeleteRequest,
   DescribedColumn,
   Described,
   DescribedRead,
@@ -140,6 +148,9 @@ export type {
   UpdateRequest,
 } from './records/types.js'
 export { planCreate, planRead, planUpdate } from './records/plan.js'
+export { planDelete } from './records/delete.js'
+export { deleteTerms } from './records/delete-terms.js'
+export type { DeleteTerms } from './records/delete-terms.js'
 export { listable, listColumns, listOrder, planList, recordPage } from './records/list.js'
 export { childFields } from './records/children.js'
 export type { ChildLookup, ParentKey, PublishedTable } from './records/children.js'
@@ -152,7 +163,7 @@ export { listTerms } from './records/list-terms.js'
 export type { ListTerms } from './records/list-terms.js'
 export { throughTerms } from './records/through.js'
 export type { ThroughTerms } from './records/through.js'
-export { driftRefusal, LIST_REFUSED, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './records/drift.js'
+export { DELETE_REFUSED, driftRefusal, LIST_REFUSED, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './records/drift.js'
 export { rejectedSelection, toFormAnswers } from './records/answers.js'
 export { decodeRecordKey, intendedRecord, recordToken } from './records/token.js'
 export type { RecordKeyDecoding, RecordTokenEncoding, RecordTokenErrorCode, RecordTokenRefusal } from './records/token.js'
@@ -161,6 +172,7 @@ export type {
   FormRecord,
   InvalidValues,
   MembershipCheck,
+  PlannedDelete,
   PlannedInsert,
   PlannedList,
   PlannedRead,
@@ -168,5 +180,19 @@ export type {
   PlanRefusal,
   PlanRefusalCode,
 } from './records/plan-types.js'
-export type { FormMenu, FormMenuChild, FormMenuEntry, ListColumns, ListSortTerm, PublishedForm, RecordList, RecordListQuery, ResolvedLookup, RuntimeRefusal, UnknownOutcome } from './runtime.js'
+export type {
+  Deleting,
+  FormMenu,
+  FormMenuChild,
+  FormMenuEntry,
+  ListColumns,
+  ListSortTerm,
+  PublishedForm,
+  RecordDeleted,
+  RecordList,
+  RecordListQuery,
+  ResolvedLookup,
+  RuntimeRefusal,
+  UnknownOutcome,
+} from './runtime.js'
 export { LIST_PAGE_SIZE, WRITE_ID_HEADER } from './runtime.js'

@@ -27,7 +27,7 @@ snapshot.gaps // what this release could not describe: a foreign table
 snapshot.fingerprint // changes when the structure, the account's privileges, or the account changes
 
 const lookups = createPostgresLookups(sql) // LookupAdapter: search, resolve, rejects
-const records = createPostgresRecords(sql) // RecordAdapter: describe, read, list, insert, update
+const records = createPostgresRecords(sql) // RecordAdapter: describe, read, list, insert, update, delete
 await adapter.close()
 ```
 
@@ -247,6 +247,36 @@ where six, which the definition suite counts.
   process. `records-lost-answer` holds all three.
 - **A refused write still fires the table's statement-level triggers**, and
   in autocommit what they did is kept.
+
+### A delete
+
+`records.delete(request)` deletes one record in one statement on 0041's
+paths
+([0050](../../docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)):
+a CTE that deletes the row its key, the filters and every through locate,
+at the version sent, while the definition holds, no declared foreign key
+that cascades, sets NULL or sets a default refers to the table or to a
+relation below it -- a partition, a table that inherits from it -- read
+whether or not its triggers are enabled, and no rule acts on a delete from
+the table; selected with a scalar subquery over its own rows, so a second
+row fails the statement (21000) and nothing is deleted, which the adapter
+throws. On the locked path, under an isolation other than READ COMMITTED,
+the transaction first locks the table with every relation below it: the
+statement takes its snapshot before it locks the partitions it plans, and
+a key added onto a partition while it waited would otherwise act unseen.
+After no row, one statement tells a moved definition or reach
+(`schema-changed`), a rule (`refused`), another isolation (`unavailable`),
+not found, stale, and a row found at the version sent -- a BEFORE DELETE
+trigger that returned NULL, a row security policy for DELETE stricter than
+the one for SELECT -- `refused`. A foreign key's refusal is 23503 on
+PostgreSQL 17 under NO ACTION and RESTRICT alike. A table a rule acts on
+refuses every delete: PostgreSQL itself refuses the CTE (0A000) under a DO
+ALSO rule, a DO INSTEAD NOTHING rule, and a DO INSTEAD rule without
+RETURNING or with several actions, and the statement's own guard refuses
+the one it would run, an unconditional DO INSTEAD rule that returns a row,
+whose action would otherwise be answered as the deletion.
+`delete.integration.test.ts` holds every case `DELETE_PARITY` names, a DO
+ALSO and a DO INSTEAD rule, and a key onto a partition on both paths.
 
 ### What a lookup reads
 

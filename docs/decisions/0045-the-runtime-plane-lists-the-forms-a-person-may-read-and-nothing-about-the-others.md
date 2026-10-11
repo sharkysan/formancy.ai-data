@@ -1,6 +1,6 @@
 # 0045 — The runtime plane lists the forms a person may read, and nothing about the others
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md): the menu lists delete by `offers()`, never for a form whose bindings say nothing of it
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**

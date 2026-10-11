@@ -89,7 +89,11 @@ dropped the key from the end of its order would show on both engines.
   `uuid.integration.test.ts` expect of a uuid key end to end (0056):
   discovered with its default, generated read-only, one token on both
   engines, created, updated and stale, another tenant's not found, listed
-  under an order, paged, and offered by `sales.parcel`'s lookup. `UUID_ROWS`
+  under an order, paged, and offered by `sales.parcel`'s lookup; and what a
+  delete is allowed (0050): the delivery form offers one on SQL Server
+  alone, by its rowversion, and a grant of it is refused for the parcels
+  that cascade from a delivery, as one on the order form is for its
+  deliveries and its lines. `UUID_ROWS`
   is what those suites insert first: two orders of tenant 2's, one delivery
   under the first and sixteen under the second, each keyed with one byte
   set and all of one carrier, so a lookup's options tie on it. The one
@@ -100,6 +104,12 @@ dropped the key from the end of its order would show on both engines.
   ones, and held on every run by the sixteen, paged as a list and tied as a
   lookup's options, whose order is exactly the order an engine weighs the
   bytes in.
+- `DELETE_PARITY` is what both adapters' `delete.integration.test.ts`
+  expect of a delete of one record of the parity schema (0050): one answer
+  for both engines, or one per engine where they differ, which
+  `deleteAnswer(name, engine)` reads. `UPDATE_RECREATED` is the update an
+  application's delete and insert again of a typed key lets land on the new
+  record, characterised on both.
 
 - `startTcpHop({ kind, host, port })` puts a TCP hop in front of a database that
   can lose an answer after the database has sent it (0031). `kind` is what
@@ -193,14 +203,15 @@ comparators, each `FILTER_PARITY` entry, each `DISPLAY_PARITY` column, each
 value, the two shipments, each change of `DRIFTING` both engines run, and
 each of `THROUGH_CASES`, what a form reached through a parent shows (0043),
 the one where the engines answer differently, `moved-parent`, included, each
-`LIST_PARITY` case (0044), and each `UUID_PARITY` case (0056), `order`
+`LIST_PARITY` case (0044), each `DELETE_PARITY` case and
+`update: recreated` (0050), and each `UUID_PARITY` case (0056), `order`
 included, whose expectation is each engine's own order.
 The ids are derived from the shared data --
 `filterCase(entry)`, `displayCase(column)`, `temporalCase(column)`,
 `refusalCase(name)`, `edgeCase(name)`,
 `shipmentCase('first')`, `driftingCase(name)`, `throughCase(name)`,
-`listCase(name)`, `uuidCase(name)`, `MODEL_CASES.owner` -- so no test types
-one.
+`listCase(name)`, `deleteCase(name)`, `UPDATE_RECREATED_CASE`,
+`uuidCase(name)`, `MODEL_CASES.owner` -- so no test types one.
 
 `DRIFTING` is the table of changes to a form's own table after it was
 published ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)):

@@ -19,7 +19,9 @@ import type { FastifyRequest } from 'fastify'
  * answered with the first sending's answer -- awaited, if that is still with
  * the database -- which is the answer the page should have had. The id is
  * the person's, the form's and the operation's, so another of each is
- * another write; and the same id with another body is refused, because
+ * another write -- a delete's included (0050), whose answer is a token and
+ * `deleted`, so nothing of a deleted record is kept; and the same id with
+ * another body is refused, because
  * answering it with the first write's answer would say "Created" about
  * something never sent.
  *
@@ -103,7 +105,7 @@ export function createWriteOnce(now: () => number = Date.now) {
      * check and the claim are one synchronous step, so two sendings that
      * arrive together cannot both perform.
      */
-    async once(scope: { actor: string; form: string; operation: 'create' | 'update'; id: string; body: unknown }, perform: () => Promise<WriteAnswer>): Promise<WriteAnswer & { repeated: boolean }> {
+    async once(scope: { actor: string; form: string; operation: 'create' | 'update' | 'delete'; id: string; body: unknown }, perform: () => Promise<WriteAnswer>): Promise<WriteAnswer & { repeated: boolean }> {
       prune()
       const key = JSON.stringify([scope.actor, scope.form, scope.operation, scope.id])
       const digest = createHash('sha256').update(JSON.stringify(scope.body) ?? '').digest('hex')

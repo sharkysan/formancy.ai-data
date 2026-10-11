@@ -241,8 +241,8 @@ export function planCreate(snapshot: MetadataSnapshot, bindings: FormBindings, p
   }
 }
 
-/** Whether a version is one this target's concurrency could have returned: a rowversion's hex, or a canonical integer in the column's range. */
-function versionFits(prepared: Prepared, kind: 'rowversion' | 'version-column', column: string, version: unknown): boolean {
+/** Whether a version is one this target's concurrency could have returned: a rowversion's hex, or a canonical integer in the column's range. The delete planner asks it too. */
+export function versionFits(prepared: Prepared, kind: 'rowversion' | 'version-column', column: string, version: unknown): boolean {
   if (typeof version !== 'string') return false
   if (kind === 'rowversion') return decodeRowversion(version) !== undefined
   const type = (prepared.columns.get(column) as ColumnMeta).type

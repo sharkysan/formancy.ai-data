@@ -1,13 +1,16 @@
+import { offers } from '../generate/offers.js'
 import type { FormBindings } from '../generate/types.js'
 import { bindingsVersionProblem } from '../generate/version.js'
 import type { ColumnAccess, MetadataSnapshot, ObjectMeta, ObjectRef } from '../metadata.js'
+import { grantsDelete } from '../policy/cascades.js'
 import type { FormPolicy } from '../policy/types.js'
 import type { DescribedTable } from '../records/types.js'
 import { findObject } from '../snapshot.js'
 import { absence, gapChanges, unseen } from './access.js'
 import { columnChanges } from './columns.js'
-import { allFields, byCodepoint, type Comparison, describe, type Draft, foreignKeyIn, identityKeyIn, objectIn, type Operation, refKey, stopped } from './context.js'
+import { allFields, byCodepoint, type Comparison, describe, type Draft, type DriftPolicy, foreignKeyIn, identityKeyIn, objectIn, type Operation, refKey, stopped, WRITES } from './context.js'
 import { accountChanges, privilegeChanges } from './privileges.js'
+import { referrerChanges } from './referrers.js'
 import { checkChanges, lookupTargetChanges, rootRelationshipChanges } from './relationships.js'
 import type { DriftChange, DriftReport, DriftSeverity, DriftSubject, DriftVerdict } from './types.js'
 
@@ -23,8 +26,11 @@ export type DescribedRoot = Omit<DescribedTable, 'definition'>
  */
 export const ROOT_DEFINITION: ReadonlyArray<(comparison: Comparison) => Draft[]> = [rootKindChanges, columnChanges, rootRelationshipChanges]
 
+/** What the form offers, by `offers()`: an absent flag -- delete, before 0050 -- is not offered. */
+type Offered = DriftVerdict['writable']
+
 /** What the form offered, and its root in `base`: the checks every comparison makes on entry. */
-function entered(base: MetadataSnapshot, bindings: FormBindings): { before: ObjectMeta; offered: { create: boolean; update: boolean } } {
+function entered(base: MetadataSnapshot, bindings: FormBindings): { before: ObjectMeta; offered: Offered } {
   // First: a version-1 file says one write flag for both operations, and
   // every verdict below about which writes a change stops would be a guess.
   const version = bindingsVersionProblem(bindings.version)
@@ -36,11 +42,23 @@ function entered(base: MetadataSnapshot, bindings: FormBindings): { before: Obje
   // database did not change, and nothing about whether these bindings could
   // ever have come from it. Found in review: doctored bindings were accepted
   // whenever the two snapshots happened to be equal.
-  return { before: assertBindingsMatch(base, bindings), offered: { ...bindings.operations } }
+  const before = assertBindingsMatch(base, bindings)
+  return { before, offered: { create: offers(bindings, 'create'), update: offers(bindings, 'update'), delete: offers(bindings, 'delete') } }
 }
 
 /** What a missing root leaves the runtime: nothing, because a request finds no table to describe and is refused. */
-const NOTHING_LEFT: DriftVerdict = { readable: false, writable: { create: false, update: false } }
+const NOTHING_LEFT: DriftVerdict = { readable: false, writable: { create: false, update: false, delete: false } }
+
+/**
+ * The writes a stop of which is `blocking` (0050): what the form offers,
+ * delete only where the policy lets somebody delete. The generator offers
+ * delete on every table it can be made against, most of which nobody may
+ * delete from; a DELETE grant revoked there must not mark the form
+ * `blocking`. Whether delete is still `writable` is decided either way.
+ */
+function counted(offered: Offered, policy: Pick<FormPolicy, 'operations'>): Offered {
+  return { ...offered, delete: offered.delete && grantsDelete(policy) }
+}
 
 /**
  * What changed between the snapshot a form was generated from and the
@@ -63,7 +81,7 @@ const NOTHING_LEFT: DriftVerdict = { readable: false, writable: { create: false,
  * root-definition families over the root as `current` describes it, which is
  * never stricter than review and looser by what only review compares.
  */
-export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings, policy: Pick<FormPolicy, 'lookups'>): DriftReport {
+export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings, policy: DriftPolicy): DriftReport {
   const { before, offered } = entered(base, bindings)
   // The runtime takes the same shortcut, before anything is described: equal
   // fingerprints are one database, whatever the objects passed in say.
@@ -74,7 +92,7 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
 
   const after = findObject(current, bindings.root)
   // The account is said beside a missing root: under another principal it may be missing for that principal only.
-  if (after === undefined) return { ...finish([rootMissing(current, bindings), ...accountChanges(base, current, bindings)], offered), runtime: NOTHING_LEFT }
+  if (after === undefined) return { ...finish([rootMissing(current, bindings), ...accountChanges(base, current, bindings)], offered, policy), runtime: NOTHING_LEFT }
 
   const comparison: Comparison = { base, current, bindings, policy, before, after, cited: new Set() }
   const report = finish(
@@ -83,10 +101,13 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
       ...lookupTargetChanges(comparison),
       ...checkChanges(comparison),
       ...privilegeChanges(comparison),
+      // What refers to the root is review's, never in a request's description (0050).
+      ...referrerChanges(comparison),
       // Last: a gap is reported on its own only when no change above gave it as its reason.
       ...gapChanges(comparison),
     ],
     offered,
+    policy,
   )
   return { ...report, runtime: verdictOf(rootDefinition(base, before, describedOf(current, bindings.root) as DescribedRoot, bindings, policy, offered)) }
 }
@@ -122,7 +143,7 @@ export function describedOf(snapshot: MetadataSnapshot, ref: ObjectRef): Describ
  * nothing is assumed of a column discovery never saw. No snapshot is made
  * (0004): nothing is hashed and nothing runs `assertConsistent`.
  */
-export function diffRootDefinition(base: MetadataSnapshot, described: DescribedRoot, bindings: FormBindings, policy: Pick<FormPolicy, 'lookups'>): DriftReport {
+export function diffRootDefinition(base: MetadataSnapshot, described: DescribedRoot, bindings: FormBindings, policy: DriftPolicy): DriftReport {
   const { before, offered } = entered(base, bindings)
   const report = rootDefinition(base, before, described, bindings, policy, offered)
   return { ...report, runtime: verdictOf(report) }
@@ -135,8 +156,8 @@ function rootDefinition(
   before: ObjectMeta,
   described: DescribedRoot,
   bindings: FormBindings,
-  policy: Pick<FormPolicy, 'lookups'>,
-  offered: { create: boolean; update: boolean },
+  policy: DriftPolicy,
+  offered: Offered,
 ): Omit<DriftReport, 'runtime'> {
   const known = new Map(before.columns.map((column) => [column.name, column]))
   const after: ObjectMeta = {
@@ -148,7 +169,7 @@ function rootDefinition(
     foreignKeys: described.foreignKeys,
   }
   const comparison: Comparison = { base, current: base, bindings, policy, before, after, cited: new Set() }
-  return finish(ROOT_DEFINITION.flatMap((family) => family(comparison)), offered)
+  return finish(ROOT_DEFINITION.flatMap((family) => family(comparison)), offered, policy)
 }
 
 function verdictOf(report: DriftVerdict): DriftVerdict {
@@ -210,7 +231,7 @@ function rootKindChanges({ before, after, bindings }: Comparison): Draft[] {
       kind: 'root-kind-changed',
       subject: { kind: 'object', object: after.ref },
       affects: allFields(bindings),
-      stops: toView ? ['create', 'update'] : [],
+      stops: toView ? WRITES : [],
       breaksReads: false,
       otherwise: 'review',
       message: toView
@@ -233,14 +254,16 @@ function subjectKey(subject: DriftSubject): string {
  * Severity, order and what is still writable, decided once for every change.
  *
  * Blocking when the change breaks what the form shows, or stops a write the
- * form offers; otherwise the change's own lesser severity. The same dropped
+ * form offers -- a delete, only where the policy lets somebody delete
+ * (`counted`); otherwise the change's own lesser severity. The same dropped
  * column is blocking for a form that binds it and a note for one that does not.
  */
-function finish(drafts: readonly Draft[], offered: { create: boolean; update: boolean }): Omit<DriftReport, 'runtime'> {
+function finish(drafts: readonly Draft[], offered: Offered, policy: Pick<FormPolicy, 'operations'>): Omit<DriftReport, 'runtime'> {
   const stops = new Set<Operation>(drafts.flatMap(stopped))
+  const blocks = counted(offered, policy)
   const changes: DriftChange[] = drafts.map((draft) => ({
     kind: draft.kind,
-    severity: draft.breaksReads || draft.stops.some((operation) => offered[operation]) ? 'blocking' : draft.otherwise,
+    severity: draft.breaksReads || draft.stops.some((operation) => blocks[operation]) ? 'blocking' : draft.otherwise,
     subject: draft.subject,
     affects: draft.affects,
     message: draft.message,
@@ -256,6 +279,6 @@ function finish(drafts: readonly Draft[], offered: { create: boolean; update: bo
     changes,
     blocking: changes.some((change) => change.severity === 'blocking'),
     readable: !drafts.some((draft) => draft.breaksReads),
-    writable: { create: offered.create && !stops.has('create'), update: offered.update && !stops.has('update') },
+    writable: { create: offered.create && !stops.has('create'), update: offered.update && !stops.has('update'), delete: offered.delete && !stops.has('delete') },
   }
 }

@@ -1,4 +1,4 @@
-import type { InsertRequest, ObjectRef, ReadRequest, RecordAdapter, RecordOutcome, UpdateRequest } from '@formancy/data-core'
+import type { DeleteOutcome, DeleteRequest, InsertRequest, ObjectRef, ReadRequest, RecordAdapter, RecordOutcome, UpdateRequest } from '@formancy/data-core'
 
 /*
  * The record port as the suites written before 0041 call it, over the real
@@ -40,6 +40,11 @@ export function defined(records: RecordAdapter) {
     async update(request: Undefined<UpdateRequest>): Promise<RecordOutcome> {
       const found = await definitionOf(request)
       return found.ok ? records.update({ ...request, definition: found.definition }) : found
+    },
+    /** A delete (0050), with the definition `describe` reads just before it, as the runtime's. */
+    async delete(request: Undefined<DeleteRequest>): Promise<DeleteOutcome> {
+      const found = await definitionOf(request)
+      return found.ok ? records.delete({ ...request, definition: found.definition }) : found
     },
   }
 }

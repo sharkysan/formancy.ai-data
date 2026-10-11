@@ -4,6 +4,7 @@ import { findObject } from '../snapshot.js'
 import { assertReadableLookup, assertReadableRoot, identityFor, rowSecurityNotes, UNREADABLE, uninsertablePins, versionAccessProblem, writesFor } from './access.js'
 import { controlFor } from './controls.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, sourceNameFor } from './names.js'
+import { deleteUnoffered } from './offers.js'
 import type { ConcurrencyBinding, FieldBinding, FormBindings, GeneratedForm, GenerationNote, GenerationRequest, LookupChoice } from './types.js'
 import { BINDINGS_VERSION, GENERATED_SPEC_VERSION } from './version.js'
 
@@ -315,7 +316,7 @@ function concurrencyFor(
     notes.push({
       subject: root.ref.name,
       kind: 'blocked',
-      message: `Update is not offered: this connection's account may not read ${rowversion.name}, the rowversion a stale save is detected by.`,
+      message: `Update and delete are not offered: this connection's account may not read ${rowversion.name}, the rowversion a stale save is detected by.`,
     })
     return null
   }
@@ -378,31 +379,37 @@ function operationsFor(
 ): FormBindings['operations'] {
   if (root.kind === 'view') {
     notes.push({ subject: root.ref.name, kind: 'blocked', message: 'A view is read-only until a writable view is explicitly supported.' })
-    return { create: false, update: false }
+    return { create: false, update: false, delete: false }
   }
 
   const create = createFor(root, planned, pins, notes)
-  let update = true
+  // A delete names its record as an update does, by the key and the version
+  // read (0050): without either, neither is offered, and one note says both.
+  let addressed = true
   if (identity === null) {
     // identityFor noted a key the account cannot read; only a table with no key at all is said here.
-    update = false
+    addressed = false
     if (root.primaryKey === null && root.uniqueKeys.length === 0) {
-      notes.push({ subject: root.ref.name, kind: 'blocked', message: 'Update is not offered: no primary or unique key identifies a record.' })
+      notes.push({ subject: root.ref.name, kind: 'blocked', message: 'Update and delete are not offered: no primary or unique key identifies a record.' })
     }
   } else if (concurrency === null && root.columns.some((column) => column.type.kind === 'rowversion')) {
     // concurrencyFor noted the rowversion the account cannot read.
-    update = false
+    addressed = false
   } else if (concurrency === null || !concurrency.confirmed) {
-    update = false
+    addressed = false
     notes.push({
       subject: root.ref.name,
       kind: 'blocked',
       message:
         concurrency === null
-          ? 'Update is not offered: no rowversion and no confirmed version column, so a stale save could not be detected.'
-          : `Update is not offered until ${concurrency.column} is confirmed as a version column.`,
+          ? 'Update and delete are not offered: no rowversion and no confirmed version column, so a stale save could not be detected.'
+          : `Update and delete are not offered until ${concurrency.column} is confirmed as a version column.`,
     })
-  } else if (planned.some((entry) => entry.privilegeOnly) && !planned.some((entry) => entry.binding.writes.update)) {
+  }
+  if (!addressed || identity === null || concurrency === null) return { create, update: false, delete: false }
+
+  let update = true
+  if (planned.some((entry) => entry.privilegeOnly) && !planned.some((entry) => entry.binding.writes.update)) {
     // Something would be written on update but for privilege, and nothing is:
     // the database would refuse every save. A form that writes nothing for
     // other reasons keeps the behaviour it had before 0027.
@@ -410,7 +417,12 @@ function operationsFor(
     notes.push({ subject: root.ref.name, kind: 'blocked', message: "Update is not offered: this connection's account may UPDATE none of the columns this form writes." })
   }
 
-  return { create, update }
+  // What the delete also does to other tables is never read here: that is
+  // the policy's to accept (deleteProblems), one decision for publish,
+  // planning, drift and the studio.
+  const unoffered = deleteUnoffered(root, identity, concurrency)
+  if (unoffered !== null) notes.push({ subject: root.ref.name, kind: 'blocked', message: unoffered })
+  return { create, update, delete: unoffered === null }
 }
 
 function layoutFor(root: ObjectMeta, planned: readonly Planned[]): LayoutNode[] {

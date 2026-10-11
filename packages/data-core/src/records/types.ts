@@ -172,6 +172,55 @@ export interface UpdateRequest {
   definition: string
 }
 
+/**
+ * What a delete of one record reaches through foreign keys (0050), as the
+ * planner decided it from the snapshot and the policy: what each adapter's
+ * statement holds the database to, so a key that would act differently is
+ * refused there rather than followed.
+ *
+ * In 0050 a delete reaches the root alone: `removed` is the root, and
+ * `cleared` and `accepted` are empty. The shape is the one a delete that
+ * cascades by name will fill in (0051).
+ */
+export interface DeleteReach {
+  /** The tables a delete removes rows of, the root first. */
+  removed: readonly ObjectRef[]
+  /** The tables whose referencing columns a delete sets NULL or to their default, and those columns. */
+  cleared: ReadonlyArray<{ table: ObjectRef; columns: readonly string[] }>
+  /** Each foreign key the policy accepts a delete acting through: the table it is on, its name, the table it refers to, and its action. */
+  accepted: ReadonlyArray<{ from: ObjectRef; name: string; onto: ObjectRef; onDelete: 'cascade' | 'set-null' | 'set-default' }>
+}
+
+/**
+ * Delete the record named by `key`, only if its version is still
+ * `expectedVersion` and it is inside the filters and every through, as an
+ * update locates it (0050) -- one guarded statement, so nothing can change
+ * between the check and the delete. A record outside them is `not-found`
+ * whatever version is sent. The statement deletes one row or none: a key
+ * that matches more is refused inside it, with nothing deleted. And it
+ * deletes only while the table's definition is `definition` (0041) and
+ * nothing refers to the tables of `reach` in a way the reach does not name.
+ */
+export interface DeleteRequest {
+  target: RecordTarget & { concurrency: RecordConcurrency }
+  key: readonly RecordValue[]
+  /** The token a read returned: hex for a rowversion, a decimal string for a version column. */
+  expectedVersion: string
+  filters: RowFilters
+  through: readonly Through[]
+  reach: DeleteReach
+  definition: string
+}
+
+/**
+ * What a delete removed (0050): the identity columns as the statement
+ * deleted them, canonical, so the token answered is the row's own -- under
+ * a case-insensitive key collation it may be spelled otherwise than the one
+ * sent (0028) -- and the version it had. No other value: nothing of a
+ * deleted record is kept for a resend to answer with (0031).
+ */
+export type DeleteOutcome = { ok: true; deleted: { values: Record<string, ApiValue>; version: string } } | RecordFailure
+
 /** A record as the API carries it: canonical values by column, and its current version token. */
 export interface RecordRead {
   ok: true
@@ -285,7 +334,9 @@ export type ListOutcome = { ok: true; described: DescribedTable; rows: Array<Omi
  * table's definition is `definition`; otherwise it is `schema-changed`, and
  * the record was not written. A read's description is of the table as that
  * read statement found it, and so is a list's (0044): one statement for the
- * page and the table it was read from.
+ * page and the table it was read from. A delete runs only while the
+ * definition holds too, and while nothing refers to the tables it reaches in
+ * a way its request does not name (0050).
  */
 export interface RecordAdapter {
   describe(table: ObjectRef): Promise<Described>
@@ -293,4 +344,6 @@ export interface RecordAdapter {
   list(request: ListRequest): Promise<ListOutcome>
   insert(request: InsertRequest): Promise<RecordOutcome>
   update(request: UpdateRequest): Promise<RecordOutcome>
+  /** One record, by its key and the version its person read (0050): one guarded statement, never retried. */
+  delete(request: DeleteRequest): Promise<DeleteOutcome>
 }

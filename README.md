@@ -23,8 +23,10 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 
 > **Status: in development, nothing released.** Each line under *What it does*
 > links the decision record whose **Verified by** names what fails when the
-> line stops being true. Not yet: a release, a delete, a host page that
-> draws a field an update may not write as read-only
+> line stops being true. Not yet: a release, a page here that deletes a
+> record, a delete that reaches another table through a foreign key, a
+> policy step in the studio that grants delete, a host page that draws a
+> field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
 > a run through a real Cloudflare tunnel, and a licence a lawyer has
 > reviewed.
@@ -131,6 +133,22 @@ is not licensed for production.
   PostgreSQL's bytes in turn, SQL Server's byte groups -- total and stable on
   both, and not the same
   ([0056](./docs/decisions/0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md)).
+- **A record can be deleted, one at a time, by its token and the version its
+  person read**, under the policy's `operations.delete`, granted only to
+  roles that may read and scoped as an update is, in one guarded statement
+  that deletes one row or none, through the runtime plane and
+  `@formancy/data-client`; a deletion whose answer was lost is safe to send
+  again with the same version. A form offers delete once regenerated from a
+  snapshot this release took, where the database numbers its key or SQL
+  Server's rowversion guards it -- not on PostgreSQL's order lines, nor its
+  deliveries, whose uuid key a default fills -- and a policy may not grant
+  it while another table's foreign key would cascade, clear or set a
+  default on a delete, so the fixture's orders, whose lines and deliveries
+  cascade, and its deliveries, whose parcels do, are not deleted yet.
+  Triggers that run on a delete are the database's, and on PostgreSQL a
+  rule that acts on one makes every delete of its table refused. No page
+  here deletes yet
+  ([0050](./docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)).
 - **A person is shown the forms they may read**, and nothing about any
   other, each with the forms whose rows a page may list below one of its
   records, derived from the published forms' foreign keys and types without
@@ -158,7 +176,10 @@ is not licensed for production.
 - **Audited and measured.** One audit event for each request that reaches a
   route of either plane, and never a value
   ([0023](./docs/decisions/0023-the-audit-trail-is-operational-not-evidence.md),
-  [0033](./docs/decisions/0033-the-administrator-plane-is-audited.md));
+  [0033](./docs/decisions/0033-the-administrator-plane-is-audited.md)); a
+  delete's only trace is the keyed hash of its token, and without an audit
+  key there is none
+  ([0050](./docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md));
   performance measured through the shipped server on both engines, for every
   runtime request but a page of records and the menu of forms, and held in CI by rows read and
   round trips, never a time
@@ -373,10 +394,14 @@ Of the host page's suites and checks, only that picture's check below holds
 the page to it, and on PostgreSQL alone
 ([0038](./docs/decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 
-What it does not do yet: on a loaded record it draws the fields an update
-may not write -- Customer, Order date, Amount and Created by for the order
-form's own account -- as editable, and the server refuses a changed one,
-which is [filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong).
+What it does not do yet: it deletes nothing, though the runtime plane
+serves a delete -- the open form's tags of what a person may do leave delete
+out until the page has a control for it
+([0050](./docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md));
+and on a loaded record it draws the fields an update may not write --
+Customer, Order date, Amount and Created by for the order form's own
+account -- as editable, and the server refuses a changed one, which is
+[filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong).
 
 In a real host the application's own session supplies the token; the page asks
 for one because it has none, holds it in memory only, and forgets it on a
@@ -487,7 +512,7 @@ customer options from the runtime plane, as the host page above shows.
 | `@formancy/data-core` | The database-neutral core: the ports, the metadata contract and what discovery could not see, generation, policy, presentation, the record planner, drift review and the codecs. No driver, no HTTP, no Node. |
 | `@formancy/data-postgres` | The PostgreSQL adapter, on the `postgres` driver. |
 | `@formancy/data-sqlserver` | The SQL Server adapter, on `mssql` over `tedious` — pure JavaScript, no ODBC. |
-| `@formancy/data-client` | The browser's side of the runtime plane: a `fetch`-based client for the forms a person may read, a published form's definition, its records -- one by its token or a page at a time -- and its lookups, and the option sources both formancy renderers take. Source-available, framework-neutral, no Node. |
+| `@formancy/data-client` | The browser's side of the runtime plane: a `fetch`-based client for the forms a person may read, a published form's definition, its records -- one by its token or a page at a time, created, updated and deleted -- and its lookups, and the option sources both formancy renderers take. Source-available, framework-neutral, no Node. |
 | `@formancy/data-server` | The server: configuration store, host identity, the administrator and runtime planes over HTTP, the audit trail, and the composition root that starts them from configuration. Fastify, like formancy's. |
 | `@formancy/data-fixtures` | Private test support: one business model for both engines, a table keyed by a uuid the database fills among its edge cases, with its restricted reader and the order form's own account; the comparator both adapters' discovery answers to; the cases both engines share -- parity and drift -- each with one expectation; the sized table the performance harness reads; and `renamedColumn`, a snapshot as discovery reports it after a rename. Never published. |
 | `@formancy/data-performance` | Private: the harness that measures the shipped server against both engines and renders `docs/performance.md` from what it measured. Never published. |

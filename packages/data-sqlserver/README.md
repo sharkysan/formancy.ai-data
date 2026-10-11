@@ -264,13 +264,20 @@ counting pass counts it through a TCP hop on every run, and
 
 ### Records
 
-`createSqlServerRecords(pool)` reads, inserts and updates one record, and
-lists a page of records -- one statement, an OUTER APPLY with OFFSET and
-FETCH beside the table's description, a nullable column's NULLs placed by a
-CASE
+`createSqlServerRecords(pool)` reads, inserts, updates and deletes one
+record, and lists a page of records -- one statement, an OUTER APPLY with
+OFFSET and FETCH beside the table's description, a nullable column's NULLs
+placed by a CASE
 ([0015](../../docs/decisions/0015-a-record-operation-is-one-guarded-statement.md),
 [0017](../../docs/decisions/0017-sqlserver-operations.md),
-[0044](../../docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)):
+[0044](../../docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)).
+A delete runs in the write batch: `delete ... output deleted... into`, then
+the batch's checks, an INSTEAD OF DELETE guard, and a reach guard that
+refuses (51707, `schema-changed`) a key or an edge constraint that acts on
+the delete, enabled or not, and an account that no longer holds VIEW
+DEFINITION on the database or is bound by a VIEW DEFINITION or CONTROL deny,
+by discovery's own conditions; more than one row rolls it back
+([0050](../../docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)):
 
 ```ts
 import { createSqlServerRecords } from '@formancy/data-sqlserver'

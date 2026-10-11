@@ -13,6 +13,7 @@ import type { Said } from './leave.js'
 import { LAYOUTS } from './layout.js'
 import type { Layout, View } from './layout.js'
 import { useOpening } from './opening.js'
+import { operationTags } from './operations.js'
 import { renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
 import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
@@ -23,9 +24,6 @@ import type { SaveResult, Session } from './session.js'
 import { Split } from './split.js'
 
 const LAYOUT_LABELS: Readonly<Record<Layout, string>> = { 'side-by-side': 'Side by side', stacked: 'Stacked', separate: 'Separate views' }
-
-/** What each operation is called on its tag. */
-const OPERATIONS: Readonly<Record<string, string>> = { read: 'Read', create: 'Create', update: 'Update' }
 
 const DISCARDED: Said = ['Discarded the unsaved changes. ']
 
@@ -46,7 +44,7 @@ function FormHead({
 }: {
   title: string
   formId: string
-  operations: readonly string[]
+  operations: PublishedForm['operations']
   layout: Layout
   note: boolean
   headingRef: RefObject<HTMLHeadingElement | null>
@@ -59,8 +57,8 @@ function FormHead({
           <span>{title}</span> <code>{formId}</code>
         </h2>
         <ul className="ops" aria-label="Operations">
-          {operations.map((operation) => (
-            <li key={operation}>{OPERATIONS[operation] ?? operation}</li>
+          {operationTags(operations).map((tag) => (
+            <li key={tag}>{tag}</li>
           ))}
         </ul>
       </div>

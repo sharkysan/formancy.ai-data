@@ -1,6 +1,6 @@
 import type { FormBindings } from '../generate/types.js'
 import type { ColumnAccess, ColumnMeta, MetadataSnapshot, ObjectMeta, ObjectRef, RowSecurity } from '../metadata.js'
-import { findObject } from '../snapshot.js'
+import { findObject, recordsDeleteFacts } from '../snapshot.js'
 import { allFields, type Comparison, describe, type Draft, fieldsOver, list, lookups, type Operation, objectIn, sameRef, writesOn } from './context.js'
 
 /*
@@ -196,10 +196,48 @@ export function accountChanges(base: MetadataSnapshot, current: MetadataSnapshot
   ]
 }
 
+/**
+ * Whether the account may still DELETE from the root (0050): compared only
+ * between two snapshots that both record it (0049). A base taken before
+ * 0049 never asked, and a form generated from it offers no delete, so
+ * nothing about deleting changed for it; a current snapshot that no longer
+ * says is `referrerChanges`' to report, with what refers to the root.
+ */
+function deleteDraft(comparison: Comparison): Draft[] {
+  const { base, current, before, after } = comparison
+  if (!recordsDeleteFacts(base) || !recordsDeleteFacts(current)) return []
+  const was = before.access?.delete === true
+  const is = after.access?.delete === true
+  if (was === is) return []
+  const subject = { kind: 'object', object: after.ref } as const
+  return [
+    was
+      ? {
+          kind: 'privilege-narrowed',
+          subject,
+          affects: [],
+          stops: ['delete'],
+          breaksReads: false,
+          otherwise: 'review',
+          message: `This connection's account may no longer DELETE from ${describe(after.ref)}, so delete is blocked. This is a privilege change, not a schema change: restore the grant, or review the form.`,
+        }
+      : {
+          kind: 'privilege-widened',
+          subject,
+          affects: [],
+          stops: [],
+          breaksReads: false,
+          otherwise: 'info',
+          message: `This connection's account may now DELETE from ${describe(after.ref)}, which it could not when the form was generated. Regenerating may offer more; the published form is unchanged.`,
+        },
+  ]
+}
+
 /** Every privilege, row-security and account change the form rests on, for the root and each lookup's target. */
 export function privilegeChanges(comparison: Comparison): Draft[] {
   return [
     ...comparedObjects(comparison).flatMap(({ before, after }) => [...columnDrafts(comparison, before, after), ...rowSecurityDraft(comparison, before, after)]),
+    ...deleteDraft(comparison),
     ...accountChanges(comparison.base, comparison.current, comparison.bindings),
   ]
 }

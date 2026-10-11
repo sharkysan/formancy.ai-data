@@ -88,6 +88,12 @@ database would refuse on every request. Row-level security that applies is an
 Exact decimals and integers past 2^53 become text fields with an exact pattern,
 never JavaScript numbers. Update is offered only with a proven concurrency
 token. See [0009](../../docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md).
+Delete is offered with one too, where the account may DELETE and the version
+proves the record for good: a rowversion, or a version column on a table
+whose key the database numbers. A key a default fills does not count, since
+a default may hand out one value twice, so a uuid key from
+`gen_random_uuid()` guarded by a version column offers no delete
+([0050](../../docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)).
 
 ## Drift review
 
@@ -366,6 +372,18 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   description its own statement carried by `driftRefusal(…, 'list')`: a
   read's refusal, and `LIST_REFUSED` when the table no longer holds the key
   unique and NOT NULL.
+- **A delete** (0050). `planDelete(snapshot, bindings, policy, context,
+  recordToken, expectedVersion, described)` asks the policy first -- its
+  filters and throughs scope a delete as an update's do -- then whether the
+  form offers delete (`offers()`, where an absent flag is not offered) with
+  a confirmed token, as its own snapshot says it can (`deleteUnoffered`),
+  what a delete also does (`deleteProblems`, which refuses a grant while a
+  key that refers to the root cascades, clears or sets a default), the
+  description (`driftRefusal(…, 'delete')`, `DELETE_REFUSED`), the token
+  and the version. The request's `reach` is the root alone; an adapter
+  reads it through `deleteTerms`, which throws on a key that is not the
+  identity, a missing version, filter or through, and a reach that goes
+  past the root.
 - **A person's menu** (0045). `menuForm(bundle, context)` reads one
   published form alone for this person -- a bundle it cannot read throws
   there, for the caller to leave out -- and `formMenu(forms)` names, in

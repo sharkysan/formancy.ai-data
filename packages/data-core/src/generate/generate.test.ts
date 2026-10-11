@@ -266,7 +266,7 @@ describe('generateForm', () => {
   test('rowversion is a confirmed token; a version-looking column is a suggestion until confirmed', () => {
     const sqlServer = generateForm(fixtureLike('sqlserver'), ORDER)
     expect(sqlServer.bindings.concurrency).toEqual({ kind: 'rowversion', column: 'row_version', confirmed: true })
-    expect(sqlServer.bindings.operations).toEqual({ create: true, update: true })
+    expect(sqlServer.bindings.operations).toEqual({ create: true, update: true, delete: false })
     expect(sqlServer.form.model.fields.map((field) => field.key)).not.toContain('row_version')
 
     const inferred = generateForm(fixtureLike('postgres'), ORDER)
@@ -311,7 +311,7 @@ describe('generateForm', () => {
     const { bindings } = generateForm(revisions, { ...ORDER, root: { schema: 'sales', name: 'document' }, lookups: [] })
     expect(bindings.concurrency).toBeNull()
     expect(bindings.fields.map((binding) => binding.field)).toEqual(['id', 'version', 'body'])
-    expect(bindings.operations).toEqual({ create: true, update: false })
+    expect(bindings.operations).toEqual({ create: true, update: false, delete: false })
   })
 
   // With no way to detect a stale save, an update could overwrite somebody
@@ -319,7 +319,7 @@ describe('generateForm', () => {
   test('without a concurrency token, update is not offered and the reason is written down', () => {
     const { bindings, notes } = generateForm(fixtureLike('postgres'), { ...ORDER, root: { schema: 'sales', name: 'employee' }, lookups: [] })
     expect(bindings.concurrency).toBeNull()
-    expect(bindings.operations).toEqual({ create: true, update: false })
+    expect(bindings.operations).toEqual({ create: true, update: false, delete: false })
     expect(notes).toContainEqual(expect.objectContaining({ kind: 'blocked', message: expect.stringMatching(/stale save could not be detected/) }))
   })
 
@@ -394,7 +394,8 @@ describe('generateForm', () => {
     expect(form.model.fields.find((field) => field.key === 'id')).not.toHaveProperty('required')
     expect(bindings.fields.find((binding) => binding.field === 'id')).toMatchObject({ writes: { create: false, update: false } })
     expect(bindings.identity).toEqual(['id'])
-    expect(bindings.operations).toEqual({ create: true, update: true })
+    // No delete: this snapshot does not say whether its account may (0050).
+    expect(bindings.operations).toEqual({ create: true, update: true, delete: false })
     expect(form.logic?.rules).toContainEqual({ target: 'id', kind: 'disabled', cel: 'true' })
     expect(form.layouts?.[0]?.nodes.map((node) => ('label' in node ? node.label : undefined))).toEqual(['Delivery', 'Record'])
     expect(notes).toContainEqual({
@@ -441,7 +442,7 @@ describe('generateForm', () => {
     expect(pinned.bindings.identity).toEqual(['tenant_id', 'id'])
     expect(writesOf(pinned, 'id')).toEqual({ create: false, update: false })
     expect(pinned.form.model.fields.find((field) => field.key === 'id')).not.toHaveProperty('required')
-    expect(pinned.bindings.operations).toEqual({ create: true, update: true })
+    expect(pinned.bindings.operations).toEqual({ create: true, update: true, delete: false })
     expect(pinned.notes).toContainEqual(expect.objectContaining({ subject: 'id', kind: 'read-only', message: expect.stringMatching(/^The database fills this key/) }))
     expect(writesOf(generateForm(delivery, request), 'id')).toEqual({ create: true, update: true })
     const leg = generateForm(delivery, { ...ORDER, root: { schema: 'sales', name: 'leg' }, lookups: [], pinned: ['tenant_id'] })
@@ -549,7 +550,7 @@ describe('generateForm', () => {
     })
     const log = generateForm(keyless, { ...ORDER, root: { schema: 'sales', name: 'log' }, lookups: [] })
     expect(log.bindings.identity).toBeNull()
-    expect(log.bindings.operations).toEqual({ create: true, update: false })
+    expect(log.bindings.operations).toEqual({ create: true, update: false, delete: false })
     expect(log.notes).toContainEqual(expect.objectContaining({ kind: 'blocked', message: expect.stringMatching(/no primary or unique key/) }))
     expect(generateForm(keyless, { ...ORDER, root: { schema: 'sales', name: 'code' }, lookups: [] }).bindings.identity).toEqual(['code'])
   })
@@ -557,7 +558,7 @@ describe('generateForm', () => {
   // A view has no write path in the first release.
   test('a view generates a read-only form', () => {
     const { bindings, form } = generateForm(fixtureLike('postgres'), { ...ORDER, root: { schema: 'sales', name: 'customer_summary' }, lookups: [] })
-    expect(bindings.operations).toEqual({ create: false, update: false })
+    expect(bindings.operations).toEqual({ create: false, update: false, delete: false })
     expect(bindings.fields.every((binding) => !binding.writes.create && !binding.writes.update)).toBe(true)
     expect(form.logic?.rules).toHaveLength(form.model.fields.length)
   })
@@ -602,6 +603,186 @@ describe('generateForm', () => {
     expect(() =>
       generateForm(shared, { ...ORDER, lookups: [...ORDER.lookups, { foreignKey: 'fk_order_tenant', display: ['name'] }] }),
     ).toThrow(/tenant_id belongs to both fk_order_customer and fk_order_tenant/)
+  })
+})
+
+/**
+ * The fixture-like snapshot as discovery has taken one since 0049: the
+ * order's lines beside it, whose key people type and which cascade from the
+ * order, and on every object whether the account may delete from it and
+ * every key that refers to it, derived from the foreign keys as the
+ * fixture's comparators derive them.
+ */
+function withDeleteFacts(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}, mayDelete: (object: ObjectMeta) => boolean = () => true): MetadataSnapshot {
+  return fixtureLike(kind, (objects) => {
+    objects.push(
+      table(
+        'order_line',
+        [
+          col('order_id', INT64),
+          col('line_no', INT32),
+          col('quantity', INT32),
+          kind === 'sqlserver' ? col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' }) : col('row_version', INT64, { hasDefault: true }),
+        ],
+        {
+          primaryKey: { name: 'pk_order_line', columns: ['order_id', 'line_no'] },
+          foreignKeys: [
+            {
+              name: 'fk_order_line_order',
+              columns: ['order_id'],
+              references: { table: { schema: 'sales', name: 'order' }, columns: ['id'] },
+              onUpdate: 'no-action',
+              onDelete: 'cascade',
+              enforced: true,
+              validated: true,
+            },
+          ],
+        },
+      ),
+    )
+    edit(objects)
+    for (const object of objects) {
+      object.access = { delete: object.kind === 'table' && mayDelete(object) }
+      object.referencedBy = objects
+        .flatMap((other) => other.foreignKeys.map((key) => ({ other, key })))
+        .filter(({ key }) => key.references?.table.schema === object.ref.schema && key.references.table.name === object.ref.name)
+        .map(({ other, key }) => ({
+          table: { ...other.ref },
+          name: key.name,
+          columns: [...key.columns],
+          referencedColumns: [...(key.references?.columns ?? [])],
+          onDelete: key.onDelete,
+          onUpdate: key.onUpdate,
+          enforced: key.enforced,
+        }))
+        .sort((left, right) => (left.table.name < right.table.name ? -1 : left.table.name > right.table.name ? 1 : left.name < right.name ? -1 : left.name > right.name ? 1 : 0))
+    }
+  })
+}
+
+const LINE: GenerationRequest = {
+  connection: 'erp',
+  root: { schema: 'sales', name: 'order_line' },
+  formId: 'sales-order-line',
+  title: 'Order line',
+  lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
+}
+
+/** The generator's blocked notes that name delete. */
+function deleteNotes(notes: ReturnType<typeof generateForm>['notes']): string[] {
+  return notes.filter((note) => note.kind === 'blocked' && /delete/i.test(note.message)).map((note) => note.message)
+}
+
+describe('delete (0050)', () => {
+  // A delete can be made against the order: a table, a key the database
+  // numbers, a token that proves the record -- a rowversion, or a confirmed
+  // version column -- and an account that may DELETE. What the delete also
+  // does to order_line, whose key cascades from it, is the policy's to
+  // accept (deleteProblems): the generator never reads referencedBy, so the
+  // order form offers delete whatever refers to it, and one function decides
+  // the reach (watched failing with delete offered only where update is and
+  // nothing refers to the table).
+  test('offers delete of an order on both engines, though order_line cascades from it', () => {
+    const sqlServer = generateForm(withDeleteFacts('sqlserver'), ORDER)
+    expect(sqlServer.bindings.operations).toEqual({ create: true, update: true, delete: true })
+    expect(deleteNotes(sqlServer.notes)).toEqual([])
+    const postgres = generateForm(withDeleteFacts('postgres'), { ...ORDER, versionColumn: 'row_version' })
+    expect(postgres.bindings.operations).toEqual({ create: true, update: true, delete: true })
+    expect(withDeleteFacts('postgres').objects.find((object) => object.ref.name === 'order')?.referencedBy).toEqual([
+      expect.objectContaining({ name: 'fk_order_line_order', onDelete: 'cascade' }),
+    ])
+  })
+
+  // A version column starts at its default on every insert, so a line
+  // deleted at version 1 and created again under its typed key (order_id,
+  // line_no) is at version 1 too, and a stale delete -- or one sent again
+  // after a lost answer -- would land on the new line. SQL Server's
+  // rowversion never repeats, so its lines may be deleted; PostgreSQL's may
+  // not, and the note says why. A key the database numbers never comes back
+  // from a form (0026): by-default counts, or `serial` would not (watched
+  // failing with the version rule removed: PostgreSQL's lines offered delete).
+  test('offers delete of a line where its version cannot restart: on SQL Server, not on PostgreSQL', () => {
+    expect(generateForm(withDeleteFacts('sqlserver'), LINE).bindings.operations.delete).toBe(true)
+    const postgres = generateForm(withDeleteFacts('postgres'), { ...LINE, versionColumn: 'row_version' })
+    expect(postgres.bindings.operations).toEqual({ create: true, update: true, delete: false })
+    expect(deleteNotes(postgres.notes)).toEqual([
+      "Delete is not offered: a record of sales.order_line created again with a deleted record's key starts its row_version where the deleted one did, so a version cannot tell the two apart. A key the database numbers, or SQL Server's rowversion, can.",
+    ])
+    const serial = withDeleteFacts('postgres', (objects) => {
+      objects.push(table('ticket', [col('id', INT32, { generated: 'identity-by-default', hasDefault: true }), col('note', { kind: 'text', maxLength: 50, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', INT64, { hasDefault: true })], {
+        primaryKey: { name: 'pk_ticket', columns: ['id'] },
+      }))
+    })
+    expect(generateForm(serial, { ...LINE, root: { schema: 'sales', name: 'ticket' }, lookups: [], versionColumn: 'row_version' }).bindings.operations.delete).toBe(true)
+  })
+
+  // A key the database fills by its default (0056) is never written by a
+  // form, as a numbered one is not, but a default is not a sequence: it may
+  // hand out one value twice -- a constant on a one-row table does -- and a
+  // record created again under it starts its version column where the
+  // deleted one did. So such a key proves no record on its own: a delivery
+  // guarded by PostgreSQL's version column offers no delete, and the note
+  // says why; one guarded by SQL Server's rowversion does, whatever its key.
+  // What the delete also does to its parcels is the policy's (watched failing
+  // with a filled key counted as numbered: PostgreSQL's delivery offered delete).
+  test("offers no delete where a version column guards a key the database fills by its default; a rowversion's table does", () => {
+    const deliveries = (kind: DatabaseKind): MetadataSnapshot =>
+      withDeleteFacts(kind, (objects) => {
+        objects.push(
+          table(
+            'delivery',
+            [
+              col('id', { kind: 'uuid' }, { hasDefault: true, defaultExpression: kind === 'postgres' ? 'gen_random_uuid()' : '(newsequentialid())' }),
+              col('carrier', { kind: 'text', maxLength: 40, lengthUnit: 'utf16-code-units', fixedLength: false }),
+              kind === 'sqlserver' ? col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' }) : col('row_version', INT64, { hasDefault: true }),
+            ],
+            { primaryKey: { name: 'pk_delivery', columns: ['id'] } },
+          ),
+        )
+      })
+    const request: GenerationRequest = { ...ORDER, root: { schema: 'sales', name: 'delivery' }, lookups: [] }
+    const postgres = generateForm(deliveries('postgres'), { ...request, versionColumn: 'row_version' })
+    expect(postgres.bindings.fields.find((binding) => binding.field === 'id')?.writes).toEqual({ create: false, update: false })
+    expect(postgres.bindings.operations).toEqual({ create: true, update: true, delete: false })
+    expect(deleteNotes(postgres.notes)).toEqual([
+      "Delete is not offered: a record of sales.delivery created again with a deleted record's key starts its row_version where the deleted one did, so a version cannot tell the two apart. A key the database numbers, or SQL Server's rowversion, can.",
+    ])
+    const sqlServer = generateForm(deliveries('sqlserver'), request)
+    expect(sqlServer.bindings.operations).toEqual({ create: true, update: true, delete: true })
+    expect(deleteNotes(sqlServer.notes)).toEqual([])
+  })
+
+  // A form does not offer what its account cannot do (0027). The reader may
+  // not DELETE; a snapshot taken before 0049 does not say, and is read as
+  // "not offered" with a way out, never as "may". Each says why, once.
+  test('offers no delete where the account may not DELETE, or the snapshot does not say whether it may', () => {
+    const reader = generateForm(withDeleteFacts('sqlserver', () => {}, () => false), ORDER)
+    expect(reader.bindings.operations.delete).toBe(false)
+    expect(deleteNotes(reader.notes)).toEqual(["Delete is not offered: this connection's account may not DELETE from sales.order."])
+    const before = generateForm(fixtureLike('sqlserver'), ORDER)
+    expect(before.bindings.operations.delete).toBe(false)
+    expect(deleteNotes(before.notes)).toEqual(['Delete is not offered: this snapshot was taken before it recorded whether its account may delete. Discover again.'])
+  })
+
+  // A delete names its record by the key and the version the person read,
+  // as an update does, so what stops update for want of either stops delete
+  // too, and the one note says both. A view has no write path at all.
+  test('offers no delete without a key or a confirmed token, or on a view, saying so with update', () => {
+    const facts = withDeleteFacts('postgres')
+    const employee = generateForm(facts, { ...ORDER, root: { schema: 'sales', name: 'employee' }, lookups: [] })
+    expect(employee.bindings.operations.delete).toBe(false)
+    expect(deleteNotes(employee.notes)).toEqual(['Update and delete are not offered: no rowversion and no confirmed version column, so a stale save could not be detected.'])
+    const inferred = generateForm(facts, ORDER)
+    expect(deleteNotes(inferred.notes)).toEqual(['Update and delete are not offered until row_version is confirmed as a version column.'])
+    const keyless = withDeleteFacts('sqlserver', (objects) => {
+      objects.push(table('log', [col('message', { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' })]))
+    })
+    const log = generateForm(keyless, { ...ORDER, root: { schema: 'sales', name: 'log' }, lookups: [] })
+    expect(log.bindings.operations).toEqual({ create: true, update: false, delete: false })
+    expect(deleteNotes(log.notes)).toEqual(['Update and delete are not offered: no primary or unique key identifies a record.'])
+    const view = generateForm(facts, { ...ORDER, root: { schema: 'sales', name: 'customer_summary' }, lookups: [] })
+    expect(view.bindings.operations).toEqual({ create: false, update: false, delete: false })
+    expect(deleteNotes(view.notes)).toEqual([])
   })
 })
 

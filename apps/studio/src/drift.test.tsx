@@ -151,7 +151,7 @@ describe('drift', () => {
     plane.databases.set('fixture', withoutColumn(OWNER_SNAPSHOT, 'order', 'notes'))
     await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
     const report = await within(drift).findByRole('region', { name: 'Version 1 of sales-order, against the database now' })
-    expect((await serverReport()).runtime).toEqual({ readable: false, writable: { create: false, update: false } })
+    expect((await serverReport()).runtime).toEqual({ readable: false, writable: { create: false, update: false, delete: false } })
     expect(items(report, 'What the published form may still do').some((item) => item.startsWith('The server still allows'))).toBe(false)
   })
 

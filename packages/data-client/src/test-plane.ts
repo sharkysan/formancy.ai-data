@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { EMPTY_PRESENTATION } from '@formancy/data-core'
+import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
 import type { FieldBinding, FormPolicy } from '@formancy/data-core'
 import { startTcpHop } from '@formancy/data-fixtures'
 import type { TcpHop } from '@formancy/data-fixtures'
@@ -56,6 +56,14 @@ export interface Lossy {
   hops: Record<'pg' | 'ms', TcpHop>
   /** How many orders have exactly these notes, asked of the database's owner, not through a hop. */
   ordersWithNotes(connection: 'pg' | 'ms', notes: string): Promise<number>
+  /**
+   * A row of `lost.removable` -- a numbered id and a text the suite chooses,
+   * its key -- inserted by the owner, which `pg-hop-removable` and
+   * `ms-hop-removable` may delete (0050): its token.
+   */
+  insertRemovable(connection: 'pg' | 'ms', code: string): Promise<string>
+  /** How many rows of `lost.removable` have this code, asked of the owner. */
+  removableCoded(connection: 'pg' | 'ms', code: string): Promise<number>
 }
 
 export interface Plane {
@@ -101,23 +109,31 @@ function headersOf(init: RequestInit | undefined): Record<string, string> {
  * Starts the server and publishes `pg-order` and `ms-order` through the
  * administrator's plane -- with `lines`, `pg-order-line` and
  * `ms-order-line` too, an order's lines reached through their order (0043);
- * and, with `hops`, `pg-hop-order` and `ms-hop-order` through a TCP hop
- * each (`Lossy`).
+ * with `removable`, `pg-removable` and `ms-removable` over the parity
+ * schema's table a clerk may delete from within their tenant (0050); and,
+ * with `hops`, `pg-hop-order` and `ms-hop-order` through a TCP hop each, and
+ * `pg-hop-removable` and `ms-hop-removable` over `lost.removable` (`Lossy`).
  */
-export async function startPlane(options: { hops?: boolean; lines?: boolean } = {}): Promise<Plane> {
+export async function startPlane(options: { hops?: boolean; lines?: boolean; removable?: boolean } = {}): Promise<Plane> {
   const { pg, ms } = inject('databases')
   const connections: ConnectionConfig[] = [
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
     { id: 'ms', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true } },
   ]
+  const [pgConnection, msConnection] = connections as [ConnectionConfig, ConnectionConfig]
+  // Every key of the parity schema's removable tables is numbered by the database, so a version proves a record (0050).
+  connections.push({ ...pgConnection, id: 'pg-parity', schemas: ['parity'] }, { ...msConnection, id: 'ms-parity', schemas: ['parity'] })
   const hops = options.hops === true ? { pg: await startTcpHop({ ...pg, kind: 'postgres' }), ms: await startTcpHop({ ...ms, kind: 'sqlserver' }) } : undefined
   if (hops !== undefined) {
     // The same databases, reached through the hops by the address an operator would write.
     connections.push(
-      { ...(connections[0] as ConnectionConfig), id: 'pg-hop', host: '127.0.0.1', port: hops.pg.port },
-      { ...(connections[1] as ConnectionConfig), id: 'ms-hop', host: '127.0.0.1', port: hops.ms.port },
+      { ...pgConnection, id: 'pg-hop', host: '127.0.0.1', port: hops.pg.port },
+      { ...msConnection, id: 'ms-hop', host: '127.0.0.1', port: hops.ms.port },
+      { ...pgConnection, id: 'pg-hop-lost', host: '127.0.0.1', port: hops.pg.port, schemas: ['lost'] },
+      { ...msConnection, id: 'ms-hop-lost', host: '127.0.0.1', port: hops.ms.port, schemas: ['lost'] },
     )
   }
+  const owners = hops === undefined ? undefined : await openOwners(pg, ms)
   const registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: { PG_PASSWORD: pg.password, MS_PASSWORD: ms.password },
     readFile: async () => '',
@@ -173,6 +189,17 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean } = 
     const policy: FormPolicy = { ...clerkPolicy((bindings as { fields: FieldBinding[] }).fields), rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }
     await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
   }
+  // Forms a clerk may delete with (0050): within their tenant over the parity schema, and every row of lost.removable through the hops.
+  const deletable: Array<[string, string, Record<string, unknown>, FormPolicy['rowFilters']]> = [
+    ...(options.removable === true ? ENGINES.map(({ connection }): [string, string, Record<string, unknown>, FormPolicy['rowFilters']] => [`${connection}-parity`, `${connection}-removable`, { root: { schema: 'parity', name: 'removable' }, pinned: ['tenant_id'] }, [{ column: 'tenant_id', attribute: 'tenant' }]]) : []),
+    ...(hops === undefined ? [] : ENGINES.map(({ connection }): [string, string, Record<string, unknown>, FormPolicy['rowFilters']] => [`${connection}-hop-lost`, `${connection}-hop-removable`, { root: { schema: 'lost', name: 'removable' } }, []])),
+  ]
+  for (const [connection, formId, generation, rowFilters] of deletable) {
+    const { form, bindings, snapshot, generation: generated } = await admin('/v1/form-proposals', { connection, formId, title: 'Removable', lookups: [], versionColumn: 'version', ...generation })
+    const base = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
+    const policy: FormPolicy = { ...base, operations: { ...base.operations, delete: ['clerk'] }, rowFilters, lookups: {} }
+    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation: generated, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+  }
 
   const sent: Sent[] = []
   const spied: typeof fetch = async (input, init) => {
@@ -181,14 +208,13 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean } = 
     return fetch(input, init)
   }
 
-  const owners = hops === undefined ? undefined : await openOwners(pg, ms)
   return {
     base,
     tokens,
     sent,
     fetch: spied,
     client: (token = tokens.clerk) => createDataClient({ token: typeof token === 'function' ? token : () => token, base, fetch: spied }),
-    lossy: hops === undefined || owners === undefined ? undefined : { hops, ordersWithNotes: owners.ordersWithNotes },
+    lossy: hops === undefined || owners === undefined ? undefined : { hops, ordersWithNotes: owners.ordersWithNotes, insertRemovable: owners.insertRemovable, removableCoded: owners.removableCoded },
     close: async () => {
       await app.close()
       // Awaited behind the hops too: the PostgreSQL adapter bounds postgres.js's
@@ -201,8 +227,12 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean } = 
   }
 }
 
-/** The databases' owners, on connections of their own around the hops. */
-async function openOwners(pg: DatabaseDetails, ms: DatabaseDetails): Promise<{ ordersWithNotes: Lossy['ordersWithNotes']; close(): Promise<void> }> {
+/**
+ * The databases' owners, on connections of their own around the hops, and
+ * `lost.removable` on each, made once for the run: a numbered id and a
+ * code, its key, so a delete's answer echoes a text the suite chose (0050).
+ */
+async function openOwners(pg: DatabaseDetails, ms: DatabaseDetails): Promise<Pick<Lossy, 'ordersWithNotes' | 'insertRemovable' | 'removableCoded'> & { close(): Promise<void> }> {
   const pgOwner = postgres({ host: pg.host, port: pg.port, database: pg.database, username: pg.user, password: pg.password, onnotice: () => {} })
   const msOwner = await new mssql.ConnectionPool({
     server: ms.host,
@@ -212,7 +242,25 @@ async function openOwners(pg: DatabaseDetails, ms: DatabaseDetails): Promise<{ o
     password: ms.password,
     options: { encrypt: false, trustServerCertificate: true },
   }).connect()
+  await pgOwner.unsafe('create schema if not exists lost; create table if not exists lost.removable (id integer generated always as identity, code varchar(100) not null, version integer not null default 1, primary key (id, code))')
+  await msOwner.request().batch("if schema_id('lost') is null exec('create schema lost')")
+  await msOwner.request().batch(`if object_id('lost.removable') is null create table lost.removable (
+    id int identity(1, 1) not null, code nvarchar(100) not null, version int not null constraint df_lost_removable_version default 1,
+    constraint pk_lost_removable primary key (id, code))`)
   return {
+    insertRemovable: async (connection, code) => {
+      const id =
+        connection === 'pg'
+          ? ((await pgOwner<Array<{ id: string }>>`insert into lost.removable (code) values (${code}) returning id::text as id`)[0]?.id ?? '')
+          : String((await msOwner.request().input('code', mssql.NVarChar(100), code).query<{ id: number }>('insert into lost.removable (code) output inserted.id values (@code)')).recordset[0]?.id)
+      const token = recordToken(['id', 'code'], { id, code })
+      if (!token.ok) throw new Error(token.message)
+      return token.token
+    },
+    removableCoded: async (connection, code) => {
+      if (connection === 'pg') return (await pgOwner<Array<{ n: number }>>`select count(*)::int as n from lost.removable where code = ${code}`)[0]?.n ?? 0
+      return (await msOwner.request().input('code', mssql.NVarChar(100), code).query<{ n: number }>('select count(*) as n from lost.removable where code = @code')).recordset[0]?.n ?? 0
+    },
     ordersWithNotes: async (connection, notes) => {
       if (connection === 'pg') return (await pgOwner<Array<{ n: number }>>`select count(*)::int as n from sales."order" where notes = ${notes}`)[0]?.n ?? 0
       const result = await msOwner.request().input('notes', mssql.NVarChar(mssql.MAX), notes).query<{ n: number }>('select count(*) as n from sales.[order] where notes = @notes')

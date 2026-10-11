@@ -191,6 +191,10 @@ function registry(): ConnectionRegistry {
       calls.updates.push(request)
       return writeOutcome
     },
+    delete: async () => {
+      throw new Error('these routes never delete')
+    },
+
   }
   const lookups: LookupAdapter = {
     search: async () => {

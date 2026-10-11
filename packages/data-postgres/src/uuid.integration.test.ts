@@ -1,4 +1,18 @@
-import { buildLookupConfig, findObject, generateForm, lookupRowFilter, planCreate, planList, planRead, planUpdate, recordPage, scopeRowFilters, toFormAnswers } from '@formancy/data-core'
+import {
+  buildLookupConfig,
+  deleteProblems,
+  findObject,
+  generateForm,
+  lookupRowFilter,
+  planCreate,
+  planList,
+  planRead,
+  planUpdate,
+  recordPage,
+  scopeRowFilters,
+  toFormAnswers,
+  validatePolicy,
+} from '@formancy/data-core'
 import type {
   FormBindings,
   FormPolicy,
@@ -79,6 +93,26 @@ const DELIVERY: GenerationRequest = {
   lookups: [{ foreignKey: 'fk_delivery_order', display: ['order_date'] }],
   pinned: ['tenant_id'],
   versionColumn: 'row_version',
+}
+
+/** The order form, as far as a delete of it is asked: its tenant pinned, its customer a lookup. */
+const ORDER: GenerationRequest = {
+  connection: 'test',
+  root: { schema: 'sales', name: 'order' },
+  formId: 'order',
+  title: 'Order',
+  lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+  pinned: ['tenant_id'],
+  versionColumn: 'row_version',
+}
+
+/** A tenant's clerk reads the tenant's orders, whose customers are the tenant's. */
+const ORDER_POLICY: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk'], create: [], update: [] },
+  fields: {},
+  rowFilters: TENANT,
+  lookups: { customer: TENANT },
 }
 
 const clerk = (tenant: string): PolicyContext => ({ actor: { id: `u-${tenant}`, roles: ['clerk'] }, attributes: { tenant } })
@@ -199,15 +233,44 @@ describe('generation', covers('postgres', uuidCase('generated')), () => {
   // The catalog calls the key 'none', because the column takes a value; a
   // form that offered it would let a person write the record's address. It
   // is shown in the Record section, never written or required, and create
-  // stays offered because the database fills it (0056).
-  test('makes the key read-only, never required, and still offers create and update', () => {
+  // stays offered because the database fills it (0056). Delete is not: the
+  // version column starts at its default again under a key used again, and
+  // a key a default fills is not one the database numbers (0050).
+  test('makes the key read-only, never required, and still offers create and update, and no delete', () => {
     const { form, bindings } = generateForm(snapshot, DELIVERY)
     const expected = UUID_PARITY.generated
     expect(bindings.fields.find((binding) => binding.field === expected.field)?.writes).toEqual(expected.writes)
     expect(form.model.fields.find((field) => field.key === expected.field)).not.toHaveProperty('required')
     expect(form.layouts?.[0]?.nodes.map((node) => ('label' in node ? node.label : undefined))).toEqual(expected.sections)
-    expect(bindings.operations).toEqual(expected.operations)
+    expect(bindings.operations).toEqual(expected.operations.postgres)
     expect(bindings.identity).toEqual(UUID_PARITY.discovered.key)
+  })
+})
+
+describe('a delete', covers('postgres', uuidCase('delete')), () => {
+  // 0050 lets a delete reach nothing past its record through a foreign key,
+  // and 0056's tables cascade: a parcel's key from its delivery, and a
+  // delivery's from its order, beside a line's. Asked over what the order
+  // form's own account discovers, as the publish check asks it -- the
+  // policy's fit, then what a delete also does -- a grant of delete is
+  // refused on the delivery form, which here offers none at all, its
+  // version column guarding a key a default fills, and for the parcels a
+  // delete would take with it; and on the order form for its deliveries and
+  // its lines, so no order is deleted yet. Without the grant, neither form
+  // is refused anything: the refusals are the delete's. A parcel has no
+  // version column, so it offers no delete at all.
+  test('is refused on the delivery form for its parcels, and on the order form for its deliveries and its lines', () => {
+    const refused = (bindings: FormBindings, policy: FormPolicy): string[] => {
+      const fit = validatePolicy(policy, bindings)
+      return [...(fit.ok ? [] : fit.problems), ...deleteProblems(snapshot, bindings, policy)]
+    }
+    const deleting = (policy: FormPolicy): FormPolicy => ({ ...policy, operations: { ...policy.operations, delete: ['clerk'] } })
+    expect(refused(deliveries, deleting(DELIVERY_POLICY))).toEqual(UUID_PARITY.delete.delivery.postgres)
+    expect(refused(deliveries, DELIVERY_POLICY)).toEqual([])
+    const orders = generateForm(snapshot, ORDER).bindings
+    expect(refused(orders, deleting(ORDER_POLICY))).toEqual(UUID_PARITY.delete.order)
+    expect(refused(orders, ORDER_POLICY)).toEqual([])
+    expect({ update: parcels.operations.update, delete: parcels.operations.delete }).toEqual(UUID_PARITY.delete.parcel)
   })
 })
 

@@ -1,6 +1,6 @@
 # 0041 — The runtime refuses what drift blocks in the form's own table, decided over a description read in each request, and every write holds the table to it
 
-- **Status:** accepted; extended by [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md): a page of records is decided over the description its own statement carries, as a read is, and is refused there also when the table no longer holds its key unique and NOT NULL, a change review does not stop
+- **Status:** accepted; extended by [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md): a page of records is decided over the description its own statement carries, as a read is, and is refused there also when the table no longer holds its key unique and NOT NULL, a change review does not stop; extended by [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md): a delete is decided over the root's description as every write is, with `delete` in the verdict's `writable`, and its statement refuses a key that acts on it, which no description holds; on PostgreSQL's locked path a delete locks every relation below the table too, because the statement takes its snapshot before it locks the partitions it plans
 - **Date:** 2026-10-10
 - **Deciders:** Daniel Bacher
 - **Verified by:**

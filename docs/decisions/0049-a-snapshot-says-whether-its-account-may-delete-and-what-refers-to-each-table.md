@@ -1,6 +1,6 @@
 # 0049 — A snapshot says whether its account may delete from each table, and every foreign key that refers to it
 
-- **Status:** accepted; extended by [0056](0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md): the writer may also delete deliveries and parcels, which a delete of an order now cascades into, and the comparators and both adapters' access suites hold its DELETE to `order`, `order_line`, `delivery` and `parcel`
+- **Status:** accepted; narrowed by [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md): between two snapshots that both record the facts, a `referenced-by` gap on the root stops delete, and a current snapshot without the facts its base had stops it too; extended by [0056](0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md): the writer may also delete deliveries and parcels, which a delete of an order now cascades into, and the comparators and both adapters' access suites hold its DELETE to `order`, `order_line`, `delivery` and `parcel`
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**

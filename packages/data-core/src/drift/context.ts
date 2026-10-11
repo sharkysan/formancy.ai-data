@@ -3,8 +3,21 @@ import type { ForeignKeyMeta, KeyMeta, MetadataSnapshot, ObjectMeta, ObjectRef }
 import type { FormPolicy } from '../policy/types.js'
 import type { DriftKind, DriftSubject } from './types.js'
 
-/** A write the published form may offer. */
-export type Operation = 'create' | 'update'
+/** A write the published form may offer: a delete since 0050, which writes no field. */
+export type Operation = 'create' | 'update' | 'delete'
+
+/** The writes a field gives its column a value on (0027): a delete writes none. */
+export type FieldWrite = 'create' | 'update'
+
+/** Every write, in the order a verdict says them. */
+export const WRITES: readonly Operation[] = ['create', 'update', 'delete']
+
+/**
+ * What drift reads of a published policy: each lookup's filter, whose target
+ * columns its searches compare (0028), and who may do what, by which a stop
+ * of delete is decided blocking only where somebody may delete (0050).
+ */
+export type DriftPolicy = Pick<FormPolicy, 'lookups' | 'operations'>
 
 /**
  * A change before its severity is known. The severity depends on the form as
@@ -25,7 +38,7 @@ export interface Draft {
 
 /** The writes a change stops: every one, when the form can no longer read what it binds. */
 export function stopped(draft: Draft): readonly Operation[] {
-  return draft.breaksReads ? ['create', 'update'] : draft.stops
+  return draft.breaksReads ? WRITES : draft.stops
 }
 
 /** One review: the two snapshots, the form, its policy's lookup filters, and its root in each. */
@@ -37,8 +50,10 @@ export interface Comparison {
    * The published policy's lookup filters: the target columns each lookup's
    * searches compare, which the bindings do not record (0028). The root's
    * filter columns are bound columns (`validatePolicy`), compared as such.
+   * And its operations: a change that stops delete blocks only a form whose
+   * policy lets somebody delete (0050).
    */
-  policy: Pick<FormPolicy, 'lookups'>
+  policy: DriftPolicy
   before: ObjectMeta
   after: ObjectMeta
   /**
@@ -94,12 +109,12 @@ export function fieldsOver(bindings: FormBindings, columns: readonly string[]): 
 }
 
 /** Whether a field gives `column` its value on `operation` (0027: a field is written per operation). */
-export function writesOn(bindings: FormBindings, column: string, operation: Operation): boolean {
+export function writesOn(bindings: FormBindings, column: string, operation: FieldWrite): boolean {
   return bindings.fields.some((binding) => binding.writes[operation] && columnsOf(binding).includes(column))
 }
 
 /** The operations on which a field gives `column` its value. */
-export function writtenOn(bindings: FormBindings, column: string): Operation[] {
+export function writtenOn(bindings: FormBindings, column: string): FieldWrite[] {
   return (['create', 'update'] as const).filter((operation) => writesOn(bindings, column, operation))
 }
 

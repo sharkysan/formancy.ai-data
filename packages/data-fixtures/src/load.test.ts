@@ -91,7 +91,25 @@ describe('the fixture files', () => {
     const names = (text: string) => [...new Set([...strip(text).matchAll(/constraint\s+(\w+)/gi)].map((match) => match[1]))].filter((name) => !name?.startsWith('df_')).sort()
     const postgres = readFixture('postgres.parity.sql')
     const sqlServer = readFixture('sqlserver.parity.sql')
-    expect(tables(postgres)).toEqual(['contended', 'declined', 'display_kinds', 'display_use', 'generated', 'guarded', 'item_use', 'tenant_item'])
+    expect(tables(postgres)).toEqual([
+      'contended',
+      'declined',
+      'display_kinds',
+      'display_use',
+      'generated',
+      'guarded',
+      'item_use',
+      'keyed',
+      'removable',
+      'removable_child',
+      'removable_declined',
+      'removable_log',
+      'removable_restrict',
+      'removable_ruled',
+      'removable_self',
+      'removable_triggered',
+      'tenant_item',
+    ])
     expect(tables(sqlServer)).toEqual(tables(postgres))
     expect(names(sqlServer)).toEqual(names(postgres))
   })

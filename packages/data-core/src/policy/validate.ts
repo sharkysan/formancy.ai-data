@@ -1,5 +1,7 @@
+import { offers } from '../generate/offers.js'
 import type { FieldBinding, FormBindings } from '../generate/types.js'
-import { type ParsedPolicy, readPolicy } from './inputs.js'
+import { byCodepoint, type ParsedPolicy, readPolicy } from './inputs.js'
+import { unscopedLookups } from './through.js'
 import type { FormPolicy, PolicyValidation } from './types.js'
 
 /**
@@ -50,11 +52,12 @@ function fitProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
   const pinned = new Map(policy.rowFilters.map((rule) => [rule.column, rule.attribute]))
 
   // A grant nothing can honour is a policy that says something untrue.
-  for (const operation of ['create', 'update'] as const) {
-    if (policy.operations[operation].size > 0 && !bindings.operations[operation]) {
+  for (const operation of ['create', 'update', 'delete'] as const) {
+    if (policy.operations[operation].size > 0 && !offers(bindings, operation)) {
       problems.push(`operations.${operation} grants roles, and this form does not offer ${operation}`)
     }
   }
+  problems.push(...deleteGrantProblems(policy, bindings))
 
   for (const [key, entry] of policy.fields) {
     const binding = byField.get(key)
@@ -82,6 +85,45 @@ function fitProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
     if (binding.kind === 'lookup') problems.push(...lookupProblems(binding, policy, pinned))
   }
   problems.push(...throughFitProblems(policy, byField))
+  return problems
+}
+
+/**
+ * What a delete grant asks of the rest of the policy (0050), beyond the form
+ * offering one.
+ *
+ * Every role that may delete may read. A delete is refused unless it names
+ * the version its person read; a role that cannot read has no version but a
+ * guess, and a version column's are small integers that can be tried one
+ * after another. Roles match as exact strings, so this is every actor.
+ *
+ * And something scopes the rows a delete reaches while a lookup's options
+ * are filtered (`unscopedLookups`): a child form published before 0043 has
+ * no row filter and no through, and there a guessed token and version
+ * would delete another tenant's row. A list of such a form is refused for
+ * the same shape (0044). The policy may mean every row is shared; a delete
+ * cannot be taken back, so it says so with a row filter or a through first.
+ *
+ * What a delete also does to other tables is `deleteProblems`', which needs
+ * the snapshot.
+ */
+function deleteGrantProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
+  const deleting = policy.operations.delete
+  if (deleting.size === 0) return []
+  const problems = [...deleting]
+    .filter((role) => !policy.operations.read.has(role))
+    .sort(byCodepoint)
+    .map((role) => `operations.delete grants ${role}, who may not read with this form: a delete names the version its person read, so grant read to every role that may delete`)
+  const unscoped = unscopedLookups(bindings, {
+    rowFilters: [...policy.rowFilters],
+    through: [...policy.through],
+    lookups: Object.fromEntries([...policy.lookups].map(([key, rules]) => [key, [...rules]])),
+  })
+  if (unscoped.length > 0) {
+    problems.push(
+      `operations.delete grants roles, and nothing scopes the records of this form though the options of ${unscoped.join(' and ')} are filtered, so a delete could reach a record of any tenant by its token: scope them with a row filter or a through`,
+    )
+  }
   return problems
 }
 

@@ -22,11 +22,12 @@ import { DATABASE_KINDS } from '@formancy/data-core'
  * holds the definition to what it must ignore.
  */
 
-/** What may still be done with the published form: read it, create, update. */
+/** What may still be done with the published form: read it, create, update, delete (0050). */
 export interface DriftVerdict {
   readonly read: boolean
   readonly create: boolean
   readonly update: boolean
+  readonly delete: boolean
 }
 
 /**
@@ -59,9 +60,10 @@ export interface DriftingCase {
   readonly insert: Readonly<Record<string, string | number | null>>
 }
 
-const NOTHING_STOPS: DriftVerdict = { read: true, create: true, update: true }
-const WRITES_STOP: DriftVerdict = { read: true, create: false, update: false }
-const EVERYTHING_STOPS: DriftVerdict = { read: false, create: false, update: false }
+const NOTHING_STOPS: DriftVerdict = { read: true, create: true, update: true, delete: true }
+/** The writes that give a column a value stop; a delete gives none, and is stopped only by what names its record (0050). */
+const WRITES_STOP: DriftVerdict = { read: true, create: false, update: false, delete: true }
+const EVERYTHING_STOPS: DriftVerdict = { read: false, create: false, update: false, delete: false }
 
 const UNTOUCHED: DriftSend = { field: 'note', value: 'an untouched field' }
 
@@ -262,7 +264,8 @@ export const DRIFTING: readonly DriftingCase[] = [
       sqlserver: ['alter table drifting.dropped_identity_key drop constraint pk_dropped_identity_key'],
     },
     moves: true,
-    verdict: { read: true, create: true, update: false },
+    // The key a delete names its record by is gone, as for an update (0050).
+    verdict: { read: true, create: true, update: false, delete: false },
     updates: [UNTOUCHED],
     insert: { code: 'NEW' },
   },

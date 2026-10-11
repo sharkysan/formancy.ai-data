@@ -168,7 +168,8 @@ describe('choosing', () => {
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     let generated = await screen.findByRole('main', { name: 'Generate' })
     expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: not offered'])
-    expect(list(generated, 'Blocked')).toEqual(['order Update is not offered until row_version is confirmed as a version column.'])
+    // A delete names its version as an update does, so one note says both (0050).
+    expect(list(generated, 'Blocked')).toEqual(['order Update and delete are not offered until row_version is confirmed as a version column.'])
 
     await user.click(within(screen.getByRole('navigation', { name: 'Steps' })).getByRole('button', { name: '2. Choose' }))
     await user.selectOptions(within(step('Choose')).getByLabelText('Version column'), 'row_version')

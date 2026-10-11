@@ -90,10 +90,10 @@ function recording(factory: ConnectionFactory): ConnectionFactory {
   }
 }
 
-/** How many writes the adapter was asked to make on a connection so far. */
+/** How many writes the adapter was asked to make on a connection so far: deletes too (0050). */
 function writesAsked(connection: string): number {
   const tally = asked.get(connection) ?? {}
-  return (tally['insert'] ?? 0) + (tally['update'] ?? 0)
+  return (tally['insert'] ?? 0) + (tally['update'] ?? 0) + (tally['delete'] ?? 0)
 }
 
 let pg: PostgresFixture
@@ -209,11 +209,11 @@ async function owner(engine: Engine): Promise<{ run(statements: readonly string[
   }
 }
 
-/** Everything the form offers, to a clerk, on every field it writes and every lookup: no row filter, so only drift could refuse. */
+/** Everything the form offers, to a clerk, on every field it writes and every lookup, delete included: no row filter, so only drift could refuse. */
 function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
     version: 1,
-    operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+    operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'], delete: ['clerk'] },
     fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
     rowFilters: [],
     lookups: Object.fromEntries(fields.filter((binding) => binding.kind === 'lookup').map((binding) => [binding.field, []])),
@@ -243,8 +243,10 @@ interface Shown {
   read: { status: number; code?: string }
   updates: Sent[]
   create: Sent
-  /** The owner's row after every write, against the row the ALTER left, when no update may commit. */
+  /** The owner's row after the updates and the create, against the row the ALTER left, when no update may commit. */
   rowAsAltered: boolean | null
+  /** A delete of row 1 at the version the clerk last held, sent last (0050). */
+  delete: Sent
   rows: number
 }
 
@@ -252,16 +254,17 @@ interface Shown {
 function expected(entry: DriftingCase, verdict: DriftVerdict, after: Held): Shown {
   const runtime = runtimeOf(entry) as DriftVerdict
   const write = (allowed: boolean, status: number): Sent => (allowed ? { status, reached: true, committed: true } : { status: 409, code: 'drift', reached: false, committed: false })
-  const operations = (['read', 'create', 'update'] as const).filter((operation) => runtime[operation])
+  const operations = (['read', 'create', 'update', 'delete'] as const).filter((operation) => runtime[operation])
   return {
     review: verdict,
-    runtime: { readable: runtime.read, writable: { create: runtime.create, update: runtime.update } },
+    runtime: { readable: runtime.read, writable: { create: runtime.create, update: runtime.update, delete: runtime.delete } },
     form: !runtime.read ? { status: 409, code: 'drift' } : operations.length === 0 ? { status: 409, code: 'drift' } : { status: 200, operations },
     read: runtime.read ? { status: 200 } : { status: 409, code: 'drift' },
     updates: entry.updates.map(() => write(runtime.update, 200)),
     create: write(runtime.create, 201),
     rowAsAltered: runtime.update ? null : true,
-    rows: after.rows + (runtime.create ? 1 : 0),
+    delete: write(runtime.delete, 200),
+    rows: after.rows + (runtime.create ? 1 : 0) - (runtime.delete ? 1 : 0),
   }
 }
 
@@ -290,7 +293,7 @@ describe.each([
     })
     expect(proposed.status, JSON.stringify(proposed.json)).toBe(200)
     const proposal = proposed.json as Proposal
-    expect(proposal.bindings.operations).toEqual({ create: true, update: true })
+    expect(proposal.bindings.operations).toEqual({ create: true, update: true, delete: true })
     const policy = clerkPolicy(proposal.bindings.fields)
     const bundle = { format: 2, connection, generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy, snapshot: proposal.snapshot }
     const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle })
@@ -336,17 +339,20 @@ describe.each([
     }
     const create = await send(`/v1/forms/${formId}/records/create`, { answers: entry.insert }, 201)
     const last = await ddl.held(entry.table)
+    // Last, at the version the clerk last held: answered exactly when the runtime allows delete (0050).
+    const removal = await send(`/v1/forms/${formId}/records/delete`, { record: 'k1:1', version }, 200)
     const runtime = runtimeOf(entry) as DriftVerdict
 
     const shown: Shown = {
-      review: { read: (routed as { readable?: boolean }).readable as boolean, create: routed.writable.create, update: routed.writable.update },
+      review: { read: (routed as { readable?: boolean }).readable as boolean, create: routed.writable.create, update: routed.writable.update, delete: routed.writable.delete },
       runtime: (routed as { runtime?: unknown }).runtime,
       form: form.status === 200 ? { status: 200, operations: form.json.operations as string[] } : { status: form.status, code: form.json?.code as string },
       read: read.status === 200 ? { status: 200 } : { status: read.status, code: read.json?.code as string },
       updates,
       create,
       rowAsAltered: runtime.update ? null : last.row === after.row,
-      rows: last.rows,
+      delete: removal,
+      rows: (await ddl.held(entry.table)).rows,
     }
     expect(shown).toEqual(expected(entry, entry.verdict as DriftVerdict, after))
     // Review alone says what diffSnapshots says: the route adds nothing of its own.

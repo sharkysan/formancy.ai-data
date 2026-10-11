@@ -19,7 +19,7 @@ import type { RecordColumn, Through } from './types.js'
  */
 
 /** The root's filter for an operation, each term typed from its column and spelled as the column holds it (0028). */
-export function filtersFor(prepared: Prepared, policy: FormPolicy, context: PolicyContext, operation: 'read' | 'update'): { ok: true; filter: RowFilter; filters: RowFilters } | PlanRefusal {
+export function filtersFor(prepared: Prepared, policy: FormPolicy, context: PolicyContext, operation: 'read' | 'update' | 'delete'): { ok: true; filter: RowFilter; filters: RowFilters } | PlanRefusal {
   const filter = rowFilter(policy, context, operation)
   if (!filter.ok) return filter
   const scoped = scopeRowFilters(prepared.root, filter.filter, 'rowFilters')
@@ -56,7 +56,7 @@ export function throughFor(
   prepared: Prepared,
   policy: FormPolicy,
   context: PolicyContext,
-  operation: 'read' | 'update',
+  operation: 'read' | 'update' | 'delete',
 ): { ok: true; through: Through[] } | PlanRefusal {
   const resolved = throughFilters(policy, context, bindings, operation)
   if (!resolved.ok) return resolved

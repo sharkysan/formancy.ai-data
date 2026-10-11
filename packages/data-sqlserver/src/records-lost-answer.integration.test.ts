@@ -53,7 +53,14 @@ const timingOut = (): Partial<mssql.config> => ({ requestTimeout: AFTER_THE_COMM
 beforeAll(async () => {
   fixture = await startSqlServerFixture()
   owner = await new mssql.ConnectionPool(fixture.admin).connect()
-  snapshot = await discoverSqlServer(owner, { schemas: ['sales'] })
+  await owner.request().batch('create schema lost')
+  await owner.request().batch(`create table lost.removable (
+    id int identity(1, 1) not null,
+    code nvarchar(100) not null,
+    version int not null constraint df_lost_removable_version default 1,
+    constraint pk_lost_removable primary key (id, code)
+  )`)
+  snapshot = await discoverSqlServer(owner, { schemas: ['sales', 'lost'] })
 })
 
 afterAll(async () => {
@@ -121,6 +128,11 @@ async function until(check: () => Promise<boolean>, what: string): Promise<void>
 
 async function ordersWith(notes: string): Promise<number> {
   const found = await owner.request().input('notes', mssql.NVarChar(mssql.MAX), notes).query<{ n: number }>('select count(*) as n from sales.[order] where notes = @notes')
+  return found.recordset[0]?.n ?? -1
+}
+
+async function removableCoded(code: string): Promise<number> {
+  const found = await owner.request().input('code', mssql.NVarChar(100), code).query<{ n: number }>('select count(*) as n from lost.removable where code = @code')
   return found.recordset[0]?.n ?? -1
 }
 
@@ -219,6 +231,41 @@ describe('an answer lost after the write committed', () => {
       const stored = await records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', id)], columns: [columnOf(ORDER, 'notes')], filters: { kind: 'unrestricted' }, through: [] })
       expect(stored).toMatchObject({ ok: true, values: { notes } })
       expect((stored as RecordOutcome & { ok: true }).version).not.toBe(sentVersion)
+    } finally {
+      await close()
+    }
+  })
+
+  // A delete names the version its person read, so sent again after its
+  // answer was lost it deletes nothing else (0050). The marker is the key's
+  // own text -- a fresh UUID beside a numbered id -- bound as nvarchar and
+  // selected back from the batch's table variable after the commit, both
+  // UTF-16: it crossed once, the row is gone, and the adapter answered
+  // unknown (watched failing with the cut answered as a read's: unavailable).
+  test('a delete is unknown-outcome, sent once, and the row is gone', async () => {
+    const code = markerText()
+    const created = await owner.request().input('code', mssql.NVarChar(100), code).query<{ id: number }>('insert into lost.removable (code) output inserted.id values (@code)')
+    const id = String(created.recordset[0]?.id)
+    const table: ObjectRef = { schema: 'lost', name: 'removable' }
+    const { hop, pool, close } = await throughHop()
+    try {
+      const bytes = answerBytes('sqlserver', code)
+      const sent = hop.countSent(bytes)
+      const lost = hop.swallowAnswersFrom(bytes)
+      const pending = defined(createSqlServerRecords(pool)).delete({
+        target: { table, identity: [columnOf(table, 'id'), columnOf(table, 'code')], concurrency: { kind: 'version-column', column: 'version' } },
+        key: [valueOf(table, 'id', id), valueOf(table, 'code', code)],
+        expectedVersion: '1',
+        filters: { kind: 'unrestricted' },
+        through: [],
+        reach: { removed: [table], cleared: [], accepted: [] },
+      })
+      await within(lost.matched, 'the marker never appeared in an answer')
+      await until(async () => (await removableCoded(code)) === 0, 'the delete never became visible')
+      lost.cut()
+      expect(await pending).toMatchObject({ ok: false, code: 'unknown-outcome' })
+      expect(sent()).toBe(1)
+      expect(await removableCoded(code)).toBe(0)
     } finally {
       await close()
     }

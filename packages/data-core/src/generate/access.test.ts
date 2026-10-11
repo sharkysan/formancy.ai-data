@@ -79,7 +79,7 @@ describe('columns the account may not read or write', () => {
     expect(disabled(form)).not.toContain('amount')
     expect(disabled(form)).not.toContain('notes')
     expect(disabled(form)).not.toContain('customer')
-    expect(form.bindings.operations).toEqual({ create: true, update: true })
+    expect(form.bindings.operations).toEqual({ create: true, update: true, delete: false })
   })
 
   // Neither write is possible, so the field is shown and never written, like
@@ -109,7 +109,7 @@ describe('operations the account may not perform', () => {
   // names the privilege so the remedy is a grant.
   test('no INSERT on the root blocks create, and the note names INSERT', () => {
     const form = generateForm(snapshot('sqlserver', (objects) => restrictAll(objects, 'order', { insert: false })), ORDER)
-    expect(form.bindings.operations).toEqual({ create: false, update: true })
+    expect(form.bindings.operations).toEqual({ create: false, update: true, delete: false })
     expect(form.notes).toContainEqual({ subject: 'order', kind: 'blocked', message: "Create is not offered: this connection's account may INSERT none of the columns of sales.order." })
   })
 
@@ -117,7 +117,7 @@ describe('operations the account may not perform', () => {
   // database on every save.
   test('no UPDATE on any column the form would write blocks update, and the note names UPDATE', () => {
     const form = generateForm(snapshot('sqlserver', (objects) => restrictAll(objects, 'order', { update: false })), ORDER)
-    expect(form.bindings.operations).toEqual({ create: true, update: false })
+    expect(form.bindings.operations).toEqual({ create: true, update: false, delete: false })
     expect(form.notes).toContainEqual({ subject: 'order', kind: 'blocked', message: "Update is not offered: this connection's account may UPDATE none of the columns this form writes." })
   })
 
@@ -163,7 +163,7 @@ describe('identity and concurrency', () => {
     })
     const form = generateForm(keyless, on('country'))
     expect(form.bindings.identity).toBeNull()
-    expect(form.bindings.operations).toEqual({ create: true, update: false })
+    expect(form.bindings.operations).toEqual({ create: true, update: false, delete: false })
     expect(form.notes).toContainEqual({ subject: 'country', kind: 'blocked', message: "Records cannot be read back or updated: this connection's account may not read key column id." })
   })
 
@@ -184,7 +184,7 @@ describe('identity and concurrency', () => {
     expect(hidden.notes).toContainEqual({
       subject: 'order',
       kind: 'blocked',
-      message: "Update is not offered: this connection's account may not read row_version, the rowversion a stale save is detected by.",
+      message: "Update and delete are not offered: this connection's account may not read row_version, the rowversion a stale save is detected by.",
     })
   })
 })
@@ -225,7 +225,7 @@ describe('row security', () => {
           'Row-level security applies to this connection on sales.customer: records outside its policies read as not found, a write its policies refuse is refused, and this module sets no session state a policy may read (0011).',
       },
     ])
-    expect(form.bindings.operations).toEqual({ create: true, update: true })
+    expect(form.bindings.operations).toEqual({ create: true, update: true, delete: false })
   })
 
   // "Cannot tell" is not "none": the reviewer is told which, and why.

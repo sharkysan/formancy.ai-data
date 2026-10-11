@@ -5,7 +5,7 @@ import type { MetadataSnapshot, ObjectMeta } from '../metadata.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { formMenu, grantedOperations, menuForm } from './menu.js'
 import type { MenuBundle } from './menu.js'
-import { actor, AUDITOR, CLERK, CLERK_RW, fk, INTAKE, LINE_POLICY, lineForm, ORDER_POLICY, orderForm, PG, sales, snapshot, TENANT } from './test-support.js'
+import { actor, AUDITOR, CLERK, CLERK_RW, fk, INTAKE, LINE_POLICY, lineForm, MS_FACTS, ORDER_POLICY, orderForm, PG, sales, snapshot, TENANT } from './test-support.js'
 
 /*
  * The forms a person's menu names, and the children under each (0045): the
@@ -47,6 +47,19 @@ describe('grantedOperations', () => {
     expect(grantedOperations(orderForm(PG, false).bindings, ORDER_POLICY, CLERK)).toEqual(['read', 'create'])
     // A row filter whose attribute the context lacks scopes nothing, so it grants nothing (0011).
     expect(grantedOperations(ORDER.bindings, ORDER_POLICY, actor(['clerk'], {}))).toEqual([])
+  })
+
+  // Every form published before 0050 says nothing of delete in its
+  // bindings, and offers none, by `offers()`: read as "anything but false",
+  // as the form route read every flag before, a policy granting delete
+  // would put delete on such a form's menu (watched failing that way). One
+  // that offers it lists it last.
+  test('lists delete only where the bindings say they offer it, after update', () => {
+    const deleting: FormPolicy = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, delete: ['clerk'] } }
+    const { delete: _delete, ...unsaid } = ORDER.bindings.operations
+    expect(grantedOperations({ ...ORDER.bindings, operations: unsaid }, deleting, CLERK)).toEqual(['read', 'create', 'update'])
+    expect(grantedOperations(orderForm(MS_FACTS).bindings, deleting, CLERK)).toEqual(['read', 'create', 'update', 'delete'])
+    expect(grantedOperations(orderForm(MS_FACTS).bindings, deleting, AUDITOR)).toEqual(['read'])
   })
 })
 

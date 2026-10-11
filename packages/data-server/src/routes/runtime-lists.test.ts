@@ -150,6 +150,9 @@ function registry(): ConnectionRegistry {
     update: async () => {
       throw new Error('a list never updates')
     },
+    delete: async () => {
+      throw new Error('a list never deletes')
+    },
   }
   const lookups: LookupAdapter = { search: async () => ({ rows: [], hasMore: false, omitted: 0 }), resolve: async () => [], rejects: async () => [] }
   const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0' }), discover: async () => SNAPSHOT, close: async () => {} } as DatabaseAdapter

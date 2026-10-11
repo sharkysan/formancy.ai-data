@@ -56,7 +56,11 @@
         { "file": "packages/data-sqlserver/src/through.integration.test.ts" },
         { "file": "packages/data-postgres/src/list.integration.test.ts" },
         { "file": "packages/data-sqlserver/src/list.integration.test.ts" },
-        { "file": "packages/data-server/src/routes/runtime-menu.test.ts" }
+        { "file": "packages/data-server/src/routes/runtime-menu.test.ts" },
+        { "file": "packages/data-core/src/records/plan-delete.test.ts" },
+        { "file": "packages/data-postgres/src/delete.integration.test.ts" },
+        { "file": "packages/data-sqlserver/src/delete.integration.test.ts" },
+        { "file": "packages/data-server/src/routes/runtime-deletes.test.ts" }
       ]
     },
     {

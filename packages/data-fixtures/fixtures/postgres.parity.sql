@@ -140,4 +140,94 @@ end
 $$;
 create trigger tr_contended before update on parity.contended for each row execute function parity.contend();
 
+-- What a delete is held to (0050), one table per concern so no case's rows
+-- or triggers reach another's. Every key but keyed's is numbered by the
+-- database, so a version column proves a record there (0050) and the
+-- generator offers delete; the suites insert the rows they delete.
+-- removable is per tenant; removable_child refers to it with NO ACTION, a
+-- line scoped through its parent's tenant; removable_restrict refers to it
+-- with RESTRICT, which SQL Server spells NO ACTION; removable_self refers to
+-- itself. keyed's key is typed, so a version column cannot tell a record
+-- from one created again under its key: no delete is offered there, and the
+-- suites characterise an update that lands on such a record.
+create table parity.removable (
+  id int generated always as identity constraint pk_removable primary key,
+  tenant_id int not null,
+  note varchar(50) null,
+  version int not null default 1
+);
+create table parity.removable_child (
+  id int generated always as identity constraint pk_removable_child primary key,
+  removable_id int not null constraint fk_removable_child_removable references parity.removable (id),
+  note varchar(50) null,
+  version int not null default 1
+);
+create table parity.removable_restrict (
+  id int generated always as identity constraint pk_removable_restrict primary key,
+  removable_id int not null constraint fk_removable_restrict_removable references parity.removable (id) on delete restrict
+);
+create table parity.removable_self (
+  id int generated always as identity constraint pk_removable_self primary key,
+  parent_id int null constraint fk_removable_self_parent references parity.removable_self (id),
+  version int not null default 1
+);
+create table parity.keyed (
+  code varchar(10) not null constraint pk_keyed primary key,
+  note varchar(50) null,
+  version int not null default 1
+);
+
+-- What the database runs on a delete that the module does not see (0050):
+-- a trigger's own error ('refuse'), a row a trigger inserts again
+-- ('restore'), and a row it writes elsewhere ('log'), each by the deleted
+-- row's note. removable_declined's trigger declines every delete without an
+-- error, as declined's declines every insert; removable_ruled has a rule
+-- that writes the log on a delete, which SQL Server has no counterpart of.
+create table parity.removable_triggered (
+  id int generated always as identity constraint pk_removable_triggered primary key,
+  note varchar(50) null,
+  version int not null default 1
+);
+create table parity.removable_log (
+  id int not null,
+  note varchar(50) null
+);
+create function parity.before_removal() returns trigger language plpgsql as $$
+begin
+  if old.note = 'refuse' then
+    raise exception 'removable_triggered refuses this delete';
+  end if;
+  return old;
+end
+$$;
+create trigger tr_removable_triggered_before before delete on parity.removable_triggered for each row execute function parity.before_removal();
+create function parity.after_removal() returns trigger language plpgsql as $$
+begin
+  if old.note = 'restore' then
+    insert into parity.removable_triggered (id, note, version) overriding system value values (old.id, old.note, old.version);
+  elsif old.note = 'log' then
+    insert into parity.removable_log (id, note) values (old.id, old.note);
+  end if;
+  return null;
+end
+$$;
+create trigger tr_removable_triggered_after after delete on parity.removable_triggered for each row execute function parity.after_removal();
+create table parity.removable_declined (
+  id int generated always as identity constraint pk_removable_declined primary key,
+  note varchar(50) null,
+  version int not null default 1
+);
+create function parity.decline_removal() returns trigger language plpgsql as $$
+begin
+  return null;
+end
+$$;
+create trigger tr_removable_declined before delete on parity.removable_declined for each row execute function parity.decline_removal();
+create table parity.removable_ruled (
+  id int generated always as identity constraint pk_removable_ruled primary key,
+  note varchar(50) null,
+  version int not null default 1
+);
+create rule removable_ruled_also as on delete to parity.removable_ruled do also insert into parity.removable_log (id, note) values (old.id, 'ruled');
+
 analyze parity.tenant_item;

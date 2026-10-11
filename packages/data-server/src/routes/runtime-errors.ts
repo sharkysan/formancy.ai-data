@@ -114,19 +114,65 @@ export function recordFailure(bindings: FormBindings, failure: RecordFailure): H
 }
 
 /**
+ * A delete's refusal by the database as an HTTP answer (0050), in a
+ * delete's words: nothing was deleted, never "nothing was saved". Never a
+ * field error: a delete writes no field, and the column a constraint names
+ * is another table's. A key that still refers to the record is
+ * `referenced`, said without the table, the key or how many rows -- the
+ * route logs the key's name (runtime-deletes.ts) -- though the answer
+ * itself tells the person that something refers to the record, which any
+ * refusal would.
+ * `unknown-outcome` is the route's to answer with `unknownOutcome`, which
+ * names what was addressed; here it is a bug, as for a read.
+ */
+export function deleteFailure(failure: RecordFailure): HttpRefusal {
+  const refused: HttpRefusal = { status: 422, body: { code: 'refused', message: 'The database refused this request, and nothing was deleted. Sending it again will be refused the same way.' } }
+  switch (failure.code) {
+    case 'not-found':
+      return { status: 404, body: { code: 'not-found', message: 'No such record.' } }
+    case 'stale':
+      return { status: 409, body: { code: 'stale', message: 'The record changed since it was read. Reload it and review the changes before deleting it.' } }
+    case 'foreign-key-violation':
+      return { status: 422, body: { code: 'referenced', message: 'Other records still refer to this one, so the database keeps it. Nothing was deleted.' } }
+    case 'unique-violation':
+    case 'not-null-violation':
+    case 'check-violation':
+    case 'too-long':
+    case 'out-of-range':
+    case 'refused':
+      // A trigger's or a constraint's refusal of what the delete did: it
+      // will be refused again, so the person is not invited to retry (0028).
+      return refused
+    case 'permission-denied':
+      return { status: 403, body: { code: 'permission-denied', message: 'The database connection is not allowed to do this.' } }
+    case 'schema-changed':
+      return { status: 409, body: { code: 'schema-changed', message: 'The database changed since this form was published.' } }
+    case 'unavailable':
+      return { status: 503, body: { code: 'unavailable', message: 'The database could not complete this now. Nothing was deleted.' } }
+    case 'unknown-outcome':
+      throw new Error('only a write has an unknown outcome; the delete route answers it with unknownOutcome')
+  }
+}
+
+/**
  * A write that was sent and whose answer was lost, as an HTTP answer (0031):
  * 502, because something between this server and the database failed, and in
  * words that say it may have been saved. Nothing here sends it again.
  *
  * The sentence never names a value (0011): what was addressed travels in
  * `record` and `version`, for the host to reconcile with. Each sentence says
- * what is safe next. An update is protected by its version (0015). A create
+ * what is safe next. An update and a delete are protected by their version
+ * (0015, 0050). A create
  * whose key the insert named can be read by it. A create whose key the
  * database numbers cannot be found by anything here.
  */
-export function unknownOutcome(operation: 'create' | 'update', record: string | null, version: string | null): { status: 502; body: UnknownOutcome } {
+export function unknownOutcome(operation: 'create' | 'update' | 'delete', record: string | null, version: string | null): { status: 502; body: UnknownOutcome } {
   let message: string
-  if (operation === 'update') {
+  if (operation === 'delete') {
+    // A delete is protected by its version as an update is, and a key a
+    // version proves a record by is never another record's (0050).
+    message = 'The connection to the database failed after the deletion was sent. It may have been deleted. Deleting again with the same version deletes nothing else: if it was deleted, that is answered as not found.'
+  } else if (operation === 'update') {
     message = 'The connection to the database failed after the change was sent. It may have been saved. Saving again with the same version is safe: it is stored at most once.'
   } else if (record !== null) {
     message = 'The connection to the database failed after the record was sent. It may have been saved: read it before entering it again.'

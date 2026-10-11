@@ -12,7 +12,10 @@ import type { PolicyContext, PolicyOperation, PolicyRefusal, RowFilterRule } fro
  * property lookup. Once checked and copied, neither can happen.
  */
 
-export const OPERATIONS: readonly PolicyOperation[] = ['read', 'create', 'update']
+export const OPERATIONS: readonly PolicyOperation[] = ['read', 'create', 'update', 'delete']
+
+/** The operations every policy must say, `[]` for nobody; `delete` may be left out, and is then nobody's (0050). */
+const REQUIRED_OPERATIONS: readonly PolicyOperation[] = ['read', 'create', 'update']
 
 /**
  * Codepoint order, deliberately not `localeCompare`: a list of problems or of
@@ -88,7 +91,7 @@ export interface ParsedPolicy {
 
 /**
  * Refuses a property this release does not read. It would be a rule the
- * person who wrote it believes is enforced — a `delete` operation, an
+ * person who wrote it believes is enforced — an `archive` operation, an
  * `operator` on a row filter — and that nothing enforces.
  */
 function unread(record: Record<string, unknown>, known: readonly string[], where: string, problems: string[]): void {
@@ -186,10 +189,15 @@ export function readPolicy(policy: unknown): { parsed: ParsedPolicy; problems: [
   if (policy['version'] !== 1) problems.push('version is not 1, the only policy version this release reads')
 
   const rawOperations = policy['operations']
-  const operations = { read: new Set<string>(), create: new Set<string>(), update: new Set<string>() }
+  const operations = { read: new Set<string>(), create: new Set<string>(), update: new Set<string>(), delete: new Set<string>() }
   if (isRecord(rawOperations)) {
     unread(rawOperations, OPERATIONS, 'operations.', problems)
-    for (const operation of OPERATIONS) operations[operation] = readRoles(rawOperations[operation], `operations.${operation}`, problems)
+    for (const operation of OPERATIONS) {
+      // Own properties only: `delete` found on a prototype was not written by the policy's author.
+      if (REQUIRED_OPERATIONS.includes(operation) || Object.hasOwn(rawOperations, operation)) {
+        operations[operation] = readRoles(rawOperations[operation], `operations.${operation}`, problems)
+      }
+    }
   } else {
     problems.push('operations is not an object')
   }

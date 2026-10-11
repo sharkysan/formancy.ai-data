@@ -21,8 +21,8 @@ Apache-2.0 `@formancy/spec` for types only.
 ## What it exports
 
 ```ts
-createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, create, update, reconcile, query, resolve }
-isUnknownWrite(outcome) // → whether a create or update's outcome is an UnknownWrite
+createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, create, update, delete, reconcile, query, resolve }
+isUnknownWrite(outcome) // → whether a create, update or delete's outcome is an UnknownWrite
 lookupSources(client, formId, form, operation | () => operation) // → { [source]: { resolve } }
 sourceNames(form)       // → every optionsSource the document names, once each, in document order
 fieldProblems(refusal)  // → { [field]: [sentence, …] }, for engine.applyServerErrors
@@ -32,16 +32,18 @@ Every client function resolves to an `Outcome`: `{ ok: true, value }` or a
 `Refusal` — `{ ok: false, status, code, message, fieldErrors? }`. It rejects
 only for an abort the caller asked for, with the AbortError it raised.
 `create` and `update` resolve to a `WriteOutcome`, which is that or an
-`UnknownWrite` — see below.
+`UnknownWrite` — see below; `delete` to a `DeleteOutcome`, the server's
+`{ record, deleted: true }` or a refusal, or an `UnknownWrite`.
 
 | Function | Route |
 |---|---|
 | `forms(signal?)` | `GET /v1/forms` → `{ forms: [{ id, title, operations, children }] }` |
-| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list }` |
+| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting }` |
 | `read(formId, record)` | `POST /v1/forms/:id/records/read` |
 | `list(formId, query?, signal?)` | `POST /v1/forms/:id/records/list` → `{ rows, hasMore }` |
 | `create(formId, answers)` | `POST /v1/forms/:id/records/create` |
 | `update(formId, { record, version, answers })` | `POST /v1/forms/:id/records/update` |
+| `delete(formId, { record, version })` | `POST /v1/forms/:id/records/delete` → `{ record, deleted: true }` |
 | `reconcile(formId, unknown)` | `POST /v1/forms/:id/records/read`, or nothing when there is no token |
 | `query(formId, source, { operation, search, offset?, limit? }, signal?)` | `POST /v1/forms/:id/lookups/:source/query` |
 | `resolve(formId, source, { operation, tokens }, signal?)` | `POST /v1/forms/:id/lookups/:source/resolve` |
@@ -58,7 +60,16 @@ says which fields a page may be searched and sorted by
 a `form` reply without one is `unexpected`, as from a server older than
 lists. `list` sends exactly `search`, `sort`, `parent`, `offset` and `limit`
 in a POST body, each left out the server's default, so the search is in no
-URL.
+URL. A form's `deleting` says what a delete also does -- whether it
+cascades, clears references, or may be refused while other rows refer to
+the record -- for a page to word its confirmation by, and is `null`
+exactly when `operations` holds no `delete`; a reply that breaks that is
+`unexpected`, as is one without `deleting` from a server older than
+deletes, so a host upgrades its server first
+([0050](../../docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)).
+`delete` sends exactly `record` and `version`, with a write id of its own,
+and is done only on the server's `{ record, deleted: true }`, whose token
+is the row the statement deleted.
 
 `forms` is the menu
 ([0045](../../docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)):
@@ -101,19 +112,21 @@ a title, operations or children is `unexpected`.
   record — may have reached the database, so it is an `UnknownWrite`:
   `{ ok: false, status, code: 'unknown-outcome', message, operation, record,
   version, origin }`, `origin` being `database` (the server's 502, whose
-  `record` and `version` it carries) or `transport` (the update's own, or
-  `null` for a create). `ok` is false, so a host that checks only `ok` fails
-  closed. Nothing is ever sent again. `reconcile(formId, unknown)` reads what
-  it addressed and says `unchanged` (an update's record still at the version
-  sent: saving again with it is stored at most once), `changed`, `present`,
+  `record` and `version` it carries) or `transport` (the update's or the
+  delete's own, or `null` for a create). `ok` is false, so a host that
+  checks only `ok` fails closed. Nothing is ever sent again.
+  `reconcile(formId, unknown)` reads what it addressed and says `unchanged`
+  (an update's or a deletion's record still at the version sent: saving or
+  deleting again with it is done at most once), `changed`, `present`,
   `absent` (the read's 404, through this person's read filter: not proof the
   row is not stored, but creating again is safe, because the key stops a
-  second row) or `unverifiable` (no token, and no request) — or passes on
-  the read's own refusal. On a read, 0029's rules stand: a proxy's page is
+  second row; for a deletion, the record is gone, by it or another) or
+  `unverifiable` (no token, and no request) — or passes on the read's own
+  refusal. On a read, 0029's rules stand: a proxy's page is
   `unexpected`.
 - **Every write carries a write id of its own**, in the `formancy-write-id`
   header: 128 random bits from `crypto.getRandomValues`, new for every
-  `create` and `update` call. Chromium sends a request again, below the
+  `create`, `update` and `delete` call. Chromium sends a request again, below the
   page, when the connection it reused closed before any answer; the server
   answers that copy with the first one's answer instead of applying it
   twice (0031). The client itself still never sends anything again.

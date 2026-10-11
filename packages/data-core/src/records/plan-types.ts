@@ -2,7 +2,7 @@ import type { ApiValue } from '../codecs/codec.js'
 import type { DriftChange } from '../drift/types.js'
 import type { LookupConfig, RowFilters } from '../lookup/types.js'
 import type { PolicyRefusalCode } from '../policy/types.js'
-import type { InsertRequest, ListRequest, ReadRequest, UpdateRequest } from './types.js'
+import type { DeleteRequest, InsertRequest, ListRequest, ReadRequest, UpdateRequest } from './types.js'
 
 /**
  * Why the planner produced no request, as a stable code.
@@ -21,7 +21,8 @@ import type { InsertRequest, ListRequest, ReadRequest, UpdateRequest } from './t
  *   key, a column bound twice, a concurrency column of the wrong kind, a
  *   lookup its foreign key does not support.
  * - `operation-unavailable` — the form does not offer it: no create, no
- *   update, no confirmed concurrency, or no key a record token can carry;
+ *   update, no delete, no confirmed concurrency, or no key a record token
+ *   can carry;
  *   and no list of records whose key can be NULL, or whose rows nothing
  *   scopes while a lookup's options are filtered (0044).
  * - `invalid-request` — answers that are not an object of field keys.
@@ -130,6 +131,9 @@ export type PlannedUpdate =
     }
   | InvalidValues
   | PlanRefusal
+
+/** A delete planned (0050): the one request an adapter runs, and nothing to recheck -- a delete selects nothing. */
+export type PlannedDelete = { ok: true; request: DeleteRequest } | PlanRefusal
 
 export type PlannedList =
   | {

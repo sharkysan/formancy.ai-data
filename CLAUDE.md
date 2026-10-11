@@ -62,8 +62,8 @@ One path runs through the packages, and most changes touch one step of it.
 
 The ports, each implemented by `data-postgres` and `data-sqlserver`:
 `DatabaseAdapter` (ping, discover), `RecordAdapter` (describe, read, list,
-insert, update) and `LookupAdapter` (search, resolve, rejects). Each adapter
-package exports `connect…`, `create…Adapter`, `create…Records` and
+insert, update, delete) and `LookupAdapter` (search, resolve, rejects). Each
+adapter package exports `connect…`, `create…Adapter`, `create…Records` and
 `create…Lookups` and owns its driver (0025); `data-server/src/drivers.ts` is
 the one place the server meets them. Inside an adapter, `discovery/` holds one
 catalog concern per file, `sql/` the quoting, binding and statement building,

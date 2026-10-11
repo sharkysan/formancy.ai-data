@@ -1,6 +1,25 @@
 export { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
 export type { ExpectedAccess, ExpectedCapability, ExpectedObjectAccess, ExpectedObjectFacts } from './access.js'
-export { displayCase, driftingCase, edgeCase, filterCase, covers, listCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase, THROUGH_CASES, throughCase, uuidCase } from './cases.js'
+export {
+  covers,
+  deleteCase,
+  displayCase,
+  driftingCase,
+  edgeCase,
+  filterCase,
+  listCase,
+  MODEL_CASES,
+  refusalCase,
+  sharedCases,
+  shipmentCase,
+  temporalCase,
+  THROUGH_CASES,
+  throughCase,
+  UPDATE_RECREATED_CASE,
+  uuidCase,
+} from './cases.js'
+export { DELETE_PARITY, deleteAnswer, UPDATE_RECREATED } from './deletes.js'
+export type { DeleteAnswer, DeleteCase, DeleteExpectation } from './deletes.js'
 export type { ThroughCase } from './cases.js'
 export {
   DEFAULT_IMAGES,

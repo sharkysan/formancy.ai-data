@@ -71,7 +71,7 @@ export function throughSql(statement: Statement, through: ThroughTerms): string 
  * the WHERE of every statement but an insert, and so of the read, the update
  * and the statement that tells a stale update from one aimed at nothing.
  */
-function located(statement: Statement, key: readonly RecordValue[], terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): string[] {
+export function located(statement: Statement, key: readonly RecordValue[], terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): string[] {
   const where = key.map((value) => `${column(value.name)} ${op('=')} ${bound(statement, value)}`)
   return [...where, ...filterSql(statement, ROW, terms), ...through.map((entry) => throughSql(statement, entry))]
 }
@@ -86,11 +86,11 @@ function located(statement: Statement, key: readonly RecordValue[], terms: reado
  * named in pg_catalog can no `=(bigint, numeric)` on the search path take its
  * place (`sql/catalog.ts`).
  */
-function versionIs(statement: Statement, request: UpdateRequest): string {
+export function versionIs(statement: Statement, request: Pick<UpdateRequest, 'target' | 'expectedVersion'>): string {
   return `${column(request.target.concurrency.column)} ${op('=')} ${statement.as(request.expectedVersion, 'pg_catalog.numeric')}`
 }
 
-function selectFrom(table: ObjectRef, select: readonly string[], where: readonly string[]): string {
+export function selectFrom(table: ObjectRef, select: readonly string[], where: readonly string[]): string {
   // An empty select list is legal in PostgreSQL, and reads as a mistake.
   return [`select ${select.length > 0 ? select.join(', ') : 'true'}`, `from ${quoteTable(table)} as ${ROW}`, `where ${where.join(' and ')}`].join('\n')
 }
@@ -113,7 +113,7 @@ export type WritePath = 'read-committed' | 'locked'
  * would read the catalog from before an ALTER the statement is then analysed
  * after: measured (the probes before 0041), an insert stored 1234.57 that way.
  */
-function guard(statement: Statement, table: ObjectRef, definition: Definition, path: WritePath): string[] {
+export function guard(statement: Statement, table: ObjectRef, definition: Definition, path: WritePath): string[] {
   const moved = `${digestOf(factsOf(statement, table))} ${op('=')} ${statement.text(definition.digest)}`
   return path === 'read-committed' ? [moved, `${ISOLATION} ${op('=')} '${READ_COMMITTED}'`] : [moved]
 }
@@ -228,7 +228,16 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
   return { text, params: statement.params }
 }
 
-/** The lock the locked path takes first: the one the write would take, or a read's. */
-export function lockStatement(table: ObjectRef, mode: 'access share' | 'row exclusive'): RecordStatement {
-  return { text: `lock table only ${quoteTable(table)} in ${mode} mode`, params: [] }
+/**
+ * The lock the locked path takes first: the one the write would take, or a
+ * read's. On the table alone, or with `below` on every relation below it
+ * too -- its partitions at any depth and the tables that inherit from it --
+ * which a delete from the table plans and locks only after its snapshot is
+ * taken under REPEATABLE READ (0050). PostgreSQL 17 locks each relation
+ * below on the table's own privilege: measured on postgres:17-alpine
+ * (17.11), 2026-10-11, an account granted DELETE on a partitioned table and
+ * on an inheritance parent, and nothing on what is below them, locked both.
+ */
+export function lockStatement(table: ObjectRef, mode: 'access share' | 'row exclusive', extent: 'only' | 'below' = 'only'): RecordStatement {
+  return { text: `lock table ${extent === 'only' ? 'only ' : ''}${quoteTable(table)} in ${mode} mode`, params: [] }
 }

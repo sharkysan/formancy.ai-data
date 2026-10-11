@@ -1,6 +1,6 @@
 {
   "generated": "by scripts/cloudflare/doors.mjs from the routes the built data server registers; do not edit, run node scripts/cloudflare/doors.mjs --write",
-  "runtimePattern": "^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/update)$",
+  "runtimePattern": "^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/delete|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/update)$",
   "serverLimitPerMinute": 600,
   "routes": [
     {
@@ -88,6 +88,14 @@
       "path": "/v1/forms/:id/records/create",
       "plane": "runtime",
       "sample": "/v1/forms/order/records/create",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/records/delete",
+      "plane": "runtime",
+      "sample": "/v1/forms/order/records/delete",
       "administratorDoor": "behind Access",
       "runtimeDoor": "forwarded"
     },

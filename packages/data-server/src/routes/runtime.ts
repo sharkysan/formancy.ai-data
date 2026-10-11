@@ -2,6 +2,7 @@ import {
   authorizeOperation,
   buildLookupConfig,
   checkSubmittedFields,
+  deleteEffects,
   driftRefusal,
   findObject,
   grantedOperations,
@@ -44,6 +45,7 @@ import type { HostIdentity } from '../identity.js'
 import type { AuditSink, RuntimeAuditEvent, RuntimeOperation } from '../audit.js'
 import { auditedForm, auditRequests, recordReference } from '../audit.js'
 import { loadPublished } from '../published.js'
+import { registerDeleteRoute } from './runtime-deletes.js'
 import { planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
 import { registerListRoute } from './runtime-lists.js'
 import { registerMenuRoute } from './runtime-menu.js'
@@ -82,6 +84,7 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'POST /v1/forms/:id/records/list': 'list',
   'POST /v1/forms/:id/records/create': 'create',
   'POST /v1/forms/:id/records/update': 'update',
+  'POST /v1/forms/:id/records/delete': 'delete',
   'POST /v1/forms/:id/lookups/:source/query': 'lookup-query',
   'POST /v1/forms/:id/lookups/:source/resolve': 'lookup-resolve',
 }
@@ -223,7 +226,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    * log, with the adapter's sentence, which names no value; answered with what
    * was addressed; and never sent again -- each route asks the adapter once.
    */
-  function lost(request: FastifyRequest<{ Params: { id: string } }>, operation: 'create' | 'update', record: string | null, version: string | null, failure: string): WriteAnswer {
+  function lost(request: FastifyRequest<{ Params: { id: string } }>, operation: 'create' | 'update' | 'delete', record: string | null, version: string | null, failure: string): WriteAnswer {
     request.log.warn({ form: request.params.id, operation, failure }, 'a write was sent and its answer lost; it is not retried')
     return { ...unknownOutcome(operation, record, version), record: record ?? undefined }
   }
@@ -235,7 +238,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    */
   async function sendOnce(
     request: FastifyRequest<{ Params: { id: string } }>,
-    operation: 'create' | 'update',
+    operation: 'create' | 'update' | 'delete',
     id: string | undefined,
     perform: () => Promise<WriteAnswer>,
   ): Promise<WriteAnswer & { repeated?: boolean }> {
@@ -442,7 +445,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     // grid it would be refused (0044).
     const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, actor)
     const list = listed.ok && driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'list') === undefined ? listColumns(bundle.bindings, listed.fields) : null
-    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list } satisfies PublishedForm
+    // What a delete also does, for a page to word its confirmation by: only where one is offered (0050).
+    const deleting = operations.includes('delete') ? deleteEffects(bundle.snapshot, bundle.bindings.root) : null
+    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list, deleting } satisfies PublishedForm
   })
 
   /**
@@ -504,6 +509,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const { record, version, answers } = body
     return answered(reply, await sendOnce(request, 'update', id, () => updated(request, bundle, open, record, version, answers)))
   })
+
+  // One record, by its token and the version read (0050): the update's steps, a delete's answers.
+  registerDeleteRoute(app, { published, connection, context, sendOnce, lost, refusal, answered })
 
   /** The lookup field a source name stands for, its config and the actor's filter for it — or a reply already sent. */
   async function lookupFor(request: FastifyRequest<{ Params: { id: string; source: string } }>, reply: FastifyReply, operation: unknown) {

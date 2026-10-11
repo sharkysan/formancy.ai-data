@@ -104,7 +104,7 @@ function resolveThrough(policy: ParsedPolicy, actor: TrustedContext): ThroughFil
 }
 
 /**
- * Whether the actor may read, create or update records of this form.
+ * Whether the actor may read, create, update or delete records of this form.
  *
  * An operation that cannot be scoped is not authorised either: when a row
  * filter names an attribute the context lacks, this refuses, so a caller that
@@ -243,6 +243,8 @@ export function lookupRowFilter(
   const prepared = prepare(policy, context, bindings)
   if (!prepared.ok) return prepared
   const { policy: parsed, actor } = prepared
+  // A delete writes no field and selects nothing (0050): no lookup's options are its to search.
+  if (operation === 'delete') return refuse('operation-denied', 'a delete has no lookup to search')
   const scoped = authorise(parsed, actor, operation)
   if (!scoped.ok) return scoped
   const rules = parsed.lookups.get(lookupField)

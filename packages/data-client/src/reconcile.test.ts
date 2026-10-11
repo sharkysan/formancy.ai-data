@@ -102,6 +102,24 @@ describe('reconcile', () => {
     expect(asked).toEqual([])
   })
 
+  // A deletion is reconciled by reading what it addressed (0050): not
+  // found, it is gone -- by this deletion or another, which a version a
+  // record cannot share with another makes the same; at the version sent it
+  // is still there and deleting again with that version is safe; at another,
+  // it changed since the person saw it. Never a resend.
+  test('a deletion is absent on the read’s 404, unchanged at the version sent, and changed at another', async () => {
+    const deletion = unknown({ operation: 'delete', message: 'It may have been deleted.' })
+    const missing = await reading(404, { code: 'not-found', message: 'No such record.' })
+    expect(await createDataClient({ token: () => 't', base: missing.base }).reconcile('pg-ticket', deletion)).toEqual({ ok: true, state: 'absent' })
+    expect(missing.asked).toEqual(['POST /v1/forms/pg-ticket/records/read {"record":"k1:7"}'])
+    const there = await reading(200, stored('v1'))
+    expect(await createDataClient({ token: () => 't', base: there.base }).reconcile('pg-ticket', deletion)).toEqual({ ok: true, state: 'unchanged', current: stored('v1') })
+    const moved = await reading(200, stored('v2'))
+    expect(await createDataClient({ token: () => 't', base: moved.base }).reconcile('pg-ticket', deletion)).toEqual({ ok: true, state: 'changed', current: stored('v2') })
+    const denied = await reading(403, { code: 'operation-denied', message: 'This form is not available to you.' })
+    expect(await createDataClient({ token: () => 't', base: denied.base }).reconcile('pg-ticket', deletion)).toMatchObject({ ok: false, status: 403, code: 'operation-denied' })
+  })
+
   // A read that is refused says nothing about the write: a person who may
   // create and not read, a database out of reach. Calling that "absent"
   // would invite the duplicate; it is the read's own refusal, for the host
