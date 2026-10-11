@@ -3,9 +3,11 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import mssql from 'mssql'
 import postgres from 'postgres'
+import { getContainerRuntimeClient } from 'testcontainers'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { PostgresFixture, SqlServerFixture } from './containers.js'
 import { POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
+import { connectDocker } from './docker.js'
 import { FILTER_PARITY } from './parity.js'
 import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 
@@ -374,5 +376,48 @@ describe('what each start records for the release report', () => {
       await pool.close()
     }
     expect(written()).toEqual(expect.arrayContaining([pg.server, ms.server]))
+  })
+})
+
+describe("the fixtures' containers", () => {
+  // The performance harness reads each database container's CPU, memory and
+  // limits from Docker by the id the fixture reports (0034). An id that named
+  // no container, or the other engine's, would charge one database's CPU to
+  // the other or stop the measurement at its first read.
+  test('are named by the id Docker holds them under, with the image the suites name', async () => {
+    const client = await getContainerRuntimeClient()
+    for (const [fixture, image] of [
+      [pg, POSTGRES_IMAGE],
+      [ms, SQLSERVER_IMAGE],
+    ] as const) {
+      const inspected = await client.container.inspect(client.container.getById(fixture.containerId))
+      expect({ image: inspected.Config.Image, running: inspected.State.Running }).toEqual({ image, running: true })
+    }
+  })
+
+  // The harness reads its precondition, the machine's Docker and each
+  // database's CPU through this reader (0034). An id cut to another length
+  // than `running()` lists would match no container, a CPU counter read as
+  // a rate would go backwards between two reads, and `hasImage` saying yes
+  // to an image that is not there would let a run pull one mid-measurement.
+  test('are read by the Docker reader: listed, described, counted, and their images present', async () => {
+    const docker = await connectDocker()
+    const running = await docker.running()
+    for (const [fixture, image] of [
+      [pg, POSTGRES_IMAGE],
+      [ms, SQLSERVER_IMAGE],
+    ] as const) {
+      const id = fixture.containerId.slice(0, 12)
+      expect(running).toContainEqual(expect.objectContaining({ id, image }))
+      expect(await docker.describe(fixture.containerId)).toMatchObject({ id, image, imageId: expect.stringMatching(/^sha256:[0-9a-f]{64}$/), limits: { nanoCpus: 0, cpuQuota: 0, memoryBytes: 0 } })
+      const first = await docker.usage(fixture.containerId)
+      const second = await docker.usage(fixture.containerId)
+      expect(first.cpuNs).toBeGreaterThan(0)
+      expect(first.memoryBytes).toBeGreaterThan(0)
+      expect(second.cpuNs).toBeGreaterThanOrEqual(first.cpuNs)
+      expect(await docker.hasImage(image)).toBe(true)
+    }
+    expect(await docker.hasImage('formancy-data-fixtures/no-such-image:never')).toBe(false)
+    expect(await docker.facts()).toMatchObject({ version: expect.stringMatching(/^\d+\./), ncpu: expect.any(Number) })
   })
 })

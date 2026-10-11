@@ -1,6 +1,6 @@
 # 0005 — One business model, written twice, and one comparator both adapters answer to
 
-- **Status:** accepted; the list of where the engines differ is extended by [0026](0026-name-every-column-fact-the-engines-disagree-on.md); the fixture, by a writer and a row-security policy, and the comparator, by what each account may do, extended by [0027](0027-a-snapshot-says-what-its-account-may-do.md)
+- **Status:** accepted; the list of where the engines differ is extended by [0026](0026-name-every-column-fact-the-engines-disagree-on.md); the fixture, by a writer and a row-security policy, and the comparator, by what each account may do, extended by [0027](0027-a-snapshot-says-what-its-account-may-do.md); an opt-in sized `sales.customer`, for lookups and their measurement, extended by [0034](0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-fixtures/src/load.test.ts` — both SQL files

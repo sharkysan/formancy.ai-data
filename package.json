@@ -18,7 +18,8 @@
     "test:getting-started": "node scripts/getting-started.mjs",
     "pictures": "node scripts/pictures.mjs",
     "typecheck": "turbo run typecheck",
-    "check:pkg": "turbo run check:pkg"
+    "check:pkg": "turbo run check:pkg",
+    "performance": "pnpm build && pnpm --filter @formancy/data-performance run measure && pnpm --filter @formancy/data-performance run render"
   },
   "devDependencies": {
     "turbo": "2.11.2",

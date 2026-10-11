@@ -83,8 +83,9 @@ jobs:
       # CLA signature names the current text, upstream is depended on at exact
       # versions, no source file is past the 600-line budget, the `test`
       # job's matrix names every package with a suite, these workflows keep
-      # the shape the release depends on, and the release report's registers
-      # hold. A guard that is not a gate is a comment.
+      # the shape the release depends on, the release report's registers
+      # hold, and docs/performance.md is what its committed results render.
+      # A guard that is not a gate is a comment.
       - run: pnpm test:repo
 
       # What this job found, for the report: the guards' results and the
@@ -131,7 +132,7 @@ jobs:
       # Every suite reports, rather than the first failure cancelling the rest.
       fail-fast: false
       matrix:
-        package: ['@formancy/data-core', '@formancy/data-fixtures', '@formancy/data-postgres', '@formancy/data-sqlserver', '@formancy/data-server', '@formancy/data-client', '@formancy/data-examples', '@formancy/data-studio', '@formancy/data-host']
+        package: ['@formancy/data-core', '@formancy/data-fixtures', '@formancy/data-postgres', '@formancy/data-sqlserver', '@formancy/data-server', '@formancy/data-client', '@formancy/data-performance', '@formancy/data-examples', '@formancy/data-studio', '@formancy/data-host']
     steps:
       - uses: actions/checkout@v4
 
@@ -389,6 +390,55 @@ jobs:
             exit 1
           }
           docker rm -f data-server
+
+      # FORMANCY_DATA_RATE_LIMIT is a public setting (0034). rate-limit.test.ts
+      # holds how it is parsed; only the running image shows main.ts reads it:
+      # a limit of 2 answers the third request 429, and a value that is not a
+      # whole number stops a server that is otherwise configured, with the
+      # sentence naming it, rather than starting with the default. The second
+      # container runs detached and is waited for, so a server that ignored
+      # the setting fails this step instead of holding it until the timeout.
+      - name: FORMANCY_DATA_RATE_LIMIT sets the limit, and a value that is not one stops the server
+        run: |
+          configured=(
+            -e FORMANCY_DATA_ISSUER=https://host.example
+            -e FORMANCY_DATA_AUDIENCE=formancy-data
+            -e FORMANCY_DATA_IDENTITY_SECRET=env:HOST_SECRET
+            -e HOST_SECRET=a-shared-secret-of-at-least-thirty-two-bytes
+          )
+          docker run -d --name data-server-limited -p 127.0.0.1:4390:4390 \
+            "${configured[@]}" -e FORMANCY_DATA_RATE_LIMIT=2 formancy/data-server:ci
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4390/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:4390/health || { docker logs data-server-limited; exit 1; }
+          statuses=$(for _ in 1 2 3; do curl -s -o /dev/null -w ' %{http_code}' http://127.0.0.1:4390/v1/whoami; done)
+          docker rm -f data-server-limited
+          if [ "$statuses" != " 401 401 429" ]; then
+            echo "::error::With FORMANCY_DATA_RATE_LIMIT=2, three requests answered${statuses}; expected 401 401 429"
+            exit 1
+          fi
+
+          docker run -d --name data-server-misconfigured \
+            "${configured[@]}" -e FORMANCY_DATA_RATE_LIMIT=abc formancy/data-server:ci
+          for _ in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Running}}' data-server-misconfigured)" = false ] && break
+            sleep 1
+          done
+          running=$(docker inspect -f '{{.State.Running}}' data-server-misconfigured)
+          code=$(docker inspect -f '{{.State.ExitCode}}' data-server-misconfigured)
+          output=$(docker logs data-server-misconfigured 2>&1)
+          docker rm -f data-server-misconfigured
+          echo "$output"
+          if [ "$running" != false ] || [ "$code" = 0 ]; then
+            echo "::error::With FORMANCY_DATA_RATE_LIMIT=abc the server was still running after 30 s, or exited 0"
+            exit 1
+          fi
+          if ! echo "$output" | grep -q 'FORMANCY_DATA_RATE_LIMIT is a whole number'; then
+            echo "::error::With FORMANCY_DATA_RATE_LIMIT=abc the server stopped without naming the setting"
+            exit 1
+          fi
 
       - name: Keep what this job found, for the report
         id: collect

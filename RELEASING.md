@@ -15,6 +15,12 @@ node scripts/bump.mjs 0.1.0
 #    what is knowingly missing. The release report names the upstream
 #    @formancy/* versions the release was tested with; the changelog need not.
 
+# 2b. Whether docs/performance.md still describes what ships (0034). If this
+#     names a difference, stop everything else on the machine -- the demo,
+#     other containers -- run `pnpm performance`, and commit
+#     docs/performance/results.json and the page it rendered
+node scripts/performance-stale.mjs
+
 # 3. Verify locally — the workflow runs these again, but finding out here is cheaper
 pnpm build && pnpm typecheck && pnpm test:coverage && pnpm check:pkg && pnpm test:repo
 node scripts/verify-licenses.mjs
@@ -63,8 +69,15 @@ cannot be taken back:
    run, and the release body — the version's changelog section and the
    report's summary — and fails when the body has no section or is longer
    than the 125,000 characters GitHub accepts.
-4. **`check`, in a job that holds `contents: read` and no secret:** refuses
-   a report with any problem, a partial or local one, or one of another
+4. **`check`, in a job that holds `contents: read` and no secret:** first
+   **refuses a release whose measured code, runtime dependencies or build
+   inputs differ from what the published performance figures were measured
+   on**: it runs `node scripts/performance-stale.mjs` after the install and
+   without a build, and fails naming each difference
+   ([0034](docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md));
+   step 2b above is the same check, run where the re-measurement can happen,
+   and `scripts/performance-stale.test.mjs` fails when `publish` stops
+   waiting for it. Then it refuses a report with any problem, a partial or local one, or one of another
    commit, run, release or version; tarballs that are not, byte for byte, the
    install gate's, one per published package, each at the release's version;
    a tarball without `LICENSE.md` and `NOTICE` or with the wrong licence
@@ -95,9 +108,10 @@ The server image is built by this workflow at the tagged commit, pushed to
 `ghcr.io/<owner>/formancy-data-server:<tag>` with build provenance, signed with
 cosign **by digest**, and carries the SBOM as an attestation. There is no
 `latest` tag. The gates build the same image on every pull request and prove it
-starts, refuses when unconfigured, runs unprivileged, and can write its
-store's directory; the report labels that one as the gate's image, never as
-the published one.
+starts, refuses when unconfigured, runs unprivileged, can write its store's
+directory, and reads `FORMANCY_DATA_RATE_LIMIT`: a limit of 2 answers the
+third request 429, and a value that is not a whole number stops it. The
+report labels that one as the gate's image, never as the published one.
 
 The composed stack's web image -- nginx with the studio and the host page,
 `formancy/data-web:compose` -- is never released. Compose builds it from the

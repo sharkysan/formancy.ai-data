@@ -33,7 +33,7 @@
       ]
     },
     "0005": {
-      "reviewed": "sha256:dff4d300dc4011863352eb88ec3889fa2b934fc4bd410d35d62e7d35b0d25bba",
+      "reviewed": "sha256:46c8aa5cd6b6fd181bf39ad1ee740f7738f2e55832e47df65344611ba25b480d",
       "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
     },
     "0006": {
@@ -822,8 +822,64 @@
         }
       ]
     },
+    "0034": {
+      "reviewed": "sha256:7e9fc3d1426a7c8fbed75e6e00ba13de7a4569a9bc97c8377c3cefb931b07961",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "On PostgreSQL every lookup search reads every row its form's row filter admits -- each of the tenant's customers, or the whole referenced table on a form with no tenant row filter -- because no index serves a contains search or the order by name.",
+          "heldBy": "packages/data-postgres/src/lookups-sized.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server every lookup search reads every row its form's row filter admits too, by seeks over the tenant's keys, or by a scan of the whole referenced table on a form with no tenant row filter.",
+          "heldBy": "packages/data-sqlserver/src/lookups-sized.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "Nothing bounds a slow lookup search: no trigram index, prefix mode or minimum length ships, PostgreSQL has no statement timeout, and a search the browser abandoned is not cancelled, so the database finishes every scan it started."
+        },
+        {
+          "area": "databases",
+          "says": "Every adapter statement makes two database round trips, because mssql checks each pooled connection with `SELECT 1` before using it and postgres.js has the server describe each unprepared statement before running it.",
+          "heldBy": "packages/data-performance/src/harness.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "`FORMANCY_DATA_RATE_LIMIT` sets the requests a minute per client address, and with no `trustProxy` setting it raises the one bucket every client behind a proxy shares."
+        },
+        {
+          "area": "testing",
+          "says": "The published performance figures describe one machine as its hypervisor presents it: loopback HTTP, the databases through Docker's published ports, no TLS, warm caches, both images' default settings, SQL Server's Developer edition, PostgreSQL on musl, one server process, the order form on the writer's account and one page size."
+        },
+        {
+          "area": "testing",
+          "says": "Not measured: tails under an arrival rate, more requests in flight than the pools hold, a lookup table between or beyond the two sizes measured, a customer table not loaded in key order, a larger snapshot, the Alpine image, the composed stack's proxy, and PostgreSQL under a default isolation other than READ COMMITTED, where every record request locks the form's table first (0041)."
+        },
+        {
+          "area": "testing",
+          "says": "The time of the description of the form's table that every record request reads (0041) is inside the published figures and not separated from them; a write refused as drift is counted and never timed."
+        },
+        {
+          "area": "testing",
+          "says": "Contention from outside the measuring VM is not seen, and contention during a block's own load cannot be told from that load, because the hypervisor reports no steal and the calibration probe is read only in the idle gaps around each block."
+        },
+        {
+          "area": "testing",
+          "says": "The database's CPU per request is net of its container's idle rate in the gaps around the block, so work the engine did on its own only while the block ran is still in it."
+        },
+        {
+          "area": "testing",
+          "says": "The added-latency figures cover the leg between the server and the database; the browser's leg to the server, TLS, bandwidth and TCP's congestion window are not in them."
+        },
+        {
+          "area": "testing",
+          "says": "An added-latency difference includes what the machine drifted between a request's undelayed and delayed passes, which run one after the other: for some requests it moved between rounds by more than a tenth of the added delay, and more samples did not remove that."
+        }
+      ]
+    },
     "0035": {
-      "reviewed": "sha256:dd419d209c0a0d9f336fea9ff0bbcefe53659352d5e5eb36531c92c99f089f47",
+      "reviewed": "sha256:af64c92b9b69b191ef3a9ac3029df315f3820404417cb70dcc7a4b742b73af5a",
       "limitations": [
         {
           "area": "databases",

@@ -90,7 +90,9 @@
     },
     {
       "gate": 11,
-      "open": "No performance figures are published yet; the performance-evidence record (0034) is to supply them."
+      "evidence": [
+        { "document": "docs/performance.md" }
+      ]
     },
     {
       "gate": 12,

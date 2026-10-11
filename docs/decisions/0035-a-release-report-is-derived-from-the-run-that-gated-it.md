@@ -1,6 +1,6 @@
 # 0035 — A release report is derived from the run that gated the release, and says what it did not test
 
-- **Status:** accepted
+- **Status:** accepted; the release's `check` job also refuses a release whose measured product differs from what the published performance figures were measured on, gate 11 is stated by `docs/performance.md`, and the container gate also checks `FORMANCY_DATA_RATE_LIMIT`, extended by [0034](0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

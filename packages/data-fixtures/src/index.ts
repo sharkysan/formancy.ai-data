@@ -17,6 +17,8 @@ export type { PostgresFixture, SqlServerFixture, StartedServer } from './contain
 export { restrictedDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'
 export { defined } from './defined.js'
 export type { DefinedRecords, Undefined } from './defined.js'
+export { connectDocker } from './docker.js'
+export type { DockerContainer, DockerContainerFacts, DockerDaemon, DockerReader } from './docker.js'
 export { DRIFTING, driftingOn, runtimeOf, sharedDrifting } from './drifting.js'
 export type { DriftingCase, DriftSend, DriftVerdict } from './drifting.js'
 export { readFixture, splitBatches } from './load.js'
@@ -36,7 +38,26 @@ export type { FilterParityCase, ParityFilterColumn, RefusalParityCase } from './
 export { renamedColumn } from './rename.js'
 export { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 export { answerBytes, startTcpHop } from './tcp-hop.js'
-export type { LostAnswer, TcpHop } from './tcp-hop.js'
+export type { LostAnswer, Schedule, TcpHop } from './tcp-hop.js'
+export {
+  FIXTURE_CUSTOMERS,
+  SIZED_CUSTOMERS,
+  sizedChunk,
+  sizedCountry,
+  sizedCustomer,
+  sizedCustomerRows,
+  sizedDigest,
+  sizedDigester,
+  sizedLookupPage,
+  sizedReadBack,
+  sizedResolveKeys,
+  sizedRowsRead,
+  sizedTableRows,
+  sizedTerms,
+} from './sized.js'
+export type { SizedReadBack, SizedRow } from './sized.js'
+export { loadSizedCustomers, SIZED_CHUNK_ROWS, verifySizedCustomers } from './sized-load.js'
+export type { SizedLoad, SizedTarget } from './sized-load.js'
 export type { ServerAnswer, ServerRecord } from './servers.js'
 // For a suite that starts its own container through startPostgresContainer or
 // startSqlServerContainer and keeps it in a typed variable, without declaring
