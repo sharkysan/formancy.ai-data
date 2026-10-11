@@ -35,13 +35,14 @@ export const STUDIO_STEPS = Object.freeze({
 /** What the host page calls the controls and the messages the guide names. */
 export const HOST = Object.freeze({
   token: 'Host token',
-  formId: 'Form id',
-  open: 'Open the form',
+  signIn: 'Sign in',
+  forms: 'Forms',
   newRecord: 'New record',
   save: 'Save',
   created: 'Created record',
   saved: 'Saved.',
   signOut: 'Sign out',
+  openByToken: 'Open by record token',
   record: 'Record token',
   load: 'Load',
   notFound: 'No such record.',

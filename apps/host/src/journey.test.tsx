@@ -1,7 +1,7 @@
 import { encodeKeyToken } from '@formancy/data-core'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, waitFor } from '@testing-library/react'
-import { answer, chooseCustomer, control, load, openForm, said, save, shows } from './test-host.js'
+import { answer, chooseCustomer, control, load, loaded, openForm, said, save, shows } from './test-host.js'
 import type { RendererName } from './test-host.js'
 import { SECOND_CUSTOMER } from './test-values.js'
 import { EDGES, ENGINES, startPlane } from './test-plane.js'
@@ -61,6 +61,7 @@ describe.each(ENGINES)('the journey on $engine', ({ formId }) => {
     // label, which only the resolve route can supply -- the record holds a
     // token, and a renderer that showed it would show the token.
     await load(user, record)
+    await loaded(record)
     for (const renderer of [creator, editor]) {
       await shows(renderer, 'Customer', 'Muster AG')
       await shows(renderer, 'Amount', EDGES.largestAmount)

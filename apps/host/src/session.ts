@@ -2,7 +2,8 @@ import { createFormEngine } from '@formancy/core'
 import type { FormEngine } from '@formancy/core'
 import { fieldProblems, isUnknownWrite, lookupSources } from '@formancy/data-client'
 import type { DataClient, FormRecord, LookupOperation, PublishedForm, Reconciliation, UnknownWrite, WriteOutcome } from '@formancy/data-client'
-import { drawLookupsAsTypeaheads } from './widgets.js'
+import type { Work } from './leave.js'
+import { disableFields, drawLookupsAsTypeaheads } from './widgets.js'
 
 /*
  * One pane's session: the engine that holds a person's answers, the record
@@ -35,6 +36,12 @@ import { drawLookupsAsTypeaheads } from './widgets.js'
  *   second record. The hold is the form's: Load and New clear it. An update
  *   sent again at the same version and answered stale stays unknown: the
  *   record moved on, most likely by the save whose answer was lost.
+ *
+ * What a pane holds that leaving it would lose (`work()`, 0047): answers
+ * changed since it was opened or last saved, a save still out, or a save
+ * whose outcome is unknown. The workspace asks before anything drops a form
+ * that holds work; `discard()` drops it, and opens the form again as it was
+ * opened or last saved.
  *
  * A submit the engine refused sends nothing: the renderer already says why.
  * A press while a save is unanswered sends nothing either, and says so
@@ -102,6 +109,21 @@ export interface SessionOptions {
   formId: string
   definition: PublishedForm
   renderer: Renderer
+  /**
+   * What the engine's element ids start with, before the renderer: the
+   * form's id for a record's panes, `<child form>~<field>` for a child
+   * section's, so two sections of one form -- or a form that is its own
+   * child -- never mint one id twice (0047). `~` is in neither a form id nor
+   * a field key.
+   */
+  namespace?: string
+  /**
+   * Fields drawn disabled on the host's copy: a child's field that names its
+   * parent, which the page fills in. Presentation only -- the renderers still
+   * submit a disabled field, and the server checks only that the parent is
+   * one the person may reference (0043).
+   */
+  fixed?: readonly string[]
 }
 
 /**
@@ -130,9 +152,15 @@ function said(outcome: WriteOutcome, created: boolean): string {
   return outcome.value.record === null ? 'Created.' : `Created record ${outcome.value.record}.`
 }
 
-export function createSession({ client, formId, definition, renderer }: SessionOptions) {
-  // The host's copy of the form: the published one, with its lookups drawn as typeaheads.
-  const form = drawLookupsAsTypeaheads(definition.form)
+export function createSession({ client, formId, definition, renderer, namespace, fixed = [] }: SessionOptions) {
+  // The host's copy of the form: the published one, with its lookups drawn
+  // as typeaheads and the fields the page fills in disabled.
+  const form = disableFields(drawLookupsAsTypeaheads(definition.form), fixed)
+  // A saved record this person may not update is drawn with every field
+  // disabled, as the generator draws a field nothing may write: presentation
+  // only, the server refuses the update (UX-SPEC D19).
+  const readOnly = disableFields(form, form.model.fields.map((field) => field.key))
+  const ids = namespace ?? form.id
   const allows = (operation: LookupOperation): boolean => definition.operations.includes(operation)
   const operationFor = (record: string | undefined): LookupOperation =>
     record !== undefined ? (allows('update') ? 'update' : 'read') : allows('create') ? 'create' : 'read'
@@ -141,6 +169,8 @@ export function createSession({ client, formId, definition, renderer }: SessionO
 
   let state: SessionState = { record: undefined, version: undefined, operation: operationFor(undefined) }
   let opened: Opened | undefined
+  /** The answers as the form was opened or last saved: what "changed" is measured against. */
+  let baseline: Record<string, unknown> = {}
   /** The save in flight, and the generation of the form that sent it. */
   let saving: { promise: Promise<SaveResult | null>; generation: number } | undefined
   /** The last save of a form whose outcome is unknown, and whether it holds that form. */
@@ -151,16 +181,17 @@ export function createSession({ client, formId, definition, renderer }: SessionO
   const sources = lookupSources(client, formId, form, () => state.operation)
 
   function open(record?: FormRecord): FormEngine {
+    const token = record?.record ?? undefined
     const engine = createFormEngine({
-      schema: form,
+      schema: token !== undefined && !allows('update') ? readOnly : form,
       // One id namespace per renderer: two renderers of one document on one
       // page would otherwise mint every element id twice (formancy.ai 0095).
-      formId: `${form.id}-${renderer}`,
+      formId: `${ids}-${renderer}`,
       ...(record === undefined ? {} : { initialValue: record.answers }),
       capabilities: CAPABILITIES,
     })
-    const token = record?.record ?? undefined
     state = { record: token, version: record?.version ?? undefined, operation: operationFor(token) }
+    baseline = structuredClone(engine.value()) as Record<string, unknown>
     opened = { engine, generation: (opened?.generation ?? 0) + 1 }
     for (const listener of listeners) listener()
     return engine
@@ -200,11 +231,16 @@ export function createSession({ client, formId, definition, renderer }: SessionO
     }
     const now = engine.value() as Record<string, unknown>
     let newer = false
+    // What the record now holds, as the form would show it: what was sent,
+    // in the stored spelling where the server says one.
+    const held: Record<string, unknown> = { ...sent }
     for (const [key, value] of Object.entries(outcome.value.answers)) {
       if (!keys.has(key)) continue
+      held[key] = value
       if (same(now[key], sent[key])) engine.setValue([key], value)
       else newer = true
     }
+    baseline = held
     const record = outcome.value.record ?? undefined
     state = { record, version: outcome.value.version ?? undefined, operation: operationFor(record) }
     const message = said(outcome, created)
@@ -225,11 +261,47 @@ export function createSession({ client, formId, definition, renderer }: SessionO
     return settle(engine, generation, sent, { record, version }, outcome, record === undefined)
   }
 
+  /** The record as this form was opened or last saved: its token, its version, and the answers as stored. */
+  function saved(): FormRecord {
+    return { record: state.record ?? null, version: state.version ?? null, answers: structuredClone(baseline) as FormRecord['answers'] }
+  }
+
+  /** Whether the answers on screen differ from those the form was opened or last saved with. */
+  function changed(): boolean {
+    const now = (current().engine.value() ?? {}) as Record<string, unknown>
+    return [...new Set([...Object.keys(now), ...Object.keys(baseline)])].some((key) => !same(now[key], baseline[key]))
+  }
+
   return {
     formId,
     definition,
     renderer,
     sources,
+    changed,
+    /**
+     * What this form holds that leaving it would lose: a save whose outcome
+     * is unknown first, then a save still out, then changed answers; null
+     * when nothing would be lost.
+     */
+    work(): Work | null {
+      const { generation } = current()
+      if (lostHere() !== undefined) return 'unknown'
+      if (saving?.generation === generation) return 'saving'
+      return changed() ? 'changed' : null
+    },
+    /**
+     * Drop what this form holds: open it again as it was opened or last
+     * saved. A save still out is then a replaced form's, said and not applied,
+     * and an unknown write's hold goes, as Load and New clear it (0031).
+     */
+    discard(): void {
+      open(saved())
+    },
+    /**
+     * The record as opened or last saved, with nothing typed since: what
+     * another pane opens once this one has created a record (0047).
+     */
+    saved,
     /** The engine on screen. The same object between opens, so `useSyncExternalStore` can read it. */
     opened: current,
     subscribe(listener: () => void): () => void {

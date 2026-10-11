@@ -10,22 +10,29 @@
  * scripts/palette.test.mjs fails when the three copies here disagree; when the
  * admin's palette moves upstream, they move with it, by hand.
  *
- * The forms are not the host's: they are what the host's people fill in, so
- * they are white paper in the Blueprint theme from @formancy/themes, and the
- * renderers ship no CSS. Every rule here that names an element rather than a
- * class of the page's own ends in `:where(:not(.sheet *))`: off the paper,
- * and, being `:where`, no heavier than it was. The browser gate fails when
- * any rule of these files selects an element on either paper.
+ * Two things on the page are not the host's to dress. The forms are what the
+ * host's people fill in, so they are white paper in the Blueprint theme from
+ * @formancy/themes, and the renderers ship no CSS. The grids are AG Grid
+ * Community, recoloured only through its theme parameters (grid-theme.ts).
+ * Every rule here that names an element rather than a class of the page's
+ * own ends in `:where(:not(.sheet *, .grid-bench *))`: off the paper and out
+ * of the grid, and, being `:where`, no heavier than it was. The browser gate
+ * fails when any rule of these files selects an element on a paper or in a
+ * grid, and grid-theme.test.ts when any names an AG Grid class or property.
  */
 
 /*
  * In cascade order, one file per reason to change: the room, the controls,
- * the page around the forms, the panes, and narrow screens last so their
- * rules win. Vite inlines each import into one stylesheet; the browser gate
- * inlines them the same way before it parses.
+ * the page around the forms, the panes, the workspace's shell, its records
+ * and detail, and narrow screens last so their rules win. Vite inlines each
+ * import into one stylesheet; the browser gate inlines them the same way
+ * before it parses. Every breakpoint is `@media (max-width: Nrem)`, the one
+ * form the gate reads.
  */
 @import './styles/room.css';
 @import './styles/controls.css';
 @import './styles/page.css';
 @import './styles/panes.css';
+@import './styles/workspace.css';
+@import './styles/records.css';
 @import './styles/narrow.css';

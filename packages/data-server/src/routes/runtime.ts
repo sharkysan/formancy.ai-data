@@ -71,7 +71,9 @@ declare module 'fastify' {
 /**
  * The audit name of each runtime route, keyed `METHOD url`; a route without
  * one stops the server, or never answers (0033). `admin-audit.test.ts` sends
- * every route the router holds and fails on an entry no route has.
+ * every route the router holds and fails on an entry no route has. Exported
+ * from the package: the host page's suite reads the runtime plane's routes
+ * here rather than keeping a list of its own (0047).
  */
 export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'GET /v1/forms': 'form-list',

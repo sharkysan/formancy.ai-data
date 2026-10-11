@@ -29,7 +29,8 @@ export async function audit(): Promise<string[]> {
  * name and refusing an empty one does.
  */
 export function unnamed(): string[] {
-  const roles = ['link', 'button', 'textbox', 'combobox', 'listbox', 'checkbox', 'radio', 'spinbutton', 'switch'] as const
+  // A grid and the separator are controls too: the keyboard stops on each (0047).
+  const roles = ['link', 'button', 'textbox', 'combobox', 'listbox', 'checkbox', 'radio', 'spinbutton', 'switch', 'grid', 'separator'] as const
   return roles
     .flatMap((role) => screen.queryAllByRole(role))
     .filter((element) => computeAccessibleName(element).trim() === '')

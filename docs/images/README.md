@@ -26,7 +26,8 @@ page does not restate them.
   (`POSTGRES_IMAGE` from `@formancy/data-fixtures`, through testcontainers),
   connected as the order form's own account, whose grants and row-level
   security bind it. ada publishes `pg-order` with the guide's request and
-  policy; clara is a clerk of tenant 1 and otto a clerk of tenant 2. The
+  policy; clara is a clerk of tenant 1 and otto a clerk of tenant 2. That
+  account may not read `sales.order_line`, so no child grid is pictured. The
   database the pictures were taken over is in each record's `database`, and
   is never compared.
 - **The examples page** is its static build; it has no server.
@@ -65,9 +66,10 @@ listens on a port.
 `scripts/pictures/camera.mjs` takes every picture the same way:
 
 - **Settings.** Device scale factor 2, `en-US`, UTC, reduced motion, a
-  viewport 900 px high and 1200 px wide for the studio and the host page,
-  1300 px for the examples page; each app refuses a width at or below its
-  stylesheet's widest `max-width` breakpoint.
+  viewport 900 px high and 1200 px wide for the studio, 1440 px for the
+  host page, whose workspace draws its Forms sidebar only past 80rem
+  (0047), and 1300 px for the examples page; each app refuses a width at or
+  below its stylesheet's widest `max-width` breakpoint.
 - **Fonts.** It waits until every family the page asks Google Fonts for has a
   face loaded and none is loading, and records each family's version from the
   font file's URL. `document.fonts.ready` alone once resolved with a family

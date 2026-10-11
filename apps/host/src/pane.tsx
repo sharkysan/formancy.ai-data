@@ -6,6 +6,7 @@ import { AngularForm } from './angular-mount.js'
 import { ReactForm } from './react-form.js'
 import type { SaveResult, Session, Submitted } from './session.js'
 import { UnknownNotice } from './unknown-notice.js'
+import { NoticeHeading } from './words.js'
 
 /** How a renderer is written for a person. */
 const NAMES = { react: 'React', angular: 'Angular' } as const
@@ -18,6 +19,9 @@ export const SAVING = 'Saving…'
 
 /** What the saved line says once "Load the saved record" has replaced the draft. */
 export const DISCARDED = 'Loaded the saved record. Your changes were discarded.'
+
+/** What the saved line's colour repeats: the server's answer, a save still out, or a refusal (UX-SPEC §5.11). */
+type Kind = 'answer' | 'pending' | 'refused'
 
 /** What a save opened, and the how-manyth notice it is: a new one is drawn afresh, never over the last one's state. */
 type Notice = { kind: 'stale' | 'refused' | 'unknown'; message: string; n: number }
@@ -39,18 +43,37 @@ type Notice = { kind: 'stale' | 'refused' | 'unknown'; message: string; n: numbe
  * answered, must be there before it speaks. What it said is kept with the
  * generation it was said for, so a new form starts with an empty line.
  */
-export function Pane({ session, title }: { session: Session; title: string }): ReactElement {
+export function Pane({
+  session,
+  title,
+  level = 4,
+  idBase,
+  namedBy,
+  onAnswer,
+}: {
+  session: Session
+  title: string
+  /** The heading's level: under the detail's h3, or a child row's h5 (0047). */
+  level?: 4 | 6
+  /** What the pane's element ids start with: the session's namespace, unique on the page. */
+  idBase: string
+  /** A child row's heading, which names its panes first, so no two regions share a name. */
+  namedBy?: string
+  /** A save the server answered with a record: the workspace shows it in its grid. */
+  onAnswer?: (result: SaveResult) => void
+}): ReactElement {
   const { engine, generation } = useSyncExternalStore(session.subscribe, session.opened)
   const name = NAMES[session.renderer]
-  const headingId = `pane-${session.renderer}`
+  const headingId = `pane-${idBase}-${session.renderer}`
+  const Heading = level === 4 ? 'h4' : 'h6'
   const heading = useRef<HTMLHeadingElement>(null)
   // The generation "Load the saved record" opened, so the new part can say so
   // and the keyboard can go somewhere deliberate rather than to the page.
   const [reloaded, setReloaded] = useState<number | null>(null)
-  const [line, setLine] = useState({ generation, text: '' })
+  const [line, setLine] = useState<{ generation: number; text: string; kind: Kind }>({ generation, text: '', kind: 'answer' })
   // Said for the form on screen when it is said: a save answered after Load
   // or New is the replaced form's, and the new form's line is where it goes.
-  const say = useCallback((text: string) => setLine({ generation: session.opened().generation, text }), [session])
+  const say = useCallback((text: string, kind: Kind = 'answer') => setLine({ generation: session.opened().generation, text, kind }), [session])
 
   useEffect(() => {
     if (reloaded === generation) heading.current?.focus()
@@ -63,13 +86,15 @@ export function Pane({ session, title }: { session: Session; title: string }): R
   }, [session, say])
 
   return (
-    <section className="pane" aria-labelledby={headingId}>
-      <h2 id={headingId} className="pane-heading" tabIndex={-1} ref={heading}>
-        {name}
-      </h2>
-      <p role="status" className="saved">
-        {line.generation === generation ? line.text : ''}
-      </p>
+    <section className="pane" aria-labelledby={namedBy === undefined ? headingId : `${namedBy} ${headingId}`}>
+      <div className="pane-top">
+        <Heading id={headingId} className="pane-heading" tabIndex={-1} ref={heading}>
+          {name}
+        </Heading>
+        <p role="status" className="saved" data-kind={line.kind}>
+          {line.generation === generation ? line.text : ''}
+        </p>
+      </div>
       <PaneBody
         key={generation}
         session={session}
@@ -77,7 +102,10 @@ export function Pane({ session, title }: { session: Session; title: string }): R
         name={name}
         title={title}
         headingId={headingId}
+        named={namedBy === undefined ? headingId : `${namedBy} ${headingId}`}
+        noticeLevel={level}
         say={say}
+        onAnswer={onAnswer}
         onReload={async () => {
           const problem = await session.reload()
           if (problem === null) loaded()
@@ -98,7 +126,10 @@ function PaneBody({
   name,
   title,
   headingId,
+  named,
+  noticeLevel,
   say,
+  onAnswer,
   onReload,
   onLoad,
 }: {
@@ -107,7 +138,11 @@ function PaneBody({
   name: string
   title: string
   headingId: string
-  say: (text: string) => void
+  /** The ids that name the pane: a notice is named by them and its own heading. */
+  named: string
+  noticeLevel: 4 | 6
+  say: (text: string, kind?: Kind) => void
+  onAnswer: ((result: SaveResult) => void) | undefined
   onReload: () => Promise<string | null>
   onLoad: (record: FormRecord) => void
 }): ReactElement {
@@ -136,7 +171,8 @@ function PaneBody({
   function show(result: SaveResult | null): void {
     if (result?.kind === 'busy' || result?.kind === 'replaced' || result?.kind === 'held') {
       // About another press, or another form: the notice, if any, is still this form's.
-      say(result.message)
+      // A press that sent nothing is refused; a replaced form's answer is an answer.
+      say(result.message, result.kind === 'replaced' ? 'answer' : 'refused')
       return
     }
     if (result?.kind === 'stale' || result?.kind === 'refused' || result?.kind === 'unknown') {
@@ -145,16 +181,18 @@ function PaneBody({
       return
     }
     setNotice(null)
+    if (result?.kind === 'saved' || result?.kind === 'created') onAnswer?.(result)
     // A refused selection is said on its field and in the error summary,
     // which takes the focus; this line says only that nothing was saved.
-    say(result === null ? '' : result.kind === 'invalid' ? `Not saved. ${result.message}` : result.message)
+    if (result?.kind === 'invalid') say(`Not saved. ${result.message}`, 'refused')
+    else say(result === null ? '' : result.message)
   }
 
   async function submit(outcome: Submitted): Promise<void> {
     // The line changes as soon as a save is sent, so the answer is heard even
     // when its words are the last save's: "Saved." twice in a row is no change
     // to a live region, and nothing would be said.
-    if (outcome.ok) say(SAVING)
+    if (outcome.ok) say(SAVING, 'pending')
     show(await session.save(outcome))
   }
 
@@ -168,12 +206,12 @@ function PaneBody({
       {notice?.kind === 'unknown' ? (
         // Keyed by the notice: a second unknown save is another save, whose
         // check, confirmation and focus start again rather than inherit the first's.
-        <UnknownNotice key={notice.n} session={session} message={notice.message} label={`${headingId} ${noticeId}`} noticeId={noticeId} noticeRef={noticeRef} onLoad={onLoad} />
+        <UnknownNotice key={notice.n} session={session} message={notice.message} label={`${named} ${noticeId}`} noticeId={noticeId} noticeLevel={noticeLevel} noticeRef={noticeRef} onLoad={onLoad} />
       ) : notice === null ? null : (
-        <div role="region" aria-labelledby={`${headingId} ${noticeId}`} tabIndex={-1} ref={noticeRef} className="notice" data-kind={notice.kind}>
-          <h3 id={noticeId} className="notice-heading">
+        <div role="region" aria-labelledby={`${named} ${noticeId}`} tabIndex={-1} ref={noticeRef} className="notice" data-kind={notice.kind}>
+          <NoticeHeading level={noticeLevel} id={noticeId}>
             Not saved
-          </h3>
+          </NoticeHeading>
           <p className="notice-text">{notice.message}</p>
           {notice.kind === 'stale' ? (
             <>

@@ -1,6 +1,6 @@
 # 0029 — A host renders a published form through one client of the runtime plane
 
-- **Status:** accepted; narrowed by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): a non-JSON 502 is `unexpected` on a read only; a write's answer is known only when the data server says what happened, every write carries a write id of its own, and `reconcile` reads an unknown one; the host page is served at `/host/` on the composed stack's one origin, by `deploy/web/nginx.conf`, extended by [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)
+- **Status:** accepted; narrowed by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): a non-JSON 502 is `unexpected` on a read only; a write's answer is known only when the data server says what happened, every write carries a write id of its own, and `reconcile` reads an unknown one; the host page is served at `/host/` on the composed stack's one origin, by `deploy/web/nginx.conf`, extended by [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md); narrowed by [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md): the host page is a workspace over every form the person may read, and draws a record in the renderer the viewer chooses -- React until they choose, or both -- rather than both always
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

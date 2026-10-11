@@ -12,5 +12,9 @@ export type { Regeneration, Restoration } from './routes/admin-evolution.js'
 export { createConnectionRegistry, parseConnections } from './connections.js'
 export type { ConnectionConfig, ConnectionFactory, ConnectionRegistry, OpenConnection } from './connections.js'
 export { DRIVER_FACTORIES } from './drivers.js'
+// The runtime plane's routes, `METHOD url`, each with its audit name: what a
+// host is allowed to send, which the host page's suite holds itself to (0047).
+export { ROUTE_OPERATIONS } from './routes/runtime.js'
+export type { RuntimeOperation } from './audit.js'
 export { logAuditSink, recordReference } from './audit.js'
 export type { AdminAuditEvent, AuditEvent, AuditSink, RuntimeAuditEvent } from './audit.js'

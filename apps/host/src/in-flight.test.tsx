@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
-import { answer, chooseCustomer, control, load, mount, rendered, RENDERERS, said, save, shows, signIn, statuses } from './test-host.js'
-import { EDGES, ENGINES, holdingWrites, startPlane, TOKENS } from './test-plane.js'
+import { cleanup, waitFor, within } from '@testing-library/react'
+import { answer, chooseCustomer, control, load, newRecord, openWith, RENDERERS, said, save, shows, statuses, unsavedNotice } from './test-host.js'
+import type { User } from './test-host.js'
+import { EDGES, ENGINES, holdingWrites, startPlane } from './test-plane.js'
 import type { Engine, Holding, Plane } from './test-plane.js'
 
 /*
@@ -32,11 +33,9 @@ afterAll(async () => {
 afterEach(cleanup)
 
 /** The page, signed in as tenant 1's clerk, with every create and update held until `holding.answer()`. */
-async function openHeld(formId: string): Promise<{ user: ReturnType<typeof mount>; holding: Holding }> {
+async function openHeld(formId: string): Promise<{ user: User; holding: Holding }> {
   const holding = holdingWrites(plane.fetch)
-  const user = mount(holding.fetch)
-  await signIn(user, TOKENS.clerk, formId)
-  await rendered()
+  const user = await openWith(holding.fetch, formId)
   return { user, holding }
 }
 
@@ -103,9 +102,11 @@ describe.each(ENGINES)('a save in flight on $engine', (engine) => {
   })
 
   // New while a create is out: the record is written, and the person needs
-  // its token -- without it they may well enter the order again. The answer
-  // is said on the pane's line as the replaced form's, and the new, empty
-  // form stays empty and stays a new record.
+  // its token -- without it they may well enter the order again. A save
+  // still out is work New would drop, so the page asks first (0047); told to
+  // discard, it opens the new form, and the answer is still said on the
+  // pane's line as the replaced form's, and the new, empty form stays empty
+  // and stays a new record.
   test.each(RENDERERS)('in %s, a create answered after New is said, and the new form stays empty', async (renderer) => {
     const { user, holding } = await openHeld(engine.formId)
     await chooseCustomer(user, renderer, 'Muster', 'Muster AG')
@@ -114,7 +115,11 @@ describe.each(ENGINES)('a save in flight on $engine', (engine) => {
     await save(user, renderer)
     await writesHeld(holding, 1)
 
-    await user.click(within(screen.getByRole('region', { name: 'Record' })).getByRole('button', { name: 'New record' }))
+    await newRecord(user)
+    await waitFor(() => expect(unsavedNotice()).not.toBeNull())
+    const asking = unsavedNotice() as HTMLElement
+    expect(within(asking).getByRole('list').textContent).toContain(`New record, ${renderer}: a save the server has not answered yet.`)
+    await user.click(within(asking).getByRole('button', { name: 'Discard and continue' }))
     await shows(renderer, 'Amount', '')
     holding.answer()
     const line = await said(renderer, /^The save sent before this form was replaced: Created record k1:\S+\.$/)

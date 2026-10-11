@@ -1,6 +1,6 @@
 # 0031 — An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here
 
-- **Status:** accepted; extended by [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md): an update's read, plan and membership checks run inside its sending, so a resend asks the database nothing; extended by [0041](0041-the-runtime-refuses-what-drift-blocks.md): a write's description is read inside its sending, and a create's plan and membership checks moved into it
+- **Status:** accepted; extended by [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md): an update's read, plan and membership checks run inside its sending, so a resend asks the database nothing; extended by [0041](0041-the-runtime-refuses-what-drift-blocks.md): a write's description is read inside its sending, and a create's plan and membership checks moved into it; extended by [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md): the host page asks before anything drops a form holding a save whose outcome is unknown, and a child row's create reaches `present` and `absent` through the page
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**
@@ -114,8 +114,17 @@
   `apps/host/src/unknown-notice.test.ts` — `present` says a record with this
   key is stored, not that this save stored it, and `absent` that this form
   cannot find it, not that it is not stored (watched failing against "It was
-  saved" and "It is not in the record"). No host suite reaches either
-  through the page: no form the host's plane publishes names its own key.
+  saved" and "It is not in the record"). Both are reached through the page
+  in `apps/host/src/unknown-child.test.tsx` (0047): an order line's key is
+  the order and the number the person typed, so a line checks as
+  `present` when the test plane's `lose` ran the real insert and then
+  answered `unknown-outcome` in place of the adapter's answer, and as
+  `absent` when it answered so without running it (watched failing with
+  the answer lost between the page and the server instead, which checks
+  as unverifiable). The loss there is made up around a real write; that a
+  connection really dropped between the server and the database makes the
+  adapters answer `unknown-outcome` is
+  `packages/data-server/src/e2e-lost-answer.integration.test.ts`'s.
   `apps/host/scripts/browser-test.mjs` (`pnpm test:browser`) — in Chromium,
   at every width: an update the real server stored and whose connection
   Playwright then reset, with the keyboard on the notice and the save sent

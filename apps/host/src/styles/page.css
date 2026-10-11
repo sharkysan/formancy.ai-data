@@ -8,21 +8,27 @@
   padding: 1rem;
 }
 
-main:where(:not(.sheet *)) {
+/* Signed in, the app bar sits at the top edge and the workspace under it. */
+.page.in {
+  gap: 0;
+  padding-top: 0;
+}
+
+main:where(:not(.sheet *, .grid-bench *)) {
   display: grid;
   gap: 1rem;
   min-width: 0;
 }
 
 /* The skip link's target takes focus only so the next Tab starts there. */
-main:where(:not(.sheet *)):focus {
+main:where(:not(.sheet *, .grid-bench *)):focus {
   outline: none;
 }
 
+/* Glass: the room's panel. Signed in, only the work surfaces wear it -- the
+   Records panel and the detail's header -- so it marks where the work is. */
 .masthead,
-.card,
-.pane,
-.colophon {
+.card {
   min-width: 0;
   border: 1px solid var(--edge-strong);
   border-radius: 16px;
@@ -37,6 +43,32 @@ main:where(:not(.sheet *)):focus {
   padding: 1.5rem;
 }
 
+/* Signed in: a flat bar on the bench, 3.5rem (the data-dense header). The
+   name and the product on one line; the lead is the sign-in page's. Not
+   sticky: nothing fixed may cover a focused control. */
+.masthead.appbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.125rem 1rem;
+  min-height: 3.5rem;
+  padding: 0.5rem 0.25rem;
+  border: 0;
+  border-bottom: 1px solid var(--edge);
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.masthead.appbar h1:where(:not(.sheet *, .grid-bench *)) {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
 .eyebrow {
   margin: 0;
   color: var(--muted);
@@ -46,7 +78,7 @@ main:where(:not(.sheet *)):focus {
   text-transform: uppercase;
 }
 
-h1:where(:not(.sheet *)) {
+h1:where(:not(.sheet *, .grid-bench *)) {
   margin: 0.25rem 0 0.5rem;
   font-family: var(--display);
   font-size: clamp(1.5rem, 4vw, 2.25rem);
@@ -93,48 +125,29 @@ h1:where(:not(.sheet *)) {
   font-size: 0.8125rem;
 }
 
-/* A field and its two buttons on one line where there is room. */
-.record-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 0 0.75rem;
-}
-
-.record-form .actions {
-  margin: 0.5rem 0;
-}
-
-/* What the server said the definition allows: teal, the server's colour. */
-.form-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
-  padding-block: 0.75rem;
-}
-
-.form-line p {
-  margin: 0;
-  color: var(--server);
-  font-size: 0.9375rem;
-}
-
+/* A refusal: the warm colour of something to look at, as every refusal on
+   the page is -- a refused list, a refused save, the stale notice. */
 .problem-box {
   margin: 0.75rem 0 0;
   padding: 0.625rem 0.875rem;
-  border: 1px solid color-mix(in srgb, var(--invalid) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--invalid) 10%, transparent);
-  color: #ffc2ca;
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  color: var(--warn);
   font-size: 0.875rem;
 }
 
+/* Flat muted text on the bench, under a rule: a colophon, not a panel. */
 .colophon {
-  padding: 1rem 1.25rem;
+  min-width: 0;
+  padding: 0.75rem 0.25rem 0;
+  border-top: 1px solid var(--edge);
   color: var(--muted);
   font-size: 0.8125rem;
+}
+
+.page.in .colophon {
+  margin-top: 1.5rem;
 }
 
 .colophon p {

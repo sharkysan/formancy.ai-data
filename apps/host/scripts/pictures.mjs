@@ -28,14 +28,18 @@
 // the save after it must be sent once, answered 409 `drift` and leave the
 // row as it was.
 //
-// Walk order: typeahead, the hero, stale, refused, unknown, another tenant,
-// drift -- last, because it changes the table; the README shows them in
-// scenes.json's order. Elements are found by role and
-// accessible name, with two exceptions, each said where it is: the host token
-// is a password field, which has no role, so it is found by its label; and
-// the line saying what the signed-in person may do is a paragraph, which has
-// no name, so it is found by its role and filtered by its text, and the card
-// it sits in, which has no role, as its parent.
+// The page is the workspace (0047): clara signs in, chooses pg-order under
+// Forms, and the scenes are drawn with both renderers, which the renderer
+// switch shows. The connection is the order form's own account, which may
+// not read sales.order_line, so no child section is pictured: the guide's
+// setup has no line form to publish (0047 says what nothing grants it).
+//
+// Walk order: typeahead, the hero, stale, refused, unknown, the unsaved
+// notice, another tenant, drift -- last, because it changes the table; the
+// README shows them in scenes.json's order.
+// Elements are found by role and accessible name, with one exception, said
+// where it is: the host token is a password field, which has no role, so it
+// is found by its label.
 //
 // `pnpm --filter @formancy/data-host pictures`, after `pnpm build`; the root's
 // `pnpm pictures` runs it with the others. It needs Docker, for the database.
@@ -150,24 +154,28 @@ function actsOver(plane) {
   const paper = (page, name) => pane(page, name).getByRole('form', { name: `Order, ${name}`, exact: true })
   const box = (page, name, label) => paper(page, name).getByRole('textbox', { name: field(label) })
   const customer = (page, name) => paper(page, name).getByRole('combobox', { name: field(journey.order.customer.label) })
-  const record = (page) => page.getByRole('region', { name: 'Record', exact: true })
+  const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
+  /** The detail: the region its heading names -- the open record's, or "No record open". */
+  const detail = (page, name) => page.getByRole('region', { name, exact: true })
   const save = (page, name) => paper(page, name).getByRole('button', { name: HOST.save, exact: true }).click()
   const row = async () => (await owner`select status, notes, row_version from sales."order" where id = ${ID}`)[0]
+  /** Press `button`, and Discard and continue if the page asks first: a scene's work is not the next one's. */
+  const carryOn = async (page, button) => {
+    await button.click()
+    const notice = page.getByRole('region', { name: 'Unsaved changes', exact: true })
+    if (await notice.isVisible().catch(() => false)) await notice.getByRole('button', { name: 'Discard and continue', exact: true }).click()
+  }
   const load = async (page) => {
-    await record(page).getByRole('textbox', { name: HOST.record, exact: true }).fill(RECORD)
-    await record(page).getByRole('button', { name: HOST.load, exact: true }).click()
-    await record(page).getByRole('status').filter({ hasText: `Loaded record ${RECORD} into both forms.` }).waitFor()
-    // Each pane names the loaded customer after asking the runtime plane, so after the bar's status.
+    const disclosure = page.getByRole('button', { name: HOST.openByToken, exact: true })
+    if ((await disclosure.getAttribute('aria-expanded')) !== 'true') await disclosure.click()
+    await page.getByRole('textbox', { name: HOST.record, exact: true }).fill(RECORD)
+    await carryOn(page, page.getByRole('button', { name: HOST.load, exact: true }))
+    await detail(page, `Order ${RECORD}`).getByRole('status').filter({ hasText: `Loaded record ${RECORD} into both forms.` }).waitFor()
+    // Each pane names the loaded customer after asking the runtime plane, so after the detail's status.
     const named = new RegExp(`combobox "${journey.order.customer.label}\\*?": ${journey.order.customer.choose}`)
     for (const name of ['React', 'Angular']) await untilSnapshot(pane(page, name), named, { within: WITHIN, what: `the ${name} pane's customer` })
   }
   const both = (page) => ({ React: pane(page, 'React'), Angular: pane(page, 'Angular') })
-  // The card saying what the signed-in person may do, with Sign out beside
-  // it. A paragraph has no name, so the line is found by its role and
-  // filtered by its text; the card has no role at all, so it is the line's
-  // parent. The card, not the line: as the last part of a picture, the line
-  // left the card's own padding and border at the picture's edge.
-  const allowed = (page) => ({ Allowed: page.getByRole('paragraph').filter({ hasText: /records with this form\.$/ }).locator('..') })
   let lookups = 0
   return {
     'host-typeahead': async (page) => {
@@ -205,7 +213,11 @@ function actsOver(plane) {
         if (JSON.stringify(held) !== JSON.stringify(wanted)) wrong.push(`the ${name} pane holds ${JSON.stringify(held)}`)
       }
       if (wrong.length > 0) throw new Error(`${wrong.join('; ')}, not ${JSON.stringify(wanted)}`)
-      return { parts: { Record: record(page), ...allowed(page), ...both(page) } }
+      // The grid's row, opened: the page set the grid's selection from the record it loaded.
+      const open = records(page).getByRole('row', { selected: true })
+      await open.waitFor()
+      // The workspace whole: Forms, and main -- the form's heading, its operations and layout, the records and the record.
+      return { parts: { Forms: page.getByRole('navigation', { name: HOST.forms, exact: true }), Workspace: page.getByRole('main') } }
     },
 
     'host-stale': async (page) => {
@@ -222,7 +234,7 @@ function actsOver(plane) {
     },
 
     'host-refused': async (page) => {
-      await record(page).getByRole('button', { name: HOST.newRecord, exact: true }).click()
+      await carryOn(page, records(page).getByRole('button', { name: HOST.newRecord, exact: true }))
       await owner`insert into sales.customer (tenant_id, customer_no, name) values (1, ${DELETED.no}, ${DELETED.name})`
       await customer(page, 'React').pressSequentially('Brunner')
       // The renderer asks the runtime plane to name the value it now holds
@@ -275,20 +287,35 @@ function actsOver(plane) {
       return { parts: { React: pane(page, 'React') } }
     },
 
+    'host-unsaved': async (page) => {
+      // The React pane holds the save whose answer was lost: New record would drop it, so the page asks.
+      await records(page).getByRole('button', { name: HOST.newRecord, exact: true }).click()
+      const notice = page.getByRole('region', { name: 'Unsaved changes', exact: true })
+      await notice.waitFor()
+      if (!(await notice.evaluate((element) => element === document.activeElement))) throw new Error('the unsaved notice did not take the keyboard')
+      return { parts: { Notice: notice }, keepFocus: true }
+    },
+
     'host-other-tenant': async (page) => {
-      await page.getByRole('button', { name: HOST.signOut, exact: true }).click()
+      await page.getByRole('region', { name: 'Unsaved changes', exact: true }).getByRole('button', { name: 'Keep editing', exact: true }).click()
+      await carryOn(page, page.getByRole('button', { name: HOST.signOut, exact: true }))
       await signIn(page, TOKENS.otto)
-      await record(page).getByRole('textbox', { name: HOST.record, exact: true }).fill(RECORD)
-      await record(page).getByRole('button', { name: HOST.load, exact: true }).click()
-      await record(page).getByRole('alert').waitFor()
+      // otto's grid holds no order of tenant 1's: the fixture's is clara's.
+      await records(page).getByRole('status').filter({ hasText: 'No records.' }).waitFor()
+      await page.getByRole('button', { name: HOST.openByToken, exact: true }).click()
+      await page.getByRole('textbox', { name: HOST.record, exact: true }).fill(RECORD)
+      await page.getByRole('button', { name: HOST.load, exact: true }).click()
+      await detail(page, 'No record open').getByRole('alert').waitFor()
       // What otto may do, beside the refusal: he may read records with this
       // form, so "No such record." is the token's answer, not a permission's.
-      return { parts: { Record: record(page), ...allowed(page) } }
+      return { parts: { Records: records(page), Record: detail(page, 'No record open') } }
     },
 
     'host-drift': async (page) => {
-      await page.getByRole('button', { name: HOST.signOut, exact: true }).click()
+      await carryOn(page, page.getByRole('button', { name: HOST.signOut, exact: true }))
       await signIn(page, TOKENS.clara)
+      // Stacked, as clara arrived, whatever layout the address kept through Sign out.
+      await page.getByRole('radio', { name: 'Stacked', exact: true }).check()
       await load(page)
       const width = async () => Number((await owner`select character_maximum_length as width from information_schema.columns where table_schema = 'sales' and table_name = 'order' and column_name = 'status'`)[0]?.width)
       const wide = await width()
@@ -326,11 +353,24 @@ function actsOver(plane) {
   }
 }
 
-/** Signed in with `token` and pg-order open in both panes. The token is a password field, which has no role. */
+/** Signed in with `token`, pg-order chosen under Forms and its records listed. The token is a password field, which has no role. */
 async function signIn(page, token) {
   await page.getByLabel(HOST.token, { exact: true }).fill(token)
-  await page.getByLabel(HOST.formId, { exact: true }).fill(FORM.formId)
-  await page.getByRole('button', { name: HOST.open, exact: true }).click()
+  await page.getByRole('button', { name: HOST.signIn, exact: true }).click()
+  await page.getByRole('navigation', { name: HOST.forms, exact: true }).getByRole('link', { name: `${FORM.title} ${FORM.formId}`, exact: true }).click()
+  await page.getByRole('region', { name: 'Records', exact: true }).getByRole('status').filter({ hasText: /^(Rows|No records)/ }).waitFor()
+}
+
+/**
+ * clara's arrival: signed in, the records stacked above the record -- so the
+ * two papers stand side by side under the grid -- both renderers on, and a
+ * new order open for the typeahead's scene.
+ */
+async function arrive(page) {
+  await signIn(page, TOKENS.clara)
+  await page.getByRole('radio', { name: 'Stacked', exact: true }).check()
+  await page.getByRole('region', { name: 'Records', exact: true }).getByRole('button', { name: HOST.newRecord, exact: true }).click()
+  await page.getByRole('radio', { name: 'Both', exact: true }).check()
   for (const name of ['React', 'Angular']) {
     await page.getByRole('region', { name, exact: true }).getByRole('combobox', { name: field(journey.order.customer.label) }).waitFor()
   }
@@ -345,7 +385,8 @@ try {
     app: 'host',
     chromium,
     playwright: require('playwright/package.json').version,
-    width: 1200,
+    // Past the workspace's widest breakpoint, 80rem, where Forms is a sidebar.
+    width: 1440,
     css: { directory: join(app, 'src'), entry: 'host.css' },
     themes: manifest.dependencies['@formancy/themes'],
     origin: ORIGIN,
@@ -356,7 +397,7 @@ try {
     database: async () => `${(await plane.owner`select version() as v`)[0].v}, from ${POSTGRES_IMAGE}, as ${WRITER.user}`,
     open: async (page) => {
       await page.goto(`${ORIGIN}/`)
-      await signIn(page, TOKENS.clara)
+      await arrive(page)
     },
     acts: actsOver(plane),
   })

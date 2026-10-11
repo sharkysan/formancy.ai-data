@@ -24,7 +24,7 @@
   color-scheme: dark;
 }
 
-*:where(:not(.sheet *)) {
+*:where(:not(.sheet *, .grid-bench *)) {
   box-sizing: border-box;
 }
 
@@ -58,16 +58,16 @@ body::before {
   mask-image: linear-gradient(black, transparent 85%);
 }
 
-:where(:not(.sheet *))::selection {
+:where(:not(.sheet *, .grid-bench *))::selection {
   background: color-mix(in srgb, var(--client) 45%, transparent);
 }
 
-:where(:not(.sheet *)):focus-visible {
+:where(:not(.sheet *, .grid-bench *)):focus-visible {
   outline: 2px solid var(--server);
   outline-offset: 2px;
 }
 
-code:where(:not(.sheet *)) {
+code:where(:not(.sheet *, .grid-bench *)) {
   font-family: var(--mono);
   font-size: 0.875em;
   /* A token is one long word, and a phone is narrow. */

@@ -3,7 +3,7 @@ import { cleanup, screen, within } from '@testing-library/react'
 import journey from '../../../scripts/getting-started/journey.json'
 import { HOST } from '../../../scripts/getting-started/walk.mjs'
 import type { Journey } from '../../../scripts/getting-started/walk.mjs'
-import { answer, mount, paper, rendered, said, shows } from './test-host.js'
+import { answer, answeredOnce, chooseRenderer, mount, paper, said, shows } from './test-host.js'
 import type { RendererName, User } from './test-host.js'
 import { ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
@@ -27,6 +27,8 @@ import type { Plane } from './test-plane.js'
 
 const GUIDE = journey as Journey
 
+const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 let plane: Plane
 
 beforeAll(async () => {
@@ -39,14 +41,14 @@ afterAll(async () => {
 
 afterEach(cleanup)
 
-const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/** The guide's sign-in: a token, a form id, and Open the form. */
+/** The guide's sign-in: a token and Sign in, then the form chosen under Forms by its id, and its grid answered. */
 async function open(user: User, token: string, formId: string): Promise<void> {
   await user.type(screen.getByLabelText(HOST.token), token)
-  await user.type(screen.getByLabelText(HOST.formId), formId)
-  await user.click(screen.getByRole('button', { name: HOST.open }))
-  await rendered()
+  await user.click(screen.getByRole('button', { name: HOST.signIn }))
+  const forms = await screen.findByRole('navigation', { name: HOST.forms }, { timeout: 15_000 })
+  await user.click(within(forms).getByRole('link', { name: new RegExp(` ${escape(formId)}$`) }))
+  await answeredOnce('Records')
 }
 
 async function save(user: User, renderer: RendererName): Promise<void> {
@@ -70,9 +72,11 @@ describe("the guide's section 5", () => {
     const user = mount(plane.fetch)
     await open(user, TOKENS.clerk, engine.formId)
     await user.click(screen.getByRole('button', { name: HOST.newRecord }))
+    // "use either": React is the page's default, and the switch shows Angular.
+    await chooseRenderer(user, renderer)
 
     const { customer, create, update } = GUIDE.order
-    const box = within(paper(renderer)).getByRole('combobox', { name: customer.label })
+    const box = await within(paper(renderer)).findByRole('combobox', { name: customer.label }, { timeout: 15_000 })
     await user.type(box, customer.search)
     await user.click(await within(paper(renderer)).findByRole('option', { name: customer.choose }, { timeout: 15_000 }))
     for (const entry of create) await answer(user, renderer, entry.label, entry.value)
@@ -88,6 +92,7 @@ describe("the guide's section 5", () => {
     // Another tenant's clerk, as the guide has otto do it.
     await user.click(screen.getByRole('button', { name: HOST.signOut }))
     await open(user, TOKENS.otherClerk, engine.formId)
+    await user.click(screen.getByRole('button', { name: HOST.openByToken }))
     await user.type(screen.getByRole('textbox', { name: HOST.record }), record)
     await user.click(screen.getByRole('button', { name: HOST.load }))
     expect((await screen.findByRole('alert')).textContent).toBe(HOST.notFound)
