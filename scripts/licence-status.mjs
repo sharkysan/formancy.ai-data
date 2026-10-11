@@ -1,18 +1,24 @@
 // What a document says of the licence's state, derived from LICENSE.md
-// (0048).
+// (0048, 0054).
 //
 // LICENSE.md opens, under its title, with a version line --
 //
-//   **Version 1 — in force from 11 October 2026. Not reviewed by a lawyer.**
+//   **Version 1.1 — in force from 11 October 2026. Not reviewed by a lawyer.**
 //
-// -- and its section "Obtaining a production licence" names the address a
-// production licence is requested from. Every tracked Markdown document that
-// holds this generator's block, in scripts/generated-block.mjs's grammar,
-// says what those two say, rendered here; README.md must hold one. So no
-// document can name another version, date or address than the licence's:
-// licence-status.test.mjs fails in `pnpm test:repo` until `node
+// -- its version a whole number or one with a minor number, N or N.N, kept
+// as written -- and its section "Obtaining a production licence" names the
+// address a production licence is requested from. Every tracked Markdown
+// document that holds this generator's block, in scripts/generated-block.mjs's
+// grammar, says what those two say, rendered here; README.md must hold one.
+// So no document can name another version, date or address than the
+// licence's: licence-status.test.mjs fails in `pnpm test:repo` until `node
 // scripts/licence-status.mjs --write` has rewritten the blocks. A sentence
 // about the licence outside a block is held by review.
+//
+// Since Version 1.1 that section names its address for the agreement
+// Redistribution requires too (0054). A block says what the heading names,
+// a production licence, and no more; the section may name only one address,
+// so the two cannot be given different ones there.
 //
 // It reads one shape of version line: a licence in force that says no lawyer
 // has reviewed it. Any other throws rather than rendering a guess -- a
@@ -41,17 +47,19 @@ const REQUIRED = 'README.md'
 const LEGAL_GATE = 10
 
 const MONTHS = 'January|February|March|April|May|June|July|August|September|October|November|December'
-const VERSION_LINE = new RegExp(`^\\*\\*Version (\\d+) — in force from (\\d{1,2} (?:${MONTHS}) \\d{4})\\. Not reviewed by a lawyer\\.\\*\\*$`)
+const VERSION_LINE = new RegExp(`^\\*\\*Version (\\d+(?:\\.\\d+)?) — in force from (\\d{1,2} (?:${MONTHS}) \\d{4})\\. Not reviewed by a lawyer\\.\\*\\*$`)
 const PRODUCTION_SECTION = /^## (\d+)\. Obtaining a production licence$/m
 const ADDRESS = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g
 
 /**
- * LICENSE.md's state: `{ version, date, section, address }`, `date` the day
- * it is in force from, `section` the number of the section on obtaining a
- * production licence and `address` the one address it names. Throws on a
- * version line it does not read -- a draft's and a reviewed licence's among
- * them -- on none under the title, on no section on obtaining a production
- * licence, and on that section naming no address, or several.
+ * LICENSE.md's state: `{ version, date, section, address }`, `version` as
+ * the line writes it (`'1.1'`; a number would make 1.1 of a 1.10), `date`
+ * the day it is in force from, `section` the number of the section on
+ * obtaining a production licence and `address` the one address it names.
+ * Throws on a version line it does not read -- a draft's and a reviewed
+ * licence's among them -- on none under the title, on no section on
+ * obtaining a production licence, and on that section naming no address, or
+ * several.
  */
 export function readLicence(text) {
   const source = text.replaceAll('\r\n', '\n')
@@ -72,7 +80,7 @@ export function readLicence(text) {
   const addresses = [...new Set(body.match(ADDRESS) ?? [])]
   if (addresses.length === 0) throw new Error(`${LICENCE}'s section ${String(section)} names no address a production licence is requested from`)
   if (addresses.length > 1) throw new Error(`${LICENCE}'s section ${String(section)} names ${String(addresses.length)} addresses: ${addresses.join(', ')}; a document can name only one`)
-  return { version: Number(match[1]), date: match[2], section, address: addresses[0] }
+  return { version: match[1], date: match[2], section, address: addresses[0] }
 }
 
 /** The link to LICENSE.md from the repository-relative Markdown `file`. */
@@ -83,7 +91,7 @@ export function linkFrom(file) {
 
 /** The block's body: the licence's version, date, review and address, and nothing else. */
 export function render(licence, link) {
-  return `[\`${LICENCE}\`](${link}) has the terms. It is Version ${String(licence.version)}, in force from ${licence.date}, and says at the top that no lawyer has reviewed it. A production licence is requested from [${licence.address}](mailto:${licence.address}), as its section ${String(licence.section)} says.`
+  return `[\`${LICENCE}\`](${link}) has the terms. It is Version ${licence.version}, in force from ${licence.date}, and says at the top that no lawyer has reviewed it. A production licence is requested from [${licence.address}](mailto:${licence.address}), as its section ${String(licence.section)} says.`
 }
 
 /** Every tracked Markdown document holding this generator's block, README.md always among them. */

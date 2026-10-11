@@ -1,12 +1,14 @@
 # Formancy Data Source-Available Licence
 
-**Version 1 — in force from 11 October 2026. Not reviewed by a lawyer.**
+**Version 1.1 — in force from 11 October 2026. Not reviewed by a lawyer.**
 
-This text states the terms Formancy Data is offered under. Version 1 is in
-force from 11 October 2026 and replaces Version 0, the draft of 8 October
-2026. **This version has not been reviewed by a lawyer.** It is published in
-the repository so that the terms are visible to everyone who reads the source.
-Production licences, which section 3 describes, can be had as section 9 says.
+This text states the terms Formancy Data is offered under. Version 1.1 is in
+force from 11 October 2026 and replaces Version 1 of the same day, which named
+no address for the agreement Redistribution requires, and Version 0, the draft
+of 8 October 2026. **This version has not been reviewed by a lawyer.** It is
+published in the repository so that the terms are visible to everyone who
+reads the source. Production licences, which section 3 describes, can be had
+as section 9 says.
 
 This is not an open-source licence. It is not Apache-2.0, and it is not the
 licence of [formancy](https://github.com/sharkysan/formancy.ai), on which this
@@ -143,9 +145,10 @@ not.
 ## 9. Obtaining a production licence
 
 Production licences are requested from the Rightsholder at info@formancy.ai.
-The Software is new and has no published price; the plan is to set the price
-after the first design partners have established what the Software is worth
-to them.
+The separate commercial agreement that Redistribution requires, which
+section 3 describes, is requested at the same address. The Software is new
+and has no published price; the plan is to set the price after the first
+design partners have established what the Software is worth to them.
 
 ## 10. Governing law and place of jurisdiction
 
