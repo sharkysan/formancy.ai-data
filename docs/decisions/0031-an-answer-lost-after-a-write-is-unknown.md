@@ -10,10 +10,16 @@
   side ends its own (watched failing against the first hop, which tore both
   sockets down on the first close: 393216 of 4194304 bytes arrived); it drops
   a connection's answers from the read in which the marker completes, across
-  a split and through one gap of exactly eight bytes, and a gap of seven or
-  nine does not match (watched failing with the completing read forwarded,
-  with a gap of seven, and with no tail kept between reads); it counts the
-  marker the client sends across a split; a lost answer's `cut()` ends only
+  a split and, on SQL Server, through one gap of exactly eight bytes, a TDS
+  packet header, and a gap of seven or nine does not match (watched failing
+  with the completing read forwarded, with a gap of seven, and with no tail
+  kept between reads); it counts the marker the client sends across a split;
+  on PostgreSQL and HTTP, where nothing cuts a marker, it matches one only
+  whole, so a PostgreSQL marker ending in `e` before a bound `sales` is
+  counted once, and a hop not told which of the three crosses it is refused
+  (watched failing on 2026-10-11 against the hop that allowed the gap on
+  every wire: "expected 2 to be 1", a gapped marker counted, and the hop
+  started); a lost answer's `cut()` ends only
   the connections that swallowed and the hop's ends every one, after which
   the next is forwarded (watched failing with the lost answer's cut ending
   every connection).
@@ -140,7 +146,10 @@
   `packages/data-postgres` and `packages/data-sqlserver`'s
   `records-lost-answer.integration.test.ts`, through the same hop, hold each
   adapter's classification of a lost answer, and on SQL Server the
-  `RequestError` wrapping 0017 read in mssql's source.
+  `RequestError` wrapping 0017 read in mssql's source. PostgreSQL's insert
+  case sends a marker ending in `e`, which that hop counted twice on the
+  real wire (watched failing three runs in three on 2026-10-11, "expected 2
+  to be 1"; with a random UUID last, it had failed one run in sixteen).
   `packages/data-postgres/src/adapter.integration.test.ts` — `close()`
   returns after a connection was cut in the middle of a statement, and lets
   a statement still running finish first (watched failing with `end()`

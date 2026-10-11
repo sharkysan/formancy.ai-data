@@ -69,7 +69,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   const target = new URL(fixture.admin)
-  hop = await startTcpHop({ host: target.hostname, port: Number(target.port) })
+  hop = await startTcpHop({ kind: 'postgres', host: target.hostname, port: Number(target.port) })
   // One connection, so the write and anything after it share the one the hop watches.
   viaHop = postgres({ ...connectionOf(fixture.admin), host: '127.0.0.1', port: hop.port, max: 1, onnotice: () => {} })
 })
@@ -148,8 +148,14 @@ describe('an answer lost after the write committed', () => {
   // order; this is unknown-outcome, the driver sent the insert exactly once,
   // and exactly one order exists. Without CONNECTION_CLOSED in the adapter's
   // in-flight codes the cut would be thrown as a programming error instead.
+  //
+  // The marker ends in `e` on purpose. The parameter bound after the notes is
+  // `sales`, whose `e` is the eighth byte after the notes end, and a hop that
+  // let a packet header cut a PostgreSQL marker counted this one sending
+  // twice -- one run in sixteen, while the marker's last character was the
+  // UUID's.
   test('an insert is unknown-outcome, was sent once, and exactly one row exists', async () => {
-    const notes = marker('inserted, answer lost')
+    const notes = `${marker('inserted, answer lost')} e`
     const bytes = answerBytes('postgres', notes)
     const sent = hop.countSent(bytes)
     const lost = hop.swallowAnswersFrom(bytes)

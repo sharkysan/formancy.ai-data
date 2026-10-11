@@ -112,7 +112,7 @@ export async function startStack(options: { runDir: string; rateLimit: number })
     }
     await prepareDrifted({ pg: pg.admin, ms: ms.admin })
     const writers = writerOf(pg, ms)
-    const hops = { pg: await startTcpHop(writers.pg), ms: await startTcpHop(writers.ms) }
+    const hops = { pg: await startTcpHop({ ...writers.pg, kind: 'postgres' }), ms: await startTcpHop({ ...writers.ms, kind: 'sqlserver' }) }
     started.unshift(() => hops.pg.close(), () => hops.ms.close())
 
     mkdirSync(options.runDir, { recursive: true })

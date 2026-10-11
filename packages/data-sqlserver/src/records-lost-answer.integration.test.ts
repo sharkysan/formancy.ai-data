@@ -85,7 +85,7 @@ const markerText = (): string => `lost-answer-${randomUUID()}`
 
 /** A pool of one connection to the fixture's database through a hop of its own: the write and anything before it share that connection. */
 async function throughHop(config: Partial<mssql.config> = {}): Promise<{ hop: TcpHop; pool: mssql.ConnectionPool; close: () => Promise<void> }> {
-  const hop = await startTcpHop({ host: fixture.admin.server, port: fixture.admin.port ?? 1433 })
+  const hop = await startTcpHop({ kind: 'sqlserver', host: fixture.admin.server, port: fixture.admin.port ?? 1433 })
   const pool = await new mssql.ConnectionPool({ ...fixture.admin, ...config, server: '127.0.0.1', port: hop.port, pool: { max: 1 } }).connect()
   return {
     hop,

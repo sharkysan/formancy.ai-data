@@ -110,7 +110,7 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean } = 
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
     { id: 'ms', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true } },
   ]
-  const hops = options.hops === true ? { pg: await startTcpHop(pg), ms: await startTcpHop(ms) } : undefined
+  const hops = options.hops === true ? { pg: await startTcpHop({ ...pg, kind: 'postgres' }), ms: await startTcpHop({ ...ms, kind: 'sqlserver' }) } : undefined
   if (hops !== undefined) {
     // The same databases, reached through the hops by the address an operator would write.
     connections.push(

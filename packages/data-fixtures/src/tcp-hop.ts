@@ -22,6 +22,10 @@ import type { DatabaseKind } from '@formancy/data-core'
  * constraint's refusal after the row (P2b). A suite polls a connection of its
  * own until the write is visible before it calls `cut()`.
  *
+ * The hop is told what crosses it, because only SQL Server's TDS packets can
+ * cut a marker, and a match that allowed for a cut where none can occur
+ * counted one sending as two (`CUT_BY`).
+ *
  * Since 0034 the hop also counts round trips and can delay answers, for the
  * performance measurement and the adapters' pinned counts. A round trip is a
  * turn -- the client speaking again after it last heard the server -- which
@@ -70,12 +74,23 @@ export interface TcpHop {
   close(): Promise<void>
 }
 
+/** What crosses a hop: one engine's protocol, or HTTP, which is how the host page's browser gate reaches the page. */
+export type HopKind = DatabaseKind | 'http'
+
 /**
- * A TDS packet header is eight bytes, and a packet holds at most 4096, so a
- * text in a long SQL Server answer can be interrupted by one. A match
- * tolerates exactly one such interruption and no other.
+ * How many bytes can cut a marker on each wire. A TDS packet header is eight
+ * bytes, and a packet holds at most 4096, so a text in a long SQL Server
+ * request or answer can be interrupted by one; there a match tolerates
+ * exactly one such interruption and no other. PostgreSQL puts a bound value,
+ * and a column of a row, whole inside one message, and HTTP has no 8-byte
+ * packet header, so on those a marker is matched only whole. A gap tolerated
+ * where none can occur finds a phantom: the marker less its last byte, eight
+ * bytes, and that byte again -- which counted a PostgreSQL insert twice
+ * whenever its marker ended in the `e` of the `sales` bound eight bytes on.
  */
-const PACKET_HEADER = 8
+const CUT_BY: Record<HopKind, number> = { postgres: 0, sqlserver: 8, http: 0 }
+
+const isHopKind = (value: unknown): value is HopKind => typeof value === 'string' && Object.hasOwn(CUT_BY, value)
 
 /** The text as the engine's driver puts it on the wire: postgres.js in UTF-8, tedious in UTF-16LE. */
 export function answerBytes(kind: DatabaseKind, text: string): Buffer {
@@ -83,17 +98,19 @@ export function answerBytes(kind: DatabaseKind, text: string): Buffer {
 }
 
 /**
- * Where each match of `marker` in `hay` ends: the marker whole, or split once
- * by exactly PACKET_HEADER bytes. Only ends past `after` are reported, which
- * are the matches that complete in bytes not searched before.
+ * Where each match of `marker` in `hay` ends: the marker whole, or, where the
+ * wire can cut it (`cutBy` above 0), split once by exactly `cutBy` bytes.
+ * Only ends past `after` are reported, which are the matches that complete
+ * in bytes not searched before.
  */
-function matchEnds(hay: Buffer, marker: Buffer, after: number): number[] {
+function matchEnds(hay: Buffer, marker: Buffer, after: number, cutBy: number): number[] {
   const ends = new Set<number>()
-  for (let split = 0; split < marker.length; split += 1) {
+  const splits = cutBy === 0 ? 1 : marker.length
+  for (let split = 0; split < splits; split += 1) {
     // Split 0 is the marker whole; split n is n bytes, a header, and the rest.
     const head = split === 0 ? marker : marker.subarray(0, split)
     const tail = split === 0 ? Buffer.alloc(0) : marker.subarray(split)
-    const gap = split === 0 ? 0 : PACKET_HEADER
+    const gap = split === 0 ? 0 : cutBy
     for (let at = hay.indexOf(head); at >= 0; at = hay.indexOf(head, at + 1)) {
       const from = at + head.length + gap
       const end = from + tail.length
@@ -106,14 +123,15 @@ function matchEnds(hay: Buffer, marker: Buffer, after: number): number[] {
 /**
  * A stream of reads searched for one marker: each read is searched with the
  * longest prefix of a match that can still be incomplete -- the marker less
- * one byte, and a header -- kept from the reads before it.
+ * one byte, and a header where the wire has one -- kept from the reads
+ * before it.
  */
-function watcher(marker: Buffer): (chunk: Buffer) => number {
-  const keep = marker.length + PACKET_HEADER - 1
+function watcher(marker: Buffer, cutBy: number): (chunk: Buffer) => number {
+  const keep = marker.length + cutBy - 1
   let tail = Buffer.alloc(0)
   return (chunk) => {
     const hay = Buffer.concat([tail, chunk])
-    const found = matchEnds(hay, marker, tail.length).length
+    const found = matchEnds(hay, marker, tail.length, cutBy).length
     tail = hay.subarray(Math.max(0, hay.length - keep))
     return found
   }
@@ -148,10 +166,10 @@ interface Count {
   total: number
 }
 
-function watcherFor(watchers: WeakMap<Pair, (chunk: Buffer) => number>, pair: Pair, marker: Buffer): (chunk: Buffer) => number {
+function watcherFor(watchers: WeakMap<Pair, (chunk: Buffer) => number>, pair: Pair, marker: Buffer, cutBy: number): (chunk: Buffer) => number {
   let watch = watchers.get(pair)
   if (watch === undefined) {
-    watch = watcher(marker)
+    watch = watcher(marker, cutBy)
     watchers.set(pair, watch)
   }
   return watch
@@ -162,7 +180,15 @@ function destroy(pair: Pair): void {
   pair.upstream.destroy()
 }
 
-export async function startTcpHop(target: { host: string; port: number }): Promise<TcpHop> {
+/**
+ * A hop in front of `target`, told what crosses it: `kind` decides whether a
+ * marker can be cut on that wire. Refused without one, because the browser
+ * gate calls it from a script nothing type-checks.
+ */
+export async function startTcpHop(target: { kind: HopKind; host: string; port: number }): Promise<TcpHop> {
+  const kind: unknown = target.kind
+  if (!isHopKind(kind)) throw new Error(`a hop is told what crosses it, postgres, sqlserver or http, not ${String(kind)}`)
+  const cutBy = CUT_BY[kind]
   const pairs = new Set<Pair>()
   const arms = new Set<Arm>()
   const counts: Count[] = []
@@ -200,7 +226,7 @@ export async function startTcpHop(target: { host: string; port: number }): Promi
   function fromServer(pair: Pair, chunk: Buffer): void {
     if (pair.swallowing) return
     for (const arm of arms) {
-      if (watcherFor(arm.watchers, pair, arm.marker)(chunk) === 0) continue
+      if (watcherFor(arm.watchers, pair, arm.marker, cutBy)(chunk) === 0) continue
       pair.swallowing = true
       arm.swallowed.add(pair)
       arm.found()
@@ -212,7 +238,7 @@ export async function startTcpHop(target: { host: string; port: number }): Promi
     if (pair.lastSpoke !== 'client') for (const counter of turnCounters) counter.total += 1
     pair.lastSpoke = 'client'
     pair.upstream.write(chunk)
-    for (const count of counts) count.total += watcherFor(count.watchers, pair, count.marker)(chunk)
+    for (const count of counts) count.total += watcherFor(count.watchers, pair, count.marker, cutBy)(chunk)
   }
 
   // Half-open on both sides, so a FIN is passed on as a FIN, and only after

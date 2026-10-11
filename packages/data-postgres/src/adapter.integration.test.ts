@@ -56,7 +56,7 @@ describe('closing a pool', () => {
 
   beforeAll(async () => {
     owner = postgres(container.getConnectionUri(), { onnotice: () => {} })
-    hop = await startTcpHop({ host: container.getHost(), port: container.getPort() })
+    hop = await startTcpHop({ kind: 'postgres', host: container.getHost(), port: container.getPort() })
   })
 
   afterAll(async () => {

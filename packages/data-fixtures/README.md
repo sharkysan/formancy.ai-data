@@ -101,14 +101,21 @@ dropped the key from the end of its order would show on both engines.
   lookup's options, whose order is exactly the order an engine weighs the
   bytes in.
 
-- `startTcpHop({ host, port })` puts a TCP hop in front of a database that
-  can lose an answer after the database has sent it (0031).
+- `startTcpHop({ kind, host, port })` puts a TCP hop in front of a database that
+  can lose an answer after the database has sent it (0031). `kind` is what
+  crosses it -- `'postgres'`, `'sqlserver'`, or `'http'` for the browser
+  gate's hop in front of the page -- and a hop without one is refused.
   `swallowAnswersFrom(marker)` drops a connection's answers from the read in
   which `marker` -- a text the write's answer echoes, in the driver's
-  encoding, `answerBytes('postgres' | 'sqlserver', text)` -- completes,
-  tolerating one 8-byte TDS packet header inside it; its `cut()` ends only the
-  connections that swallowed. `countSent(marker)` counts the marker on its way
-  to the database, which is how a suite shows a write was not sent again.
+  encoding, `answerBytes('postgres' | 'sqlserver', text)` -- completes; its
+  `cut()` ends only the connections that swallowed. `countSent(marker)`
+  counts the marker on its way to the database, which is how a suite shows a
+  write was not sent again. On SQL Server a match tolerates one 8-byte TDS
+  packet header inside the marker, because a packet can cut it there.
+  PostgreSQL sends a bound value whole inside one message and HTTP has no
+  8-byte packet header, so on those a marker is matched only whole: the
+  tolerance there counted a PostgreSQL insert twice whenever its marker
+  ended in the `e` of the `sales` bound eight bytes on.
   `cut()` ends every connection. Every byte is the driver's and the server's,
   and a close is passed on only after every byte before it, so a suite behind
   it is not a mocked driver; only a cut loses what is in flight. The host
