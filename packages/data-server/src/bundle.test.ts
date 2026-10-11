@@ -363,6 +363,32 @@ describe('validateBundle', () => {
     impossible.snapshot.objects.push(copy(good()).snapshot.objects[0] as never)
     expect(validateBundle(impossible)).toMatchObject({ ok: false, problems: [expect.stringMatching(/not one a catalog could produce/)] })
   })
+
+  // Inside an object that is a bundle, a part of another shape than the
+  // check reads: bindings whose fields, root, operations or identity a hand
+  // edit left as something else. Each is a problem with a reason, in both
+  // formats, never an exception: a check that threw would answer every
+  // read of the form with whatever the exception said, the store's path
+  // or a property name, through the server's default 500. Watched failing:
+  // each of these threw a TypeError.
+  test('refuses bindings of another shape with a reason, and never throws', () => {
+    const edits: Record<string, (bindings: Record<string, unknown>) => void> = {
+      'fields null': (bindings) => (bindings['fields'] = null),
+      'fields an object': (bindings) => (bindings['fields'] = {}),
+      'a field null': (bindings) => (bindings['fields'] = [null]),
+      'root null': (bindings) => (bindings['root'] = null),
+      'operations null': (bindings) => (bindings['operations'] = null),
+      'identity a number': (bindings) => (bindings['identity'] = 1),
+    }
+    for (const [name, edit] of Object.entries(edits)) {
+      for (const bundle of [copy(good()), copy(before0030())]) {
+        edit(bundle.bindings as unknown as Record<string, unknown>)
+        let outcome: ReturnType<typeof validateBundle> | undefined
+        expect(() => (outcome = validateBundle(bundle)), name).not.toThrow()
+        expect(outcome, name).toMatchObject({ ok: false, problems: expect.arrayContaining([expect.any(String)]) })
+      }
+    }
+  })
 })
 
 describe('a format-2 bundle (0030)', () => {

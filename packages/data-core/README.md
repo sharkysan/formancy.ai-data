@@ -351,6 +351,25 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   description its own statement carried by `driftRefusal(…, 'list')`: a
   read's refusal, and `LIST_REFUSED` when the table no longer holds the key
   unique and NOT NULL.
+- **A person's menu** (0045). `menuForm(bundle, context)` reads one
+  published form alone for this person -- a bundle it cannot read throws
+  there, for the caller to leave out -- and `formMenu(forms)` names, in
+  codepoint order, every one whose policy lets this person read, with
+  `grantedOperations` -- what the policy grants of what the form offers
+  as published, the part of `GET /v1/forms/:id`'s answer that asks no
+  database -- and the children under each, comparing only what
+  `menuForm` read. `childFields(parent, child)` is
+  the structure: a lookup of the child, on the same connection, onto the
+  parent's identity column for column in order, each foreign-key column of
+  the referenced key's normalized type in each side's own snapshot, so the
+  parent's record token is a value the child's field takes. The child's
+  list narrowed by it holds the rows whose foreign key references that
+  record by the database's own equality, which on a text key under a
+  collation that ignores case or trailing spaces is not byte equality: a
+  row's field can spell the key otherwise than the parent's token does.
+  The menu names a child only when this person may list it (`listable`)
+  and read that field. It asks no database: what the table allows now is
+  decided when a form is opened.
 - **Membership is the database's.** A lookup token whose key carries the tenant
   is refused when the tenant is not the context's; one that does not — a
   surrogate id — cannot be judged without a query. Every selection comes back

@@ -49,6 +49,39 @@ export interface PublishedForm {
 }
 
 /**
+ * A child of a form in a person's menu (0045): the child form, and its
+ * lookup field that references the parent's records. A page lists the
+ * parent record's children by asking the child form's list with
+ * `parent: { field, record }`.
+ */
+export interface FormMenuChild {
+  form: string
+  field: string
+}
+
+/**
+ * One form in a person's menu: its id and title, the operations the policy
+ * grants them of what the form offers as published, and the children under
+ * it. Opening it (`GET /v1/forms/:id`) narrows the operations to what the
+ * database as it is now still allows, and says whether a list is offered
+ * now: the menu asks no database (0045).
+ */
+export interface FormMenuEntry {
+  id: string
+  title: string
+  operations: PolicyOperation[]
+  children: FormMenuChild[]
+}
+
+/**
+ * `GET /v1/forms`: the published forms this person may read, in codepoint
+ * order of their ids, and nothing about any other (0045).
+ */
+export interface FormMenu {
+  forms: FormMenuEntry[]
+}
+
+/**
  * The most records one list page holds (0044), and the limit a request that
  * names none gets.
  *

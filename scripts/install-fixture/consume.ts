@@ -7,7 +7,7 @@
  * shipped. Connecting to a database is the integration suites' business.
  */
 import { createDataClient, fieldProblems, LIST_PAGE_SIZE, lookupSources, sourceNames } from '@formancy/data-client'
-import type { Outcome, PublishedForm, RecordList, Refusal } from '@formancy/data-client'
+import type { FormMenu, Outcome, PublishedForm, RecordList, Refusal } from '@formancy/data-client'
 import { DATABASE_KINDS, isDatabaseKind } from '@formancy/data-core'
 import type { DatabaseAdapter, DatabaseKind } from '@formancy/data-core'
 import { connectPostgres, createPostgresAdapter } from '@formancy/data-postgres'
@@ -95,4 +95,15 @@ if (Object.keys(lookupSources(client, 'order', form, 'create')).join() !== 'orde
 const page: Outcome<RecordList> = await client.list('..', { limit: LIST_PAGE_SIZE })
 if (page.ok || page.code !== 'invalid-name' || fetched !== 0 || !Number.isSafeInteger(LIST_PAGE_SIZE)) throw new Error('list("..") was not refused before a request')
 
-console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists included; audit events`)
+// The menu (0045): the client's forms() and its answer's type through the
+// published entry points, read from a stub that answers as the server does --
+// a reply checked by a guard the published code carries, not only the source.
+const menuClient = createDataClient({
+  token: () => 'unused',
+  base: 'http://127.0.0.1:9',
+  fetch: async () => new Response(JSON.stringify({ forms: [{ id: 'order', title: 'Order', operations: ['read'], children: [{ form: 'order-line', field: 'order' }] }] }), { status: 200, headers: { 'content-type': 'application/json' } }),
+})
+const menu: Outcome<FormMenu> = await menuClient.forms()
+if (!menu.ok || menu.value.forms[0]?.children[0]?.field !== 'order') throw new Error('forms() did not read the menu')
+
+console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists and the menu included; audit events`)

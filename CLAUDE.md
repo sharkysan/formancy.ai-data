@@ -53,7 +53,10 @@ One path runs through the packages, and most changes touch one step of it.
    records (0044) -- is where a browser's request meets the policy, the
    codecs, the tokens and the bindings and becomes a typed request to an
    adapter (0018, 0022). The adapter runs it as one guarded statement and
-   never retries it (0015).
+   never retries it (0015). The menu, `GET /v1/forms`
+   (`routes/runtime-menu.ts`), names the forms a person may read and their
+   children, each bundle read alone by `menuForm` and compared by `formMenu`
+   (`records/menu.ts`, `records/children.ts`), asking no database (0045).
 6. **Review drift.** `diffSnapshots` (`drift/`) classifies a fresh snapshot
    against what a published form's bindings and lookups rest on (0010).
 

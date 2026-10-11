@@ -41,8 +41,12 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > NULL and is one the person may read or is pinned to them, and only where
 > something scopes the rows wherever a lookup's options are filtered, so a
 > child form published before `through` has no list; a page over a table
-> that no longer holds its key unique and NOT NULL is refused as drift, and
-> a host page does not show a list yet. A page
+> that no longer holds its key unique and NOT NULL is refused as drift. A
+> person is shown the forms they may read and nothing about any other,
+> each with the forms whose rows a page may list below one of its records,
+> derived from the published forms' foreign keys and types, without a
+> statement to any database; a host page shows neither a list nor this
+> menu yet. A page
 > renders generated forms in React and Angular side by side, and the studio
 > walks an administrator from a connection to a published form and its drift.
 > A published form keeps the presentation chosen over its generated base, and
@@ -83,7 +87,8 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > loaded, every shared case on both engines -- which a release checks, signs
 > and attaches. Performance is measured, not promised:
 > [`docs/performance.md`](./docs/performance.md) publishes figures for every
-> runtime request but a page of records, which came after them, through the
+> runtime request but a page of records and the menu of forms, which came
+> after them, through the
 > shipped server on both engines against a sized customer table, with the
 > database's size, the machine, the network path and the date; CI holds the
 > rows each lookup reads and the round trips each measured operation makes,
@@ -145,7 +150,7 @@ dist, which the notices take as this repository's own.
 | `@formancy/data-core` | The database-neutral port and metadata contract: what discovery returns, including what it could not see. No driver, no HTTP, no Node. |
 | `@formancy/data-postgres` | The PostgreSQL adapter, on the `postgres` driver. |
 | `@formancy/data-sqlserver` | The SQL Server adapter, on `mssql` over `tedious` — pure JavaScript, no ODBC. |
-| `@formancy/data-client` | The browser's side of the runtime plane: a `fetch`-based client for a published form's definition, its records -- one by its token or a page at a time -- and its lookups, and the option sources both formancy renderers take. Source-available, framework-neutral, no Node. |
+| `@formancy/data-client` | The browser's side of the runtime plane: a `fetch`-based client for the forms a person may read, a published form's definition, its records -- one by its token or a page at a time -- and its lookups, and the option sources both formancy renderers take. Source-available, framework-neutral, no Node. |
 | `@formancy/data-server` | The server: configuration store, host identity, the administrator and runtime planes over HTTP, the audit trail, and the composition root that starts them from configuration. Fastify, like formancy's. |
 | `@formancy/data-fixtures` | Private test support: one business model for both engines, a restricted reader, and the comparator both adapters answer to. Never published. |
 | `@formancy/data-performance` | Private: the harness that measures the shipped server against both engines and renders `docs/performance.md` from what it measured. Never published. |
@@ -505,7 +510,7 @@ other container runs.
 
 - [`docs/getting-started.md`](./docs/getting-started.md) — from an empty machine with Docker and git to a published form on both engines; CI runs it as written.
 - [`docs/deploy/cloudflare.md`](./docs/deploy/cloudflare.md) — the composed stack behind a Cloudflare Tunnel, with Access in front of the studio and a door for a host application: what Cloudflare does here and what it cannot, every setting, and what nobody has measured.
-- [`docs/performance.md`](./docs/performance.md) — what each runtime request but a page of records costs through the shipped server on both engines, with the database's size, the machine, the network path and the date, and what holds each claim.
+- [`docs/performance.md`](./docs/performance.md) — what each runtime request but a page of records and the menu of forms costs through the shipped server on both engines, with the database's size, the machine, the network path and the date, and what holds each claim.
 - [`docs/decisions/`](./docs/decisions/README.md) — every decision somebody could helpfully undo, with what verifies it.
 - [`docs/release/`](./docs/release/README.md) — the report every CI run and every release builds of what it was tested on, the register of the limitations the decisions state, and the release gates' evidence.
 - [`docs/images/README.md`](./docs/images/README.md) — how the README's pictures are taken, and what holds them and what does not.

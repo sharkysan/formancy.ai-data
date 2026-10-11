@@ -364,7 +364,7 @@
       ]
     },
     "0019": {
-      "reviewed": "sha256:f2c1fc91e7b12557ce979caafdd9565ba17b4d8e7d0ee294090516029a5348c1",
+      "reviewed": "sha256:a5a4f5871cac672c2872ba001ab950a6c2d3926d9369c9ba10d750fa910524cc",
       "limitations": [
         {
           "area": "operations",
@@ -403,7 +403,7 @@
       ]
     },
     "0022": {
-      "reviewed": "sha256:4a3d155fd55f1fd7bd34ab34731d1ed504a11610dc886cc19fd4d282c249beb3",
+      "reviewed": "sha256:140ae2c0612539ee5555ec77f0eaf2c50c023cbbb56f8e996a5f2ece32ed6ce3",
       "limitations": [
         {
           "area": "writes",
@@ -416,7 +416,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:39bfe61cec4635ef5212e891b7177c563d172bbd70f2f258c8aabb45a55cc899",
+      "reviewed": "sha256:fa0d08ca0632740b3dd2f08be651619347d70091d06e8143fba3cd71a667a44e",
       "limitations": [
         {
           "area": "operations",
@@ -908,7 +908,7 @@
       "none": "A rule for this repository's branches; nobody who installs, integrates or operates the module meets it."
     },
     "0037": {
-      "reviewed": "sha256:d115943fb462e4444036381d79f4fb3fe3c23e7ec0504b7b7893b09e19838705",
+      "reviewed": "sha256:99df0bb1149caa5d63f192261dcc2318b0823cf9af7388afb9094ca087a66390",
       "limitations": [
         {
           "area": "operations",
@@ -1262,6 +1262,42 @@
         {
           "area": "testing",
           "says": "No list is in the published performance figures: what a page reads, its round trips and its time are not measured."
+        }
+      ]
+    },
+    "0045": {
+      "reviewed": "sha256:47dcf2d820a25ebc1cf692b08f1d8652537d1f3ccb169c583a286e9e5672f774",
+      "limitations": [
+        {
+          "area": "server",
+          "says": "Each request for the menu of forms reads and validates every published form, with nothing cached: about 2 ms a form, 180 ms over a hundred forms of the fixture snapshot's size, measured once in-process on 2026-10-11, those the person may not read included. Any host token can ask for it, and nothing bounds that work but the server's one rate limit."
+        },
+        {
+          "area": "operations",
+          "says": "One form directory the file store cannot read fails its listing, and the menu of forms is then a 500 for everybody; read from the store's code, not tested."
+        },
+        {
+          "area": "operations",
+          "says": "A published version that no longer validates, does not parse or cannot be read, or is bound to a connection the allowlist does not have, is left out of the menu of forms, and only the server's log says so.",
+          "heldBy": "packages/data-server/src/routes/runtime-menu.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A form a person may create with and not read is not in their menu of forms.",
+          "heldBy": "packages/data-core/src/records/menu.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "The menu of forms says what the policy and the published bundles allow, not what the database allows now: a form it names can be refused as drift when opened, and a child it names can be offered no list then."
+        },
+        {
+          "area": "forms",
+          "says": "A foreign key onto a key other than the parent form's identity, or of another type than the key it references, makes no child in the menu of forms, though its rows reference the parent's.",
+          "heldBy": "packages/data-core/src/records/children.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "Under a collation that ignores case or trailing spaces, a child form's rows listed under a parent record can spell a text foreign key otherwise than the parent's token does."
         }
       ]
     },

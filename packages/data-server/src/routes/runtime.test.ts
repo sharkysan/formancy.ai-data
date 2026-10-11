@@ -490,6 +490,32 @@ describe('a form reached through a parent (0043)', () => {
   })
 })
 
+describe('the menu and the form it names (0045)', () => {
+  // The menu says what the policy grants of what each form offers, and
+  // opening the form starts from the same `grantedOperations` before it
+  // asks the database. Here the database allows everything, so for every
+  // form and every person the two answers are one: a form the menu names
+  // opens with exactly its operations, and one it does not name is not
+  // offered to be read. Watched failing with `GET /v1/forms/:id` asking
+  // only whether the person holds a role the policy names for each
+  // operation: a clerk with no tenant was offered every operation of the
+  // customer form, whose tenant filter they cannot supply, and which the
+  // menu, asking the policy, did not name.
+  test('names a form with the operations opening it offers, and no form opening it does not offer to read', async () => {
+    const ids = ['blind', 'country', 'customer', 'line', 'memo', 'scoped']
+    for (const token of ['clerk', 'clerk-042', 'stranger', 'editor', 'clerk-untenanted']) {
+      const menu = (await app.inject({ method: 'GET', url: '/v1/forms', headers: as(token) })).json() as { forms: Array<{ id: string; operations: string[] }> }
+      for (const id of ids) {
+        const opened = await app.inject({ method: 'GET', url: `/v1/forms/${id}`, headers: as(token) })
+        const named = menu.forms.find((entry) => entry.id === id)
+        const offered: string[] = opened.statusCode === 200 ? (opened.json() as { operations: string[] }).operations : []
+        expect([token, id, offered], opened.body).toEqual([token, id, named?.operations ?? offered.filter((operation) => operation !== 'read')])
+      }
+    }
+    expect(calls.reads).toBe(0)
+  })
+})
+
 describe('a write whose answer was lost (0031)', () => {
   const LOST: RecordOutcome = { ok: false, code: 'unknown-outcome', message: 'write CONNECTION_CLOSED 10.0.0.5:5432' }
 

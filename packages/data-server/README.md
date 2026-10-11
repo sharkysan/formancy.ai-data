@@ -28,7 +28,8 @@ existed would be documented and inert.
   bindings, its policy and the snapshot they came from, checked on publish and
   on every read: a hand-edited file is refused, not served
   ([0019](../../docs/decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)).
-  A version published before bindings version 2 is refused with "republish",
+  It never throws: bindings of another shape than it reads are a problem
+  like any other (0045). A version published before bindings version 2 is refused with "republish",
   and so is a row filter on a column the snapshot's account may not read, or,
   while the form offers create, a root filter on a column it may not
   `INSERT`, which every create writes
@@ -165,6 +166,29 @@ existed would be documented and inert.
   description no longer holds the key unique and NOT NULL; its log line
   says `list`, as the audit does. `routes/runtime-lists.test.ts` holds the
   route over fake ports.
+
+  `GET /v1/forms` answers the menu
+  ([0045](../../docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)):
+  every published form whose policy lets this person read, in codepoint
+  order of its id, with its title, the operations the policy grants of
+  what it offers as published -- what `GET /v1/forms/:id` starts from
+  before it asks the database -- and its children, the forms whose rows a
+  page may list below one of its records with that record's token as the
+  list's `parent`: derived by `childFields` from the bundles, and named
+  only where the person is offered that list and may read the field. It
+  says nothing about any other form. Every request reads and validates
+  every published form's newest version and reads each alone
+  (`menuForm`), leaving out, with a line in the log, a form whose version
+  no longer validates, does not parse or cannot be read, whose connection
+  the allowlist does not have, or whose bindings the menu cannot read;
+  a store that cannot list its forms is 500 `store-unavailable`, naming
+  no path. It asks no database, and costs about 2 ms a published form,
+  measured once in-process (0045), which any host token can ask for and
+  only the rate limit bounds. Audited as `form-list`, with no form,
+  version or record. `routes/runtime-menu.test.ts` holds the route over a
+  real store and a registry that refuses every connection;
+  `routes/runtime.test.ts` that a form it names opens with the operations
+  it named.
 
   An update reads the record first and removes the echo it can prove
   ([0022](../../docs/decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)):

@@ -113,7 +113,7 @@ export function fromServer(response) {
  * - outside: an answer that is not the web front's, the data server's 400
  *   path-not-plain, which it gives before any route's work, or nginx's own
  *   404, which the runtime door's server in nginx.conf gives for every path
- *   outside /v1/forms/ and which serves no file. A host application's own
+ *   outside /v1/forms and /v1/forms/ and which serves no file. A host application's own
  *   page passes; the studio's would not.
  *
  * No answer at all -- a DNS name that does not resolve, a TLS failure, a

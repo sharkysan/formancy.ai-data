@@ -92,6 +92,30 @@ describe('when the data server is not what answers', () => {
     }
   })
 
+  // The menu (0045) is `GET /v1/forms`, with no name in its path and the
+  // token in the header. Its answer is taken only in the server's shape: a
+  // page draws a link per entry and a grid per child, and an entry without
+  // `children` -- a proxy's, or a server's that has no menu -- would be
+  // drawn as a form with none. Watched failing with only `forms` checked
+  // for being a list: the entries below were taken for the server's.
+  test("a menu is GET /v1/forms, taken only in the server's shape", async () => {
+    const ENTRY = { id: 'pg-order', title: 'Order', operations: ['read'], children: [{ form: 'pg-order-line', field: 'order' }] }
+    let body: unknown = { forms: [ENTRY] }
+    const { base, asked } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    expect(await client.forms()).toEqual({ ok: true, value: body })
+    expect(asked).toEqual(['GET /v1/forms Bearer t'])
+    const { children: _children, ...childless } = ENTRY
+    for (const forms of [undefined, {}, [childless], [{ ...ENTRY, id: 7 }], [{ ...ENTRY, title: null }], [{ ...ENTRY, operations: 'read' }], [{ ...ENTRY, children: [{ form: 'pg-order-line' }] }], [{ ...ENTRY, children: [{ form: 1, field: 'order' }] }]]) {
+      body = { forms }
+      expect(await client.forms(), JSON.stringify(forms)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
+    body = { forms: [] }
+    expect(await client.forms()).toEqual({ ok: true, value: { forms: [] } })
+  })
+
   // A refusal without a code still carries its sentence, under `http-<status>`,
   // so a host can show what was said without the client pretending to know why.
   test('a refusal with a sentence and no code is http-<status>', async () => {

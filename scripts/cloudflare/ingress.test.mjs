@@ -274,16 +274,34 @@ describe('the climbs out of the web front’s file locations', () => {
   })
 
   // What the runtime rule names: the web front's server for the runtime
-  // door, which must exist, serve no file and forward the runtime routes'
-  // prefix. 8080's locations serve files; a rule that named it again would
-  // put the studio's page behind a path nginx resolves into /studio/.
-  test('meet, on the runtime rule’s port, an nginx server that serves no file', () => {
+  // door, which must exist, serve no file and pass every runtime route to
+  // the server. 8080's locations serve files; a rule that named it again
+  // would put the studio's page behind a path nginx resolves into /studio/.
+  // Each runtime route's sample meets the location nginx chooses for it --
+  // an exact one first, then the longest prefix -- and that location
+  // passes it on. `/v1/forms`, the menu (0045), is no path below the
+  // `/v1/forms/` prefix: with no location of its own this model gives it
+  // to `/`, and nginx in fact answered it with its own 301 to `/v1/forms/`
+  // (measured with this file in the web front's nginx, 2026-10-11). Watched
+  // failing with that exact location removed: "/v1/forms".
+  test('meet, on the runtime rule’s port, an nginx server that serves no file and passes every runtime route on', () => {
     const port = Number(/:(\d+)$/.exec(SERVICES.runtime)?.[1])
     const servers = conf.split(/^server \{$/m).slice(1)
     const runtime = servers.filter((block) => new RegExp(`^\\s*listen ${String(port)};`, 'm').test(block))
     expect(runtime).toHaveLength(1)
     expect(runtime[0]).not.toMatch(/^\s*(alias|root)\s/m)
-    expect([...runtime[0].matchAll(/^\s*location\s+(\S+)\s*\{/gm)].map((match) => match[1])).toEqual(['/v1/forms/', '/'])
-    for (const route of doors.routes.filter((entry) => entry.plane === 'runtime')) expect(route.path.startsWith('/v1/forms/'), route.path).toBe(true)
+    const locations = [...runtime[0].matchAll(/^\s*location\s+(=\s+)?(\S+)\s*\{([^}]*)\}/gm)].map(([, exact, path, body]) => ({
+      exact: exact !== undefined,
+      path,
+      passed: /^\s*proxy_pass\s+http:\/\/server:4390;$/m.test(body),
+    }))
+    const chosen = (path) => locations.find((entry) => entry.exact && entry.path === path) ?? locations.filter((entry) => !entry.exact && path.startsWith(entry.path)).sort((a, b) => b.path.length - a.path.length)[0]
+    for (const route of doors.routes.filter((entry) => entry.plane === 'runtime')) expect(chosen(route.sample)?.passed, route.sample).toBe(true)
+    // And nothing else: every other path is nginx's own 404.
+    expect(locations).toEqual([
+      { exact: true, path: '/v1/forms', passed: true },
+      { exact: false, path: '/v1/forms/', passed: true },
+      { exact: false, path: '/', passed: false },
+    ])
   })
 })
