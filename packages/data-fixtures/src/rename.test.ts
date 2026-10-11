@@ -112,6 +112,26 @@ describe('renamedColumn', () => {
     expect(() => renamedColumn(unread, T, 'note', 'memo')).toThrow('s.t.note is named by check ck_t_size, whose text this account could not read;')
   })
 
+  // A key on a table outside the snapshot that refers to the column is said
+  // only by the table's referencedBy (0049). Left as it was, it would refer to
+  // a column the table no longer has, which createSnapshot refuses with a
+  // sentence about the key and not about the rename.
+  test('refuses a column that a key from outside the snapshot refers to', () => {
+    const { fingerprint: _, ...contents } = snapshot()
+    const outside = { table: { schema: 'audit', name: 'copy' }, name: 'fk_copy_t', columns: ['t_note'], referencedColumns: ['note'], onDelete: 'cascade' as const, onUpdate: 'no-action' as const, enforced: true }
+    const inbound = (name: string) =>
+      contents.objects.flatMap((object) =>
+        object.foreignKeys
+          .filter((key) => key.references?.table.name === name)
+          .map((key) => ({ table: object.ref, name: key.name, columns: key.columns, referencedColumns: key.references?.columns ?? [], onDelete: key.onDelete, onUpdate: key.onUpdate, enforced: key.enforced })),
+      )
+    const recorded = createSnapshot({
+      ...contents,
+      objects: contents.objects.map((object) => ({ ...object, access: { delete: true }, referencedBy: [...inbound(object.ref.name), ...(object.ref.name === 't' ? [outside] : [])] })),
+    })
+    expect(() => renamedColumn(recorded, T, 'note', 'memo')).toThrow('s.t.note is named by foreign key fk_copy_t of audit.copy, which refers to it; renamedColumn renames only a column nothing else names')
+  })
+
   // The name it is given is the table's already: two columns of one name is
   // createSnapshot's refusal, and renamedColumn makes nothing past it.
   test('refuses a name the table already has', () => {

@@ -24,7 +24,7 @@
       "none": "Its user-facing cost, that what is tested is exactly the images the tests name, is the report's tested-on section, derived from each run."
     },
     "0004": {
-      "reviewed": "sha256:1f7c448c008ebcd083ad7d6cc7a38d5c500e59f69b059136d56ad7c4c8fca47a",
+      "reviewed": "sha256:ca98cd0ed9328133061f0515d273f1173a03c6742880ed018581a29a6ba28a7d",
       "limitations": [
         {
           "area": "databases",
@@ -33,11 +33,11 @@
       ]
     },
     "0005": {
-      "reviewed": "sha256:35ad9b6c38f021830f6ea8ac13d5bb22affee286dad34eadebf4a167b6334fd2",
+      "reviewed": "sha256:2039c1b439d91703e0207f91b2c34384e8bd0192c253a5bd2f65f80e8759531d",
       "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
     },
     "0006": {
-      "reviewed": "sha256:2861ad227f6776e7b551a4a62a55a5ba74b4afc5866d7f71dbd5f34b5bd5d30a",
+      "reviewed": "sha256:688390de68404a7b97d5d3269905efac1074a6ae5c0936898e10a6fbfe171c89",
       "limitations": [
         {
           "area": "databases",
@@ -62,7 +62,7 @@
       ]
     },
     "0007": {
-      "reviewed": "sha256:10cc84adfbb6d49dd542ef16832a9414ac5c023c64086b2614dfdbac98b44ce0",
+      "reviewed": "sha256:e93dc88863213d377d5ca12263fe6769a4a7ab05b4079062afeb8dd86770a591",
       "limitations": [
         {
           "area": "forms",
@@ -74,7 +74,7 @@
         },
         {
           "area": "databases",
-          "says": "SQL Server discovery is seven queries side by side, not one consistent read, so a concurrent `ALTER` can tear it."
+          "says": "SQL Server discovery is several queries side by side, not one consistent read, so a concurrent `ALTER` can tear it."
         },
         {
           "area": "databases",
@@ -113,7 +113,7 @@
       ]
     },
     "0010": {
-      "reviewed": "sha256:41ad7dad6e2925cbad437d4aed11ccbc24dbc9db412934a9bd4c6d5a299f4192",
+      "reviewed": "sha256:7430efab524d6e5e346d9f2bfd5aee830dd50e0235671ea6a8a5b1766ba235bf",
       "limitations": [
         {
           "area": "forms",
@@ -505,7 +505,7 @@
       ]
     },
     "0027": {
-      "reviewed": "sha256:7a7ef9c476e8d2134e51c9b79f1e2a44f916b34bd0f606f374ded4bc184a9ad8",
+      "reviewed": "sha256:cc529b7775cc570e2e5eccef3b3b407fa237531b6f5b6775ab18bbe68148bc2c",
       "limitations": [
         {
           "area": "databases",
@@ -533,7 +533,7 @@
         },
         {
           "area": "access",
-          "says": "DELETE, REFERENCES and EXECUTE privileges are not described."
+          "says": "REFERENCES and EXECUTE privileges are not described."
         },
         {
           "area": "access",
@@ -1344,6 +1344,39 @@
         {
           "area": "licence",
           "says": "Open, and a lawyer's questions: which court the Rightsholder's domicile in Switzerland names, and whether it is exclusive; whether Version 1 replaces Version 0 for someone who received the Software under Version 0, and what a later version does for someone who received it under Version 1; whether the licence's law and court govern a production licence; and whether the UN Convention on Contracts for the International Sale of Goods applies."
+        }
+      ]
+    },
+    "0049": {
+      "reviewed": "sha256:1a788804451b29022c1ea6ab5f4dba1e4b1a979bb03fe4a46c147dbb6f966ec6",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "A snapshot taken before 0049 says neither whether its account may delete from a table nor what refers to it; only a new discovery records them."
+        },
+        {
+          "area": "databases",
+          "says": "A SQL Server account without database VIEW DEFINITION, or with a VIEW DEFINITION or CONTROL deny on any object or schema, cannot establish that it sees every foreign key that refers to a table in scope, and its snapshot carries a `referenced-by` gap.",
+          "heldBy": "packages/data-sqlserver/src/discovery.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A table outside the approved schemas whose foreign key refers to one in scope is named in the snapshot, with its key and columns.",
+          "heldBy": "packages/data-postgres/src/discovery.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A PostgreSQL key onto a partition of a table, or onto a table that inherits from it, is not listed on that table but said by a `referenced-by` gap on it, for every account.",
+          "heldBy": "packages/data-postgres/src/discovery.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A SQL Server graph edge constraint is not listed as something that refers to a node table; each one that connects it is a `referenced-by` gap on it, for every account.",
+          "heldBy": "packages/data-sqlserver/src/discovery.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A server older than 0049 refuses a snapshot with a `referenced-by` gap, and so a form published from one, on every read."
         }
       ]
     },

@@ -22,7 +22,8 @@ added unvalidated beside one SQL Server disables.
   discovers as, and the container's `containerId`, which the performance
   harness reads CPU, memory and limits by (0034). A row-level security
   policy on `sales.customer` shows the writer tenant 1 only; it binds nobody
-  else, though SQL Server applies it to `dbo` too (0027).
+  else, though SQL Server applies it to `dbo` too (0027). The writer may
+  delete orders and their lines, and the reader nothing (0049).
 - `connectDocker()` reads Docker through testcontainers' own runtime client:
   the daemon's facts, the running containers, whether an image is present,
   a container's image, digests and limits, and its cumulative CPU and
@@ -30,17 +31,21 @@ added unvalidated beside one SQL Server disables.
   performance harness that uses it (0034), because nothing else may declare
   testcontainers (below).
 - `FIXTURE_MODEL` is the database-neutral truth. Where the engines genuinely
-  differ, it says so per engine rather than smoothing it over.
+  differ, it says so per engine rather than smoothing it over. What refers
+  to each table is derived from its foreign keys, not written twice: every
+  key of the fixture is on a table in `sales` (0049).
 - `snapshotDisagreements(snapshot)` reports every way a discovered snapshot
-  differs from the model, the owner's every privilege and row security
-  included, and `restrictedDisagreements(snapshot)` holds the reader's
-  snapshot to one rule: the right answer, or a gap — never silence.
+  differs from the model, the owner's every privilege, row security and
+  what refers to each table included, and
+  `restrictedDisagreements(snapshot)` holds the reader's snapshot to one
+  rule: the right answer, or a gap — never silence — for the keys of
+  `sales.order` and the keys that refer to it.
   `structuralDisagreements` compares the structure alone, for an account that
   sees everything and is not the owner, and `accessDisagreements(snapshot,
   READER_ACCESS | WRITER_ACCESS)` holds a restricted account to what the
-  fixture grants it, column by column, with every column the model has: an
-  adapter that left out what the account may not read, as a
-  privilege-filtered catalog would, disagrees.
+  fixture grants it, column by column and DELETE by table, with every
+  column the model has: an adapter that left out what the account may not
+  read, as a privilege-filtered catalog would, disagrees.
 - Beside it, the `parity` schema (0028) — `fixtures/postgres.parity.sql` and
   `fixtures/sqlserver.parity.sql`, loaded last — which is outside
   `FIXTURE_SCOPE`, so no snapshot of `sales` sees it. A tenant column under a

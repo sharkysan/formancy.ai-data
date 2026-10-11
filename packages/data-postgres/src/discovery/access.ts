@@ -1,5 +1,6 @@
-import type { ColumnAccess } from '@formancy/data-core'
+import type { ColumnAccess, ObjectAccess } from '@formancy/data-core'
 import type { TransactionSql } from 'postgres'
+import { DESCRIBED_RELATION } from './objects.js'
 
 interface AccessRow {
   oid: number
@@ -62,4 +63,39 @@ export async function readAccess(sql: TransactionSql, schemas: readonly string[]
     byObject.set(row.oid, columns)
   }
   return byObject
+}
+
+interface ObjectAccessRow {
+  oid: number
+  delete: boolean
+}
+
+/**
+ * Whether this account may DELETE from each table and view in scope, by the
+ * oid of the relation (0049): `has_table_privilege`, ANDed with USAGE on the
+ * schema, keyed by oid for the reasons `readAccess` gives. Grants through
+ * PUBLIC and inherited memberships count as the server counts them.
+ *
+ * DELETE alone deletes nothing by a key: a WHERE or a RETURNING that names a
+ * column needs SELECT on it too, which the columns' access says. Measured on
+ * postgres:17-alpine (17.11), 2026-10-11 (P1): a role with DELETE and no SELECT
+ * runs `delete … where false` and is refused 42501 for `where id = 1`; given
+ * SELECT on id, `where id = 1 returning id` runs and `returning v` is
+ * refused. DELETE alone also takes `lock table only … in row exclusive mode`.
+ * And over every table of the fixture, as the owner, the reader and a writer
+ * granted DELETE on order and order_line, each answer here was the one
+ * `delete … where false` got (`discovery-access.integration.test.ts`); a view
+ * that cannot be updated is refused 55000 before any privilege is asked, so
+ * a view's answer is its grant's.
+ */
+export async function readObjectAccess(sql: TransactionSql, schemas: readonly string[]): Promise<Map<number, ObjectAccess>> {
+  const rows = await sql<ObjectAccessRow[]>`
+    select
+      c.oid,
+      pg_catalog.has_schema_privilege(n.oid, 'USAGE') and pg_catalog.has_table_privilege(c.oid, 'DELETE') as delete
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = any(${schemas})
+      and ${sql.unsafe(DESCRIBED_RELATION)}`
+  return new Map(rows.map((row) => [row.oid, { delete: row.delete }]))
 }

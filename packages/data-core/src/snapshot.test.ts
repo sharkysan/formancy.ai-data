@@ -277,3 +277,138 @@ describe('createSnapshot', () => {
     expect(snapshot(objects, { gaps: [...gaps].reverse(), scope: { schemas: ['SALES', 'audit'] } }).fingerprint).toBe(made.fingerprint)
   })
 })
+
+describe('what a snapshot says about deleting (0049)', () => {
+  /** `a`, keyed by `id`, and `b`, whose `a_id` refers to it and cascades: one key, seen from both ends. */
+  const toA = {
+    name: 'fk_b_a',
+    columns: ['a_id'],
+    references: { table: { schema: 'sales', name: 'a' }, columns: ['id'] },
+    onUpdate: 'no-action' as const,
+    onDelete: 'cascade' as const,
+    enforced: true,
+    validated: true,
+  }
+  const inboundToA = { table: { schema: 'sales', name: 'b' }, name: 'fk_b_a', columns: ['a_id'], referencedColumns: ['id'], onDelete: 'cascade' as const, onUpdate: 'no-action' as const, enforced: true }
+  const a = (extra: Partial<ObjectMeta> = {}) => table('a', [column('id', 1)], { primaryKey: { name: 'pk_a', columns: ['id'] }, ...extra })
+  const b = (extra: Partial<ObjectMeta> = {}) => table('b', [column('id', 1), column('a_id', 2)], { foreignKeys: [toA], ...extra })
+  const withFacts = (deletable: boolean, extra: Partial<ObjectMeta> = {}): Partial<ObjectMeta> => ({ access: { delete: deletable }, referencedBy: [], ...extra })
+
+  // Every bundle published before this record carries a snapshot with
+  // neither fact, and the server hashes it again on every read (0019). A
+  // contract that filled the absent facts in -- `delete: false`, no keys --
+  // would hash those snapshots differently, and every published form would be
+  // refused as edited after it was taken. The literal is what the release
+  // before 0049 made of these two tables (data-core at 0cf7ce8).
+  test('a snapshot taken before 0049, with neither fact on any object, validates and keeps the fingerprint it was stored with', () => {
+    const stored = snapshot([a(), b()])
+    expect(stored.fingerprint).toBe('5939f7cc8e1b1dda3c8b5e18421ee79301f9bda1e3b1648ca2f0c2b5c1390431')
+    expect(stored.objects.map((object) => [object.access, object.referencedBy])).toEqual([
+      [undefined, undefined],
+      [undefined, undefined],
+    ])
+    expect(stored.objects.every((object) => !('access' in object) && !('referencedBy' in object))).toBe(true)
+  })
+
+  // The two facts are one answer: whether a delete can be made, and what it
+  // also does. A snapshot that said one and not the other would offer a delete
+  // whose reach nobody looked at, or a reach with no word on the grant; one
+  // object without them among objects with them is no catalog's answer.
+  test('one fact without the other is refused, and so is an object without them among objects with them', () => {
+    expect(() => snapshot([a({ access: { delete: true } })])).toThrow(/sales\.a: access without referencedBy/)
+    expect(() => snapshot([a({ referencedBy: [] })])).toThrow(/sales\.a: referencedBy without access/)
+    expect(() => snapshot([a(withFacts(true, { referencedBy: [inboundToA] })), b()])).toThrow(/sales\.b: has neither access nor referencedBy, while sales\.a has both/)
+    expect(() => snapshot([a({ access: { delete: 'yes' } as never, referencedBy: [] })])).toThrow(/sales\.a: access delete is not a boolean/)
+    expect(() => snapshot([a({ access: { delete: true }, referencedBy: {} as never })])).toThrow(/sales\.a: referencedBy is not a list/)
+  })
+
+  // A key onto a table in scope is on another object of the same snapshot,
+  // whose foreignKeys say it too. Two records of one fact are made from one
+  // catalog read or they disagree, and a disagreement is an adapter bug that
+  // would let review show one reach and the runtime guard another (0004).
+  test('referencedBy and the referring table’s own foreign keys must agree, both ways, for a table in the snapshot', () => {
+    expect(() => snapshot([a(withFacts(true)), b(withFacts(true))])).toThrow(/sales\.a: referencedBy lacks fk_b_a of sales\.b, which refers to it/)
+    expect(() => snapshot([a(withFacts(true, { referencedBy: [inboundToA] })), b(withFacts(true, { foreignKeys: [] }))])).toThrow(
+      /sales\.a: referencedBy names fk_b_a of sales\.b, which has no such foreign key onto it/,
+    )
+    expect(() => snapshot([a(withFacts(true, { referencedBy: [{ ...inboundToA, onDelete: 'set-null' }] })), b(withFacts(true))])).toThrow(
+      /sales\.a: referencedBy says fk_b_a of sales\.b otherwise than its own foreign keys do/,
+    )
+    expect(() => snapshot([a(withFacts(true, { referencedBy: [{ ...inboundToA, enforced: false }] })), b(withFacts(true))])).toThrow(/otherwise than its own foreign keys do/)
+    const agreed = snapshot([a(withFacts(true, { referencedBy: [inboundToA] })), b(withFacts(false))])
+    expect(agreed.objects.map((object) => [object.ref.name, object.access, object.referencedBy])).toEqual([
+      ['a', { delete: true }, [inboundToA]],
+      ['b', { delete: false }, []],
+    ])
+  })
+
+  // A key from a schema outside the scope has no object in the snapshot to
+  // agree with: it is named, and that is all. Sorted by codepoint, as every
+  // other list, so two reads of one catalog hash alike.
+  test('a key from a table outside the snapshot is accepted, and referencedBy sorts by table and name in codepoint order', () => {
+    const outside = (schema: string, name: string, key: string) => ({ ...inboundToA, table: { schema, name }, name: key })
+    const listed = [outside('audit', 'copy', 'fk_z'), inboundToA, outside('Audit', 'copy', 'fk_a'), outside('audit', 'copy', 'fk_a')]
+    const made = snapshot([a(withFacts(true, { referencedBy: listed })), b(withFacts(true))])
+    expect(made.objects[0]?.referencedBy?.map((key) => `${key.table.schema}.${key.table.name}.${key.name}`)).toEqual(['Audit.copy.fk_a', 'audit.copy.fk_a', 'audit.copy.fk_z', 'sales.b.fk_b_a'])
+    expect(snapshot([a(withFacts(true, { referencedBy: [...listed].reverse() })), b(withFacts(true))]).fingerprint).toBe(made.fingerprint)
+    // A key whose target this connection cannot see (0007) refers to nothing it can name, and asks nothing of referencedBy.
+    const hidden = { ...toA, name: 'fk_b_hidden', references: null }
+    expect(() => snapshot([a(withFacts(true, { referencedBy: [inboundToA] })), b(withFacts(true, { foreignKeys: [toA, hidden] }))])).not.toThrow()
+  })
+
+  // What no catalog could have produced, refused naming the object, as a
+  // foreign key's own shape is: a key named twice, one with no columns, two
+  // sides of different lengths, a column this table does not have, an action
+  // outside the five, an enforced flag that is not one.
+  test('refuses an inbound key no catalog could have produced', () => {
+    const refused = (key: Record<string, unknown>) => () => snapshot([a(withFacts(true, { referencedBy: [key as never] }))])
+    const outside = { ...inboundToA, table: { schema: 'audit', name: 'copy' } }
+    expect(() => snapshot([a(withFacts(true, { referencedBy: [outside, outside] }))])).toThrow(/sales\.a: referencedBy names fk_b_a of audit\.copy twice/)
+    expect(refused({ ...outside, columns: [], referencedColumns: [] })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy has no columns/)
+    expect(refused({ ...outside, columns: ['x', 'y'] })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy pairs 2 columns with 1/)
+    expect(refused({ ...outside, referencedColumns: ['nope'] })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy refers to nope, which the table does not have/)
+    expect(refused({ ...outside, onDelete: 'erase' })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy has an action that is not one the contract names/)
+    expect(refused({ ...outside, onUpdate: undefined })).toThrow(/has an action that is not one the contract names/)
+    expect(refused({ ...outside, enforced: 'yes' })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy has no enforced flag/)
+    expect(refused({ ...outside, table: { schema: '', name: 'copy' } })).toThrow(/sales\.a: an inbound key's table is not one the contract names/)
+    expect(refused({ ...outside, name: '' })).toThrow(/sales\.a: an inbound key of audit\.copy has no name/)
+  })
+
+  // A key from a table outside the snapshot has no foreign key of its own
+  // to agree with, so its referring columns are held here or nowhere: a
+  // later reach that clears them would name what no table has. Neither
+  // engine accepts a referenced column twice (PostgreSQL "foreign key
+  // referenced-columns list must not contain duplicates", SQL Server 8136),
+  // and neither lets a key refer to a view, materialized or indexed (42809,
+  // 1768), measured on postgres:17-alpine (17.11) and 16.0.4295.3,
+  // 2026-10-11. PostgreSQL does accept a referring column twice --
+  // `foreign key (a, a) references t (x, y)` -- so that is not refused.
+  test('refuses an inbound key whose columns are not names, a referenced column twice, and a key onto a view', () => {
+    const refused = (key: Record<string, unknown>) => () => snapshot([a(withFacts(true, { referencedBy: [key as never] }))])
+    const outside = { ...inboundToA, table: { schema: 'audit', name: 'copy' } }
+    expect(refused({ ...outside, columns: [42] })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy names a column that is not a name/)
+    expect(refused({ ...outside, columns: [''] })).toThrow(/names a column that is not a name/)
+    expect(refused({ ...outside, columns: [null] })).toThrow(/names a column that is not a name/)
+    const wide = table('a', [column('id', 1), column('n', 2)], { primaryKey: { name: 'pk_a', columns: ['id', 'n'] } })
+    expect(() => snapshot([{ ...wide, ...withFacts(true, { referencedBy: [{ ...outside, columns: ['x', 'y'], referencedColumns: ['id', 'id'] }] }) }])).toThrow(
+      /sales\.a: inbound key fk_b_a of audit\.copy refers to id twice/,
+    )
+    expect(() => snapshot([{ ...wide, ...withFacts(true, { referencedBy: [{ ...outside, columns: ['x', 'x'], referencedColumns: ['id', 'n'] }] }) }])).not.toThrow()
+    const view = table('a', [column('id', 1)], { kind: 'view' })
+    expect(() => snapshot([{ ...view, ...withFacts(true, { referencedBy: [outside] }) }])).toThrow(/sales\.a: a view, which no foreign key can refer to, has referencedBy/)
+    expect(() => snapshot([{ ...view, ...withFacts(true) }])).not.toThrow()
+  })
+
+  // A revoked DELETE grant, and a key that now refers to the table, are
+  // changes to what a delete may do, so each moves the fingerprint, or
+  // drift's fast path would never look. The gap that says the list may be
+  // short is an aspect the contract names.
+  test('both facts are in the fingerprint, and a referenced-by gap is one the contract names', () => {
+    const outside = { ...inboundToA, table: { schema: 'audit', name: 'copy' } }
+    const before = snapshot([a(withFacts(true))])
+    expect(snapshot([a(withFacts(false))]).fingerprint).not.toBe(before.fingerprint)
+    expect(snapshot([a(withFacts(true, { referencedBy: [outside] }))]).fingerprint).not.toBe(before.fingerprint)
+    const gap: CoverageGap = { subject: { kind: 'scope' }, aspect: 'referenced-by', detail: 'a key this account cannot see may refer to any table' }
+    expect(snapshot([a(withFacts(true))], { gaps: [gap] }).gaps).toEqual([gap])
+  })
+})

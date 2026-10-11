@@ -69,7 +69,7 @@
   },
   "studio-connect": {
     "file": "docs/images/readme/studio-connect.webp",
-    "captured": "2026-10-10",
+    "captured": "2026-10-11",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -79,10 +79,10 @@
     "timezone": "UTC",
     "css": {
       "width": 874,
-      "height": 640
+      "height": 688
     },
-    "bytes": 146738,
-    "sha256": "17ec757dad75f2b7c4270df9a46e992af26f5b75ffd547314cc1693fd0c7ddb2",
+    "bytes": 165580,
+    "sha256": "3305692b31f79e8182d0f5d3bf5e3ce001dd75d1b8e1a65ad174159d80365a6d",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -96,7 +96,7 @@
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
     "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.4.0",
     "text": {
-      "Seen": "- region \"What ms-reader can see\":\n  - heading \"What ms-reader can see\" [level=3]\n  - paragraph:\n    - text: \"SQL Server 16.0.4295.3, schemas sales: 1 table and 0 views. Discovered as\"\n    - code: formancy_reader\n    - text: . Fingerprint\n    - code: a7bab9aaa431\n    - text: .\n  - region \"What this connection could not see\":\n    - heading \"What this connection could not see\" [level=4]\n    - paragraph:\n      - text: Each of these is\n      - strong: cannot tell\n      - text: \", not\"\n      - strong: does not exist\n      - text: \": a table, key or relationship missing below may be there, out of this account’s sight.\"\n    - list \"What this connection could not see\":\n      - listitem:\n        - code: The whole scope\n        - text: row-security this account lacks VIEW DEFINITION on the database, which is what lists every security policy, so a security policy it cannot see may filter any table or view in scope\n      - listitem:\n        - code: Schema sales\n        - text: objects without VIEW DEFINITION on schema sales, the catalog lists only the tables and views this account holds a permission on, so one it cannot see is absent without trace\n      - listitem:\n        - code: sales.order\n        - text: \"checks ck_order_status: the expression is hidden without VIEW DEFINITION\"\n      - listitem:\n        - code: sales.order\n        - text: \"defaults status: the definition of its default df_order_status is hidden without VIEW DEFINITION\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_approved_by references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_created_by references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_customer references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n  - heading \"Tables and views\" [level=4]\n  - list \"Tables and views\":\n    - listitem:\n      - group:\n        - code: sales.order\n        - text: table"
+      "Seen": "- region \"What ms-reader can see\":\n  - heading \"What ms-reader can see\" [level=3]\n  - paragraph:\n    - text: \"SQL Server 16.0.4295.3, schemas sales: 1 table and 0 views. Discovered as\"\n    - code: formancy_reader\n    - text: . Fingerprint\n    - code: 94b2d94ccf2a\n    - text: .\n  - region \"What this connection could not see\":\n    - heading \"What this connection could not see\" [level=4]\n    - paragraph:\n      - text: Each of these is\n      - strong: cannot tell\n      - text: \", not\"\n      - strong: does not exist\n      - text: \": a table, key or relationship missing below may be there, out of this account’s sight.\"\n    - list \"What this connection could not see\":\n      - listitem:\n        - code: The whole scope\n        - text: referenced-by this account lacks VIEW DEFINITION on the database, which is what lists every foreign key on a table in any schema, so a key on a table it cannot see may refer to any table in scope\n      - listitem:\n        - code: The whole scope\n        - text: row-security this account lacks VIEW DEFINITION on the database, which is what lists every security policy, so a security policy it cannot see may filter any table or view in scope\n      - listitem:\n        - code: Schema sales\n        - text: objects without VIEW DEFINITION on schema sales, the catalog lists only the tables and views this account holds a permission on, so one it cannot see is absent without trace\n      - listitem:\n        - code: sales.order\n        - text: \"checks ck_order_status: the expression is hidden without VIEW DEFINITION\"\n      - listitem:\n        - code: sales.order\n        - text: \"defaults status: the definition of its default df_order_status is hidden without VIEW DEFINITION\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_approved_by references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_created_by references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_customer references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n  - heading \"Tables and views\" [level=4]\n  - list \"Tables and views\":\n    - listitem:\n      - group:\n        - code: sales.order\n        - text: table"
     }
   },
   "studio-choose": {

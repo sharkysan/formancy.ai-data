@@ -45,7 +45,7 @@ export const FOREIGN_KEYS_SQL = (scoped: string): string => `
 /** sys.foreign_keys' *_referential_action codes. SQL Server has no RESTRICT. */
 const ACTIONS: readonly ReferentialAction[] = ['no-action', 'cascade', 'set-null', 'set-default']
 
-function action(code: number, name: string): ReferentialAction {
+export function action(code: number, name: string): ReferentialAction {
   const found = ACTIONS[code]
   // Unreached on the servers tested: SQL Server 2022 has exactly these four.
   // A later one with a fifth fails loudly here rather than being reported as

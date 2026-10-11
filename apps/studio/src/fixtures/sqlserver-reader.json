@@ -290,10 +290,21 @@
           "validated": true
         }
       ],
-      "rowSecurity": "unknown"
+      "access": {
+        "delete": false
+      },
+      "rowSecurity": "unknown",
+      "referencedBy": []
     }
   ],
   "gaps": [
+    {
+      "subject": {
+        "kind": "scope"
+      },
+      "aspect": "referenced-by",
+      "detail": "this account lacks VIEW DEFINITION on the database, which is what lists every foreign key on a table in any schema, so a key on a table it cannot see may refer to any table in scope"
+    },
     {
       "subject": {
         "kind": "scope"
@@ -365,5 +376,5 @@
       "detail": "fk_order_customer references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not"
     }
   ],
-  "fingerprint": "a7bab9aaa43192493a62837d1bc58e64bec6fd164d6dd03482e7e4b940cc75b1"
+  "fingerprint": "94b2d94ccf2abc6e9fc3f1847ba98a7b9f4e5dceef43be5e432631bfe6ce792a"
 }

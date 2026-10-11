@@ -81,7 +81,7 @@ This:
 3. loads the sample fixture into each, with each engine's own client, and
    gives the order form's own account, `formancy_writer`, a password from
    that volume -- the server connects as that account, which may do what an
-   order form needs and nothing more;
+   order form needs, delete an order with its lines, and nothing more;
 4. builds the data server's image and an nginx image holding the studio and
    the host page, from this checkout, and starts them.
 

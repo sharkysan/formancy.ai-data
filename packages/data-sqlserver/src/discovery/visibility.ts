@@ -75,6 +75,18 @@ const DENIED_SCHEMAS_SQL = `
     and ${BINDS_ME}
     and has_perms_by_name(quotename(schema_name(p.major_id)), N'SCHEMA', N'VIEW DEFINITION') = 0`
 
+/**
+ * Whether the account may view every definition in the database, which is
+ * what lists to it every object of every schema -- and so every security
+ * policy, which lives in a schema of its own and filters a table in any
+ * other (0027, B10b), and every foreign key, which is on a table in any
+ * schema and refers to one in scope (0049, P2). VIEW SECURITY DEFINITION
+ * shows no policy at all (B10d). The database is QUOTENAME'd:
+ * HAS_PERMS_BY_NAME parses it, and in a database named `it's [odd] db` the
+ * raw name answers NULL (B9).
+ */
+const DATABASE_SQL = `select has_perms_by_name(quotename(db_name()), N'DATABASE', N'VIEW DEFINITION') as can_view_definitions`
+
 /** VIEW DEFINITION or CONTROL denies that bind this account, by securable class. */
 export interface Denials {
   objects: number
@@ -84,13 +96,34 @@ export interface Denials {
 export interface Visibility {
   gaps: CoverageGap[]
   denied: Denials
+  /** VIEW DEFINITION on the database. */
+  canViewDatabase: boolean
+}
+
+/**
+ * Why this account may not see every definition in the database, or nothing
+ * when it may: what row security (0027) and what refers to a table (0049)
+ * are established by, because a security policy and a foreign key each live
+ * on an object of any schema. Established takes VIEW DEFINITION on the
+ * database and no VIEW DEFINITION or CONTROL deny on an object or a schema
+ * binding the account -- a denied object, or an object in a denied schema,
+ * is not listed even under the database grant (B10e, B10f; for a key, P2).
+ * `lists` names what the database grant lists, for the sentence.
+ */
+export function unseenDefinitions(visibility: Visibility, lists: string): string[] {
+  const reasons: string[] = []
+  if (!visibility.canViewDatabase) reasons.push(`this account lacks VIEW DEFINITION on the database, which is what lists every ${lists}`)
+  if (visibility.denied.objects > 0) reasons.push(`this account is denied VIEW DEFINITION or CONTROL on ${String(visibility.denied.objects)} object(s)`)
+  if (visibility.denied.schemas > 0) reasons.push(`this account is denied VIEW DEFINITION or CONTROL on ${String(visibility.denied.schemas)} schema(s)`)
+  return reasons
 }
 
 export async function readObjectVisibility(pool: ConnectionPool, schemas: readonly string[]): Promise<Visibility> {
-  const [rows, deniedObjects, deniedSchemas] = await Promise.all([
+  const [rows, deniedObjects, deniedSchemas, database] = await Promise.all([
     queryScope<SchemaRow>(pool, schemas, SCHEMAS_SQL),
     pool.request().query<{ hidden: number }>(DENIED_OBJECTS_SQL),
     pool.request().query<{ hidden: number }>(DENIED_SCHEMAS_SQL),
+    pool.request().query<{ can_view_definitions: number | null }>(DATABASE_SQL),
   ])
   const gaps: CoverageGap[] = rows
     .filter((row) => row.can_view_definitions !== 1)
@@ -107,5 +140,5 @@ export async function readObjectVisibility(pool: ConnectionPool, schemas: readon
       detail: `this account is denied VIEW DEFINITION on ${String(denied.objects)} object(s) it therefore cannot see, and the catalog does not say which schema they are in: any of them may be in scope`,
     })
   }
-  return { gaps, denied }
+  return { gaps, denied, canViewDatabase: database.recordset[0]?.can_view_definitions === 1 }
 }

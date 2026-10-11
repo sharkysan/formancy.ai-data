@@ -1,6 +1,6 @@
 # 0006 — Discover PostgreSQL from pg_catalog, and ask separately what the account may use
 
-- **Status:** accepted; describing only usable objects, and the `columns` gap, narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md)
+- **Status:** accepted; describing only usable objects, and the `columns` gap, narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md); whether the account may delete from each table, every declared key from any schema that refers to it, and a `referenced-by` gap for a key onto a partition or an inheriting table below it, extended by [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-postgres/src/discovery.integration.test.ts`

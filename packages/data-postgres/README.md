@@ -355,8 +355,24 @@ and asks the server what the connecting account may do
   in the fingerprint.
 - A foreign key keeps its target even when the account cannot use the
   target: PostgreSQL's catalog names it, so a target is never unknown here.
-- The only gap a PostgreSQL snapshot carries is a **foreign table**, which
-  this release does not describe, named as the gap's subject.
+- **Deleting** ([0049](../../docs/decisions/0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md)):
+  each table and view says whether the account may `DELETE` from it, as
+  `has_table_privilege` answers, ANDed with `USAGE` on the schema, and lists
+  every declared foreign key that refers to it — from a table in any schema,
+  which is named and not described — read under the same two conditions as
+  the referring side's keys, so a partition's clones are not listed. Every
+  role reads every such key, so nothing is hidden from the account. A key
+  is listed on the relation it names; one declared onto a partition of a
+  table, at any depth and in any schema, or onto a table that inherits
+  from it, is a `referenced-by` gap on that table instead, because a
+  delete from it reaches those rows and fires the key. `enforced: false`
+  on such a key says some trigger of it is disabled, which may be the
+  referring table's checks alone: a delete still acts through it then. A
+  `DELETE` that names a column in its `WHERE` or `RETURNING` also needs
+  `SELECT` on it.
+- The gaps a PostgreSQL snapshot carries are what this release does not
+  describe: a **foreign table**, named as the gap's subject, and a key onto
+  a partition or an inheriting table, as above.
 
 What a snapshot cannot say, and the operations then report as
 `permission-denied`: a `serial` or `nextval()` default needs `USAGE` on its
@@ -466,11 +482,14 @@ The suites start `postgres:17-alpine` unless a test names another image, through
   still running, which lets it answer.
 - `discovery.integration.test.ts` — the shared model as the owner, the
   restricted reader's rule and its grants, privileges short of a whole
-  table, the scope, the fingerprint, and a check added NOT VALID read as
-  enforced and not validated.
+  table, the scope, the fingerprint, a check added NOT VALID read as
+  enforced and not validated, a key from outside the scope named on the
+  table it refers to, a key between partitioned tables listed once, and a
+  key onto a partition or an inheriting table a gap on the table above.
 - `discovery-access.integration.test.ts` — the writer's grants through its
-  role, every reported capability checked against the statement the server
-  runs or refuses (as the owner, the reader and the writer), a session role
+  role, every reported capability, DELETE on each table included, checked
+  against the statement the server runs or refuses (as the owner, the reader
+  and the writer), a session role
   and an `INHERIT FALSE` membership, row security for the owner with and
   without `FORCE` and for a `BYPASSRLS` role, and what the record operations
   do with both: a `serial` create refused, a hidden row `not-found`.

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import type { ColumnMeta, DatabaseKind, MetadataSnapshot, NormalizedType, ObjectMeta, RowSecurity } from '@formancy/data-core'
-import { createSnapshot } from '@formancy/data-core'
+import type { ColumnMeta, DatabaseKind, InboundKey, MetadataSnapshot, NormalizedType, ObjectMeta, RowSecurity } from '@formancy/data-core'
+import { createSnapshot, findObject } from '@formancy/data-core'
 import { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
 import { restrictedDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'
 import { FIXTURE_MODEL } from './model.js'
@@ -56,10 +56,62 @@ function columnOf(objects: ObjectMeta[], table: string, name: string): ColumnMet
   return found
 }
 
-function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}, gaps: MetadataSnapshot['gaps'] = []): MetadataSnapshot {
+/**
+ * The keys among `objects` that refer to `target`: what an adapter reads, from
+ * the same catalog as their own foreign keys, as `target`'s referencedBy
+ * (0049). Derived after a test's edit, so a key it changes or drops is
+ * changed or dropped at both ends, as in a database.
+ */
+function inbound(objects: readonly ObjectMeta[], target: ObjectMeta): InboundKey[] {
+  return objects.flatMap((referrer) =>
+    referrer.foreignKeys.flatMap((key) =>
+      key.references !== null && key.references.table.schema === target.ref.schema && key.references.table.name === target.ref.name
+        ? [{ table: { ...referrer.ref }, name: key.name, columns: [...key.columns], referencedColumns: [...key.references.columns], onDelete: key.onDelete, onUpdate: key.onUpdate, enforced: key.enforced }]
+        : [],
+    ),
+  )
+}
+
+/**
+ * The perfect snapshot, `edit`ed, made the one way a snapshot is made. Taken
+ * since 0049 unless `before0049`: each object then says whether the account
+ * may delete from it -- the owner may, unless the edit said otherwise -- and
+ * what refers to it.
+ */
+function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}, gaps: MetadataSnapshot['gaps'] = [], before0049 = false): MetadataSnapshot {
   const objects = perfect(kind)
   edit(objects)
+  if (!before0049) {
+    for (const entry of objects) {
+      entry.access ??= { delete: true }
+      entry.referencedBy ??= inbound(objects, entry)
+    }
+  }
   return createSnapshot({ kind, serverVersion: 'x', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, objects, gaps })
+}
+
+/** `made`, changed as a file read back could be and createSnapshot would not allow: the comparators also read committed captures. */
+function readBack(made: MetadataSnapshot, edit: (snapshot: MetadataSnapshot) => void): MetadataSnapshot {
+  const copy = structuredClone(made)
+  edit(copy)
+  return copy
+}
+
+function described(made: MetadataSnapshot, name: string): ObjectMeta {
+  const found = findObject(made, { schema: 'sales', name })
+  if (found === undefined) throw new Error(`no ${name}`)
+  return found
+}
+
+/** A key onto sales.order from a table outside the approved schemas, which only referencedBy can say. */
+const FROM_OUTSIDE: InboundKey = {
+  table: { schema: 'audit', name: 'order_copy' },
+  name: 'fk_order_copy_order',
+  columns: ['order_id'],
+  referencedColumns: ['id'],
+  onDelete: 'cascade',
+  onUpdate: 'no-action',
+  enforced: true,
 }
 
 function object(objects: ObjectMeta[], name: string): ObjectMeta {
@@ -285,6 +337,56 @@ describe('snapshotDisagreements', () => {
     })
     expect(snapshotDisagreements(policed)).toEqual(['sales.customer row security is applies, expected none'])
   })
+
+  // The owner may delete from every table (0049). Reported otherwise, a form
+  // generated as the owner would not offer a delete the owner may make; a
+  // snapshot taken before 0049 says nothing about deleting at all, which is
+  // what every capture was until recaptured.
+  test('an owner snapshot that may not delete, or that says nothing about deleting, is a disagreement', () => {
+    const narrowed = snapshot('postgres', (objects) => {
+      object(objects, 'order').access = { delete: false }
+    })
+    expect(snapshotDisagreements(narrowed)).toEqual(['sales.order access says it may not delete, expected that the owner may'])
+    const before = snapshotDisagreements(snapshot('sqlserver', () => {}, [], true))
+    expect(before).toHaveLength(FIXTURE_MODEL.length)
+    expect(before).toContainEqual('sales.order says nothing about deleting; it was taken before 0049')
+  })
+
+  // A delete of an order also deletes its lines, by a key that is on
+  // order_line: only order's referencedBy can say so, and only if it lists
+  // every key. One missing reads as "a delete does nothing else", one from
+  // outside the fixture is a key the fixture does not have, and a wrong
+  // action is a reach that is not the database's.
+  test('notices a key that refers to a table missing from its referencedBy, an extra one, and one with the wrong action', () => {
+    const made = snapshot('postgres')
+    expect(described(made, 'order').referencedBy?.map((key) => key.name)).toEqual(['fk_order_line_order'])
+    expect(described(made, 'employee').referencedBy?.map((key) => key.name)).toEqual(['fk_employee_manager', 'fk_order_approved_by', 'fk_order_created_by'])
+    const missing = readBack(made, (copy) => {
+      described(copy, 'order').referencedBy = []
+    })
+    expect(snapshotDisagreements(missing)).toEqual(['sales.order is referred to by [], expected [sales.order_line fk_order_line_order]'])
+    const extra = snapshot('postgres', (objects) => {
+      object(objects, 'order').referencedBy = [FROM_OUTSIDE, ...inbound(objects, object(objects, 'order'))]
+    })
+    expect(snapshotDisagreements(extra)).toEqual(['sales.order is referred to by [audit.order_copy fk_order_copy_order, sales.order_line fk_order_line_order], expected [sales.order_line fk_order_line_order]'])
+    const action = readBack(made, (copy) => {
+      const key = described(copy, 'order').referencedBy?.[0]
+      if (key !== undefined) Object.assign(key, { onDelete: 'no-action', enforced: false, referencedColumns: ['tenant_id'] })
+    })
+    expect(snapshotDisagreements(action)).toEqual([
+      'sales.order fk_order_line_order of sales.order_line refers to [tenant_id], expected [id]',
+      'sales.order fk_order_line_order of sales.order_line on delete is no-action, expected cascade',
+      'sales.order fk_order_line_order of sales.order_line is not enforced',
+    ])
+  })
+
+  // The owner sees every key, so a referenced-by gap is an adapter that
+  // failed to read what it could have.
+  test('a referenced-by gap is a disagreement for the owner', () => {
+    expect(snapshotDisagreements(snapshot('sqlserver', () => {}, [{ subject: { kind: 'scope' }, aspect: 'referenced-by', detail: 'x' }]))).toEqual([
+      'unexpected gap on the scope (referenced-by): x',
+    ])
+  })
 })
 
 describe('structuralDisagreements', () => {
@@ -297,11 +399,18 @@ describe('structuralDisagreements', () => {
     const reader = snapshot('postgres', (objects) => {
       for (const entry of objects) {
         entry.rowSecurity = 'applies'
+        entry.access = { delete: false }
         for (const column of entry.columns) column.access = { select: false, insert: false, update: false }
       }
     })
     expect(structuralDisagreements(reader)).toEqual([])
     expect(snapshotDisagreements(reader)).not.toEqual([])
+    // An account without database VIEW DEFINITION on SQL Server cannot tell
+    // whether a key on a table it cannot see refers to one in scope (0049):
+    // beyond the account, as row security is, and still the model's keys.
+    const unsure = snapshot('sqlserver', () => {}, [{ subject: { kind: 'scope' }, aspect: 'referenced-by', detail: 'no VIEW DEFINITION on the database' }])
+    expect(structuralDisagreements(unsure)).toEqual([])
+    expect(structuralDisagreements(snapshot('sqlserver', () => {}, [], true))).toHaveLength(FIXTURE_MODEL.length)
     const short = snapshot('postgres', (objects) => {
       object(objects, 'order').columns.pop()
     })
@@ -325,6 +434,7 @@ function grantsOf(expected: typeof READER_ACCESS, kind: DatabaseKind) {
       }
       const rowSecurity = granted.rowSecurity ?? 'none'
       entry.rowSecurity = typeof rowSecurity === 'string' ? rowSecurity : (rowSecurity[kind] ?? 'none')
+      entry.access = { delete: granted.delete ?? false }
     }
   }
 }
@@ -420,6 +530,24 @@ describe('accessDisagreements', () => {
     expect(accessDisagreements(told, READER_ACCESS)).toEqual([])
     expect(accessDisagreements({ ...told, gaps: [] }, READER_ACCESS)).toEqual(['sales.order row security is unknown and no row-security gap says why'])
   })
+
+  // The order form's account may delete orders and their lines, and the
+  // reader nothing (0049). Misread, a form would offer a delete the database
+  // refuses, or hide one it allows; and a delete of an order cascades into
+  // order_line, so a grant on order alone is not the fixture's.
+  test('a delete other than granted is a disagreement, and so is a snapshot that says nothing about deleting', () => {
+    const writer = (edit: (objects: ObjectMeta[]) => void) =>
+      asAccount('postgres', (objects) => {
+        grantsOf(WRITER_ACCESS, 'postgres')(objects)
+        edit(objects)
+      })
+    expect(accessDisagreements(writer(() => {}), WRITER_ACCESS)).toEqual([])
+    expect(described(writer(() => {}), 'order_line').access).toEqual({ delete: true })
+    expect(accessDisagreements(writer((objects) => (object(objects, 'order_line').access = { delete: false })), WRITER_ACCESS)).toEqual(['sales.order_line delete is false, expected true'])
+    expect(accessDisagreements(writer((objects) => (object(objects, 'customer').access = { delete: true })), WRITER_ACCESS)).toEqual(['sales.customer delete is true, expected false'])
+    const reader = asAccount('sqlserver', grantsOf(READER_ACCESS, 'sqlserver'))
+    expect(accessDisagreements(readBack(reader, (copy) => delete described(copy, 'order').access), READER_ACCESS)).toEqual(['sales.order says nothing about deleting; it was taken before 0049'])
+  })
 })
 
 describe('restrictedDisagreements', () => {
@@ -463,10 +591,26 @@ describe('restrictedDisagreements', () => {
   // A full, correct answer is of course also fine; a wrong target is not.
   test('a correct foreign key passes and a wrong target does not', () => {
     expect(restrictedDisagreements(snapshot('postgres'))).toEqual([])
-    const wrongTarget = snapshot('postgres', (objects) => {
-      const foreignKey = object(objects, 'order').foreignKeys.find((entry) => entry.name === 'fk_order_customer')
+    // Read back from a file: no catalog lists a key onto employee over columns employee lacks, so createSnapshot would refuse it (0049).
+    const wrongTarget = readBack(snapshot('postgres'), (copy) => {
+      const foreignKey = described(copy, 'order').foreignKeys.find((entry) => entry.name === 'fk_order_customer')
       if (foreignKey?.references) foreignKey.references.table = { schema: 'sales', name: 'employee' }
     })
     expect(restrictedDisagreements(wrongTarget)).toEqual(['fk_order_customer points at sales.employee, expected sales.customer'])
+  })
+
+  // The same rule for the keys that refer to sales.order (0049): the reader
+  // may not see order_line, and fk_order_line_order is on order_line. Missing
+  // with nothing said, a delete of an order would look as if it reached
+  // nothing else; behind a referenced-by gap it is "cannot tell".
+  test('a key that refers to sales.order missing from its referencedBy is a disagreement, unless a referenced-by gap says so', () => {
+    const orderOnly = (objects: ObjectMeta[]): void => {
+      objects.splice(0, objects.length, object(objects, 'order'))
+      object(objects, 'order').referencedBy = []
+    }
+    expect(restrictedDisagreements(snapshot('sqlserver', orderOnly))).toEqual(['fk_order_line_order of sales.order_line refers to sales.order, and is missing with no gap that says the reader cannot see it'])
+    expect(restrictedDisagreements(snapshot('sqlserver', orderOnly, [{ subject: { kind: 'scope' }, aspect: 'referenced-by', detail: 'no VIEW DEFINITION on the database' }]))).toEqual([])
+    expect(restrictedDisagreements(snapshot('sqlserver', orderOnly, [{ subject: { kind: 'scope' }, aspect: 'foreign-keys', detail: 'another aspect' }]))).toHaveLength(1)
+    expect(restrictedDisagreements(snapshot('postgres', () => {}, [], true))).toEqual(['sales.order says nothing about deleting; it was taken before 0049'])
   })
 })

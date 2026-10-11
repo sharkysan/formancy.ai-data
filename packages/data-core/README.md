@@ -25,6 +25,13 @@ browser.
   UPDATE, column by column, and whether row-level security applies to it, per
   table — `none`, `applies`, or `unknown` with the gap that says why
   ([0027](../../docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).
+  Since [0049](../../docs/decisions/0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md)
+  each table and view also says whether the account may DELETE from it
+  (`access`) and every foreign key that refers to it, from a table in any
+  schema (`referencedBy`), or a `referenced-by` gap says the list may be
+  short. Both are absent from a snapshot taken before, which keeps its
+  fingerprint; `createSnapshot` refuses one without the other, and a key
+  between two tables of the snapshot said otherwise at its two ends.
 - **Form generation**: `generateForm(snapshot, request)` returns a spec 3
   formancy document, its `FormBindings`, and a note on every choice it made.
   `GENERATED_SPEC_VERSION` is that `"3"`, which the data server also holds

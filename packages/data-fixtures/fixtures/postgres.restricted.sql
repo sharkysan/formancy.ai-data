@@ -11,7 +11,10 @@
 -- formancy_writer is the order form's account, holding its grants through
 -- the role formancy_forms: it reads and inserts orders, updates some of their
 -- columns, reads three columns of customer, and postgres.sql's row-level
--- security shows it tenant 1 only (src/access.ts, WRITER_ACCESS).
+-- security shows it tenant 1 only (src/access.ts, WRITER_ACCESS). It may
+-- delete orders and their lines (0049): a delete of an order cascades into
+-- order_line, and a delete that reaches a table is to be held to the
+-- account's DELETE on it.
 --
 -- The passwords are fixture constants for a container that lives for one
 -- test run; src/containers.ts holds the same values, and src/load.test.ts
@@ -24,5 +27,6 @@ create role formancy_forms nologin;
 grant usage on schema sales to formancy_forms;
 grant select, insert on sales."order" to formancy_forms;
 grant update (status, notes, "group", approved_by, row_version) on sales."order" to formancy_forms;
+grant delete on sales."order", sales.order_line to formancy_forms;
 grant select (tenant_id, customer_no, name) on sales.customer to formancy_forms;
 create role formancy_writer login password 'writer-fixture-password' in role formancy_forms;
