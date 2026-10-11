@@ -4,7 +4,7 @@
     "app": "host",
     "placement": "hero",
     "title": "One record, both renderers",
-    "caption": "`pg-order`, generated from `sales.order` on PostgreSQL as the order form's own account and published through the administrator plane with the getting-started guide's request and policy, drawn by `@formancy/react` and `@formancy/angular` from one definition through `@formancy/data-client`. The order is the fixture's edge case: its id, “9007199254740993”, is 2^53+1, which a JavaScript number reads back as …992, and its amount, “99999999999999.9999”, is the largest `numeric(18,4)` holds. Both panes show both digit for digit, because exact values travel as strings ([0008](./docs/decisions/0008-exact-values-travel-as-strings.md)).",
+    "caption": "`pg-order`, generated from `sales.order` on PostgreSQL as the order form's own account, published through the administrator plane, and drawn by `@formancy/react` and `@formancy/angular` from one definition through `@formancy/data-client`. The order's id, “9007199254740993”, is 2^53+1, which a JavaScript number reads back as …992, and its amount, “99999999999999.9999”, is the largest `numeric(18,4)` holds. Both panes show both digit for digit, because exact values travel as strings ([0008](./docs/decisions/0008-exact-values-travel-as-strings.md)).",
     "alt": "The host page's record bar saying “Loaded record k1:9007199254740993 into both forms.”, a line saying of pg-order that “you may read, create and update records with this form.” beside a Sign out button, and below them the same order form twice, React on the left and Angular on the right, each showing customer “Muster AG”, id 9007199254740993 and amount 99999999999999.9999.",
     "quotes": {
       "9007199254740993": ["React", "Angular"],
@@ -70,7 +70,7 @@
   {
     "id": "studio-policy",
     "app": "studio",
-    "placement": "more",
+    "placement": "inline",
     "title": "Policy",
     "step": "4. Policy",
     "caption": "The tenant pin becomes a row filter on the orders this form reaches and on the customers its list may offer, taken from the signed-in person's attributes “and never from the form”; a customer outside the filter is refused on save “even by somebody who knows its key” ([0011](./docs/decisions/0011-every-operation-carries-a-trusted-policy-context.md)).",
@@ -78,6 +78,18 @@
     "quotes": {
       "and never from the form": ["Rows"],
       "even by somebody who knows its key": ["Lookup"]
+    }
+  },
+  {
+    "id": "studio-through",
+    "app": "studio",
+    "placement": "more",
+    "title": "Order lines through their order",
+    "caption": "A form over `sales.order_line`, which has no tenant column, discovered as the fixture's owner because the order form's own account may not read the lines. Its Order list is filtered to the person's tenant; ticked, the box “Only rows of sales.order_line whose Order is one of these” makes another tenant's line not found on read and update, and “A row that names none is reached by nobody.” Unticked, the step notes that nothing scopes the rows; nothing requires the box ([0043](./docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)).",
+    "alt": "The group Rows the Order list may offer, on the Policy step of a form over sales.order_line: a filter of tenant_id equal to the trusted attribute tenant, and the box “Only rows of sales.order_line whose Order is one of these”, ticked, with its hint.",
+    "quotes": {
+      "Only rows of sales.order_line whose Order is one of these": ["Lookup"],
+      "A row that names none is reached by nobody.": ["Lookup"]
     }
   },
   {
@@ -99,8 +111,8 @@
     "placement": "more",
     "title": "Preview",
     "step": "6. Preview",
-    "caption": "The form as the people filling it in will see it, on white paper in the Blueprint theme and checked by the released engine; the studio's browser gate fails if any rule of the studio's own stylesheet selects an element on the paper. The Customer list is filled only by the runtime plane, so “the renderer says where the list would be”.",
-    "alt": "The Preview step: a note that the Customer list is filled by the runtime plane once published, and the order form on white paper after Validate, with Order date, Customer and Amount marked required.",
+    "caption": "The form as the people filling it in will see it, with the labels and order chosen in Presentation, on white paper in the Blueprint theme, and checked by the released engine after Validate. The Customer list is filled only by the runtime plane, so “the renderer says where the list would be”.",
+    "alt": "The Preview step: a note that the Customer list is filled by the runtime plane once published, and the order form on white paper after Validate, with notes labelled Remarks at full width, Order date and Amount marked required, and Order date, Customer and Amount each saying required.",
     "quotes": {
       "the renderer says where the list would be": ["Preview"]
     }
@@ -108,7 +120,7 @@
   {
     "id": "studio-publish-conflict",
     "app": "studio",
-    "placement": "more",
+    "placement": "inline",
     "title": "A conflicting publish",
     "step": "7. Publish",
     "caption": "Another administrator, grace, published version 2 while ada worked; the capture script sends grace's request to the same server. Nothing is overwritten: “Yours was not published, and theirs is untouched.” The step says which version is published now, and “Publishing waits until you rebase on it.” ([0013](./docs/decisions/0013-published-configuration-is-files-with-link-based-swap.md)).",
@@ -125,7 +137,7 @@
     "placement": "inline",
     "title": "Drift",
     "step": "8. Drift",
-    "caption": "After the capture script renamed `notes` to `memo` in the captured snapshot, which is what discovery reports after a column is renamed in the database, on both engines. The published form may not be used until the change is reviewed, the rename is a “possible-rename” for a person to confirm and not a guess, and restoring version 1, which still binds `notes`, is refused with what blocks it: “Version 1 cannot be restored: the database has changed in a way it cannot serve.” ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md), [0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).",
+    "caption": "After the capture script renamed `notes` to `memo` in the captured snapshot, as discovery reports a real rename on both engines. The rename is a “possible-rename” for a person to confirm, not a guess, and restoring version 1, which still binds `notes`, is refused: “Version 1 cannot be restored: the database has changed in a way it cannot serve.” Against a database changed this way the server refuses what the report blocks ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md), [0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md), [0041](./docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)).",
     "alt": "The Drift step: “3 changes, 1 blocking.”; read, create and update blocked; a blocking column-dropped change for notes, review changes for the new column memo and a possible rename; and a refused restore of version 1 with what blocks it.",
     "quotes": {
       "possible-rename": ["Drift"],
@@ -162,11 +174,36 @@
     "app": "studio",
     "placement": "more",
     "title": "Restored",
-    "caption": "Once the database fits version 1 again, it is restored as the next version with the policy it had: “The database was not changed.”",
+    "caption": "After the capture script put the snapshot back without the rename, version 1 fits the database again and is restored as the next version, with the policy it had: “The database was not changed.”",
     "alt": "The versions panel saying “Restored version 1 as version 4” and that the database was not changed.",
     "quotes": {
       "The database was not changed.": ["Versions"],
       "Restored version 1 as version 4": ["Versions"]
+    }
+  },
+  {
+    "id": "studio-keys",
+    "app": "studio",
+    "placement": "more",
+    "title": "A key that moved",
+    "caption": "The capture script renamed `order_date` to `order date` in the captured snapshot with the drift's function, which the adapters' suites compare with a real rename of `notes` only. Regenerated, the key `order_date` now names the column `order date`, and nothing can tell whether that is the same column, so its grants wait: “Keep grants for order_date”, or remove them. “Publishing waits until each is decided, and the server refuses grants nobody decided.” ([0039](./docs/decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md)).",
+    "alt": "A notice “Keys that now stand for something else” on the Policy step: that each grant below was written for what its key stood for, that publishing waits until each is decided, the sentence “Grants for order_date were written for column order_date; it now stands for column order date.”, and buttons to keep or remove the grants for order_date.",
+    "quotes": {
+      "Keys that now stand for something else": ["Keys"],
+      "Grants for order_date were written for column order_date; it now stands for column order date.": ["Keys"],
+      "Keep grants for order_date": ["Keys"],
+      "Publishing waits until each is decided, and the server refuses grants nobody decided.": ["Keys"]
+    }
+  },
+  {
+    "id": "host-typeahead",
+    "app": "host",
+    "placement": "inline",
+    "title": "The customer typeahead",
+    "caption": "The customer field is a typeahead the host page draws over the published lookup. As clara, a clerk of tenant 1, types, the server answers as her with the rows she may choose: “Muster AG”, and not tenant 2's Other Tenant GmbH, which matches too and has the same customer number. Each option travels under a token that is a reference, not a permission ([0012](./docs/decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md)).",
+    "alt": "The React pane of a new order with er typed into Customer and a list offering Muster AG alone.",
+    "quotes": {
+      "Muster AG": ["List"]
     }
   },
   {
@@ -184,29 +221,6 @@
     }
   },
   {
-    "id": "host-unknown",
-    "app": "host",
-    "placement": "inline",
-    "title": "A save whose answer was lost",
-    "caption": "A save whose answer was lost after the server stored it: the capture script lets the server store it and then tells the page the connection was reset. The page cannot know whether it was saved, so it says so, offers to check, and holds the save; nothing sends it again ([0031](./docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).",
-    "alt": "The React pane with a notice “It may have been saved”, the sentence that the answer was lost between this page and the data server, and a button “Check whether it was saved”.",
-    "quotes": {
-      "It may have been saved": ["React"],
-      "Check whether it was saved": ["React"]
-    }
-  },
-  {
-    "id": "host-typeahead",
-    "app": "host",
-    "placement": "more",
-    "title": "The customer typeahead",
-    "caption": "The customer field is a typeahead the host page draws over the published lookup. As clara, a clerk of tenant 1, types, the page asks the runtime plane as her, and the server answers with the rows she may choose: “Muster AG”, and not tenant 2's Other Tenant GmbH, which matches too and has the same customer number. Each option travels under a token that is a reference, not a permission ([0012](./docs/decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md)).",
-    "alt": "The React pane of a new order with er typed into Customer and a list offering Muster AG alone.",
-    "quotes": {
-      "Muster AG": ["List"]
-    }
-  },
-  {
     "id": "host-refused",
     "app": "host",
     "placement": "more",
@@ -216,6 +230,30 @@
     "quotes": {
       "This is not one of the options this form offers.": ["React"],
       "There is 1 problem to fix": ["React"]
+    }
+  },
+  {
+    "id": "host-unknown",
+    "app": "host",
+    "placement": "more",
+    "title": "A save whose answer was lost",
+    "caption": "A save whose answer was lost after the server stored it: the capture script lets the server store it and then tells the page the connection was reset. The page cannot know whether it was saved, so it says so, offers to check, and holds the save; the page sends nothing again ([0031](./docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).",
+    "alt": "The React pane with a notice “It may have been saved”, the sentence that the answer was lost between this page and the data server, and a button “Check whether it was saved”.",
+    "quotes": {
+      "It may have been saved": ["React"],
+      "Check whether it was saved": ["React"]
+    }
+  },
+  {
+    "id": "host-drift",
+    "app": "host",
+    "placement": "more",
+    "title": "A save after the table changed",
+    "caption": "After clara loaded the record, the capture script narrowed `status` from `varchar(20)` to `varchar(8)` through the database's owner, which drift review says stops create and update. Her save, which changes only the notes, is refused by the server in a sentence that names no column: “Nothing was saved; an administrator must review the form.” What she typed stays in the form, and the row is as it was ([0041](./docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)).",
+    "alt": "The React pane with a notice “Not saved” saying that the database changed since this form was published, in a way this form cannot save safely, that nothing was saved and that an administrator must review the form, above the loaded order with the notes clara typed still in it.",
+    "quotes": {
+      "Not saved": ["React"],
+      "Nothing was saved; an administrator must review the form.": ["React"]
     }
   },
   {

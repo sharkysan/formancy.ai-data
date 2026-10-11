@@ -18,8 +18,10 @@ page does not restate them.
   administrator plane, over the committed captured snapshots in
   `apps/studio/src/fixtures/`, each read back against its fingerprint. `pg`
   is the order form's own account, as the getting-started guide's `pg` is;
-  `ms-reader` is SQL Server's account without VIEW DEFINITION. ada and grace
-  are two administrators. No Docker.
+  `pg-owner` is the fixture's owner, for the form over `sales.order_line`,
+  which the order form's own account may not read; `ms-reader` is SQL Server's
+  account without VIEW DEFINITION. ada and grace are two administrators. No
+  Docker.
 - **The host page** runs against the real server over a real PostgreSQL
   (`POSTGRES_IMAGE` from `@formancy/data-fixtures`, through testcontainers),
   connected as the order form's own account, whose grants and row-level
@@ -39,12 +41,24 @@ listens on a port.
   server, required to answer 201.
 - *Drift*: the writer snapshot with `notes` renamed to `memo` in place, by
   `renamedColumn` from `@formancy/data-fixtures`, which both adapters'
-  discovery suites hold equal to what discovery reports after a real rename.
+  discovery suites hold equal to what discovery reports after a real rename
+  of `notes`.
+- *Restored*: the writer snapshot put back without the rename, so that
+  version 1 fits the database again.
+- *A key that moved*: the same snapshot with `order_date` renamed to
+  `order date` by the same function. No suite compares that rename with a
+  real one; `renamedColumn` refuses a column that a key, a foreign key or a
+  check names, and `order_date` is none.
 - *A refused choice*: a customer inserted and, after it was chosen, deleted
   through the database's owner.
 - *A save whose answer was lost*: the update is handed to the server, required
   to answer 200 and to have been sent once, and the page is then told the
   connection was reset.
+- *A save after the table changed*: `sales.order.status` narrowed from
+  `varchar(20)` to `varchar(8)` through the database's owner, after clara
+  loaded the record: the shape of the shared drift case `tightened-text`.
+  It is the host walk's last act, because it changes the table and every
+  earlier act reads it as the fixture made it.
 
 ## The camera
 
@@ -92,7 +106,17 @@ record, and `pnpm test:repo` fails when they are not what the render gives.
 against the database: that both panes hold the id digit for digit, that the
 stale save overwrote nothing, that the lost save was stored, that the
 typeahead offers clara her tenant's customer alone though tenant 2's matches
-too. They run at every capture and every `--check`.
+too; that `status` is `varchar(20)` before the narrowing and `varchar(8)`
+after it, as host-drift's caption says, read from the catalog because neither
+width is in the picture (watched failing with 9 for 8); that after it drift
+review, asked as ada, says reads go on and create and update stop, for the
+runtime too, and that the save after it was sent once, answered 409 `drift`
+and left the row as it was; that the regeneration over the moved key reports
+`order_date` and nothing else, and that the Publish step waits for it with
+its button disabled (watched failing with the button left enabled for
+undecided keys); and that the lines' form notes that nothing scopes its rows
+until the box is ticked (watched failing with the note taken out of the
+step). They run at every capture and every `--check`.
 
 ## Commands
 
@@ -139,7 +163,9 @@ the network for Google Fonts at capture, and Docker for the host page.
 **GitHub's column width has not been measured.** The machine the pictures
 were first taken on could not reach GitHub's assets: its firewall refused
 `github.githubassets.com` on 2026-10-09 and held it for approval on
-2026-10-10. A picture wider than the column is scaled down by GitHub; how
+2026-10-10, and held it for approval again on 2026-10-11, when the pictures
+of the moved key, the lines' form and the save after the table changed were
+added. A picture wider than the column is scaled down by GitHub; how
 far, and whether the hero's digits stay legible at that scale, is for the
 first review on github.com to say, with the window width and the date.
 
@@ -154,6 +180,17 @@ Filed, not hidden, because a picture is the product as it is:
   loaded, which the hero shows. The runtime plane does not tell the page which
   fields an update may write, so the fix is the server's and the page's, not
   this page's.
+- **A restore's help line names the version after the one it made.** Once
+  version 1 is restored as version 4, the Versions panel's help line above
+  it already says a restore publishes "as version 5", which the restored
+  picture shows beside "Restored version 1 as version 4". Both are true;
+  side by side they read as a contradiction. The studio's copy, filed.
+- **A moved key's columns are told apart by a space.** The Policy step's
+  sentence about a reassigned key, "...written for column order_date; it now
+  stands for column order date", sets both names in proportional type, where
+  the space reads as ordinary English; the key that moved picture shows it.
+  The sentence is data-core's `describeReassigned`, which the server's
+  refusal says too, so marking the names is a change to both, filed.
 - **The preview's Customer field loses its required marker.** When the
   renderer cannot fill a field's options -- the studio speaks only the
   administrator plane -- it draws a sentence in place of the control, so
@@ -173,8 +210,10 @@ Filed, not hidden, because a picture is the product as it is:
 - **Whether a picture persuades**, and how GitHub scales it.
 - **The people's names.** That ada, grace, clara and otto are the identities
   the scripts' literal tokens stand for.
-- **SQL Server on the host page.** Only PostgreSQL is pictured there; the host
-  page's suites prove its behaviour on both engines.
+- **SQL Server on the host page.** Only PostgreSQL is pictured there. The host
+  page's suites prove its behaviour on both engines, but for the drift
+  refusal: that the page shows one is held only by host-drift's `--check`, on
+  PostgreSQL, and no host suite reaches it on either engine.
 - **The snapshot format.** A Playwright upgrade that changes how the
   accessibility snapshot is written turns the check red with no product
   change; retaking the pictures is the answer, and the failure names both
