@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, test } from 'vitest'
 import { classify, MISSING } from './journey.mjs'
-import { anonymousMountProblems, auditEvents, bindMountProblems, configProblems, exposureProblems, leaks, namedSecretFiles, pageReferences, redact, styleReferences } from './stack.mjs'
+import { anonymousMountProblems, auditEvents, bindMountProblems, configProblems, exposureProblems, leaks, namedSecretFiles, noticesProblem, pageReferences, redact, styleReferences } from './stack.mjs'
 
 /**
  * The gate's checks that need no Docker, held to cases (0032). Each is also
@@ -260,6 +260,24 @@ describe('the page check', () => {
       'data:image/png;base64,AA',
       'a.css',
     ])
+  })
+
+  // Each page's build writes its third-party notices beside it (0046), in
+  // UTF-8, and a browser left to guess the encoding of a bare text/plain can
+  // garble a licence's accented name or copyright sign: nginx must say
+  // UTF-8. A build without the plugin answers 404, and nginx without
+  // `charset` a bare text/plain; both are what the stack check catches. The
+  // status is checked as well as the type: an error page or a redirect
+  // served as UTF-8 text -- the check follows no redirect, as a browser's
+  // first request does not -- is no notices file.
+  test('wants each page’s notices as UTF-8 text', () => {
+    expect(noticesProblem('/studio/THIRD-PARTY-NOTICES.txt', 200, 'text/plain; charset=utf-8')).toBeUndefined()
+    expect(noticesProblem('/host/THIRD-PARTY-NOTICES.txt', 200, 'text/plain; charset=UTF-8')).toBeUndefined()
+    expect(noticesProblem('/host/THIRD-PARTY-NOTICES.txt', 200, 'text/plain')).toBe('/host/THIRD-PARTY-NOTICES.txt answered 200 text/plain, not 200 text/plain; charset=utf-8')
+    expect(noticesProblem('/studio/THIRD-PARTY-NOTICES.txt', 404, 'text/html')).toBe('/studio/THIRD-PARTY-NOTICES.txt answered 404 text/html, not 200 text/plain; charset=utf-8')
+    expect(noticesProblem('/studio/THIRD-PARTY-NOTICES.txt', 200, 'text/plain; charset=iso-8859-1')).toBeDefined()
+    expect(noticesProblem('/host/THIRD-PARTY-NOTICES.txt', 404, 'text/plain; charset=utf-8')).toBe('/host/THIRD-PARTY-NOTICES.txt answered 404 text/plain; charset=utf-8, not 200 text/plain; charset=utf-8')
+    expect(noticesProblem('/host/THIRD-PARTY-NOTICES.txt', 301, 'text/plain; charset=utf-8')).toBeDefined()
   })
 })
 

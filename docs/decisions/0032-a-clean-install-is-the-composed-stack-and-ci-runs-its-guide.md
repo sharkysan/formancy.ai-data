@@ -1,6 +1,6 @@
 # 0032 — A clean install is the composed stack behind one proxy, and CI runs its guide
 
-- **Status:** accepted; its CI jobs -- `getting-started`, and `container`, which checks the store's directory -- run in `gates.yml`, which `ci.yml` and `release.yml` both call, before the release's `check` and `publish` jobs, and `getting-started` records what each composed database answered for the release report, extended by [0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md)
+- **Status:** accepted; its CI jobs -- `getting-started`, and `container`, which checks the store's directory -- run in `gates.yml`, which `ci.yml` and `release.yml` both call, before the release's `check` and `publish` jobs, and `getting-started` records what each composed database answered for the release report, extended by [0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md); the web image serves each page's third-party notices as UTF-8, and the gate's page check asks for both, extended by [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md)
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

@@ -62,8 +62,11 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > browser gate measures it. From an empty machine with Docker and git,
 > `docker compose --profile stack up` runs both databases with the sample
 > fixture, the server, and the studio and the host page behind one proxy,
-> and a CI job runs [the guide](./docs/getting-started.md) that says how, as
-> written, on both engines. Every CI run ends in a report of what it was
+> each with the licence and notice texts of the packages it bundles beside
+> it -- all but what Vite folds in as text, which
+> [0046](./docs/decisions/0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md)
+> names -- and a CI job runs [the guide](./docs/getting-started.md) that says
+> how, as written, on both engines. Every CI run ends in a report of what it was
 > tested on -- each server's own version, the dependencies the suites
 > loaded, every shared case on both engines -- which a release checks, signs
 > and attaches. Performance is measured, not promised:
@@ -91,6 +94,19 @@ and backend this module builds on stay Apache-2.0; this module does not.
 review and says so at the top. Why a paid module exists beside an Apache-2.0
 project, and why in a repository of its own, is decision
 [0001](./docs/decisions/0001-a-paid-module-in-its-own-repository.md).
+
+The studio and the host page bundle other people's packages, React, Angular
+and upstream formancy among them. Each build writes `THIRD-PARTY-NOTICES.txt`
+beside its page, with each package's licence and notice files -- a name
+that begins `LICENSE`, `LICENCE`, `COPYING` or `NOTICE` and is not code -- at
+its root and on the way to what of it is bundled. It stops when a package
+ships no licence text, or when it meets code it cannot place, a worker's
+among it. The composed stack serves them at `/studio/THIRD-PARTY-NOTICES.txt`
+and `/host/THIRD-PARTY-NOTICES.txt`; this repository's own `LICENSE.md` and
+`NOTICE` stay in the image
+([0046](./docs/decisions/0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md)).
+Every package's build refuses to inline anything from node_modules into its
+dist, which the notices take as this repository's own.
 
 ## Packages
 

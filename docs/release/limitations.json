@@ -741,7 +741,7 @@
       ]
     },
     "0032": {
-      "reviewed": "sha256:f3c48172f9c8c7148821cce852ec446b9d9a83343e544ddd499a8a95cbebbe8d",
+      "reviewed": "sha256:dee28c4cac0edc957b7c03a6704255bfc8797977bef44e811b81b4d1c4b374f0",
       "limitations": [
         {
           "area": "operations",
@@ -1107,6 +1107,35 @@
         {
           "area": "testing",
           "says": "That a host whose reader is at `@formancy/*` 0.3.0 reads every generated form was measured once, on 2026-10-10, and nothing here runs a 0.3.0 renderer."
+        }
+      ]
+    },
+    "0046": {
+      "reviewed": "sha256:bc6e4fd4ff2cfae13de07b795e999fd8dc16a8d721e79271aeac6e7a991d0e3e",
+      "limitations": [
+        {
+          "area": "licence",
+          "says": "The studio's and the host page's third-party notices are the texts each bundled package ships; what a licence requires beyond its text is not judged."
+        },
+        {
+          "area": "licence",
+          "says": "The helpers Vite and Rolldown write into the studio's and the host page's chunks themselves are not listed in their third-party notices."
+        },
+        {
+          "area": "licence",
+          "says": "What Vite folds into the studio's or the host page's output as text is not listed in its third-party notices: a package stylesheet that a stylesheet `@import`s, a package's file under Vite's inline limit named by a CSS `url()` or a `new URL()`, and a module whose only export is a boolean or a number."
+        },
+        {
+          "area": "licence",
+          "says": "Code a package vendors is listed in the third-party notices under the package that ships it, with the licence and notice files on the way to it, not under its own name and version."
+        },
+        {
+          "area": "licence",
+          "says": "The web front serves each page's third-party notices but not the repository's own LICENSE.md and NOTICE, which are in the web image at /usr/share/formancy-data/."
+        },
+        {
+          "area": "operations",
+          "says": "The third-party notices at /studio/THIRD-PARTY-NOTICES.txt and /host/THIRD-PARTY-NOTICES.txt name the exact version of every package each page bundles, to anyone who reaches the web front."
         }
       ]
     }

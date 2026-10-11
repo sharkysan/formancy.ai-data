@@ -23,7 +23,9 @@
 //  4. that the server and the minter can read the secrets their settings
 //     name, and no other;
 //  5. the pages, through the one origin: every script and stylesheet the
-//     studio and the host page name is served with its type;
+//     studio and the host page name is served with its type, and beside
+//     each page its third-party notices, as text that says it is UTF-8
+//     (0046);
 //  6. the journey the guide walks, over HTTP, on PostgreSQL then SQL Server,
 //     with journey.json's values -- the ones the guide's tables are generated
 //     from (journey.mjs) -- and each database's version as the server's own

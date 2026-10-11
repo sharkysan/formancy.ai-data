@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url'
 import angular from '@analogjs/vite-plugin-angular'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { thirdPartyNotices } from '../../scripts/third-party-notices.mjs'
 
 /**
  * What the Angular compiler is pointed at, and nothing else: the one component
@@ -38,6 +39,10 @@ export default defineConfig({
       tsconfig: TSCONFIG,
       transformFilter: (_code: string, id: string) => ANGULAR_SOURCES.some((part) => id.includes(part)),
     }),
+    // dist/THIRD-PARTY-NOTICES.txt: every package the build bundles, with
+    // the licence and notice files it ships; a package with no licence text,
+    // or code the plugin cannot place, stops the build (0046).
+    thirdPartyNotices(),
   ],
   // Fail rather than wander to the next free port: an address nobody was told
   // about is worse than an error. 4390 is the server's, 4391 the examples',
