@@ -59,3 +59,20 @@ catalog:
   testcontainers: ^12.1.0
   "@testcontainers/postgresql": ^12.1.0
   "@testcontainers/mssqlserver": ^12.1.0
+
+# pnpm refuses a package published less than a day ago, the lockfile's
+# included, and an upstream release is adopted the day it is published (0055).
+# So each package of that release is exempt here, by its exact version, as
+# pnpm writes it when the pins move -- `@formancy/expressions` too, which comes
+# in beneath the others. Nothing outside upstream is exempt, and an exemption
+# for a version the lockfile no longer installs is removed:
+# scripts/upstream-deps.mjs refuses either.
+minimumReleaseAgeExclude:
+  - '@formancy/angular@0.5.0'
+  - '@formancy/builder-core@0.5.0'
+  - '@formancy/conformance@0.5.0'
+  - '@formancy/core@0.5.0'
+  - '@formancy/expressions@0.5.0'
+  - '@formancy/react@0.5.0'
+  - '@formancy/spec@0.5.0'
+  - '@formancy/themes@0.5.0'

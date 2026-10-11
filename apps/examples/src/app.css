@@ -29,7 +29,7 @@
   --ok: #4fdc8a;
   --warn: #ffd27a;
 
-  --display: 'Archivo', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --display: 'Archivo', 'Archivo Variable', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
 
   /* The two stacks admin.css reads from workbench.css as --wb-sans and
      --wb-mono. This page has no builder panes, so it does not load

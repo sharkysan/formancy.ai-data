@@ -56,7 +56,7 @@ only enforcement is "we remember" says so plainly.
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-a-paid-module-in-its-own-repository.md) | A paid module lives in its own repository, under its own licence | accepted; extended by 0048 |
-| [0002](0002-depend-on-upstream-never-copy-it.md) | Depend on released upstream packages at exact versions; never copy them | accepted; spec 4 window closed, 0042 |
+| [0002](0002-depend-on-upstream-never-copy-it.md) | Depend on released upstream packages at exact versions; never copy them | accepted; spec 4 window closed, 0042; extended by 0055 |
 | [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted |
 | [0004](0004-a-snapshot-says-what-it-could-not-see.md) | A metadata snapshot says what it could not see, and is made in one place | accepted; narrowed by 0027; extended by 0049 |
 | [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026, 0027, 0034, 0043, 0049 |
@@ -104,3 +104,4 @@ only enforcement is "we remember" says so plainly.
 | [0048](0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md) | The licence is in force before a lawyer has read it | accepted; extended by 0054 |
 | [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md) | A snapshot says whether its account may delete from each table, and every foreign key that refers to it | accepted |
 | [0054](0054-version-1-1-names-the-address-for-a-redistribution-agreement-too.md) | Version 1.1 of the licence names the address for a redistribution agreement too | accepted |
+| [0055](0055-an-upstream-release-is-adopted-the-day-it-is-published.md) | An upstream release is adopted the day it is published, and only upstream is exempt from the release age | accepted |

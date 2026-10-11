@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { upstreamDependencyProblems, workspaceManifests } from './upstream-deps.mjs'
+import {
+  lockedPackages,
+  releaseAgeExemptionProblems,
+  releaseAgeExemptions,
+  upstreamDependencyProblems,
+  workspaceManifests,
+} from './upstream-deps.mjs'
 
 describe('upstreamDependencyProblems', () => {
   const core = { name: '@formancy/data-core', dependencies: { '@formancy/spec': '0.3.0' } }
@@ -34,11 +40,53 @@ describe('upstreamDependencyProblems', () => {
   })
 })
 
+describe('releaseAgeExemptionProblems', () => {
+  const siblings = new Set(['@formancy/data-core'])
+  const locked = new Set(['@formancy/core@0.5.0', '@formancy/expressions@0.5.0', 'ajv@8.20.0'])
+
+  // What pnpm writes when a release younger than its minimum age is pinned,
+  // and the only thing the exemption is for: upstream, by exact version,
+  // installed now -- the transitive `@formancy/expressions` included.
+  test('accepts an upstream package at a version the lockfile installs', () => {
+    expect(releaseAgeExemptionProblems(['@formancy/core@0.5.0', '@formancy/expressions@0.5.0'], locked, siblings)).toEqual([])
+  })
+
+  // The policy exists for packages nobody here reviews: a third-party package
+  // admitted on its first day would be the compromise it guards against.
+  test('refuses a package outside the upstream scope, and a sibling', () => {
+    const problems = releaseAgeExemptionProblems(['ajv@8.20.0', '@formancy/data-core@0.1.0'], locked, siblings)
+    expect(problems).toHaveLength(2)
+    expect(problems[0]).toMatch(/ajv@8\.20\.0/)
+    expect(problems[1]).toMatch(/@formancy\/data-core@0\.1\.0/)
+  })
+
+  // A name alone, or a pattern, admits every later release on its first day,
+  // which is a range by another route (0002).
+  test('refuses a name without a version, a pattern and a range', () => {
+    const problems = releaseAgeExemptionProblems(['@formancy/core', '@formancy/*', '@formancy/core@^0.5.0'], locked, siblings)
+    expect(problems).toHaveLength(3)
+  })
+
+  // An exemption for a version nothing installs any more admits nothing, and
+  // left behind it reads as if that version were still in use.
+  test('refuses an upstream version the lockfile no longer installs', () => {
+    const problems = releaseAgeExemptionProblems(['@formancy/core@0.4.0'], locked, siblings)
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toMatch(/@formancy\/core@0\.4\.0/)
+  })
+})
+
 describe('this workspace', () => {
   // The real tree, so the guard is a gate and not an example.
   test('depends on upstream only at exact released versions', () => {
     const manifests = workspaceManifests()
     expect(manifests.length).toBeGreaterThanOrEqual(3)
     expect(upstreamDependencyProblems(manifests)).toEqual([])
+  })
+
+  // The real pnpm-workspace.yaml against the real lockfile.
+  test('exempts from the minimum release age only upstream versions it installs', () => {
+    const siblings = new Set(workspaceManifests().map((manifest) => manifest.name))
+    expect(releaseAgeExemptionProblems(releaseAgeExemptions(), lockedPackages(), siblings)).toEqual([])
   })
 })

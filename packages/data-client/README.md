@@ -119,8 +119,9 @@ a title, operations or children is `unexpected`.
   twice (0031). The client itself still never sends anything again.
 - **Field problems are sentences.** The renderers print an error entry as
   it is, beside the field and in the error summary, as observed at 0.3.0 on
-  2026-10-09 and at 0.4.0 on 2026-10-10, so `fieldProblems` hands them the
-  server's sentence, which never echoes a value. The code stays on the
+  2026-10-09, at 0.4.0 on 2026-10-10 and at 0.5.0 on 2026-10-11, so
+  `fieldProblems` hands them the server's sentence, which never echoes a
+  value. The code stays on the
   refusal for a program.
 
 ## In React
@@ -185,18 +186,20 @@ to update asks under update's filter without a new application.
   write id, in its process only: a copy that reaches another replica is
   applied again.
 - **`hasMore` and `omitted` do not reach the person.** A renderer's option
-  contract, as read at 0.3.0 on 2026-10-09 and unchanged at 0.4.0, is a list
-  of `{ value, label }`, so a list of exactly one page looks complete. A
-  typeahead keeps narrowing; a plain select does not.
-- **Its types are `@formancy/spec` 0.4.0's.** `PublishedForm.form` is the
+  contract, as read at 0.3.0 on 2026-10-09 and unchanged at 0.4.0 and 0.5.0,
+  is a list of `{ value, label }`, so a list of exactly one page looks
+  complete. A typeahead keeps narrowing; a plain select does not.
+- **Its types are `@formancy/spec` 0.5.0's.** `PublishedForm.form` is the
   `FormSchema` of the `@formancy/spec` this package pins exactly (0002), and
   there `specVersion` may be `"4"`, so a host whose engine is
   `@formancy/core` 0.3.0 does not compile the React snippet above: TS2322 at
   `createFormEngine`, measured with TypeScript 6.0.3 and `skipLibCheck` off
-  on 2026-10-10. The document itself is spec 3
+  on 2026-10-10, and again against 0.5.0's types on 2026-10-11, when a host
+  whose engine is at 0.4.0 compiled it. The document itself is spec 3
   ([0042](../../docs/decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)),
   so such a host casts it to its own `@formancy/spec`'s `FormSchema`, or
-  moves its renderer to 0.4.0. Nothing here type-checks a 0.3.0 host.
+  moves its renderer to 0.4.0 or later. Nothing here type-checks a 0.3.0 or
+  a 0.4.0 host.
 - **Records are addressed by token only.** The definition does not name the
   identity columns, so a host keeps the tokens that create, read and lookups
   return, or encodes its own key with data-core's `encodeKeyToken`.

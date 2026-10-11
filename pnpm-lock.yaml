@@ -233,23 +233,23 @@ importers:
         specifier: ^22.1.7
         version: 22.2.1(@angular/common@22.2.1(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))
       '@formancy/angular':
-        specifier: 0.4.0
-        version: 0.4.0(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))
+        specifier: 0.5.0
+        version: 0.5.0(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))
       '@formancy/core':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@formancy/data-core':
         specifier: workspace:*
         version: link:../../packages/data-core
       '@formancy/react':
-        specifier: 0.4.0
-        version: 0.4.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        specifier: 0.5.0
+        version: 0.5.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@formancy/spec':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@formancy/themes':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       react:
         specifier: ^19.3.0
         version: 19.3.0
@@ -273,8 +273,8 @@ importers:
         specifier: ^22.1.7
         version: 22.2.1(@angular/compiler@22.2.1)(typescript@6.0.3)
       '@formancy/conformance':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@formancy/data-fixtures':
         specifier: workspace:*
         version: link:../../packages/data-fixtures
@@ -339,23 +339,23 @@ importers:
         specifier: ^22.1.7
         version: 22.2.1(@angular/common@22.2.1(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))
       '@formancy/angular':
-        specifier: 0.4.0
-        version: 0.4.0(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))
+        specifier: 0.5.0
+        version: 0.5.0(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))
       '@formancy/core':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@formancy/data-client':
         specifier: workspace:*
         version: link:../../packages/data-client
       '@formancy/react':
-        specifier: 0.4.0
-        version: 0.4.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        specifier: 0.5.0
+        version: 0.5.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@formancy/spec':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@formancy/themes':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       react:
         specifier: ^19.3.0
         version: 19.3.0
@@ -379,8 +379,8 @@ importers:
         specifier: ^22.1.7
         version: 22.2.1(@angular/compiler@22.2.1)(typescript@6.0.3)
       '@formancy/conformance':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@formancy/data-core':
         specifier: workspace:*
         version: link:../../packages/data-core
@@ -445,23 +445,23 @@ importers:
   apps/studio:
     dependencies:
       '@formancy/builder-core':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@formancy/core':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@formancy/data-core':
         specifier: workspace:*
         version: link:../../packages/data-core
       '@formancy/react':
-        specifier: 0.4.0
-        version: 0.4.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        specifier: 0.5.0
+        version: 0.5.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@formancy/spec':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@formancy/themes':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       react:
         specifier: ^19.3.0
         version: 19.3.0
@@ -470,8 +470,8 @@ importers:
         version: 19.3.0(react@19.3.0)
     devDependencies:
       '@formancy/conformance':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@formancy/data-fixtures':
         specifier: workspace:*
         version: link:../../packages/data-fixtures
@@ -536,15 +536,15 @@ importers:
         specifier: workspace:*
         version: link:../data-core
       '@formancy/spec':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: 'catalog:'
         version: 0.18.5
       '@formancy/core':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@formancy/data-fixtures':
         specifier: workspace:*
         version: link:../data-fixtures
@@ -588,15 +588,15 @@ importers:
   packages/data-core:
     dependencies:
       '@formancy/spec':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: 'catalog:'
         version: 0.18.5
       '@formancy/core':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.3(vitest@5.0.3)
@@ -763,8 +763,8 @@ importers:
         specifier: workspace:*
         version: link:../data-sqlserver
       '@formancy/spec':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       fastify:
         specifier: ^5.12.5
         version: 5.12.5
@@ -1402,8 +1402,8 @@ packages:
   '@fastify/rate-limit@11.2.0':
     resolution: {integrity: sha512-X7osJd4XSvMoejYrnJkSZYYjY1eNYoBqhjlzf1RakC2204qExFqZFTKj5+T7VuzA/iUI9Z3UoSqQRkB2HpG0oQ==}
 
-  '@formancy/angular@0.4.0':
-    resolution: {integrity: sha512-O96BCnEyfb+s11irtRYGlEg27NXZY9V2kYaaBtnZ2O3005HLDrm4YiFbJXMWgGPKaZgEeSatVzpI1B3AE0TVzw==}
+  '@formancy/angular@0.5.0':
+    resolution: {integrity: sha512-9u3SeETyPXVCIijsAtC+zteD7FNnFUbf6qh2bisr8XaVXmsLD8u2yJhlytTJ9vgqclJi5dwBQ32RrbMKCV1+1Q==}
     peerDependencies:
       '@angular/cdk': ^22.0.0
       '@angular/core': ^22.0.0
@@ -1414,29 +1414,29 @@ packages:
       '@angular/material':
         optional: true
 
-  '@formancy/builder-core@0.4.0':
-    resolution: {integrity: sha512-u7jGPfygu9AZ7D75rwPbzb2J9G8vTxih6dPvaBQ0pZjhrH4hgGlPhX6fTJY2RstI+O/6kk/F2DKSjPMIRQPUJQ==}
+  '@formancy/builder-core@0.5.0':
+    resolution: {integrity: sha512-j15lG6fA+ZT0qiyqkUksvUD2Knn6pO7j9MOUDhJWzrvjLEA86VIIgvSI9mni5hmK71dyl9xOzQ8Gh8UvXcKZqw==}
 
-  '@formancy/conformance@0.4.0':
-    resolution: {integrity: sha512-wiSbAGIErBVjv2+8xGO4Jlo9DhGMf2f9bj5arieOXG7RDhw3gGAVdWk5KgIpSgX08FKH/22/K+u7YZ7yX7AZjA==}
+  '@formancy/conformance@0.5.0':
+    resolution: {integrity: sha512-3qJ/btTfXMRSHvKwwS2/O7/ohXDeCR0ECbWZyy2epDwx05tsGA0f/k3URX5myZJk8LTSQrYj9j/YUWCvQmh4GA==}
 
-  '@formancy/core@0.4.0':
-    resolution: {integrity: sha512-WBJH+ZDwrN+f2VKfLQjDumRnoNIqCUW9OfmKlIgv36iWSJTAZ81mlgD0RqZ3lvhw0AzJvZ2XmIqZCbU9zU7x0A==}
+  '@formancy/core@0.5.0':
+    resolution: {integrity: sha512-DjOyQpwxtMAO6G7jXvj7ML9O3qdt62D6pC+X/2X5l0p7Gstlz/saikvviF/Qrq45z19nMUHuykPPXlx0YEQ9fw==}
 
-  '@formancy/expressions@0.4.0':
-    resolution: {integrity: sha512-OTa99Xf5DpArwl7aLcZ1TPprpQ0mJy8Qxk83w5j7o4cfiY5ZU85/b7DsdHe4UqL0dmNwQk2nZTte+wVVRiwNyA==}
+  '@formancy/expressions@0.5.0':
+    resolution: {integrity: sha512-LsKq3ZZ7zDZu8/c3ENaH0qBBHR+XxPKdIeYr8FJ2B71ZLT2UQSlyLSo06IuVy3yHvy2wU8x4Xb7kAxpV4b3kEQ==}
 
-  '@formancy/react@0.4.0':
-    resolution: {integrity: sha512-CEGmweXCTrsL3V7o9/hDJuRppRc3qnjaE/o0SUf85oXS9CXMwqFaAqDrDR4pJLZXZSSkWBX4/RclXJh8ShfDqQ==}
+  '@formancy/react@0.5.0':
+    resolution: {integrity: sha512-yEzZ4E4msxYyTYMX6tB1BMP/+olwWGezr+aJ7NJ9vdrwvn7NmA4vsMGE40kCAZ2mSoYESnGOqpxQ24OFQRgeAQ==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
 
-  '@formancy/spec@0.4.0':
-    resolution: {integrity: sha512-DZ8HlnVskZryOkrsEolEBtB14b5yYRIn50uTG0EhmBsj38/MvXmoC0ZHXE+bR02sMIEp2pa7g82cZr1wM6qRjQ==}
+  '@formancy/spec@0.5.0':
+    resolution: {integrity: sha512-XBI1vrDBwX/kKHYTR6YxXbWEGq1zwBEj007wa8sWVXEEQ6yLZuZvDlMuT+697YoKI2K9ysD4iq0ZxgXpVvx0xw==}
 
-  '@formancy/themes@0.4.0':
-    resolution: {integrity: sha512-TNV69V3grj22v391/d+y1VuPiQaUXBaezYBGix3U6i77xFkLcBS+Ptm1HCF2Ck9+SJm5dWnWhVEHJmHB95LNew==}
+  '@formancy/themes@0.5.0':
+    resolution: {integrity: sha512-0LekIDwtb66xXSLhb/c+z2budWT6C5wTLkyE2k/dbUtjQCaf1VGZF45Xy4p0IjI9jv5YubcVO600Q/fd2kIgtQ==}
 
   '@grpc/grpc-js@1.14.5':
     resolution: {integrity: sha512-7VZM+SVdEcUUqSQeNI3zM8Qs/BhQKZndPo2h5VkYkAM8Iz0wJIa8mKV5ekQGqG8UUsnkQ0NMxIxwkIHYvj0qOw==}
@@ -5298,47 +5298,47 @@ snapshots:
       ip-address: 10.7.3
       toad-cache: 3.7.4
 
-  '@formancy/angular@0.4.0(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))':
+  '@formancy/angular@0.5.0(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))':
     dependencies:
       '@angular/core': 22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2)
-      '@formancy/core': 0.4.0
-      '@formancy/spec': 0.4.0
+      '@formancy/core': 0.5.0
+      '@formancy/spec': 0.5.0
       tslib: 2.8.1
       uqr: 0.1.3
 
-  '@formancy/builder-core@0.4.0':
+  '@formancy/builder-core@0.5.0':
     dependencies:
-      '@formancy/core': 0.4.0
-      '@formancy/expressions': 0.4.0
-      '@formancy/spec': 0.4.0
+      '@formancy/core': 0.5.0
+      '@formancy/expressions': 0.5.0
+      '@formancy/spec': 0.5.0
 
-  '@formancy/conformance@0.4.0':
+  '@formancy/conformance@0.5.0':
     dependencies:
-      '@formancy/spec': 0.4.0
+      '@formancy/spec': 0.5.0
 
-  '@formancy/core@0.4.0':
+  '@formancy/core@0.5.0':
     dependencies:
-      '@formancy/expressions': 0.4.0
-      '@formancy/spec': 0.4.0
+      '@formancy/expressions': 0.5.0
+      '@formancy/spec': 0.5.0
 
-  '@formancy/expressions@0.4.0':
+  '@formancy/expressions@0.5.0':
     dependencies:
       '@marcbachmann/cel-js': 8.0.0
 
-  '@formancy/react@0.4.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@formancy/react@0.5.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
-      '@formancy/core': 0.4.0
-      '@formancy/spec': 0.4.0
+      '@formancy/core': 0.5.0
+      '@formancy/spec': 0.5.0
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
       uqr: 0.1.3
 
-  '@formancy/spec@0.4.0':
+  '@formancy/spec@0.5.0':
     dependencies:
       '@noble/hashes': 2.4.0
       ajv: 8.20.0
 
-  '@formancy/themes@0.4.0': {}
+  '@formancy/themes@0.5.0': {}
 
   '@grpc/grpc-js@1.14.5':
     dependencies:

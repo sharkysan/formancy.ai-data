@@ -631,8 +631,8 @@ describe('versions', () => {
   })
 
   // A version edited on the volume to spec 4, its base and form alike, so
-  // every comparison a read makes still agrees: @formancy/spec 0.4.0's
-  // validator accepts it, and at 0.3.0 it was refused as corrupt. Read and
+  // every comparison a read makes still agrees: @formancy/spec's validator
+  // accepts it from 0.4.0 on, and at 0.3.0 it was refused as corrupt. Read and
   // restore both go through loadVersion, which holds it to the version the
   // generator writes (0042), so neither serves nor republishes it to a host
   // page whose renderer would refuse it. Watched failing before that check:

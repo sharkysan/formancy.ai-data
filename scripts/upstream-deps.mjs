@@ -10,12 +10,18 @@
 // break this one. An exact version is a decision somebody made, in a diff
 // somebody can read.
 //
+// 0055: a release is adopted the day it is published by exempting each of its
+// exact versions from pnpm's minimum release age, and nothing else is exempt.
+// An exemption for a package outside upstream, for a name or a pattern rather
+// than a version, or for a version the lockfile no longer installs is refused.
+//
 // Run as `node scripts/upstream-deps.mjs`, and by `scripts/upstream-deps.test.mjs`
 // against both fixtures and the real tree.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import YAML from 'yaml'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -69,13 +75,62 @@ export function upstreamDependencyProblems(manifests) {
   return problems
 }
 
+/** What `pnpm-workspace.yaml` exempts from pnpm's minimum release age, as written. */
+export function releaseAgeExemptions(repoRoot = root) {
+  const workspace = YAML.parse(readFileSync(join(repoRoot, 'pnpm-workspace.yaml'), 'utf8')) ?? {}
+  return (workspace.minimumReleaseAgeExclude ?? []).map(String)
+}
+
+/**
+ * Every `name@version` the lockfile installs from a registry. pnpm writes the
+ * lockfile as two documents, pnpm's own installation first and the
+ * workspace's second, and both are read.
+ */
+export function lockedPackages(repoRoot = root) {
+  const documents = YAML.parseAllDocuments(readFileSync(join(repoRoot, 'pnpm-lock.yaml'), 'utf8'))
+  return new Set(documents.flatMap((document) => Object.keys(document.toJS()?.packages ?? {})))
+}
+
+/**
+ * What is wrong with the exemptions from pnpm's minimum release age, each
+ * named once (0055).
+ *
+ * An exemption is an upstream package at the exact version the lockfile
+ * installs: pnpm writes one for each package of a release adopted on the day
+ * it is published, transitive ones included. Anything else admits a package
+ * nobody here chose on its first day, or outlives the version it was for.
+ *
+ * Pure over what it is handed, so the tests can hand it exemptions this
+ * repository does not have.
+ */
+export function releaseAgeExemptionProblems(exempt, locked, siblings) {
+  const problems = []
+  for (const entry of exempt) {
+    const at = entry.lastIndexOf('@')
+    const name = at > 0 ? entry.slice(0, at) : entry
+    const version = at > 0 ? entry.slice(at + 1) : ''
+    if (!name.startsWith(UPSTREAM_SCOPE) || siblings.has(name) || !EXACT.test(version)) {
+      problems.push(`minimumReleaseAgeExclude ${entry} is not an upstream package at an exact version`)
+    } else if (!locked.has(entry)) {
+      problems.push(`minimumReleaseAgeExclude ${entry} is not a version the lockfile installs; remove it`)
+    }
+  }
+  return problems
+}
+
 // `node scripts/upstream-deps.mjs`
 if (process.argv[1]?.endsWith('upstream-deps.mjs')) {
-  const problems = upstreamDependencyProblems(workspaceManifests())
+  const manifests = workspaceManifests()
+  const siblings = new Set(manifests.map((manifest) => manifest.name))
+  const problems = [
+    ...upstreamDependencyProblems(manifests),
+    ...releaseAgeExemptionProblems(releaseAgeExemptions(), lockedPackages(), siblings),
+  ]
   if (problems.length > 0) {
     console.error('Upstream dependency check failed:')
     for (const problem of problems) console.error(`  - ${problem}`)
     process.exit(1)
   }
   console.log('upstream: every @formancy/* dependency outside this workspace is an exact released version')
+  console.log('upstream: only upstream versions the lockfile installs are exempt from the minimum release age')
 }
