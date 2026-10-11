@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { READER_ACCESS, WRITER_ACCESS } from './access.js'
-import { covers, displayCase, driftingCase, edgeCase, filterCase, listCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase, THROUGH_CASES, throughCase } from './cases.js'
+import { covers, displayCase, driftingCase, edgeCase, filterCase, listCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase, THROUGH_CASES, throughCase, uuidCase } from './cases.js'
 import { sharedDrifting } from './drifting.js'
 import * as fixtures from './index.js'
 import { LIST_PARITY } from './lists.js'
@@ -8,6 +8,8 @@ import type { ListCase } from './lists.js'
 import { FIXTURE_MODEL } from './model.js'
 import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 import type { RefusalParityCase } from './parity.js'
+import { UUID_PARITY } from './uuid.js'
+import type { UuidCase } from './uuid.js'
 import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 
 /**
@@ -34,6 +36,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   DRIFTING: sharedDrifting().map((entry) => driftingCase(entry.name)),
   THROUGH_CASES: THROUGH_CASES.map(throughCase),
   LIST_PARITY: (Object.keys(LIST_PARITY) as ListCase[]).map(listCase),
+  UUID_PARITY: (Object.keys(UUID_PARITY) as UuidCase[]).map(uuidCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
@@ -55,6 +58,8 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   FIXTURE_CUSTOMERS: "the fixture's own customers, which the sized table holds beside the generated ones",
   SIZED_CHUNK_ROWS: 'how many rows one statement of the sized load carries',
   LIST_ROWS: "the rows the list suites insert; what a list shows of them is LIST_PARITY's",
+  UUID_ROWS: "the rows the uuid suites insert; what the suites show of them is UUID_PARITY's",
+  DELIVERIES: "the fixture's delivery keys, which UUID_PARITY's cases name",
 }
 
 /** What a call made while a file is collected gave: its options, or the sentence it threw. */

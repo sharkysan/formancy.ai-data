@@ -13,7 +13,13 @@ column, which a form can reach only through its order (0043). And
 `sales.shipment`, the column facts the two engines disagree on (0026): a
 by-default identity against a sequence default, a UTF-8 varchar, fixed and
 variable binary, a real and a zoneless timestamp with a fraction, and a check
-added unvalidated beside one SQL Server disables.
+added unvalidated beside one SQL Server disables. And `sales.delivery`, keyed
+by a uuid the database fills by its default -- `gen_random_uuid()` on
+PostgreSQL, `newsequentialid()` on SQL Server -- a child of an order with a
+tenant of its own and a version as the order's, and `sales.parcel`, whose
+foreign key is onto that uuid (0056). On SQL Server the delivery's key is
+nonclustered, so its rows are a heap as PostgreSQL's are, and a lookup that
+dropped the key from the end of its order would show on both engines.
 
 - `startPostgresFixture()` and `startSqlServerFixture()` start a container, load
   the fixture, create `formancy_reader` — who may read `sales.order` and nothing
@@ -23,7 +29,12 @@ added unvalidated beside one SQL Server disables.
   harness reads CPU, memory and limits by (0034). A row-level security
   policy on `sales.customer` shows the writer tenant 1 only; it binds nobody
   else, though SQL Server applies it to `dbo` too (0027). The writer may
-  delete orders and their lines, and the reader nothing (0049).
+  delete orders and their lines, and the reader nothing (0049). The writer
+  holds a delivery's and a parcel's grants as it holds an order's: it reads
+  and inserts them, updates a delivery's carrier and shipping time (on
+  PostgreSQL its version too) and a parcel's delivery and label, never a
+  key, a tenant or an order, and deletes them, where a delete of an order
+  cascades through its deliveries into their parcels (0056).
 - `connectDocker()` reads Docker through testcontainers' own runtime client:
   the daemon's facts, the running containers, whether an image is present,
   a container's image, digests and limits, and its cumulative CPU and
@@ -73,6 +84,22 @@ added unvalidated beside one SQL Server disables.
   `FIRST_SHIPMENT` and `SECOND_SHIPMENT` are the two shipments as both
   adapters' record reads must return them — one object, so neither engine can
   spell a real or a zoneless timestamp its own way.
+- `DELIVERIES` names the fixture's three delivery keys in lower case, as every
+  read spells them, and `UUID_PARITY` is what both adapters'
+  `uuid.integration.test.ts` expect of a uuid key end to end (0056):
+  discovered with its default, generated read-only, one token on both
+  engines, created, updated and stale, another tenant's not found, listed
+  under an order, paged, and offered by `sales.parcel`'s lookup. `UUID_ROWS`
+  is what those suites insert first: two orders of tenant 2's, one delivery
+  under the first and sixteen under the second, each keyed with one byte
+  set and all of one carrier, so a lookup's options tie on it. The one
+  answer the engines give differently is the order of uuid values, and
+  `uuidOrder(kind, keys)` is each engine's: PostgreSQL's bytes in turn, SQL
+  Server's byte groups, the last six bytes first. Measured on both servers
+  on 2026-10-11 with the sixteen keys, the fixture's three and 1000 random
+  ones, and held on every run by the sixteen, paged as a list and tied as a
+  lookup's options, whose order is exactly the order an engine weighs the
+  bytes in.
 
 - `startTcpHop({ host, port })` puts a TCP hop in front of a database that
   can lose an answer after the database has sent it (0031).
@@ -158,12 +185,15 @@ comparators, each `FILTER_PARITY` entry, each `DISPLAY_PARITY` column, each
 `TEMPORAL_PARITY` column, each `REFUSAL_PARITY` refusal, each `EDGE_VALUES`
 value, the two shipments, each change of `DRIFTING` both engines run, and
 each of `THROUGH_CASES`, what a form reached through a parent shows (0043),
-the one where the engines answer differently, `moved-parent`, included.
+the one where the engines answer differently, `moved-parent`, included, each
+`LIST_PARITY` case (0044), and each `UUID_PARITY` case (0056), `order`
+included, whose expectation is each engine's own order.
 The ids are derived from the shared data --
 `filterCase(entry)`, `displayCase(column)`, `temporalCase(column)`,
 `refusalCase(name)`, `edgeCase(name)`,
 `shipmentCase('first')`, `driftingCase(name)`, `throughCase(name)`,
-`MODEL_CASES.owner` -- so no test types one.
+`listCase(name)`, `uuidCase(name)`, `MODEL_CASES.owner` -- so no test types
+one.
 
 `DRIFTING` is the table of changes to a form's own table after it was
 published ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)):

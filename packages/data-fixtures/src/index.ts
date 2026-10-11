@@ -1,6 +1,6 @@
 export { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
 export type { ExpectedAccess, ExpectedCapability, ExpectedObjectAccess, ExpectedObjectFacts } from './access.js'
-export { displayCase, driftingCase, edgeCase, filterCase, covers, listCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase, THROUGH_CASES, throughCase } from './cases.js'
+export { displayCase, driftingCase, edgeCase, filterCase, covers, listCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase, THROUGH_CASES, throughCase, uuidCase } from './cases.js'
 export type { ThroughCase } from './cases.js'
 export {
   DEFAULT_IMAGES,
@@ -40,6 +40,8 @@ export { DISPLAY_PARITY, FILTER_PARITY, PARITY_SCOPE, REFUSAL_PARITY, TEMPORAL_P
 export type { FilterParityCase, ParityFilterColumn, RefusalParityCase } from './parity.js'
 export { renamedColumn } from './rename.js'
 export { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
+export { DELIVERIES, UUID_PARITY, UUID_ROWS, uuidOrder } from './uuid.js'
+export type { UuidCase } from './uuid.js'
 export { answerBytes, startTcpHop } from './tcp-hop.js'
 export type { LostAnswer, Schedule, TcpHop } from './tcp-hop.js'
 export {

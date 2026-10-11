@@ -27,6 +27,12 @@
 --                 double and real; a UTF-8 varchar on SQL Server; fixed and
 --                 variable binary; a composite unique key; a check added
 --                 unvalidated and one SQL Server disables
+--   delivery      a uuid primary key the database fills by its default
+--                 (gen_random_uuid() here, newsequentialid() on SQL Server);
+--                 a child of order with a tenant of its own, and a version
+--                 column as order's (0056)
+--   parcel        a foreign key onto delivery's uuid, so a lookup's key is
+--                 one (0056)
 --   customer_summary  a view
 --
 -- And one row-level security policy, on customer: the writer
@@ -112,6 +118,29 @@ create table sales.shipment (
   constraint ck_shipment_reference check (reference <> '')
 );
 
+-- A key the database fills: no identity, a default. SQL Server's file uses
+-- newsequentialid(), which only a default may call; both are 'none' and
+-- hasDefault in src/model.ts, and the generator never writes the key (0056).
+-- A delivery is a child of its order, cascading as a line does (0049), with
+-- a tenant of its own, so a form may pin it and reach it through the order.
+create table sales.delivery (
+  id uuid not null default gen_random_uuid() constraint pk_delivery primary key,
+  tenant_id integer not null,
+  order_id bigint not null
+    constraint fk_delivery_order references sales."order" (id) on delete cascade,
+  carrier varchar(40) not null,
+  shipped_at timestamptz,
+  -- Application-maintained, as order's is.
+  row_version bigint not null default 1
+);
+
+create table sales.parcel (
+  id integer generated always as identity constraint pk_parcel primary key,
+  delivery_id uuid not null
+    constraint fk_parcel_delivery references sales.delivery (id) on delete cascade,
+  label varchar(40) not null
+);
+
 create view sales.customer_summary as
   select c.tenant_id, c.customer_no, c.name, count(o.id) as order_count
   from sales.customer c
@@ -150,6 +179,19 @@ insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pic
 values (1, 'A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11', 32767, 'Zürich-01', '09:30', '2026-10-08 12:34:56.5', 0.30000000000000004, 0.1, '\x01', '\x01'),
        (1, 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 0, 'B', '17:05', '2026-10-08 12:34:56', null, null, null, null);
 alter table sales.shipment add constraint ck_shipment_carrier check (carrier_code > 0) not valid;
+
+-- Three deliveries of the order, their keys given so both files hold the
+-- same ones (src/uuid.ts, DELIVERIES). One is written in upper case, which
+-- PostgreSQL stores as the same uuid. They are listed in another order on
+-- each engine: PostgreSQL compares a uuid's bytes in turn, SQL Server its
+-- last six bytes first (0056).
+insert into sales.delivery (id, tenant_id, order_id, carrier, shipped_at)
+values ('1D3E5A70-9C2B-4F61-8E44-3C0A7D9B2E51', 1, 9007199254740993, 'Express', '2026-10-09 08:00:00+00'),
+       ('6a9f0c12-4b8e-4d27-b3c5-0e7f1a2d4c90', 1, 9007199254740993, 'Freight', null),
+       ('c4b81e2f-7a3d-4e95-a06b-91d2f5e8a7c3', 1, 9007199254740993, 'Post', null);
+insert into sales.parcel (delivery_id, label)
+values ('1d3e5a70-9c2b-4f61-8e44-3c0a7d9b2e51', 'Box 1'),
+       ('c4b81e2f-7a3d-4e95-a06b-91d2f5e8a7c3', 'Box 2');
 
 -- Row-level security that binds one account. The container's owner is a
 -- superuser and bypasses it, so every owner suite reads both tenants; the

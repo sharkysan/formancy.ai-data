@@ -352,25 +352,28 @@ describe('snapshotDisagreements', () => {
     expect(before).toContainEqual('sales.order says nothing about deleting; it was taken before 0049')
   })
 
-  // A delete of an order also deletes its lines, by a key that is on
-  // order_line: only order's referencedBy can say so, and only if it lists
-  // every key. One missing reads as "a delete does nothing else", one from
-  // outside the fixture is a key the fixture does not have, and a wrong
-  // action is a reach that is not the database's.
+  // A delete of an order also deletes its lines and its deliveries, by keys
+  // on order_line and delivery: only order's referencedBy can say so, and
+  // only if it lists every key. One missing reads as "a delete does nothing
+  // else", one from outside the fixture is a key the fixture does not have,
+  // and a wrong action is a reach that is not the database's.
   test('notices a key that refers to a table missing from its referencedBy, an extra one, and one with the wrong action', () => {
     const made = snapshot('postgres')
-    expect(described(made, 'order').referencedBy?.map((key) => key.name)).toEqual(['fk_order_line_order'])
+    expect(described(made, 'order').referencedBy?.map((key) => key.name)).toEqual(['fk_delivery_order', 'fk_order_line_order'])
+    expect(described(made, 'delivery').referencedBy?.map((key) => key.name)).toEqual(['fk_parcel_delivery'])
     expect(described(made, 'employee').referencedBy?.map((key) => key.name)).toEqual(['fk_employee_manager', 'fk_order_approved_by', 'fk_order_created_by'])
     const missing = readBack(made, (copy) => {
       described(copy, 'order').referencedBy = []
     })
-    expect(snapshotDisagreements(missing)).toEqual(['sales.order is referred to by [], expected [sales.order_line fk_order_line_order]'])
+    expect(snapshotDisagreements(missing)).toEqual(['sales.order is referred to by [], expected [sales.delivery fk_delivery_order, sales.order_line fk_order_line_order]'])
     const extra = snapshot('postgres', (objects) => {
       object(objects, 'order').referencedBy = [FROM_OUTSIDE, ...inbound(objects, object(objects, 'order'))]
     })
-    expect(snapshotDisagreements(extra)).toEqual(['sales.order is referred to by [audit.order_copy fk_order_copy_order, sales.order_line fk_order_line_order], expected [sales.order_line fk_order_line_order]'])
+    expect(snapshotDisagreements(extra)).toEqual([
+      'sales.order is referred to by [audit.order_copy fk_order_copy_order, sales.delivery fk_delivery_order, sales.order_line fk_order_line_order], expected [sales.delivery fk_delivery_order, sales.order_line fk_order_line_order]',
+    ])
     const action = readBack(made, (copy) => {
-      const key = described(copy, 'order').referencedBy?.[0]
+      const key = described(copy, 'order').referencedBy?.find((entry) => entry.name === 'fk_order_line_order')
       if (key !== undefined) Object.assign(key, { onDelete: 'no-action', enforced: false, referencedColumns: ['tenant_id'] })
     })
     expect(snapshotDisagreements(action)).toEqual([
@@ -600,7 +603,7 @@ describe('restrictedDisagreements', () => {
   })
 
   // The same rule for the keys that refer to sales.order (0049): the reader
-  // may not see order_line, and fk_order_line_order is on order_line. Missing
+  // may see neither order_line nor delivery, and their keys are on them. Missing
   // with nothing said, a delete of an order would look as if it reached
   // nothing else; behind a referenced-by gap it is "cannot tell".
   test('a key that refers to sales.order missing from its referencedBy is a disagreement, unless a referenced-by gap says so', () => {
@@ -608,9 +611,12 @@ describe('restrictedDisagreements', () => {
       objects.splice(0, objects.length, object(objects, 'order'))
       object(objects, 'order').referencedBy = []
     }
-    expect(restrictedDisagreements(snapshot('sqlserver', orderOnly))).toEqual(['fk_order_line_order of sales.order_line refers to sales.order, and is missing with no gap that says the reader cannot see it'])
+    expect(restrictedDisagreements(snapshot('sqlserver', orderOnly))).toEqual([
+      'fk_delivery_order of sales.delivery refers to sales.order, and is missing with no gap that says the reader cannot see it',
+      'fk_order_line_order of sales.order_line refers to sales.order, and is missing with no gap that says the reader cannot see it',
+    ])
     expect(restrictedDisagreements(snapshot('sqlserver', orderOnly, [{ subject: { kind: 'scope' }, aspect: 'referenced-by', detail: 'no VIEW DEFINITION on the database' }]))).toEqual([])
-    expect(restrictedDisagreements(snapshot('sqlserver', orderOnly, [{ subject: { kind: 'scope' }, aspect: 'foreign-keys', detail: 'another aspect' }]))).toHaveLength(1)
+    expect(restrictedDisagreements(snapshot('sqlserver', orderOnly, [{ subject: { kind: 'scope' }, aspect: 'foreign-keys', detail: 'another aspect' }]))).toHaveLength(2)
     expect(restrictedDisagreements(snapshot('postgres', () => {}, [], true))).toEqual(['sales.order says nothing about deleting; it was taken before 0049'])
   })
 })

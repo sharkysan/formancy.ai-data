@@ -69,6 +69,14 @@ const { form, bindings, notes } = generateForm(snapshot, {
 Pass the columns the form's policy pins as `pinned`: they become read-only
 fields filled from trusted context, never required fields the policy refuses.
 
+A key the database numbers or fills is shown in the Record section and never
+written: an identity (0026), and a column with a default and no generation
+that is all of the key the request does not pin -- a uuid from
+`gen_random_uuid()` or `newsequentialid()`, alone or beside a pinned tenant --
+whose note says the database fills it. Where the pins leave more of the key,
+a defaulted column of it is still written
+([0056](../../docs/decisions/0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md)).
+
 The form offers what the snapshot's account may do and nothing else: no field
 over a column it may not read, a field written per operation — `writes:
 { create, update }`, bindings version 2 — so a column it may INSERT and not

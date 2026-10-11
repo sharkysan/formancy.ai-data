@@ -1,6 +1,6 @@
 # 0044 — A form's records are listed a page at a time under its read policy, searched and paged as a lookup is
 
-- **Status:** accepted
+- **Status:** accepted; narrowed by [0056](0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md): a uuid on SQL Server is ordered by its byte groups, not by a collation, and a list ordered by a uuid key is in each engine's own order, which the shared case `uuid: order` compares
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**

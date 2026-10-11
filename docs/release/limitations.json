@@ -33,7 +33,7 @@
       ]
     },
     "0005": {
-      "reviewed": "sha256:2039c1b439d91703e0207f91b2c34384e8bd0192c253a5bd2f65f80e8759531d",
+      "reviewed": "sha256:6b61bcbe7eb47abc3c27b1c88b2cb699d78215334f1634e2f049ef1453ff2926",
       "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
     },
     "0006": {
@@ -96,7 +96,7 @@
       ]
     },
     "0009": {
-      "reviewed": "sha256:4faca24b615da13b0365e062d3d806e2afc59be9444610b7d580a63e00d45ad0",
+      "reviewed": "sha256:39dbd372b2d654f57a6223b0cf92d74fb3de8cbd80376f4146a6756122fdb408",
       "limitations": [
         {
           "area": "forms",
@@ -167,7 +167,7 @@
       ]
     },
     "0012": {
-      "reviewed": "sha256:2e663bc1695384c8ddb77e6ae980431aa73ae2064204f32292680fcae3480168",
+      "reviewed": "sha256:b642b3ff009efefa33e718ab691230038a064dd27e1d23e83bac3ac3c836a36e",
       "limitations": [
         {
           "area": "forms",
@@ -191,7 +191,7 @@
         },
         {
           "area": "databases",
-          "says": "The order of text, and of UUIDs on SQL Server, is each engine's collation, so a lookup lists non-ASCII text in an order that differs by engine."
+          "says": "The order of text is each engine's collation, so a lookup lists non-ASCII text in an order that differs by engine."
         },
         {
           "area": "forms",
@@ -1208,7 +1208,7 @@
       ]
     },
     "0044": {
-      "reviewed": "sha256:2af59b155399d0a90d8b0ac92a47b0f9027761a42032623c204732c63f9e04a0",
+      "reviewed": "sha256:e24471b76e917da77b4a39d4df4be2492203aa5c7862c784c1f0394fb703ed0a",
       "limitations": [
         {
           "area": "forms",
@@ -1224,7 +1224,7 @@
         },
         {
           "area": "forms",
-          "says": "A list's text is ordered by each engine's collation, and so is a uuid on SQL Server, so a page of non-ASCII names can come in a different order on each engine."
+          "says": "A list's text is ordered by each engine's collation, so a page of non-ASCII names can come in a different order on each engine."
         },
         {
           "area": "forms",
@@ -1348,7 +1348,7 @@
       ]
     },
     "0049": {
-      "reviewed": "sha256:1a788804451b29022c1ea6ab5f4dba1e4b1a979bb03fe4a46c147dbb6f966ec6",
+      "reviewed": "sha256:3f08a5c72d1e1e8c0536211b06670e920b8c7d90abe661586a89e1517038ecb5",
       "limitations": [
         {
           "area": "databases",
@@ -1395,6 +1395,39 @@
         {
           "area": "operations",
           "says": "An image of the composed stack built from a checkout within a day of an upstream release this repository adopted installs that release's `@formancy/*` packages without pnpm's one-day minimum release age, because the build reads this repository's `pnpm-workspace.yaml` and the exemptions in it."
+        }
+      ]
+    },
+    "0056": {
+      "reviewed": "sha256:0596be7ab9944e74fa5dd5f4d97995e503bbd7d473ee23ada827157db7fd5e94",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "A list ordered by a uuid key, and a lookup's options tied on their label, come in each engine's own order of uuid -- PostgreSQL's by its bytes in turn, SQL Server's by its byte groups, the last six bytes first -- so the same rows are listed in another order on each engine; each order is total and stable.",
+          "heldBy": "packages/data-sqlserver/src/uuid.integration.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A grid of records keyed by a uuid, in its default order, lists them in an order that tells a person nothing -- `gen_random_uuid()`'s keys are random, and `newsequentialid()`'s rise only among the keys one server made -- unless the host sorts by another column."
+        },
+        {
+          "area": "access",
+          "says": "On SQL Server a `newsequentialid()` key rises across every tenant of the server, so a record token tells a tenant that keys were handed out between its own creates, where a `gen_random_uuid()` key on PostgreSQL says nothing of the kind.",
+          "heldBy": "packages/data-sqlserver/src/uuid.integration.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A key column with a default that is all of the key the policy does not pin, such as a uuid from `gen_random_uuid()` or `newsequentialid()` alone or beside a pinned tenant, is shown and never written by a generated form, so a person cannot choose it, and a policy that grants write on its field is refused at publish.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A key the database fills beside a column the person gives, such as `(order_id, id)` with nothing pinned, is still written by a generated form, so there the person may choose the uuid.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A one-column key whose default is a constant fills one record, and every later create of that form is refused on the key; inferred from the rule, not tested."
         }
       ]
     }

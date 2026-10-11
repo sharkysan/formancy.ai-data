@@ -1,6 +1,6 @@
 # 0049 — A snapshot says whether its account may delete from each table, and every foreign key that refers to it
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0056](0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md): the writer may also delete deliveries and parcels, which a delete of an order now cascades into, and the comparators and both adapters' access suites hold its DELETE to `order`, `order_line`, `delivery` and `parcel`
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**

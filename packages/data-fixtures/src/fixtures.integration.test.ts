@@ -9,6 +9,7 @@ import type { PostgresFixture, SqlServerFixture } from './containers.js'
 import { POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
 import { connectDocker } from './docker.js'
 import { FILTER_PARITY } from './parity.js'
+import { DELIVERIES } from './uuid.js'
 import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 
 /**
@@ -79,6 +80,35 @@ describe('the PostgreSQL fixture', () => {
         { conname: 'ck_shipment_reference', convalidated: true },
         { conname: 'ck_shipment_weight', convalidated: true },
       ])
+    } finally {
+      await sql.end()
+    }
+  })
+
+  // FIXTURE_MODEL says delivery's key is a uuid the database fills by a
+  // default and that the files insert DELIVERIES' keys, one of them in upper
+  // case. If a key were stored as another value, or the default filled none,
+  // both adapters' uuid suites would be held to rows the database does not
+  // have (0056). The insert is rolled back: the suites count the deliveries.
+  test('holds the deliveries the model describes, and fills a key a create leaves out', async () => {
+    const sql = postgres(pg.admin)
+    try {
+      const rows = await sql<{ id: string; carrier: string }[]>`select id::text as id, carrier from sales.delivery order by carrier`
+      expect(rows.map((row) => [row.carrier, row.id])).toEqual([
+        ['Express', DELIVERIES.express],
+        ['Freight', DELIVERIES.freight],
+        ['Post', DELIVERIES.post],
+      ])
+      const [parcels] = await sql<{ n: number }[]>`select count(*)::int as n from sales.parcel p join sales.delivery d on d.id = p.delivery_id`
+      expect(parcels?.n).toBe(2)
+      const filled = new Error('rolled back')
+      await expect(
+        sql.begin(async (tx) => {
+          const [row] = await tx<{ id: string }[]>`insert into sales.delivery (tenant_id, order_id, carrier) values (1, ${EDGE_VALUES.beyondSafeInteger}, 'Filled') returning id::text as id`
+          expect(row?.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+          throw filled
+        }),
+      ).rejects.toBe(filled)
     } finally {
       await sql.end()
     }
@@ -198,6 +228,37 @@ describe('the SQL Server fixture', () => {
         { name: 'ck_shipment_reference', is_disabled: true, is_not_trusted: true },
         { name: 'ck_shipment_weight', is_disabled: false, is_not_trusted: false },
       ])
+    } finally {
+      await pool.close()
+    }
+  })
+
+  // As for PostgreSQL. SQL Server prints a uniqueidentifier in upper case
+  // whatever case it was written in (0017), so the text an adapter reads is
+  // lower-cased by the adapter; here it is compared as printed, and
+  // newsequentialid() fills a key a create leaves out.
+  test('holds the deliveries the model describes, and fills a key a create leaves out', async () => {
+    const pool = await new mssql.ConnectionPool(ms.admin).connect()
+    try {
+      const rows = await pool.request().query<{ id: string; carrier: string }>('select convert(nchar(36), id) as id, carrier from sales.delivery order by carrier')
+      expect(rows.recordset.map((row) => [row.carrier, row.id])).toEqual([
+        ['Express', DELIVERIES.express.toUpperCase()],
+        ['Freight', DELIVERIES.freight.toUpperCase()],
+        ['Post', DELIVERIES.post.toUpperCase()],
+      ])
+      const parcels = await pool.request().query<{ n: number }>('select count(*) as n from sales.parcel as p join sales.delivery as d on d.id = p.delivery_id')
+      expect(parcels.recordset[0]?.n).toBe(2)
+      const filled = await pool
+        .request()
+        .batch<{ id: string; definition: string }>(
+          `begin transaction;
+           declare @made table (id uniqueidentifier);
+           insert into sales.delivery (tenant_id, order_id, carrier) output inserted.id into @made values (1, ${EDGE_VALUES.beyondSafeInteger}, N'Filled');
+           select convert(nchar(36), m.id) as id, object_definition(c.default_object_id) as definition
+           from @made as m cross join sys.columns as c where c.object_id = object_id(N'sales.delivery') and c.name = N'id';
+           rollback transaction;`,
+        )
+      expect(filled.recordset).toEqual([{ id: expect.stringMatching(/^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/), definition: '(newsequentialid())' }])
     } finally {
       await pool.close()
     }

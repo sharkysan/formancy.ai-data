@@ -187,12 +187,14 @@ describe('what a snapshot says an account may do', () => {
 
   // A form offers a delete only where the account may make it (0049). The
   // owner may delete from every table and view, the reader from none, the
-  // writer from orders and their lines -- a delete of an order cascades into
-  // order_line -- through its role, and not from customer, whose columns it
-  // reads. An adapter that asked INSERT would say order and not order_line;
-  // one that asked the column check would answer per column. A delete matched
-  // by a column needs SELECT on it as well (P1), which the columns say.
-  test('the owner may delete from every object, the reader from none, the writer from order and order_line only, through its role', async () => {
+  // writer from orders, their lines and deliveries, and the deliveries'
+  // parcels -- a delete of an order cascades into order_line and delivery,
+  // and from there into parcel (0056) -- through its role, and not from
+  // customer, whose columns it reads. An adapter that asked INSERT would say
+  // order and not order_line; one that asked the column check would answer
+  // per column. A delete matched by a column needs SELECT on it as well (P1),
+  // which the columns say.
+  test('the owner may delete from every object, the reader from none, the writer from order, order_line, delivery and parcel only, through its role', async () => {
     const deletable = (snapshot: MetadataSnapshot) => snapshot.objects.filter((meta) => meta.access?.delete === true).map((meta) => meta.ref.name)
     const asOwner = await discoverSqlServer(owner, FIXTURE_SCOPE)
     const asReader = await discoverSqlServer(await connect(fixture.reader), FIXTURE_SCOPE)
@@ -201,7 +203,7 @@ describe('what a snapshot says an account may do', () => {
     expect(deletable(asOwner)).toEqual(asOwner.objects.map((meta) => meta.ref.name))
     expect(deletable(asReader)).toEqual([])
     expect(object(asReader, 'sales', 'order').access).toEqual({ delete: false })
-    expect(deletable(asWriter)).toEqual(['order', 'order_line'])
+    expect(deletable(asWriter)).toEqual(['delivery', 'order', 'order_line', 'parcel'])
     expect(object(asWriter, 'sales', 'customer').access).toEqual({ delete: false })
     expect(await allows(writer, 'delete from sales.order_line where 1 = 0')).toBe(true)
     expect(await allows(writer, 'delete from sales.customer where 1 = 0')).toBe(false)

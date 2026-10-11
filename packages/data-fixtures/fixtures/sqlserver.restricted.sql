@@ -11,7 +11,9 @@
 -- VIEW DEFINITION on the database, the minimum for a snapshot that can
 -- establish that no security policy applies (0027, B10c, B19). sqlserver.sql's
 -- security policy shows the writer tenant 1 only. It may delete orders and
--- their lines (0049), as on PostgreSQL.
+-- their lines (0049), as on PostgreSQL, and holds a delivery's and a parcel's
+-- grants as postgres.restricted.sql does, less the delivery's rowversion
+-- (0056).
 create user formancy_reader for login formancy_reader;
 GO
 
@@ -24,6 +26,12 @@ grant update (status, notes, [group], approved_by) on sales.[order] to formancy_
 grant delete on sales.[order] to formancy_forms;
 grant delete on sales.order_line to formancy_forms;
 grant select (tenant_id, customer_no, name) on sales.customer to formancy_forms;
+grant select, insert on sales.delivery to formancy_forms;
+grant update (carrier, shipped_at) on sales.delivery to formancy_forms;
+grant delete on sales.delivery to formancy_forms;
+grant select, insert on sales.parcel to formancy_forms;
+grant update (delivery_id, label) on sales.parcel to formancy_forms;
+grant delete on sales.parcel to formancy_forms;
 grant view definition to formancy_forms;
 create user formancy_writer for login formancy_writer;
 alter role formancy_forms add member formancy_writer;

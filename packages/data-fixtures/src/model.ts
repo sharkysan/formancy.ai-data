@@ -171,6 +171,43 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
     rowSecurity: 'none',
   },
   {
+    ref: sales('delivery'),
+    kind: 'table',
+    columns: [
+      // A key the database fills by its default, gen_random_uuid() on
+      // PostgreSQL and newsequentialid() on SQL Server: not generated in the
+      // catalog's sense, because the column takes a value given to it, and so
+      // the same fact on both. The generator never writes it (0056).
+      { name: 'id', type: { kind: 'uuid' }, nullable: false, generated: 'none', hasDefault: true },
+      { name: 'tenant_id', type: INT32, nullable: false },
+      { name: 'order_id', type: INT64, nullable: false },
+      { name: 'carrier', nullable: false, ...textOn(40, false, 'utf16-code-units') },
+      { name: 'shipped_at', type: { kind: 'timestamp', withTimeZone: true }, nullable: true },
+      // As order's: the engines differ as they do there.
+      {
+        name: 'row_version',
+        nullable: false,
+        byKind: {
+          postgres: { type: INT64, generated: 'none', hasDefault: true },
+          sqlserver: { type: { kind: 'rowversion' }, generated: 'rowversion' },
+        },
+      },
+    ],
+    primaryKey: ['id'],
+    uniqueKeys: {},
+    foreignKeys: [
+      {
+        name: 'fk_delivery_order',
+        columns: ['order_id'],
+        references: { table: sales('order'), columns: ['id'] },
+        onDelete: 'cascade',
+        validated: true,
+      },
+    ],
+    checks: [],
+    rowSecurity: 'none',
+  },
+  {
     ref: sales('employee'),
     kind: 'table',
     columns: [
@@ -278,6 +315,29 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
         name: 'fk_order_line_order',
         columns: ['order_id'],
         references: { table: sales('order'), columns: ['id'] },
+        onDelete: 'cascade',
+        validated: true,
+      },
+    ],
+    checks: [],
+    rowSecurity: 'none',
+  },
+  {
+    ref: sales('parcel'),
+    kind: 'table',
+    columns: [
+      { name: 'id', type: INT32, nullable: false, generated: 'identity-always', hasDefault: false },
+      // A foreign key onto a uuid key: a lookup whose token carries a uuid (0056).
+      { name: 'delivery_id', type: { kind: 'uuid' }, nullable: false },
+      { name: 'label', nullable: false, ...textOn(40, false, 'utf16-code-units') },
+    ],
+    primaryKey: ['id'],
+    uniqueKeys: {},
+    foreignKeys: [
+      {
+        name: 'fk_parcel_delivery',
+        columns: ['delivery_id'],
+        references: { table: sales('delivery'), columns: ['id'] },
         onDelete: 'cascade',
         validated: true,
       },
