@@ -1,5 +1,5 @@
-import { rowFilterTerms, throughTerms } from '@formancy/data-core'
-import type { ApiValue, DescribedRead, ObjectRef, RecordAdapter, RecordColumn, RecordFailure, RecordOutcome, RecordRead, RecordTarget, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
+import { listTerms, rowFilterTerms, throughTerms } from '@formancy/data-core'
+import type { ApiValue, DescribedRead, ListOutcome, ListRequest, ObjectRef, RecordAdapter, RecordColumn, RecordFailure, RecordOutcome, RecordRead, RecordTarget, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
 import type { Sql, TransactionSql } from 'postgres'
 import { run } from '../sql/statement.js'
 import type { TextResult, TextRow } from '../sql/statement.js'
@@ -8,6 +8,7 @@ import { describedFrom, parseDefinition, READ_COMMITTED } from './definition.js'
 import type { Definition } from './definition.js'
 import { connectionLost, recordFailure, sqlState } from './errors.js'
 import type { Phase } from './errors.js'
+import { listStatement } from './list.js'
 import { checkInsert, checkKey, checkUpdate, isVersion } from './requests.js'
 import {
   definitionStatement,
@@ -161,6 +162,20 @@ function readAnswer(request: Parameters<RecordAdapter['read']>[0], ran: Ran): { 
 }
 
 /**
+ * A list's answer from its statement's rows (0044): the page's records in
+ * the statement's order, with the description the first row carries and the
+ * isolation it was read under. One row with no record when the page is empty.
+ */
+function listAnswer(request: ListRequest, ran: Ran): { answer: ListOutcome; isolation?: string } {
+  if (!ran.ok) return { answer: ran.failure }
+  // Always a row: the description's, with the page's first record beside it or none.
+  const { described, isolation } = describedBy(ran.result.rows[0] as TextRow)
+  if (described === undefined) return { answer: NOT_DESCRIBED, isolation }
+  const rows = ran.result.rows.filter((row) => row[DESCRIBED_COLUMNS] !== null).map((row) => recordOf(request.target, request.columns, row.slice(DESCRIBED_COLUMNS + 1)))
+  return { answer: { ok: true, described, rows }, isolation }
+}
+
+/**
  * Whether the table moved, after a write that wrote nothing or failed: the
  * answer when it did, otherwise `undefined` -- or, on the read-committed
  * path, the isolation, when this connection's is not that path's. One
@@ -250,8 +265,9 @@ async function failedWrite(sql: Sql, table: ObjectRef, definition: Definition, p
  * before anything is sent.
  *
  * Every read answers the table's definition from the statement that read the
- * record, and every write runs only while the table still has the definition
- * it was decided over. Under READ COMMITTED a statement takes its snapshot
+ * record -- a list too, from the statement that read its page (0044) -- and
+ * every write runs only while the table still has the definition it was
+ * decided over. Under READ COMMITTED a statement takes its snapshot
  * after the table's lock, and the guard is in the statement. Under any other
  * isolation it does not, so a read that reports one is asked again and a
  * write decided over one is run in a transaction that locks the table first.
@@ -278,6 +294,16 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       // asked again after the lock. A read may be asked again; a write never.
       const again = await lockedTransaction(sql, request.target.table, 'access share', statement)
       return readAnswer(request, again.ok ? again : { ok: false, failure: recordFailure(again.error, 'read'), state: sqlState(again.error) }).answer
+    },
+
+    async list(request) {
+      const terms = listTerms(request)
+      const statement = listStatement(request, terms)
+      const first = listAnswer(request, await attempt(sql, statement, 'read'))
+      if (first.isolation === undefined || first.isolation === READ_COMMITTED) return first.answer
+      // As a read (above): under another isolation the page is asked again after the table's lock.
+      const again = await lockedTransaction(sql, request.target.table, 'access share', statement)
+      return listAnswer(request, again.ok ? again : { ok: false, failure: recordFailure(again.error, 'read'), state: sqlState(again.error) }).answer
     },
 
     async insert(request) {

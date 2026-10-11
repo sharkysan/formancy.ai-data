@@ -1,6 +1,6 @@
 # 0012 — A lookup token is a reference, not a permission
 
-- **Status:** accepted; narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): row filters carry their column's type and compare exactly, and labels are spelled once from canonical values
+- **Status:** accepted; narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): row filters carry their column's type and compare exactly, and labels are spelled once from canonical values; extended by [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md): a record list's search is this lookup's, through `checkSearch` and each adapter's `sql/search.ts`, and its NULLs go last as a lookup's do, spelled only for a column the snapshot says is nullable, through the one `sql/order.ts`
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/lookup/token.test.ts` — every awkward

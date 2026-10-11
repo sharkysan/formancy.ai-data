@@ -108,6 +108,8 @@ function registry(): ConnectionRegistry {
       const outcome = readOutcome ?? { ok: true, values: { ...STORED }, version: rowVersion }
       return outcome.ok ? { ok: true, described, record: { values: outcome.values, version: outcome.version } } : outcome
     },
+    // Lists are runtime-lists.test.ts's; here the port only has to be whole.
+    list: async () => ({ ok: true, described, rows: [] }),
     insert: async (request) => {
       calls.inserts.push(request)
       return { ok: true, values: { ...STORED }, version: VERSION }

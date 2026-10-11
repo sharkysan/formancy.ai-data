@@ -275,6 +275,47 @@ describe.each([
     expect(saved.json().answers).toMatchObject({ quantity: 3, line_total: '4.50' })
   })
 
+  // A list is a read of many records (0044): each tenant's clerk is listed
+  // their own orders and none of the other's, each row what a read of it
+  // returns; and a line of tenant 2's order, which has no tenant column of
+  // its own, is never in tenant 1's line list, with or without its order
+  // named as the parent. Watched failing with the line form's list planned
+  // without its through: tenant 2's line was listed for tenant 1.
+  test("lists hold each tenant's own records, and a line of another tenant's order is never listed", async () => {
+    const lineForm = `${connection}-order-line`
+    const theirsDefinition = (await call('GET', `/v1/forms/${formId}`, otherClerk)).json()
+    expect(theirsDefinition.list).toMatchObject({ sortable: expect.arrayContaining(['id', 'order_date']) })
+    const source = theirsDefinition.form.model.fields.find((field: { key: string }) => field.key === 'customer').optionsSource as string
+    const customer = (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, otherClerk, { operation: 'create', search: '' })).json().rows[0].token as string
+    const order = await call('POST', `/v1/forms/${formId}/records/create`, otherClerk, { answers: { customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '1' } })
+    expect(order.statusCode, order.body).toBe(201)
+    const theirOrder = order.json().record as string
+    const line = await call('POST', `/v1/forms/${lineForm}/records/create`, otherClerk, { answers: { order: theirOrder, line_no: 1, quantity: 1, unit_price: '1.00' } })
+    expect(line.statusCode, line.body).toBe(201)
+    const theirLine = line.json().record as string
+
+    const listed = async (form: string, bearer: string, body: Record<string, unknown> = {}): Promise<string[]> => {
+      const answer = await call('POST', `/v1/forms/${form}/records/list`, bearer, body)
+      expect(answer.statusCode, answer.body).toBe(200)
+      return (answer.json().rows as Array<{ record: string }>).map((row) => row.record)
+    }
+    const ourOrder = `k1:${EDGE_VALUES.beyondSafeInteger}`
+    const ours = await listed(formId, clerk, { sort: [{ field: 'order_date', direction: 'desc' }] })
+    expect(ours).toContain(ourOrder)
+    expect(ours).not.toContain(theirOrder)
+    expect(await listed(formId, otherClerk)).toEqual([theirOrder])
+
+    expect(await listed(lineForm, clerk)).not.toContain(theirLine)
+    expect(await listed(lineForm, clerk, { parent: { field: 'order', record: theirOrder } })).toEqual([])
+    expect(await listed(lineForm, otherClerk, { parent: { field: 'order', record: theirOrder } })).toEqual([theirLine])
+    expect(await listed(lineForm, clerk, { parent: { field: 'order', record: ourOrder } })).toContain(`${ourOrder},1`)
+
+    // Each row is what a read of its token returns, through the same server.
+    const page = (await call('POST', `/v1/forms/${formId}/records/list`, clerk, { limit: 1 })).json()
+    expect(page.hasMore).toBe(true)
+    expect((await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record: page.rows[0].record })).json()).toEqual(page.rows[0])
+  })
+
   // Step 10: nothing changed in the database, so drift reports nothing.
   test('drift against the database as it is now reports nothing', async () => {
     const drift = await call('POST', `/v1/forms/${formId}/drift`, admin)

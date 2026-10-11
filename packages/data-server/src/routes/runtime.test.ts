@@ -177,6 +177,11 @@ function registry(): ConnectionRegistry {
       const described = description(request.target.table)
       return described.ok ? { ok: true, described: described.described, record: { values: outcome.values, version: outcome.version } } : described
     },
+    // Lists are runtime-lists.test.ts's; here the port only has to be whole.
+    list: async (request) => {
+      const described = description(request.target.table)
+      return described.ok ? { ok: true, described: described.described, rows: [] } : described
+    },
     insert: async (request) => {
       calls.inserts.push(request)
       await insertGate

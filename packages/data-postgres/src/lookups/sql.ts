@@ -1,7 +1,9 @@
-import type { LookupConfig, LookupKeyColumn, LookupQuery, LookupSearchColumn, LookupSort, RowFilterTerm } from '@formancy/data-core'
+import type { LookupConfig, LookupKeyColumn, LookupQuery, RowFilterTerm } from '@formancy/data-core'
 import { op } from '../sql/catalog.js'
 import { filterSql } from '../sql/filters.js'
 import { quoteIdentifier, quoteTable } from '../sql/identifiers.js'
+import { orderBy } from '../sql/order.js'
+import { searchSql } from '../sql/search.js'
 import { Statement } from '../sql/statement.js'
 import type { Param } from '../sql/statement.js'
 import { sqlTypeOf } from '../sql/types.js'
@@ -16,35 +18,8 @@ export interface LookupStatement {
 /** The alias of the target table in every lookup query. */
 const ROW = '"r"'
 
-/**
- * LIKE's escape character. Not a backslash: a composition root may still set
- * `standard_conforming_strings = off`, and then `'\'` is not a one-character
- * literal but the start of an unterminated one.
- */
-const ESCAPE = '!'
-
-/** Maps, not object literals: `constructor` is a property of every object and of no Map. */
-const DIRECTION: ReadonlyMap<unknown, string> = new Map([
-  ['asc', 'asc'],
-  ['desc', 'desc'],
-])
-const NULLS: ReadonlyMap<unknown, string> = new Map([
-  ['first', 'nulls first'],
-  ['last', 'nulls last'],
-])
-
 function column(name: string): string {
   return `${ROW}.${quoteIdentifier(name)}`
-}
-
-/**
- * The search, as a LIKE pattern that matches it literally: the escape
- * character, `%` and `_` each escaped, so a person typing `100%` finds
- * "100%" and not every name that starts with 100. `[` means nothing to
- * PostgreSQL's LIKE and needs nothing.
- */
-export function containsPattern(search: string): string {
-  return `%${search.replace(/[!%_]/g, (character) => `${ESCAPE}${character}`)}%`
 }
 
 /**
@@ -60,38 +35,6 @@ function selectList(config: LookupConfig, withDisplay: boolean): string {
   const keys = config.targetColumns.map((key) => canonicalText(key.type, column(key.name)))
   const display = withDisplay ? config.display.map((entry) => canonicalText(entry.type, column(entry.name))) : []
   return [...keys, ...display].join(', ')
-}
-
-/** The order, each column's direction and NULL placement spelled from a fixed table rather than copied. */
-function orderBy(sort: readonly LookupSort[]): string {
-  return sort
-    .map((entry) => {
-      const direction = DIRECTION.get(entry.direction)
-      const nulls = NULLS.get(entry.nulls)
-      if (direction === undefined || nulls === undefined) throw new Error(`${entry.column} has no order this adapter can spell.`)
-      return `${column(entry.column)} ${direction} ${nulls}`
-    })
-    .join(', ')
-}
-
-/**
- * Whether a search column contains the pattern, case folded.
- *
- * The column is read as its canonical text, the text its label shows: text
- * as itself, an integer as its digits (0028), never through another
- * conversion.
- *
- * Through the database's default collation: PostgreSQL 17 refuses LIKE and
- * ILIKE outright on a column whose collation is nondeterministic (0A000), and
- * the default collation is always deterministic. ILIKE folds case as that
- * collation's ctype does; nothing folds accents, where formancy's own
- * narrowing does (README).
- *
- * Spelled as what `ilike … escape` stands for, `~~*` against `like_escape`,
- * because the keyword names its operator without a schema (`sql/catalog.ts`).
- */
-function contains(search: LookupSearchColumn, pattern: string): string {
-  return `(${canonicalText(search.type, column(search.name))} collate pg_catalog."default") ${op('~~*')} pg_catalog.like_escape(${pattern}, '${ESCAPE}')`
 }
 
 /** A lookup query. `where` is never empty: a search excludes NULL keys, and a key query has its keys. */
@@ -110,13 +53,11 @@ export function searchStatement(config: LookupConfig, query: LookupQuery, terms:
   const statement = new Statement()
   // No foreign key value can reference a key that holds a NULL.
   const where = [...filterSql(statement, ROW, terms), ...config.targetColumns.map((key) => `${column(key.name)} is not null`)]
-  if (query.search !== '') {
-    const pattern = statement.text(containsPattern(query.search))
-    where.push(`(${config.search.map((entry) => contains(entry, pattern)).join(' or ')})`)
-  }
+  // Matched as a record list matches (sql/search.ts), and ordered as one is ordered (sql/order.ts).
+  if (query.search !== '') where.push(searchSql(statement, ROW, config.search, query.search))
   const limit = statement.as(String(query.limit + 1), 'pg_catalog.int8')
   const offset = statement.as(String(query.offset), 'pg_catalog.int8')
-  const text = assemble(config, selectList(config, true), where, `order by ${orderBy(config.sort)}\nlimit ${limit} offset ${offset}`)
+  const text = assemble(config, selectList(config, true), where, `order by ${orderBy(ROW, config.sort)}\nlimit ${limit} offset ${offset}`)
   return { text, params: statement.params }
 }
 

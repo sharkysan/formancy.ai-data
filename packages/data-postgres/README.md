@@ -27,7 +27,7 @@ snapshot.gaps // what this release could not describe: a foreign table
 snapshot.fingerprint // changes when the structure, the account's privileges, or the account changes
 
 const lookups = createPostgresLookups(sql) // LookupAdapter: search, resolve, rejects
-const records = createPostgresRecords(sql) // RecordAdapter: describe, read, insert, update
+const records = createPostgresRecords(sql) // RecordAdapter: describe, read, list, insert, update
 await adapter.close()
 ```
 
@@ -513,6 +513,12 @@ The suites start `postgres:17-alpine` unless a test names another image, through
   connections, every refusal the fixture can provoke, writes a trigger or a
   rule declines, objects planted on the search path, and a connection cut
   through a TCP hop after a write was sent.
+- `list.integration.test.ts` — a page of records (0044), each case
+  `LIST_PARITY`'s: key order and paging, a literal search, NULLs last both
+  ways, a NOT NULL sort spelled without a placement, a parent over an
+  integer and over a `char(2)` foreign key, a child's lines through their
+  order, every row its read, and a page refused once its own description
+  says the key can be NULL or is not unique.
 - `records-lost-answer.integration.test.ts` — an insert and an update whose
   answer the hop drops after the commit, counted at the wire; a deferred
   unique constraint refused after the row was sent, with and without the

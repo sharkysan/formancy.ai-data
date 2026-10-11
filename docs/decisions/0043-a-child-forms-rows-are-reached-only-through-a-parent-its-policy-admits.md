@@ -1,6 +1,6 @@
 # 0043 — A child form's rows are reached only through a parent its policy admits
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md): a list of records carries every through from its first statement, and a form whose rows nothing scopes while a lookup's options are filtered offers no list
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**

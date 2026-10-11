@@ -150,6 +150,22 @@ existed would be documented and inert.
   `routes/runtime-drift.integration.test.ts` every change of `DRIFTING`
   (`@formancy/data-fixtures`) on both engines.
 
+  `POST /v1/forms/:id/records/list` answers one page of the records a person
+  may read, `{ rows, hasMore }` and no total
+  ([0044](../../docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)):
+  a read of many, under the read filter and every through, each row what
+  `records/read` returns for its token, a POST so the search is in no URL,
+  and audited as `list` with no record and never the search, the sort or
+  the parent. `GET /v1/forms/:id` sends `list` -- what a page may be searched
+  and sorted by -- or `null` where the person would be refused one: a key
+  that can be NULL or that they may not read, rows nothing scopes though a
+  lookup's options are filtered, or a table that no longer holds the key
+  unique and NOT NULL. A page is decided over the description its own
+  statement carried, as a read is, and is also 409 `drift` when that
+  description no longer holds the key unique and NOT NULL; its log line
+  says `list`, as the audit does. `routes/runtime-lists.test.ts` holds the
+  route over fake ports.
+
   An update reads the record first and removes the echo it can prove
   ([0022](../../docs/decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)):
   a field the actor may not write, equal to the record as read; and,
@@ -323,10 +339,12 @@ through it, and CI runs that guide as written
 It is an evaluation stack, not a deployment: the guide's section 8 says what
 a deployment changes.
 
-What each runtime request costs through `dist/main.mjs`, configured this way,
-on both engines and with the machine, the database's size and the date it was
-measured on, is in [`docs/performance.md`](../../docs/performance.md)
-([0034](../../docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
+What each runtime request but a page of records costs through
+`dist/main.mjs`, configured this way, on both engines and with the machine,
+the database's size and the date it was measured on, is in
+[`docs/performance.md`](../../docs/performance.md)
+([0034](../../docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md));
+lists came after those figures, and 0044 says what measuring them needs.
 
 ## Licence
 

@@ -246,9 +246,13 @@ counting pass counts it through a TCP hop on every run, and
 
 ### Records
 
-`createSqlServerRecords(pool)` reads, inserts and updates one record
+`createSqlServerRecords(pool)` reads, inserts and updates one record, and
+lists a page of records -- one statement, an OUTER APPLY with OFFSET and
+FETCH beside the table's description, a nullable column's NULLs placed by a
+CASE
 ([0015](../../docs/decisions/0015-a-record-operation-is-one-guarded-statement.md),
-[0017](../../docs/decisions/0017-sqlserver-operations.md)):
+[0017](../../docs/decisions/0017-sqlserver-operations.md),
+[0044](../../docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)):
 
 ```ts
 import { createSqlServerRecords } from '@formancy/data-sqlserver'

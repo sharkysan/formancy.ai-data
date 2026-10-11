@@ -142,8 +142,8 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
     // compared it in the column's collation: under parity.ci, which is case
     // insensitive, tenant `acme` read `ACME`'s rows too (C3c) — and SQL
     // Server, comparing differently, disagreed. Every path a filter scopes is
-    // run: the lookup's page, its resolve and its membership, a read and an
-    // update.
+    // run: the lookup's page, its resolve and its membership, a list of the
+    // table's records (0044), a read and an update.
     test(`${entry.column} = '${entry.value}' selects exactly ${String(entry.keys.length)} named row(s), in every operation`, covers('postgres', filterCase(entry)), async () => {
       const filters = scoped(entry.column, entry.value)
       const expected = new Set(entry.keys.map((key) => tokenOf(...key)))
@@ -155,6 +155,20 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
       expect(page.hasMore).toBe(false)
       expect(new Set((await lookups.resolve(items(), named, filters)).map((row) => row.token))).toEqual(expected)
       expect(new Set(await lookups.rejects(items(), named, filters))).toEqual(new Set(named.filter((token) => !expected.has(token))))
+
+      // A list of the table under the same filter lists exactly those rows (0044).
+      const listed = await createPostgresRecords(owner).list({
+        target: tenantItem(),
+        columns: [col('tenant_item', 'tenant_code'), col('tenant_item', 'item_no')],
+        filters, through: [],
+        equal: [],
+        search: null,
+        sort: [{ column: 'tenant_code', direction: 'asc', nulls: null }, { column: 'item_no', direction: 'asc', nulls: null }],
+        offset: 0,
+        limit: 50,
+      })
+      if (!listed.ok) throw new Error(`expected a page, got ${listed.code}`)
+      expect(new Set(listed.rows.map((row) => tokenOf(String(row.values['tenant_code']), String(row.values['item_no']))))).toEqual(expected)
 
       const records = defined(createPostgresRecords(owner))
       const before = await namedRows()

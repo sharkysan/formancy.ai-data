@@ -2,7 +2,7 @@ import type { ApiValue } from '../codecs/codec.js'
 import type { DriftChange } from '../drift/types.js'
 import type { LookupConfig, RowFilters } from '../lookup/types.js'
 import type { PolicyRefusalCode } from '../policy/types.js'
-import type { InsertRequest, ReadRequest, UpdateRequest } from './types.js'
+import type { InsertRequest, ListRequest, ReadRequest, UpdateRequest } from './types.js'
 
 /**
  * Why the planner produced no request, as a stable code.
@@ -14,13 +14,16 @@ import type { InsertRequest, ReadRequest, UpdateRequest } from './types.js'
  *   Nothing in the bindings can be trusted to mean what it meant. Or the
  *   database as it is now stops this operation for the form as published
  *   (0041): its table, as the request described it, has changed in a way
- *   drift review's root families stop.
+ *   drift review's root families stop -- or, for a page of records, no
+ *   longer holds the key unique and NOT NULL (0044).
  * - `invalid-bindings` — bindings that do not say what their own snapshot
  *   says: a column it lacks or types differently, an identity that is not a
  *   key, a column bound twice, a concurrency column of the wrong kind, a
  *   lookup its foreign key does not support.
  * - `operation-unavailable` — the form does not offer it: no create, no
- *   update, no confirmed concurrency, or no key a record token can carry.
+ *   update, no confirmed concurrency, or no key a record token can carry;
+ *   and no list of records whose key can be NULL, or whose rows nothing
+ *   scopes while a lookup's options are filtered (0044).
  * - `invalid-request` — answers that are not an object of field keys.
  * - `invalid-record-token` — a record token that does not name a record of
  *   this form, spelled as its key holds it.
@@ -32,6 +35,11 @@ import type { InsertRequest, ReadRequest, UpdateRequest } from './types.js'
  *   both adapters read those cut to formancy's shape, and only that read
  *   tells an unedited one from a change (0040). A caller's mistake, never a
  *   person's.
+ * - `not-sortable` — a list sorted by a field this actor may not sort it
+ *   by: one they may not read, a lookup, or one with no order both engines
+ *   can rely on (0044).
+ * - `not-searchable` — a list searched where this actor may read no field a
+ *   search can match (0044).
  */
 export type PlanRefusalCode =
   | PolicyRefusalCode
@@ -43,6 +51,8 @@ export type PlanRefusalCode =
   | 'invalid-version'
   | 'nothing-to-update'
   | 'record-not-read'
+  | 'not-sortable'
+  | 'not-searchable'
 
 export interface PlanRefusal {
   ok: false
@@ -119,6 +129,15 @@ export type PlannedUpdate =
       memberships: MembershipCheck[]
     }
   | InvalidValues
+  | PlanRefusal
+
+export type PlannedList =
+  | {
+      ok: true
+      request: ListRequest
+      /** The field keys the actor may see, for `recordPage`. */
+      fields: string[]
+    }
   | PlanRefusal
 
 /** A record as a form receives it. */

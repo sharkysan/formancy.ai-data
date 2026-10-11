@@ -35,17 +35,27 @@ only for an abort the caller asked for, with the AbortError it raised.
 
 | Function | Route |
 |---|---|
-| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable }` |
+| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list }` |
 | `read(formId, record)` | `POST /v1/forms/:id/records/read` |
+| `list(formId, query?, signal?)` | `POST /v1/forms/:id/records/list` → `{ rows, hasMore }` |
 | `create(formId, answers)` | `POST /v1/forms/:id/records/create` |
 | `update(formId, { record, version, answers })` | `POST /v1/forms/:id/records/update` |
 | `reconcile(formId, unknown)` | `POST /v1/forms/:id/records/read`, or nothing when there is no token |
 | `query(formId, source, { operation, search, offset?, limit? }, signal?)` | `POST /v1/forms/:id/lookups/:source/query` |
 | `resolve(formId, source, { operation, tokens }, signal?)` | `POST /v1/forms/:id/lookups/:source/resolve` |
 
-The reply types — `PublishedForm`, `FormRecord`, `LookupResult`, `LookupRow`,
-`FieldError` — are re-exported from `@formancy/data-core`, where the server's
-handlers are checked against the same declarations.
+The reply types — `PublishedForm`, `FormRecord`, `RecordList`,
+`RecordListQuery`, `ListSortTerm`, `ListColumns`, `LookupResult`,
+`LookupRow`, `FieldError` — and `LIST_PAGE_SIZE` are re-exported from
+`@formancy/data-core`, where the server's handlers are checked against the
+same declarations. A form's `list`
+is `null` when the server would refuse this person a page, and otherwise
+says which fields a page may be searched and sorted by
+([0044](../../docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md));
+a `form` reply without one is `unexpected`, as from a server older than
+lists. `list` sends exactly `search`, `sort`, `parent`, `offset` and `limit`
+in a POST body, each left out the server's default, so the search is in no
+URL.
 
 ## The rules it keeps for a host
 

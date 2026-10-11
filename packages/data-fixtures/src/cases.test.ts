@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { READER_ACCESS, WRITER_ACCESS } from './access.js'
-import { covers, displayCase, driftingCase, edgeCase, filterCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase, THROUGH_CASES, throughCase } from './cases.js'
+import { covers, displayCase, driftingCase, edgeCase, filterCase, listCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase, THROUGH_CASES, throughCase } from './cases.js'
 import { sharedDrifting } from './drifting.js'
 import * as fixtures from './index.js'
+import { LIST_PARITY } from './lists.js'
+import type { ListCase } from './lists.js'
 import { FIXTURE_MODEL } from './model.js'
 import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 import type { RefusalParityCase } from './parity.js'
@@ -31,6 +33,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   SECOND_SHIPMENT: [shipmentCase('second')],
   DRIFTING: sharedDrifting().map((entry) => driftingCase(entry.name)),
   THROUGH_CASES: THROUGH_CASES.map(throughCase),
+  LIST_PARITY: (Object.keys(LIST_PARITY) as ListCase[]).map(listCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
@@ -51,6 +54,7 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   SIZED_CUSTOMERS: "what the sized table is generated from (0034); what a lookup on it reads is sizedRowsRead()'s, a function",
   FIXTURE_CUSTOMERS: "the fixture's own customers, which the sized table holds beside the generated ones",
   SIZED_CHUNK_ROWS: 'how many rows one statement of the sized load carries',
+  LIST_ROWS: "the rows the list suites insert; what a list shows of them is LIST_PARITY's",
 }
 
 /** What a call made while a file is collected gave: its options, or the sentence it threw. */

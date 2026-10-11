@@ -1,8 +1,8 @@
 import { WRITE_ID_HEADER } from '@formancy/data-core'
-import type { FieldError, FormRecord, LookupResult, LookupRow, PublishedForm } from '@formancy/data-core'
+import type { FieldError, FormRecord, LookupResult, LookupRow, PublishedForm, RecordList, RecordListQuery } from '@formancy/data-core'
 import { reconcile } from './reconcile.js'
 import type { Reconciliation } from './reconcile.js'
-import { isFormRecord, isLookupResult, isPublishedForm, isResolved, refusalOf, UNEXPECTED } from './shapes.js'
+import { isFormRecord, isLookupResult, isPublishedForm, isRecordList, isResolved, refusalOf, UNEXPECTED } from './shapes.js'
 import { writeOutcome } from './writes.js'
 import type { UnknownWrite, WriteAnswer, WriteIntent, WriteOutcome } from './writes.js'
 
@@ -187,6 +187,24 @@ export function createDataClient(options: DataClientOptions) {
 
     /** `POST …/records/read`: one record by its token, with the version an update sends back. */
     read,
+
+    /**
+     * `POST …/records/list` (0044): one page of the records this person may
+     * read, each what `read` returns for its token, and whether more follow.
+     * A property left out is the server's default -- no search, the key's
+     * order, no parent, the first page, the largest page -- and exactly the
+     * route's keys are sent, whatever else the object carries. A POST, so the
+     * search is never in a URL.
+     */
+    list: (formId: string, query: Partial<RecordListQuery> = {}, signal?: AbortSignal): Promise<Outcome<RecordList>> =>
+      call({
+        method: 'POST',
+        names: [formId],
+        route: ([form]) => `/v1/forms/${String(form)}/records/list`,
+        body: { search: query.search, sort: query.sort, parent: query.parent, offset: query.offset, limit: query.limit },
+        read: (body) => (isRecordList(body) ? body : undefined),
+        signal,
+      }),
 
     /**
      * `POST …/records/create`: a new record from the answers; the reply is what

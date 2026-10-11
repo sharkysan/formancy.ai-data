@@ -382,15 +382,15 @@ async function waiting(table: string, count: number): Promise<void> {
 
 describe('an ALTER that commits while a request waits for it', () => {
   // The window between a description and its write. The owner holds the
-  // ALTER uncommitted while a create, an update and a read queue behind its
-  // lock, then commits. Under READ COMMITTED each statement takes its
+  // ALTER uncommitted while a create, an update, a read and a list queue
+  // behind its lock, then commits. Under READ COMMITTED each statement takes its
   // snapshot after the lock and the guard sees the change. Under REPEATABLE
   // READ a statement's snapshot is taken before it waits: without the lock
   // taken first, the read behind a rewrite answers no row, and the write
   // stores the narrowed value (the probes before 0041 measured both).
   for (const isolation of ['read committed', 'repeatable read'] as const) {
     for (const name of ['narrowed-decimal', 'sequence-default'] as const) {
-      test(`${name} under ${isolation}: the writes are schema-changed, nothing is written, and the read is the table after`, async () => {
+      test(`${name} under ${isolation}: the writes are schema-changed, nothing is written, and the read and the list are the table after`, async () => {
         const entry = await copyOf(name, `${name.replaceAll('-', '_')}_${isolation.replace(' ', '_')}`)
         const snapshot = await discoverPostgres(owner, SCOPE)
         const sql = postgres(fixture.admin, { onnotice: () => {}, connection: { default_transaction_isolation: isolation } })
@@ -400,15 +400,18 @@ describe('an ALTER that commits while a request waits for it', () => {
           expect(old.endsWith(`@${isolation}`)).toBe(true)
           const stale = writes(entry, snapshot, '1', old)
           const read = { target: target(entry.table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const, through: [] }
+          // A list is a read of a page, asked again after the lock as a read is (0044).
+          const list = { target: read.target, columns: read.columns, filters: read.filters, through: [], equal: [], search: null, sort: [{ column: 'id', direction: 'asc', nulls: null }], offset: 0, limit: 50 } as const
           const altering = await holdAlter(entry)
-          const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read)] as const
-          await waiting(entry.table, 3)
+          const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read), records.list(list)] as const
+          await waiting(entry.table, 4)
           await altering.commit()
-          const [inserted, updated, reread] = await Promise.all(pending)
+          const [inserted, updated, reread, relisted] = await Promise.all(pending)
           expect(inserted).toMatchObject({ ok: false, code: 'schema-changed' })
           expect(updated).toMatchObject({ ok: false, code: 'schema-changed' })
           const now = described(await records.describe(ref(entry.table)))
           expect(reread).toMatchObject({ ok: true, described: { definition: now.definition }, record: { version: '1' } })
+          expect(relisted).toMatchObject({ ok: true, described: { definition: now.definition }, rows: [{ version: '1' }] })
           expect(await held(entry.table)).toMatchObject({ rows: 1, row: expect.stringMatching(/"memo":null/) })
         } finally {
           await sql.end()

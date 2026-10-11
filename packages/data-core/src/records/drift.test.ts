@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import type { NormalizedType, ObjectMeta } from '../metadata.js'
-import { driftRefusal, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './drift.js'
+import type { ColumnMeta, NormalizedType, ObjectMeta } from '../metadata.js'
+import { driftRefusal, LIST_REFUSED, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './drift.js'
 import { planCreate, planUpdate } from './plan.js'
 import type { DescribedTable } from './types.js'
 import { ANSWERS, AUDITOR, CLERK, DEFINITION, described, MS, MS_ORDER, ORDER_POLICY, ORDER_TOKEN, PG, PG_ORDER, snapshot, text } from './test-support.js'
@@ -49,6 +49,36 @@ describe('driftRefusal and runtimeOperations', () => {
     const refusal = driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', GROUP_NARROWED), 'update')
     expect(refusal?.drift?.map((change) => [change.kind, change.affects])).toEqual([['column-tightened', ['group']]])
     for (const sentence of [READ_REFUSED, WRITE_REFUSED, NOTHING_LEFT]) expect(sentence).not.toMatch(/group|varchar|amount/)
+  })
+
+  // A list pages by the key (0044), and that order is total only while the
+  // table holds the key unique and NOT NULL. Review reports a key column
+  // made nullable as a note and a key that is gone as stopping update, and
+  // a read by token needs neither; but over two rows on one key a page holds
+  // one record twice, and rows with a NULL key have no token and no order
+  // the engine defines, so offset paging repeats or skips them. Watched
+  // failing with a page decided as a read is: both descriptions listed.
+  test('refuses a page when the table no longer holds the key to a total order, which a read allows', () => {
+    const loosened = after('postgres', (order) => {
+      ;(order.columns.find((column) => column.name === 'id') as ColumnMeta).nullable = true
+      order.primaryKey = null
+      order.uniqueKeys.push({ name: 'uq_order_id', columns: ['id'] })
+    })
+    for (const [name, description, kind] of [['loosened', loosened, 'column-loosened'], ['dropped', after('postgres', KEY_DROPPED), 'identity-key-changed']] as const) {
+      expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, description, 'read'), name).toBeUndefined()
+      const refused = driftRefusal(PG, PG_ORDER, ORDER_POLICY, description, 'list')
+      expect(refused, name).toMatchObject({ ok: false, code: 'drift', message: LIST_REFUSED })
+      // The log is told what moved the key, whatever review calls it.
+      expect(refused?.drift?.map((change) => [change.kind, change.affects]), name).toContainEqual([kind, ['id']])
+    }
+    expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, described(PG, PG_ORDER), 'list')).toBeUndefined()
+    // A page the read refuses is refused as a read is.
+    expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', AMOUNT_AS_TEXT), 'list')).toMatchObject({ ok: false, code: 'drift', message: READ_REFUSED })
+    expect(LIST_REFUSED).not.toMatch(/\bid\b|key column|NULL/)
+    // `GET` asks this of every form it opens: one with no identity has no
+    // key to hold, offers no list by `listable`, and is not refused here for it.
+    const keyless = { ...PG_ORDER, identity: null }
+    expect(driftRefusal(PG, keyless, ORDER_POLICY, after('postgres', KEY_DROPPED), 'list')).toBeUndefined()
   })
 
   // What GET offers is the runtime's verdict, from the same report.

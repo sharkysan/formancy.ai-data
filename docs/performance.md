@@ -6,6 +6,9 @@ reading, creating and updating an order; and what a write the runtime
 refuses because the form's table changed still asks the database. Measured
 results, not promises
 ([0034](./decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
+All but a page of records, which arrived after these were measured
+([0044](./decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)
+names what measuring it needs).
 
 The requests go through `@formancy/data-client` and real HTTP to the shipped
 server, `packages/data-server/dist/main.mjs`, started as an operator starts it
@@ -134,6 +137,11 @@ there would be either too loose to mean anything or flaky.
   Server in the same batch. Counting shows
   the statements it adds; what the catalog walk inside each statement costs
   is in their time and cannot be told apart from the rest of it.
+- **No page of records.** `POST /v1/forms/:id/records/list` came after the
+  figures
+  ([0044](./decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)):
+  what a page reads, its round trips and its time are not here, and no
+  block of the harness sends one.
 - **PostgreSQL under READ COMMITTED only**, the fixture's default isolation.
   Under another, every read and write first locks the form's table in a
   transaction of its own (0041), which takes more round trips than the pins

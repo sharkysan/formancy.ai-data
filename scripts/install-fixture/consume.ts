@@ -6,8 +6,8 @@
  * is on trial is that the published entry points resolve, with the types that
  * shipped. Connecting to a database is the integration suites' business.
  */
-import { createDataClient, fieldProblems, lookupSources, sourceNames } from '@formancy/data-client'
-import type { Outcome, PublishedForm, Refusal } from '@formancy/data-client'
+import { createDataClient, fieldProblems, LIST_PAGE_SIZE, lookupSources, sourceNames } from '@formancy/data-client'
+import type { Outcome, PublishedForm, RecordList, Refusal } from '@formancy/data-client'
 import { DATABASE_KINDS, isDatabaseKind } from '@formancy/data-core'
 import type { DatabaseAdapter, DatabaseKind } from '@formancy/data-core'
 import { connectPostgres, createPostgresAdapter } from '@formancy/data-postgres'
@@ -89,4 +89,10 @@ const dotted = await client.form('..')
 if (dotted.ok || dotted.code !== 'invalid-name' || fetched !== 0) throw new Error('form("..") was not refused before a request')
 if (Object.keys(lookupSources(client, 'order', form, 'create')).join() !== 'order.customer') throw new Error('lookupSources did not name order.customer')
 
-console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client; audit events`)
+// A page of records (0044): the client's list, its answer's type and the page
+// bound it re-exports, through the published entry points -- a value the
+// client re-exports from the core, which a type-only re-export would lose.
+const page: Outcome<RecordList> = await client.list('..', { limit: LIST_PAGE_SIZE })
+if (page.ok || page.code !== 'invalid-name' || fetched !== 0 || !Number.isSafeInteger(LIST_PAGE_SIZE)) throw new Error('list("..") was not refused before a request')
+
+console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists included; audit events`)

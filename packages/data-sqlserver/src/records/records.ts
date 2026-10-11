@@ -1,5 +1,5 @@
 import type { RecordAdapter, RecordColumn, RecordConcurrency, RecordFailure, RecordRead, RecordTarget, RecordValue } from '@formancy/data-core'
-import { decodeRowversion, encodeRowversion, rowFilterTerms, throughTerms } from '@formancy/data-core'
+import { decodeRowversion, encodeRowversion, listTerms, rowFilterTerms, throughTerms } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
 import { prepare, send } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
@@ -7,6 +7,7 @@ import { fromCanonicalText } from '../sql/values.js'
 import { definitionBytes, describedFrom } from './definition.js'
 import { failureFor } from './errors.js'
 import type { Phase } from './errors.js'
+import { listStatement } from './list.js'
 import { describeStatement, existsStatement, insertStatement, readStatement, updateStatement } from './statements.js'
 import type { ExpectedVersion } from './statements.js'
 
@@ -156,6 +157,17 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
       if (described === 'cut') return CUT
       if (described === undefined) return NOT_DESCRIBED
       return { ok: true, described, record: row.found === null ? null : recordFrom(row, request.columns, request.target.concurrency) }
+    },
+
+    async list(request) {
+      const terms = listTerms(request)
+      const rows = await attempt(pool, listStatement(request, terms), 'read')
+      if (!Array.isArray(rows)) return rows
+      // Always a row: the description's, on the page's first record or beside none.
+      const described = describedBy(rows[0] as Row)
+      if (described === 'cut') return CUT
+      if (described === undefined) return NOT_DESCRIBED
+      return { ok: true, described, rows: rows.filter((row) => row.found !== null).map((row) => recordFrom(row, request.columns, request.target.concurrency)) }
     },
 
     async insert(request) {

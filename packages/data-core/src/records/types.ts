@@ -1,5 +1,5 @@
 import type { ApiValue } from '../codecs/codec.js'
-import type { LookupKeyColumn, RowFilters } from '../lookup/types.js'
+import type { LookupKeyColumn, LookupSearchColumn, RowFilters } from '../lookup/types.js'
 import type { ColumnMeta, NormalizedType, ObjectMeta, ObjectRef } from '../metadata.js'
 
 /**
@@ -77,6 +77,50 @@ export interface ReadRequest {
   columns: readonly RecordColumn[]
   filters: RowFilters
   through: readonly Through[]
+}
+
+/**
+ * One column of a list's order (0044). `nulls` is `'last'` for a column the
+ * snapshot says is nullable -- a NULL comes after every value, whichever the
+ * direction, as in a lookup -- and `null` for a NOT NULL one, which holds
+ * none and is spelled with no placement, so an index on it can serve the
+ * order on either engine. `listOrder` makes it from the snapshot.
+ */
+export interface RecordSort {
+  column: string
+  direction: 'asc' | 'desc'
+  nulls: 'last' | null
+}
+
+/** A list's search: the trimmed text, never empty, and the columns it is matched against, each of a kind both engines spell alike as text (0028). */
+export interface ListSearch {
+  text: string
+  columns: readonly LookupSearchColumn[]
+}
+
+/**
+ * One page of the records the trusted filters and every through admit
+ * (0044): the rows a read by each one's token would find, in `sort`, which
+ * ends with every identity column it does not already name and so is total.
+ *
+ * `equal` narrows to one parent: the root's foreign-key columns a lookup
+ * binds, each with the value the parent's token names, compared with the
+ * database's own equality as the foreign key compares them; `[]` for none.
+ * It adds no permission -- the filters and the throughs still decide which
+ * rows exist. `search` is `null` for none. The adapter fetches `limit + 1`
+ * rows from `offset`, so `recordPage` can tell whether more follow without
+ * a COUNT.
+ */
+export interface ListRequest {
+  target: RecordTarget
+  columns: readonly RecordColumn[]
+  filters: RowFilters
+  through: readonly Through[]
+  equal: readonly RecordValue[]
+  search: ListSearch | null
+  sort: readonly RecordSort[]
+  offset: number
+  limit: number
 }
 
 /** A column as `describe` reads it: what discovery says of its definition, without what the account may do or a comment. */
@@ -215,6 +259,12 @@ export type Described = { ok: true; described: DescribedTable } | RecordFailure
 export type DescribedRead = { ok: true; described: DescribedTable; record: Omit<RecordRead, 'ok'> | null } | RecordFailure
 
 /**
+ * A list's rows, up to `limit + 1` in the request's order, with the table as
+ * that same statement found it, answered whether any row was found (0041).
+ */
+export type ListOutcome = { ok: true; described: DescribedTable; rows: Array<Omit<RecordRead, 'ok'>> } | RecordFailure
+
+/**
  * The record half of the database port, which both adapters implement and one
  * conformance suite holds them to.
  *
@@ -234,11 +284,13 @@ export type DescribedRead = { ok: true; described: DescribedTable; record: Omit<
  * statement that read the record. An insert or an update runs only while the
  * table's definition is `definition`; otherwise it is `schema-changed`, and
  * the record was not written. A read's description is of the table as that
- * read statement found it.
+ * read statement found it, and so is a list's (0044): one statement for the
+ * page and the table it was read from.
  */
 export interface RecordAdapter {
   describe(table: ObjectRef): Promise<Described>
   read(request: ReadRequest): Promise<DescribedRead>
+  list(request: ListRequest): Promise<ListOutcome>
   insert(request: InsertRequest): Promise<RecordOutcome>
   update(request: UpdateRequest): Promise<RecordOutcome>
 }

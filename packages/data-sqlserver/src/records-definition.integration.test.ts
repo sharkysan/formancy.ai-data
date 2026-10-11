@@ -361,13 +361,14 @@ async function waiting(count: number): Promise<void> {
 
 describe('an ALTER that commits while a request waits for it', () => {
   // The window between a description and its write. The owner holds the
-  // ALTER uncommitted while a create, an update and a read queue behind its
-  // schema-modification lock, then commits. Each statement then compiles
-  // against the new table, and the batch's check after it sees the change.
+  // ALTER uncommitted while a create, an update, a read and a list (0044)
+  // queue behind its schema-modification lock, then commits. Each statement
+  // then compiles against the new table, and the batch's check after it sees
+  // the change.
   // Checked in a statement of its own before the write instead, both writes
   // would commit under the new definition.
   for (const name of ['narrowed-decimal', 'sequence-default'] as const) {
-    test(`${name}: the writes are schema-changed, nothing is written, and the read is the table after`, async () => {
+    test(`${name}: the writes are schema-changed, nothing is written, and the read and the list are the table after`, async () => {
       const entry = await copyOf(name, `${name.replaceAll('-', '_')}_raced`)
       const snapshot = await discoverSqlServer(owner, SCOPE)
       const records = createSqlServerRecords(owner)
@@ -376,14 +377,17 @@ describe('an ALTER that commits while a request waits for it', () => {
       const transaction = new mssql.Transaction(owner)
       await transaction.begin()
       await batches(transaction, entry.alter.sqlserver as readonly string[])
-      const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read(entry.table))] as const
-      await waiting(3)
+      const { target: table, columns, filters } = read(entry.table)
+      const list = { target: table, columns, filters, through: [], equal: [], search: null, sort: [{ column: 'id', direction: 'asc', nulls: null }], offset: 0, limit: 50 } as const
+      const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read(entry.table)), records.list(list)] as const
+      await waiting(4)
       await transaction.commit()
-      const [inserted, updated, reread] = await Promise.all(pending)
+      const [inserted, updated, reread, relisted] = await Promise.all(pending)
       expect(inserted).toMatchObject({ ok: false, code: 'schema-changed' })
       expect(updated).toMatchObject({ ok: false, code: 'schema-changed' })
       const now = described(await records.describe(ref(entry.table)))
       expect(reread).toMatchObject({ ok: true, described: { definition: now.definition }, record: { version: expect.any(String) } })
+      expect(relisted).toMatchObject({ ok: true, described: { definition: now.definition }, rows: [{ version: expect.any(String) }] })
       expect(await held(entry.table)).toMatchObject({ rows: 1, row: expect.stringMatching(/"memo":null/) })
     })
   }

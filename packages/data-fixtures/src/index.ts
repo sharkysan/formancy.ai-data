@@ -1,6 +1,6 @@
 export { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
 export type { ExpectedAccess, ExpectedCapability, ExpectedObjectAccess, ExpectedObjectFacts } from './access.js'
-export { displayCase, driftingCase, edgeCase, filterCase, covers, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase, THROUGH_CASES, throughCase } from './cases.js'
+export { displayCase, driftingCase, edgeCase, filterCase, covers, listCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase, THROUGH_CASES, throughCase } from './cases.js'
 export type { ThroughCase } from './cases.js'
 export {
   DEFAULT_IMAGES,
@@ -22,6 +22,8 @@ export { connectDocker } from './docker.js'
 export type { DockerContainer, DockerContainerFacts, DockerDaemon, DockerReader } from './docker.js'
 export { DRIFTING, driftingOn, runtimeOf, sharedDrifting } from './drifting.js'
 export type { DriftingCase, DriftSend, DriftVerdict } from './drifting.js'
+export { LIST_PARITY, LIST_ROWS } from './lists.js'
+export type { ListCase } from './lists.js'
 export { readFixture, splitBatches } from './load.js'
 export type { FixtureFile } from './load.js'
 export { FIXTURE_MODEL, FIXTURE_SCOPE } from './model.js'

@@ -76,3 +76,18 @@ export function throughProblems(snapshot: MetadataSnapshot, bindings: FormBindin
   }
   return problems
 }
+
+/**
+ * The lookup fields whose options the policy filters while nothing scopes
+ * the form's own rows -- no row filter and no through -- in the form's
+ * order; `[]` when something scopes the rows or no lookup's options are
+ * filtered. That is what a child table with no tenant of its own looks like
+ * before its rows are tied to a parent's (0043). The studio notes it, and
+ * a list is refused for it (0044): a policy may say every row is shared,
+ * and this shape is how a line form had to say so before `through`.
+ */
+export function unscopedLookups(bindings: FormBindings, policy: FormPolicy): string[] {
+  if (policy.rowFilters.length > 0 || namedThrough(policy).length > 0) return []
+  const filtered = (field: string): boolean => Object.hasOwn(policy.lookups, field) && (policy.lookups[field] as unknown[]).length > 0
+  return bindings.fields.filter((binding) => binding.kind === 'lookup' && filtered(binding.field)).map((binding) => binding.field)
+}
