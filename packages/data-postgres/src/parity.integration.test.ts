@@ -132,7 +132,7 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
         expect(scoping).toMatchObject({ ok: false, code: entry.refused })
         const forged = { kind: 'restricted', equal: [{ column: entry.column, type: col('tenant_item', entry.column).type, value: entry.value }] } as unknown as RowFilters
         await expect(createPostgresLookups(owner).search(items(), FIRST_PAGE, forged)).rejects.toThrow(/not spelled as its column holds it/)
-        const read = defined(createPostgresRecords(owner)).read({ target: tenantItem(), key: [val('tenant_item', 'tenant_code', 'acme'), val('tenant_item', 'item_no', '1')], columns: [], filters: forged })
+        const read = defined(createPostgresRecords(owner)).read({ target: tenantItem(), key: [val('tenant_item', 'tenant_code', 'acme'), val('tenant_item', 'item_no', '1')], columns: [], filters: forged, through: [] })
         await expect(read).rejects.toThrow(/not spelled as its column holds it/)
       })
       continue
@@ -161,7 +161,7 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
       for (const [tenant, item] of NAMED) {
         const key = [val('tenant_item', 'tenant_code', tenant), val('tenant_item', 'item_no', item)]
         const token = tokenOf(tenant, item)
-        const read = await records.read({ target: tenantItem(), key, columns: [col('tenant_item', 'label')], filters })
+        const read = await records.read({ target: tenantItem(), key, columns: [col('tenant_item', 'label')], filters, through: [] })
         expect(read.ok ? 'found' : read.code, token).toBe(expected.has(token) ? 'found' : 'not-found')
         const row = before.get(token)
         if (row === undefined) throw new Error(`${token} is not a named row`)
@@ -170,7 +170,7 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
           key,
           set: [val('tenant_item', 'label', row.label)],
           expectedVersion: row.version,
-          filters,
+          filters, through: [],
           returning: [],
         })
         expect(update.ok ? 'written' : update.code, token).toBe(expected.has(token) ? 'written' : 'not-found')
@@ -280,7 +280,7 @@ describe('an unconstrained numeric, which only PostgreSQL has', () => {
     const target: RecordTarget = { table: amount.ref, identity: [{ name: 'id', type: idType }], concurrency: null }
     const found: string[] = []
     for (const id of ['1', '2', '3']) {
-      const read = await defined(createPostgresRecords(owner)).read({ target, key: [{ name: 'id', type: idType, value: id }], columns: [], filters: scoping.filters })
+      const read = await defined(createPostgresRecords(owner)).read({ target, key: [{ name: 'id', type: idType, value: id }], columns: [], filters: scoping.filters, through: [] })
       if (read.ok) found.push(id)
     }
     expect(found).toEqual(['1'])
@@ -370,7 +370,7 @@ describe('an instant and a time are read cut to the shape (TEMPORAL_PARITY)', ()
         target: { table: { schema: 'parity', name: 'display_kinds' }, identity: [col('display_kinds', 'id')], concurrency: null },
         key: [val('display_kinds', 'id', '1')],
         columns: [col('display_kinds', 'tm'), col('display_kinds', 'ts')],
-        filters: EVERY_ROW,
+        filters: EVERY_ROW, through: [],
       }
       for (const sql of [owner, configured]) expect(await defined(createPostgresRecords(sql)).read(request)).toEqual({ ok: true, values: TEMPORAL_PARITY, version: null })
     } finally {
@@ -397,7 +397,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
       key: [val('guarded', 'id', '2')],
       set: [val('guarded', 'note', 'refuse')],
       expectedVersion: '0',
-      filters: EVERY_ROW,
+      filters: EVERY_ROW, through: [],
       returning: [],
     })
     expect(failed(update).code).toBe(REFUSAL_PARITY.guardedUpdate)
@@ -457,7 +457,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
           key: [val('contended', 'id', '1')],
           set: [val('contended', 'note', 'the victim')],
           expectedVersion: '0',
-          filters: EVERY_ROW,
+          filters: EVERY_ROW, through: [],
           returning: [],
         })
         await waitUntilBlocked(1)
@@ -495,7 +495,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
           key: [val('guarded', 'id', '5')],
           set: [val('guarded', 'note', 'waited')],
           expectedVersion: '0',
-          filters: EVERY_ROW,
+          filters: EVERY_ROW, through: [],
           returning: [],
         })
         return { outcome }

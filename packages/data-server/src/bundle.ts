@@ -1,4 +1,4 @@
-import { bindingsVersionProblem, createSnapshot, findObject, rowFilterColumnProblem, validatePolicy } from '@formancy/data-core'
+import { bindingsVersionProblem, createSnapshot, findObject, rowFilterColumnProblem, throughProblems, validatePolicy } from '@formancy/data-core'
 import type { FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { format2Problems } from './bundle-format2.js'
@@ -129,13 +129,18 @@ export function validateBundle(document: unknown): BundleValidation {
 }
 
 /**
- * Everything a policy does not fit: the bindings (`validatePolicy`), and the
- * snapshot's columns a row filter compares (`unfilterableColumns`). One
- * function for the bundle check and for the regeneration route's report, so
- * the two cannot disagree about one policy.
+ * Everything a policy does not fit: the bindings (`validatePolicy`), the
+ * snapshot's columns a row filter compares (`unfilterableColumns`), and what
+ * the snapshot says of each lookup a through names (`throughProblems`, 0043),
+ * which the planner asks too. One function for the bundle check and for the
+ * regeneration route's report, so the two cannot disagree about one policy.
  */
 export function policyProblems(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy): string[] {
-  return [...fitProblems(policy, bindings), ...unfilterableColumns(snapshot, bindings, policy)]
+  return [
+    ...fitProblems(policy, bindings),
+    ...unfilterableColumns(snapshot, bindings, policy),
+    ...throughProblems(snapshot, bindings, policy).map((problem) => `policy: ${problem}`),
+  ]
 }
 
 function fitProblems(policy: FormPolicy, bindings: FormBindings): string[] {

@@ -74,7 +74,7 @@
     "title": "Policy",
     "step": "4. Policy",
     "caption": "The tenant pin becomes a row filter on the orders this form reaches and on the customers its list may offer, taken from the signed-in person's attributes “and never from the form”; a customer outside the filter is refused on save “even by somebody who knows its key” ([0011](./docs/decisions/0011-every-operation-carries-a-trusted-policy-context.md)).",
-    "alt": "Two policy groups, each with tenant_id equal to the trusted attribute tenant: the row filters on sales.order and the rows the Customer list may offer.",
+    "alt": "Two policy groups, each with tenant_id equal to the trusted attribute tenant: the row filters on sales.order and the rows the Customer list may offer, under which an unticked box offers to reach only the orders whose Customer is one of these.",
     "quotes": {
       "and never from the form": ["Rows"],
       "even by somebody who knows its key": ["Lookup"]

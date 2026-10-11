@@ -1,6 +1,6 @@
 # 0011 — Every operation carries a trusted policy context
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md): a row may also be scoped one foreign-key hop away, to a row a lookup's equality filter admits (`through`)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/policy/evaluate.test.ts` — a

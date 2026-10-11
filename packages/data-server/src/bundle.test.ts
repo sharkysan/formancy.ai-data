@@ -234,6 +234,50 @@ describe('validateBundle', () => {
     expect(stamped.ok ? [] : stamped.problems).toContainEqual(expect.stringMatching(/^policy: rowFilters placed_at is datetimeoffset, which a row filter cannot compare/))
   })
 
+  // A through scopes the form's own rows by a lookup's filter on its target
+  // (0043). Over a lookup that offers every row it scopes nothing; over a
+  // text key it compares two columns whose collations the snapshot does not
+  // record. Either would be published as a tenant boundary nothing enforces,
+  // so each is refused at publish -- and with a filter over an integer key
+  // the same form publishes.
+  test('a through over a lookup that offers every row, or over a text key, is refused at publish', () => {
+    const text = { kind: 'text', maxLength: 20, lengthUnit: 'utf16-code-units', fixedLength: false } as const
+    const taken = (key: NormalizedType) =>
+      createSnapshot({
+        kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
+        objects: [
+          {
+            ref: { schema: 'sales', name: 'order' }, kind: 'table', comment: null,
+            columns: [column('id', 1, key), column('tenant_id', 2, INT32), column('placed', 3, { kind: 'date' })],
+            primaryKey: { name: 'pk_order', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+          },
+          {
+            ref: { schema: 'sales', name: 'order_line' }, kind: 'table', comment: null,
+            columns: [column('order_id', 1, key), column('line_no', 2, INT32), column('row_version', 3, { kind: 'rowversion' }, { generated: 'rowversion' })],
+            primaryKey: { name: 'pk_order_line', columns: ['order_id', 'line_no'] }, uniqueKeys: [],
+            foreignKeys: [{ name: 'fk_order_line_order', columns: ['order_id'], references: { table: { schema: 'sales', name: 'order' }, columns: ['id'] }, onUpdate: 'no-action', onDelete: 'cascade', enforced: true, validated: true }],
+            checks: [], rowSecurity: 'none',
+          },
+        ],
+      })
+    const bundle = (key: NormalizedType, rules: FormPolicy['rowFilters']): BundleV1 => {
+      const snapshotted = taken(key)
+      const { form, bindings } = generateForm(snapshotted, { connection: 'erp', root: { schema: 'sales', name: 'order_line' }, formId: 'order-line', title: 'Line', lookups: [{ foreignKey: 'fk_order_line_order', display: ['placed'] }] })
+      const fields = Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: ['clerk'] }]))
+      const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields, rowFilters: [], lookups: { order: rules }, through: ['order'] }
+      return { format: 1, connection: 'erp', form, bindings, policy, snapshot: snapshotted }
+    }
+    const tenant = [{ column: 'tenant_id', attribute: 'tenant' }]
+
+    expect(validateBundle(bundle(INT32, tenant))).toMatchObject({ ok: true })
+    const everyRow = validateBundle(bundle(INT32, []))
+    expect(everyRow.ok ? [] : everyRow.problems).toEqual(['policy: through: order scopes nothing, because lookups.order is [], every row of sales.order'])
+    const textKey = validateBundle(bundle(text, tenant))
+    expect(textKey.ok ? [] : textKey.problems).toEqual([
+      'policy: through: order joins sales.order_line.order_id and sales.order.id, which a through cannot compare: only integer, decimal, uuid and date keys are compared without a collation, and the snapshot records none',
+    ])
+  })
+
   // Bindings from one snapshot over another describe columns that may not exist.
   test('refuses bindings generated from another snapshot', () => {
     const mixed = copy(good())

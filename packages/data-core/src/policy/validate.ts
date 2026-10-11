@@ -81,6 +81,28 @@ function fitProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
   for (const binding of bindings.fields) {
     if (binding.kind === 'lookup') problems.push(...lookupProblems(binding, policy, pinned))
   }
+  problems.push(...throughFitProblems(policy, byField))
+  return problems
+}
+
+/**
+ * A through scopes the root by a lookup's own filter on its target (0043), so
+ * it must name a lookup of this form whose filter says something. Over `[]`
+ * -- every row of the target -- it would scope nothing, and a rule nothing
+ * enforces is refused (0011). A lookup with no entry at all is already
+ * refused above. What the snapshot says of the lookup's key is
+ * `throughProblems`' question, which needs it.
+ */
+function throughFitProblems(policy: ParsedPolicy, byField: ReadonlyMap<string, FieldBinding>): string[] {
+  const problems: string[] = []
+  for (const key of policy.through) {
+    const binding = byField.get(key)
+    if (binding === undefined) problems.push(`through: ${key} is not a field of this form`)
+    else if (binding.kind !== 'lookup') problems.push(`through: ${key} is not a lookup field of this form`)
+    else if (policy.lookups.get(key)?.length === 0) {
+      problems.push(`through: ${key} scopes nothing, because lookups.${key} is [], every row of ${binding.target.table.schema}.${binding.target.table.name}`)
+    }
+  }
   return problems
 }
 

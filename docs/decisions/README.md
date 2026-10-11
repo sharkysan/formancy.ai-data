@@ -59,20 +59,20 @@ only enforcement is "we remember" says so plainly.
 | [0002](0002-depend-on-upstream-never-copy-it.md) | Depend on released upstream packages at exact versions; never copy them | accepted; spec 4 window closed, 0042 |
 | [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted |
 | [0004](0004-a-snapshot-says-what-it-could-not-see.md) | A metadata snapshot says what it could not see, and is made in one place | accepted; narrowed by 0027 |
-| [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026, 0027, 0034 |
+| [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026, 0027, 0034, 0043 |
 | [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027 |
 | [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted; narrowed by 0026, 0027 |
 | [0008](0008-exact-values-travel-as-strings.md) | Exact values travel as strings, are canonical, and are never rounded | accepted; narrowed by 0026, 0028 |
 | [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042 |
 | [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041; extended by 0030 |
-| [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted |
+| [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted; extended by 0043 |
 | [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted; narrowed by 0028 |
 | [0013](0013-published-configuration-is-files-with-link-based-swap.md) | Published configuration is files, and compare-and-swap is a hard link | accepted; extended by 0030 |
 | [0014](0014-host-identity-is-verified-offline.md) | Host identity is a token verified offline, with a pinned algorithm | accepted |
-| [0015](0015-a-record-operation-is-one-guarded-statement.md) | A record operation is one guarded statement, canonical in and out, never retried | accepted; narrowed by 0041; extended by 0031 |
-| [0016](0016-postgres-operations.md) | PostgreSQL operations: canonical text in and out, every name from pg_catalog | accepted; narrowed by 0028, 0040, 0041; extended by 0031 |
-| [0017](0017-sqlserver-operations.md) | SQL Server operations: one guarded batch, and a write reported done only when the table holds it | accepted; narrowed by 0026, 0028, 0031, 0040, 0041; extended by 0027, 0031 |
-| [0018](0018-one-planner-turns-answers-into-requests.md) | One planner turns answers into requests, and leaves membership to the database | accepted; narrowed by 0028, 0041; extended by 0040 |
+| [0015](0015-a-record-operation-is-one-guarded-statement.md) | A record operation is one guarded statement, canonical in and out, never retried | accepted; narrowed by 0041; extended by 0031, 0043 |
+| [0016](0016-postgres-operations.md) | PostgreSQL operations: canonical text in and out, every name from pg_catalog | accepted; narrowed by 0028, 0040, 0041; extended by 0031, 0043 |
+| [0017](0017-sqlserver-operations.md) | SQL Server operations: one guarded batch, and a write reported done only when the table holds it | accepted; narrowed by 0026, 0028, 0031, 0040, 0041; extended by 0027, 0031, 0043 |
+| [0018](0018-one-planner-turns-answers-into-requests.md) | One planner turns answers into requests, and leaves membership to the database | accepted; narrowed by 0028, 0041; extended by 0040, 0043 |
 | [0019](0019-a-published-form-is-checked-every-time-it-is-read.md) | A published form is one bundle, checked every time it is read; a form reaches only allowlisted databases | accepted; extended by 0030, 0041, 0042 |
 | [0020](0020-administration-is-a-separate-plane.md) | Administration is a separate plane, held by a role in the host's token | accepted; extended by 0033 |
 | [0021](0021-generated-forms-preview-in-both-frameworks.md) | Generated forms are previewed in both frameworks, generated in the browser from a captured snapshot | accepted; narrowed by 0029 |
@@ -92,8 +92,9 @@ only enforcement is "we remember" says so plainly.
 | [0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md) | A release report is derived from the run that gated the release, and says what it did not test | accepted; extended by 0034 |
 | [0036](0036-a-merged-branch-is-deleted-by-the-merge.md) | A merged branch is deleted by the merge, and only by the merge | accepted |
 | [0038](0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md) | README pictures are taken by a script from states the product reaches, and held to the text they show | accepted |
-| [0039](0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md) | The server refuses a publish whose keys now name other columns, unless it says what happens to their grants | accepted |
+| [0039](0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md) | The server refuses a publish whose keys now name other columns, unless it says what happens to their grants | accepted; extended by 0043 |
 | [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md) | Instants and times are read to formancy's shape on both engines, and an unedited one is never written back | accepted; narrowed by 0041; extended by 0041 |
 | [0041](0041-the-runtime-refuses-what-drift-blocks.md) | The runtime refuses what drift blocks in the form's own table, decided over a description read in each request, and every write holds the table to it | accepted |
 | [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md) | Generated forms stay on spec 3 after spec 4 is released | accepted |
+| [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md) | A child form's rows are reached only through a parent its policy admits | accepted |
 | [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md) | A built app carries the licence and notice texts of everything it bundles | accepted |

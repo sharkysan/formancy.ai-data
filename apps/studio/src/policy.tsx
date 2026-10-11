@@ -3,11 +3,11 @@ import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
 import { findObject, rowFilterColumnProblem, validatePolicy } from '@formancy/data-core'
 import type { FormBindings, FormPolicy, MetadataSnapshot, ReassignedKey } from '@formancy/data-core'
-import { describeRef } from './choice.js'
+import { describeRef, throughBlocker } from './choice.js'
 import { labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
 import { LookupFilters, RowFilters } from './policy-filters.js'
-import { boundColumns, fillFromOperations, formatRoles, lookupBindings, orphanFields, orphanLookups, parseRoles, withFieldRoles } from './policy-model.js'
+import { boundColumns, fillFromOperations, formatRoles, lookupBindings, orphanFields, orphanLookups, parseRoles, withFieldRoles, withoutLookup, withThrough } from './policy-model.js'
 import { ReassignedKeys } from './reassigned.js'
 
 /**
@@ -87,6 +87,29 @@ function PolicyCheck({ problems }: { problems: readonly string[] }): ReactElemen
 }
 
 /**
+ * A note, never a refusal (0043): the root has no row filter and is reached
+ * through no lookup, though a lookup's list is filtered -- which is what a
+ * child table with no tenant of its own looks like before its rows are tied
+ * to its parent's. `rowFilters: []` is a statement a policy may make (0011),
+ * so nothing here blocks publishing.
+ */
+function UnscopedNote({ root, policy, filtered }: { root: string; policy: FormPolicy; filtered: readonly string[] }): ReactElement | null {
+  if (policy.rowFilters.length > 0 || (policy.through ?? []).length > 0 || filtered.length === 0) return null
+  const lists = `${filtered.join(' and ')} ${filtered.length === 1 ? 'list is' : 'lists are'}`
+  return (
+    <div className="notice" role="note" aria-labelledby="unscoped-title">
+      <p id="unscoped-title">
+        <strong>Nothing scopes these rows</strong>
+      </p>
+      <p>
+        {root} has no row filter and is reached through no lookup, so every one of its rows is in reach of anybody an operation
+        names, though the {lists} filtered. Where a row belongs to the tenant of the row it names, tick the box under its list.
+      </p>
+    </div>
+  )
+}
+
+/**
  * Step 5: who may do what with this form (`FormPolicy`), kept apart from the
  * form and its bindings (plan section 9).
  *
@@ -136,18 +159,15 @@ export function PolicyStep({
 
   function decide(key: string, decision: 'keep' | 'remove'): void {
     if (decision === 'remove') {
-      // Every grant the key carries: its field's roles and, for a lookup, its filter.
-      const lookups = { ...policy.lookups }
-      delete lookups[key]
-      onPolicy({ ...withFieldRoles(policy, key, [], []), lookups })
+      // Every grant the key carries: its field's roles and, for a lookup, its
+      // filter and the through that rests on it (0043).
+      onPolicy(withoutLookup(withFieldRoles(policy, key, [], []), key))
     }
     onDecided(key, decision)
   }
 
   function removeStrayLookup(key: string): void {
-    const lookups = { ...policy.lookups }
-    delete lookups[key]
-    onPolicy({ ...policy, lookups })
+    onPolicy(withoutLookup(policy, key))
     focusAfter(afterRemoving(strayLookups, key, strayRemove))
   }
 
@@ -257,16 +277,26 @@ export function PolicyStep({
         stale={stale}
         onRegenerate={onRegenerate}
       />
-      <LookupFilters lookups={lookupBindings(bindings)} labels={labels} snapshot={snapshot} policy={policy} onLookups={(lookups) => onPolicy({ ...policy, lookups })} />
+      <LookupFilters
+        lookups={lookupBindings(bindings)}
+        labels={labels}
+        snapshot={snapshot}
+        policy={policy}
+        root={describeRef(bindings.root)}
+        blockers={Object.fromEntries(lookupBindings(bindings).map((binding) => [binding.field, throughBlocker(snapshot, bindings, binding.field)]))}
+        onLookups={(lookups) => onPolicy({ ...policy, lookups })}
+        onThrough={(through) => onPolicy(withThrough(policy, through))}
+      />
+      <UnscopedNote root={describeRef(bindings.root)} policy={policy} filtered={lookupBindings(bindings).filter((binding) => (policy.lookups[binding.field]?.length ?? 0) > 0).map((binding) => labels[binding.field] ?? binding.field)} />
       {strayLookups.length === 0 ? null : (
         <div className="notice" role="note">
-          <p>The policy filters lookups this form does not have:</p>
+          <p>The policy filters, or reaches rows through, lookups this form does not have:</p>
           <ul>
             {strayLookups.map((key) => (
               <li key={key}>
                 <code>{key}</code>{' '}
                 <button type="button" id={strayRemove(key)} className="button" onClick={() => removeStrayLookup(key)}>
-                  Remove{' '}<span className="visually-hidden">the {key} lookup filter</span>
+                  Remove{' '}<span className="visually-hidden">{Object.hasOwn(policy.lookups, key) ? `the ${key} lookup filter` : `${key} from through`}</span>
                 </button>
               </li>
             ))}

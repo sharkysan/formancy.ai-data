@@ -351,6 +351,21 @@ describe('grantsOnKey', () => {
     // A key is a field's, not a property every object has.
     expect(grantsOnKey(policy({}), 'constructor')).toBe(false)
   })
+
+  // A key a through names scopes the root's rows by its lookup's filter
+  // (0043), whether or not anybody holds a role on its field. Re-pointed to
+  // another foreign key, the same filter scopes the rows through another
+  // parent, which can admit rows the published scope hid -- a line whose
+  // order is another tenant's, reached through a quote of this one's. So it
+  // is a grant to decide as a role is (watched failing: a through key with
+  // no role counted as nothing, and was published unasked).
+  test('is also a through on the key, which scopes every row the form reaches', () => {
+    const scoped = (fields: FormPolicy['fields']): FormPolicy => ({ ...policy(fields, { order: [{ column: 'tenant_id', attribute: 'tenant' }] }), through: ['order'] })
+    expect(grantsOnKey(scoped({}), 'order')).toBe(true)
+    expect(grantsOnKey(scoped({ order: { read: [], write: [] } }), 'order')).toBe(true)
+    expect(grantsOnKey(scoped({}), 'customer')).toBe(false)
+    expect(grantsOnKey({ ...scoped({}), through: [] }, 'order')).toBe(false)
+  })
 })
 
 describe('describeReassigned', () => {

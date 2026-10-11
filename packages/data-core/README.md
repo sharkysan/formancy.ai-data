@@ -245,6 +245,30 @@ would refuse. The request planner below runs them on every read, create and
 update it plans. See
 [0011](../../docs/decisions/0011-every-operation-carries-a-trusted-policy-context.md).
 
+A table with no tenant column of its own -- an order's lines -- is scoped
+through a parent instead: `through: ['order']` names lookup fields whose
+filter on their target also scopes the form's rows
+([0043](../../docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)).
+
+```ts
+const linePolicy = { …, rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }
+throughFilters(linePolicy, context, bindings, 'read') // { ok: true, through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }] }
+throughProblems(snapshot, bindings, linePolicy)        // [] -- or why its lookup cannot scope: it does not configure, or its key is text
+```
+
+`validatePolicy` refuses a through that is not a lookup of the form, is
+named twice, or whose list offers every row; `throughProblems` refuses one
+whose key is text on either side, which no snapshot records a collation to
+compare by, on both engines. `throughFilters` authorises the operation and
+refuses a missing attribute, and asks for no grant on the field: a through
+scopes rows and offers no options. `authorizeOperation` refuses every
+operation, create included, whose through the context cannot resolve, so a
+form is never offered for what every request would then be refused. And a
+through names a key: `grantsOnKey` counts it, so a regeneration that
+re-points that key is asked about (0039) whether or not anybody holds a role
+on its field. Optional: a policy without it means what it meant, and a server
+older than it refuses a policy that uses it.
+
 ## Record requests
 
 The one place a browser's request becomes an adapter's: the policy, the
@@ -301,6 +325,15 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   another record's, an update carrying one is refused `record-not-read`. A
   field the actor may not read is never compared, and needs no read
   ([0040](../../docs/decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).
+- **Throughs are on every read and update** (0043). `planRead` and
+  `planUpdate` put a typed `Through` on the request for each lookup the
+  policy names -- the root's foreign-key columns, the target and its key,
+  and the lookup's filter scoped as every filter is -- and an adapter reads
+  them with `throughTerms`, as it reads filters with `rowFilterTerms`: a
+  request without `through` (`[]` for none) is thrown before anything is
+  sent. A through field is required on create, omitted or null, and may not
+  be cleared on update, whatever its column allows: a row whose foreign key
+  is NULL references no parent, and nobody could reach it again.
 - **Membership is the database's.** A lookup token whose key carries the tenant
   is refused when the tenant is not the context's; one that does not — a
   surrogate id — cannot be judged without a query. Every selection comes back

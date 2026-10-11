@@ -47,9 +47,27 @@ export const shipmentCase = (which: 'first' | 'second'): string => `shipment: ${
 export const driftingCase = (name: string): string => `drifting: ${name}`
 
 /**
+ * What a form scoped through a parent shows on each engine (0043), through
+ * the statements that decide it: `read` -- another tenant's parent's row is
+ * not found, and this tenant's is; `update` -- it is not found whatever
+ * version is sent, and nothing is written, and this tenant's is updated;
+ * `self-reference` -- a table scoped through a key onto itself is scoped by
+ * the row referenced, never the row read; `composite` -- a key of two
+ * columns compares each with the one its foreign key pairs it with;
+ * `moved-parent` -- what an update that waited for its row answers when
+ * another transaction moved the row's parent out of the scope meanwhile,
+ * where the engines differ: PostgreSQL writes it, SQL Server answers
+ * not-found, and both answer not-found for a row filter on the row itself.
+ */
+export const THROUGH_CASES = ['read', 'update', 'self-reference', 'composite', 'moved-parent'] as const
+export type ThroughCase = (typeof THROUGH_CASES)[number]
+export const throughCase = (name: ThroughCase): string => `through: ${name}`
+
+/**
  * Every case both adapters answer to, in a fixed order: the model's, then
  * every filter, label, temporal read, refusal and edge value, then the two
- * shipments, then every change to a form's own table both engines run (0041).
+ * shipments, then every change to a form's own table both engines run (0041),
+ * then what a form scoped through a parent shows (0043).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -64,6 +82,7 @@ export function sharedCases(): string[] {
     shipmentCase('first'),
     shipmentCase('second'),
     ...sharedDrifting().map((entry) => driftingCase(entry.name)),
+    ...THROUGH_CASES.map(throughCase),
   ]
   const seen = new Set<string>()
   for (const id of ids) {

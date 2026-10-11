@@ -12,6 +12,7 @@ import {
   CLERK_COLUMNS,
   CLERK_FIELDS,
   CLERK_RW,
+  column,
   CUSTOMER_POLICY,
   customerForm,
   customerSource,
@@ -21,6 +22,8 @@ import {
   fieldOf,
   INT32,
   INT64,
+  LINE_POLICY,
+  lineForm,
   MS,
   MS_ORDER,
   ORDER_ID,
@@ -53,12 +56,49 @@ describe('planUpdate', () => {
         set: [value('customer_no', INT32, '1002'), value('notes', text(null), null), value('paid', BOOLEAN, false)],
         expectedVersion: '1',
         filters: TENANT_ONE,
+        through: [],
         returning: CLERK_COLUMNS,
         definition: DEFINITION,
       },
       fields: CLERK_FIELDS,
       memberships: [{ field: 'customer', config: buildLookupConfig(PG_ORDER, 'customer', { snapshot: PG }), tokens: ['k1:1,1002'], filters: TENANT_ONE }],
     })
+  })
+
+  // A line's update is guarded by its order as its read is (0043): the
+  // through goes into the update's WHERE and into the read that tells stale
+  // from not-found, so another tenant's line is not found whatever version
+  // is sent. The order is part of the line's key, so the same order is
+  // accepted and not written, and is still rechecked as a selection.
+  test("carries a line's through into the update, beside the key, the filter and the version", () => {
+    const bindings = lineForm(PG).bindings
+    const planned = planUpdate(PG, bindings, LINE_POLICY, CLERK, `k1:${ORDER_ID},1`, '1', { order: `k1:${ORDER_ID}`, quantity: 4 }, undefined, described(PG, bindings))
+    expect(planned).toMatchObject({
+      ok: true,
+      request: {
+        key: [value('order_id', INT64, ORDER_ID), value('line_no', INT32, '1')],
+        set: [value('quantity', INT32, '4')],
+        filters: { kind: 'unrestricted' },
+        through: [{ columns: [column('order_id', INT64)], target: sales('order'), targetColumns: [{ name: 'id', type: INT64 }], filters: TENANT_ONE }],
+      },
+      memberships: [{ field: 'order', tokens: [`k1:${ORDER_ID}`], filters: TENANT_ONE }],
+    })
+    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(PG, PG_ORDER))).toMatchObject({ ok: true, request: { through: [] } })
+  })
+
+  // A row whose through key is NULL references no parent, so no filter can
+  // admit it: cleared, the record would vanish from everybody who may read
+  // it (0043). Refused as required even where the column may be NULL -- the
+  // order's employee is nullable -- and the update of the same form without
+  // the through clears it as before.
+  test('refuses to clear a through field, even over a nullable column', () => {
+    const through: FormPolicy = { ...ORDER_POLICY, through: ['employee'] }
+    expect(planUpdate(PG, PG_ORDER, through, CLERK, ORDER_TOKEN, '1', { employee: null }, undefined, described(PG, PG_ORDER))).toMatchObject({
+      ok: false,
+      code: 'invalid-values',
+      fieldErrors: [{ field: 'employee', code: 'required', message: 'A value is required.' }],
+    })
+    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { employee: null }, undefined, described(PG, PG_ORDER))).toMatchObject({ ok: true, request: { set: [value('created_by', INT32, null)] } })
   })
 
   // Clearing is subject to nullability: amount is NOT NULL.

@@ -47,7 +47,9 @@
         { "file": "packages/data-server/src/routes/runtime.test.ts" },
         { "file": "packages/data-core/src/policy/evaluate.test.ts" },
         { "file": "packages/data-server/src/e2e.integration.test.ts" },
-        { "file": "packages/data-client/src/lookups.integration.test.ts" }
+        { "file": "packages/data-client/src/lookups.integration.test.ts" },
+        { "file": "packages/data-postgres/src/through.integration.test.ts" },
+        { "file": "packages/data-sqlserver/src/through.integration.test.ts" }
       ]
     },
     {

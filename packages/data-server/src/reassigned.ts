@@ -45,10 +45,11 @@ const sameAnchor = (left: FieldAnchor, right: FieldAnchor): boolean =>
 
 /**
  * The keys `replaced` bound to another column or lookup than `published`
- * does, that `published`'s policy grants on -- a role on the key's field,
- * `grantsOnKey`, the function the studio asks with -- and that `confirmed`
- * does not name exactly as reassigned: the same key, the column or lookup it
- * stood for, and the one it stands for now. A confirmation matched by key
+ * does, that `published`'s policy grants on -- a role on the key's field or
+ * a through that names it (0043), `grantsOnKey`, the function the studio
+ * asks with -- and that `confirmed` does not name exactly as reassigned: the
+ * same key, the column or lookup it stood for, and the one it stands for
+ * now. A confirmation matched by key
  * alone would carry a decision to a column nobody was shown -- a studio
  * draft generated again after its keys were decided can renumber one again.
  * One for a key that was not reassigned grants nothing, and is ignored.

@@ -228,6 +228,53 @@ describe.each([
     expect(visible.json().answers.amount).toBe(EDGE_VALUES.largestAmount)
   })
 
+  // An order's lines have no tenant column (0043). Published with the order
+  // lookup in `through`, the line form reaches a line only through an order
+  // the lookup's filter admits: tenant 1's clerk creates, reads and updates a
+  // line of tenant 1's order, and tenant 2's clerk is told 404 for the read
+  // and for the update with the line's current version -- the answer a line
+  // that does not exist gets -- and may not create one under that order.
+  test("an order's lines are reached through the order: its tenant's clerk reads and updates one, another tenant's is told 404", async () => {
+    const lineForm = `${connection}-order-line`
+    const proposal = await call('POST', '/v1/form-proposals', admin, {
+      connection,
+      root: { schema: 'sales', name: 'order_line' },
+      formId: lineForm,
+      title: 'Order line',
+      lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
+      ...(versionColumn === undefined ? {} : { versionColumn }),
+    })
+    expect(proposal.statusCode, proposal.body).toBe(200)
+    const proposed = proposal.json() as Proposal
+    expect(proposed.bindings.operations).toEqual({ create: true, update: true })
+    const policy: FormPolicy = {
+      ...clerkPolicy(proposed.bindings.fields),
+      rowFilters: [],
+      lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      through: ['order'],
+    }
+    const published = await call('POST', `/v1/forms/${lineForm}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, policy) })
+    expect(published.statusCode, published.body).toBe(201)
+
+    const order = `k1:${EDGE_VALUES.beyondSafeInteger}`
+    const created = await call('POST', `/v1/forms/${lineForm}/records/create`, clerk, { answers: { order, line_no: 2, quantity: 2, unit_price: '1.50' } })
+    expect(created.statusCode, created.body).toBe(201)
+    const { record, version } = created.json()
+    expect(record).toBe(`k1:${EDGE_VALUES.beyondSafeInteger},2`)
+    expect((await call('POST', `/v1/forms/${lineForm}/records/read`, clerk, { record })).json().answers).toMatchObject({ order, quantity: 2, unit_price: '1.50', line_total: '3.00' })
+
+    expect((await call('POST', `/v1/forms/${lineForm}/records/read`, otherClerk, { record })).statusCode).toBe(404)
+    const theirs = await call('POST', `/v1/forms/${lineForm}/records/update`, otherClerk, { record, version, answers: { quantity: 9 } })
+    expect(theirs.statusCode, theirs.body).toBe(404)
+    const under = await call('POST', `/v1/forms/${lineForm}/records/create`, otherClerk, { answers: { order, line_no: 3, quantity: 1, unit_price: '1.00' } })
+    expect(under.statusCode, under.body).toBe(422)
+    expect(under.json()).toMatchObject({ fieldErrors: [{ field: 'order', code: 'not-an-option' }] })
+
+    const saved = await call('POST', `/v1/forms/${lineForm}/records/update`, clerk, { record, version, answers: { quantity: 3 } })
+    expect(saved.statusCode, saved.body).toBe(200)
+    expect(saved.json().answers).toMatchObject({ quantity: 3, line_total: '4.50' })
+  })
+
   // Step 10: nothing changed in the database, so drift reports nothing.
   test('drift against the database as it is now reports nothing', async () => {
     const drift = await call('POST', `/v1/forms/${formId}/drift`, admin)

@@ -10,7 +10,7 @@ import type { FormPolicy, ReassignedKey } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Proposal } from './api.js'
 import { PolicyStep } from './policy.js'
-import { audit, discover, focusedName, generateOrder, goTo, paragraphs, pressEnter, servedDocument, signIn, step, writeOrderPolicy } from './test-studio.js'
+import { audit, discover, focusedName, generateOrder, goTo, paragraphs, pressEnter, servedDocument, signIn, step, unnamed, writeOrderPolicy } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
@@ -290,6 +290,136 @@ describe('what the editor writes', () => {
     if (!latest.ok) throw new Error(latest.message)
     expect(latest.value.bundle.policy.fields['status']).toEqual({ read: ['auditor', 'clerk'], write: ['clerk'] })
     expect(Object.hasOwn(latest.value.bundle.policy.fields, 'group')).toBe(false)
+  })
+})
+
+describe('rows reached through a lookup (0043)', () => {
+  /** The order's lines, generated with their order as a lookup and the version column confirmed, on the Policy step with clerks granted everything. */
+  async function linePolicy(user: Awaited<ReturnType<typeof signIn>>): Promise<HTMLElement> {
+    await discover(user)
+    await user.click(screen.getByRole('button', { name: 'Choose a root' }))
+    const choose = step('Choose')
+    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order_line')
+    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_line_order as a lookup' }))
+    await user.selectOptions(within(choose).getByLabelText('Version column'), 'row_version')
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    const policy = await goTo(user, 'Policy')
+    for (const operation of ['read', 'create', 'update']) await user.type(within(policy).getByLabelText(`Roles that may ${operation}`), 'clerk')
+    await user.click(within(policy).getByRole('button', { name: 'Fill every field from the operations' }))
+    return policy
+  }
+
+  const THROUGH = 'Only rows of sales.order_line whose Order is one of these'
+
+  // A line has no tenant column, so no row filter can keep it to one; its
+  // order's tenant can. The box that says so is offered only where it would
+  // scope something the server accepts: not while the order list is
+  // undecided or offers every row -- a through over [] scopes nothing, and
+  // publishing refuses it -- and from the moment the list is filtered. Until
+  // it is ticked, a note says that nothing scopes the lines though their
+  // order list is filtered; ticked, the policy names the lookup in `through`
+  // and publishes with it. Every control is named and axe passes in the
+  // state the note and the box are both in.
+  test('offers the box only once the list is filtered, notes what nothing scopes, and publishes the through', async () => {
+    const user = await signIn(plane)
+    const policy = await linePolicy(user)
+    const list = () => within(policy).getByRole('group', { name: 'Rows the Order list may offer' })
+    expect(within(list()).queryByRole('checkbox', { name: THROUGH })).toBeNull()
+    await pressEnter(user, within(list()).getByRole('button', { name: 'Offer every row of sales.order' }))
+    expect(within(list()).queryByRole('checkbox', { name: THROUGH })).toBeNull()
+    expect(within(policy).queryByRole('note', { name: 'Nothing scopes these rows' })).toBeNull()
+
+    await user.click(within(list()).getByRole('button', { name: 'Add a filter to the Order list' }))
+    await user.selectOptions(within(list()).getByRole('combobox', { name: 'Column of Order filter 1' }), 'tenant_id')
+    expect(check(policy)).toEqual({ summary: 'The policy fits this form.', problems: [] })
+    const box = within(list()).getByRole('checkbox', { name: THROUGH })
+    expect(box).toHaveProperty('checked', false)
+    expect(paragraphs(within(policy).getByRole('note', { name: 'Nothing scopes these rows' }))).toEqual([
+      'Nothing scopes these rows',
+      'sales.order_line has no row filter and is reached through no lookup, so every one of its rows is in reach of anybody an operation names, though the Order list is filtered. Where a row belongs to the tenant of the row it names, tick the box under its list.',
+    ])
+    expect(await audit()).toEqual([])
+    expect(unnamed()).toEqual([])
+
+    await user.click(box)
+    expect(box).toHaveProperty('checked', true)
+    expect(within(policy).queryByRole('note', { name: 'Nothing scopes these rows' })).toBeNull()
+    expect(check(policy)).toEqual({ summary: 'The policy fits this form.', problems: [] })
+    const publish = await goTo(user, 'Publish')
+    await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
+    await within(publish).findByText('Published version 1 of sales-order_line.')
+    const latest = await createAdminClient({ token: TOKENS.admin, fetch: plane.fetch }).latest('sales-order_line')
+    if (!latest.ok) throw new Error(latest.message)
+    expect(latest.value.bundle.policy.through).toEqual(['order'])
+    expect(latest.value.bundle.policy.lookups['order']).toEqual([{ column: 'tenant_id', attribute: 'tenant' }])
+  })
+
+  // A customer's country is keyed by text, which the server refuses to
+  // reach a form through: no box, and the reason, in the server's words,
+  // where the box would be. A filtered list is not enough.
+  test('offers no box over a text key, and says why', async () => {
+    const user = await signIn(plane)
+    await discover(user)
+    await user.click(screen.getByRole('button', { name: 'Choose a root' }))
+    const choose = step('Choose')
+    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.customer')
+    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_customer_country as a lookup' }))
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    const policy = await goTo(user, 'Policy')
+    const list = within(policy).getByRole('group', { name: 'Rows the Country list may offer' })
+    await user.click(within(list).getByRole('button', { name: 'Add a filter to the Country list' }))
+    expect(within(list).queryByRole('checkbox')).toBeNull()
+    expect(paragraphs(list)).toContain(
+      'Rows of sales.customer are not reached through Country: it joins sales.customer.country_code and sales.country.iso_code, which a through cannot compare: only integer, decimal, uuid and date keys are compared without a collation, and the snapshot records none.',
+    )
+  })
+})
+
+describe('a through left behind (0043)', () => {
+  const RW = { read: ['clerk'], write: ['clerk'] }
+  const BOX = 'Only rows of sales.order whose Customer is one of these'
+  const fitting = (through: string[]): FormPolicy => ({
+    version: 1,
+    operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+    fields: { customer: RW },
+    rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+    lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
+    through,
+  })
+
+  // A through over a lookup the form no longer has -- a regeneration dropped
+  // it -- is refused by validatePolicy. The step names it with a way to
+  // remove it, as it names a stray lookup filter: without one, the policy
+  // could never be published again from the studio.
+  test('a through over a lookup the form does not have is named and removed', async () => {
+    servedDocument()
+    const proposal = await orderProposal()
+    const user = userEvent.setup()
+    render(<PolicyOf proposal={proposal} initial={fitting(['customer', 'gone'])} />)
+    const policy = screen.getByRole('main', { name: 'Policy' })
+    expect(check(policy).problems).toEqual(['through: gone is not a field of this form'])
+    await pressEnter(user, within(policy).getByRole('button', { name: 'Remove gone from through' }))
+    expect(check(policy)).toEqual({ summary: 'The policy fits this form.', problems: [] })
+    expect(within(within(policy).getByRole('group', { name: 'Rows the Customer list may offer' })).getByRole('checkbox', { name: BOX })).toHaveProperty('checked', true)
+  })
+
+  // Removing a reassigned lookup's grants takes its filter, which was
+  // written for what the key stood for before -- and the through that rested
+  // on that filter. Left in place, it would scope the new lookup by a filter
+  // nobody wrote for it the moment one was written.
+  test('removing a reassigned lookup’s grants takes it out of through', async () => {
+    servedDocument()
+    const proposal = await orderProposal()
+    const user = userEvent.setup()
+    const reassigned: ReassignedKey[] = [{ field: 'customer', was: { kind: 'lookup', foreignKey: 'fk_order_customer' }, now: { kind: 'lookup', foreignKey: 'fk_order_buyer' } }]
+    render(<PolicyOf proposal={proposal} initial={fitting(['customer'])} reassigned={reassigned} />)
+    const policy = screen.getByRole('main', { name: 'Policy' })
+    await pressEnter(user, within(policy).getByRole('button', { name: 'Remove grants for customer' }))
+    expect(within(within(policy).getByRole('group', { name: 'Rows the Customer list may offer' })).queryByRole('checkbox', { name: BOX })).toBeNull()
+    await pressEnter(user, within(policy).getByRole('button', { name: 'Offer every row of sales.customer' }))
+    expect(check(policy).problems).toEqual(['lookups.customer must pin sales.customer.tenant_id to tenant, because customer sets tenant_id, which a row filter pins to tenant'])
   })
 })
 

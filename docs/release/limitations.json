@@ -33,7 +33,7 @@
       ]
     },
     "0005": {
-      "reviewed": "sha256:46c8aa5cd6b6fd181bf39ad1ee740f7738f2e55832e47df65344611ba25b480d",
+      "reviewed": "sha256:35ad9b6c38f021830f6ea8ac13d5bb22affee286dad34eadebf4a167b6334fd2",
       "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
     },
     "0006": {
@@ -150,11 +150,11 @@
       ]
     },
     "0011": {
-      "reviewed": "sha256:86f99011f416e950c30491e7f82750ef056b270cd0757f9e9faa3887ec1a6408",
+      "reviewed": "sha256:26503a8e438bcc32b930a58e0b25ccddbe32b4b9aa69525d79767cf33841e0f1",
       "limitations": [
         {
           "area": "access",
-          "says": "Equality is all a row filter can say: \"a manager sees their team's orders\" is not expressible, nor is an actor in two tenants at once."
+          "says": "Equality is all a row filter can say, on the form's own row or, through a lookup, on the row it references (0043): an actor in two tenants at once is not expressible, nor is a rule two foreign-key hops away."
         },
         {
           "area": "access",
@@ -234,7 +234,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:b6581d589081306a76a64fcf460ba8aa247a00cd0b2ed7ffd1c1c4d001e94234",
+      "reviewed": "sha256:c8dbac08ca8ae5459a6a4f39498b697fbafe0ae71949f72e91c532a1d2dccbf8",
       "limitations": [
         {
           "area": "databases",
@@ -247,7 +247,7 @@
       ]
     },
     "0016": {
-      "reviewed": "sha256:b4668c80fccd7a58c58bf32f3852394971224e3739089bef5920efbc0662e953",
+      "reviewed": "sha256:969ebd4b79729057aa84905e515da4c55e08594e3603fc7789c347a0627894ae",
       "limitations": [
         {
           "area": "databases",
@@ -289,7 +289,7 @@
       ]
     },
     "0017": {
-      "reviewed": "sha256:d670962f022582c3afcc209eb7626c4cf8f7c8faf797947999e55ea43ad2eb90",
+      "reviewed": "sha256:c7c8914ef4591cf14869c14a0e998e4c4d336f3fc5fc15b885ab383a7f9e1f07",
       "limitations": [
         {
           "area": "writes",
@@ -335,7 +335,7 @@
       ]
     },
     "0018": {
-      "reviewed": "sha256:1c30455dda790a95e44ae0cc6ae80b3d02bd75321e6e0647983cd9828c3b9047",
+      "reviewed": "sha256:dcd281277cc87709dbc6299d7951e72c8ffff63c4854c950d98b52a2fbbaa753",
       "limitations": [
         {
           "area": "access",
@@ -912,7 +912,7 @@
       "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the browser job's time. Nobody who installs, integrates or operates the module meets them."
     },
     "0039": {
-      "reviewed": "sha256:834cdc0a05684b5dd48130cc01150ffabcd1f5e81342781a7db530d86313cb76",
+      "reviewed": "sha256:9b2e1311db341b2f588b32fce9a94d42c3c9d51668092b065ee3029187633366",
       "limitations": [
         {
           "area": "access",
@@ -1107,6 +1107,56 @@
         {
           "area": "testing",
           "says": "That a host whose reader is at `@formancy/*` 0.3.0 reads every generated form was measured once, on 2026-10-10, and nothing here runs a 0.3.0 renderer."
+        }
+      ]
+    },
+    "0043": {
+      "reviewed": "sha256:c8bafc5bbfe0b5c877a73d1e4e64fa4be3fac87ee9a0d883eaae7e2a0ff86899",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A child form's tenant rule restates its parent's in its lookup filter, and nothing checks that the two agree."
+        },
+        {
+          "area": "access",
+          "says": "A form is reached through one foreign-key hop at most: a grandchild is not scoped by its grandparent."
+        },
+        {
+          "area": "forms",
+          "says": "A row whose through key is NULL is reachable by nobody, so a through field is required on create, omitted or null, whatever its column allows.",
+          "heldBy": "packages/data-core/src/records/plan-create.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "For the same reason a through field may not be cleared on update, whatever its column allows.",
+          "heldBy": "packages/data-core/src/records/plan-update.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A through over a lookup that offers every row, or over a text key, is refused at publish on both engines, the text key until a snapshot records collations.",
+          "heldBy": "packages/data-server/src/bundle.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "What a child's create pins is a parent the person may reference, not the one on their screen."
+        },
+        {
+          "area": "server",
+          "says": "A server older than this release refuses a policy that uses `through`, as it refuses every property it does not read."
+        },
+        {
+          "area": "databases",
+          "says": "Each through adds an EXISTS to every read, update and not-found statement of its form, whose plan and time are not measured."
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL, under READ COMMITTED and REPEATABLE READ, an update that waits for its row while another transaction moves the row's parent out of the scope and commits is written, where a row filter on the row itself and SQL Server answer not-found.",
+          "heldBy": "packages/data-postgres/src/through.integration.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A key a through names is a grant for 0039's check, so a publish that re-points it to another foreign key is refused until confirmed even when nobody holds a role on its field.",
+          "heldBy": "packages/data-server/src/reassigned.test.ts"
         }
       ]
     },

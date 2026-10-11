@@ -212,6 +212,33 @@ describe('validatePolicy', () => {
     ])
   })
 
+  // A through scopes this form's rows by a lookup's own filter on its target
+  // (0043). Named on a field the form lacks, or on one that is not a lookup,
+  // it names a filter nothing could apply; over a lookup whose entry is []
+  // it scopes nothing at all. Each is a rule its author believes is
+  // enforced, so each is refused, naming the entry, and a through that fits
+  // is accepted as it is.
+  test('refuses a through over a field the form lacks, one that is not a lookup, and one whose lookup offers every row', () => {
+    expect(problems({ ...ORDER_POLICY, through: ['customer'] })).toEqual([])
+    expect(problems({ ...ORDER_POLICY, through: ['discount', 'notes', 'customer', 'created_by'] })).toEqual([
+      'through: discount is not a field of this form',
+      'through: notes is not a lookup field of this form',
+      'through: created_by scopes nothing, because lookups.created_by is [], every row of sales.employee',
+    ])
+  })
+
+  // The shape is read before anything is fitted: a through that is not a
+  // list, an entry that is not a key, and a key named twice -- a list
+  // somebody misread -- are each named, with every other problem.
+  test('refuses a through that is not a list of lookup keys, or names one twice', () => {
+    expect(problems({ ...ORDER_POLICY, through: 'customer' })).toEqual(['through is not a list of lookup field keys'])
+    expect(problems({ ...ORDER_POLICY, through: ['customer', '', 7, 'customer'] })).toEqual([
+      'through[1] is not a field key',
+      'through[2] is not a field key',
+      'through[3] names customer a second time',
+    ])
+  })
+
   // A role list that is a string makes `includes` a substring match. A
   // property this release does not read is a rule nobody enforces, which the
   // person who wrote it believes is enforced. Each is named, all at once,

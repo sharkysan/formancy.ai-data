@@ -1,5 +1,5 @@
-import { findObject, gapCovers, rowFilterColumnProblem } from '@formancy/data-core'
-import type { ColumnMeta, CoverageGap, ForeignKeyMeta, LookupChoice, MetadataSnapshot, ObjectMeta, ObjectRef, RowFilterRule } from '@formancy/data-core'
+import { findObject, gapCovers, rowFilterColumnProblem, throughProblems } from '@formancy/data-core'
+import type { ColumnMeta, CoverageGap, ForeignKeyMeta, FormBindings, LookupChoice, MetadataSnapshot, ObjectMeta, ObjectRef, RowFilterRule } from '@formancy/data-core'
 import type { ProposalRequest } from './api.js'
 
 /**
@@ -126,6 +126,19 @@ export function suggestedDisplay(target: ObjectMeta, keyColumns: readonly string
   const text = shown.find((column) => column.type.kind === 'text' && !keyColumns.includes(column.name))
   const first = text ?? shown[0]
   return first === undefined ? [] : [first.name]
+}
+
+/**
+ * Why a form's rows cannot be reached through the lookup `field` (0043), or
+ * `null`. Asked of `throughProblems`, the function the server runs on
+ * publish, so a lookup the policy step offers is one publishing accepts: a
+ * key the snapshot says is text is refused there, and here it is said in
+ * the same words, after "it". Whether the lookup's list is filtered is the
+ * policy's question, and the step asks it.
+ */
+export function throughBlocker(snapshot: MetadataSnapshot, bindings: FormBindings, field: string): string | null {
+  const [problem] = throughProblems(snapshot, bindings, { version: 1, operations: { read: [], create: [], update: [] }, fields: {}, rowFilters: [], lookups: {}, through: [field] })
+  return problem === undefined ? null : `it ${problem.slice(`through: ${field} `.length)}`
 }
 
 /**

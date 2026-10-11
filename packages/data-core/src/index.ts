@@ -92,8 +92,10 @@ export { codecFor } from './codecs/codec.js'
 export type { ApiValue, Codec, CodecOutcome } from './codecs/codec.js'
 export { canonicalFloat32 } from './codecs/numbers.js'
 export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
-export { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter } from './policy/evaluate.js'
+export { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter, throughFilters } from './policy/evaluate.js'
 export { validatePolicy } from './policy/validate.js'
+export { isThroughKeyType, throughProblems } from './policy/through.js'
+export type { ThroughKeyType } from './policy/through.js'
 export type {
   FieldPolicy,
   ForcedValues,
@@ -108,6 +110,7 @@ export type {
   RowFilter,
   RowFilterResult,
   RowFilterRule,
+  ThroughFilters,
 } from './policy/types.js'
 export type {
   DescribedColumn,
@@ -125,9 +128,12 @@ export type {
   RecordRead,
   RecordTarget,
   RecordValue,
+  Through,
   UpdateRequest,
 } from './records/types.js'
 export { planCreate, planRead, planUpdate } from './records/plan.js'
+export { throughTerms } from './records/through.js'
+export type { ThroughTerms } from './records/through.js'
 export { driftRefusal, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './records/drift.js'
 export { rejectedSelection, toFormAnswers } from './records/answers.js'
 export { decodeRecordKey, intendedRecord, recordToken } from './records/token.js'

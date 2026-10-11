@@ -142,11 +142,22 @@ in short:
   counted in `omitted`. Membership is decided from the keys as the rows hold
   them, so a case-insensitive collation or `char(n)` padding cannot admit a
   token the lookup never offered.
-- **An update is one statement**: key, filters and expected version in one
-  WHERE, the version column incremented in the same SET. Zero rows, or 40001
-  under REPEATABLE READ, is followed by one read that tells `stale` from
-  `not-found`, inside the same filters, so another tenant's record is
-  `not-found` too. A record still at the version sent was declined by the
+- **An update is one statement**: key, filters, every through and expected
+  version in one WHERE, the version column incremented in the same SET. Zero
+  rows, or 40001 under REPEATABLE READ, is followed by one read that tells
+  `stale` from `not-found`, inside the same filters and throughs, so another
+  tenant's record is `not-found` too, whatever version was sent. A through
+  ([0043](../../docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md))
+  is `exists (select from <target> as "p" where "p".<key>
+  operator(pg_catalog.=) "r".<foreign key> and <filters on "p">)`, in the
+  read too, every column qualified; its plan is not measured. Under
+  concurrency it is weaker than a row filter: the parent is read from the
+  statement's snapshot, so an update that waited for its row is written
+  though another transaction moved the parent out of the scope and
+  committed during the wait, under READ COMMITTED and REPEATABLE READ,
+  where a row filter on the record is checked again and SQL Server answers
+  `not-found` (the shared case `through: moved-parent`). A record still at
+  the version sent was declined by the
   database itself — a BEFORE trigger returning NULL, a rule, a row security
   policy — and is `refused`, not `stale`; so is an insert the server
   completed as `INSERT 0 0`.

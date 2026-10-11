@@ -156,7 +156,7 @@ function ok(outcome: RecordOutcome): Extract<RecordOutcome, { ok: true }> {
 }
 
 async function readOrder(records: DefinedRecords, id: string = FIXTURE_ORDER, filters: RowFilters = tenant('1')): Promise<RecordOutcome> {
-  return records.read({ target: target(ORDER), key: [valueOf(ORDER, 'id', id)], columns: readable(ORDER), filters })
+  return records.read({ target: target(ORDER), key: [valueOf(ORDER, 'id', id)], columns: readable(ORDER), filters, through: [] })
 }
 
 function orderUpdate(set: RecordValue[], expectedVersion: string, filters: RowFilters = tenant('1')): Undefined<UpdateRequest> {
@@ -167,7 +167,7 @@ function orderUpdate(set: RecordValue[], expectedVersion: string, filters: RowFi
     key: [valueOf(ORDER, 'id', FIXTURE_ORDER)],
     set,
     expectedVersion,
-    filters,
+    filters, through: [],
     returning: [columnOf(ORDER, 'notes'), columnOf(ORDER, 'status')],
   }
 }
@@ -253,7 +253,7 @@ describe('reading a record', () => {
           target: target(CUSTOMER),
           key: [valueOf(CUSTOMER, 'tenant_id', tenantId), valueOf(CUSTOMER, 'customer_no', '1001')],
           columns: readable(CUSTOMER),
-          filters: tenant(tenantId),
+          filters: tenant(tenantId), through: [],
         }),
       )
     const [muster, other] = await Promise.all([customer('1'), customer('2')])
@@ -269,7 +269,7 @@ describe('reading a record', () => {
         target: target(ORDER_LINE),
         key: [valueOf(ORDER_LINE, 'order_id', FIXTURE_ORDER), valueOf(ORDER_LINE, 'line_no', '1')],
         columns: readable(ORDER_LINE),
-        filters: EVERY_ROW,
+        filters: EVERY_ROW, through: [],
       }),
     )
     expect(line.values).toEqual({ order_id: FIXTURE_ORDER, line_no: '1', quantity: '3', unit_price: '0.10', line_total: EDGE_VALUES.computedLineTotal })
@@ -284,7 +284,7 @@ describe('reading a record', () => {
   // more (0017).
   test('every other kind reads as its codec spells it, and what the shapes cannot hold is cut off', async () => {
     const records = defined(createSqlServerRecords(owner))
-    const kinds = ok(await records.read({ target: target(KINDS), key: [valueOf(KINDS, 'id', '1')], columns: readable(KINDS), filters: EVERY_ROW }))
+    const kinds = ok(await records.read({ target: target(KINDS), key: [valueOf(KINDS, 'id', '1')], columns: readable(KINDS), filters: EVERY_ROW, through: [] }))
     expect(kinds.values).toEqual({
       id: '1',
       f: 0.1,
@@ -317,7 +317,7 @@ describe('reading a record', () => {
     ])
     await owner.request().batch('alter table ops.widened alter column name nvarchar(40) null; alter table ops.widened alter column amount decimal(18, 6) null')
     await owner.request().batch("update ops.widened set name = N'Muster AG, Zurich branch', amount = 1.234567")
-    expect(await records.read({ target: target(widened), key: [valueOf(widened, 'id', '1')], columns, filters: EVERY_ROW })).toEqual({
+    expect(await records.read({ target: target(widened), key: [valueOf(widened, 'id', '1')], columns, filters: EVERY_ROW, through: [] })).toEqual({
       ok: true,
       values: { name: 'Muster AG, Zurich branch', amount: '1.234567' },
       version: null,
@@ -332,7 +332,7 @@ describe('reading a record', () => {
     const records = defined(createSqlServerRecords(owner))
     const tenanted: ObjectRef = { schema: 'ops', name: 'tenanted' }
     const acme = filterOn(tenanted, 'tenant', 'acme')
-    const read = (id: string) => records.read({ target: target(tenanted), key: [valueOf(tenanted, 'id', id)], columns: [columnOf(tenanted, 'note')], filters: acme })
+    const read = (id: string) => records.read({ target: target(tenanted), key: [valueOf(tenanted, 'id', id)], columns: [columnOf(tenanted, 'note')], filters: acme, through: [] })
     expect(await read('1')).toMatchObject({ ok: false, code: 'not-found' })
     expect(await read('2')).toEqual({ ok: true, values: { note: 'lower' }, version: null })
   })
@@ -359,7 +359,7 @@ describe('reading a record', () => {
       target: target(CUSTOMER),
       key: [valueOf(CUSTOMER, 'tenant_id', '1'), valueOf(CUSTOMER, 'customer_no', '1001')],
       columns: readable(CUSTOMER),
-      filters: tenant('1'),
+      filters: tenant('1'), through: [],
     })
     expect(customer).toMatchObject({ ok: false, code: 'permission-denied' })
   })
@@ -521,7 +521,7 @@ describe('writing every kind', () => {
     const records = defined(createSqlServerRecords(closed))
     const orderKey = [valueOf(ORDER, 'id', FIXTURE_ORDER)]
     const read = (overrides: Partial<Parameters<DefinedRecords['read']>[0]>) =>
-      records.read({ target: target(ORDER), key: orderKey, columns: [columnOf(ORDER, 'status')], filters: EVERY_ROW, ...overrides })
+      records.read({ target: target(ORDER), key: orderKey, columns: [columnOf(ORDER, 'status')], filters: EVERY_ROW, through: [], ...overrides })
     const insert = (values: RecordValue[]) => records.insert({ target: target(ORDER), values, returning: [], definition: ANY_DEFINITION })
 
     await expect(read({ key: [valueOf(ORDER, 'tenant_id', '1')] })).rejects.toThrow(/names exactly its identity/)
@@ -636,10 +636,10 @@ describe('updating a record', () => {
         key: [valueOf(VERSIONED, 'id', '1')],
         set: [valueOf(VERSIONED, 'note', note)],
         expectedVersion,
-        filters,
+        filters, through: [],
         returning: [columnOf(VERSIONED, 'note')],
       })
-    const read = await records.read({ target: versioned, key: [valueOf(VERSIONED, 'id', '1')], columns: [columnOf(VERSIONED, 'note')], filters: tenant('1') })
+    const read = await records.read({ target: versioned, key: [valueOf(VERSIONED, 'id', '1')], columns: [columnOf(VERSIONED, 'note')], filters: tenant('1'), through: [] })
     expect(read).toEqual({ ok: true, values: { note: 'start' }, version: '0' })
     expect(await update('one', '0')).toEqual({ ok: true, values: { note: 'one' }, version: '1' })
     expect(await update('again', '0')).toMatchObject({ ok: false, code: 'stale' })
@@ -663,7 +663,7 @@ describe('updating a record', () => {
     const versioned = target(VERSIONED, 'version')
     const concurrency = { kind: 'version-column', column: 'version' } as const
     const key = [valueOf(VERSIONED, 'id', '2')]
-    const read = async () => ok(await records.read({ target: versioned, key, columns: [columnOf(VERSIONED, 'note')], filters: tenant('1') }))
+    const read = async () => ok(await records.read({ target: versioned, key, columns: [columnOf(VERSIONED, 'note')], filters: tenant('1'), through: [] }))
     expect((await read()).version).toBe('0')
     const outcomes = await race(
       (request) => request.query('select id from ops.versioned with (updlock, holdlock) where id = 2'),
@@ -673,7 +673,7 @@ describe('updating a record', () => {
           key,
           set: [valueOf(VERSIONED, 'note', `from writer ${String(index)}`)],
           expectedVersion: '0',
-          filters: tenant('1'),
+          filters: tenant('1'), through: [],
           returning: [columnOf(VERSIONED, 'note')],
         }),
     )
@@ -703,9 +703,9 @@ describe('updating a record', () => {
       const rowTarget = target(ref)
       const { concurrency } = rowTarget
       if (concurrency === null) throw new Error(`${ref.name} has a rowversion`)
-      const read = async () => ok(await records.read({ target: rowTarget, key, columns: [columnOf(ref, 'note'), columnOf(ref, 'touched')], filters: EVERY_ROW }))
+      const read = async () => ok(await records.read({ target: rowTarget, key, columns: [columnOf(ref, 'note'), columnOf(ref, 'touched')], filters: EVERY_ROW, through: [] }))
       const save = (note: string, expectedVersion: string | null) =>
-        records.update({ target: { ...rowTarget, concurrency }, key, set: [valueOf(ref, 'note', note)], expectedVersion: expectedVersion ?? '', filters: EVERY_ROW, returning: [] })
+        records.update({ target: { ...rowTarget, concurrency }, key, set: [valueOf(ref, 'note', note)], expectedVersion: expectedVersion ?? '', filters: EVERY_ROW, through: [], returning: [] })
 
       const inserted = ok(await records.insert({ target: rowTarget, values, returning: [] }))
       const afterInsert = await read()
@@ -727,7 +727,7 @@ describe('updating a record', () => {
         key: [valueOf(counted, 'id', '1')],
         set: [valueOf(counted, 'note', note)],
         expectedVersion,
-        filters: EVERY_ROW,
+        filters: EVERY_ROW, through: [],
         returning: [columnOf(counted, 'note')],
       })
     expect(await update('one', '0')).toEqual({ ok: true, values: { note: 'one' }, version: '2' })
@@ -765,11 +765,11 @@ describe('updating a record', () => {
     const records = defined(createSqlServerRecords(owner))
     const concurrency = { kind: 'version-column', column: 'version' } as const
     const heap = { table: HEAP, identity: [columnOf(HEAP, 'tenant_id')], concurrency }
-    await expect(records.read({ target: heap, key: [valueOf(HEAP, 'tenant_id', '1')], columns: [columnOf(HEAP, 'note')], filters: EVERY_ROW })).rejects.toThrow(
+    await expect(records.read({ target: heap, key: [valueOf(HEAP, 'tenant_id', '1')], columns: [columnOf(HEAP, 'note')], filters: EVERY_ROW, through: [] })).rejects.toThrow(
       /more than one/,
     )
     await expect(
-      records.update({ target: heap, key: [valueOf(HEAP, 'tenant_id', '1')], set: [valueOf(HEAP, 'note', 'both')], expectedVersion: '0', filters: EVERY_ROW, returning: [] }),
+      records.update({ target: heap, key: [valueOf(HEAP, 'tenant_id', '1')], set: [valueOf(HEAP, 'note', 'both')], expectedVersion: '0', filters: EVERY_ROW, through: [], returning: [] }),
     ).rejects.toThrow(/more than one/)
     const rows = await owner.request().query<{ note: string; version: number }>('select note, version from ops.heap order by note')
     expect(rows.recordset).toEqual([
@@ -818,7 +818,7 @@ describe('the column facts the engines disagree on', () => {
   test('the shipments read back exactly as both adapters must return them', covers('sqlserver', shipmentCase('first'), shipmentCase('second'), edgeCase('largestSmallint'), edgeCase('localTimestamp'), edgeCase('localTimestampWholeSecond')), async () => {
     const records = defined(createSqlServerRecords(owner))
     const read = async (id: string) =>
-      ok(await records.read({ target: target(SHIPMENT), key: [valueOf(SHIPMENT, 'id', id)], columns: readable(SHIPMENT), filters: tenant('1') }))
+      ok(await records.read({ target: target(SHIPMENT), key: [valueOf(SHIPMENT, 'id', id)], columns: readable(SHIPMENT), filters: tenant('1'), through: [] }))
     const [first, second] = await Promise.all([read('1'), read('2')])
     expect(first).toEqual({ ok: true, values: FIRST_SHIPMENT, version: null })
     expect(second).toEqual({ ok: true, values: SECOND_SHIPMENT, version: null })
@@ -836,7 +836,7 @@ describe('the column facts the engines disagree on', () => {
     expect(codec.parse(ten)).toEqual({ ok: true, value: ten })
     const inserted = ok(await records.insert({ target: target(SHIPMENT), values: newShipment({ reference: ten }), returning: [columnOf(SHIPMENT, 'id')] }))
     const id = inserted.values.id ?? null
-    expect(ok(await records.read({ target: target(SHIPMENT), key: [valueOf(SHIPMENT, 'id', id)], columns: [columnOf(SHIPMENT, 'reference')], filters: EVERY_ROW })).values).toEqual({
+    expect(ok(await records.read({ target: target(SHIPMENT), key: [valueOf(SHIPMENT, 'id', id)], columns: [columnOf(SHIPMENT, 'reference')], filters: EVERY_ROW, through: [] })).values).toEqual({
       reference: ten,
     })
 
@@ -882,7 +882,7 @@ describe('the column facts the engines disagree on', () => {
         target: target(SHIPMENT),
         key: [valueOf(SHIPMENT, 'id', inserted.values.id ?? null)],
         columns: [columnOf(SHIPMENT, 'temperature_c')],
-        filters: EVERY_ROW,
+        filters: EVERY_ROW, through: [],
       }),
     )
     expect(read.values).toEqual({ temperature_c: 0.1 })
@@ -909,7 +909,7 @@ describe('the column facts the engines disagree on', () => {
   test('a zoneless timestamp keeps its fraction, trailing zeros dropped', async () => {
     const records = defined(createSqlServerRecords(owner))
     const read = async (id: string) =>
-      ok(await records.read({ target: target(ZONELESS), key: [valueOf(ZONELESS, 'id', id)], columns: readable(ZONELESS).slice(1), filters: EVERY_ROW })).values
+      ok(await records.read({ target: target(ZONELESS), key: [valueOf(ZONELESS, 'id', id)], columns: readable(ZONELESS).slice(1), filters: EVERY_ROW, through: [] })).values
     expect(await read('1')).toEqual({ d7: '2026-10-08T12:34:50.12', dt: '2026-10-08T12:34:56.007', sdt: '2026-10-08T12:35:00' })
     expect(await read('2')).toEqual({ d7: '2026-10-08T12:34:50', dt: '2026-10-08T12:34:50', sdt: '2026-10-08T12:34:00' })
     expect(await read('3')).toEqual({ d7: '2026-10-08T12:34:56.0000001', dt: '2026-10-08T12:34:59.997', sdt: null })

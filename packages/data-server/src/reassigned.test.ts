@@ -54,6 +54,25 @@ describe('unconfirmedKeys', () => {
     expect(unconfirmedKeys(before, fitted(after, policy({ customer: { read: [], write: [] } }, { customer: [] })), [])).toEqual([])
   })
 
+  // A key a through names scopes the root by its lookup's filter (0043), with
+  // or without a role on its field. Re-pointed from a line's order to its
+  // quote, both onto sales.order, the same filter would scope the lines
+  // through the quote: a line whose quote is tenant 1's would be tenant 1's
+  // to read and update though its order is tenant 2's. So it is refused
+  // until confirmed, as a role is (watched failing: listed as nothing, and
+  // published unasked).
+  test('a through on a re-pointed lookup needs confirming, though nobody holds a role on its field', () => {
+    const toOrder = (field: string, foreignKey: string, column: string): FieldBinding => ({ ...lookupBinding(field, foreignKey), columns: [column], target: { table: { schema: 'sales', name: 'order' }, columns: ['id'] } } as FieldBinding)
+    const before = bindings(columnBinding('note', 'note'), toOrder('order', 'fk_line_order', 'order_id'))
+    const after = bindings(columnBinding('note', 'note'), toOrder('order', 'fk_line_quote', 'quote_id'), toOrder('order_2', 'fk_line_order', 'order_id'))
+    const repointed = { field: 'order', was: { kind: 'lookup', foreignKey: 'fk_line_order' }, now: { kind: 'lookup', foreignKey: 'fk_line_quote' } } as const
+    const scoped = fitted(after, { ...policy({ note: { read: ['clerk'], write: [] } }, { order: [{ column: 'tenant_id', attribute: 'tenant' }], order_2: [] }), through: ['order'] })
+    expect(unconfirmedKeys(before, scoped, [])).toEqual([repointed])
+    expect(unconfirmedKeys(before, scoped, [repointed])).toEqual([])
+    // Without the through, the same policy grants nothing on the key.
+    expect(unconfirmedKeys(before, fitted(after, { ...scoped.policy, through: [] }), [])).toEqual([])
+  })
+
   // A key that became a lookup stands for something else as surely as a
   // renumbered column does, and a confirmation is of what it stands for, by
   // kind: a column that happens to share the foreign key's name is not the

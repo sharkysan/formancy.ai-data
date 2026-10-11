@@ -233,15 +233,20 @@ export function reassignedKeys(before: FormBindings, after: FormBindings): Reass
 
 /**
  * Whether a policy grants anything on a key: a read or write role on its
- * field. A lookup's filter is not a grant by itself -- every lookup field
- * must have one, `[]` for every row (`validatePolicy`), and an actor who may
- * neither read nor write the field is refused its options
- * (`lookupRowFilter`'s `field-denied`) -- so a key whose roles are gone
- * reaches nothing, which is what removing its grants leaves. The server's
- * refusal of an unconfirmed key and the studio's question about one are
- * this function (0039).
+ * field, or a through that names it (0043). A lookup's filter is not a
+ * grant by itself -- every lookup field must have one, `[]` for every row
+ * (`validatePolicy`), and an actor who may neither read nor write the field
+ * is refused its options (`lookupRowFilter`'s `field-denied`) -- so a key
+ * with no role and no through reaches nothing, which is what removing its
+ * grants leaves. A through does reach something without a role: its filter
+ * decides which of the root's rows exist, through the foreign key the key
+ * stands for, and re-pointed to another one the same filter scopes the rows
+ * through another parent, which can admit rows the old scope hid. The
+ * server's refusal of an unconfirmed key and the studio's question about
+ * one are this function (0039).
  */
 export function grantsOnKey(policy: FormPolicy, key: string): boolean {
+  if ((policy.through ?? []).includes(key)) return true
   const entry = Object.hasOwn(policy.fields, key) ? policy.fields[key] : undefined
   return entry !== undefined && (entry.read.length > 0 || entry.write.length > 0)
 }

@@ -104,13 +104,13 @@ async function held(table: string): Promise<{ row: string | null; rows: number }
 }
 
 function writes(entry: DriftingCase, snapshot: MetadataSnapshot, version: string, definition: string) {
-  const update = { target: target(entry.table), key: [{ ...ID, value: '1' }], set: [value(snapshot, entry.table, 'memo', 'written')], expectedVersion: version, filters: { kind: 'unrestricted' } as const, returning: [], definition }
+  const update = { target: target(entry.table), key: [{ ...ID, value: '1' }], set: [value(snapshot, entry.table, 'memo', 'written')], expectedVersion: version, filters: { kind: 'unrestricted' } as const, through: [], returning: [], definition }
   const values = [...Object.entries(entry.insert).map(([name, given]) => value(snapshot, entry.table, name, given)), value(snapshot, entry.table, 'memo', 'created')]
   const insert = { target: target(entry.table), values, returning: [ID], definition }
   return { update, insert }
 }
 
-const read = (table: string) => ({ target: target(table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const })
+const read = (table: string) => ({ target: target(table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const, through: [] })
 
 /** The version a read found, which the next update is guarded by. */
 async function versionOf(table: string): Promise<string> {

@@ -17,7 +17,9 @@ import type { DescribedTable, RecordColumn, RecordValue } from './types.js'
  * additions the fixture lacks: an employee belongs to a tenant, so a lookup
  * keyed by a surrogate id is per tenant, the case the planner cannot see
  * into; and an order has a nullable `paid` flag, the three-state boolean.
- * Bindings are what the real generator makes of it.
+ * Bindings are what the real generator makes of it. An order's lines carry
+ * a version of their own, as the fixture's do since 0043, so their form
+ * offers update.
  */
 export const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 export const INT64: NormalizedType = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' }
@@ -104,6 +106,18 @@ export function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => vo
         ],
       },
     ),
+    table(
+      'order_line',
+      [
+        col('order_id', 1, INT64),
+        col('line_no', 2, INT32),
+        col('quantity', 3, INT32),
+        col('unit_price', 4, { kind: 'decimal', precision: 12, scale: 2 }),
+        col('line_total', 5, { kind: 'decimal', precision: 14, scale: 2 }, { nullable: true, generated: 'computed' }),
+        kind === 'sqlserver' ? col('row_version', 6, { kind: 'rowversion' }, { generated: 'rowversion' }) : col('row_version', 6, INT64, { hasDefault: true }),
+      ],
+      { primaryKey: { name: 'pk_order_line', columns: ['order_id', 'line_no'] }, foreignKeys: [fk('fk_order_line_order', ['order_id'], 'order', ['id'])] },
+    ),
     table('customer_summary', [col('tenant_id', 1, INT32), col('customer_no', 2, INT32), col('order_count', 3, INT64)], { kind: 'view' }),
   ]
   edit(objects)
@@ -122,6 +136,18 @@ export function orderForm(source: MetadataSnapshot, confirm = true): GeneratedFo
       { foreignKey: 'fk_order_created_by', display: ['name'] },
     ],
     ...(source.kind === 'postgres' && confirm ? { versionColumn: 'row_version' } : {}),
+  })
+}
+
+/** An order's lines, their order a lookup shown by its date; on PostgreSQL the version column confirmed. */
+export function lineForm(source: MetadataSnapshot): GeneratedForm {
+  return generateForm(source, {
+    connection: 'erp',
+    root: sales('order_line'),
+    formId: 'sales-order-line',
+    title: 'Order line',
+    lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
+    ...(source.kind === 'postgres' ? { versionColumn: 'row_version' } : {}),
   })
 }
 
@@ -179,6 +205,26 @@ export const CUSTOMER_POLICY: FormPolicy = {
   },
   rowFilters: TENANT,
   lookups: { country: [] },
+}
+
+/**
+ * The lines of the orders this tenant may reference (0043): sales.order_line
+ * has no tenant column, so the order lookup's filter on sales.order scopes
+ * them, and the root has no row filter of its own.
+ */
+export const LINE_POLICY: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk', 'auditor'], create: ['clerk'], update: ['clerk'] },
+  fields: {
+    order: CLERK_RW,
+    line_no: CLERK_RW,
+    quantity: CLERK_RW,
+    unit_price: CLERK_RW,
+    line_total: { read: ['clerk', 'auditor'], write: [] },
+  },
+  rowFilters: [],
+  lookups: { order: TENANT },
+  through: ['order'],
 }
 
 export const actor = (roles: string[], attributes: Record<string, string> = { tenant: '1' }): PolicyContext => ({ actor: { id: 'u-1', roles }, attributes })

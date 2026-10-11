@@ -76,6 +76,8 @@ create table sales.order_line (
   quantity int not null,
   unit_price decimal(12, 2) not null,
   line_total as (quantity * unit_price) persisted,
+  -- As order's: SQL Server writes it, where PostgreSQL's file has an application-maintained column (0043).
+  row_version rowversion not null,
   constraint pk_order_line primary key (order_id, line_no)
 );
 

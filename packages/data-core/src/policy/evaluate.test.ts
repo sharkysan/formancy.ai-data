@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { FieldBinding, FieldWrites, FormBindings } from '../generate/types.js'
-import { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter } from './evaluate.js'
+import { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter, throughFilters } from './evaluate.js'
 import type { FormPolicy, PolicyContext } from './types.js'
 import { validatePolicy } from './validate.js'
 
@@ -62,6 +62,9 @@ const CUSTOMER = bindings(
   ['tenant_id', 'customer_no'],
 )
 
+/** An order's lines: no tenant column, and the order a lookup whose target, sales.order, has one. */
+const LINE = bindings('order_line', [lookup('order', ['order_id'], 'order', ['id']), column('line_no'), column('quantity')], ['order_id', 'line_no'])
+
 const BOTH = ['clerk', 'manager']
 const TENANT = [{ column: 'tenant_id', attribute: 'tenant' }]
 
@@ -91,6 +94,20 @@ const CUSTOMER_POLICY: FormPolicy = {
   },
   rowFilters: TENANT,
   lookups: { country: [] },
+}
+
+/**
+ * The lines of the orders this tenant may reference, and no others (0043).
+ * Managers read and write lines; an auditor reads them and is granted no
+ * field, the order's included.
+ */
+const LINE_POLICY: FormPolicy = {
+  version: 1,
+  operations: { read: [...BOTH, 'auditor'], create: BOTH, update: BOTH },
+  fields: { order: { read: BOTH, write: BOTH }, line_no: { read: BOTH, write: BOTH }, quantity: { read: BOTH, write: BOTH } },
+  rowFilters: [],
+  lookups: { order: TENANT },
+  through: ['order'],
 }
 
 const CLERK: PolicyContext = { actor: { id: 'u-17', roles: ['clerk'] }, attributes: { tenant: '42' } }
@@ -132,6 +149,22 @@ describe('authorizeOperation', () => {
   // without the filter it could not have built.
   test('refuses an operation whose row filter the context cannot supply', () => {
     expect(authorizeOperation(ORDER_POLICY, { ...CLERK, attributes: {} }, 'read')).toMatchObject({ ok: false, code: 'missing-attribute' })
+  })
+
+  // A through scopes a child's rows as a row filter scopes the root's
+  // (0043): read and update carry it, and a create's parent is checked under
+  // the same filter. A context without its attribute can do none of them, so
+  // none is authorised -- offered, the form would list operations whose
+  // every request is then refused (watched failing: read was granted).
+  test('refuses every operation whose through the context cannot supply, and grants them when it can', () => {
+    for (const operation of ['read', 'create', 'update'] as const) {
+      expect(authorizeOperation(LINE_POLICY, { ...MANAGER, attributes: {} }, operation)).toMatchObject({
+        ok: false,
+        code: 'missing-attribute',
+        message: expect.stringMatching(/^lookups\.order: tenant_id must equal the context's tenant/),
+      })
+      expect(authorizeOperation(LINE_POLICY, MANAGER, operation)).toEqual({ ok: true })
+    }
   })
 
   // `delete`, or a name every plain object inherits, is not an operation any
@@ -476,6 +509,46 @@ describe('lookupRowFilter', () => {
   })
 })
 
+describe('throughFilters', () => {
+  // A line has no tenant of its own. Its order's does, and the line form's
+  // lookup filter on sales.order says which orders this tenant may
+  // reference: that filter, resolved from the context, is what scopes the
+  // lines (0043). A policy that names no through scopes nothing more.
+  test("resolves each through lookup's filter from the context, and is empty for a policy that names none", () => {
+    expect(throughFilters(LINE_POLICY, CLERK, LINE, 'read')).toEqual({ ok: true, through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }] })
+    expect(throughFilters(LINE_POLICY, MANAGER, LINE, 'update')).toEqual({ ok: true, through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }] })
+    const { through: _, ...unscoped } = LINE_POLICY
+    expect(throughFilters(unscoped, CLERK, LINE, 'read')).toEqual({ ok: true, through: [] })
+  })
+
+  // A filter is never the only thing between a caller and a query it may not
+  // run: the operation is authorised first, as every function here does. And
+  // a missing tenant is a refusal, never a shorter scope -- dropped, it would
+  // be every tenant's lines.
+  test('authorises the operation first, and refuses a missing attribute rather than scoping nothing', () => {
+    expect(throughFilters(LINE_POLICY, NOBODY, LINE, 'read')).toEqual({ ok: false, code: 'operation-denied', message: 'no role of this actor may read with this form' })
+    for (const attributes of [{}, { tenant: '' }]) {
+      expect(throughFilters(LINE_POLICY, { ...CLERK, attributes }, LINE, 'read')).toMatchObject({
+        ok: false,
+        code: 'missing-attribute',
+        message: expect.stringMatching(/^lookups\.order: tenant_id must equal the context's tenant/),
+      })
+    }
+    expect(throughFilters(edited(LINE_POLICY, (draft) => { draft.lookups['order'] = [] }), CLERK, LINE, 'read')).toMatchObject({ ok: false, code: 'invalid-policy' })
+  })
+
+  // A through is a row filter: it scopes rows, and offers the actor no
+  // options. An actor who may read lines and is granted nothing on the order
+  // field is scoped by it all the same -- refused, as a lookup search would
+  // refuse them, they could read nothing; let through unscoped, every
+  // tenant's lines.
+  test('scopes an actor granted nothing on the field, where a lookup search refuses them', () => {
+    const auditor: PolicyContext = { actor: { id: 'u-5', roles: ['auditor'] }, attributes: { tenant: '42' } }
+    expect(lookupRowFilter(LINE_POLICY, auditor, LINE, 'read', 'order')).toMatchObject({ ok: false, code: 'field-denied' })
+    expect(throughFilters(LINE_POLICY, auditor, LINE, 'read')).toEqual({ ok: true, through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }] })
+  })
+})
+
 describe('forcedValues', () => {
   // On create, the tenant column is written from the context. It is the same
   // decision as the read filter, made in one place, so the row a person
@@ -526,6 +599,7 @@ describe('a forged context', () => {
       rowFilter(ORDER_POLICY, context, 'read'),
       lookupRowFilter(ORDER_POLICY, context, ORDER, 'create', 'customer'),
       forcedValues(ORDER_POLICY, context),
+      throughFilters(LINE_POLICY, context, LINE, 'read'),
     ]) {
       expect(result).toMatchObject({ ok: false, code: 'invalid-context' })
     }

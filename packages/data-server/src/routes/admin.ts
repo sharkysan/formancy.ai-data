@@ -179,7 +179,7 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
       // Compared with a version somebody has replaced, the keys may say something else: the conflict is the answer.
       const current = await store.latest(id)
       if (current !== expectedBase) return conflict(current)
-      return refuse(reply, 422, 'keys-reassigned', `Version ${String(expectedBase)} bound ${keys.map((key) => key.field).join(', ')} to other columns or lookups: confirm the grants on each for what it stands for now, or remove them.`, {
+      return refuse(reply, 422, 'keys-reassigned', `Version ${String(expectedBase)} bound ${keys.map((key) => key.field).join(', ')} to other columns or lookups: confirm the grants on each for what it stands for now, or remove them. A grant is a role on the key's field, or a through that scopes this form's rows by it.`, {
         keys,
         problems: keys.map(describeReassigned),
       })

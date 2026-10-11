@@ -7,7 +7,9 @@ Test support, private, never published. One business model written twice —
 plan names: a composite key, a foreign key to a unique key that is not the
 primary key, a reserved word as a table and a column name, a self-reference
 added over a row that breaks it, an exact decimal at its limit, an integer past
-2^53, an identity, a computed column, a view, and a type nobody supports. And
+2^53, an identity, a computed column, a view, a type nobody supports, and a
+child table, `sales.order_line`, with no tenant of its own and a version
+column, which a form can reach only through its order (0043). And
 `sales.shipment`, the column facts the two engines disagree on (0026): a
 by-default identity against a sequence default, a UTF-8 varchar, fixed and
 variable binary, a real and a zoneless timestamp with a fraction, and a check
@@ -149,12 +151,14 @@ performance harness does, uses `connectDocker()`. The adapters' own typed variab
 `sharedCases()` is every case both adapters are held to, by id: the model's
 comparators, each `FILTER_PARITY` entry, each `DISPLAY_PARITY` column, each
 `TEMPORAL_PARITY` column, each `REFUSAL_PARITY` refusal, each `EDGE_VALUES`
-value, the two shipments, and each change of `DRIFTING` both engines run.
+value, the two shipments, each change of `DRIFTING` both engines run, and
+each of `THROUGH_CASES`, what a form reached through a parent shows (0043),
+the one where the engines answer differently, `moved-parent`, included.
 The ids are derived from the shared data --
 `filterCase(entry)`, `displayCase(column)`, `temporalCase(column)`,
 `refusalCase(name)`, `edgeCase(name)`,
-`shipmentCase('first')`, `driftingCase(name)`, `MODEL_CASES.owner` -- so no
-test types one.
+`shipmentCase('first')`, `driftingCase(name)`, `throughCase(name)`,
+`MODEL_CASES.owner` -- so no test types one.
 
 `DRIFTING` is the table of changes to a form's own table after it was
 published ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)):

@@ -165,7 +165,7 @@
   },
   "studio-policy": {
     "file": "docs/images/readme/studio-policy.webp",
-    "captured": "2026-10-10",
+    "captured": "2026-10-11",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -175,10 +175,10 @@
     "timezone": "UTC",
     "css": {
       "width": 874,
-      "height": 530
+      "height": 613
     },
-    "bytes": 59628,
-    "sha256": "08064a21e57e8dabaa4a3d30633fc54a885d1d52d9207f22377ea17ddc307a78",
+    "bytes": 83042,
+    "sha256": "91cf63b5874a7f8d4b67475285f8444af8fdfbde35ed86bf84705772f3e2eeac",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -193,7 +193,7 @@
     "stylesheet": "sha256 c741439314f8b9e29b2794899280279e8f149af80d3b0820230dccfd9f5fdcfb of src/studio.css with its imports, and @formancy/themes 0.4.0",
     "text": {
       "Rows": "- group \"Row filters on sales.order\":\n  - text: Row filters on sales.order\n  - paragraph: \"Which rows of sales.order this form reaches: on read and update the filter, on create the values the pinned columns are written with, from the signed-in person’s attributes and never from the form.\"\n  - list:\n    - listitem:\n      - text: Column of row filter 1\n      - combobox \"Column of row filter 1\":\n        - option \"id\"\n        - option \"row_version\"\n        - option \"tenant_id\" [selected]\n        - option \"customer_no\"\n        - option \"order_date\"\n        - option \"status\"\n        - option \"amount\"\n        - option \"notes\"\n        - option \"group\"\n        - option \"created_by\"\n        - option \"approved_by\"\n      - text: Trusted attribute of row filter 1\n      - textbox \"Trusted attribute of row filter 1\": tenant\n      - button \"Remove row filter 1\"\n  - paragraph:\n    - button \"Add a row filter\"",
-      "Lookup": "- group \"Rows the Customer list may offer\":\n  - text: Rows the Customer list may offer\n  - paragraph: The Customer field chooses a row of sales.customer. A choice is checked again on save against these filters, so a row they exclude cannot be submitted even by somebody who knows its key.\n  - list:\n    - listitem:\n      - text: Column of Customer filter 1\n      - combobox \"Column of Customer filter 1\":\n        - option \"tenant_id\" [selected]\n        - option \"customer_no\"\n        - option \"name\"\n      - text: Trusted attribute of Customer filter 1\n      - textbox \"Trusted attribute of Customer filter 1\": tenant\n      - button \"Remove Customer filter 1\"\n  - paragraph:\n    - button \"Add a filter to the Customer list\""
+      "Lookup": "- group \"Rows the Customer list may offer\":\n  - text: Rows the Customer list may offer\n  - paragraph: The Customer field chooses a row of sales.customer. A choice is checked again on save against these filters, so a row they exclude cannot be submitted even by somebody who knows its key.\n  - list:\n    - listitem:\n      - text: Column of Customer filter 1\n      - combobox \"Column of Customer filter 1\":\n        - option \"tenant_id\" [selected]\n        - option \"customer_no\"\n        - option \"name\"\n      - text: Trusted attribute of Customer filter 1\n      - textbox \"Trusted attribute of Customer filter 1\": tenant\n      - button \"Remove Customer filter 1\"\n  - paragraph:\n    - button \"Add a filter to the Customer list\"\n  - checkbox \"Only rows of sales.order whose Customer is one of these\"\n  - text: Only rows of sales.order whose Customer is one of these\n  - paragraph: \"For a table with no tenant of its own: a row of sales.order is read and updated only while the row its Customer names is one this list may offer, and created only under one. A row that names none is reached by nobody.\""
     }
   },
   "studio-presentation": {
