@@ -79,7 +79,13 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > runtime request through the shipped server on both engines against a sized
 > customer table, with the database's size, the machine, the network path and
 > the date; CI holds the rows each lookup reads and the round trips each
-> operation makes, never a time.
+> operation makes, never a time. A
+> [guide](./docs/deploy/cloudflare.md) puts that stack behind Cloudflare: a
+> locally-managed tunnel whose configuration is generated from the server's
+> routes and checked against cloudflared, Access in front of the studio, and
+> a door on which nothing but the runtime plane's routes reaches the server,
+> and no file is served; nothing of the product runs at Cloudflare, and
+> nothing has been run through a real tunnel.
 > `CHANGELOG.md` says what each step found.
 
 ## Licence, in one table
@@ -449,7 +455,10 @@ package's `test:coverage` in a job of its own; in jobs of their own
 `pnpm test:e2e:install`, `pnpm test:browser`, the server image, and
 `pnpm test:getting-started`, which runs the guide from a clean checkout with
 Node and Docker alone, with the runner's Compose and again with the oldest
-the guide names. The last job builds [the release report](./docs/release/README.md)
+the guide names, and `pnpm test:cloudflare`, which holds the Cloudflare
+overlay to [its guide](./docs/deploy/cloudflare.md) offline, against the
+pinned cloudflared and the built server, with the same two Compose
+releases; it needs `pnpm build` first. The last job builds [the release report](./docs/release/README.md)
 from what every other job found, and fails the run on anything wrong in it
 ([0035](./docs/decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)).
 [`CLAUDE.md`](./CLAUDE.md) says what each is for and what the bar is.
@@ -476,6 +485,7 @@ other container runs.
 ## Documents
 
 - [`docs/getting-started.md`](./docs/getting-started.md) — from an empty machine with Docker and git to a published form on both engines; CI runs it as written.
+- [`docs/deploy/cloudflare.md`](./docs/deploy/cloudflare.md) — the composed stack behind a Cloudflare Tunnel, with Access in front of the studio and a door for a host application: what Cloudflare does here and what it cannot, every setting, and what nobody has measured.
 - [`docs/performance.md`](./docs/performance.md) — what each runtime request costs through the shipped server on both engines, with the database's size, the machine, the network path and the date, and what holds each claim.
 - [`docs/decisions/`](./docs/decisions/README.md) — every decision somebody could helpfully undo, with what verifies it.
 - [`docs/release/`](./docs/release/README.md) — the report every CI run and every release builds of what it was tested on, the register of the limitations the decisions state, and the release gates' evidence.

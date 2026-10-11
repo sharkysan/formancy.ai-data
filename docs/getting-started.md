@@ -300,3 +300,9 @@ What a real deployment changes:
 - its own database accounts, granted what each form needs, in
   `connections.json`, with TLS to the database;
 - its own secret store, mounted as files the settings name with `file:`.
+
+[`docs/deploy/cloudflare.md`](./deploy/cloudflare.md) puts this stack behind
+Cloudflare: a tunnel with no inbound port, Access in front of the studio,
+and a door for a host application on which nothing but the runtime plane's
+routes reaches the server. It says what that changes and what nobody has
+measured.

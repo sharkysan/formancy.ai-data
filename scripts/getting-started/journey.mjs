@@ -14,6 +14,7 @@
 
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { request as httpRequest } from 'node:http'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -262,6 +263,56 @@ async function use(base, tokens, form, journey) {
 export async function journeyFor(base, tokens, form, journey) {
   await publish(base, tokens.admin, form, journey)
   return use(base, tokens, form, journey)
+}
+
+/** One request with its target exactly as written, on a connection of its own: node:http sends the path it is given, where fetch's URL parser may rewrite one. */
+function asWritten(base, method, target) {
+  const { hostname, port } = new URL(base)
+  return new Promise((resolve, reject) => {
+    const outgoing = httpRequest({ host: hostname, port, method, path: target, headers: { accept: 'application/json' }, agent: false, timeout: 60_000 }, (incoming) => {
+      let text = ''
+      incoming.setEncoding('utf8')
+      incoming.on('data', (chunk) => (text += chunk))
+      incoming.on('end', () => {
+        let json
+        try {
+          json = JSON.parse(text)
+        } catch {
+          json = undefined
+        }
+        resolve({ status: incoming.statusCode, json })
+      })
+    })
+    outgoing.on('timeout', () => outgoing.destroy(new Error(`${method} ${target} had no answer within 60 seconds`)))
+    outgoing.on('error', reject)
+    outgoing.end()
+  })
+}
+
+/**
+ * What a proxy in front of the stack -- the Cloudflare guide's tunnel --
+ * relies on, through the web port (0037): the server's answers say
+ * `Cache-Control: no-store`, a published form's and a refusal's, through
+ * nginx, whose own Cache-Control is empty for /v1/; and a path that is not
+ * plain, sent as written, is the server's 400 path-not-plain, which shows
+ * nginx forwards it as sent and the server refuses it before any route's
+ * work. Problems, as sentences.
+ */
+export async function proxyProblems(base, token, formId) {
+  const problems = []
+  for (const [what, answer] of [
+    [`GET /v1/forms/${formId}`, await call(base, 'GET', `/v1/forms/${formId}`, { token })],
+    ['GET /v1/whoami without a token', await call(base, 'GET', '/v1/whoami')],
+  ]) {
+    const value = answer.headers.get('cache-control')
+    if (value !== 'no-store') problems.push(`${what} answered ${String(answer.status)} with Cache-Control ${value ?? 'none'}, not no-store`)
+  }
+  const target = '/v1/forms/a/versions/..%2F..%2Fb'
+  const refused = await asWritten(base, 'GET', target)
+  if (refused.status !== 400 || refused.json?.code !== 'path-not-plain') {
+    problems.push(`GET ${target}, sent as written, answered ${String(refused.status)} ${String(refused.json?.code)}, not 400 path-not-plain: nginx did not forward it as sent, or the server routed it`)
+  }
+  return problems
 }
 
 /**

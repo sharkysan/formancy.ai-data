@@ -741,7 +741,7 @@
       ]
     },
     "0032": {
-      "reviewed": "sha256:dee28c4cac0edc957b7c03a6704255bfc8797977bef44e811b81b4d1c4b374f0",
+      "reviewed": "sha256:bd2f372dce87bd1371aabeb3a652963268335026ed1c40e261751285b0ac0487",
       "limitations": [
         {
           "area": "operations",
@@ -906,6 +906,53 @@
     "0036": {
       "reviewed": "sha256:4463042a110e470eac46550dc3965682323994fb60edb78026a20e330481e760",
       "none": "A rule for this repository's branches; nobody who installs, integrates or operates the module meets it."
+    },
+    "0037": {
+      "reviewed": "sha256:22ac92b2537d71a47341277a65b8e61db8d97ac3813546abe44d6be9ef43cf30",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "Behind Cloudflare, Cloudflare decrypts every request and answer at its edge, host tokens and record values included, and anybody with Cloudflare Tunnel edit permission or an unrevoked login token can stream every request header, so that permission is as sensitive as reading host tokens."
+        },
+        {
+          "area": "operations",
+          "says": "The tunnel is locally managed, against Cloudflare's recommendation for most uses and for Docker, so its routes cannot be edited in the dashboard, and each setup run makes an account-wide login token the operator must revoke by hand, which cloudflared leaves to the browser to download when it cannot fetch it."
+        },
+        {
+          "area": "operations",
+          "says": "Whoever can change the tunnel's ingress, or add a private network route to it, which no setting of cloudflared refuses, reaches the web front's both ports without Access and whatever the machine routes to, though not the server past nginx or the composed stack's databases; setup looks for a private network route once, and nothing looks again."
+        },
+        {
+          "area": "server",
+          "says": "The data server answers 400 `path-not-plain`, before authentication, to a path holding a percent-escape, a backslash, an empty segment or a `.` or `..` segment, where a route used to answer 401, 404 or 400.",
+          "heldBy": "packages/data-server/src/app.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "What Fastify's router answers before any hook -- an escape that does not decode, a parameter past its length, the 503 while closing -- carries no `Cache-Control: no-store` and is not counted by the rate limit.",
+          "heldBy": "packages/data-server/src/app.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "Behind Cloudflare, an edge error, a block, a challenge or a lapsed Access session reads in data-client as a write that may have been saved and a read it does not understand, though nothing reached the server and nothing is audited."
+        },
+        {
+          "area": "writes",
+          "says": "On Cloudflare's Free plan the edge's rate-limiting rule cannot answer with a body of its own, so a write it blocked reads as one that may have been saved; the body that reads as a refusal needs Pro or above."
+        },
+        {
+          "area": "access",
+          "says": "Behind the tunnel every visitor shares the server's one rate-limit bucket; per-address limiting is the edge's rule, which counts per Cloudflare location and imprecisely, and counts a host application's backend as one visitor."
+        },
+        {
+          "area": "operations",
+          "says": "nginx's access log holds every visitor's address as Cloudflare forwards it, and every request line with its query."
+        },
+        {
+          "area": "testing",
+          "says": "Nothing of the Cloudflare deployment has been measured through a real tunnel: what Access answers, whether the edge forwards an encoded path as sent, whether log streaming shows `Authorization`, and how long the tunnel takes to connect are documented or unknown."
+        }
+      ]
     },
     "0038": {
       "reviewed": "sha256:3a71785e58666cc6986db9106567345bf844921884f71097908289199d2f0c61",

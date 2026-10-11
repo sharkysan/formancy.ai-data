@@ -50,8 +50,9 @@ RUN pnpm --filter @formancy/data-studio exec vite build --base=/studio/
 RUN pnpm --filter @formancy/data-host exec vite build --base=/host/
 
 # -------------------------------------------------------------- runtime stage
-# Unprivileged: uid 101, listening on 8080. An exact release, so a rebuild next
-# month serves with the nginx this one was checked against.
+# Unprivileged: uid 101, listening on 8080, and on 8081 for the runtime door
+# behind Cloudflare (0037), which nothing publishes. An exact release, so a
+# rebuild next month serves with the nginx this one was checked against.
 FROM nginxinc/nginx-unprivileged:1.30.5-alpine AS runtime
 
 COPY LICENSE.md NOTICE /usr/share/formancy-data/
@@ -59,4 +60,4 @@ COPY --from=build /repo/apps/studio/dist/ /usr/share/formancy-data/studio/
 COPY --from=build /repo/apps/host/dist/ /usr/share/formancy-data/host/
 COPY deploy/web/nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 8080
+EXPOSE 8080 8081

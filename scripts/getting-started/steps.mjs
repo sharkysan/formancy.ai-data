@@ -60,9 +60,10 @@ export function refuseShellSpecific(command, where) {
  * The guide's ```sh blocks, in order: `run` for each one the gate runs, with
  * the line its command is on, and `skipped` for the marked clone and cd.
  * Throws a sentence naming the line for everything the gate could not run
- * as written.
+ * as written, opening with `document`, the guide it read: the Cloudflare
+ * guide's commands are held to the same rules (0037).
  */
-export function extractSteps(markdown) {
+export function extractSteps(markdown, { document = 'docs/getting-started.md' } = {}) {
   const lines = markdown.replaceAll('\r\n', '\n').split('\n')
   const run = []
   const skipped = []
@@ -70,7 +71,7 @@ export function extractSteps(markdown) {
     const open = FENCE.exec(lines[index])
     if (open === null) {
       if (SKIP_MARKER.test(lines[index].trim()) && !/^\s*`{3,}sh\s*$/.test(lines[index + 1] ?? '')) {
-        throw new Error(`docs/getting-started.md line ${String(index + 1)}: the "not run by the gate" marker is not on the line before a \`\`\`sh block.`)
+        throw new Error(`${document} line ${String(index + 1)}: the "not run by the gate" marker is not on the line before a \`\`\`sh block.`)
       }
       continue
     }
@@ -84,11 +85,11 @@ export function extractSteps(markdown) {
       if (close.test(line)) break
       body.push(line.startsWith(indent) ? line.slice(indent.length) : line.trimStart())
     }
-    if (index === lines.length) throw new Error(`docs/getting-started.md line ${String(start)}: a code block is never closed.`)
+    if (index === lines.length) throw new Error(`${document} line ${String(start)}: a code block is never closed.`)
     if (language === 'text') continue
     if (language !== 'sh') {
       throw new Error(
-        `docs/getting-started.md line ${String(start)}: a \`\`\`${language} block is neither run by the gate (\`\`\`sh) nor output (\`\`\`text), so a command in it would be one nothing runs.`,
+        `${document} line ${String(start)}: a \`\`\`${language} block is neither run by the gate (\`\`\`sh) nor output (\`\`\`text), so a command in it would be one nothing runs.`,
       )
     }
     const commands = body.map((line) => line.trim()).filter((line) => line !== '')
@@ -96,27 +97,27 @@ export function extractSteps(markdown) {
     if (marked) {
       const other = commands.find((command) => !SKIPPABLE.test(command))
       if (commands.length === 0 || other !== undefined) {
-        throw new Error(`docs/getting-started.md line ${String(start)}: a block the gate skips holds "${other ?? '(nothing)'}"; only git clone and cd may be skipped.`)
+        throw new Error(`${document} line ${String(start)}: a block the gate skips holds "${other ?? '(nothing)'}"; only git clone and cd may be skipped.`)
       }
       skipped.push({ line: start + 1, commands })
       continue
     }
     if (commands.length !== 1) {
       throw new Error(
-        `docs/getting-started.md line ${String(start)}: a \`\`\`sh block holds ${String(commands.length)} commands; the gate runs one per block, so each shell -- sh, PowerShell, cmd -- runs it the same way.`,
+        `${document} line ${String(start)}: a \`\`\`sh block holds ${String(commands.length)} commands; the gate runs one per block, so each shell -- sh, PowerShell, cmd -- runs it the same way.`,
       )
     }
     const [command] = commands
     if (SKIPPABLE.test(command)) {
-      throw new Error(`docs/getting-started.md line ${String(start)}: "${command}" would be run by the gate; mark its block "<!-- not run by the gate: ... -->".`)
+      throw new Error(`${document} line ${String(start)}: "${command}" would be run by the gate; mark its block "<!-- not run by the gate: ... -->".`)
     }
     if (!command.startsWith('docker compose ')) {
-      throw new Error(`docs/getting-started.md line ${String(start)}: "${command}" is not a docker compose command, and every step but the clone and cd is one.`)
+      throw new Error(`${document} line ${String(start)}: "${command}" is not a docker compose command, and every step but the clone and cd is one.`)
     }
-    refuseShellSpecific(command, `docs/getting-started.md line ${String(start + 1)}`)
+    refuseShellSpecific(command, `${document} line ${String(start + 1)}`)
     run.push({ line: start + 1, command })
   }
-  if (run.length === 0) throw new Error('docs/getting-started.md has no ```sh block for the gate to run.')
+  if (run.length === 0) throw new Error(`${document} has no \`\`\`sh block for the gate to run.`)
   return { run, skipped }
 }
 

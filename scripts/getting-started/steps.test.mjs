@@ -116,6 +116,18 @@ describe("the guide's steps", () => {
     expect(() => extractSteps(markdown)).toThrow(sentence)
   })
 
+  // The Cloudflare guide's commands are read by this same function (0037);
+  // a refusal naming getting-started.md would send its reader to the wrong
+  // document. Every sentence names the document it read, and this one by
+  // default.
+  test('name the document they read, getting-started.md unless told otherwise', () => {
+    const markdown = '```bash\ndocker compose up -d\n```\n'
+    expect(() => extractSteps(markdown)).toThrow(/^docs\/getting-started\.md line 1: /)
+    expect(() => extractSteps(markdown, { document: 'docs/deploy/cloudflare.md' })).toThrow(/^docs\/deploy\/cloudflare\.md line 1: /)
+    expect(() => extractSteps('```sh\ndocker compose ps;\n```\n', { document: 'docs/deploy/cloudflare.md' })).toThrow(/^docs\/deploy\/cloudflare\.md line 2: /)
+    expect(() => extractSteps('Nothing.\n', { document: 'docs/deploy/cloudflare.md' })).toThrow(/^docs\/deploy\/cloudflare\.md has no /)
+  })
+
   // An indented fence is still a fence: a ```sh block inside a list item is
   // run, not missed.
   test('find a ```sh block inside a list item', () => {

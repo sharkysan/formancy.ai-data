@@ -31,6 +31,10 @@
 //     from (journey.mjs) -- and each database's version as the server's own
 //     adapter reports it, written to test-results/servers/ for the release
 //     report (0035);
+//  6a. what a proxy in front of the stack relies on (0037), through the web
+//     port: a published form and a refusal each say Cache-Control: no-store,
+//     and a path holding ..%2F, sent as written, is the server's 400
+//     path-not-plain, so nginx forwards it as sent and the server refuses it;
 //  7. the commands section 7 names in running text, against the running
 //     stack, and on Linux the server answering at its container address, as
 //     section 8 says;
@@ -57,7 +61,7 @@ import { appendFileSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { call, classify, composedServer, journeyFor, MISSING, stillThere, writeServerRecord } from './getting-started/journey.mjs'
+import { call, classify, composedServer, journeyFor, MISSING, proxyProblems, stillThere, writeServerRecord } from './getting-started/journey.mjs'
 import {
   anonymousMountProblems,
   auditEvents,
@@ -289,6 +293,9 @@ async function main() {
     await timed('Gate: pages and assets', async () => fail('the web front does not serve what the pages name', await pageProblems(base)))
     const records = new Map()
     for (const form of journey.forms) records.set(form, await timed(`Gate: journey on ${form.engine}`, () => journeyFor(base, tokens, form, journey)))
+    await timed('Gate: what a proxy in front sees, through the web front', async () => {
+      fail('a proxy in front of the stack could keep an answer, or forward a path the server routes', await proxyProblems(base, tokens.clerk1, journey.forms[0].formId))
+    })
     // What each composed database answered, through the product's own
     // adapter, kept for the release report beside every suite's (0035).
     await timed('Gate: each database, as the server reports it', async () => {

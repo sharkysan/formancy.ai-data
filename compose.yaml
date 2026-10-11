@@ -199,6 +199,11 @@ services:
     image: formancy/data-web:compose
     ports:
       - "127.0.0.1:${FORMANCY_DATA_WEB_PORT:-4394}:8080"
+    # compose's network, to reach the server, and `edge`, which nothing else
+    # of this file joins: the Cloudflare overlay's cloudflared joins it alone
+    # (0037), so a tunnel whose ingress is changed reaches the web front and
+    # not the server or the databases.
+    networks: [default, edge]
     depends_on:
       server:
         # The server image's own HEALTHCHECK. Restarted when the server is
@@ -245,3 +250,8 @@ volumes:
   formancy-data-secrets-server:
   formancy-data-secrets-token:
   formancy-data-store:
+
+networks:
+  # The web front's alone in this file; see `web`. Docker makes it, empty of
+  # anything but the web front, whenever the stack starts.
+  edge:
