@@ -12,9 +12,12 @@ import { reporters } from '../../vitest.results'
  *
  * LOAD_SECONDS are the local measurement (P6: 35.4 s on PostgreSQL and 15.2 s
  * on SQL Server, the slowest of three loads each, 2026-10-09, on a Docker
- * Sandbox VM on a Windows 11 workstation) until this package's first CI job
- * measures them. The rest of the smoke run took about a minute there, inside
- * the pull allowance when the image is already present.
+ * Sandbox VM on a Windows 11 workstation). This pull request's CI loaded the
+ * same table in 19.9 s and 9.5 s (2026-10-10, the data-fixtures job, which
+ * prints its load; this package's job does not), which would give 659 s. The
+ * slower machine's figures stay, so the hook holds on both. The rest of the
+ * smoke run took about a minute there, inside the pull allowance when the
+ * image is already present.
  */
 const PULL_SECONDS = 600
 const LOAD_SECONDS = { postgres: 35.4, sqlserver: 15.2 }

@@ -109,7 +109,9 @@ added unvalidated beside one SQL Server disables.
   sized suite, both adapters' `lookups-sized.integration.test.ts` and the
   performance harness each load it into containers of their own. On the
   Docker Sandbox VM on a Windows 11 workstation (2026-10-09), a load took
-  about 35 s on PostgreSQL and 15 s on SQL Server, read-back included.
+  about 35 s on PostgreSQL and 15 s on SQL Server, read-back included; on
+  GitHub's hosted runner, in this package's CI job (2026-10-10), 19.9 s and
+  9.5 s.
   `sized.ts` is the generator and every expectation, pure: names unique
   case-insensitively, in an alphabet whose code-point order and
   case-insensitive order agree, so PostgreSQL on musl and SQL Server's CI

@@ -823,7 +823,7 @@
       ]
     },
     "0034": {
-      "reviewed": "sha256:e97b7a9e60688aa22727557af396164dca54f41b834164bedb2d3b5504c99a4f",
+      "reviewed": "sha256:3f9c1b017c86aa8f30b50a9f8105fa7052088d9839bee544186b9ed8b7e71ba4",
       "limitations": [
         {
           "area": "databases",
@@ -871,6 +871,10 @@
         {
           "area": "testing",
           "says": "The added-latency figures cover the leg between the server and the database; the browser's leg to the server, TLS, bandwidth and TCP's congestion window are not in them."
+        },
+        {
+          "area": "testing",
+          "says": "An added-latency difference includes what the machine drifted between a request's undelayed and delayed passes, which run one after the other: for some requests it moved between rounds by more than a tenth of the added delay, and more samples did not change that."
         }
       ]
     },

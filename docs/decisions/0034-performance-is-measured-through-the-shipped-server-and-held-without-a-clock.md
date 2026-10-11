@@ -1,7 +1,7 @@
 # 0034 — Performance is measured through the shipped server against a sized lookup table, published with what it ran on, and held without a clock by what each operation reads and how often it asks the database
 
 - **Status:** accepted
-- **Date:** [TO FILL at merge: the merge date]
+- **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**
   `packages/data-postgres/src/lookups-sized.integration.test.ts` — on the
@@ -385,14 +385,23 @@ Developer, SQL_Latin1_General_CP1_CI_AS:
 - **P6**: loading took 34.5–35.4 s on PostgreSQL (the insert about 33 s)
   and 15.0–15.2 s on SQL Server (about 13 s) with the machine otherwise
   quiet, and 35.9 s and 19.7 s during the smoke run beside other work.
-  [TO FILL from this pull request's CI: the load seconds in the
-  data-fixtures, data-postgres, data-sqlserver and data-performance jobs;
-  with them `LOAD_SECONDS` and its comment in
-  `packages/data-performance/vitest.config.ts`; and whether the other three
-  suites' hook timeouts need raising.] Those were left as they were on local
-  load times alone. data-postgres's is shorter than data-fixtures' and
-  data-sqlserver's, and its sized file's `beforeAll` now loads the table on
-  top of the image pull the timeout was set for.
+  In this pull request's CI (run 38011316250, 2026-10-10 at about 01:00
+  UTC, on `a6b68c8`, the branch before its rebase, on GitHub's hosted
+  runners), the data-fixtures job printed its load: 19.9 s on PostgreSQL
+  (the insert 17.9 s) and 9.5 s on SQL Server (7.0 s). The other three jobs
+  print no load of their own; their sized files took 44.2 s
+  (data-postgres) and 38.5 s (data-sqlserver), start, load and tests
+  together, and the harness 67.1 s from starting both databases to
+  publishing. CI loads faster than this machine, so `LOAD_SECONDS` in
+  `packages/data-performance/vitest.config.ts` keeps the local figures,
+  the slower, and its comment says why: a hook of 702 s, where CI's
+  would give 659 s. The other three suites' hook timeouts need no raising:
+  each sized file's `beforeAll` starts its databases and loads the table,
+  and the slowest, data-postgres's at 44.2 s in all in CI and about 35 s of
+  load here, sits inside its 300 s, the shortest of the three, which was
+  set for pulling the image on a machine that has never run it;
+  data-fixtures' 39.4 s for both engines and data-sqlserver's 38.5 s sit
+  inside 600 s.
 - **P7**: testcontainers' runtime client reads one-shot container stats on
   Docker 29.8.1, the cumulative CPU nanoseconds and memory in one read of
   9 to 89 ms. Docker Desktop was not available to try.
@@ -406,10 +415,21 @@ Developer, SQL_Latin1_General_CP1_CI_AS:
 - **P9**: JIT never fired. `jit` is on, `jit_above_cost` 100,000 and
   `pg_jit_available()` true, but no plan cost more than 35,584 under the
   defaults or 69,968 serially (the unfiltered first page).
-- **P10**: [TO FILL from the measurement run: autovacuum, autoanalyze,
-  recompile and statistics-update counts per block, on any table, and which
-  blocks, if any, they cluster in; and the databases' idle CPU rates in the
-  gaps, and which blocks they are highest after.]
+- **P10** (the two publish runs P14 describes, each block's counts summed
+  over its three rounds; the counters count runs on any table and do not
+  name it): PostgreSQL's autovacuum and autoanalyze ran only in blocks that
+  write or that come soon after a block of writes, never elsewhere. In the
+  published run, 4 autovacuums and 12 autoanalyzes: in the one-at-a-time
+  create, in the eight-in-flight health check and form
+  that follow the one-at-a-time update, and in the added-latency form,
+  create and update, the form following the eight-in-flight update. In the
+  first, 3 and 6: in the eight-in-flight first page and search many
+  customers match, and in the added-latency form and first page, each
+  following a block of writes. SQL Server recompiled nothing and updated
+  no statistics in either run. In the idle gaps of the published run
+  PostgreSQL's container used 123 to 137 ms of CPU a second around every
+  block, none standing out; SQL Server's used 9 to 16, its highest, 15.8,
+  around the eight-in-flight one-key resolve, and no other past 12.
 - **P11** (2026-10-09, about 22:10 UTC, beside other work, load average
   about 4.4): inserting the million generated customers into a copy of
   `sales.customer` took 42.0, 39.5, 37.7, 38.3 and 40.1 s on PostgreSQL and
@@ -418,15 +438,35 @@ Developer, SQL_Latin1_General_CP1_CI_AS:
   what the machine did on its own, so the loaders keep 50,000, about 2.9 MB
   of JSON a statement.
 - **P12** is not part of this change.
-- **P13**: [TO FILL from the measurement run: the output of
-  `pnpm --filter @formancy/data-performance run calibrate` over ten idle
-  minutes on the quiet machine -- the slowest idle gap's median, a gap as
-  long as the protocol's, against the fastest window as long as the quiet
-  check's -- and the tolerance it sets in `protocol.ts`.]
-- **P14**: [TO FILL from the measurement run: whether 200 samples per
-  latency pass gave a median difference whose round-to-round spread is
-  under a tenth of D, and how far the hop undelayed sat from the direct p50
-  for each request, against the bound of D.]
+- **P13** (2026-10-10, 16:30:49 to 16:40:49 UTC, the quiet machine, no
+  container running and nothing else at work):
+  `pnpm --filter @formancy/data-performance run calibrate` took 1,199
+  probes at 500 ms, median 9.60 ms. The slowest of 299 idle gaps of
+  2,000 ms ran 1.606 times the fastest of 59 baseline windows of 10 s, so
+  `protocol.ts` sets the tolerance to 1.61, that rounded up to the
+  hundredth, with the output beside it. In the published run the worst
+  idle gap of any block was 1.58 times the quiet check's baseline (on
+  PostgreSQL, one at a time, the search no customer matches with no tenant
+  row filter), and no block was run again.
+- **P14**: no, and a higher count did not make it so. The first publish
+  run (2026-10-10, 16:41 to 18:20 UTC, 5,937 s, 200 samples a pass) was
+  measured and not published: the rounds' differences spread past a tenth
+  of D, 0.5 ms, for 11 of the 22 requests, up to 4.63 ms (SQL Server, the
+  search no customer matches). Resampling each of its passes 400 times put
+  the spread the median's sampling error alone would give at 1.09 ms at
+  most, and under 0.5 ms from about 930 samples a pass, so `protocol.ts`
+  now takes 1,000. In the published run, at 1,000, 7 of the 22 still
+  spread past 0.5 ms: PostgreSQL's first page and the searches one
+  customer or none match (0.58 to 0.76 ms), SQL Server's first page and
+  the searches many or one match (0.59 to 1.08 ms), and SQL Server's
+  create (0.73 ms). Resampled the same way, 200 times, sampling alone
+  accounts there for an expected spread of 0.41 ms at most, and 0.13 to
+  0.14 ms for the four outside SQL Server's searches. The rest is the
+  machine drifting between a request's undelayed and delayed passes, which
+  run one after the other, and no count removes it. Undelayed, every
+  request through the hop sat within D of its direct p50: at most 1.27 ms
+  slower in the published run (SQL Server's create), 1.40 ms in the first
+  (PostgreSQL's create).
 
 The machine the figures were measured on is described in the generated
 region of `docs/performance.md`, as its hypervisor presents it; it is not
@@ -487,8 +527,9 @@ typed statements for postgres.js -- for decisions of their own.
 
 - **Every release whose measured code, runtime dependencies or build
   inputs changed must be re-measured** on a quiet Linux machine, for as long
-  as a run takes ([TO FILL from the measurement run: its duration and date]).
-  In practice, every release.
+  as a run takes: the published one, from 2026-10-10 22:05 to 2026-10-11
+  00:30 UTC, took 8,691 s, about 2 h 25 min, at 1,000 samples a latency
+  pass. In practice, every release.
 - **CI time**: the fixtures, PostgreSQL and SQL Server suites each load a
   million customers, and the gates' test matrix gains a job that runs the
   harness; a release runs the same gates, each suite on a runner of its own
@@ -531,6 +572,11 @@ typed statements for postgres.js -- for decisions of their own.
   measurement.
 - **The added-latency table covers one leg.** The browser's leg to the
   server, TLS, bandwidth and TCP's congestion window are not in it.
+- **An added-latency difference carries what the machine drifted between
+  two passes.** A request's undelayed and delayed passes run one after the
+  other, so for some requests the difference moved between rounds by more
+  than a tenth of D, and a higher sample count did not change that (P14).
+  The page prints the median of the rounds' differences, not their spread.
 - **A contains search grows with the rows a filter admits.** Two sizes are
   measured, not a curve. No remedy ships: no trigram index (`pg_trgm`
   cannot be assumed, and SQL Server has none), no prefix mode, no minimum

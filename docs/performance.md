@@ -96,6 +96,12 @@ there would be either too loose to mean anything or flaky.
   it shows what holding every database answer adds, against the round trips
   counted. The browser's leg to the server, TLS, bandwidth and TCP's
   congestion window are not in it.
+- **An added-latency difference is no finer than the machine's drift.** Each
+  request's undelayed and delayed passes run one after the other, so what the
+  machine drifted between them is in the difference. For some requests it
+  moved between rounds by more than a tenth of the delay, which more samples
+  did not change (0034, P14); the table prints the median of the rounds'
+  differences, not their spread.
 - **Warm caches and default settings**: both images as the suites run them,
   SQL Server's Developer edition, and PostgreSQL on musl, which orders text by
   code point. A glibc or ICU PostgreSQL compares by locale for every row a
