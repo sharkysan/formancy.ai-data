@@ -64,9 +64,11 @@ describe.each(ENGINES)('a stale save on $engine', (engine) => {
     await save(user, second)
 
     // The server's sentence, verbatim, and the one thing the page adds: that
-    // nothing typed was lost. In a region the keyboard is taken to -- not an
+    // nothing typed was lost. Waited for as long as the suite waits for
+    // Angular: with the workspace's suites beside it, under coverage, the
+    // answer took longer than waitFor's default second (seen 2026-10-11). In a region the keyboard is taken to -- not an
     // alert, which a screen reader would announce on top of the focus move.
-    await waitFor(() => expect(notice(second)).not.toBeNull())
+    await waitFor(() => expect(notice(second)).not.toBeNull(), { timeout: 15_000 })
     const refused = notice(second) as HTMLElement
     expect(paragraphs(refused)).toEqual([STALE, DRAFT_KEPT])
     await waitFor(() => expect(focusedName()).toBe(`${second} Not saved`))

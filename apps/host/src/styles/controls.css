@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------- controls */
 
-button:where(:not(.sheet *)) {
+button:where(:not(.sheet *, .grid-bench *)) {
   font: inherit;
   cursor: pointer;
 }
@@ -9,6 +9,7 @@ button:where(:not(.sheet *)) {
 .button {
   display: inline-flex;
   align-items: center;
+  gap: 0.25rem;
   min-height: 2.5rem;
   padding: 0 1rem;
   border: 1px solid var(--edge-strong);
@@ -22,21 +23,38 @@ button:where(:not(.sheet *)) {
   border-color: var(--client);
 }
 
+/* A ghost: there when wanted and quiet otherwise. Its transparent border is
+   what forced colours draw, so it still has a boundary there. */
+.button.quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.button.quiet:hover {
+  border-color: var(--edge-strong);
+  color: var(--text);
+}
+
 /* The action a part of the page is for: violet, the colour of what a person
    acts on. Solid rather than the site's gradient, so its contrast can be
-   measured. */
+   measured; the size of every other button and no glow, since the fill is
+   its emphasis. The transparent border is its edge in forced colours. */
 .primary {
+  display: inline-flex;
+  align-items: center;
   min-height: 2.5rem;
-  padding: 0 1.25rem;
-  border: 0;
+  padding: 0 1.125rem;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: var(--client);
   color: #06050d;
+  font-size: 0.875rem;
   font-weight: 600;
-  box-shadow: 0 8px 26px -12px rgb(139 123 255 / 80%);
+  white-space: nowrap;
 }
 
-input:where(:not(.sheet *)) {
+input:where(:not(.sheet *, .grid-bench *)) {
   width: 100%;
   min-width: 0;
   min-height: 2.5rem;
@@ -49,13 +67,16 @@ input:where(:not(.sheet *)) {
   font-size: 0.9375rem;
 }
 
-input:where(:not(.sheet *)):focus-visible {
-  outline: none;
+/* The room's teal ring, as every other control has it, around the violet
+   border and glow the room gives a field it is typing into. */
+input:where(:not(.sheet *, .grid-bench *)):focus-visible {
+  outline: 2px solid var(--server);
+  outline-offset: 2px;
   border-color: var(--client);
   box-shadow: 0 0 0 4px rgb(139 123 255 / 22%);
 }
 
-label:where(:not(.sheet *)) {
+label:where(:not(.sheet *, .grid-bench *)) {
   font-size: 0.875rem;
   font-weight: 500;
 }
@@ -72,4 +93,18 @@ label:where(:not(.sheet *)) {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+}
+
+kbd:where(:not(.sheet *, .grid-bench *)) {
+  display: inline-block;
+  min-width: 1.5rem;
+  padding: 0 0.375rem;
+  border: 1px solid var(--edge-strong);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  text-align: center;
 }

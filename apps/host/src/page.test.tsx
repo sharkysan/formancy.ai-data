@@ -2,9 +2,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleName } from 'dom-accessibility-api'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
-import { answer, answerable, chooseCustomer, load, mount, notice, openForm, pane, paper, rendered, RENDERERS, said, save, shows, signIn, unknownNotice } from './test-host.js'
+import { answer, answerable, chooseCustomer, chooseForm, chooseRenderer, gridSection, load, mount, newRecord, notice, openForm, openWith, pane, paper, RENDERERS, said, save, shows, signIn, unknownNotice, unsavedNotice } from './test-host.js'
 import { EDGES, ENGINES, losingWrites, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
+import { PREFERENCES } from './prefs.js'
 import { CHANGED_SINCE_UNKNOWN } from './session.js'
 
 /*
@@ -21,14 +22,18 @@ import { CHANGED_SINCE_UNKNOWN } from './session.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane()
+  plane = await startPlane({ children: true })
 })
 
 afterAll(async () => {
   await plane?.close()
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  localStorage.clear()
+  window.history.replaceState(null, '', '/')
+})
 
 /** The state's name, and what axe and the name check found in it: both empty, or the state says which failed. */
 async function floor(state: string): Promise<{ state: string; axe: string[]; unnamed: string[] }> {
@@ -49,16 +54,16 @@ async function freshOrder(formId: string): Promise<string> {
   return created.value.record
 }
 
-// Signed out is the same page whatever database is behind it: one form, two
-// fields and a button, and the first thing a keyboard meets after the skip
-// link is the token.
-test('signed out, the page asks for a token and a form id, and passes the floor', async () => {
+// Signed out is the same page whatever database is behind it: one field
+// and a button -- the form is chosen from the menu once signed in -- and
+// the first thing a keyboard meets after the skip link is the token.
+test('signed out, the page asks for a token alone, and passes the floor', async () => {
   mount(plane.fetch)
-  expect(screen.getByRole('heading', { level: 1, name: 'A published form, in both renderers' })).toBeTruthy()
-  screen.getByRole('link', { name: 'Skip to the form' })
+  expect(screen.getByRole('heading', { level: 1, name: 'Published forms, in both renderers' })).toBeTruthy()
+  screen.getByRole('link', { name: 'Skip to the workspace' })
   screen.getByLabelText('Host token')
-  screen.getByRole('textbox', { name: 'Form id' })
-  screen.getByRole('button', { name: 'Open the form' })
+  expect(screen.queryByRole('textbox', { name: 'Form id' })).toBeNull()
+  screen.getByRole('button', { name: 'Sign in' })
   expect(await floor('signed out')).toEqual(CLEAN('signed out'))
 })
 
@@ -77,9 +82,10 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
         .sort()
       expect({ renderer, names }).toEqual({ renderer, names: labels })
     }
-    // What the definition allows, said from the server's answer.
-    expect(paragraphs(screen.getByRole('main'))).toContain(`${formId}: you may read, create and update records with this form.`)
-    expect(focusedName()).toBe('Record token')
+    // What the definition allows, said from the server's answer, as tags.
+    expect(within(screen.getByRole('list', { name: 'Operations' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Read', 'Create', 'Update'])
+    // New record took the keyboard to the record's heading.
+    expect(focusedName()).toBe('New record')
   })
 
   // Every state a person reaches is held to the floor, not the first one
@@ -100,7 +106,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
 
     await answer(user, 'Angular', 'Notes', 'a stale change')
     await save(user, 'Angular')
-    await waitFor(() => expect(notice('Angular')).not.toBeNull())
+    await waitFor(() => expect(notice('Angular')).not.toBeNull(), { timeout: 15_000 })
     expect(await floor('stale notice')).toEqual(CLEAN('stale notice'))
 
     const no = connection === 'pg' ? 8301 : 8302
@@ -112,14 +118,67 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
     expect(await floor('refused selection')).toEqual(CLEAN('refused selection'))
   })
 
+  // The workspace's own states, each held to the floor: signed in with no
+  // form open, a form's records, a record open with its lines, a line open
+  // under it, the unsaved-changes notice, the record view of Separate views,
+  // and a refused list. Each adds markup -- a grid, a separator, a child's
+  // panes, a notice -- where a missing name or a broken reference turns up.
+  test("passes the floor in the workspace's states", async () => {
+    // A list refused by the real server when the test says: its database unreachable for that one request.
+    let refuse = false
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      const path = new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname
+      if (!refuse || !path.endsWith('/records/list')) return plane.fetch(input, init)
+      refuse = false
+      plane.unreachable.add(connection)
+      try {
+        return await plane.fetch(input, init)
+      } finally {
+        plane.unreachable.delete(connection)
+      }
+    }
+    const user = mount(fetch)
+    await signIn(user, TOKENS.clerk)
+    await screen.findByRole('heading', { level: 2, name: 'No form open' }, { timeout: 15_000 })
+    expect(await floor('signed in, no form')).toEqual(CLEAN('signed in, no form'))
+    await chooseForm(user, formId)
+    await chooseRenderer(user)
+    expect(await floor('records')).toEqual(CLEAN('records'))
+
+    await load(user, EDGES.seededOrder)
+    await shows('Angular', 'Customer', 'Muster AG')
+    await waitFor(() => expect(within(gridSection('Order line')).getAllByRole('status')[0]?.textContent).toMatch(/^Order line rows 1–/), { timeout: 15_000 })
+    expect(await floor('a record and its lines')).toEqual(CLEAN('a record and its lines'))
+
+    const lines = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
+    await user.click(within(lines).getAllByRole('gridcell')[0] as HTMLElement)
+    await waitFor(() => expect(screen.getByRole('region', { name: `Order line ${EDGES.seededOrder},1 Angular` })).toBeTruthy(), { timeout: 15_000 })
+    await within(screen.getByRole('region', { name: `Order line ${EDGES.seededOrder},1 Angular` })).findByRole('spinbutton', { name: /^Quantity/ }, { timeout: 15_000 })
+    expect(await floor('a line open')).toEqual(CLEAN('a line open'))
+
+    await answer(user, 'React', 'Notes', 'a draft on the floor')
+    await newRecord(user)
+    await waitFor(() => expect(unsavedNotice()).not.toBeNull())
+    expect(await floor('unsaved notice')).toEqual(CLEAN('unsaved notice'))
+    await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Keep editing' }))
+
+    await user.click(screen.getByRole('radio', { name: 'Separate views' }))
+    expect(await floor('separate views, records')).toEqual(CLEAN('separate views, records'))
+    refuse = true
+    await user.type(screen.getByRole('textbox', { name: 'Search' }), 'placed')
+    await user.click(within(gridSection('Records')).getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe('The database cannot be reached. Nothing was saved.'), { timeout: 15_000 })
+    expect(await floor('a refused list')).toEqual(CLEAN('a refused list'))
+  })
+
   // The server's refusal, in its words, where the person asked: a page that
   // said "something went wrong" would leave them unable to tell a bad token
   // from a missing form.
-  test('a token the server does not accept is its sentence, at open', async () => {
+  test('a token the server does not accept is its sentence, at sign-in', async () => {
     const user = mount(plane.fetch)
-    await signIn(user, 'not-a-host-token', formId)
+    await signIn(user, 'not-a-host-token')
     expect((await screen.findByRole('alert')).textContent).toBe('A valid host token is required.')
-    expect(screen.queryByRole('region', { name: 'React' })).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Forms' })).toBeNull()
   })
 
   // A record the person may not see does not exist for them: tenant 1's
@@ -128,8 +187,8 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
   test('a record that is not there is the server sentence, on load', async () => {
     const user = await openForm(plane, formId, TOKENS.otherClerk)
     await load(user, EDGES.seededOrder)
-    const bar = screen.getByRole('region', { name: 'Record' })
-    expect((await within(bar).findByRole('alert')).textContent).toBe('No such record.')
+    expect((await screen.findByRole('alert')).textContent).toBe('No such record.')
+    expect(screen.getByRole('button', { name: 'Open by record token' }).getAttribute('aria-expanded')).toBe('true')
     for (const renderer of RENDERERS) expect(within(pane(renderer)).getByRole('combobox', { name: 'Customer' })).toHaveProperty('value', '')
   })
 
@@ -139,8 +198,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
     const user = await openForm(plane, formId)
     await load(user, EDGES.seededOrder)
     for (const renderer of RENDERERS) await shows(renderer, 'Customer', 'Muster AG')
-    const bar = screen.getByRole('region', { name: 'Record' })
-    await user.click(within(bar).getByRole('button', { name: 'New record' }))
+    await newRecord(user)
     for (const renderer of RENDERERS) {
       await shows(renderer, 'Customer', '')
       await shows(renderer, 'Amount', '')
@@ -160,9 +218,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
   // confirmed it -- and the notice holds the floor in each of those states.
   test('a save whose answer is lost says it may have been saved, holds the create, and passes the floor', async () => {
     const losing = losingWrites(plane.fetch, { when: 'after' })
-    const user = mount(losing.fetch)
-    await signIn(user, TOKENS.clerk, formId)
-    await rendered()
+    const user = await openWith(losing.fetch, formId)
     const notes = `lost on the page ${connection} ${String(Date.now())}`
     await chooseCustomer(user, 'React', 'Muster', 'Muster AG')
     await answer(user, 'React', 'Order date', EDGES.orderDate)
@@ -170,7 +226,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
     await answer(user, 'React', 'Notes', notes)
     await save(user, 'React')
 
-    await waitFor(() => expect(unknownNotice('React')).not.toBeNull())
+    await waitFor(() => expect(unknownNotice('React')).not.toBeNull(), { timeout: 15_000 })
     const lost = unknownNotice('React') as HTMLElement
     expect(paragraphs(lost)[0]).toBe('The answer to this save was lost between this page and the data server. It may have been saved.')
     await waitFor(() => expect(focusedName()).toBe('React It may have been saved'))
@@ -210,16 +266,14 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
   // pressed, a check in between included, rather than falling to the page.
   test('a second unknown save starts the notice again, and the keyboard follows each "Enter it again anyway"', async () => {
     const losing = losingWrites(plane.fetch, { when: 'after', times: 2 })
-    const user = mount(losing.fetch)
-    await signIn(user, TOKENS.clerk, formId)
-    await rendered()
+    const user = await openWith(losing.fetch, formId)
     const notes = `lost twice on the page ${connection} ${String(Date.now())}`
     await chooseCustomer(user, 'React', 'Muster', 'Muster AG')
     await answer(user, 'React', 'Order date', EDGES.orderDate)
     await answer(user, 'React', 'Amount', '32')
     await answer(user, 'React', 'Notes', notes)
     await save(user, 'React')
-    await waitFor(() => expect(unknownNotice('React')).not.toBeNull())
+    await waitFor(() => expect(unknownNotice('React')).not.toBeNull(), { timeout: 15_000 })
     let lost = unknownNotice('React') as HTMLElement
 
     await user.click(within(lost).getByRole('button', { name: 'Check whether it was saved' }))
@@ -253,15 +307,13 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
   test('an update whose answer is lost checks as changed, and loads the saved record', async () => {
     const record = await freshOrder(formId)
     const losing = losingWrites(plane.fetch, { when: 'after' })
-    const user = mount(losing.fetch)
-    await signIn(user, TOKENS.clerk, formId)
-    await rendered()
+    const user = await openWith(losing.fetch, formId)
     await load(user, record)
     await shows('React', 'Amount', '1.0000')
     const notes = `lost update on the page ${connection} ${String(Date.now())}`
     await answer(user, 'React', 'Notes', notes)
     await save(user, 'React')
-    await waitFor(() => expect(unknownNotice('React')).not.toBeNull())
+    await waitFor(() => expect(unknownNotice('React')).not.toBeNull(), { timeout: 15_000 })
     let lost = unknownNotice('React') as HTMLElement
 
     // Saved again as the 502 invites, and stale by its own doing: still the
@@ -287,14 +339,12 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
   test('an update lost before it was sent checks as unchanged, a failed check says it is still unknown, and Save then saves', async () => {
     const record = await freshOrder(formId)
     const losing = losingWrites(plane.fetch, { when: 'before' })
-    const user = mount(losing.fetch)
-    await signIn(user, TOKENS.clerk, formId)
-    await rendered()
+    const user = await openWith(losing.fetch, formId)
     await load(user, record)
     await shows('React', 'Amount', '1.0000')
     await answer(user, 'React', 'Amount', '7')
     await save(user, 'React')
-    await waitFor(() => expect(unknownNotice('React')).not.toBeNull())
+    await waitFor(() => expect(unknownNotice('React')).not.toBeNull(), { timeout: 15_000 })
     const lost = unknownNotice('React') as HTMLElement
 
     plane.unreachable.add(connection)
@@ -315,11 +365,12 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
   // Signing out forgets the client, and the token with it: the page is back
   // at the question, with nothing filled in, and the forms are gone. The
   // button the keyboard was on went with them, so the keyboard goes to the
-  // question -- as opening the form takes it to the record token -- rather
-  // than to the top of the page, a whole page of Tabs from anything.
+  // question rather than to the top of the page, a whole page of Tabs from
+  // anything.
   test('Sign out goes back to the question, with the token forgotten', async () => {
     const user = await openForm(plane, formId)
     await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Forms' })).toBeNull())
     expect(screen.queryByRole('region', { name: 'React' })).toBeNull()
     expect((screen.getByLabelText('Host token') as HTMLInputElement).value).toBe('')
     expect(focusedName()).toBe('Host token')
@@ -327,10 +378,14 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
   })
 
   // The token is held in the client's closure and nowhere a script, an
-  // extension or the next person at the machine could read it back.
+  // extension or the next person at the machine could read it back. The
+  // browser keeps the viewer's two choices -- the renderer and the split --
+  // and nothing else (0047).
   test('the token is in no storage, no cookie, no address and nowhere in the document', async () => {
     await openForm(plane, formId)
-    expect(localStorage.length).toBe(0)
+    const kept = Object.keys(localStorage)
+    expect(kept.filter((key) => !(Object.values(PREFERENCES) as string[]).includes(key))).toEqual([])
+    expect(kept.map((key) => localStorage.getItem(key) ?? '').filter((value) => value.includes(TOKENS.clerk))).toEqual([])
     expect(sessionStorage.length).toBe(0)
     expect(document.cookie).toBe('')
     expect(window.location.href).not.toContain(TOKENS.clerk)

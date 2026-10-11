@@ -1,6 +1,6 @@
 import type { FormSchema } from '@formancy/spec'
 import { describe, expect, test } from 'vitest'
-import { drawLookupsAsTypeaheads } from './widgets.js'
+import { disableFields, drawLookupsAsTypeaheads } from './widgets.js'
 
 /** A form with one of each kind of select this host meets, and one text field. */
 function form(): FormSchema {
@@ -39,5 +39,19 @@ describe("the host's choice of control for a lookup", () => {
     const before = JSON.stringify(published)
     drawLookupsAsTypeaheads(published)
     expect(JSON.stringify(published)).toBe(before)
+  })
+})
+
+describe("the host's disabled fields", () => {
+  // A child's parent field, and every field of a record the person may only
+  // read, are drawn as the generator draws a field nothing may write: by a
+  // `disabled` rule. Added on the host's copy and nowhere else, and once.
+  test('adds a disabled rule for each field once, and leaves the published form alone', () => {
+    const published = { ...form(), logic: { rules: [{ target: 'status', kind: 'disabled', cel: 'true' }] } } as unknown as FormSchema
+    const before = JSON.stringify(published)
+    const drawn = disableFields(published, ['customer', 'status'])
+    expect(drawn.logic?.rules.map((rule) => `${rule.target} ${rule.kind} ${String(rule.cel)}`)).toEqual(['status disabled true', 'customer disabled true'])
+    expect(JSON.stringify(published)).toBe(before)
+    expect(disableFields(published, [])).toBe(published)
   })
 })

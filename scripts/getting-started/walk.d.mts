@@ -58,13 +58,14 @@ export declare const STUDIO: Readonly<{ token: string; signIn: string; steps: st
 export declare const STUDIO_STEPS: Readonly<{ connect: string; choose: string; generate: string; policy: string; publish: string }>
 export declare const HOST: Readonly<{
   token: string
-  formId: string
-  open: string
+  signIn: string
+  forms: string
   newRecord: string
   save: string
   created: string
   saved: string
   signOut: string
+  openByToken: string
   record: string
   load: string
   notFound: string

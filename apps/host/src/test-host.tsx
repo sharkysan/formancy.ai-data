@@ -13,7 +13,9 @@ import { TOKENS } from './test-plane.js'
  * How the suites drive the host page: as a person would, by role and
  * accessible name (formancy.ai 0034), against the real server behind
  * `plane.fetch`. Both panes are reached the same way, through the region
- * their heading names, so a helper here cannot favour one renderer.
+ * their heading names, so a helper here cannot favour one renderer -- with
+ * the renderer switch on Both, which is how the suites hold 0029's promise
+ * that both renderers behave the same (0047).
  */
 
 export type User = ReturnType<typeof userEvent.setup>
@@ -41,17 +43,65 @@ export function mount(fetch: typeof globalThis.fetch): User {
   return userEvent.setup()
 }
 
-/** Type a token and a form id into the sign-in form and open it. Nothing is waited for. */
-export async function signIn(user: User, token: string, formId: string): Promise<void> {
+const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** Type a token into the sign-in form and sign in. Nothing is waited for. */
+export async function signIn(user: User, token: string): Promise<void> {
   await user.type(screen.getByLabelText('Host token'), token)
-  await user.type(screen.getByLabelText('Form id'), formId)
-  await user.click(screen.getByRole('button', { name: 'Open the form' }))
+  await user.click(screen.getByRole('button', { name: 'Sign in' }))
 }
 
-/** The page, signed in as `token` with `formId` open, once both renderers have drawn it. */
+/** A form's link under Forms: named by its title, then its id. */
+export async function formLink(formId: string): Promise<HTMLElement> {
+  const nav = await screen.findByRole('navigation', { name: 'Forms' }, ARRIVES_WITHIN)
+  return within(nav).getByRole('link', { name: new RegExp(` ${escaped(formId)}$`) })
+}
+
+/** Choose a form under Forms, and wait until its Records grid has answered. */
+export async function chooseForm(user: User, formId: string): Promise<void> {
+  await user.click(await formLink(formId))
+  await screen.findByRole('heading', { level: 2, name: new RegExp(` ${escaped(formId)}$`) }, ARRIVES_WITHIN)
+  await answeredOnce('Records')
+}
+
+/** Wait until the status line of the grid named `heading` says something other than that it is loading. */
+export async function answeredOnce(heading: string): Promise<string> {
+  let said = ''
+  await waitFor(() => {
+    const status = within(gridSection(heading)).getAllByRole('status')[0]
+    said = status?.textContent ?? ''
+    expect(said === '' || /^Loading/.test(said), `the ${heading} grid still says "${said}"`).toBe(false)
+  }, ARRIVES_WITHIN)
+  return said
+}
+
+/** The section a grid's heading names: the Records panel, or a child section. */
+export function gridSection(heading: string): HTMLElement {
+  return screen.getByRole('region', { name: heading })
+}
+
+/** The renderer switch set to `choice`: Both, so every helper below finds both panes. */
+export async function chooseRenderer(user: User, choice: 'React' | 'Angular' | 'Both' = 'Both'): Promise<void> {
+  const radio = screen.getByRole('radio', { name: choice })
+  if (!(radio as HTMLInputElement).checked) await user.click(radio)
+}
+
+/**
+ * The page, signed in as `token`, with `formId` chosen under Forms, both
+ * renderers on, and New record pressed: the form open in both panes for a
+ * new record, once both renderers have drawn it.
+ */
 export async function openForm(plane: Plane, formId: string, token: string = TOKENS.clerk): Promise<User> {
-  const user = mount(plane.fetch)
-  await signIn(user, token, formId)
+  return openWith(plane.fetch, formId, token)
+}
+
+/** `openForm`, with the page given `fetch`: one that holds or loses writes. */
+export async function openWith(fetch: typeof globalThis.fetch, formId: string, token: string = TOKENS.clerk): Promise<User> {
+  const user = mount(fetch)
+  await signIn(user, token)
+  await chooseForm(user, formId)
+  await chooseRenderer(user)
+  await newRecord(user)
   await rendered()
   return user
 }
@@ -136,13 +186,79 @@ export function unknownNotice(renderer: RendererName): HTMLElement | null {
   return within(pane(renderer)).queryByRole('region', { name: `${renderer} It may have been saved` })
 }
 
-/** Load a record into both panes through the record bar. Nothing is waited for: the caller says what it expects to see. */
+/** Open the record-token tool if it is closed. */
+export async function openTokenTool(user: User): Promise<void> {
+  const disclosure = screen.getByRole('button', { name: 'Open by record token' })
+  if (disclosure.getAttribute('aria-expanded') !== 'true') await user.click(disclosure)
+}
+
+/** Load a record into both panes by its token. Nothing is waited for: the caller says what it expects to see. */
 export async function load(user: User, record: string): Promise<void> {
-  const bar = screen.getByRole('region', { name: 'Record' })
-  const box = within(bar).getByRole('textbox', { name: 'Record token' })
+  await openTokenTool(user)
+  const box = screen.getByRole('textbox', { name: 'Record token' })
   await user.clear(box)
   await user.type(box, record)
-  await user.click(within(bar).getByRole('button', { name: 'Load' }))
+  await user.click(screen.getByRole('button', { name: 'Load' }))
+}
+
+/**
+ * Wait until the detail says `record` was loaded. A pane already showing the
+ * record -- one that followed a create in the other pane (0047) -- is no sign
+ * that the Load has answered, and what is typed before it does is asked
+ * about when it does.
+ */
+export async function loaded(record: string, title = 'Order'): Promise<void> {
+  await waitFor(() => expect(within(screen.getByRole('region', { name: `${title} ${record}` })).getAllByRole('status')[0]?.textContent).toMatch(new RegExp(`^Loaded record ${escaped(record)} into `)), ARRIVES_WITHIN)
+}
+
+/**
+ * Words only the records one test makes carry, written into their notes, so
+ * the test finds them as a person finds what they made: by searching for
+ * it. A page holds `LIST_PAGE_SIZE` rows in key order, and every file adds
+ * its orders to the one database the run shares, in an order nothing fixes
+ * -- so a new row looked for on the first page unsearched is there or not by
+ * how many orders other files made first (PR #57's CI: the first page held
+ * fifty older orders). Letters among the digits, so no integer column's
+ * digits contain them, and nothing a LIKE pattern reads.
+ */
+export function stamp(prefix: string): string {
+  return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+}
+
+/** The first cell of every data row in the Records grid: a record's key, as the grid shows it. */
+export function recordKeys(): string[] {
+  const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
+  return within(grid)
+    .getAllByRole('row')
+    .flatMap((row) => {
+      const cells = within(row).queryAllByRole('gridcell')
+      return cells.length === 0 ? [] : [cells[0]?.textContent ?? '']
+    })
+}
+
+/**
+ * Search the Records grid for `words`, typed into Search and submitted, and
+ * wait until it lists exactly the records `keys` names, in order: the page
+ * the search asked for, and not the one it replaces, whose rows a test could
+ * otherwise click as they went.
+ */
+export async function searchRecords(user: User, words: string, keys: readonly string[]): Promise<void> {
+  const search = screen.getByRole('search', { name: 'Search records' })
+  const box = within(search).getByRole('textbox', { name: 'Search' })
+  await user.clear(box)
+  await user.type(box, words)
+  await user.click(within(search).getByRole('button', { name: 'Search' }))
+  await waitFor(() => expect({ words, keys: recordKeys() }).toEqual({ words, keys }), ARRIVES_WITHIN)
+}
+
+/** Press New record in the Records panel: both panes empty for a new record. Nothing is waited for. */
+export async function newRecord(user: User): Promise<void> {
+  await user.click(within(gridSection('Records')).getByRole('button', { name: 'New record' }))
+}
+
+/** The unsaved-changes notice, or null when the page is not asking. */
+export function unsavedNotice(): HTMLElement | null {
+  return screen.queryByRole('region', { name: 'Unsaved changes' })
 }
 
 /** The roles ARIA gives a control a person answers with, as the examples page lists them. */

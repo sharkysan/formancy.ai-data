@@ -15,6 +15,8 @@
         { "file": "apps/host/src/journey.test.tsx" },
         { "file": "apps/host/src/stale.test.tsx" },
         { "file": "apps/host/src/in-flight.test.tsx" },
+        { "file": "apps/host/src/workspace.test.tsx" },
+        { "file": "apps/host/src/children.test.tsx" },
         { "file": "apps/examples/src/previews.test.tsx" },
         { "browserGate": "apps/examples" },
         { "browserGate": "apps/host" }

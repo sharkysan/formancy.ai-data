@@ -50,7 +50,8 @@ describe('the widest breakpoint', () => {
   // widest max-width would picture the narrow one under a wide caption.
   test("is read from each app's stylesheet as its gate inlines it", () => {
     expect(widestBreakpoint(stylesheet(join(REPO, 'apps', 'studio', 'src'), 'studio.css'), 'studio.css')).toBe(1024)
-    expect(widestBreakpoint(stylesheet(join(REPO, 'apps', 'host', 'src'), 'host.css'), 'host.css')).toBe(1024)
+    // The workspace's widest tier, 80rem, where Forms turns from a sidebar into tabs (0047).
+    expect(widestBreakpoint(stylesheet(join(REPO, 'apps', 'host', 'src'), 'host.css'), 'host.css')).toBe(1280)
     expect(widestBreakpoint(stylesheet(join(REPO, 'apps', 'examples', 'src'), 'app.css'), 'app.css')).toBe(1280)
   })
 

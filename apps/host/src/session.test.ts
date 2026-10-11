@@ -278,6 +278,10 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     const record = String(session.state().record)
     expect(result).toEqual({ kind: 'created', message: `Created record ${record}. Changes made while it was saving are still in the form, not saved.` })
     expect(engine.value()).toMatchObject({ amount: '7.0000', notes: 'typed while saving' })
+    // What another pane opens once this one created the record (0047): the
+    // record as stored, never the words typed since, which are this form's
+    // alone (watched failing with the engine's answers handed over).
+    expect(session.saved()).toEqual({ record, version: session.state().version, answers: expect.objectContaining({ amount: '7.0000', notes: 'first' }) })
 
     // And the next press sends them, as an update from the version just made.
     const next = session.save(submitted(session, {}))
@@ -285,6 +289,34 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     holding.answer()
     expect(await next).toEqual({ kind: 'saved', message: 'Saved.' })
     expect((await stored(formId, record)).answers['notes']).toBe('typed while saving')
+  })
+
+  // What the workspace's guard asks a session (0047), through a real save: a
+  // save still out is work leaving would lose; once it is answered, the
+  // stored spelling is what the form holds, so "12.5" shown as "12.5000" is
+  // no change -- but what was typed while it was out still is. A guard that
+  // compared with what the form was opened with would ask about every saved
+  // form; one that ignored a save in flight would drop its answer silently.
+  test('says a save still out is work, and after it only what was typed meanwhile', async () => {
+    const { session, holding } = await heldSession(formId)
+    const { engine } = session.opened()
+    expect(session.work()).toBeNull()
+    const first = session.save(submitted(session, { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '12.5' }))
+    await writesHeld(holding, 1)
+    expect(session.work()).toBe('saving')
+    holding.answer()
+    expect(await first).toMatchObject({ kind: 'created' })
+    expect(engine.value()).toMatchObject({ amount: '12.5000' })
+    expect(session.work()).toBeNull()
+
+    const second = session.save(submitted(session, { notes: 'sent' }))
+    await writesHeld(holding, 1)
+    engine.setValue(['status'], 'shipped')
+    holding.answer()
+    expect(await second).toMatchObject({ kind: 'saved' })
+    expect(session.work()).toBe('changed')
+    engine.setValue(['status'], 'placed')
+    expect(session.work()).toBeNull()
   })
 
   // New (or Load) while a create is in flight: the new form is not the old
@@ -393,6 +425,23 @@ describe.each(ENGINES)('a save whose answer is lost, on $engine (0031)', ({ form
     expect(session.unknown()).toBeUndefined()
     expect(await session.check()).toMatchObject({ ok: false, code: 'nothing-to-check' })
     expect(await session.save(submitted(session, { customer: pick, order_date: EDGES.orderDate, status: 'placed', amount: '23' }))).toMatchObject({ kind: 'created' })
+  })
+
+  // A save whose outcome is unknown is the work the guard must not let go
+  // unasked (0031, 0047): it may have been stored, and only its check can
+  // say. Discarding it is the person's decision, and opens the form as it
+  // was read, with nothing held and nothing to check.
+  test('a lost save is unknown work until the form is discarded', async () => {
+    const reader = await losingSession(formId, 'after')
+    const loaded = await freshOrder(formId, reader.session, 'before a lost save, discarded')
+    const { session } = await losingSession(formId, 'after', loaded)
+    expect(await session.save(submitted(session, { notes: `lost, then discarded ${connection} ${String(Date.now())}` }))).toMatchObject({ kind: 'unknown' })
+    expect(session.work()).toBe('unknown')
+    session.discard()
+    expect(session.work()).toBeNull()
+    expect(session.unknown()).toBeUndefined()
+    expect(session.state()).toEqual({ record: loaded.record, version: loaded.version, operation: 'update' })
+    expect((session.opened().engine.value() as Record<string, unknown>)['notes']).toBe('before a lost save, discarded')
   })
 
   // An update lost after it was stored holds nothing -- its version makes a

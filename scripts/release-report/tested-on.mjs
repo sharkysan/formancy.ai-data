@@ -34,6 +34,8 @@ const TOOLING = [
   { name: 'jsdom', apps: true },
   { name: 'react', apps: true },
   { name: '@angular/core', apps: true },
+  // The host page's grids (0047): pinned exactly, ag-grid-react with it (apps/host/src/grid-pin.test.ts).
+  { name: 'ag-grid-community', apps: true },
   { name: 'axe-core', apps: true },
   { name: 'typescript', dir: '.' },
   { name: 'vitest', dir: '.' },

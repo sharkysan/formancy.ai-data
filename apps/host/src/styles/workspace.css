@@ -1,0 +1,416 @@
+/* ---------------------------------------------------------- the workspace
+ *
+ * UX-SPEC.md §3-§5, applied (0047). Room variables and color-mix() of them
+ * only, and the room's one literal ink (#06050d). Every rule that names an
+ * element ends in :where(:not(.sheet *, .grid-bench *)), and nothing here
+ * selects inside .sheet or .grid-bench: the paper is Blueprint's and the
+ * grid is its theme's (grid-theme.ts).
+ *
+ * The shell's heights are fixed so the sticky panels sit exactly where they
+ * are drawn: the app bar 3.5rem, the form header 2.5rem, gaps 0.75rem. The
+ * Records panel, the detail and the children are in records.css.
+ */
+
+/* Signed in, the page's scrollbar keeps its place whether or not the page
+   scrolls, so a notice or a longer record never shifts the workspace
+   sideways. The sign-in page does not scroll and keeps no empty gutter. */
+html:has(.page.in):where(:not(.sheet *, .grid-bench *)) {
+  scrollbar-gutter: stable;
+}
+
+/* `hidden` means hidden, whatever display a class gives the element. */
+[hidden]:where(:not(.sheet *, .grid-bench *)) {
+  display: none !important;
+}
+
+/* Colour only, 150 ms, for the host's own controls. Not motion. */
+.button,
+.primary,
+.form-link,
+.segment,
+.disclosure {
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.button:active {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.primary:active {
+  background: color-mix(in srgb, var(--client) 88%, var(--ground));
+}
+
+/* A control that would do nothing here: said by its look, and by
+   aria-disabled rather than `disabled`, which would drop the keyboard (0029). */
+.button[aria-disabled='true'] {
+  border-style: dashed;
+  border-color: var(--edge-strong);
+  background: transparent;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.button[aria-disabled='true']:hover {
+  border-color: var(--edge-strong);
+}
+
+/* The one data-losing control on the page: an outline, never a fill. */
+.button.danger {
+  border-color: var(--invalid);
+  color: var(--invalid);
+}
+
+.button.danger:hover {
+  border-color: var(--invalid);
+  background: color-mix(in srgb, var(--invalid) 10%, transparent);
+}
+
+/* A heading the keyboard is moved to: where the next Tab starts, clear of
+   the window's edge. Its ring is the room's :focus-visible one. */
+:is(h2, h3, h4, h5):where([tabindex='-1']):where(:not(.sheet *, .grid-bench *)) {
+  scroll-margin-block-start: 1rem;
+}
+
+/* ---------------------------------------------------- nav column and main */
+
+.workspace {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 0 1.25rem;
+  align-items: start;
+  padding-top: 0.75rem;
+}
+
+main.workspace-main:where(:not(.sheet *, .grid-bench *)) {
+  gap: 0.75rem;
+  align-content: start;
+}
+
+/* Forms: a flat sidebar, 15rem, sticky at the place it is drawn so it never
+   moves, and as tall as the window below the app bar, so Sign out stays at
+   its foot. A long menu scrolls inside its list. */
+.forms {
+  position: sticky;
+  top: 4.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: calc(100dvh - 4.25rem);
+  padding: 0.25rem 1rem 1rem 0;
+  border-inline-end: 1px solid var(--edge);
+}
+
+.forms-heading {
+  margin: 0.25rem 0 0 0.75rem;
+  font-weight: 500;
+}
+
+.forms-list {
+  display: grid;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 0.125rem;
+  min-height: 0;
+  margin: 0;
+  padding: 4px;
+  overflow: auto;
+  list-style: none;
+}
+
+.form-link {
+  display: grid;
+  gap: 0.125rem;
+  align-content: center;
+  min-height: 2.75rem;
+  padding: 0.375rem 0.75rem 0.375rem calc(0.75rem + 3px);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.9375rem;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.form-link code {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.form-link:hover {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+/* The open form: a tint, weight, and a bar. The bar is a real border, so it
+   is a shape in forced colours too, where a shadow is dropped. */
+.form-link[aria-current='page'] {
+  padding-inline-start: 0.75rem;
+  border-inline-start: 3px solid var(--client);
+  border-start-start-radius: 2px;
+  border-end-start-radius: 2px;
+  background: color-mix(in srgb, var(--client) 16%, transparent);
+  font-weight: 600;
+}
+
+.forms-foot {
+  padding: 0.75rem 0 0 4px;
+  border-top: 1px solid var(--edge);
+}
+
+.forms-foot .button {
+  justify-content: center;
+  width: 100%;
+}
+
+.forms .status {
+  margin: 0 0 0 0.75rem;
+}
+
+/* --------------------------------------------------- form header and choices */
+
+.form-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  min-height: 2.5rem;
+}
+
+.form-id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  min-width: 0;
+}
+
+.form-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.125rem 0.625rem;
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.form-title code {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* What this person may do with the form: tags, not buttons -- a fill and no
+   border, so they are never mistaken for controls. */
+.ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ops li {
+  padding: 0 0.5rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.375rem;
+}
+
+.choice {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choice legend {
+  float: left;
+  margin: 0 0.75rem 0 0;
+  padding: 0;
+  line-height: 2.5rem;
+}
+
+/* One choice of a few: a single track with the options flush inside it, the
+   checked one filled. Native radios laid over each option, so arrows move
+   the choice and the group is one Tab stop. The checked option's transparent
+   border is what forced colours draw, so it differs there too. */
+.segmented {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid var(--edge-strong);
+  border-radius: 999px;
+}
+
+.segment {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: calc(2.5rem - 8px);
+  padding: 0 calc(0.875rem + 2px);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segment input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+}
+
+.segment:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.segment:has(input:checked) {
+  padding: 0 0.875rem;
+  border: 2px solid transparent;
+  background: var(--client);
+  color: #06050d;
+}
+
+.segment:has(input:focus-visible) {
+  outline: 2px solid var(--server);
+  outline-offset: 2px;
+}
+
+.layout-note {
+  clear: both;
+  margin: 0.375rem 0 0;
+}
+
+/* ------------------------------------------------------ the unsaved notice
+ * Compact: the heading and what was asked on one line, the forms under it,
+ * the two answers at the end of the row. */
+
+.unsaved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.625rem 1rem;
+  scroll-margin-block-start: 1rem;
+}
+
+.unsaved-text {
+  flex: 1 1 24rem;
+  min-width: 0;
+}
+
+.unsaved-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.5rem;
+}
+
+.unsaved .notice-heading,
+.unsaved .notice-text {
+  margin: 0;
+}
+
+.unsaved ul {
+  margin: 0.125rem 0 0;
+  padding-inline-start: 1.25rem;
+}
+
+.unsaved .notice-actions {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+/* --------------------------------------------------------- panels and lanes */
+
+.panel {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--edge-strong);
+  border-radius: 16px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 5%) inset,
+    0 30px 70px -40px rgb(0 0 0 / 90%);
+}
+
+.section-heading {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.section-heading code {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.lanes {
+  display: grid;
+  gap: 0.75rem;
+  align-items: start;
+  min-width: 0;
+}
+
+/* Side by side: the records and the record, at the viewer's split, with the
+   separator between them. */
+.lanes[data-layout='side-by-side'] {
+  grid-template-columns: minmax(0, var(--records-share, 55fr)) 0.75rem minmax(0, var(--record-share, 45fr));
+  gap: 0.75rem 0;
+}
+
+.split {
+  align-self: stretch;
+  position: sticky;
+  top: 7.5rem;
+  height: calc(100dvh - 8.25rem);
+  min-height: 7rem;
+  border-radius: 999px;
+  background: linear-gradient(var(--edge-strong), var(--edge-strong)) center / 2px 100% no-repeat;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.split:hover {
+  background-image: linear-gradient(var(--client), var(--client));
+}
+
+.detail {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  align-content: start;
+}
+
+.nothing {
+  display: grid;
+  gap: 0.25rem;
+}

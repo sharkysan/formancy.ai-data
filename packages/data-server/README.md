@@ -65,6 +65,11 @@ existed would be documented and inert.
 - **`parseConnections` and `createConnectionRegistry`** — the allowlist of
   databases a form may bind to, with secret references for passwords, opened
   lazily through driver factories the composition root supplies.
+- **`ROUTE_OPERATIONS`** and the type **`RuntimeOperation`** — the runtime
+  plane's routes, `METHOD url`, each with the name its audit event gives it:
+  what a host is allowed to send, which the host page's suite holds every
+  request of its journey to
+  ([0047](../../docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
 
 - **The administrator's plane** — connections, discovery, proposals,
   publication and drift, for a host token holding an administrator role

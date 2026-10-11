@@ -598,7 +598,7 @@
       ]
     },
     "0029": {
-      "reviewed": "sha256:b92dc8ec382dde2cff82f5b0a49df3c383ece0b6b1940cc7508065a92b58abad",
+      "reviewed": "sha256:5b24f1af14b256867e06ffea3c2ce9b4cf77cfa2d8ff18b598601b6c0ea3deff",
       "limitations": [
         {
           "area": "host",
@@ -688,7 +688,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:435c952bf7ccaee062f9ce86bc8c1cb3baec412046603966ce36f892776daa80",
+      "reviewed": "sha256:5dff2edcd33401101f3c7089ecb1eb94d36ee18b9ca2c10d69b40c58b59cf159",
       "limitations": [
         {
           "area": "writes",
@@ -1327,6 +1327,58 @@
         {
           "area": "operations",
           "says": "The third-party notices at /studio/THIRD-PARTY-NOTICES.txt and /host/THIRD-PARTY-NOTICES.txt name the exact version of every package each page bundles, to anyone who reaches the web front."
+        }
+      ]
+    },
+    "0047": {
+      "reviewed": "sha256:160f29aea91a9d44e6515364d4e7094ddcb1ede5cacb3a36d977f0ba4a293359",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "The host page's grids are React's, AG Grid Community pinned to one release, and show a page at a time with no total.",
+          "heldBy": "apps/host/src/grid-pin.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A record is never in the host page's address: a reload or a shared link opens the form and its layout, not the record.",
+          "heldBy": "apps/host/src/address.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "On the host page, leaving unsaved work -- another row, New record, Load, another form, Back, Sign out, a child row, hiding a renderer -- asks first; a browser reload or a closed tab does not.",
+          "heldBy": "apps/host/src/leaving.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A child row's parent is fixed only on the host page: the server checks only that it is one the person may reference."
+        },
+        {
+          "area": "host",
+          "says": "A form a person may only read still draws Save on the host page: its fields are disabled, and the server refuses the update."
+        },
+        {
+          "area": "host",
+          "says": "AG Grid's focused cell is a one-pixel border that forced colours do not draw, and a focused cell's change of state is not announced."
+        },
+        {
+          "area": "host",
+          "says": "The host page's workspace, AG Grid in it, is a chunk of about a megabyte minified and 300 kB gzipped, loaded after sign-in: measured once, on 2026-10-11."
+        },
+        {
+          "area": "host",
+          "says": "The renderer choice and the split are kept in each viewer's browser, so a shared machine keeps the last viewer's."
+        },
+        {
+          "area": "host",
+          "says": "The host page's grid columns are sized to their content -- the first page's, and the rows shown each time the split is let go -- and never stretched to the lane's width, so a wider lane leaves its space at the end."
+        },
+        {
+          "area": "testing",
+          "says": "The host gate decides what axe cannot inside a grid on the pixels Chromium painted, and accepts columns past the window's edge inside a grid's own scroller while the grid's well stays inside the window."
+        },
+        {
+          "area": "operations",
+          "says": "The composed stack's order form account may not read sales.order_line, so the getting-started guide and the README's pictures show no child grid."
         }
       ]
     },

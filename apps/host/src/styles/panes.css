@@ -1,19 +1,32 @@
 /* ------------------------------------------------------------- the panes */
 
-/* React and Angular side by side where there is room for both, stacked on a
-   narrow screen. `minmax(0, …)`, so nothing on the paper -- a long token in
-   the customer box -- can make the page scroll sideways. */
+/* The chosen renderer's form, or both side by side wherever each gets
+   26rem, stacked otherwise: auto-fit, not a breakpoint. `min(100%, ...)`, so
+   nothing on the paper -- a long token in the customer box -- can make the
+   page scroll sideways. */
 .panes {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+  gap: 1rem 0.75rem;
   align-items: start;
 }
 
+/* No card around a pane: the paper is the surface. What the host says about
+   the pane -- which renderer, what the server did with a save -- sits on the
+   bench directly above its sheet. */
 .pane {
   display: grid;
-  gap: 0.75rem;
-  padding: 1rem;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.pane-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.125rem 0.75rem;
+  min-height: 1.5rem;
+  padding-inline: 0.25rem;
 }
 
 .pane-heading {
@@ -26,15 +39,25 @@
   text-transform: uppercase;
 }
 
-/* What the server did with a save: teal. Empty, it takes no room. */
+/* What the server did with a save: teal. A refusal is warm, as every refusal
+   on the page is; a save still out is muted. Empty, it takes no room. */
 .saved {
+  flex: 1 1 12rem;
   margin: 0;
   color: var(--server);
   font-size: 0.875rem;
 }
 
+.saved[data-kind='refused'] {
+  color: var(--warn);
+}
+
+.saved[data-kind='pending'] {
+  color: var(--muted);
+}
+
 .saved:empty {
-  margin-block: -0.375rem;
+  display: none;
 }
 
 /* A save the server refused: the warm colour of something to look at. The
@@ -45,6 +68,12 @@
   border-radius: 10px;
   background: color-mix(in srgb, var(--warn) 8%, transparent);
   font-size: 0.875rem;
+}
+
+/* A notice that takes focus has its own frame; a ring around it would be a
+   second one. The focus move is the cue, as it is for a heading. */
+.notice:focus {
+  outline: none;
 }
 
 .notice-heading {

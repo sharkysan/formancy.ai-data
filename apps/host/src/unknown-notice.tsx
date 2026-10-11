@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement, RefObject } from 'react'
 import type { FormRecord, Reconciliation } from '@formancy/data-client'
 import type { Session } from './session.js'
+import { NoticeHeading } from './words.js'
 
 /** What the notice says once "Enter it again anyway" has been confirmed. */
 export const ALLOWED = 'Press Save to enter it again.'
@@ -48,6 +49,7 @@ export function UnknownNotice({
   message,
   label,
   noticeId,
+  noticeLevel,
   noticeRef,
   onLoad,
 }: {
@@ -56,6 +58,7 @@ export function UnknownNotice({
   /** The ids that name the region: the pane's heading, then the notice's. */
   label: string
   noticeId: string
+  noticeLevel: 4 | 6
   noticeRef: RefObject<HTMLDivElement | null>
   onLoad: (record: FormRecord) => void
 }): ReactElement {
@@ -85,9 +88,9 @@ export function UnknownNotice({
   const current = found?.current
   return (
     <div role="region" aria-labelledby={label} tabIndex={-1} ref={noticeRef} className="notice" data-kind="unknown">
-      <h3 id={noticeId} className="notice-heading">
+      <NoticeHeading level={noticeLevel} id={noticeId}>
         It may have been saved
-      </h3>
+      </NoticeHeading>
       <p className="notice-text">{message}</p>
       <p role="status" className="notice-text">
         {allowed ? ALLOWED : (found?.text ?? '')}

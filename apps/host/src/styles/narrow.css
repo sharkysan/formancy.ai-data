@@ -1,8 +1,137 @@
-/* ------------------------------------------------------- narrow screens */
+/* ------------------------------------------------ the tiers (UX-SPEC.md §3, 0047)
+ *
+ * Only `@media (max-width: Nrem)`: the one form the browser gate reads.
+ * Medium <= 80rem: the Forms sidebar becomes a row of tabs under the app bar.
+ * Narrow <= 56rem: Side by side is drawn stacked, and the Layout group says so.
+ * Phone  <= 40rem: the host's existing tier; gutters tighten, targets grow.
+ * Last in the cascade, so its rules win.
+ */
 
-@media (max-width: 64rem) {
-  .panes {
+@media (max-width: 80rem) {
+  .workspace {
     grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+    padding-top: 0;
+  }
+
+  /* Tabs: the open form underlined in violet and tinted (plugin, Active
+     State: "color/underline"). The underline is a real border, so forced
+     colours draw it. */
+  .forms {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0 0.25rem;
+    height: auto;
+    padding: 0;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--edge);
+  }
+
+  .forms-heading {
+    align-self: center;
+    margin: 0 0.5rem 0 0.25rem;
+  }
+
+  .forms-list {
+    display: flex;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    gap: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .form-link,
+  .form-link[aria-current='page'] {
+    display: flex;
+    align-items: center;
+    gap: 0 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 0.75rem 2px;
+    border: 0;
+    border-radius: 8px 8px 0 0;
+    white-space: nowrap;
+  }
+
+  .form-link[aria-current='page'] {
+    padding-bottom: 0;
+    border-bottom: 2px solid var(--client);
+  }
+
+  /* Leaving is apart from choosing: at the band's end. */
+  .forms-foot {
+    align-self: center;
+    margin-inline-start: auto;
+    padding: 0.25rem 0;
+    border-top: 0;
+  }
+
+  .forms-foot .button {
+    width: auto;
+  }
+
+  .forms .status {
+    flex-basis: 100%;
+  }
+
+  /* The tabs sit between the app bar and main: the sticky panel starts lower. */
+  .lanes[data-layout='side-by-side'] > .master {
+    top: 10.25rem;
+    max-height: calc(100dvh - 11rem);
+  }
+
+  .lanes[data-layout='separate'] > .master {
+    max-height: calc(100dvh - 11rem);
+  }
+
+  .lanes[data-layout='side-by-side'] .detail-head[data-empty] {
+    min-height: calc(100dvh - 11rem);
+  }
+
+  .split {
+    top: 10.25rem;
+    height: calc(100dvh - 11rem);
+  }
+}
+
+@media (max-width: 56rem) {
+  .lanes[data-layout='side-by-side'] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  /* Drawn stacked: there is nothing to split. */
+  .split {
+    display: none;
+  }
+
+  .lanes[data-layout='side-by-side'] > .master,
+  .lanes[data-layout='separate'] > .master {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .lanes[data-layout='side-by-side'] .grid-bench.master-bench {
+    flex: none;
+    max-height: clamp(14rem, 50dvh, 30rem);
+  }
+
+  /* The records view alone: as tall as the window below the panel's top. */
+  .lanes[data-layout='separate'] .grid-bench.master-bench {
+    flex: none;
+    max-height: clamp(16rem, 100dvh - 27rem, 56rem);
+  }
+
+  .lanes[data-layout='side-by-side'] .detail-head[data-empty] {
+    min-height: 0;
+  }
+
+  .form-head {
+    display: grid;
+    align-items: start;
   }
 }
 
@@ -12,8 +141,8 @@
     padding: 0.5rem;
   }
 
-  main:where(:not(.sheet *)) {
-    gap: 0.5rem;
+  .page.in {
+    padding-top: 0;
   }
 
   .masthead,
@@ -21,16 +150,123 @@
     padding: 1rem;
   }
 
-  .pane {
+  .masthead.appbar {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+    padding: 0.375rem 0.125rem;
+  }
+
+  .masthead.appbar h1:where(:not(.sheet *, .grid-bench *)) {
+    font-size: 1rem;
+  }
+
+  main:where(:not(.sheet *, .grid-bench *)) {
+    gap: 0.5rem;
+  }
+
+  .panel,
+  .child {
     padding: 0.75rem;
   }
 
-  .record-form {
-    grid-template-columns: minmax(0, 1fr);
+  .workspace,
+  .lanes {
+    gap: 0.5rem;
   }
 
-  .record-form .actions {
-    margin-top: 0;
+  .detail {
+    gap: 0.75rem;
+  }
+
+  /* The tabs: the title alone is drawn. The id stays in the link's name
+     ("Order pg-order"), which still starts with what is drawn (WCAG 2.5.3). */
+  .form-link,
+  .form-link[aria-current='page'] {
+    padding-inline: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .form-link code {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .forms-list li {
+    position: relative;
+  }
+
+  /* Touch: every control 44px tall (plugin, `touch-target-size`). */
+  .button,
+  .primary,
+  input:where(:not(.sheet *, .grid-bench *)) {
+    min-height: 2.75rem;
+  }
+
+  .segment {
+    min-height: calc(2.75rem - 8px);
+  }
+
+  .status-cell .button {
+    min-height: 2.75rem;
+  }
+
+  .form-title {
+    font-size: 1.25rem;
+  }
+
+  .choice legend {
+    float: none;
+    display: block;
+    margin-bottom: 0.25rem;
+    line-height: 1.5;
+  }
+
+  /* One row at 320 too, with the page's scrollbar gutter kept: measured,
+     the three layouts at the room's 0.875rem ran 5px past the content. */
+  .segment,
+  .segment:has(input:checked) {
+    padding-inline: 0.5rem;
+    font-size: 0.8125rem;
+  }
+
+  .segment:not(:has(input:checked)) {
+    padding-inline: calc(0.5rem + 2px);
+  }
+
+  .search-block {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .lanes[data-layout='separate'] .grid-bench.master-bench {
+    max-height: clamp(14rem, 100dvh - 30rem, 56rem);
+  }
+
+  .record-bar {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0;
+  }
+
+  .record-bar .button {
+    justify-self: start;
+  }
+
+  .status-cell {
+    flex-basis: 100%;
+  }
+
+  .unsaved .notice-actions {
+    flex-basis: 100%;
+  }
+
+  .child-detail {
+    padding-inline-start: 0.625rem;
   }
 
   .sheet {

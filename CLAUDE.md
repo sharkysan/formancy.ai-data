@@ -184,9 +184,12 @@ under both renderers
 the second is `apps/studio`, the administrator's application over the
 server's administrator plane
 ([0024](docs/decisions/0024-the-studio-speaks-only-the-admin-plane.md)); the
-third is `apps/host`, a host application's page over the runtime plane, one
-published form under both renderers
-([0029](docs/decisions/0029-a-host-renders-a-published-form-through-one-client.md)).
+third is `apps/host`, a host application's workspace over the runtime plane:
+the forms a person may read, a page of a form's records in an AG Grid
+Community grid with search, and the open record's form with its child rows,
+under React, Angular or both
+([0029](docs/decisions/0029-a-host-renders-a-published-form-through-one-client.md),
+[0047](docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
 All three, and the landing page when it arrives, are formancy.ai's concept
 applied, not a new one:
 

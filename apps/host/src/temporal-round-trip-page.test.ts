@@ -8,7 +8,7 @@ import { createConnectionRegistry, createDataServer, createFileConfigurationStor
 import type { ConnectionConfig, IdentityVerifier } from '@formancy/data-server'
 import mssql from 'mssql'
 import { afterAll, afterEach, beforeAll, describe, expect, inject, test } from 'vitest'
-import { load, mount, pane, RENDERERS, signIn, statuses } from './test-host.js'
+import { chooseForm, chooseRenderer, load, mount, pane, RENDERERS, signIn, statuses } from './test-host.js'
 import type { RendererName, User } from './test-host.js'
 import type { Engine, Held, Owners, Sent } from './test-stamped.js'
 import { connectOwners, createStamped, dropStamped, ENGINE_NAME, fetchThrough, heldStamped, holdsFraction, insertStamped, updatesIn } from './test-stamped.js'
@@ -205,13 +205,12 @@ async function insertDefaulted(engine: Engine): Promise<{ record: string; before
   return { record, before }
 }
 
-/** Sign in, open the form, load `record` into both panes, and wait until both show it. */
+/** Sign in, choose the form, both renderers on, load `record` into both panes, and wait until both show it. */
 async function openRecord(id: string, record: string): Promise<User> {
   const user = mount(fetchThroughServer)
-  await signIn(user, TOKENS.clerk, id)
-  await waitFor(() => {
-    for (const renderer of RENDERERS) expect(within(paper(renderer)).queryByLabelText('Note', { exact: true })).not.toBeNull()
-  }, ARRIVES)
+  await signIn(user, TOKENS.clerk)
+  await chooseForm(user, id)
+  await chooseRenderer(user)
   await load(user, record)
   await waitFor(() => {
     for (const renderer of RENDERERS) expect(control(renderer, 'Note').value).toBe('as inserted')

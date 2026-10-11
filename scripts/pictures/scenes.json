@@ -3,15 +3,14 @@
     "id": "host-loaded",
     "app": "host",
     "placement": "hero",
-    "title": "One record, both renderers",
-    "caption": "`pg-order`, generated from `sales.order` on PostgreSQL as the order form's own account, published through the administrator plane, and drawn by `@formancy/react` and `@formancy/angular` from one definition through `@formancy/data-client`. The order's id, “9007199254740993”, is 2^53+1, which a JavaScript number reads back as …992, and its amount, “99999999999999.9999”, is the largest `numeric(18,4)` holds. Both panes show both digit for digit, because exact values travel as strings ([0008](./docs/decisions/0008-exact-values-travel-as-strings.md)).",
-    "alt": "The host page's record bar saying “Loaded record k1:9007199254740993 into both forms.”, a line saying of pg-order that “you may read, create and update records with this form.” beside a Sign out button, and below them the same order form twice, React on the left and Angular on the right, each showing customer “Muster AG”, id 9007199254740993 and amount 99999999999999.9999.",
+    "title": "One record, both renderers, in the workspace",
+    "caption": "`pg-order`, generated from `sales.order` on PostgreSQL as the order form's own account and published through the administrator plane, in the host page's workspace: the forms the person may read, the form's records in an AG Grid Community grid, and the open record drawn by `@formancy/react` and `@formancy/angular` from one definition through `@formancy/data-client` ([0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)). The order's id, “9007199254740993”, is 2^53+1, which a JavaScript number reads back as …992, and its amount, “99999999999999.9999”, is the largest `numeric(18,4)` holds. Both panes show both digit for digit, because exact values travel as strings ([0008](./docs/decisions/0008-exact-values-travel-as-strings.md)).",
+    "alt": "The host page's workspace: Forms naming pg-order, the Records grid with the order 9007199254740993 open, and below it the record, loaded “into both forms.”: the same order form twice, React and Angular, each showing customer “Muster AG”, id 9007199254740993 and amount 99999999999999.9999.",
     "quotes": {
-      "9007199254740993": ["React", "Angular"],
-      "99999999999999.9999": ["React", "Angular"],
-      "Muster AG": ["React", "Angular"],
-      "Loaded record k1:9007199254740993 into both forms.": ["Record"],
-      "you may read, create and update records with this form.": ["Allowed"]
+      "9007199254740993": ["Workspace"],
+      "99999999999999.9999": ["Workspace"],
+      "Muster AG": ["Workspace"],
+      "into both forms.": ["Workspace"]
     }
   },
   {
@@ -245,6 +244,20 @@
     }
   },
   {
+    "id": "host-unsaved",
+    "app": "host",
+    "placement": "more",
+    "title": "Leaving unsaved work",
+    "caption": "The save whose answer was lost, above, is work a person could lose: New record would drop the form that holds it, so the workspace asks first. It names what was asked for and what each form holds, and waits: “Keep editing” changes nothing and gives the keyboard back, “Discard and continue” carries the request out. Every way of leaving a form asks the same -- another row, Load, another form, Back, Sign out, a child row and hiding a renderer ([0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).",
+    "alt": "A notice “Unsaved changes”: starting a new record closes the React form of order k1:9007199254740993, which holds “a save that may have been stored, not yet checked.”, with the buttons Keep editing and Discard and continue.",
+    "quotes": {
+      "Unsaved changes": ["Notice"],
+      "a save that may have been stored, not yet checked.": ["Notice"],
+      "Keep editing": ["Notice"],
+      "Discard and continue": ["Notice"]
+    }
+  },
+  {
     "id": "host-drift",
     "app": "host",
     "placement": "more",
@@ -261,11 +274,11 @@
     "app": "host",
     "placement": "more",
     "title": "Another tenant's record",
-    "caption": "otto, a clerk of tenant 2, may read records with this form; with tenant 1's record token he is told “No such record.”, the answer a token that names no record gets, so the page learns nothing about another tenant's orders ([0022](./docs/decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)).",
-    "alt": "The record bar with token k1:9007199254740993 and an alert “No such record.”, with the line saying of pg-order that “you may read, create and update records with this form.” and a Sign out button.",
+    "caption": "otto, a clerk of tenant 2, may read records with this form, and his grid says “No records.”: tenant 1's orders are not listed for him. With tenant 1's record token he is told “No such record.”, the answer a token that names no record gets, so the page learns nothing about another tenant's orders ([0022](./docs/decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)).",
+    "alt": "otto's Records grid saying “No records.”, and below it no record open, the record token k1:9007199254740993 under Open by record token and an alert “No such record.”.",
     "quotes": {
-      "No such record.": ["Record"],
-      "you may read, create and update records with this form.": ["Allowed"]
+      "No records.": ["Records"],
+      "No such record.": ["Record"]
     }
   }
 ]
