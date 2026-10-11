@@ -5,7 +5,7 @@ import type { FormSchema } from '@formancy/spec'
  * says.
  *
  * A lookup lists rows of a database table, which can be longer than a page, and
- * the renderers' option sources, at 0.4.0 as at 0.3.0, cannot tell a person
+ * the renderers' option sources, at 0.5.0 as at 0.3.0, cannot tell a person
  * that more rows exist; a typeahead keeps narrowing as somebody types, a plain
  * select lists the first page and stops (0029). Which control a host draws is
  * the host's choice, so it is made here, on the host's copy of the form, and

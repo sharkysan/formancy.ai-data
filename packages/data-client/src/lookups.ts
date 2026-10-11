@@ -50,7 +50,7 @@ export function sourceNames(form: FormSchema): string[] {
  * not see is left out, not an error. A refusal rejects with the server's
  * sentence, which the renderer shows as "could not be loaded"; an abort
  * rejects with the AbortError. `hasMore` and `omitted` do not reach the
- * renderer, whose contract, at 0.4.0 as at 0.3.0, has nowhere to put them
+ * renderer, whose contract, at 0.5.0 as at 0.3.0, has nowhere to put them
  * (0029).
  */
 export function lookupSources(

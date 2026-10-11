@@ -305,11 +305,11 @@ describe('validateBundle', () => {
   })
 
   // A stored version is held to the spec version the generator writes, on
-  // every read as at publish (0042). @formancy/spec 0.4.0's validator accepts
-  // a spec 4 document, and a host page whose renderer is at 0.3.0 refuses one
-  // outright, so a version edited on the volume to spec 4 -- its base and form
-  // alike, which every other read check compares -- would be served to it;
-  // at 0.3.0 it was refused as corrupt. A spec 4 construct in a spec 3
+  // every read as at publish (0042). @formancy/spec's validator accepts a
+  // spec 4 document from 0.4.0 on, and a host page whose renderer is at 0.3.0
+  // refuses one outright, so a version edited on the volume to spec 4 -- its
+  // base and form alike, which every other read check compares -- would be
+  // served to it; at 0.3.0 it was refused as corrupt. A spec 4 construct in a spec 3
   // document is refused with this server's reason, not upstream's advice to
   // change the document to "4", which this server would then refuse.
   // Watched failing before the check: the first edit validated, the second

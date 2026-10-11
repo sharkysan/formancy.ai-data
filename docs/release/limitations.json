@@ -11,7 +11,7 @@
       ]
     },
     "0002": {
-      "reviewed": "sha256:db101b6820695b7847c1f8ac6c0694dd2f675d55f75cd0534cb4a144bda9745b",
+      "reviewed": "sha256:5db573673ca1095c05a53a0413ed7909c5a1d373a03eab69426bcd73af6545b6",
       "limitations": [
         {
           "area": "operations",
@@ -398,7 +398,7 @@
       "limitations": [
         {
           "area": "forms",
-          "says": "In `@formancy/core`, at 0.3.0 and again at 0.4.0, an answer is checked once `validate()` has run and on every change after that, so a person typing into an untouched form sees nothing until they press Validate."
+          "says": "In `@formancy/core`, at 0.3.0 and again at 0.4.0 and 0.5.0, an answer is checked once `validate()` has run and on every change after that, so a person typing into an untouched form sees nothing until they press Validate."
         }
       ]
     },
@@ -1149,7 +1149,7 @@
         },
         {
           "area": "host",
-          "says": "A TypeScript host whose renderer is at `@formancy/*` 0.3.0 casts `@formancy/data-client`'s published form to its own `FormSchema` or moves to 0.4.0, because the client's types are `@formancy/spec` 0.4.0's, whose `specVersion` admits `\"4\"`."
+          "says": "A TypeScript host whose renderer is at `@formancy/*` 0.3.0 casts `@formancy/data-client`'s published form to its own `FormSchema` or moves to 0.4.0 or later, because the client's types are `@formancy/spec` 0.5.0's, whose `specVersion` admits `\"4\"`."
         },
         {
           "area": "testing",
@@ -1386,6 +1386,15 @@
         {
           "area": "licence",
           "says": "The separate commercial agreement Redistribution requires is requested at the same address as a production licence, the one section 9 of LICENSE.md names, and its terms and its price are not published."
+        }
+      ]
+    },
+    "0055": {
+      "reviewed": "sha256:7abfdfc7ebea961cfce8d25f7400ee832e0cf6e96cc18693dea366128983bc2c",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "An image of the composed stack built from a checkout within a day of an upstream release this repository adopted installs that release's `@formancy/*` packages without pnpm's one-day minimum release age, because the build reads this repository's `pnpm-workspace.yaml` and the exemptions in it."
         }
       ]
     }

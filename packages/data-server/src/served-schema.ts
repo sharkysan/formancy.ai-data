@@ -15,7 +15,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *
  * The version is this server's question as well as the validator's, because
  * the validator accepts every version its release speaks, and that grows
- * with the release: at `@formancy/spec` 0.4.0 a spec 4 document is valid,
+ * with the release: from `@formancy/spec` 0.4.0 on a spec 4 document is valid,
  * and a host page whose renderer is at 0.3.0 refuses it outright. Another
  * version is refused whole, since what the validator would add is about a
  * version this server does not serve. A construct of a later version in a

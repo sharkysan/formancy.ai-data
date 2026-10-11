@@ -453,9 +453,13 @@ customer options from the runtime plane, as the host page above shows.
 
 This repository **depends on** the released `@formancy/*` packages and copies
 none of their code ([0002](./docs/decisions/0002-depend-on-upstream-never-copy-it.md)).
-Upstream versions are exact, and a guard refuses a range or a path. A generic
-improvement the module needs — an exact-decimal field type, say — goes upstream
-through formancy's own contribution rules rather than being patched here.
+Upstream versions are exact, and a guard refuses a range or a path. A release
+can be adopted the day it is published: its packages, and nothing else, are
+exempt from pnpm's one-day minimum release age, each by its exact version
+([0055](./docs/decisions/0055-an-upstream-release-is-adopted-the-day-it-is-published.md)),
+and the same guard refuses any other exemption. A generic improvement the
+module needs — an exact-decimal field type, say — goes upstream through
+formancy's own contribution rules rather than being patched here.
 
 Generated forms stay on formancy's spec 3 after spec 4's release, and the
 server publishes and serves no other version
@@ -464,7 +468,7 @@ so a host whose renderer is still at 0.3.0 can keep reading them. That was
 measured once, on 2026-10-10, in a scratch check; nothing here runs a 0.3.0
 renderer, so nothing fails if it stops being true. A TypeScript host on that
 renderer casts the published form to its own `FormSchema`, because the newer
-type allows spec 4, or moves its renderer to 0.4.0.
+type allows spec 4, or moves its renderer to 0.4.0 or later.
 
 ## Deploying
 
@@ -505,14 +509,14 @@ no name the server accepts needs one.
 | `@types/mssql`, by `@formancy/data-sqlserver` | 12.3.0 | `^12.3.0` |
 | `mssql`, by `@formancy/data-sqlserver` | 12.7.4 | `^12.0.0` |
 | `tedious`, under `mssql` | 20.3.3 | `^19.2.2 \|\| ^20.0.0`, by `mssql` |
-| `@formancy/angular` | 0.4.0 | `0.4.0` |
-| `@formancy/builder-core` | 0.4.0 | `0.4.0` |
-| `@formancy/conformance` | 0.4.0 | `0.4.0` |
-| `@formancy/core` | 0.4.0 | `0.4.0` |
-| `@formancy/expressions` (transitive) | 0.4.0 |  |
-| `@formancy/react` | 0.4.0 | `0.4.0` |
-| `@formancy/spec` | 0.4.0 | `0.4.0` |
-| `@formancy/themes` | 0.4.0 | `0.4.0` |
+| `@formancy/angular` | 0.5.0 | `0.5.0` |
+| `@formancy/builder-core` | 0.5.0 | `0.5.0` |
+| `@formancy/conformance` | 0.5.0 | `0.5.0` |
+| `@formancy/core` | 0.5.0 | `0.5.0` |
+| `@formancy/expressions` (transitive) | 0.5.0 |  |
+| `@formancy/react` | 0.5.0 | `0.5.0` |
+| `@formancy/spec` | 0.5.0 | `0.5.0` |
+| `@formancy/themes` | 0.5.0 | `0.5.0` |
 | Node, the workspace |  | `>=22.12.0` |
 | Node, the server image | `node:22.12-alpine`, every stage |  |
 | Node, CI | 22 |  |

@@ -154,9 +154,9 @@ describe('generateForm', () => {
   // And one that says spec 3 (0042): a host's renderer pinned at @formancy/*
   // 0.3.0 refuses a spec 4 document outright, so a generator that moved to 4
   // would break every such page at its next publish. The version is what
-  // fails here -- validity does not, since 0.4.0's validator accepts spec 4 --
-  // and the validator refusing a spec 4 construct in a spec 3 document is
-  // what keeps a valid one free of them. Watched failing with the
+  // fails here -- validity does not, since the validator accepts spec 4 from
+  // 0.4.0 on -- and the validator refusing a spec 4 construct in a spec 3
+  // document is what keeps a valid one free of them. Watched failing with the
   // generator's version set to "4": this case, and no other in this file.
   test('every fixture object, on both engines, produces a spec 3 document formancy accepts', () => {
     for (const kind of ['postgres', 'sqlserver'] as const) {
