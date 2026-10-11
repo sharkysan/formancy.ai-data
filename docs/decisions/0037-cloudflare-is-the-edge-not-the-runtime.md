@@ -494,8 +494,8 @@ hooks ran for.
   machine. Its log format is unchanged; nginx.conf gains the runtime
   door's server, and compose.yaml the `edge` network, which every
   getting-started stack now makes too.
-- **One server process**, nothing restarts on its own, nothing is released,
-  and no production licence can be had yet.
+- **One server process**, nothing restarts on its own, and nothing is
+  released.
 - **Here.** The overlay, the tools image, four deploy scripts, the
   generated doors file and the edge's rate-limit body; P2 and P3 in the
   server; a second server in nginx.conf and a network in compose.yaml; a

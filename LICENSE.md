@@ -1,14 +1,12 @@
 # Formancy Data Source-Available Licence
 
-**Version 0 — DRAFT of 8 October 2026. Not yet reviewed by a lawyer.**
+**Version 1 — in force from 11 October 2026. Not reviewed by a lawyer.**
 
-This text states the terms Formancy Data is intended to be offered under. It is
-published in the repository so that the terms are visible from the first
-commit, and it is marked a draft because it has not had legal review: the
-definitions of production and redistribution, the governing law and the
-mechanics of termination all need a lawyer's reading before this is relied on
-either way. Until a reviewed version replaces it, the rightsholder grants the
-free rights in the table below and nothing beyond them.
+This text states the terms Formancy Data is offered under. Version 1 is in
+force from 11 October 2026 and replaces Version 0, the draft of 8 October
+2026. **This version has not been reviewed by a lawyer.** It is published in
+the repository so that the terms are visible to everyone who reads the source.
+Production licences, which section 3 describes, can be had as section 9 says.
 
 This is not an open-source licence. It is not Apache-2.0, and it is not the
 licence of [formancy](https://github.com/sharkysan/formancy.ai), on which this
@@ -144,7 +142,12 @@ not.
 
 ## 9. Obtaining a production licence
 
-The Software is new and has no published price. Until it does, write to the
-Rightsholder through the repository's contact details; the plan is to set the
-price after the first design partners have established what the Software is
-worth to them.
+Production licences are requested from the Rightsholder at info@formancy.ai.
+The Software is new and has no published price; the plan is to set the price
+after the first design partners have established what the Software is worth
+to them.
+
+## 10. Governing law and place of jurisdiction
+
+This licence is governed by Swiss law, excluding its conflict-of-laws rules.
+The place of jurisdiction is the Rightsholder's domicile in Switzerland.

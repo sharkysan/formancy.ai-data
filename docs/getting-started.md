@@ -55,8 +55,8 @@ makes ([0024](./decisions/0024-the-studio-speaks-only-the-admin-plane.md)).
 
 Formancy Data is source-available, not open source: evaluating it, as this
 guide does, is free, and running it in production takes a paid licence. The
-[licence table](../README.md#licence-in-one-table) says what is free and what
-is not.
+[licence section](../README.md#licence-in-one-table) says what is free, what
+is not, and where a production licence is requested.
 
 ## 1. Get the code
 

@@ -2,7 +2,7 @@
   "$comment": "What each decision record's cost paragraphs say a user, integrator or operator of a release will meet, one sentence each, or why the record has none. Held to the records by scripts/release-report/limitations.test.mjs: 'reviewed' is the sha256 of the record as it was read, so any edit to a record -- a status line naming a later record included -- fails until it is read again and stamped with 'node scripts/release-report/limitations.mjs --stamp NNNN'. A line can outlive its truth until its record changes; 'heldBy' names a test that shows it still holds, and the release report fails a run in which that test did not pass. The wording is held by review.",
   "records": {
     "0001": {
-      "reviewed": "sha256:a1bc7ad08ab6e58752d047c0e3e57c75b86c71cc609c9734f77bd45b7b314139",
+      "reviewed": "sha256:befd718c74365f429ba90040df0dc75b280db1bf8b2a1de6ebdaa1595b31ace7",
       "limitations": [
         {
           "area": "licence",
@@ -908,7 +908,7 @@
       "none": "A rule for this repository's branches; nobody who installs, integrates or operates the module meets it."
     },
     "0037": {
-      "reviewed": "sha256:22ac92b2537d71a47341277a65b8e61db8d97ac3813546abe44d6be9ef43cf30",
+      "reviewed": "sha256:d115943fb462e4444036381d79f4fb3fe3c23e7ec0504b7b7893b09e19838705",
       "limitations": [
         {
           "area": "operations",
@@ -1291,6 +1291,23 @@
         {
           "area": "operations",
           "says": "The third-party notices at /studio/THIRD-PARTY-NOTICES.txt and /host/THIRD-PARTY-NOTICES.txt name the exact version of every package each page bundles, to anyone who reaches the web front."
+        }
+      ]
+    },
+    "0048": {
+      "reviewed": "sha256:724712dd3c45a80cac9d75740c050f0ec1c52410dbd9d09dc8edb8aec58bb080",
+      "limitations": [
+        {
+          "area": "licence",
+          "says": "The licence in force has not been reviewed by a lawyer: where the free rights end and Production Use begins, what Redistribution covers, and termination rest on terms no lawyer has read, and a production licence is a separate written agreement whose terms are not published."
+        },
+        {
+          "area": "licence",
+          "says": "Production licences are requested at the address section 9 of LICENSE.md names, and no price is published; the licence names no address for the agreement Redistribution needs."
+        },
+        {
+          "area": "licence",
+          "says": "Open, and a lawyer's questions: which court the Rightsholder's domicile in Switzerland names, and whether it is exclusive; whether Version 1 replaces Version 0 for someone who received the Software under Version 0, and what a later version does for someone who received it under Version 1; whether the licence's law and court govern a production licence; and whether the UN Convention on Contracts for the International Sale of Goods applies."
         }
       ]
     }
