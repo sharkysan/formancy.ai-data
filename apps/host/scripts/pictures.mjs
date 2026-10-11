@@ -21,10 +21,16 @@
 // and deleted through the owner's connection, which the script opens beside
 // the server and also asks the holds' questions over; the lost answer is an
 // update the route hands to the server, requires stored with 200 and sent
-// once, and then answers with a connection reset.
+// once, and then answers with a connection reset; the drift is `status`
+// narrowed through the owner's connection after clara loaded the record,
+// read from the catalog before and after as the widths the caption gives,
+// which drift review, asked as ada, must say stops create and update, and
+// the save after it must be sent once, answered 409 `drift` and leave the
+// row as it was.
 //
-// Walk order: typeahead, the hero, stale, refused, unknown, another tenant;
-// the README shows them in scenes.json's order. Elements are found by role and
+// Walk order: typeahead, the hero, stale, refused, unknown, another tenant,
+// drift -- last, because it changes the table; the README shows them in
+// scenes.json's order. Elements are found by role and
 // accessible name, with two exceptions, each said where it is: the host token
 // is a password field, which has no role, so it is found by its label; and
 // the line saying what the signed-in person may do is a paragraph, which has
@@ -76,6 +82,22 @@ const DELETED = { no: 1002, name: 'Brunner Logistik AG' }
  */
 const SEARCH = 'er'
 const OTHER_TENANT = { tenant: 2, name: 'Other Tenant GmbH' }
+/**
+ * The drift host-drift induces, through the owner: `status` narrowed from
+ * varchar(20) to varchar(8), the shape of DRIFTING's `tightened-text`, whose
+ * verdict stops create and update and leaves read. Every status
+ * ck_order_status allows fits, and no view names the column.
+ */
+const NARROWED = 'alter table sales."order" alter column status type varchar(8)'
+/**
+ * The widths host-drift's caption and docs/images/README.md give `status`,
+ * before and after NARROWED. Neither is in the text pictured, so the act
+ * reads them from the catalog and throws when they are not these: a fixture
+ * that changed the width, or a NARROWED that changed the narrowing, fails it.
+ */
+const WIDTHS = { before: 20, after: 8 }
+/** What clara types into the notes after the change: a field the change never touched. */
+const DRIFT_NOTES = 'Call before delivery'
 
 /** The plane over a fresh fixture, with pg-order published as the guide publishes it. */
 async function startPlane() {
@@ -130,7 +152,7 @@ function actsOver(plane) {
   const customer = (page, name) => paper(page, name).getByRole('combobox', { name: field(journey.order.customer.label) })
   const record = (page) => page.getByRole('region', { name: 'Record', exact: true })
   const save = (page, name) => paper(page, name).getByRole('button', { name: HOST.save, exact: true }).click()
-  const row = async () => (await owner`select status, notes from sales."order" where id = ${ID}`)[0]
+  const row = async () => (await owner`select status, notes, row_version from sales."order" where id = ${ID}`)[0]
   const load = async (page) => {
     await record(page).getByRole('textbox', { name: HOST.record, exact: true }).fill(RECORD)
     await record(page).getByRole('button', { name: HOST.load, exact: true }).click()
@@ -262,6 +284,44 @@ function actsOver(plane) {
       // What otto may do, beside the refusal: he may read records with this
       // form, so "No such record." is the token's answer, not a permission's.
       return { parts: { Record: record(page), ...allowed(page) } }
+    },
+
+    'host-drift': async (page) => {
+      await page.getByRole('button', { name: HOST.signOut, exact: true }).click()
+      await signIn(page, TOKENS.clara)
+      await load(page)
+      const width = async () => Number((await owner`select character_maximum_length as width from information_schema.columns where table_schema = 'sales' and table_name = 'order' and column_name = 'status'`)[0]?.width)
+      const wide = await width()
+      // After the form was opened and the record read: what somebody changing the table would do.
+      await owner.unsafe(NARROWED)
+      const narrow = await width()
+      if (wide !== WIDTHS.before || narrow !== WIDTHS.after) throw new Error(`status was varchar(${String(wide)}) and is varchar(${String(narrow)}), not varchar(${String(WIDTHS.before)}) and varchar(${String(WIDTHS.after)}) as the caption says`)
+      // The caption's premise, asked of drift review as ada: reads go on, create and update stop, and the runtime refuses the same.
+      const review = await plane.server.inject({ method: 'POST', url: `/v1/forms/${FORM.formId}/drift`, headers: { authorization: `Bearer ${TOKENS.ada}` } })
+      const report = review.json()
+      const writesStop = (verdict) => verdict?.readable === true && verdict.writable?.create === false && verdict.writable?.update === false
+      if (review.statusCode !== 200 || !writesStop(report) || !writesStop(report.runtime)) {
+        throw new Error(`drift review answered ${String(review.statusCode)} with ${JSON.stringify({ readable: report.readable, writable: report.writable, runtime: report.runtime })}, not reads allowed and writes stopped`)
+      }
+      const before = await row()
+      let sent = 0
+      const update = '**/v1/forms/*/records/update'
+      await page.route(update, async (route) => {
+        sent += 1
+        await route.fallback()
+      })
+      const answered = page.waitForResponse((response) => response.request().method() === 'POST' && /\/records\/update$/.test(new URL(response.url()).pathname))
+      await box(page, 'React', 'Notes').fill(DRIFT_NOTES)
+      await save(page, 'React')
+      const answer = await answered
+      const { code } = await answer.json()
+      await pane(page, 'React').getByRole('region', { name: 'React Not saved', exact: true }).waitFor()
+      await page.unroute(update)
+      // Counted when the page says so; refused by the server, not by the page.
+      if (sent !== 1 || answer.status() !== 409 || code !== 'drift') throw new Error(`the update was sent ${String(sent)} times and answered ${String(answer.status())} ${String(code)}, not once with 409 drift`)
+      const after = await row()
+      if (JSON.stringify(after) !== JSON.stringify(before)) throw new Error(`the order was ${JSON.stringify(before)} and is ${JSON.stringify(after)}: the refused save wrote it`)
+      return { parts: { React: pane(page, 'React') } }
     },
   }
 }

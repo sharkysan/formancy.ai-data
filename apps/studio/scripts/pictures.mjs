@@ -7,22 +7,31 @@
 // administrator plane, the audit sink the plane requires and discards, and a
 // fake connection registry over the committed captured snapshots, each read
 // back against its fingerprint. `pg` answers as postgres-writer.json -- the
-// order form's own account, the getting-started guide's `pg` -- and
-// `ms-reader` as sqlserver-reader.json, an account without VIEW DEFINITION.
-// ada and grace are both administrators with no attributes, so the conflict
-// in the Publish scene comes from another actor in the trail (0033). Values
-// come from journey.json's PostgreSQL form. No Docker.
+// order form's own account, the getting-started guide's `pg` -- `pg-owner`
+// as postgres-owner.json, the fixture's owner, for the form over
+// `sales.order_line`, which `pg` may not read, and `ms-reader` as
+// sqlserver-reader.json, an account without VIEW DEFINITION. ada and grace
+// are both administrators with no attributes, so the conflict in the Publish
+// scene comes from another actor in the trail (0033). Values come from
+// journey.json's PostgreSQL form. No Docker.
 //
 // The induced states, as the captions say: grace's publish is a real request
 // to the same server, required to answer 201; the drift is the writer
 // snapshot with `notes` renamed in place by @formancy/data-fixtures'
 // `renamedColumn`, which both adapters' discovery suites hold equal to what
-// discovery reports after a real rename.
+// discovery reports after a real rename of `notes`; the restore is over the
+// writer snapshot put back without the rename, so that version 1 fits the
+// database again; the moved key is the same snapshot with `order_date`
+// renamed to `order date` by the same function, a rename no suite compares
+// with a real one.
 //
-// One session: ada signs in, then the acts run in scenes.json's order, each
-// starting where the last one left the studio. Elements are found by role and
-// accessible name. One exception: the host token is a password field, which
-// has no role, so it is found by its label.
+// One session: ada signs in, then the acts run in their table's order, each
+// starting where the last one left the studio. That is scenes.json's order
+// but for studio-through, which the README shows after the order form's
+// policy and which runs last, because it signs out and in again to build a
+// form over another table. Elements are found by role and accessible name.
+// One exception: the host token is a password field, which has no role, so
+// it is found by its label.
 //
 // `pnpm --filter @formancy/data-studio pictures`, after `pnpm build`; the
 // root's `pnpm pictures` runs it with the others.
@@ -60,12 +69,16 @@ function readSnapshot(name) {
 }
 
 const WRITER = readSnapshot('postgres-writer.json')
+const OWNER = readSnapshot('postgres-owner.json')
 const READER = readSnapshot('sqlserver-reader.json')
+/** The fixture's owner, as a connection: the order form's own account may not read `sales.order_line`. */
+const OWNER_CONNECTION = 'pg-owner'
 
 /** The plane: `databases` is what each connection discovers now, mutable so an act can drift `pg`. */
 async function startPlane() {
   const databases = new Map([
     [FORM.connection, WRITER],
+    [OWNER_CONNECTION, OWNER],
     ['ms-reader', READER],
   ])
   const registry = {
@@ -101,6 +114,22 @@ async function at(page, step, { go = true } = {}) {
   const main = page.getByRole('main', { name: stepTitle(step), exact: true })
   await main.waitFor()
   return main
+}
+
+/** The order's lines, the root of studio-through's form. */
+const LINES = 'sales.order_line'
+const THROUGH = `Only rows of ${LINES} whose Order is one of these`
+/** The heading of a regeneration's keys and of the Policy step's question about them. */
+const KEYS = 'Keys that now stand for something else'
+/** data-core's `describeReassigned` for the moved key, and the Publish step's line about it. */
+const MOVED = 'Grants for order_date were written for column order_date; it now stands for column order date.'
+const WAITS = 'Grants for order_date were written for another column or lookup: keep or remove them in the Policy step.'
+
+/** ada, signed in, from the sign-in page. The host token is a password field, which has no role. */
+async function signIn(page) {
+  await page.getByLabel(STUDIO.token, { exact: true }).fill(TOKENS.ada)
+  await page.getByRole('button', { name: STUDIO.signIn, exact: true }).click()
+  await page.getByRole('navigation', { name: STUDIO.steps }).waitFor()
 }
 
 const discover = async (here, connection) => {
@@ -243,12 +272,64 @@ function actsOver(plane, scenes) {
     },
 
     'studio-restored': async (page) => {
+      // The rename taken back, as the caption says: version 1 fits the database again.
       plane.databases.set(FORM.connection, WRITER)
       const here = await at(page, stepOf('studio-drift'))
       await here.getByRole('button', { name: 'Check drift', exact: true }).click()
       const versions = await restoreVersion1(here)
       await versions.getByRole('status').filter({ hasText: /^Restored version 1 as version \d+/ }).waitFor()
       return { parts: { Versions: versions } }
+    },
+
+    'studio-keys': async (page) => {
+      // `order date` takes the key `order_date`, which version 4's grants were written for.
+      plane.databases.set(FORM.connection, renamedColumn(WRITER, FORM.root, 'order_date', 'order date'))
+      const drift = await at(page, stepOf('studio-drift'), { go: false })
+      await drift.getByRole('button', { name: 'Check drift', exact: true }).click()
+      await drift.getByRole('region', { name: `Version 4 of ${FORM.formId}, against the database now`, exact: true }).waitFor()
+      await drift.getByRole('button', { name: 'Regenerate, keeping your presentation', exact: true }).click()
+      const regenerated = drift.getByRole('region', { name: /^Regenerated from version 4$/ })
+      await regenerated.waitFor()
+      // The caption's one key: the regeneration reports order_date and nothing else.
+      const reported = await regenerated.getByRole('list', { name: KEYS, exact: true }).getByRole('listitem').allTextContents()
+      if (JSON.stringify(reported) !== JSON.stringify([MOVED])) throw new Error(`the regeneration reports the keys ${JSON.stringify(reported)}, not ${JSON.stringify([MOVED])}`)
+      await page.getByRole('button', { name: 'Continue to presentation', exact: true }).click()
+      await at(page, stepOf('studio-presentation'), { go: false })
+      // "Publishing waits until each is decided": the Publish step says why, with its button disabled.
+      const publish = await at(page, stepOf('studio-publish-conflict'))
+      const waits = await publish.getByRole('note').getByRole('listitem').allTextContents()
+      if (!waits.includes(WAITS)) throw new Error(`the Publish step waits for ${JSON.stringify(waits)}, not for the grants of order_date`)
+      if (!(await publish.getByRole('button', { name: /^Publish / }).isDisabled())) throw new Error('the Publish step would publish grants nobody decided')
+      const here = await at(page, stepOf('studio-policy'))
+      return { parts: { Keys: here.getByRole('region', { name: KEYS, exact: true }) } }
+    },
+
+    'studio-through': async (page) => {
+      // A form of its own, from a studio started afresh: ada signs out and in again.
+      await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+      await signIn(page)
+      await discover(await at(page, stepOf('studio-connect'), { go: false }), OWNER_CONNECTION)
+      await page.getByRole('button', { name: 'Choose a root', exact: true }).click()
+      const choose = await at(page, stepOf('studio-choose'), { go: false })
+      await choose.getByRole('combobox', { name: 'Root table or view', exact: true }).selectOption(LINES)
+      await choose.getByRole('checkbox', { name: 'Offer fk_order_line_order as a lookup', exact: true }).check()
+      await choose.getByRole('combobox', { name: 'Version column', exact: true }).selectOption('row_version')
+      await choose.getByRole('button', { name: 'Generate the form', exact: true }).click()
+      await at(page, stepOf('studio-generate'), { go: false })
+      const here = await at(page, stepOf('studio-policy'))
+      for (const operation of ['read', 'create', 'update']) await here.getByRole('textbox', { name: `Roles that may ${operation}`, exact: true }).fill(journey.policy.operations[operation].join(', '))
+      await here.getByRole('button', { name: 'Fill every field from the operations', exact: true }).click()
+      const list = here.getByRole('group', { name: 'Rows the Order list may offer', exact: true })
+      await list.getByRole('button', { name: 'Add a filter to the Order list', exact: true }).click()
+      await list.getByRole('combobox', { name: 'Column of Order filter 1', exact: true }).selectOption('tenant_id')
+      // Before the box: a filtered list, and nothing scoping the lines, which the step notes.
+      const unscoped = here.getByRole('note', { name: 'Nothing scopes these rows', exact: true })
+      await unscoped.waitFor()
+      await list.getByRole('checkbox', { name: THROUGH, exact: true }).check()
+      await unscoped.waitFor({ state: 'detached' })
+      await here.getByText(STUDIO.fits, { exact: true }).waitFor()
+      // One part: the note sits elsewhere in the step, and once ticked it is gone.
+      return { parts: { Lookup: list } }
     },
   }
 }
@@ -271,12 +352,10 @@ try {
     inject: (request) => plane.server.inject(request),
     within: WITHIN,
     secrets: Object.values(TOKENS),
-    database: `the captured snapshots apps/studio/src/fixtures/postgres-writer.json (PostgreSQL ${WRITER.serverVersion}) and sqlserver-reader.json (SQL Server ${READER.serverVersion})`,
+    database: `the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL ${WRITER.serverVersion}) and sqlserver-reader.json (SQL Server ${READER.serverVersion})`,
     open: async (page) => {
       await page.goto(`${ORIGIN}/`)
-      await page.getByLabel(STUDIO.token, { exact: true }).fill(TOKENS.ada)
-      await page.getByRole('button', { name: STUDIO.signIn, exact: true }).click()
-      await page.getByRole('navigation', { name: STUDIO.steps }).waitFor()
+      await signIn(page)
     },
     acts: actsOver(plane, scenes),
   })

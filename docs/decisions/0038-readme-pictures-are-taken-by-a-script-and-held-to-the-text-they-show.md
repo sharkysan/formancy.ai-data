@@ -1,6 +1,16 @@
 # 0038 — README pictures are taken by a script from states the product reaches, and held to the text they show
 
-- **Status:** accepted
+- **Status:** accepted; its *Where from* and *Induced states*, the 18 states
+  its *CI* cost says the browser job walks, and its *Coverage* cost describe
+  2026-10-10, and are extended by the README refresh of 2026-10-11: the
+  studio's pictures plane also has `pg-owner`, the fixture's owner, for a form
+  over `sales.order_line`; the studio's walk also induces a key moved by
+  `renamedColumn`, and puts the snapshot back before the restore, which the
+  list had left out; and the host
+  walk narrows `sales.order.status` through the owner, so that the host page
+  shows a drift refusal is held by host-drift's `--check` alone, on
+  PostgreSQL. [`docs/images/README.md`](../images/README.md) says what is
+  taken now
 - **Date:** 2026-10-10
 - **Deciders:** Daniel Bacher
 - **Verified by:**
