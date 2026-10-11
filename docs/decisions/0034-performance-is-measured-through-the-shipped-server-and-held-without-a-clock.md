@@ -425,10 +425,11 @@ Developer, SQL_Latin1_General_CP1_CI_AS:
   create and update, the form following the eight-in-flight update. In the
   first, 3 and 6: in the eight-in-flight first page and search many
   customers match, and in the added-latency form and first page, each
-  following a block of writes. SQL Server recompiled nothing and updated
-  no statistics in either run. In the idle gaps of the published run
-  PostgreSQL's container used 123 to 137 ms of CPU a second around every
-  block, none standing out; SQL Server's used 9 to 16, its highest, 15.8,
+  soon after a block of writes. SQL Server recompiled nothing and updated
+  no statistics in either run. In the idle gaps around each one-at-a-time
+  and eight-in-flight block of the published run (the added-latency passes
+  publish no idle rate), PostgreSQL's container used 123 to 136 ms of CPU a
+  second, none standing out; SQL Server's used 9 to 16, its highest, 15.8,
   around the eight-in-flight one-key resolve, and no other past 12.
 - **P11** (2026-10-09, about 22:10 UTC, beside other work, load average
   about 4.4): inserting the million generated customers into a copy of
@@ -461,9 +462,11 @@ Developer, SQL_Latin1_General_CP1_CI_AS:
   the searches many or one match (0.59 to 1.08 ms), and SQL Server's
   create (0.73 ms). Resampled the same way, 200 times, sampling alone
   accounts there for an expected spread of 0.41 ms at most, and 0.13 to
-  0.14 ms for the four outside SQL Server's searches. The rest is the
-  machine drifting between a request's undelayed and delayed passes, which
-  run one after the other, and no count removes it. Undelayed, every
+  0.14 ms for the four outside SQL Server's searches. The rest is not
+  sampling, so no count removes it: it is what changed between a request's
+  undelayed and delayed passes, which run one after the other, or in what
+  the delay itself cost from round to round, and this run does not tell
+  the two apart. Undelayed, every
   request through the hop sat within D of its direct p50: at most 1.27 ms
   slower in the published run (SQL Server's create), 1.40 ms in the first
   (PostgreSQL's create).
@@ -575,7 +578,7 @@ typed statements for postgres.js -- for decisions of their own.
 - **An added-latency difference carries what the machine drifted between
   two passes.** A request's undelayed and delayed passes run one after the
   other, so for some requests the difference moved between rounds by more
-  than a tenth of D, and a higher sample count did not change that (P14).
+  than a tenth of D, and a higher sample count did not remove that (P14).
   The page prints the median of the rounds' differences, not their spread.
 - **A contains search grows with the rows a filter admits.** Two sizes are
   measured, not a curve. No remedy ships: no trigram index (`pg_trgm`

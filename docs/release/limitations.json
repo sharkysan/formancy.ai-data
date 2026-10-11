@@ -823,7 +823,7 @@
       ]
     },
     "0034": {
-      "reviewed": "sha256:3f9c1b017c86aa8f30b50a9f8105fa7052088d9839bee544186b9ed8b7e71ba4",
+      "reviewed": "sha256:7e9fc3d1426a7c8fbed75e6e00ba13de7a4569a9bc97c8377c3cefb931b07961",
       "limitations": [
         {
           "area": "databases",
@@ -874,7 +874,7 @@
         },
         {
           "area": "testing",
-          "says": "An added-latency difference includes what the machine drifted between a request's undelayed and delayed passes, which run one after the other: for some requests it moved between rounds by more than a tenth of the added delay, and more samples did not change that."
+          "says": "An added-latency difference includes what the machine drifted between a request's undelayed and delayed passes, which run one after the other: for some requests it moved between rounds by more than a tenth of the added delay, and more samples did not remove that."
         }
       ]
     },

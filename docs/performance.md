@@ -51,7 +51,8 @@ differs from what the results render.
 - **This page.** `scripts/performance-doc.test.mjs`, in `pnpm test:repo`, fails
   when the region below is not what `results.json` renders, and when the
   result does not validate as a published measurement: the publish protocol,
-  a quiet machine, every block and every refusal the catalogue names, its
+  a quiet check the run enforced with no other container running, every
+  block and every refusal the catalogue names, its
   round trips equal to the pins it was measured against, each refusal
   answered as the catalogue says, every runtime request the harness sent
   an event in the server's audit trail, and a TCP hop that, undelayed, was
@@ -100,8 +101,8 @@ there would be either too loose to mean anything or flaky.
   request's undelayed and delayed passes run one after the other, so what the
   machine drifted between them is in the difference. For some requests it
   moved between rounds by more than a tenth of the delay, which more samples
-  did not change (0034, P14); the table prints the median of the rounds'
-  differences, not their spread.
+  a pass did not remove (0034, P14); the table prints the median of the
+  rounds' differences, not their spread.
 - **Warm caches and default settings**: both images as the suites run them,
   SQL Server's Developer edition, and PostgreSQL on musl, which orders text by
   code point. A glibc or ICU PostgreSQL compares by locale for every row a
