@@ -1295,7 +1295,7 @@
       ]
     },
     "0048": {
-      "reviewed": "sha256:724712dd3c45a80cac9d75740c050f0ec1c52410dbd9d09dc8edb8aec58bb080",
+      "reviewed": "sha256:22b4a9504504d044b62b76d9bebd0f0753d8dab0ee2ba2dfc681ddae393c8647",
       "limitations": [
         {
           "area": "licence",
@@ -1303,11 +1303,20 @@
         },
         {
           "area": "licence",
-          "says": "Production licences are requested at the address section 9 of LICENSE.md names, and no price is published; the licence names no address for the agreement Redistribution needs."
+          "says": "Production licences are requested at the address section 9 of LICENSE.md names, and no price is published."
         },
         {
           "area": "licence",
           "says": "Open, and a lawyer's questions: which court the Rightsholder's domicile in Switzerland names, and whether it is exclusive; whether Version 1 replaces Version 0 for someone who received the Software under Version 0, and what a later version does for someone who received it under Version 1; whether the licence's law and court govern a production licence; and whether the UN Convention on Contracts for the International Sale of Goods applies."
+        }
+      ]
+    },
+    "0054": {
+      "reviewed": "sha256:b44f553496300ab3b1f23c4cce389093f294c1ad8c8ab8751fa177645f2f37aa",
+      "limitations": [
+        {
+          "area": "licence",
+          "says": "The separate commercial agreement Redistribution requires is requested at the same address as a production licence, the one section 9 of LICENSE.md names, and its terms and its price are not published."
         }
       ]
     }

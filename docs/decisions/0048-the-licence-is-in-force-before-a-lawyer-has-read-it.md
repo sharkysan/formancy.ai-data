@@ -1,6 +1,6 @@
 # 0048 — The licence is in force before a lawyer has read it
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0054](0054-version-1-1-names-the-address-for-a-redistribution-agreement-too.md): Version 1.1 names section 9's address for the agreement Redistribution requires too, and the script reads a version numbered N or N.N
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:** `scripts/licence-status.test.mjs`, in `pnpm test:repo` —
@@ -156,7 +156,8 @@ a lawyer's question, not answered here:
 **Gate 10 stays open.** Its open reason in `gates.json` still names the legal
 review of `LICENSE.md`, which is held by review, and the guard above keeps
 the gate open while the version line says no lawyer has reviewed the
-licence. A release made before that review ships under Version 1 as it is.
+licence. A release made before that review ships under the version in force
+as it is.
 
 **"Can be had" depends on a mailbox.** Production licences are requested
 from info@formancy.ai, and that is true only while somebody reads it.
