@@ -1,8 +1,10 @@
 import type { ObjectMeta } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
+import type { ObjectAccessRow } from './access.js'
+import { OBJECT_ACCESS, toObjectAccess } from './access.js'
 import { queryScope } from './catalog.js'
 
-interface ObjectRow {
+interface ObjectRow extends ObjectAccessRow {
   object_id: number
   schema_name: string
   object_name: string
@@ -11,7 +13,8 @@ interface ObjectRow {
 }
 
 /**
- * The tables and views in scope, with their MS_Description.
+ * The tables and views in scope, with their MS_Description and whether the
+ * account may delete from each (access.ts, 0049).
  *
  * Only what this account holds some permission on: SQL Server filters
  * sys.objects without a word. Whether that filter can have hidden anything is
@@ -27,15 +30,16 @@ export const OBJECT_KIND = `case o.type when 'V' then 'view' else 'table' end`
 const SQL = (scoped: string): string => `
   select o.object_id, s.name as schema_name, o.name as object_name,
     ${OBJECT_KIND} as kind,
-    cast(ep.value as nvarchar(max)) as comment
+    cast(ep.value as nvarchar(max)) as comment,
+    ${OBJECT_ACCESS}
   from sys.objects o
   join sys.schemas s on s.schema_id = o.schema_id
   left join sys.extended_properties ep
     on ep.class = 1 and ep.major_id = o.object_id and ep.minor_id = 0 and ep.name = N'MS_Description'
   where o.object_id in ${scoped}`
 
-/** An object before its row security is known: that is another concern's (row-security.ts). */
-export type ObjectFound = Omit<ObjectMeta, 'rowSecurity'>
+/** An object before its row security and what refers to it are known: those are other concerns' (row-security.ts, referenced-by.ts). */
+export type ObjectFound = Omit<ObjectMeta, 'rowSecurity' | 'referencedBy'>
 
 /** Each object in scope, by object_id, with nothing attached yet. */
 export async function readObjects(pool: ConnectionPool, schemas: readonly string[]): Promise<Map<number, ObjectFound>> {
@@ -52,6 +56,7 @@ export async function readObjects(pool: ConnectionPool, schemas: readonly string
         uniqueKeys: [],
         foreignKeys: [],
         checks: [],
+        access: toObjectAccess(row),
       },
     ]),
   )

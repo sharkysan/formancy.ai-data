@@ -33,7 +33,7 @@
     "title": "Connect",
     "step": "1. Connect",
     "caption": "On SQL Server, as an account without VIEW DEFINITION. What the catalog hid from it comes first, each gap “cannot tell”, not “does not exist”, so a table or key missing below is never taken as absent ([0004](./docs/decisions/0004-a-snapshot-says-what-it-could-not-see.md), [0007](./docs/decisions/0007-sqlserver-discovery-and-what-it-hides.md)).",
-    "alt": "The studio's Connect step for ms-reader: “SQL Server 16.0.4295.3”, discovered as formancy_reader, and a panel “What this connection could not see” listing gaps in row security, objects, checks, defaults and foreign keys.",
+    "alt": "The studio's Connect step for ms-reader: “SQL Server 16.0.4295.3”, discovered as formancy_reader, and a panel “What this connection could not see” listing gaps in what refers to a table, row security, objects, checks, defaults and foreign keys.",
     "quotes": {
       "cannot tell": ["Seen"],
       "does not exist": ["Seen"],

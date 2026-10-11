@@ -64,12 +64,17 @@ function renamed(column: string, to: string, base: MetadataSnapshot = OWNER_SNAP
   return withColumn(withoutColumn(base, 'order', column), 'order', { ...meta, name: to })
 }
 
-/** sales.customer renamed to sales.client, and every foreign key that referenced it with it. */
+/**
+ * sales.customer renamed to sales.client, and every foreign key that
+ * referenced it with it -- and the table each key it holds refers to names
+ * it so (0049): createSnapshot refuses the two ends of a key disagreeing.
+ */
 function customerRenamed(): MetadataSnapshot {
   const { fingerprint: _, ...contents } = structuredClone(OWNER_SNAPSHOT)
   for (const object of contents.objects) {
     if (object.ref.name === 'customer') object.ref.name = 'client'
     for (const key of object.foreignKeys) if (key.references?.table.name === 'customer') key.references.table.name = 'client'
+    for (const key of object.referencedBy ?? []) if (key.table.name === 'customer') key.table.name = 'client'
   }
   return createSnapshot(contents)
 }

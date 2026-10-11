@@ -38,6 +38,8 @@
         { "file": "packages/data-core/src/snapshot.test.ts" },
         { "file": "packages/data-postgres/src/discovery-access.integration.test.ts" },
         { "file": "packages/data-sqlserver/src/discovery-access.integration.test.ts" },
+        { "file": "packages/data-postgres/src/discovery.integration.test.ts" },
+        { "file": "packages/data-sqlserver/src/discovery.integration.test.ts" },
         { "file": "packages/data-postgres/src/discovery-types.integration.test.ts" }
       ]
     },

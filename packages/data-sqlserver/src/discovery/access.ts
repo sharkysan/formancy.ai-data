@@ -1,4 +1,4 @@
-import type { ColumnAccess } from '@formancy/data-core'
+import type { ColumnAccess, ObjectAccess } from '@formancy/data-core'
 
 /**
  * The object a column belongs to, as HAS_PERMS_BY_NAME must be given it:
@@ -67,4 +67,37 @@ export function toAccess(row: AccessRow): ColumnAccess {
     insert: held(row, 'insert', row.can_insert),
     update: held(row, 'update', row.can_update),
   }
+}
+
+/**
+ * Whether the account may DELETE from an object of sys.objects `o` in
+ * schema `s`, as the server's own check answers it (0049), spliced into the
+ * objects query so every object has an answer. QUOTENAME'd, schema and name
+ * each, for the reason `OBJECT` above gives. Grants through a role count as
+ * the server counts them, and a DENY wins over a GRANT as it does there.
+ *
+ * DELETE alone deletes nothing by a key: a WHERE or an OUTPUT that names a
+ * column needs SELECT on it too, which the columns' access says. Measured on
+ * mcr.microsoft.com/mssql/server:2022-latest (16.0.4295.3), 2026-10-11 (P1):
+ * a user with DELETE and no SELECT runs `delete … where 1 = 0` and is refused
+ * 229 for `where id = 1`; given SELECT on id, `where id = 1` and `output
+ * deleted.id` run, and `output deleted.v` is refused 230. Over every table of
+ * the fixture, as the owner, the reader and a writer granted DELETE on order
+ * and order_line, each answer here was the one `delete … where 1 = 0` got
+ * (`discovery-access.integration.test.ts`); a view that cannot be updated is
+ * refused 4405 before any privilege is asked, so a view's answer is its
+ * grant's.
+ */
+export const OBJECT_ACCESS = `quotename(s.name) + N'.' + quotename(o.name) as access_object,
+    has_perms_by_name(quotename(s.name) + N'.' + quotename(o.name), N'OBJECT', N'DELETE') as can_delete`
+
+export interface ObjectAccessRow {
+  access_object: string | null
+  can_delete: number | null
+}
+
+/** An object's access from the row the objects query returned. A NULL is a name the check could not resolve: a defect, said, as for a column. */
+export function toObjectAccess(row: ObjectAccessRow): ObjectAccess {
+  if (row.can_delete === null) throw new Error(`HAS_PERMS_BY_NAME could not resolve ${row.access_object ?? '(unnamed object)'} for DELETE`)
+  return { delete: row.can_delete === 1 }
 }

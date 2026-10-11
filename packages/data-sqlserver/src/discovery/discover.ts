@@ -9,6 +9,7 @@ import { readForeignKeys } from './foreign-keys.js'
 import { readKeys } from './keys.js'
 import type { ObjectFound } from './objects.js'
 import { readObjects } from './objects.js'
+import { readReferencedBy, referencedByGaps } from './referenced-by.js'
 import { readPolicies, rowSecurityOf } from './row-security.js'
 import { readObjectVisibility } from './visibility.js'
 import { readServerVersion } from '../version.js'
@@ -16,7 +17,9 @@ import { readServerVersion } from '../version.js'
 /**
  * What this connection's account can see of the tables and views in `scope`,
  * what it may do with each column, whether a security policy filters each
- * object for it -- and, as gaps, what it cannot establish (0007, 0027).
+ * object for it -- and, as gaps, what it cannot establish (0007, 0027) --
+ * whether it may delete from each, and every key it can see that refers to
+ * each, from any schema (0049).
  *
  * Read from SQL Server's catalog views, never INFORMATION_SCHEMA, which carries
  * neither the trust and disable flags of a key nor rowversion nor extended
@@ -28,8 +31,11 @@ import { readServerVersion } from '../version.js'
  * an answer; a concurrent rename can still make that answer a false "no".
  *
  * Unlike PostgreSQL's, this catalog is filtered by permission: an object the
- * account holds nothing on is absent, behind a schema gap, and a security
- * policy it cannot see leaves row security `unknown`, behind a scope gap.
+ * account holds nothing on is absent, behind a schema gap, a security policy
+ * it cannot see leaves row security `unknown`, behind a scope gap, and a key
+ * on a table it cannot see is missing from what refers to a table, behind
+ * another. A graph edge constraint, which is not a foreign key, is a gap on
+ * each node table it connects, for any account (referenced-by.ts).
  *
  * The pool is the caller's. Nothing here opens a connection or reads
  * configuration, and nothing here closes the pool.
@@ -42,16 +48,17 @@ export async function discoverSqlServer(pool: ConnectionPool, scope: DiscoverySc
   const [version, account] = await Promise.all([readServerVersion(pool), readAccount(pool)])
   if (schemas.length === 0) return createSnapshot({ kind: 'sqlserver', serverVersion: version, account, scope, objects: [], gaps: [] })
 
-  const [objects, columns, keys, foreignKeys, checks, visibility, policies] = await Promise.all([
+  const [objects, columns, keys, foreignKeys, referencedBy, checks, visibility, policed] = await Promise.all([
     readObjects(pool, schemas),
     readColumns(pool, schemas),
     readKeys(pool, schemas),
     readForeignKeys(pool, schemas),
+    readReferencedBy(pool, schemas),
     readChecks(pool, schemas),
     readObjectVisibility(pool, schemas),
     readPolicies(pool, schemas),
   ])
-  const rowSecurity = rowSecurityOf(objects.keys(), policies, visibility.denied)
+  const rowSecurity = rowSecurityOf(objects.keys(), policed, visibility)
 
   const assembled: ObjectMeta[] = []
   for (const [objectId, object] of objects) {
@@ -64,6 +71,7 @@ export async function discoverSqlServer(pool: ConnectionPool, scope: DiscoverySc
       foreignKeys: foreignKeys.byObject.get(objectId) ?? [],
       checks: checks.byObject.get(objectId) ?? [],
       rowSecurity: rowSecurity.of(objectId),
+      referencedBy: referencedBy.byObject.get(objectId) ?? [],
     })
   }
 
@@ -73,7 +81,7 @@ export async function discoverSqlServer(pool: ConnectionPool, scope: DiscoverySc
     account,
     scope,
     objects: assembled,
-    gaps: [...visibility.gaps, ...rowSecurity.gaps, ...named(objects, [...columns.gaps, ...foreignKeys.gaps, ...checks.gaps])],
+    gaps: [...visibility.gaps, ...rowSecurity.gaps, ...referencedByGaps(objects.size, visibility), ...named(objects, [...columns.gaps, ...foreignKeys.gaps, ...referencedBy.gaps, ...checks.gaps])],
   })
 }
 

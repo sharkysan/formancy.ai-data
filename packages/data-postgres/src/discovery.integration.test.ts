@@ -233,7 +233,7 @@ describe('discovery as the restricted reader', () => {
   // gap. Its columns differ from the owner's only in what it may write.
   test('sees sales.order exactly as the owner does, the key into sales.customer included, apart from access', async () => {
     const [asReader, asOwner] = await Promise.all([discoverPostgres(reader, FIXTURE_SCOPE), discoverPostgres(owner, FIXTURE_SCOPE)])
-    const withoutAccess = (object: ObjectMeta) => ({ ...object, columns: object.columns.map(({ access: _access, ...rest }) => rest) })
+    const withoutAccess = ({ access: _deletes, ...object }: ObjectMeta) => ({ ...object, columns: object.columns.map(({ access: _access, ...rest }) => rest) })
     expect(withoutAccess(described(asReader, 'sales', 'order'))).toEqual(withoutAccess(described(asOwner, 'sales', 'order')))
     expect(capabilities(described(asReader, 'sales', 'order')).every((entry) => entry.endsWith(':s--'))).toBe(true)
     expect(described(asReader, 'sales', 'order').foreignKeys.find((key) => key.name === 'fk_order_customer')?.references).toEqual({
@@ -362,6 +362,121 @@ describe('the discovery scope', () => {
     expect(snapshotDisagreements(snapshot)).toEqual([])
     // Found once its schema is in scope, so the absence above is the scope's doing.
     expect(names(await discoverPostgres(owner, { schemas: ['outside'] }))).toEqual(['outside.secret'])
+  })
+
+  // A delete of an order reaches every table whose key refers to it, in any
+  // schema (0049). The scope bounds what is described, not what refers to it:
+  // a key from outside is named on the table it refers to, and nothing else
+  // of its table is read. pg_catalog shows it to the reader too, who has no
+  // USAGE on that schema (P2), so a PostgreSQL snapshot needs no gap for it.
+  // An adapter that read only the keys of tables in scope would say a delete
+  // of an order reaches order_line and nothing else.
+  test('a key from a schema outside the scope that refers to a table in it is named there, and its table is not described', async () => {
+    await owner.unsafe('create schema elsewhere; create table elsewhere.order_copy (id integer primary key, order_id bigint constraint fk_copy_order references sales."order" (id) on delete set null)')
+    try {
+      for (const sql of [owner, reader]) {
+        const snapshot = await discoverPostgres(sql, FIXTURE_SCOPE)
+        expect(names(snapshot).every((name) => name.startsWith('sales.'))).toBe(true)
+        expect(described(snapshot, 'sales', 'order').referencedBy).toEqual([
+          { table: { schema: 'elsewhere', name: 'order_copy' }, name: 'fk_copy_order', columns: ['order_id'], referencedColumns: ['id'], onDelete: 'set-null', onUpdate: 'no-action', enforced: true },
+          { table: { schema: 'sales', name: 'order_line' }, name: 'fk_order_line_order', columns: ['order_id'], referencedColumns: ['id'], onDelete: 'cascade', onUpdate: 'no-action', enforced: true },
+        ])
+        expect(snapshot.gaps).toEqual([])
+      }
+      expect(await reader`select pg_catalog.has_schema_privilege('elsewhere', 'USAGE') as usage`).toEqual([{ usage: false }])
+    } finally {
+      await owner.unsafe('drop schema elsewhere cascade')
+    }
+    expect(snapshotDisagreements(await discoverPostgres(owner, FIXTURE_SCOPE))).toEqual([])
+  })
+
+  // A key between partitioned tables is declared once, and PostgreSQL clones
+  // it onto every partition of the referring table, each clone referring to
+  // the same table (0006). The clones are plumbing: listed, they would make
+  // one key three, and a delete's reach would name partitions nobody
+  // declared a key on. Disabling the triggers of one partition's clone makes
+  // the declared key not enforced, as on the referring side -- and that is
+  // all `enforced: false` says on PostgreSQL: the referring partition's
+  // checks are off, yet the referenced side's action triggers still cascade
+  // a delete into it. A later reach that left out keys not enforced would
+  // miss this cascade.
+  test('a key onto a partitioned table is listed once, by the table it was declared on, and no clone is', async () => {
+    await owner.unsafe(`
+      create schema parted;
+      create table parted.root (id integer primary key) partition by range (id);
+      create table parted.root_low partition of parted.root for values from (0) to (100);
+      create table parted.root_high partition of parted.root for values from (100) to (200);
+      create table parted.leaf (id integer, root_id integer constraint fk_leaf_root references parted.root (id) on delete cascade, primary key (id)) partition by range (id);
+      create table parted.leaf_low partition of parted.leaf for values from (0) to (100);
+      create table parted.leaf_high partition of parted.leaf for values from (100) to (200);`)
+    const keysOnto = async () => (described(await discoverPostgres(owner, { schemas: ['parted'] }), 'parted', 'root').referencedBy ?? []).map((key) => [key.table.name, key.name, key.enforced])
+    expect(await keysOnto()).toEqual([['leaf', 'fk_leaf_root', true]])
+    const [clones] = await owner<{ count: number }[]>`select count(*)::int as count from pg_catalog.pg_constraint where conparentid <> 0 and confrelid = 'parted.root'::regclass`
+    expect(clones?.count).toBe(2)
+    await owner.unsafe('alter table parted.leaf_low disable trigger all')
+    expect(await keysOnto()).toEqual([['leaf', 'fk_leaf_root', false]])
+    // Not checked: a row referring to nothing goes in. Still acted on: the delete cascades.
+    await owner.unsafe('insert into parted.root values (1); insert into parted.leaf values (5, 1), (6, 999); delete from parted.root where id = 1')
+    expect(await owner`select id, root_id from parted.leaf order by id`).toEqual([{ id: 6, root_id: 999 }])
+  })
+
+  // A key may be declared onto one partition of a partitioned table, or onto
+  // a table that inherits from another, and pg_constraint then records it on
+  // that partition or child alone -- which discovery does not describe, or
+  // describes as a table of its own. A delete from the parent still reaches
+  // the partition's or the child's rows, and the key acts: the cascades
+  // below run. An adapter that listed keys only by the relation they name
+  // would say nothing refers to the parent but its own keys, and a delete's
+  // reach reviewed from it would be short without a word -- so each such
+  // key is a referenced-by gap on every described relation above it, the
+  // partition's schema in scope or not, the clones of a key onto the parent
+  // apart. As the reader too, who holds nothing on these tables (P2).
+  test('a key onto a partition, or onto a table that inherits, is a referenced-by gap on every described table above it', async () => {
+    await owner.unsafe(`
+      create schema heir;
+      create schema heir_far;
+      create schema heir_refs;
+      create table heir.ord (id integer, region integer, primary key (id, region)) partition by list (region);
+      create table heir.ord_1 partition of heir.ord for values in (1);
+      create table heir_far.ord_2 partition of heir.ord for values in (2) partition by list (id);
+      create table heir_far.ord_2a partition of heir_far.ord_2 for values in (1);
+      create table heir_refs.note (id integer primary key, ord_id integer, region integer,
+        constraint fk_note_ord_1 foreign key (ord_id, region) references heir.ord_1 (id, region) on delete cascade);
+      create table heir_refs.memo (id integer primary key, ord_id integer, region integer,
+        constraint fk_memo_ord_2a foreign key (ord_id, region) references heir_far.ord_2a (id, region) on delete set null);
+      create table heir_refs.line (id integer primary key, ord_id integer, region integer,
+        constraint fk_line_ord foreign key (ord_id, region) references heir.ord (id, region) on delete cascade);
+      create table heir.doc (id integer primary key);
+      create table heir.doc_archive (archived_at date) inherits (heir.doc);
+      alter table heir.doc_archive add primary key (id);
+      create table heir_refs.mention (id integer primary key, doc_id integer constraint fk_mention_archive references heir.doc_archive (id) on delete cascade);
+      insert into heir.ord values (1, 1), (1, 2);
+      insert into heir_refs.note values (1, 1, 1);
+      insert into heir_refs.memo values (1, 1, 2);
+      insert into heir.doc_archive values (7, null);
+      insert into heir_refs.mention values (1, 7);`)
+    try {
+      for (const sql of [owner, reader]) {
+        const snapshot = await discoverPostgres(sql, { schemas: ['heir'] })
+        expect(names(snapshot)).toEqual(['heir.doc', 'heir.doc_archive', 'heir.ord'])
+        expect(snapshot.gaps.map((gap) => [`${gap.subject.kind === 'object' ? gap.subject.object.name : gap.subject.kind}`, gap.aspect, gap.detail])).toEqual([
+          ['doc', 'referenced-by', 'foreign key fk_mention_archive of heir_refs.mention refers to heir.doc_archive, a table that inherits from this one, and a delete from this table reaches its rows; this release lists a key only on the table it names'],
+          ['ord', 'referenced-by', 'foreign key fk_memo_ord_2a of heir_refs.memo refers to heir_far.ord_2a, a partition of this table, and a delete from this table reaches its rows; this release lists a key only on the table it names'],
+          ['ord', 'referenced-by', 'foreign key fk_note_ord_1 of heir_refs.note refers to heir.ord_1, a partition of this table, and a delete from this table reaches its rows; this release lists a key only on the table it names'],
+        ])
+        expect(described(snapshot, 'heir', 'ord').referencedBy?.map((key) => key.name)).toEqual(['fk_line_ord'])
+        expect(described(snapshot, 'heir', 'doc').referencedBy).toEqual([])
+        expect(described(snapshot, 'heir', 'doc_archive').referencedBy?.map((key) => key.name)).toEqual(['fk_mention_archive'])
+      }
+      await owner.unsafe('delete from heir.ord where id = 1; delete from heir.doc where id = 7')
+      const [left] = await owner<{ notes: number; cleared: number; mentions: number }[]>`
+        select (select count(*)::int from heir_refs.note) as notes,
+          (select count(*)::int from heir_refs.memo where ord_id is null) as cleared,
+          (select count(*)::int from heir_refs.mention) as mentions`
+      expect(left).toEqual({ notes: 0, cleared: 1, mentions: 0 })
+    } finally {
+      await owner.unsafe('drop schema heir_refs cascade; drop schema heir_far cascade; drop schema heir cascade')
+    }
   })
 
   // An empty list is where a filter most often disappears from a query, and

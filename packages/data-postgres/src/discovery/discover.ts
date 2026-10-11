@@ -1,7 +1,7 @@
 import { createSnapshot } from '@formancy/data-core'
 import type { ColumnAccess, DiscoveryScope, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
 import type { Sql, TransactionSql } from 'postgres'
-import { readAccess } from './access.js'
+import { readAccess, readObjectAccess } from './access.js'
 import { readAccount } from './account.js'
 import { readChecks } from './checks.js'
 import { readColumns, textUnitOf } from './columns.js'
@@ -9,6 +9,7 @@ import { readComments } from './comments.js'
 import { readForeignKeys } from './foreign-keys.js'
 import { readKeys } from './keys.js'
 import { readObjects } from './objects.js'
+import { readKeysBelow, readReferencedBy } from './referenced-by.js'
 
 /**
  * A metadata snapshot of the schemas in scope, read from pg_catalog (0006).
@@ -20,10 +21,13 @@ import { readObjects } from './objects.js'
  * every table and view in scope is described, and the account's privileges
  * are asked of the server separately, column by column (`readAccess`), with
  * whether row-level security applies to it (`readObjects`) and who it is
- * (`readAccount`) -- 0027. All three are answered for any role on any
- * relation, so nothing about an object in scope is beyond this account: the
- * only gap a PostgreSQL snapshot carries is a foreign table this release does
- * not describe.
+ * (`readAccount`) -- 0027 -- and, table by table, whether it may delete
+ * (`readObjectAccess`), beside every key from any schema that refers to the
+ * table (`readReferencedBy`) -- 0049. All of them are answered for any role
+ * on any relation, so nothing about an object in scope is beyond this
+ * account: the gaps a PostgreSQL snapshot carries are what this release does
+ * not describe -- a foreign table, and a key that names a partition or an
+ * inheriting table rather than the table a delete names (`readKeysBelow`).
  *
  * Every catalog query runs in one REPEATABLE READ, read-only transaction, so
  * they all see the catalog as it was at one moment: a column added between
@@ -47,13 +51,16 @@ export async function discoverPostgres(sql: Sql, scope: DiscoveryScope): Promise
   const schemas = [...scope.schemas]
   return sql.begin('isolation level repeatable read read only', async (tx) => {
     const { version: serverVersion, encoding } = await readSettings(tx)
-    const [account, inScope, columns, access, keys, foreignKeys, checks, comments] = await Promise.all([
+    const [account, inScope, columns, access, deletes, keys, foreignKeys, referencedBy, keysBelow, checks, comments] = await Promise.all([
       readAccount(tx),
       readObjects(tx, schemas),
       readColumns(tx, schemas, textUnitOf(encoding)),
       readAccess(tx, schemas),
+      readObjectAccess(tx, schemas),
       readKeys(tx, schemas),
       readForeignKeys(tx, schemas),
+      readReferencedBy(tx, schemas),
+      readKeysBelow(tx, schemas),
       readChecks(tx, schemas),
       readComments(tx, schemas),
     ])
@@ -80,10 +87,14 @@ export async function discoverPostgres(sql: Sql, scope: DiscoveryScope): Promise
         foreignKeys: foreignKeys.get(object.oid) ?? [],
         checks: checks.get(object.oid) ?? [],
         rowSecurity: object.rowSecurity,
+        // Both queries read the same pg_class rows in one transaction; an
+        // object without an answer is reported as nothing permitted.
+        access: deletes.get(object.oid) ?? { delete: false },
+        referencedBy: referencedBy.get(object.oid) ?? [],
       }
     })
 
-    return createSnapshot({ kind: 'postgres', serverVersion, account, scope, objects, gaps: inScope.gaps })
+    return createSnapshot({ kind: 'postgres', serverVersion, account, scope, objects, gaps: [...inScope.gaps, ...keysBelow] })
   })
 }
 

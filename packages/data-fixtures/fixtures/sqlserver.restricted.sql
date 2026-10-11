@@ -10,7 +10,8 @@
 -- rowversion itself, so row_version is granted no UPDATE. The role also holds
 -- VIEW DEFINITION on the database, the minimum for a snapshot that can
 -- establish that no security policy applies (0027, B10c, B19). sqlserver.sql's
--- security policy shows the writer tenant 1 only.
+-- security policy shows the writer tenant 1 only. It may delete orders and
+-- their lines (0049), as on PostgreSQL.
 create user formancy_reader for login formancy_reader;
 GO
 
@@ -20,6 +21,8 @@ GO
 create role formancy_forms;
 grant select, insert on sales.[order] to formancy_forms;
 grant update (status, notes, [group], approved_by) on sales.[order] to formancy_forms;
+grant delete on sales.[order] to formancy_forms;
+grant delete on sales.order_line to formancy_forms;
 grant select (tenant_id, customer_no, name) on sales.customer to formancy_forms;
 grant view definition to formancy_forms;
 create user formancy_writer for login formancy_writer;

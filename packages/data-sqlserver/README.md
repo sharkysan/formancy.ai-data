@@ -92,7 +92,17 @@ the database, and nothing else: no `SELECT`, no data access
 owner sees, but not every security policy: a policy lives in a schema of its
 own and can filter a table in any other, so row security is then `unknown`
 except where a visible policy applies, and one scope gap says why.
-`VIEW SECURITY DEFINITION` does not help; it lists no policy. Without either
+`VIEW SECURITY DEFINITION` does not help; it lists no policy. Nor does a
+schema grant show a foreign key on a table of another schema that refers to
+one in scope, so what refers to each table is then a `referenced-by` scope
+gap too, by the same rule
+([0049](../../docs/decisions/0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md));
+whether the account may `DELETE` from a table is `HAS_PERMS_BY_NAME`'s answer
+on the object, read for every object it lists. A graph node table that an
+edge constraint connects carries a `referenced-by` gap under any grant, the
+owner's included: an edge constraint is not a foreign key and is not
+listed, yet a delete of a node removes the edges a `CASCADE` one connects,
+and a `NO ACTION` one refuses it. Without either
 grant, SQL Server lists only the objects the account holds a permission on and
 returns `NULL` for every default and check definition, and the snapshot says so
 per object and per schema rather than looking complete. A table someone has

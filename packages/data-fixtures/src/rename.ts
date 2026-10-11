@@ -18,6 +18,11 @@ function namers(objects: readonly ObjectMeta[], object: ObjectMeta, column: stri
       if (target !== null && same(target.table, object.ref) && target.columns.includes(column)) out.push(`foreign key ${foreignKey.name} of ${other.ref.schema}.${other.ref.name}`)
     }
   }
+  // A key from a table outside the snapshot is said only here (0049); one from inside was said above.
+  for (const inbound of object.referencedBy ?? []) {
+    const inside = objects.some((other) => same(other.ref, inbound.table))
+    if (!inside && inbound.referencedColumns.includes(column)) out.push(`foreign key ${inbound.name} of ${inbound.table.schema}.${inbound.table.name}, which refers to it`)
+  }
   for (const check of object.checks) {
     if (check.expression === null) out.push(`check ${check.name}, whose text this account could not read`)
     else if (check.expression.includes(column)) out.push(`check ${check.name}`)
@@ -38,7 +43,8 @@ function namers(objects: readonly ObjectMeta[], object: ObjectMeta, column: stri
  * column nothing else names, so that is all this makes: a column that a key
  * or a foreign key names, or a check of its table -- judged by the check's
  * text, so one that only mentions the name, or whose text the account could
- * not read, counts -- is refused rather than rewritten, because what a
+ * not read, counts -- or that a key on a table outside the snapshot refers
+ * to (0049), is refused rather than rewritten, because what a
  * catalog reports for those after a rename has not been compared with
  * anything.
  */

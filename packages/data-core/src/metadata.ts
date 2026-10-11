@@ -248,6 +248,52 @@ export interface CheckMeta {
  */
 export type RowSecurity = 'none' | 'applies' | 'unknown'
 
+/**
+ * What the account that took the snapshot may do with a whole table or view,
+ * as the database's own privilege check answered at discovery (0049). Like
+ * `ColumnAccess`, what was true then.
+ */
+export interface ObjectAccess {
+  /**
+   * It may DELETE from it: the grant on the object, and on PostgreSQL USAGE
+   * on its schema. A DELETE that names a column -- in its WHERE, in a
+   * RETURNING or an OUTPUT -- needs SELECT on that column as well (measured
+   * on both engines), which the columns' `access` says.
+   */
+  delete: boolean
+}
+
+/**
+ * A foreign key on another table that refers to this one, as the referenced
+ * object records it (0049). The table it is on may be outside the approved
+ * schemas: it is then named here and nowhere else, and nothing reads or
+ * writes it. One on a table in the snapshot is that table's `foreignKeys`
+ * entry too, and `createSnapshot` refuses the two when they disagree.
+ */
+export interface InboundKey {
+  /** The table the key is on. */
+  table: ObjectRef
+  name: string
+  /** Its columns on `table`, in the key's order. */
+  columns: string[]
+  /** This object's columns, paired with `columns` by position. */
+  referencedColumns: string[]
+  /** What a delete of a row of this object does to the rows that refer to it. */
+  onDelete: ReferentialAction
+  onUpdate: ReferentialAction
+  /**
+   * As `ForeignKeyMeta.enforced`, which it must equal for a key between two
+   * tables of the snapshot. It does not say the same on both engines. On SQL
+   * Server `false` is a disabled key: neither checked nor acted on, so a
+   * delete leaves the rows that refer to it as they are. On PostgreSQL
+   * `false` says some trigger of the key is disabled, which may be the
+   * referring table's checks alone: a delete then still cascades, clears or
+   * is refused through it (measured on both, 2026-10-11). Nothing may read
+   * `false` as "a delete does not reach through this key".
+   */
+  enforced: boolean
+}
+
 export interface ObjectMeta {
   ref: ObjectRef
   kind: 'table' | 'view'
@@ -258,10 +304,29 @@ export interface ObjectMeta {
   foreignKeys: ForeignKeyMeta[]
   checks: CheckMeta[]
   rowSecurity: RowSecurity
+  /**
+   * What the account may do with the object as a whole (0049). Present
+   * exactly when `referencedBy` is: both are absent from a snapshot taken
+   * before 0049, which says nothing about deleting, and present on every
+   * object of one taken since.
+   */
+  access?: ObjectAccess
+  /**
+   * Every foreign key the catalog shows that refers to this object, from any
+   * table in or out of scope, in codepoint order of the table's schema, its
+   * name and the key's name (0049). A `referenced-by` gap covering the object
+   * says the list may be short.
+   */
+  referencedBy?: InboundKey[]
 }
 
-/** The part of the catalog a gap is about. `row-security`: whether a policy applies could not be established (0027). */
-export type CoverageAspect = 'objects' | 'columns' | 'keys' | 'foreign-keys' | 'checks' | 'defaults' | 'comments' | 'row-security'
+/**
+ * The part of the catalog a gap is about. `row-security`: whether a policy
+ * applies could not be established (0027). `referenced-by`: a foreign key
+ * that refers to an object may be on a table this connection cannot see, so
+ * its `referencedBy` may be short (0049).
+ */
+export type CoverageAspect = 'objects' | 'columns' | 'keys' | 'foreign-keys' | 'checks' | 'defaults' | 'comments' | 'row-security' | 'referenced-by'
 
 /**
  * What a gap is about: the whole scope (it cannot be placed), one schema, or
@@ -320,11 +385,12 @@ export interface MetadataSnapshot {
   gaps: CoverageGap[]
   /**
    * A hash of everything a form binding depends on: the kind, the account's
-   * user, the objects — their columns' privileges and row security included —
-   * and the gaps. A change in what this connection can see or do changes it
-   * too, so a revoked permission is noticed as a change — and reported by
-   * drift review as a privilege or access problem rather than as a dropped
-   * table.
+   * user, the objects — their columns' privileges and row security included,
+   * and since 0049 whether the account may delete from each and the keys
+   * that refer to it — and the gaps. A change in what this connection can
+   * see or do changes it too, so a revoked permission is noticed as a change
+   * — and reported by drift review as a privilege or access problem rather
+   * than as a dropped table.
    */
   fingerprint: string
 }

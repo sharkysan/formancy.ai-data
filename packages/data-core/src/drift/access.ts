@@ -1,5 +1,5 @@
 import type { CoverageAspect, CoverageGap, CoverageSubject, MetadataSnapshot, ObjectRef } from '../metadata.js'
-import { gapCovers } from '../snapshot.js'
+import { gapCovers, recordsDeleteFacts } from '../snapshot.js'
 import { allFields, type Comparison, describe, type Draft, fieldsOver, lookups, type Operation, refKey, stopped } from './context.js'
 import type { DriftSubject } from './types.js'
 
@@ -158,8 +158,13 @@ function grouped(gaps: readonly CoverageGap[]): Map<string, Group> {
  * are left out.
  */
 export function gapChanges(comparison: Comparison): Draft[] {
-  const before = grouped(comparison.base.gaps)
-  const after = grouped(comparison.current.gaps)
+  // A snapshot taken before 0049 never looked for the keys that refer to a
+  // table, so a referenced-by gap is compared only between two that did:
+  // against one that did not, it is no change in what this connection sees.
+  const compared = (gaps: readonly CoverageGap[]) =>
+    recordsDeleteFacts(comparison.base) && recordsDeleteFacts(comparison.current) ? gaps : gaps.filter((gap) => gap.aspect !== 'referenced-by')
+  const before = grouped(compared(comparison.base.gaps))
+  const after = grouped(compared(comparison.current.gaps))
   const drafts: Draft[] = []
 
   for (const [id, gaps] of after) {

@@ -74,7 +74,7 @@ beforeAll(async () => {
 
     create schema sealed;
     create table sealed.inside (id integer primary key, note text);
-    grant select, insert, update on sealed.inside to formancy_writer;
+    grant select, insert, update, delete on sealed.inside to formancy_writer;
   `)
 })
 
@@ -122,6 +122,36 @@ describe('the writer, the order form’s account', () => {
     expect(viaRole.fingerprint).not.toBe(own.fingerprint)
     // What the server does with that principal: the policy no longer names it.
     expect(await asRole`select tenant_id from sales.customer order by tenant_id`).toEqual([{ tenant_id: 1 }, { tenant_id: 2 }])
+  })
+})
+
+/** The objects of `schema` the snapshot says the account may DELETE from. */
+function deletable(snapshot: MetadataSnapshot, schema: string): string[] {
+  return snapshot.objects.filter((object) => object.ref.schema === schema && object.access?.delete === true).map((object) => object.ref.name)
+}
+
+describe('whether the account may delete (0049)', () => {
+  // A form offers a delete only where the account may make it. The owner may
+  // delete from every table and view; the reader from none; the writer from
+  // orders and their lines -- a delete of an order cascades into
+  // order_line -- and not from customer, whose columns it reads. An adapter
+  // that asked INSERT would say order and not order_line; one that dropped
+  // the USAGE check would say the writer may delete from sealed.inside,
+  // whose table grant says DELETE and whose schema it cannot use, so every
+  // delete there fails "permission denied for schema" (P1).
+  test('the owner may delete from every object, the reader from none, the writer from order and order_line only', async () => {
+    const [asOwner, asReader, asWriter, sealed] = await Promise.all([
+      discoverPostgres(owner, FIXTURE_SCOPE),
+      discoverPostgres(reader, FIXTURE_SCOPE),
+      discoverPostgres(writer, FIXTURE_SCOPE),
+      discoverPostgres(writer, { schemas: ['sealed'] }),
+    ])
+    expect(deletable(asOwner, 'sales')).toEqual(asOwner.objects.map((object) => object.ref.name))
+    expect(deletable(asReader, 'sales')).toEqual([])
+    expect(deletable(asWriter, 'sales')).toEqual(['order', 'order_line'])
+    expect(described(asWriter, 'sales', 'customer').access).toEqual({ delete: false })
+    expect(described(sealed, 'sealed', 'inside').access).toEqual({ delete: false })
+    expect(await answers(writer, ['delete from sealed.inside where false', 'delete from sales.customer where false', 'delete from sales.order_line where false'])).toEqual(['42501', '42501', 'ok'])
   })
 })
 
@@ -187,17 +217,20 @@ interface Probe {
 }
 
 /**
- * One statement per capability per column. Writes name the column alone and
- * assign a NULL of its type, never `c = c`, which also needs SELECT (B6).
- * Writes skip a generated or identity-always column, which the server refuses
- * with 428C9 before it checks a privilege, and a view, which it refuses with
- * 55000 when the view is not updatable -- both answers about the column, not
- * about the account.
+ * One statement per capability per column, and a DELETE per table (0049).
+ * Writes name the column alone and assign a NULL of its type, never `c = c`,
+ * which also needs SELECT (B6); the DELETE matches no row by a constant, never
+ * by a column, which also needs SELECT on it (P1). Writes skip a generated or
+ * identity-always column, which the server refuses with 428C9 before it
+ * checks a privilege, and a view, which it refuses with 55000 when the view
+ * is not updatable -- both answers about the column or the view, not about
+ * the account.
  */
 function probes(snapshot: MetadataSnapshot): Probe[] {
   const out: Probe[] = []
   for (const object of snapshot.objects) {
     const table = `${quote(object.ref.schema)}.${quote(object.ref.name)}`
+    if (object.kind === 'table') out.push({ statement: `delete from ${table} where false`, claimed: object.access?.delete === true })
     for (const column of object.columns) {
       const name = quote(column.name)
       out.push({ statement: `select ${name} from ${table} where false`, claimed: column.access.select })

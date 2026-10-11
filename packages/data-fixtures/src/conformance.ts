@@ -1,4 +1,4 @@
-import type { ColumnMeta, CoverageGap, MetadataSnapshot, ObjectMeta, ObjectRef } from '@formancy/data-core'
+import type { ColumnMeta, CoverageGap, InboundKey, MetadataSnapshot, ObjectMeta, ObjectRef } from '@formancy/data-core'
 import { findObject, gapCovers } from '@formancy/data-core'
 import type { ExpectedCheck, ExpectedCheckFacts, ExpectedColumn, ExpectedColumnFacts, ExpectedObject } from './model.js'
 import { FIXTURE_MODEL } from './model.js'
@@ -14,18 +14,23 @@ import { FIXTURE_MODEL } from './model.js'
  * made checkable.
  *
  * Discovered as the owner, every column grants every privilege and each
- * object's row security is the model's (0027).
+ * object's row security is the model's (0027), and the owner may delete from
+ * every object (0049).
  */
 export function snapshotDisagreements(snapshot: MetadataSnapshot, model: readonly ExpectedObject[] = FIXTURE_MODEL): string[] {
   return disagreements(snapshot, model, true)
 }
 
 /**
- * The structure only — objects, columns, keys, constraints, and no gap but
- * one about row security — ignoring what the account may do and whether row
- * security applies to it. For an account that sees every catalog entry and is
- * not the owner: the PostgreSQL reader, a SQL Server account with database
- * VIEW DEFINITION (0027).
+ * The structure only — objects, columns, keys, constraints, the keys that
+ * refer to each object, and no gap but one about row security or about what
+ * refers to an object — ignoring what the account may do and whether row
+ * security applies to it. For an account that sees every catalog entry in
+ * scope and is not the owner: the PostgreSQL reader, a SQL Server account
+ * with VIEW DEFINITION on the schema or the database (0027). On SQL Server
+ * only the database grant shows a key on a table outside the scope, so
+ * whether one refers to a table in scope is beyond the schema grant (0049);
+ * the fixture has none, so its keys are the model's either way.
  */
 export function structuralDisagreements(snapshot: MetadataSnapshot, model: readonly ExpectedObject[] = FIXTURE_MODEL): string[] {
   return disagreements(snapshot, model, false)
@@ -51,23 +56,25 @@ function disagreements(snapshot: MetadataSnapshot, model: readonly ExpectedObjec
       out.push(`${name(entry.ref)} is missing`)
       continue
     }
-    out.push(...objectDisagreements(actual, entry, snapshot.kind))
+    out.push(...objectDisagreements(actual, entry, snapshot.kind, model))
     if (asOwner) out.push(...ownerDisagreements(actual, entry, snapshot.kind))
   }
   // Discovered as the owner, the fixture is fully visible. A gap here is an
   // adapter that failed to read something it could have. Structurally, only
-  // whether row security applies may be beyond the account.
+  // whether row security applies, and whether a key outside the scope refers
+  // to a table in it, may be beyond the account.
   for (const gap of snapshot.gaps) {
-    if (!asOwner && gap.aspect === 'row-security') continue
+    if (!asOwner && (gap.aspect === 'row-security' || gap.aspect === 'referenced-by')) continue
     out.push(`unexpected gap on ${placeOf(gap)} (${gap.aspect}): ${gap.detail}`)
   }
   return out
 }
 
-/** What only the owner's snapshot says: every privilege on every column, and the model's row security. */
+/** What only the owner's snapshot says: every privilege on every column, deleting from every object, and the model's row security. */
 function ownerDisagreements(actual: ObjectMeta, entry: ExpectedObject, kind: MetadataSnapshot['kind']): string[] {
   const out: string[] = []
   const where = name(entry.ref)
+  if (actual.access?.delete === false) out.push(`${where} access says it may not delete, expected that the owner may`)
   for (const column of actual.columns) {
     const { select, insert, update } = column.access
     if (!(select && insert && update)) {
@@ -89,6 +96,11 @@ function ownerDisagreements(actual: ObjectMeta, entry: ExpectedObject, kind: Met
  * `foreign-keys` gap on sales.order. The one answer that is never acceptable is
  * the silent one: a foreign key missing with no gap reads as "no relationship
  * exists", and a form generated from that is wrong in a way nobody would notice.
+ *
+ * The same for the keys that refer to sales.order, which are on tables the
+ * reader may not use (0049): each reported right, or a `referenced-by` gap
+ * covering sales.order -- never missing with nothing said, which reads as a
+ * delete that reaches nothing else.
  */
 export function restrictedDisagreements(snapshot: MetadataSnapshot, model: readonly ExpectedObject[] = FIXTURE_MODEL): string[] {
   const out: string[] = []
@@ -100,6 +112,20 @@ export function restrictedDisagreements(snapshot: MetadataSnapshot, model: reado
   const columns = actual.columns.map((column) => column.name)
   const wanted = entry.columns.map((column) => column.name)
   if (columns.join() !== wanted.join()) out.push(`sales.order columns are [${columns.join(', ')}], expected [${wanted.join(', ')}]`)
+
+  const before0049 = deleteFactsMissing(actual)
+  if (before0049 !== null) out.push(before0049)
+  // The keys onto sales.order are on tables the reader may not see: each is
+  // reported right, or a referenced-by gap says the list may be short (0049).
+  const admitsReferrers = snapshot.gaps.some((gap) => gap.aspect === 'referenced-by' && gapCovers(gap, entry.ref))
+  for (const wanted of expectedReferrers(model, entry.ref)) {
+    const reported = actual.referencedBy?.find((key) => key.name === wanted.name && same(key.table, wanted.table))
+    if (reported === undefined) {
+      if (before0049 === null && !admitsReferrers) out.push(`${wanted.name} of ${name(wanted.table)} refers to sales.order, and is missing with no gap that says the reader cannot see it`)
+      continue
+    }
+    out.push(...inboundDisagreements(reported, wanted, `sales.order ${wanted.name} of ${name(wanted.table)}`))
+  }
 
   const admitsGap = snapshot.gaps.some((gap) => gap.aspect === 'foreign-keys' && gapCovers(gap, entry.ref))
   for (const foreignKey of entry.foreignKeys) {
@@ -122,7 +148,7 @@ export function restrictedDisagreements(snapshot: MetadataSnapshot, model: reado
   return out
 }
 
-function objectDisagreements(actual: ObjectMeta, entry: ExpectedObject, kind: MetadataSnapshot['kind']): string[] {
+function objectDisagreements(actual: ObjectMeta, entry: ExpectedObject, kind: MetadataSnapshot['kind'], model: readonly ExpectedObject[]): string[] {
   const out: string[] = []
   const where = name(entry.ref)
 
@@ -175,6 +201,8 @@ function objectDisagreements(actual: ObjectMeta, entry: ExpectedObject, kind: Me
     if (!found.enforced) out.push(`${at} is not enforced`)
   }
 
+  out.push(...referrerDisagreements(actual, model, where))
+
   const checks = actual.checks.map((check) => check.name).sort()
   const wantedChecks = entry.checks.map((check) => check.name).sort()
   if (checks.join() !== wantedChecks.join()) out.push(`${where} checks are [${checks.join(', ')}], expected [${wantedChecks.join(', ')}]`)
@@ -188,6 +216,62 @@ function objectDisagreements(actual: ObjectMeta, entry: ExpectedObject, kind: Me
   }
 
   return out
+}
+
+/** A key that refers to an object, as the model's foreign keys say it: the fixture has no key from outside the approved schemas (0049). */
+interface ExpectedReferrer {
+  table: ObjectRef
+  name: string
+  columns: readonly string[]
+  referencedColumns: readonly string[]
+  onDelete: InboundKey['onDelete']
+}
+
+/**
+ * The keys that refer to `ref`, derived from the model's foreign keys rather
+ * than written a second time, so the two cannot disagree: every key of the
+ * fixture is on a table in `sales`.
+ */
+function expectedReferrers(model: readonly ExpectedObject[], ref: ObjectRef): ExpectedReferrer[] {
+  return model.flatMap((referrer) =>
+    referrer.foreignKeys
+      .filter((foreignKey) => same(foreignKey.references.table, ref))
+      .map((foreignKey) => ({ table: referrer.ref, name: foreignKey.name, columns: foreignKey.columns, referencedColumns: foreignKey.references.columns, onDelete: foreignKey.onDelete })),
+  )
+}
+
+/** The sentence for an object that says nothing about deleting, or `null` when it says both things 0049 records. */
+function deleteFactsMissing(actual: ObjectMeta): string | null {
+  return actual.access === undefined || actual.referencedBy === undefined ? `${name(actual.ref)} says nothing about deleting; it was taken before 0049` : null
+}
+
+function inboundDisagreements(found: InboundKey, wanted: ExpectedReferrer, at: string): string[] {
+  const out: string[] = []
+  if (found.columns.join() !== wanted.columns.join()) out.push(`${at} columns are [${found.columns.join(', ')}], expected [${wanted.columns.join(', ')}]`)
+  if (found.referencedColumns.join() !== wanted.referencedColumns.join()) out.push(`${at} refers to [${found.referencedColumns.join(', ')}], expected [${wanted.referencedColumns.join(', ')}]`)
+  if (found.onDelete !== wanted.onDelete) out.push(`${at} on delete is ${found.onDelete}, expected ${wanted.onDelete}`)
+  if (!found.enforced) out.push(`${at} is not enforced`)
+  return out
+}
+
+/**
+ * Whether the object says what refers to it, exactly the model's keys: one
+ * missing reads as a delete that reaches nothing else, and one the fixture
+ * does not have is a key from nowhere (0049).
+ */
+function referrerDisagreements(actual: ObjectMeta, model: readonly ExpectedObject[], where: string): string[] {
+  const missing = deleteFactsMissing(actual)
+  if (missing !== null) return [missing]
+  const label = (key: { table: ObjectRef; name: string }) => `${name(key.table)} ${key.name}`
+  const found = actual.referencedBy ?? []
+  const wanted = expectedReferrers(model, actual.ref)
+  const listed = found.map(label)
+  const expected = wanted.map(label).sort(byCodepoint)
+  if ([...listed].sort(byCodepoint).join('\u0000') !== expected.join('\u0000')) return [`${where} is referred to by [${listed.join(', ')}], expected [${expected.join(', ')}]`]
+  return wanted.flatMap((key) => {
+    const reported = found.find((candidate) => candidate.name === key.name && same(candidate.table, key.table))
+    return reported === undefined ? [] : inboundDisagreements(reported, key, `${where} ${key.name} of ${name(key.table)}`)
+  })
 }
 
 function columnDisagreements(actual: ColumnMeta, expected: ExpectedColumnFacts, where: string): string[] {
@@ -227,6 +311,11 @@ function sortKeys(record: Record<string, string[]>): Record<string, string[]> {
 function key(ref: ObjectRef): string {
   return `${ref.schema}\u0000${ref.name}`
 }
+
+const same = (left: ObjectRef, right: ObjectRef): boolean => key(left) === key(right)
+
+/** Codepoint order, as createSnapshot sorts. */
+const byCodepoint = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0)
 
 function name(ref: ObjectRef): string {
   return `${ref.schema}.${ref.name}`

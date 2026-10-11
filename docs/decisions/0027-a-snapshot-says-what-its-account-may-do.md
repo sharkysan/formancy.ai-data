@@ -1,6 +1,6 @@
 # 0027 — A snapshot says what its account may do, and whose it is
 
-- **Status:** accepted
+- **Status:** accepted; DELETE on each table, and the gap rule for row security shared with what refers to a table, extended by [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md)
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

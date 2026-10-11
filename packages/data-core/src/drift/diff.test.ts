@@ -253,6 +253,32 @@ describe('diffSnapshots: access', () => {
     expect(only(drift(undefined, { gaps: [gap({ kind: 'schema', schema: 'crm' }, 'row-security')] }))).toMatchObject({ severity: 'review', subject: { kind: 'schema', schema: 'crm' }, affects: ['customer'] })
   })
 
+  // A snapshot taken before 0049 never looked for the keys that refer to a
+  // table, so a referenced-by gap in one taken since is nothing the
+  // connection "could establish when the form was generated": said that way,
+  // every SQL Server form published as an account without database VIEW
+  // DEFINITION would report an access problem nobody caused. Between two
+  // snapshots that both record what refers to each table, a gap that
+  // appeared is said, and nothing a form does yet rests on it.
+  test('a referenced-by gap is compared only when both snapshots record what refers to each table', () => {
+    const recording = (objects: ObjectMeta[]): void => {
+      for (const target of objects) {
+        target.access = { delete: true }
+        target.referencedBy = objects.flatMap((referrer) =>
+          referrer.foreignKeys
+            .filter((key) => key.references !== null && key.references.table.schema === target.ref.schema && key.references.table.name === target.ref.name)
+            .map((key) => ({ table: referrer.ref, name: key.name, columns: key.columns, referencedColumns: key.references?.columns ?? [], onDelete: key.onDelete, onUpdate: key.onUpdate, enforced: key.enforced })),
+        )
+      }
+    }
+    const appeared = { gaps: [gap(null, 'referenced-by', 'No VIEW DEFINITION on the database.')] }
+    expect(drift(recording, appeared).changes).toEqual([])
+    const recorded = snapshot(recording)
+    expect(only(drift(recording, appeared, ORDER, recorded))).toMatchObject({ kind: 'access-narrowed', severity: 'info', subject: { kind: 'scope' }, affects: [] })
+    // And the other way: a base that recorded the gap, against a snapshot an older server took.
+    expect(drift(undefined, {}, ORDER, snapshot(recording, appeared)).changes).toEqual([])
+  })
+
   // A gap that disappeared means the connection sees more than it did when
   // the form was generated. Nothing breaks, so nothing is stopped.
   test('a gap that went away is noted, and stops nothing', () => {

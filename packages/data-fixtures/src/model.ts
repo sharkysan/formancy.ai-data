@@ -97,7 +97,13 @@ function deepFreeze<T>(value: T): T {
   return value
 }
 
-/** What discovery of the fixture must report, on either engine, as its owner. */
+/**
+ * What discovery of the fixture must report, on either engine, as its owner.
+ * What refers to each object (0049) is not written a second time: every key
+ * of the fixture is on a table in `sales`, so an object's `referencedBy` is
+ * exactly the foreign keys below that point at it, and the comparators
+ * derive it from them.
+ */
 export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
   {
     ref: sales('country'),

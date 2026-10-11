@@ -110,12 +110,15 @@ async function allows(pool: mssql.ConnectionPool, sql: string): Promise<boolean>
 /**
  * Every capability the snapshot reports, put to the server as the statement
  * it predicts (B12): a read of the column, an UPDATE that sets it and an
- * INSERT that names it, each matching no row. A write sets a NULL cast to the
- * column's type and never `c = c`, which reads the column and so needs SELECT
- * as well. Writes skip views, which are not written to here, and columns the
- * database writes itself -- identity, computed and period columns and
- * rowversion -- for which the server refuses the statement before it asks
- * about privileges.
+ * INSERT that names it, each matching no row, and a DELETE of each table
+ * (0049) that matches none by a constant, never by a column, which would
+ * need SELECT on it as well (P1). A write sets a NULL cast to the column's
+ * type and never `c = c`, which reads the column and so needs SELECT as
+ * well. Writes skip views, which are not written to here -- the fixture's
+ * one is refused 4405, not updatable, before any privilege is asked -- and
+ * columns the database writes itself -- identity, computed and period
+ * columns and rowversion -- for which the server refuses the statement
+ * before it asks about privileges.
  */
 async function probe(pool: mssql.ConnectionPool, snapshot: MetadataSnapshot): Promise<Probed> {
   const out: Probed = { disagreements: [], allowed: 0, refused: 0 }
@@ -127,6 +130,7 @@ async function probe(pool: mssql.ConnectionPool, snapshot: MetadataSnapshot): Pr
   }
   for (const meta of snapshot.objects) {
     const table = `${quote(meta.ref.schema)}.${quote(meta.ref.name)}`
+    if (meta.kind === 'table') await check(meta.access?.delete === true, `delete from ${table} where 1 = 0`, `${meta.ref.schema}.${meta.ref.name} delete`)
     for (const column of meta.columns) {
       const name = quote(column.name)
       const where = `${meta.ref.schema}.${meta.ref.name}.${column.name}`
@@ -179,6 +183,28 @@ describe('what a snapshot says an account may do', () => {
     expect(snapshot.gaps).toEqual([])
     expect(snapshot.account).toEqual({ user: WRITER.user, login: WRITER.user })
     expect(accessOf(object(snapshot, 'sales', 'order'))['row_version']).toEqual({ select: true, insert: true, update: false })
+  })
+
+  // A form offers a delete only where the account may make it (0049). The
+  // owner may delete from every table and view, the reader from none, the
+  // writer from orders and their lines -- a delete of an order cascades into
+  // order_line -- through its role, and not from customer, whose columns it
+  // reads. An adapter that asked INSERT would say order and not order_line;
+  // one that asked the column check would answer per column. A delete matched
+  // by a column needs SELECT on it as well (P1), which the columns say.
+  test('the owner may delete from every object, the reader from none, the writer from order and order_line only, through its role', async () => {
+    const deletable = (snapshot: MetadataSnapshot) => snapshot.objects.filter((meta) => meta.access?.delete === true).map((meta) => meta.ref.name)
+    const asOwner = await discoverSqlServer(owner, FIXTURE_SCOPE)
+    const asReader = await discoverSqlServer(await connect(fixture.reader), FIXTURE_SCOPE)
+    const writer = await connect(fixture.writer)
+    const asWriter = await discoverSqlServer(writer, FIXTURE_SCOPE)
+    expect(deletable(asOwner)).toEqual(asOwner.objects.map((meta) => meta.ref.name))
+    expect(deletable(asReader)).toEqual([])
+    expect(object(asReader, 'sales', 'order').access).toEqual({ delete: false })
+    expect(deletable(asWriter)).toEqual(['order', 'order_line'])
+    expect(object(asWriter, 'sales', 'customer').access).toEqual({ delete: false })
+    expect(await allows(writer, 'delete from sales.order_line where 1 = 0')).toBe(true)
+    expect(await allows(writer, 'delete from sales.customer where 1 = 0')).toBe(false)
   })
 
   // The studio's drift gate stands a snapshot renamed in place for a
@@ -321,6 +347,8 @@ describe('whether a security policy filters what the account sees', () => {
 
   const rowSecurityOf = (snapshot: MetadataSnapshot, name: string) => object(snapshot, 'sales', name).rowSecurity
   const scopeGap = (detail: RegExp) => ({ subject: { kind: 'scope' }, aspect: 'row-security', detail: expect.stringMatching(detail) })
+  // The same rule decides whether every key that refers to a table is seen (0049): both live on objects of any schema.
+  const referrersGap = (detail: RegExp) => ({ subject: { kind: 'scope' }, aspect: 'referenced-by', detail: expect.stringMatching(detail) })
 
   // A policy lives in one schema and filters a table in another. VIEW
   // DEFINITION on the table's schema does not list it (B10b), so employee is
@@ -333,7 +361,7 @@ describe('whether a security policy filters what the account sees', () => {
     await withGuard('on', async () => {
       const bySchema = await discoverSqlServer(schemaViewer, FIXTURE_SCOPE)
       expect(rowSecurityOf(bySchema, 'employee')).toBe('unknown')
-      expect(bySchema.gaps).toEqual([scopeGap(/lacks VIEW DEFINITION on the database/)])
+      expect(bySchema.gaps).toEqual([referrersGap(/lacks VIEW DEFINITION on the database, which is what lists every foreign key/), scopeGap(/lacks VIEW DEFINITION on the database/)])
       const byDatabase = await discoverSqlServer(databaseViewer, FIXTURE_SCOPE)
       expect(rowSecurityOf(byDatabase, 'employee')).toBe('applies')
       expect(byDatabase.gaps).toEqual([])
@@ -378,6 +406,7 @@ describe('whether a security policy filters what the account sees', () => {
       // The fixture's policy is still visible, and still applies.
       expect(rowSecurityOf(snapshot, 'customer')).toBe('applies')
       expect(snapshot.gaps.filter((gap) => gap.aspect === 'row-security')).toEqual([scopeGap(reason)])
+      expect(snapshot.gaps.filter((gap) => gap.aspect === 'referenced-by')).toEqual([referrersGap(reason)])
     })
   })
 
@@ -398,6 +427,7 @@ describe('whether a security policy filters what the account sees', () => {
       const asViewer = await discoverSqlServer(viewer, FIXTURE_SCOPE)
       expect(rowSecurityOf(asViewer, 'employee')).toBe('unknown')
       expect(asViewer.gaps.filter((gap) => gap.aspect === 'row-security')).toEqual([scopeGap(/denied VIEW DEFINITION or CONTROL on 1 schema/)])
+      expect(asViewer.gaps.filter((gap) => gap.aspect === 'referenced-by')).toEqual([referrersGap(/denied VIEW DEFINITION or CONTROL on 1 schema/)])
     })
   })
 

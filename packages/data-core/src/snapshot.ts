@@ -6,9 +6,12 @@ import type {
   CoverageGap,
   CoverageSubject,
   Generation,
+  InboundKey,
   MetadataSnapshot,
+  ObjectAccess,
   ObjectMeta,
   ObjectRef,
+  ReferentialAction,
   RowSecurity,
   TextLengthUnit,
 } from './metadata.js'
@@ -63,7 +66,11 @@ const ASPECTS: Readonly<Record<CoverageAspect, true>> = {
   defaults: true,
   comments: true,
   'row-security': true,
+  'referenced-by': true,
 }
+
+/** Every `ReferentialAction`, listed for the same reason. */
+const ACTIONS: Readonly<Record<ReferentialAction, true>> = { 'no-action': true, restrict: true, cascade: true, 'set-null': true, 'set-default': true }
 
 const CAPABILITIES: ReadonlyArray<keyof ColumnAccess> = ['select', 'insert', 'update']
 
@@ -197,6 +204,115 @@ function assertConsistent(object: ObjectMeta): void {
   }
 }
 
+/** An object of a snapshot taken since 0049, which says both of its facts. */
+type Recording = ObjectMeta & { access: ObjectAccess; referencedBy: InboundKey[] }
+
+/**
+ * Whether an object carries 0049's facts: both, or neither, and never one.
+ * Read back from JSON, so nothing about their shape is assumed.
+ */
+function carriesDeleteFacts(object: ObjectMeta): object is Recording {
+  const where = describe(object.ref)
+  const access = object.access as unknown
+  const referencedBy = object.referencedBy as unknown
+  if (access === undefined && referencedBy === undefined) return false
+  if (referencedBy === undefined) throw new Error(`${where}: access without referencedBy; a snapshot taken since 0049 records both, and one taken before it neither`)
+  if (access === undefined) throw new Error(`${where}: referencedBy without access; a snapshot taken since 0049 records both, and one taken before it neither`)
+  if (typeof access !== 'object' || access === null || typeof (access as Partial<Record<string, unknown>>)['delete'] !== 'boolean') {
+    throw new Error(`${where}: access delete is not a boolean`)
+  }
+  if (!Array.isArray(referencedBy)) throw new Error(`${where}: referencedBy is not a list`)
+  return true
+}
+
+const isName = (value: unknown): value is string => typeof value === 'string' && value !== ''
+
+/** What no catalog could have produced of one key onto `object`, refused naming both ends. */
+function assertInboundKey(object: ObjectMeta, key: InboundKey): void {
+  const where = describe(object.ref)
+  const table = key.table as Partial<ObjectRef> | undefined
+  if (typeof table !== 'object' || table === null || !isName(table.schema) || !isName(table.name)) throw new Error(`${where}: an inbound key's table is not one the contract names`)
+  const from = describe(key.table)
+  if (!isName(key.name)) throw new Error(`${where}: an inbound key of ${from} has no name`)
+  const at = `${where}: inbound key ${key.name} of ${from}`
+  const columns = key.columns as unknown
+  const referenced = key.referencedColumns as unknown
+  if (!Array.isArray(columns) || !Array.isArray(referenced) || columns.length === 0) throw new Error(`${at} has no columns`)
+  if (columns.length !== referenced.length) throw new Error(`${at} pairs ${String(columns.length)} columns with ${String(referenced.length)}`)
+  // A referring column is held to nothing else when its table is outside the
+  // snapshot, so its shape is held here. PostgreSQL accepts one twice --
+  // `foreign key (a, a)` -- so a repeat is not refused.
+  if (!columns.every(isName)) throw new Error(`${at} names a column that is not a name`)
+  // Neither engine lets a key refer to one column twice.
+  const twice = referenced.find((name, index) => referenced.indexOf(name) !== index)
+  if (twice !== undefined) throw new Error(`${at} refers to ${String(twice)} twice`)
+  for (const name of referenced) {
+    if (!object.columns.some((column) => column.name === name)) throw new Error(`${at} refers to ${String(name)}, which the table does not have`)
+  }
+  if (!isListed(ACTIONS, key.onDelete) || !isListed(ACTIONS, key.onUpdate)) throw new Error(`${at} has an action that is not one the contract names`)
+  if (typeof (key.enforced as unknown) !== 'boolean') throw new Error(`${at} has no enforced flag`)
+}
+
+/** Whether `inbound` says what the referring table's own `foreignKey` says of the same key. */
+function sameKey(inbound: InboundKey, foreignKey: ObjectMeta['foreignKeys'][number]): boolean {
+  return (
+    inbound.columns.join('\u0000') === foreignKey.columns.join('\u0000') &&
+    inbound.referencedColumns.join('\u0000') === foreignKey.references?.columns.join('\u0000') &&
+    inbound.onDelete === foreignKey.onDelete &&
+    inbound.onUpdate === foreignKey.onUpdate &&
+    inbound.enforced === foreignKey.enforced
+  )
+}
+
+/**
+ * 0049's facts: on every object or on none, each well formed, and a key from
+ * a table in the snapshot said alike at both ends.
+ *
+ * A key from a table in scope is on two objects: the referring table's
+ * `foreignKeys` and the referenced one's `referencedBy`. An adapter reads
+ * both from one catalog; one that disagreed with itself would let review show
+ * one reach and a delete act on another, so the snapshot is refused (0004).
+ * A key from a table outside the snapshot has nothing to agree with, and is
+ * a name only.
+ */
+function assertDeleteFacts(objects: readonly ObjectMeta[]): void {
+  const carrying = objects.filter(carriesDeleteFacts)
+  const [first] = carrying
+  if (first === undefined) return
+  const recorded = new Set<ObjectMeta>(carrying)
+  const without = objects.find((object) => !recorded.has(object))
+  if (without !== undefined) {
+    throw new Error(`${describe(without.ref)}: has neither access nor referencedBy, while ${describe(first.ref)} has both; a snapshot is taken before 0049 or since, not both`)
+  }
+
+  const byRef = new Map(carrying.map((object) => [refKey(object.ref), object]))
+  for (const object of carrying) {
+    const where = describe(object.ref)
+    // Neither engine lets a foreign key refer to a view, materialized or indexed.
+    if (object.kind === 'view' && object.referencedBy.length > 0) throw new Error(`${where}: a view, which no foreign key can refer to, has referencedBy`)
+    const seen = new Set<string>()
+    for (const key of object.referencedBy) {
+      assertInboundKey(object, key)
+      const id = `${refKey(key.table)}\u0000${key.name}`
+      if (seen.has(id)) throw new Error(`${where}: referencedBy names ${key.name} of ${describe(key.table)} twice`)
+      seen.add(id)
+      const referrer = byRef.get(refKey(key.table))
+      if (referrer === undefined) continue
+      const own = referrer.foreignKeys.find((foreignKey) => foreignKey.name === key.name && foreignKey.references !== null && refKey(foreignKey.references.table) === refKey(object.ref))
+      if (own === undefined) throw new Error(`${where}: referencedBy names ${key.name} of ${describe(key.table)}, which has no such foreign key onto it`)
+      if (!sameKey(key, own)) throw new Error(`${where}: referencedBy says ${key.name} of ${describe(key.table)} otherwise than its own foreign keys do`)
+    }
+  }
+  for (const referrer of carrying) {
+    for (const foreignKey of referrer.foreignKeys) {
+      const target = foreignKey.references === null ? undefined : byRef.get(refKey(foreignKey.references.table))
+      if (target === undefined) continue
+      const listed = target.referencedBy.some((key) => key.name === foreignKey.name && refKey(key.table) === refKey(referrer.ref))
+      if (!listed) throw new Error(`${describe(target.ref)}: referencedBy lacks ${foreignKey.name} of ${describe(referrer.ref)}, which refers to it`)
+    }
+  }
+}
+
 /**
  * An object's columns, unique keys and foreign keys in the order a snapshot
  * holds them: columns by catalog position, keys by name in codepoint order.
@@ -212,11 +328,20 @@ export function inSnapshotOrder<T extends { columns: ReadonlyArray<{ ordinal: nu
   }
 }
 
+/** Codepoint order of the referring table's schema, its name, then the key's name. */
+function byReferrer(a: InboundKey, b: InboundKey): number {
+  return byCodepoint(a.table.schema, b.table.schema) || byCodepoint(a.table.name, b.table.name) || byCodepoint(a.name, b.name)
+}
+
 function sortObject(object: ObjectMeta): ObjectMeta {
-  return {
+  const sorted: ObjectMeta = {
     ...inSnapshotOrder(object),
     checks: [...object.checks].sort((a, b) => byCodepoint(a.name, b.name)),
   }
+  // Only when present: a snapshot taken before 0049 has no such property,
+  // and one set to `undefined` would not hash at all.
+  if (object.referencedBy !== undefined) sorted.referencedBy = [...object.referencedBy].sort(byReferrer)
+  return sorted
 }
 
 /** Scope, then schema, then object — each by codepoint — then aspect, then detail. */
@@ -259,6 +384,7 @@ export function createSnapshot(input: Omit<MetadataSnapshot, 'fingerprint'>): Me
   }
   for (const gap of input.gaps) assertSubject(gap)
   for (const object of input.objects) assertRowSecurity(object, input.gaps)
+  assertDeleteFacts(input.objects)
   assertAccount(input)
 
   const objects = input.objects
@@ -278,6 +404,15 @@ export function createSnapshot(input: Omit<MetadataSnapshot, 'fingerprint'>): Me
     gaps,
     fingerprint: schemaHash({ kind: input.kind, account: account.user, objects, gaps }),
   }
+}
+
+/**
+ * Whether a snapshot records 0049's facts -- whether its account may delete
+ * from each object, and what refers to each -- which every object of one
+ * taken since 0049 does and none of one taken before it.
+ */
+export function recordsDeleteFacts(snapshot: Pick<MetadataSnapshot, 'objects'>): boolean {
+  return snapshot.objects.some((object) => object.referencedBy !== undefined)
 }
 
 /** Whether this connection could establish everything in scope. */

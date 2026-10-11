@@ -136,7 +136,28 @@
       ],
       "foreignKeys": [],
       "checks": [],
-      "rowSecurity": "none"
+      "rowSecurity": "none",
+      "access": {
+        "delete": false
+      },
+      "referencedBy": [
+        {
+          "table": {
+            "schema": "sales",
+            "name": "customer"
+          },
+          "name": "fk_customer_country",
+          "columns": [
+            "country_code"
+          ],
+          "referencedColumns": [
+            "iso_code"
+          ],
+          "onDelete": "no-action",
+          "onUpdate": "no-action",
+          "enforced": true
+        }
+      ]
     },
     {
       "ref": {
@@ -317,7 +338,30 @@
         }
       ],
       "checks": [],
-      "rowSecurity": "applies"
+      "rowSecurity": "applies",
+      "access": {
+        "delete": false
+      },
+      "referencedBy": [
+        {
+          "table": {
+            "schema": "sales",
+            "name": "order"
+          },
+          "name": "fk_order_customer",
+          "columns": [
+            "tenant_id",
+            "customer_no"
+          ],
+          "referencedColumns": [
+            "tenant_id",
+            "customer_no"
+          ],
+          "onDelete": "no-action",
+          "onUpdate": "no-action",
+          "enforced": true
+        }
+      ]
     },
     {
       "ref": {
@@ -413,7 +457,11 @@
       "uniqueKeys": [],
       "foreignKeys": [],
       "checks": [],
-      "rowSecurity": "none"
+      "rowSecurity": "none",
+      "access": {
+        "delete": false
+      },
+      "referencedBy": []
     },
     {
       "ref": {
@@ -514,7 +562,60 @@
         }
       ],
       "checks": [],
-      "rowSecurity": "none"
+      "rowSecurity": "none",
+      "access": {
+        "delete": false
+      },
+      "referencedBy": [
+        {
+          "table": {
+            "schema": "sales",
+            "name": "employee"
+          },
+          "name": "fk_employee_manager",
+          "columns": [
+            "manager_id"
+          ],
+          "referencedColumns": [
+            "id"
+          ],
+          "onDelete": "no-action",
+          "onUpdate": "no-action",
+          "enforced": true
+        },
+        {
+          "table": {
+            "schema": "sales",
+            "name": "order"
+          },
+          "name": "fk_order_approved_by",
+          "columns": [
+            "approved_by"
+          ],
+          "referencedColumns": [
+            "id"
+          ],
+          "onDelete": "no-action",
+          "onUpdate": "no-action",
+          "enforced": true
+        },
+        {
+          "table": {
+            "schema": "sales",
+            "name": "order"
+          },
+          "name": "fk_order_created_by",
+          "columns": [
+            "created_by"
+          ],
+          "referencedColumns": [
+            "id"
+          ],
+          "onDelete": "no-action",
+          "onUpdate": "no-action",
+          "enforced": true
+        }
+      ]
     },
     {
       "ref": {
@@ -822,7 +923,28 @@
           "validated": true
         }
       ],
-      "rowSecurity": "none"
+      "rowSecurity": "none",
+      "access": {
+        "delete": true
+      },
+      "referencedBy": [
+        {
+          "table": {
+            "schema": "sales",
+            "name": "order_line"
+          },
+          "name": "fk_order_line_order",
+          "columns": [
+            "order_id"
+          ],
+          "referencedColumns": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no-action",
+          "enforced": true
+        }
+      ]
     },
     {
       "ref": {
@@ -983,7 +1105,11 @@
         }
       ],
       "checks": [],
-      "rowSecurity": "none"
+      "rowSecurity": "none",
+      "access": {
+        "delete": true
+      },
+      "referencedBy": []
     },
     {
       "ref": {
@@ -1246,9 +1372,13 @@
           "validated": true
         }
       ],
-      "rowSecurity": "none"
+      "rowSecurity": "none",
+      "access": {
+        "delete": false
+      },
+      "referencedBy": []
     }
   ],
   "gaps": [],
-  "fingerprint": "f70a198d3f1a1c83f6560227acb190441924863f5a6885676d8190ae20526fc8"
+  "fingerprint": "0b78a8ae43ca3bda93601ab50362984905a3d4f687913a88233ce0972fd91ced"
 }

@@ -1,6 +1,6 @@
 # 0007 — Discover SQL Server from its catalog views, and name each thing they hide
 
-- **Status:** accepted; check enforcement and text length units narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md); the minimum privilege for no gap, and the denied column, narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md)
+- **Status:** accepted; check enforcement and text length units narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md); the minimum privilege for no gap, and the denied column, narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md); whether the account may delete from each table, every key it can see that refers to one, the `referenced-by` gap, and one on a node table for each edge constraint that connects it, extended by [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-sqlserver/src/discovery.integration.test.ts`

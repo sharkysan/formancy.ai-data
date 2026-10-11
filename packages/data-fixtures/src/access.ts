@@ -9,6 +9,8 @@ export interface ExpectedObjectFacts {
   select?: ExpectedCapability
   insert?: ExpectedCapability
   update?: ExpectedCapability
+  /** Whether it may DELETE from the object (0049). Defaults to no. */
+  delete?: boolean
   /** Defaults to `none`. Per engine where the engines differ. */
   rowSecurity?: RowSecurity | Partial<Record<DatabaseKind, RowSecurity>>
 }
@@ -36,15 +38,19 @@ export const READER_ACCESS: ExpectedAccess = {
  * account. It reads and inserts orders, updates four of their columns — and
  * on PostgreSQL the application-maintained row_version, which SQL Server
  * writes itself — and reads three columns of customer, whose policy shows it
- * tenant 1 only.
+ * tenant 1 only. It may delete orders and their lines (0049): a delete of an
+ * order cascades into order_line, and a delete that reaches a table is to be
+ * held to the account's DELETE on it.
  */
 export const WRITER_ACCESS: ExpectedAccess = {
   order: {
     select: 'all',
     insert: 'all',
     update: ['status', 'notes', 'group', 'approved_by'],
+    delete: true,
     byKind: { postgres: { update: ['status', 'notes', 'group', 'approved_by', 'row_version'] } },
   },
+  order_line: { delete: true },
   customer: { select: ['tenant_id', 'customer_no', 'name'], rowSecurity: 'applies' },
 }
 
@@ -61,6 +67,7 @@ function resolve(entry: ExpectedObjectAccess | undefined, kind: DatabaseKind): R
     select: facts.select ?? 'none',
     insert: facts.insert ?? 'none',
     update: facts.update ?? 'none',
+    delete: facts.delete ?? false,
     rowSecurity: typeof rowSecurity === 'string' ? rowSecurity : (rowSecurity[kind] ?? 'none'),
   }
 }
@@ -72,8 +79,9 @@ function resolve(entry: ExpectedObjectAccess | undefined, kind: DatabaseKind): R
  *
  * Three rules, for every object of the model:
  * 1. one the account may use is described, with every column the model has
- *    and exactly the capabilities granted;
- * 2. one it may not use is described, every column with none, or is absent behind an
+ *    and exactly the capabilities granted, and whether it may delete from it
+ *    (0049);
+ * 2. one it may not use is described, every column with none and no delete, or is absent behind an
  *    `objects` gap on its schema or the scope — never absent with nothing said;
  * 3. its row security is the expected one, or `unknown` with a `row-security`
  *    gap covering it.
@@ -89,7 +97,7 @@ export function accessDisagreements(snapshot: MetadataSnapshot, expected: Expect
         for (const name of listed) if (!model.columns.some((column) => column.name === name)) out.push(`the expectation for ${where} names ${name}, which the model does not have`)
       }
     }
-    const usable = CAPABILITIES.some((capability) => facts[capability] !== 'none')
+    const usable = facts.delete || CAPABILITIES.some((capability) => facts[capability] !== 'none')
     const actual = findObject(snapshot, model.ref)
     if (actual === undefined) {
       if (usable) out.push(`${where} is missing, though the account may use it`)
@@ -110,6 +118,8 @@ export function accessDisagreements(snapshot: MetadataSnapshot, expected: Expect
         if (column.access[capability] !== wanted) out.push(`${where}.${column.name} ${capability} is ${String(column.access[capability])}, expected ${String(wanted)}`)
       }
     }
+    if (actual.access === undefined) out.push(`${where} says nothing about deleting; it was taken before 0049`)
+    else if (actual.access.delete !== facts.delete) out.push(`${where} delete is ${String(actual.access.delete)}, expected ${String(facts.delete)}`)
     if (actual.rowSecurity !== facts.rowSecurity) {
       if (actual.rowSecurity !== 'unknown') out.push(`${where} row security is ${actual.rowSecurity}, expected ${facts.rowSecurity}`)
       else if (!snapshot.gaps.some((gap) => gap.aspect === 'row-security' && gapCovers(gap, model.ref))) out.push(`${where} row security is unknown and no row-security gap says why`)
