@@ -1,6 +1,6 @@
 # 0001 — A paid module lives in its own repository, under its own licence
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0048](0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md): the licence it names is put in force before a lawyer has read it
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `scripts/verify-licenses.mjs`, run by `ci.yml` on every

@@ -104,7 +104,12 @@ document kept out of the repository, so no gate's wording is here. Evidence
 is a test `file`, an app's `browserGate`, a gates.yml `job`, `sharedCases`,
 or a `document`. A gate passes in a run when everything but its documents
 passed; a document is shown as stated, with its last change and how many
-commits it is behind, and never as passed in the run.
+commits it is behind, and never as passed in the run. Gate 10's open reason
+in `gates.json` names, among other things, a legal review of `LICENSE.md`,
+and `scripts/licence-status.test.mjs` fails when that gate is given evidence
+while the licence's version line says no lawyer has reviewed it
+([0048](../decisions/0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md));
+that the reason still names the review is held by review.
 
 ## Building one on a machine
 
