@@ -929,6 +929,24 @@
             "insert": true,
             "update": true
           }
+        },
+        {
+          "name": "row_version",
+          "ordinal": 6,
+          "databaseType": "rowversion",
+          "type": {
+            "kind": "rowversion"
+          },
+          "nullable": false,
+          "hasDefault": false,
+          "defaultExpression": null,
+          "generated": "rowversion",
+          "comment": null,
+          "access": {
+            "select": true,
+            "insert": true,
+            "update": true
+          }
         }
       ],
       "primaryKey": {
@@ -1228,5 +1246,5 @@
     }
   ],
   "gaps": [],
-  "fingerprint": "bd0d6a8dc0fb21b796024d87f7b055ddf69b5804a82212a38a14614266519b30"
+  "fingerprint": "a940c2f280fd6a2f85edb2926d13a9582929c9f6112a33d67ef43f9d25a1dddf"
 }

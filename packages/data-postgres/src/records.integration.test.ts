@@ -164,7 +164,7 @@ async function newOrder(notes: string | null = null, tenant = '1'): Promise<{ id
 }
 
 function updateOf(id: string, expectedVersion: string, notes: string, filters: RowFilters = TENANT_1): Undefined<UpdateRequest> {
-  return { target: ORDER, key: orderKey(id), set: [val('order', 'notes', notes)], expectedVersion, filters, returning: [col('order', 'notes')] }
+  return { target: ORDER, key: orderKey(id), set: [val('order', 'notes', notes)], expectedVersion, filters, through: [], returning: [col('order', 'notes')] }
 }
 
 async function notesOf(id: string): Promise<{ notes: string | null; row_version: string } | undefined> {
@@ -183,7 +183,7 @@ describe('reading', () => {
         target: ORDER,
         key: orderKey(EDGE_VALUES.beyondSafeInteger),
         columns: [col('order', 'id'), col('order', 'amount'), col('order', 'order_date'), col('order', 'group')],
-        filters: TENANT_1,
+        filters: TENANT_1, through: [],
       }),
     )
     expect(order.values).toEqual({ id: EDGE_VALUES.beyondSafeInteger, amount: EDGE_VALUES.largestAmount, order_date: EDGE_VALUES.orderDate, group: 'A' })
@@ -194,7 +194,7 @@ describe('reading', () => {
           target: CUSTOMER,
           key: customerKey(tenant, '1001'),
           columns: [col('customer', 'credit_limit')],
-          filters: EVERY_ROW,
+          filters: EVERY_ROW, through: [],
         }),
       ).values.credit_limit
     expect(await limit('1')).toBe(EDGE_VALUES.largestCreditLimit)
@@ -208,7 +208,7 @@ describe('reading', () => {
           val('order_line', 'line_no', '1'),
         ],
         columns: [col('order_line', 'line_total')],
-        filters: EVERY_ROW,
+        filters: EVERY_ROW, through: [],
       }),
     )
     expect(line.values.line_total).toBe(EDGE_VALUES.computedLineTotal)
@@ -244,7 +244,7 @@ describe('reading', () => {
         returning: [],
       }),
     )
-    const read = succeeded(await records.read({ target: KINDS, key: idKey('1'), columns: KIND_COLUMNS.map((name) => col('kinds', name)), filters: EVERY_ROW }))
+    const read = succeeded(await records.read({ target: KINDS, key: idKey('1'), columns: KIND_COLUMNS.map((name) => col('kinds', name)), filters: EVERY_ROW, through: [] }))
     expect(read.values).toEqual(written)
     expect(read.version).toBe('1')
     for (const name of KIND_COLUMNS.filter((name) => name !== 'tsl')) {
@@ -252,7 +252,7 @@ describe('reading', () => {
     }
     // And the other boolean, written through the adapter: false is not NULL and not true.
     succeeded(await records.insert({ target: KINDS, values: [val('kinds', 'id', '8'), val('kinds', 'b', false)], returning: [] }))
-    expect(succeeded(await records.read({ target: KINDS, key: idKey('8'), columns: [col('kinds', 'b')], filters: EVERY_ROW })).values).toEqual({ b: false })
+    expect(succeeded(await records.read({ target: KINDS, key: idKey('8'), columns: [col('kinds', 'b')], filters: EVERY_ROW, through: [] })).values).toEqual({ b: false })
   })
 
   // Values PostgreSQL holds and formancy's shapes cannot. An instant with
@@ -273,7 +273,7 @@ describe('reading', () => {
       insert into rec.kinds (id, ts, tm) values (9, '9999-12-31 23:59:59.999999+00', '23:59:59.999999')`)
     const records = defined(createPostgresRecords(owner))
     const read = async (id: string): Promise<Record<string, ApiValue>> =>
-      succeeded(await records.read({ target: KINDS, key: idKey(id), columns: ['ts', 'tm', 'd', 'f8', 'f4', 'tsl'].map((name) => col('kinds', name)), filters: EVERY_ROW })).values
+      succeeded(await records.read({ target: KINDS, key: idKey(id), columns: ['ts', 'tm', 'd', 'f8', 'f4', 'tsl'].map((name) => col('kinds', name)), filters: EVERY_ROW, through: [] })).values
     expect(await read('2')).toEqual({ ts: '2026-10-08T10:34:56Z', tm: '10:30', d: 'infinity', f8: 'NaN', f4: null, tsl: '2026-10-08T23:59:59' })
     expect(await read('3')).toEqual({ ts: '0044-03-15T12:00:00.500000Z BC', tm: null, d: '0044-03-15 BC', f8: null, f4: '-Infinity', tsl: null })
     expect(await read('4')).toEqual({ ts: 'infinity', tm: '24:00', d: '10000-01-01 AD', f8: null, f4: null, tsl: null })
@@ -304,7 +304,7 @@ describe('reading', () => {
         insert into rec.kinds (id, t, b, i8, n, c, u, d, tm, ts, tsl, f8, f4)
         values (5, 'lower case', true, 9007199254740993, 12.50, 'AB', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
                 '2026-10-08', '23:59', '2026-10-08 12:34:56+00', '2026-10-08 12:34:56', 0.1::float8 + 0.2::float8, 0.1)`)
-      const request = { target: KINDS, key: idKey('5'), columns: KIND_COLUMNS.map((name) => col('kinds', name)), filters: EVERY_ROW }
+      const request = { target: KINDS, key: idKey('5'), columns: KIND_COLUMNS.map((name) => col('kinds', name)), filters: EVERY_ROW, through: [] }
       const expected = {
         t: 'lower case',
         b: true,
@@ -326,7 +326,7 @@ describe('reading', () => {
       // the read gave it, finds the row under a day-first DateStyle too.
       const byWallClock = { ...request, target: { ...KINDS, identity: [col('kinds', 'tsl')] }, key: [val('kinds', 'tsl', expected.tsl)], columns: [col('kinds', 't')] }
       expect(succeeded(await defined(createPostgresRecords(configured)).read(byWallClock)).values).toEqual({ t: 'lower case' })
-      const edge = { target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'amount'), col('order', 'order_date')], filters: TENANT_1 }
+      const edge = { target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'amount'), col('order', 'order_date')], filters: TENANT_1, through: [] }
       expect(succeeded(await defined(createPostgresRecords(configured)).read(edge)).values).toEqual({ amount: EDGE_VALUES.largestAmount, order_date: EDGE_VALUES.orderDate })
     } finally {
       await configured.end()
@@ -361,7 +361,7 @@ describe('reading', () => {
     const digits = (value: number): number => value.toExponential().replace(/^-|e.*$|\./g, '').length
     const reads: unknown[] = []
     for (const row of printed) {
-      const read = succeeded(await records.read({ target, key: idKey(String(row.id)), columns: [col('reals', 'f4')], filters: EVERY_ROW }))
+      const read = succeeded(await records.read({ target, key: idKey(String(row.id)), columns: [col('reals', 'f4')], filters: EVERY_ROW, through: [] }))
       const value = read.values.f4 as number
       expect(Math.fround(value), row.f4).toBe(Math.fround(Number(row.f4)))
       expect(digits(value), row.f4).toBeLessThanOrEqual(digits(Number(row.f4)))
@@ -379,7 +379,7 @@ describe('reading', () => {
       target: CUSTOMER,
       key: customerKey(tenant, number),
       columns: [col('customer', 'name')],
-      filters: TENANT_1,
+      filters: TENANT_1, through: [],
     })
     expect(succeeded(await records.read(customer('1', '1001'))).values).toEqual({ name: 'Muster AG' })
     expect(failed(await records.read(customer('2', '1001'))).code).toBe('not-found')
@@ -399,9 +399,9 @@ describe('reading', () => {
   test('a boolean filter throws before anything is sent', async () => {
     const records = defined(createPostgresRecords(owner))
     const on = { kind: 'restricted', equal: [{ column: 'b', type: col('kinds', 'b').type, value: 'true' }] } as unknown as RowFilters
-    await expect(records.read({ target: KINDS, key: idKey('6'), columns: [col('kinds', 't')], filters: on })).rejects.toThrow(/carries its column's type/)
+    await expect(records.read({ target: KINDS, key: idKey('6'), columns: [col('kinds', 't')], filters: on, through: [] })).rejects.toThrow(/carries its column's type/)
     await expect(
-      records.update({ target: KINDS, key: idKey('6'), set: [val('kinds', 't', 'x')], expectedVersion: '1', filters: on, returning: [] }),
+      records.update({ target: KINDS, key: idKey('6'), set: [val('kinds', 't', 'x')], expectedVersion: '1', filters: on, through: [], returning: [] }),
     ).rejects.toThrow(/carries its column's type/)
   })
 
@@ -413,9 +413,9 @@ describe('reading', () => {
   // column is read, written or filtered.
   test('a filter on a table with a domain that refuses NULL reads, updates and answers like any other', async () => {
     const records = defined(createPostgresRecords(owner))
-    const read = (id: string) => records.read({ target: CONTACT, key: idKey(id), columns: [col('contact', 'name')], filters: TENANT_1 })
+    const read = (id: string) => records.read({ target: CONTACT, key: idKey(id), columns: [col('contact', 'name')], filters: TENANT_1, through: [] })
     const update = (id: string, expectedVersion: string) =>
-      records.update({ target: CONTACT, key: idKey(id), set: [val('contact', 'name', 'renamed')], expectedVersion, filters: TENANT_1, returning: [col('contact', 'name')] })
+      records.update({ target: CONTACT, key: idKey(id), set: [val('contact', 'name', 'renamed')], expectedVersion, filters: TENANT_1, through: [], returning: [col('contact', 'name')] })
     expect(succeeded(await read('1')).values).toEqual({ name: 'ours' })
     expect(failed(await read('2')).code).toBe('not-found')
     expect(succeeded(await update('1', '1'))).toEqual({ ok: true, values: { name: 'renamed' }, version: '2' })
@@ -430,7 +430,7 @@ describe('reading', () => {
     const target: RecordTarget = { table: { schema: 'rec', name: 'a.b' }, identity: [ID], concurrency: null }
     const said: RecordColumn = { name: 'say "hi"', type: TEXT }
     succeeded(await records.insert({ target, values: [...idKey('1'), { ...said, value: 'hello' }], returning: [] }))
-    expect(succeeded(await records.read({ target, key: idKey('1'), columns: [said], filters: EVERY_ROW })).values).toEqual({ 'say "hi"': 'hello' })
+    expect(succeeded(await records.read({ target, key: idKey('1'), columns: [said], filters: EVERY_ROW, through: [] })).values).toEqual({ 'say "hi"': 'hello' })
   })
 
   // PostgreSQL truncates an identifier longer than 63 bytes, with only a
@@ -438,7 +438,7 @@ describe('reading', () => {
   // produce such a name, so a request carrying one is a programming error.
   test('refuses a name PostgreSQL would truncate into another table', async () => {
     const records = defined(createPostgresRecords(owner))
-    const request = (name: string) => ({ target: { table: { schema: 'rec', name }, identity: [ID], concurrency: null }, key: idKey('1'), columns: [{ name: 'note', type: TEXT }], filters: EVERY_ROW })
+    const request = (name: string) => ({ target: { table: { schema: 'rec', name }, identity: [ID], concurrency: null }, key: idKey('1'), columns: [{ name: 'note', type: TEXT }], filters: EVERY_ROW, through: [] })
     expect(succeeded(await records.read(request(LONGEST))).values).toEqual({ note: 'the table a longer name would be truncated to' })
     await expect(records.read(request(`${LONGEST}y`))).rejects.toThrow(/63 bytes/)
   })
@@ -472,7 +472,7 @@ describe('the column facts both engines are held to (0026)', () => {
     const shipment = findObject(snapshot, { schema: 'sales', name: 'shipment' })
     if (shipment === undefined) throw new Error('sales.shipment is not in the snapshot')
     const columns = shipment.columns.filter((column) => column.type.kind !== 'binary').map(({ name, type }) => ({ name, type }))
-    const read = async (id: string) => succeeded(await defined(createPostgresRecords(owner)).read({ target: SHIPMENT, key: shipmentKey(id), columns, filters: EVERY_ROW })).values
+    const read = async (id: string) => succeeded(await defined(createPostgresRecords(owner)).read({ target: SHIPMENT, key: shipmentKey(id), columns, filters: EVERY_ROW, through: [] })).values
     expect(await read('1')).toEqual(FIRST_SHIPMENT)
     expect(await read('2')).toEqual(SECOND_SHIPMENT)
   })
@@ -489,7 +489,7 @@ describe('the column facts both engines are held to (0026)', () => {
     for (const value of ['é'.repeat(20), '😀'.repeat(20)]) {
       expect(codec.parse(value)).toEqual({ ok: true, value })
       const id = await newShipment(value)
-      const read = succeeded(await defined(createPostgresRecords(owner)).read({ target: SHIPMENT, key: shipmentKey(id), columns: [col('shipment', 'reference')], filters: EVERY_ROW }))
+      const read = succeeded(await defined(createPostgresRecords(owner)).read({ target: SHIPMENT, key: shipmentKey(id), columns: [col('shipment', 'reference')], filters: EVERY_ROW, through: [] }))
       expect(read.values.reference).toBe(value)
     }
     expect(refused(codec.parse('é'.repeat(21)))).toEqual({ code: 'too-long', message: 'At most 20 characters.' })
@@ -511,11 +511,11 @@ describe('the column facts both engines are held to (0026)', () => {
     for (const [id, sent, saved] of [['30', 0.1, 0.1], ['31', 0.123456789, 0.12345679], ['32', 0.10000000149011612, 0.1]] as const) {
       expect(codec.parse(sent)).toEqual({ ok: true, value: saved })
       succeeded(await records.insert({ target: KINDS, values: [...idKey(id), val('kinds', 'f4', saved)], returning: [] }))
-      const first = succeeded(await records.read({ target: KINDS, key: idKey(id), columns: f4, filters: EVERY_ROW }))
+      const first = succeeded(await records.read({ target: KINDS, key: idKey(id), columns: f4, filters: EVERY_ROW, through: [] }))
       expect(first.values).toEqual({ f4: saved })
-      const echo = { target: KINDS, key: idKey(id), set: [val('kinds', 'f4', first.values.f4 ?? null)], expectedVersion: String(first.version), filters: EVERY_ROW, returning: f4 }
+      const echo = { target: KINDS, key: idKey(id), set: [val('kinds', 'f4', first.values.f4 ?? null)], expectedVersion: String(first.version), filters: EVERY_ROW, through: [], returning: f4 }
       expect(succeeded(await records.update(echo)).values).toEqual({ f4: saved })
-      expect(succeeded(await records.read({ target: KINDS, key: idKey(id), columns: f4, filters: EVERY_ROW })).values).toEqual({ f4: saved })
+      expect(succeeded(await records.read({ target: KINDS, key: idKey(id), columns: f4, filters: EVERY_ROW, through: [] })).values).toEqual({ f4: saved })
     }
   })
 
@@ -527,7 +527,7 @@ describe('the column facts both engines are held to (0026)', () => {
     const lone = '\ud800ab'
     expect(refused(codecFor(meta('shipment', 'reference')).parse(lone)).code).toBe('invalid-character')
     const id = await newShipment(lone)
-    const read = succeeded(await defined(createPostgresRecords(owner)).read({ target: SHIPMENT, key: shipmentKey(id), columns: [col('shipment', 'reference')], filters: EVERY_ROW }))
+    const read = succeeded(await defined(createPostgresRecords(owner)).read({ target: SHIPMENT, key: shipmentKey(id), columns: [col('shipment', 'reference')], filters: EVERY_ROW, through: [] }))
     expect(read.values.reference).toBe('�ab')
   })
 
@@ -552,7 +552,7 @@ describe('the column facts both engines are held to (0026)', () => {
   // here too so the two spellings are held to the same edges.
   test('a zoneless timestamp keeps its fraction, trailing zeros dropped, never a digit of the seconds', async () => {
     await owner.unsafe(`insert into rec.kinds (id, tsl) values (40, '2026-10-08 12:34:50.120000'), (41, '2026-10-08 12:34:50'), (42, '2026-10-08 12:34:56.000001')`)
-    const read = async (id: string) => succeeded(await defined(createPostgresRecords(owner)).read({ target: KINDS, key: idKey(id), columns: [col('kinds', 'tsl')], filters: EVERY_ROW })).values.tsl
+    const read = async (id: string) => succeeded(await defined(createPostgresRecords(owner)).read({ target: KINDS, key: idKey(id), columns: [col('kinds', 'tsl')], filters: EVERY_ROW, through: [] })).values.tsl
     expect(await read('40')).toBe('2026-10-08T12:34:50.12')
     expect(await read('41')).toBe('2026-10-08T12:34:50')
     expect(await read('42')).toBe('2026-10-08T12:34:56.000001')
@@ -761,7 +761,7 @@ describe('what a refusal is called', () => {
     expect(failed(await insert({ table: { schema: 'rec', name: 'ruled' }, identity: [ID], concurrency: null }, [])).code).toBe('refused')
 
     const update = (id: string, expectedVersion: string) =>
-      records.update({ target: DECLINED, key: idKey(id), set: [val('declined', 'note', 'never written')], expectedVersion, filters: EVERY_ROW, returning: [] })
+      records.update({ target: DECLINED, key: idKey(id), set: [val('declined', 'note', 'never written')], expectedVersion, filters: EVERY_ROW, through: [], returning: [] })
     expect(failed(await update('1', '1'))).toMatchObject({ code: 'refused', message: expect.stringMatching(/declined/) })
     // A version that has moved is still stale, and a record that is not there still not-found.
     expect(failed(await update('1', '2')).code).toBe('stale')
@@ -776,9 +776,9 @@ describe('what a refusal is called', () => {
     const records = defined(createPostgresRecords(reader))
     expect(failed(await records.insert({ target: ORDER, values: orderValues(), returning: [] })).code).toBe('permission-denied')
     expect(
-      failed(await records.read({ target: CUSTOMER, key: customerKey('1', '1001'), columns: [col('customer', 'name')], filters: TENANT_1 })).code,
+      failed(await records.read({ target: CUSTOMER, key: customerKey('1', '1001'), columns: [col('customer', 'name')], filters: TENANT_1, through: [] })).code,
     ).toBe('permission-denied')
-    expect(succeeded(await records.read({ target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'status')], filters: TENANT_1 })).values.status).toEqual(expect.any(String))
+    expect(succeeded(await records.read({ target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'status')], filters: TENANT_1, through: [] })).values.status).toEqual(expect.any(String))
   })
 
   // A binding that names what is no longer there, which drift review exists
@@ -790,10 +790,10 @@ describe('what a refusal is called', () => {
   test('a column or table that is gone, or has changed type, is schema-changed', async () => {
     const records = defined(createPostgresRecords(owner))
     const gone: RecordColumn = { name: 'discount', type: TEXT }
-    expect(failed(await records.read({ target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [gone], filters: TENANT_1 })).code).toBe('schema-changed')
-    expect(failed(await records.read({ target: { ...ORDER, table: { schema: 'sales', name: 'invoice' } }, key: orderKey('1'), columns: [], filters: TENANT_1 })).code).toBe('schema-changed')
+    expect(failed(await records.read({ target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [gone], filters: TENANT_1, through: [] })).code).toBe('schema-changed')
+    expect(failed(await records.read({ target: { ...ORDER, table: { schema: 'sales', name: 'invoice' } }, key: orderKey('1'), columns: [], filters: TENANT_1, through: [] })).code).toBe('schema-changed')
     const notesAsDate: RecordColumn = { name: 'notes', type: { kind: 'date' } }
-    expect(failed(await records.read({ target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [notesAsDate], filters: TENANT_1 })).code).toBe('schema-changed')
+    expect(failed(await records.read({ target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [notesAsDate], filters: TENANT_1, through: [] })).code).toBe('schema-changed')
     const uuidAsInteger: RecordValue = { name: 'u', type: INT32, value: '7' }
     expect(failed(await records.insert({ target: KINDS, values: [...idKey('70'), uuidAsInteger], returning: [] })).code).toBe('schema-changed')
     // The check that tells stale from not-found is a statement too, and fails the same way: with a
@@ -828,7 +828,7 @@ describe('what a refusal is called', () => {
     const nowhere = postgres({ host: '127.0.0.1', port: await closedPort(), username: 'nobody', password: 'nothing', database: 'none', connect_timeout: 5, onnotice: () => {} })
     try {
       const records = defined(createPostgresRecords(nowhere))
-      expect(failed(await records.read({ target: ORDER, key: orderKey('1'), columns: [], filters: TENANT_1 })).code).toBe('unavailable')
+      expect(failed(await records.read({ target: ORDER, key: orderKey('1'), columns: [], filters: TENANT_1, through: [] })).code).toBe('unavailable')
       expect(failed(await records.insert({ target: ORDER, values: orderValues(), returning: [], definition: ANY_DEFINITION })).code).toBe('unavailable')
     } finally {
       await nowhere.end()
@@ -871,13 +871,13 @@ describe('objects planted on the search path', () => {
   test('change no answer, whether pg_catalog is searched first or last', async () => {
     const ours = await newOrder('ours')
     const theirs = await newOrder('theirs', '2')
-    const createdAt = { target: CUSTOMER, key: customerKey('1', '1001'), columns: [col('customer', 'created_at')], filters: TENANT_1 }
+    const createdAt = { target: CUSTOMER, key: customerKey('1', '1001'), columns: [col('customer', 'created_at')], filters: TENANT_1, through: [] }
     const instant = succeeded(await defined(createPostgresRecords(owner)).read(createdAt)).values
     expect(instant.created_at).toMatch(/T\d{2}:\d{2}:\d{2}Z$/)
     // An instant is cut to the second (0040), so the fraction a planted `%`
     // dropped is now a zoneless timestamp's: the first shipment's, `.5`.
     const shipment = { table: { schema: 'sales', name: 'shipment' }, identity: [ID], concurrency: null }
-    const dispatched = { target: shipment, key: [val('shipment', 'id', '1')], columns: [col('shipment', 'dispatched_at')], filters: EVERY_ROW }
+    const dispatched = { target: shipment, key: [val('shipment', 'id', '1')], columns: [col('shipment', 'dispatched_at')], filters: EVERY_ROW, through: [] }
     expect(succeeded(await defined(createPostgresRecords(owner)).read(dispatched)).values).toEqual({ dispatched_at: EDGE_VALUES.localTimestamp })
 
     await owner.begin(async (tx) => {
@@ -897,8 +897,8 @@ describe('objects planted on the search path', () => {
         const current = (await notesOf(ours.id))?.row_version ?? ''
         expect(failed(await records.update(updateOf(ours.id, String(BigInt(current) - 1n), 'over a newer save'))).code, path).toBe('stale')
         expect(succeeded(await records.update(updateOf(ours.id, current, path))).version, path).toBe(String(BigInt(current) + 1n))
-        expect(failed(await records.read({ target: ORDER, key: orderKey(theirs.id), columns: [col('order', 'notes')], filters: TENANT_1 })).code, path).toBe('not-found')
-        const edge = { target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'order_date'), col('order', 'amount')], filters: TENANT_1 }
+        expect(failed(await records.read({ target: ORDER, key: orderKey(theirs.id), columns: [col('order', 'notes')], filters: TENANT_1, through: [] })).code, path).toBe('not-found')
+        const edge = { target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'order_date'), col('order', 'amount')], filters: TENANT_1, through: [] }
         expect(succeeded(await records.read(edge)).values, path).toEqual({ order_date: EDGE_VALUES.orderDate, amount: EDGE_VALUES.largestAmount })
         expect(succeeded(await records.read(createdAt)).values, path).toEqual(instant)
         expect(succeeded(await records.read(dispatched)).values, path).toEqual({ dispatched_at: EDGE_VALUES.localTimestamp })
@@ -924,8 +924,8 @@ describe('requests no binding produces', () => {
     const records = defined(createPostgresRecords(ended))
     const amount = val('order', 'amount', '1.0000')
     const insert = (values: RecordValue[], target: RecordTarget = ORDER) => records.insert({ target, values, returning: [], definition: ANY_DEFINITION })
-    await expect(records.read({ target: ORDER, key: customerKey('1', '1001'), columns: [], filters: TENANT_1 })).rejects.toThrow(/identity/)
-    await expect(records.read({ target: ORDER, key: orderKey('1'), columns: [col('country', 'flag')], filters: TENANT_1 })).rejects.toThrow(/no canonical text/)
+    await expect(records.read({ target: ORDER, key: customerKey('1', '1001'), columns: [], filters: TENANT_1, through: [] })).rejects.toThrow(/identity/)
+    await expect(records.read({ target: ORDER, key: orderKey('1'), columns: [col('country', 'flag')], filters: TENANT_1, through: [] })).rejects.toThrow(/no canonical text/)
     await expect(insert([amount, amount])).rejects.toThrow(/named twice/)
     // 0008: never a JavaScript number for a decimal, nor for an integer past 2^53, nor text for a boolean.
     await expect(insert([{ ...amount, value: 1 }])).rejects.toThrow(/not a canonical value for a decimal/)
@@ -940,8 +940,8 @@ describe('requests no binding produces', () => {
     // A definition this adapter did not make -- another adapter's, or one typed by hand -- guards nothing (0041).
     await expect(records.update({ ...updateOf('1', '1', 'x'), definition: '0'.repeat(64) })).rejects.toThrow(/definition this adapter described/)
     await expect(records.insert({ target: ORDER, values: [], returning: [], definition: 'by hand@read committed' })).rejects.toThrow(/definition this adapter described/)
-    await expect(records.read({ target: { ...ORDER, table: { schema: 'sales', name: '' } }, key: orderKey('1'), columns: [], filters: TENANT_1 })).rejects.toThrow(/non-empty/)
-    await expect(records.read({ target: { ...ORDER, table: { schema: 'sales', name: 'or\u0000der' } }, key: orderKey('1'), columns: [], filters: TENANT_1 })).rejects.toThrow(/NUL/)
+    await expect(records.read({ target: { ...ORDER, table: { schema: 'sales', name: '' } }, key: orderKey('1'), columns: [], filters: TENANT_1, through: [] })).rejects.toThrow(/non-empty/)
+    await expect(records.read({ target: { ...ORDER, table: { schema: 'sales', name: 'or\u0000der' } }, key: orderKey('1'), columns: [], filters: TENANT_1, through: [] })).rejects.toThrow(/NUL/)
   })
 
   // An identity is a key by construction (0009). One that is not would make
@@ -949,7 +949,7 @@ describe('requests no binding produces', () => {
   test('an identity that matches several rows is thrown, not read', async () => {
     await owner.unsafe('insert into rec.guarded values (10, 5), (11, 5)')
     const byAmount: RecordTarget = { table: { schema: 'rec', name: 'guarded' }, identity: [col('guarded', 'amount')], concurrency: null }
-    const request = { target: byAmount, key: [val('guarded', 'amount', '5')], columns: [col('guarded', 'id')], filters: EVERY_ROW }
+    const request = { target: byAmount, key: [val('guarded', 'amount', '5')], columns: [col('guarded', 'id')], filters: EVERY_ROW, through: [] }
     await expect(defined(createPostgresRecords(owner)).read(request)).rejects.toThrow(/not a key/)
   })
 
@@ -969,7 +969,7 @@ describe('requests no binding produces', () => {
   // hand this adapter something other than the server's text; it is
   // refused rather than read.
   test('a driver whose row transform rewrites rows is refused, not read', async () => {
-    const request = { target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'status')], filters: TENANT_1 }
+    const request = { target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'status')], filters: TENANT_1, through: [] }
     const asObjects = postgres(fixture.admin, { onnotice: () => {}, transform: { row: { from: (row: unknown) => ({ row }) } } })
     const asText = postgres(fixture.admin, { onnotice: () => {}, transform: { row: { from: (row: unknown) => (Array.isArray(row) ? row.map(String) : row) } } })
     try {
@@ -1079,7 +1079,7 @@ describe('a connection lost during a read', () => {
       await viaProxy`select 1`
       const held = await owner.begin(async (tx) => {
         await tx`lock table sales."order" in access exclusive mode`
-        const pending = defined(createPostgresRecords(viaProxy)).read({ target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'status')], filters: TENANT_1 })
+        const pending = defined(createPostgresRecords(viaProxy)).read({ target: ORDER, key: orderKey(EDGE_VALUES.beyondSafeInteger), columns: [col('order', 'status')], filters: TENANT_1, through: [] })
         await waitUntilBlocked(1)
         proxy.cut()
         return { pending }

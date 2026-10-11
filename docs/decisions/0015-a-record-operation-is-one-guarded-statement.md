@@ -1,6 +1,6 @@
 # 0015 — A record operation is one guarded statement, canonical in and out, never retried
 
-- **Status:** accepted; extended by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): a lost answer is carried to the host as unknown, and a test on both engines fails if anything replays it; narrowed by [0041](0041-the-runtime-refuses-what-drift-blocks.md): a read carries the table's description, and a write the definition it was decided over, refused `schema-changed` and not written when the table no longer has it
+- **Status:** accepted; extended by [0031](0031-an-answer-lost-after-a-write-is-unknown.md): a lost answer is carried to the host as unknown, and a test on both engines fails if anything replays it; narrowed by [0041](0041-the-runtime-refuses-what-drift-blocks.md): a read carries the table's description, and a write the definition it was decided over, refused `schema-changed` and not written when the table no longer has it; extended by [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md): the WHERE that locates a record carries every through, the read that tells stale from not-found included
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** both adapters' record and lookup suites, against real

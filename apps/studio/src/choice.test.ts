@@ -2,9 +2,9 @@
 //
 // Node rather than jsdom: the choice model is plain data.
 import { describe, expect, test } from 'vitest'
-import { createSnapshot, findObject } from '@formancy/data-core'
+import { createSnapshot, findObject, generateForm } from '@formancy/data-core'
 import type { ForeignKeyMeta, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
-import { formIdFor, lookupBlocker, pinCandidates, titleFor } from './choice.js'
+import { formIdFor, lookupBlocker, pinCandidates, throughBlocker, titleFor } from './choice.js'
 import { OWNER_SNAPSHOT, WRITER_SNAPSHOT } from './test-server.js'
 
 /**
@@ -93,5 +93,22 @@ describe('the columns a policy can pin', () => {
     expect(offered).toContain('name')
     expect(offered).not.toContain('active')
     expect(offered).not.toContain('created_at')
+  })
+})
+
+describe('which lookups a form can be reached through (0043)', () => {
+  // A line has no tenant; its order does, and its key is an integer, which a
+  // through compares as the foreign key does: offered. A customer's country
+  // is keyed by iso_code, char(2): the two sides are compared directly, and
+  // no snapshot records a collation to compare text by, so the server
+  // refuses that through at publish -- and the studio says why first, in the
+  // server's own words, because it asks the same function.
+  test('offers a lookup over an integer key, and says why one over a text key is not', () => {
+    const generated = (root: string, foreignKey: string, display: string) =>
+      generateForm(OWNER_SNAPSHOT, { connection: 'fixture', root: { schema: 'sales', name: root }, formId: root, title: root, lookups: [{ foreignKey, display: [display] }] }).bindings
+    expect(throughBlocker(OWNER_SNAPSHOT, generated('order_line', 'fk_order_line_order', 'order_date'), 'order')).toBeNull()
+    expect(throughBlocker(OWNER_SNAPSHOT, generated('customer', 'fk_customer_country', 'name'), 'country')).toBe(
+      'it joins sales.customer.country_code and sales.country.iso_code, which a through cannot compare: only integer, decimal, uuid and date keys are compared without a collation, and the snapshot records none',
+    )
   })
 })

@@ -384,7 +384,7 @@ describe('publishing over keys that now name other columns (0039)', () => {
     expect(undecided.statusCode).toBe(422)
     expect(undecided.json()).toEqual({
       code: 'keys-reassigned',
-      message: 'Version 1 bound job_title, job_title_2 to other columns or lookups: confirm the grants on each for what it stands for now, or remove them.',
+      message: "Version 1 bound job_title, job_title_2 to other columns or lookups: confirm the grants on each for what it stands for now, or remove them. A grant is a role on the key's field, or a through that scopes this form's rows by it.",
       keys: REASSIGNED,
       problems: [
         'Grants for job_title were written for column job_title; it now stands for column job title.',

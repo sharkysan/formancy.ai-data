@@ -183,7 +183,7 @@ describe('an answer lost after the write committed', () => {
       key: [{ ...ORDER_ID, value: id }],
       set: [{ ...col('sales', 'order', 'notes'), value: notes }],
       expectedVersion: version,
-      filters: TENANT_1,
+      filters: TENANT_1, through: [],
       returning: [col('sales', 'order', 'notes')],
     })
     const stored = async (): Promise<unknown> => [...(await owner`select notes, row_version::text as version from sales."order" where id = ${id}`)]
@@ -294,16 +294,16 @@ describe('the lock-first path, under a default isolation other than READ COMMITT
       const created = await defined(createPostgresRecords(owner)).insert({ target: ORDER, values: orderValues(marker('before the locked update')), returning: [ORDER_ID] })
       if (!created.ok) throw new Error(created.message)
       const key = [{ ...ORDER_ID, value: String(created.values.id) }]
-      const read = await records.read({ target: ORDER, key, columns: [ORDER_ID], filters: TENANT_1 })
+      const read = await records.read({ target: ORDER, key, columns: [ORDER_ID], filters: TENANT_1, through: [] })
       if (!read.ok || read.record === null) throw new Error('the order was not read')
       expect(read.described.definition).toMatch(/@repeatable read$/)
       const notes = marker('locked update, answer lost')
       const lost = hop.swallowAnswersFrom(answerBytes('postgres', notes))
-      const pending = records.update({ target: ORDER, key, set: [{ ...col('sales', 'order', 'notes'), value: notes }], expectedVersion: read.record.version as string, filters: TENANT_1, returning: [col('sales', 'order', 'notes')], definition: read.described.definition })
+      const pending = records.update({ target: ORDER, key, set: [{ ...col('sales', 'order', 'notes'), value: notes }], expectedVersion: read.record.version as string, filters: TENANT_1, through: [], returning: [col('sales', 'order', 'notes')], definition: read.described.definition })
       await within(lost.matched, 'the marker never appeared in an answer')
       lost.cut()
       expect(failed(await within(pending, 'the update never answered'))).toMatchObject({ code: 'unknown-outcome', message: expect.stringMatching(/CONNECTION_CLOSED/) })
-      expect(await within(records.read({ target: ORDER, key, columns: [ORDER_ID], filters: TENANT_1 }), 'the driver never answered again')).toMatchObject({ ok: true })
+      expect(await within(records.read({ target: ORDER, key, columns: [ORDER_ID], filters: TENANT_1, through: [] }), 'the driver never answered again')).toMatchObject({ ok: true })
     } finally {
       await repeatable.end({ timeout: 1 })
     }

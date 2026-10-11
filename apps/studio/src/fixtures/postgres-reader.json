@@ -931,6 +931,26 @@
             "insert": false,
             "update": false
           }
+        },
+        {
+          "name": "row_version",
+          "ordinal": 6,
+          "databaseType": "bigint",
+          "type": {
+            "kind": "integer",
+            "min": "-9223372036854775808",
+            "max": "9223372036854775807"
+          },
+          "nullable": false,
+          "hasDefault": true,
+          "defaultExpression": "1",
+          "generated": "none",
+          "comment": null,
+          "access": {
+            "select": false,
+            "insert": false,
+            "update": false
+          }
         }
       ],
       "primaryKey": {
@@ -1230,5 +1250,5 @@
     }
   ],
   "gaps": [],
-  "fingerprint": "1bac744881090829134c8d29863c7341c87f0e35f7cc1e50815df592416f11af"
+  "fingerprint": "d77999f34096ab6e68e42d3e3cb6663b44fce1eeb576c65d1cbf70b72432a416"
 }

@@ -82,6 +82,8 @@ export interface ParsedPolicy {
   fields: ReadonlyMap<string, ParsedFieldPolicy>
   rowFilters: readonly RowFilterRule[]
   lookups: ReadonlyMap<string, readonly RowFilterRule[]>
+  /** The lookup fields whose target's filter scopes the root too (0043), each once, in the policy's order; empty when the policy names none. */
+  through: readonly string[]
 }
 
 /**
@@ -153,6 +155,23 @@ function readFields(value: unknown, problems: string[]): Map<string, ParsedField
   return fields
 }
 
+/** The lookup keys a through names, each once; an absent property is none. */
+function readThrough(value: unknown, problems: string[]): string[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) {
+    problems.push('through is not a list of lookup field keys')
+    return []
+  }
+  const keys: string[] = []
+  for (const [index, entry] of (value as unknown[]).entries()) {
+    const key = nameOrNull(entry)
+    if (key === null) problems.push(`through[${String(index)}] is not a field key`)
+    else if (keys.includes(key)) problems.push(`through[${String(index)}] names ${key} a second time`)
+    else keys.push(key)
+  }
+  return keys
+}
+
 /**
  * The policy as the rest of this module uses it, or every reason it cannot be.
  *
@@ -163,7 +182,7 @@ function readFields(value: unknown, problems: string[]): Map<string, ParsedField
 export function readPolicy(policy: unknown): { parsed: ParsedPolicy; problems: [] } | { parsed: null; problems: string[] } {
   if (!isRecord(policy)) return { parsed: null, problems: ['the policy is not an object'] }
   const problems: string[] = []
-  unread(policy, ['version', 'operations', 'fields', 'rowFilters', 'lookups'], '', problems)
+  unread(policy, ['version', 'operations', 'fields', 'rowFilters', 'lookups', 'through'], '', problems)
   if (policy['version'] !== 1) problems.push('version is not 1, the only policy version this release reads')
 
   const rawOperations = policy['operations']
@@ -186,6 +205,8 @@ export function readPolicy(policy: unknown): { parsed: ParsedPolicy; problems: [
     problems.push('lookups is not an object')
   }
 
+  const through = readThrough(policy['through'], problems)
+
   if (problems.length > 0) return { parsed: null, problems }
-  return { parsed: { operations, fields, rowFilters, lookups }, problems: [] }
+  return { parsed: { operations, fields, rowFilters, lookups, through }, problems: [] }
 }

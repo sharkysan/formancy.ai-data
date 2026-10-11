@@ -203,9 +203,9 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
       {
         name: 'row_version',
         nullable: false,
-        // The one place the two engines are deliberately different: PostgreSQL
-        // has no rowversion, so the fixture uses an application-maintained
-        // version column there.
+        // Where the two engines are deliberately different, here and on
+        // order_line: PostgreSQL has no rowversion, so the fixture uses an
+        // application-maintained version column there.
         byKind: {
           postgres: { type: INT64, generated: 'none', hasDefault: true },
           sqlserver: { type: { kind: 'rowversion' }, generated: 'rowversion' },
@@ -254,6 +254,16 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
       // where defaults live; a naive reader would report it as a default. It is not
       // one, and the model says so for both engines.
       { name: 'line_total', type: { kind: 'decimal' }, generated: 'computed', hasDefault: false },
+      // A line is updated as a child of its order, through it (0043), and needs
+      // a version of its own for that: the engines differ here as on order.
+      {
+        name: 'row_version',
+        nullable: false,
+        byKind: {
+          postgres: { type: INT64, generated: 'none', hasDefault: true },
+          sqlserver: { type: { kind: 'rowversion' }, generated: 'rowversion' },
+        },
+      },
     ],
     primaryKey: ['order_id', 'line_no'],
     uniqueKeys: {},

@@ -1,6 +1,6 @@
 # 0039 — The server refuses a publish whose keys now name other columns, unless it says what happens to their grants
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md): a key a policy's `through` names is a grant on it, with or without a role on its field, and `grantsOnKey` counts it
 - **Date:** 2026-10-10
 - **Deciders:** Daniel Bacher
 - **Verified by:**

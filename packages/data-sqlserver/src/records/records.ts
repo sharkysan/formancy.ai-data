@@ -1,5 +1,5 @@
 import type { RecordAdapter, RecordColumn, RecordConcurrency, RecordFailure, RecordRead, RecordTarget, RecordValue } from '@formancy/data-core'
-import { decodeRowversion, encodeRowversion, rowFilterTerms } from '@formancy/data-core'
+import { decodeRowversion, encodeRowversion, rowFilterTerms, throughTerms } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
 import { prepare, send } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
@@ -146,8 +146,9 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
 
     async read(request) {
       const terms = rowFilterTerms(request.filters)
+      const through = throughTerms(request.through)
       checkKey(request.target, request.key)
-      const rows = await attempt(pool, readStatement(request, terms), 'read')
+      const rows = await attempt(pool, readStatement(request, terms, through), 'read')
       if (!Array.isArray(rows)) return rows
       // Always a row, the description's, with the record beside it or not.
       const row = onlyRow(rows) as Row
@@ -171,6 +172,7 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
     async update(request) {
       const { target } = request
       const terms = rowFilterTerms(request.filters)
+      const through = throughTerms(request.through)
       checkKey(target, request.key)
       if (request.set.length === 0) throw new Error('An update sets at least one column')
       checkAssigned(request.set, target.concurrency.column)
@@ -178,7 +180,7 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
 
       const expected = expectedVersion(target.concurrency, request.expectedVersion)
       if (expected !== undefined) {
-        const rows = await attempt(pool, updateStatement(request, terms, expected, definition), 'write', request.set)
+        const rows = await attempt(pool, updateStatement(request, terms, through, expected, definition), 'write', request.set)
         if (!Array.isArray(rows)) return rows
         const row = onlyRow(rows)
         if (row !== undefined) return { ok: true, ...recordFrom(row, request.returning, target.concurrency) }
@@ -186,8 +188,9 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
 
       // Nothing matched: the table moved, the version moved, or there is no
       // such record for this actor. A second query tells them apart, in that
-      // order; the write changed nothing, so its failure is a read's.
-      const found = await attempt(pool, existsStatement(target.table, request.key, terms, definition), 'read')
+      // order, inside the same filters and throughs; the write changed
+      // nothing, so its failure is a read's.
+      const found = await attempt(pool, existsStatement(request, terms, through, definition), 'read')
       if (!Array.isArray(found)) return found
       if (Number(found[0]?.same ?? 0) !== 1) return DEFINITION_MOVED
       return Number(found[0]?.found ?? 0) > 0 ? STALE : NOT_FOUND

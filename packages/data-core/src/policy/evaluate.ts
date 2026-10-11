@@ -9,8 +9,10 @@ import type {
   PolicyRefusal,
   PolicyRefusalCode,
   ReadableFields,
+  RowFilter,
   RowFilterResult,
   RowFilterRule,
+  ThroughFilters,
 } from './types.js'
 import { fitPolicy } from './validate.js'
 
@@ -85,17 +87,40 @@ function authorise(policy: ParsedPolicy, actor: TrustedContext, operation: Polic
 }
 
 /**
+ * Each through's lookup filter resolved from the context (0043), in the
+ * policy's order: what `throughFilters` scopes a read or an update with, and
+ * what `authorizeOperation` asks of every operation. A missing attribute is
+ * a refusal, never a shorter scope. A through over a lookup with no entry
+ * resolves no rule here; fitting the policy to its form refuses it first.
+ */
+function resolveThrough(policy: ParsedPolicy, actor: TrustedContext): ThroughFilters {
+  const through: Array<{ field: string; filter: RowFilter }> = []
+  for (const field of policy.through) {
+    const resolved = resolve(policy.lookups.get(field) ?? [], actor, `lookups.${field}`)
+    if (!resolved.ok) return resolved
+    through.push({ field, filter: resolved.filter })
+  }
+  return { ok: true, through }
+}
+
+/**
  * Whether the actor may read, create or update records of this form.
  *
  * An operation that cannot be scoped is not authorised either: when a row
  * filter names an attribute the context lacks, this refuses, so a caller that
- * checked only this would not go on to query without the filter.
+ * checked only this would not go on to query without the filter. So does a
+ * through's filter (0043), for every operation: a read and an update carry
+ * it, and a create's parent is checked under it, so a context without its
+ * attribute can do none of them, and a form that offered them would refuse
+ * every request.
  */
 export function authorizeOperation(policy: FormPolicy, context: PolicyContext, operation: PolicyOperation): PolicyDecision {
   const prepared = prepare(policy, context)
   if (!prepared.ok) return prepared
   const scoped = authorise(prepared.policy, prepared.actor, operation)
-  return scoped.ok ? { ok: true } : scoped
+  if (!scoped.ok) return scoped
+  const through = resolveThrough(prepared.policy, prepared.actor)
+  return through.ok ? { ok: true } : through
 }
 
 /**
@@ -227,6 +252,30 @@ export function lookupRowFilter(
     return refuse('field-denied', `this actor may neither read nor write ${lookupField}, so its options are not theirs to search`)
   }
   return resolve(rules, actor, `lookups.${lookupField}`)
+}
+
+/**
+ * The filters a policy's `through` puts on the root (0043): for each lookup
+ * it names, in the policy's order, that lookup's filter on its target,
+ * resolved from the context. A root row exists for the operation only where
+ * the row each of these lookups references is one its filter admits.
+ *
+ * The operation is authorised and the root scoped first, and the policy is
+ * fitted to the form, which refuses a through that scopes nothing. Each
+ * lookup's rules are resolved as `lookupRowFilter` resolves them: a missing
+ * attribute is a refusal, never a shorter scope. Unlike `lookupRowFilter`
+ * it asks for no grant on the field. A through is a row filter: it scopes
+ * which rows exist, and offers the actor no options to search, so an actor
+ * granted nothing on the field is scoped by it like anybody else.
+ */
+export function throughFilters(policy: FormPolicy, context: PolicyContext, bindings: FormBindings, operation: PolicyOperation): ThroughFilters {
+  const prepared = prepare(policy, context, bindings)
+  if (!prepared.ok) return prepared
+  const { policy: parsed, actor } = prepared
+  const scoped = authorise(parsed, actor, operation)
+  if (!scoped.ok) return scoped
+  // Fitted: a through over a lookup with no entry, or with [], is refused above.
+  return resolveThrough(parsed, actor)
 }
 
 /**

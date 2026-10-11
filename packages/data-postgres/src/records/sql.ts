@@ -1,4 +1,4 @@
-import type { InsertRequest, ObjectRef, ReadRequest, RecordColumn, RecordTarget, RecordValue, RowFilterTerm, UpdateRequest } from '@formancy/data-core'
+import type { InsertRequest, ObjectRef, ReadRequest, RecordColumn, RecordTarget, RecordValue, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
 import { op } from '../sql/catalog.js'
 import { filterSql } from '../sql/filters.js'
 import { quoteIdentifier, quoteTable } from '../sql/identifiers.js'
@@ -38,10 +38,42 @@ function outputs(target: RecordTarget, columns: readonly RecordColumn[]): string
   return list
 }
 
-/** The record named by its key, inside the trusted filters: the WHERE of every statement but an insert. */
-function located(statement: Statement, key: readonly RecordValue[], terms: readonly RowFilterTerm[]): string[] {
+/** The alias of a through's target inside its EXISTS. */
+const PARENT = '"p"'
+
+/**
+ * One through (0043) as a condition on the record: its parent row, the one
+ * the record's foreign-key columns reference, is one the target's filter
+ * admits. An EXISTS in the statement itself, so the scope is in the WHERE
+ * that locates the record, never in a read before it. The parent is read
+ * from the statement's snapshot and never again: an update that waits for
+ * the record's row and then writes it does not see a parent moved out of
+ * the scope by a transaction that committed during the wait, and the write
+ * lands as though it had come first -- under READ COMMITTED and REPEATABLE
+ * READ alike -- where a row filter on the record itself is checked again on
+ * the row the wait ends with, and SQL Server answers not-found (measured,
+ * the through suites' `moved-parent` case; 0043). `for share of "p"` closes
+ * it, measured the same way, and is not done: it needs UPDATE privilege on
+ * the parent and locks the parent's row on every write of a child. The pair
+ * compares with the database's own equality, as the foreign key does,
+ * through pg_catalog's operator; every column is qualified, so a key onto
+ * the same table compares the parent's key with the record's column and
+ * never a row with itself. A record whose foreign key is NULL matches no
+ * parent, and is outside.
+ */
+function throughSql(statement: Statement, through: ThroughTerms): string {
+  const pairs = through.pairs.map((pair) => `${PARENT}.${quoteIdentifier(pair.references)} ${op('=')} ${column(pair.column)}`)
+  return `exists (select from ${quoteTable(through.target)} as ${PARENT} where ${[...pairs, ...filterSql(statement, PARENT, through.terms)].join(' and ')})`
+}
+
+/**
+ * The record named by its key, inside the trusted filters and every through:
+ * the WHERE of every statement but an insert, and so of the read, the update
+ * and the statement that tells a stale update from one aimed at nothing.
+ */
+function located(statement: Statement, key: readonly RecordValue[], terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): string[] {
   const where = key.map((value) => `${column(value.name)} ${op('=')} ${bound(statement, value)}`)
-  return [...where, ...filterSql(statement, ROW, terms)]
+  return [...where, ...filterSql(statement, ROW, terms), ...through.map((entry) => throughSql(statement, entry))]
 }
 
 /**
@@ -121,10 +153,10 @@ export function describeStatement(table: ObjectRef): RecordStatement {
  * when the record is there, then its columns and version. One row with no
  * record when none is inside the filters; two when the identity is not a key.
  */
-export function readStatement(request: ReadRequest, terms: readonly RowFilterTerm[]): RecordStatement {
+export function readStatement(request: ReadRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): RecordStatement {
   const statement = new Statement()
   const { select, from } = described(statement, request.target.table)
-  const where = located(statement, request.key, terms)
+  const where = located(statement, request.key, terms, through)
   const record = selectFrom(request.target.table, ['true', ...outputs(request.target, request.columns)], where)
   return { text: `select ${select}, "record".*\nfrom ${from}\nleft join lateral (${record}) as "record" on true`, params: statement.params }
 }
@@ -137,10 +169,10 @@ export function readStatement(request: ReadRequest, terms: readonly RowFilterTer
  * `false`, or NULL for no such record. The digest depends on no session
  * (definition.ts), so any connection answers it as the write's would.
  */
-export function nothingChangedStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], withVersion: boolean, definition: Definition): RecordStatement {
+export function nothingChangedStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], withVersion: boolean, definition: Definition): RecordStatement {
   const statement = new Statement()
   const same = `(${digestOf(factsOf(statement, request.target.table))} ${op('=')} ${statement.text(definition.digest)})::pg_catalog.text`
-  const where = located(statement, request.key, terms)
+  const where = located(statement, request.key, terms, through)
   const unchanged = withVersion ? `(${versionIs(statement, request)})::pg_catalog.text` : `'false'`
   const found = `${selectFrom(request.target.table, [`${unchanged} as "unchanged"`], where)}\nlimit 1`
   return { text: `select ${same}, ${ISOLATION}, "found"."unchanged"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`, params: statement.params }
@@ -174,18 +206,19 @@ export function insertStatement(request: InsertRequest, definition: Definition, 
 }
 
 /**
- * One guarded update (0015): the key, the trusted filters and the expected
- * version in one WHERE, and the version column moved by one in the same
- * statement, so nothing can change between the check and the write and
- * every writer through this module sees the change. The same WHERE holds
- * the table to the definition the update was decided over (0041).
+ * One guarded update (0015): the key, the trusted filters, every through
+ * (0043) and the expected version in one WHERE, and the version column
+ * moved by one in the same statement, so nothing can change between the
+ * check and the write and every writer through this module sees the change.
+ * The same WHERE holds the table to the definition the update was decided
+ * over (0041).
  */
-export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], definition: Definition, path: WritePath): RecordStatement {
+export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], definition: Definition, path: WritePath): RecordStatement {
   const statement = new Statement()
   const version = request.target.concurrency.column
   const set = request.set.map((value) => `${quoteIdentifier(value.name)} = ${bound(statement, value)}`)
   set.push(`${quoteIdentifier(version)} = ${column(version)} ${op('+')} 1`)
-  const where = [...located(statement, request.key, terms), versionIs(statement, request), ...guard(statement, request.target.table, definition, path)]
+  const where = [...located(statement, request.key, terms, through), versionIs(statement, request), ...guard(statement, request.target.table, definition, path)]
   const text = [
     `update ${quoteTable(request.target.table)} as ${ROW}`,
     `set ${set.join(', ')}`,

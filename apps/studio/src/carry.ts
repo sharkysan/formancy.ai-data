@@ -35,8 +35,8 @@ export interface Carried {
 /**
  * The keys a draft still asks about: those undecided, and those removed
  * whose field has been given a role since -- by hand, or by filling every
- * field from the operations -- by the test the server refuses with,
- * `grantsOnKey` (0039).
+ * field from the operations -- or that a through names again (0043), by
+ * the test the server refuses with, `grantsOnKey` (0039).
  */
 export function asked(carried: Carried | null, policy: FormPolicy): ReassignedKey[] {
   if (carried === null) return []

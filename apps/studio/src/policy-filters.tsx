@@ -159,23 +159,75 @@ export function RowFilters({
 }
 
 /**
+ * Whether the root's rows are reached through a lookup (0043): a box, offered
+ * where its list is filtered and `throughBlocker` finds nothing -- or where
+ * the policy already names it, so it can be taken back -- and otherwise,
+ * under a filtered list, the reason it is not.
+ */
+function ThroughChoice({
+  field,
+  root,
+  label,
+  filtered,
+  blocker,
+  scoping,
+  onScoping,
+}: {
+  field: string
+  root: string
+  label: string
+  filtered: boolean
+  blocker: string | null
+  scoping: boolean
+  onScoping: (scoping: boolean) => void
+}): ReactElement | null {
+  const id = `through-${field}`
+  const reason = blocker === null || !filtered ? null : <p className="hint">Rows of {root} are not reached through {label}: {blocker}.</p>
+  if (!scoping && (!filtered || blocker !== null)) return reason
+  return (
+    <>
+      <div className="check">
+        <input type="checkbox" id={id} checked={scoping} aria-describedby={`${id}-about`} onChange={(event) => onScoping(event.target.checked)} />
+        <label htmlFor={id}>
+          Only rows of {root} whose {label} is one of these
+        </label>
+      </div>
+      <p className="hint" id={`${id}-about`}>
+        For a table with no tenant of its own: a row of {root} is read and updated only while the row its {label} names is one
+        this list may offer, and created only under one. A row that names none is reached by nobody.
+      </p>
+      {reason}
+    </>
+  )
+}
+
+/**
  * Which rows each lookup may offer. Undecided is its own state, distinct from
  * "every row": `validatePolicy` refuses a lookup the policy says nothing
  * about, and offering every tenant's customers is a choice a person makes,
- * not a default.
+ * not a default. Under each, whether the root's rows are reached through it
+ * (0043).
  */
 export function LookupFilters({
   lookups,
   labels,
   snapshot,
   policy,
+  root,
+  blockers,
   onLookups,
+  onThrough,
 }: {
   lookups: readonly LookupBinding[]
   labels: Readonly<Record<string, string>>
   snapshot: MetadataSnapshot
   policy: FormPolicy
+  /** The root, as the step names it. */
+  root: string
+  /** Why the root cannot be reached through each lookup, by field, or `null` (`throughBlocker`). */
+  blockers: Readonly<Record<string, string | null>>
   onLookups: (next: FormPolicy['lookups']) => void
+  onThrough: (next: string[]) => void
 }): ReactElement | null {
   const focusAfter = useFocusAfterRender()
   if (lookups.length === 0) return null
@@ -185,6 +237,7 @@ export function LookupFilters({
     else next[field] = rules
     onLookups(next)
   }
+  const through = policy.through ?? []
   return (
     <>
       {lookups.map((binding) => {
@@ -237,6 +290,15 @@ export function LookupFilters({
                 Add a filter{' '}<span className="visually-hidden">to the {label} list</span>
               </button>
             </p>
+            <ThroughChoice
+              field={binding.field}
+              root={root}
+              label={label}
+              filtered={rules !== undefined && rules.length > 0}
+              blocker={blockers[binding.field] ?? null}
+              scoping={through.includes(binding.field)}
+              onScoping={(scoping) => onThrough(scoping ? [...through, binding.field] : through.filter((field) => field !== binding.field))}
+            />
           </fieldset>
         )
       })}

@@ -103,10 +103,14 @@ export function orphanFields(policy: FormPolicy, bindings: FormBindings): string
   return Object.keys(policy.fields).filter((key) => !keys.has(key))
 }
 
-/** Lookup entries for keys that are not lookup fields of this form. */
+/**
+ * Lookup entries for keys that are not lookup fields of this form: a filter's,
+ * then a through's that has no filter entry (0043), each once.
+ */
 export function orphanLookups(policy: FormPolicy, bindings: FormBindings): string[] {
   const keys = new Set(lookupBindings(bindings).map((binding) => binding.field))
-  return Object.keys(policy.lookups).filter((key) => !keys.has(key))
+  const filtered = Object.keys(policy.lookups).filter((key) => !keys.has(key))
+  return [...filtered, ...(policy.through ?? []).filter((key) => !keys.has(key) && !filtered.includes(key))]
 }
 
 /** One field's roles, with an entry that grants nothing removed rather than kept empty. */
@@ -115,4 +119,21 @@ export function withFieldRoles(policy: FormPolicy, key: string, read: string[], 
   if (read.length === 0 && write.length === 0) delete fields[key]
   else fields[key] = { read, write }
   return { ...policy, fields }
+}
+
+/**
+ * The policy with `through` set (0043), the property left out when it names
+ * nothing: absent means none, and a policy that never uses it stays one a
+ * server older than it still reads.
+ */
+export function withThrough(policy: FormPolicy, through: readonly string[]): FormPolicy {
+  const { through: _, ...rest } = policy
+  return through.length === 0 ? rest : { ...rest, through: [...through] }
+}
+
+/** The policy with every entry for `key` in its lookups and its through removed: what a lookup's grants take with them. */
+export function withoutLookup(policy: FormPolicy, key: string): FormPolicy {
+  const lookups = { ...policy.lookups }
+  delete lookups[key]
+  return withThrough({ ...policy, lookups }, (policy.through ?? []).filter((entry) => entry !== key))
 }

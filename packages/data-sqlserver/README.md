@@ -254,12 +254,24 @@ counting pass counts it through a TCP hop on every run, and
 import { createSqlServerRecords } from '@formancy/data-sqlserver'
 
 const records = createSqlServerRecords(pool)
-const read = await records.read({ target, key, columns, filters })
+const read = await records.read({ target, key, columns, filters, through: [] })
 // { ok: true, described: { kind, columns, keys…, definition }, record: { values: { id: '9007199254740993', … }, version: '00000000000007d1' } }
-const saved = await records.update({ target, key, set, expectedVersion: read.record.version, filters, returning, definition: read.described.definition })
+const saved = await records.update({ target, key, set, expectedVersion: read.record.version, filters, through: [], returning, definition: read.described.definition })
 // or { ok: false, code: 'stale' | 'not-found' | 'schema-changed' | 'unique-violation' | …, message }
 ```
 
+- **A record is located by its key, the filters and every through**
+  ([0043](../../docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)).
+  The read, the update and the query that tells `stale` from `not-found`
+  name the table `[r]` -- `update [r] set … from <table> as [r]` -- and each
+  through is an `exists (select 1 from <target> as [p] where [p].<key> =
+  [r].<foreign key> and <filters on [p]>)`, every column qualified, so a key
+  onto the same table cannot bind the record's column to the parent. A row
+  another tenant's parent holds is `not-found` on read and on update,
+  whatever version is sent. An update that waited for its row while another
+  transaction moved the parent out of the scope is `not-found` too, with
+  READ_COMMITTED_SNAPSHOT off and on, where PostgreSQL writes it (the
+  shared case `through: moved-parent`). The EXISTS's plan is not measured.
 - **Every write holds the table to the definition it was decided over**
   ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)).
   `describe(table)` reads the root's definition in one statement, and a read

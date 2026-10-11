@@ -86,6 +86,24 @@ describe('snapshotDisagreements', () => {
     expect(snapshotDisagreements(swapped)).toEqual([expect.stringMatching(/sales\.order\.row_version type kind is "rowversion", expected "integer"/)])
   })
 
+  // An order's lines are updated through their order (0043), so they carry a
+  // version of their own -- the same difference as order's, on both engines.
+  // A snapshot taken before the fixture had it, as every captured snapshot
+  // was until recaptured, is a snapshot of another database.
+  test("holds order_line to its version column, each engine's edition, and refuses a snapshot without it", () => {
+    for (const kind of ['postgres', 'sqlserver'] as const) {
+      const version = columnOf(perfect(kind), 'order_line', 'row_version')
+      expect(version, kind).toMatchObject(kind === 'postgres' ? { type: { kind: 'integer' }, generated: 'none', hasDefault: true } : { type: { kind: 'rowversion' }, generated: 'rowversion' })
+      const before = snapshot(kind, (objects) => {
+        const line = object(objects, 'order_line')
+        line.columns = line.columns.filter((column) => column.name !== 'row_version')
+      })
+      expect(snapshotDisagreements(before), kind).toEqual([
+        'sales.order_line columns are [order_id, line_no, quantity, unit_price, line_total], expected [order_id, line_no, quantity, unit_price, line_total, row_version]',
+      ])
+    }
+  })
+
   // Every suite in a process shares the model. A test that edited it would make
   // later comparisons compare the model with itself and pass vacuously.
   test('the model cannot be edited by a test', () => {

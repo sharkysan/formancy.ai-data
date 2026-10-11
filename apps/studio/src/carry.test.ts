@@ -4,9 +4,11 @@
 // proposal to the next, with proposals the real server generated.
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createBuilderSession } from '@formancy/builder-core'
+import type { FormPolicy } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { AdminClient, Proposal, ProposalRequest } from './api.js'
-import { carryDraft, freshFields } from './carry.js'
+import { asked, carryDraft, freshFields } from './carry.js'
+import type { Carried } from './carry.js'
 import { OWNER_SNAPSHOT, startPlane, TOKENS, withColumn, withoutColumn } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
@@ -75,5 +77,22 @@ describe('carrying a draft to a new proposal', () => {
     const carried = carryDraft({ proposal: before, edited: session.exportDocument() }, before)
     expect(carried.ok).toBe(false)
     expect(!carried.ok && carried.message).toMatch(/^the draft holds edits that are not presentation: \/model\/fields\/\d+\/required: /)
+  })
+})
+
+describe('the keys a draft still asks about', () => {
+  const ORDER_KEY = { field: 'order', was: { kind: 'lookup', foreignKey: 'fk_line_order' }, now: { kind: 'lookup', foreignKey: 'fk_line_quote' } } as const
+  const removed: Carried = { from: 'version 1', version: 1, conflicts: [], fresh: [], undecided: [], kept: [], removed: [ORDER_KEY] }
+  const policy = (through: string[]): FormPolicy => ({ version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: {}, rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through })
+
+  // A removed key is asked about again once the policy grants on it again,
+  // by the server's test (0039). A through is such a grant (0043): ticked
+  // again over a key that now names another foreign key, it scopes the rows
+  // through another parent, with no role on the field. Not asked, the
+  // publish would be refused with the server's sentences and no Keep to
+  // answer them with (watched failing: a through counted as nothing).
+  test('asks again about a removed key that a through names again, with no role on its field', () => {
+    expect(asked(removed, policy([]))).toEqual([])
+    expect(asked(removed, policy(['order']))).toEqual([ORDER_KEY])
   })
 })

@@ -21,7 +21,10 @@ import {
   described,
   edited,
   fieldOf,
+  INT32,
   INT64,
+  LINE_POLICY,
+  lineForm,
   MS,
   MS_ORDER,
   ORDER_ID,
@@ -65,6 +68,7 @@ describe('planRead', () => {
         key: [value('id', INT64, ORDER_ID)],
         columns: [column('id', INT64), column('order_date', DATE), column('status', text(20))],
         filters: TENANT_ONE,
+        through: [],
       },
       fields: ['id', 'order_date', 'status'],
     })
@@ -82,6 +86,48 @@ describe('planRead', () => {
     const clerk = planRead(MS, MS_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN)
     expect(clerk).toMatchObject({ ok: true, fields: CLERK_FIELDS })
     if (clerk.ok) expect(clerk.request.columns).toEqual(CLERK_COLUMNS)
+  })
+
+  // A line has no tenant of its own (0043). Its read carries the order
+  // lookup's filter on sales.order, typed from that table's column, and the
+  // two sides of the foreign key paired in order, so the adapter can put the
+  // parent in the statement that decides "not found". Left off, the read
+  // reaches any tenant's line by a guessed key.
+  test("carries a typed through for a line's order, under the order lookup's filter", () => {
+    for (const source of [PG, MS]) {
+      const bindings = lineForm(source).bindings
+      expect(planRead(source, bindings, LINE_POLICY, CLERK, `k1:${ORDER_ID},1`), source.kind).toMatchObject({
+        ok: true,
+        request: {
+          key: [value('order_id', INT64, ORDER_ID), value('line_no', INT32, '1')],
+          filters: { kind: 'unrestricted' },
+          through: [{ columns: [column('order_id', INT64)], target: sales('order'), targetColumns: [{ name: 'id', type: INT64 }], filters: TENANT_ONE }],
+        },
+        fields: ['order', 'line_no', 'quantity', 'unit_price', 'line_total'],
+      })
+    }
+    // The order form names no through, and its read says so.
+    expect(planRead(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({ ok: true, request: { through: [] } })
+  })
+
+  // The through is the policy's, decided before the token: a missing tenant
+  // refuses rather than reading lines unscoped, and an actor granted nothing
+  // on the order field is scoped by it, not refused -- a through offers no
+  // options. A through the snapshot cannot compare is refused here as it is
+  // at publish, by the one function both ask.
+  test('refuses a missing tenant, scopes an actor granted nothing on the field, and refuses a through the snapshot cannot compare', () => {
+    const bindings = lineForm(PG).bindings
+    expect(planRead(PG, bindings, LINE_POLICY, actor(['clerk'], {}), `k1:${ORDER_ID},1`)).toMatchObject({ ok: false, code: 'missing-attribute', message: expect.stringMatching(/^lookups\.order: /) as unknown as string })
+    expect(planRead(PG, bindings, LINE_POLICY, AUDITOR, `k1:${ORDER_ID},1`)).toMatchObject({ ok: true, fields: ['line_total'], request: { through: [{ filters: TENANT_ONE }] } })
+    const textual = snapshot('postgres', (objects) => {
+      const id = objects.find((object) => object.ref.name === 'employee')?.columns.find((entry) => entry.name === 'id')
+      if (id !== undefined) id.type = text(10)
+    })
+    expect(planRead(textual, orderForm(textual).bindings, { ...ORDER_POLICY, through: ['employee'] }, CLERK, ORDER_TOKEN)).toMatchObject({
+      ok: false,
+      code: 'invalid-policy',
+      message: expect.stringMatching(/^through: employee joins sales\.employee\.id, which a through cannot compare/) as unknown as string,
+    })
   })
 
   // The token is a browser's. One that does not name a record of this form,

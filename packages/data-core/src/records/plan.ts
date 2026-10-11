@@ -5,16 +5,17 @@ import { readsCutToShape } from '../codecs/temporal.js'
 import type { FormBindings } from '../generate/types.js'
 import { buildLookupConfig } from '../lookup/config.js'
 import { scopeRowFilters } from '../lookup/filters.js'
-import type { LookupConfig, RowFilters } from '../lookup/types.js'
+import type { LookupConfig } from '../lookup/types.js'
 import { isKeyValue, isLookupKeyType } from '../lookup/values.js'
 import type { ColumnMeta, MetadataSnapshot, ObjectMeta } from '../metadata.js'
-import { checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter } from '../policy/evaluate.js'
-import type { FormPolicy, PolicyContext, RowFilter } from '../policy/types.js'
+import { checkSubmittedFields, forcedValues, lookupRowFilter, readableFields } from '../policy/evaluate.js'
+import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { findObject } from '../snapshot.js'
 import { columnAnswer, lookupAnswer } from './answers.js'
 import { driftRefusal } from './drift.js'
 import type { FieldError, FormRecord, InvalidValues, MembershipCheck, PlannedInsert, PlannedRead, PlannedUpdate, PlanRefusal } from './plan-types.js'
-import { columnsOf, inCatalogOrder, prepare, type Prepared, refuse } from './prepare.js'
+import { columnsOf, prepare, type Prepared, refuse } from './prepare.js'
+import { filtersFor, readColumns, throughFields, throughFor } from './scope.js'
 import { decodeRecordKey } from './token.js'
 import type { DescribedTable, RecordColumn, RecordValue } from './types.js'
 
@@ -72,26 +73,6 @@ function inCatalogValues(root: ObjectMeta, values: readonly RecordValue[]): Reco
   return [...values].sort((left, right) => (position.get(left.name) as number) - (position.get(right.name) as number))
 }
 
-/** The root's filter for an operation, each term typed from its column and spelled as the column holds it (0028). */
-function filtersFor(prepared: Prepared, policy: FormPolicy, context: PolicyContext, operation: 'read' | 'update'): { ok: true; filter: RowFilter; filters: RowFilters } | PlanRefusal {
-  const filter = rowFilter(policy, context, operation)
-  if (!filter.ok) return filter
-  const scoped = scopeRowFilters(prepared.root, filter.filter, 'rowFilters')
-  return scoped.ok ? { ok: true, filter: filter.filter, filters: scoped.filters } : scoped
-}
-
-/**
- * The columns to read back: the key, when a token can carry it, and the
- * columns of every field the actor may see. Nothing else, so a column the
- * policy keeps from this actor is never fetched.
- */
-function readColumns(prepared: Prepared, bindings: FormBindings, fields: readonly string[]): RecordColumn[] {
-  const names = new Set<string>(prepared.addressable ? prepared.target.identity.map((column) => column.name) : [])
-  const wanted = new Set(fields)
-  for (const binding of bindings.fields) if (wanted.has(binding.field)) for (const name of columnsOf(binding)) names.add(name)
-  return inCatalogOrder(prepared.root, names)
-}
-
 /** What a write reads back, and the fields `toFormAnswers` may show: nothing but the key for an actor who may not read. */
 function readBack(prepared: Prepared, bindings: FormBindings, policy: FormPolicy, context: PolicyContext): { fields: string[]; returning: RecordColumn[] } {
   const readable = readableFields(policy, context, bindings)
@@ -106,12 +87,16 @@ interface DecodedAnswers {
   selections: Array<[string, string]>
 }
 
+const REQUIRED = { code: 'required', message: 'A value is required.' } as const
+
 /**
  * Every answer through its column's codec, in the form's order, collecting
  * every error rather than stopping at the first. On create, a field left out
  * whose column the database would refuse to leave NULL is an error too: NOT
  * NULL, no default, not generated and not pinned. One with a default is left
- * out of the request, which is how the default applies.
+ * out of the request, which is how the default applies. A field a through
+ * names (`scoping`) is required on create and may not be cleared, whatever
+ * its column allows (0043).
  */
 function decodeAnswers(
   prepared: Prepared,
@@ -119,16 +104,21 @@ function decodeAnswers(
   answers: ReadonlyMap<string, unknown>,
   fixed: ReadonlyMap<string, ApiValue>,
   operation: 'create' | 'update',
+  scoping: ReadonlySet<string>,
 ): DecodedAnswers {
   const decoded: DecodedAnswers = { values: [], errors: [], selections: [] }
   for (const binding of bindings.fields) {
     const columns = columnsOf(binding).map((name) => prepared.columns.get(name) as ColumnMeta)
     if (!answers.has(binding.field)) {
-      const required = columns.some((column) => !fixed.has(column.name) && !column.nullable && !column.hasDefault && column.generated === 'none')
-      if (operation === 'create' && required) decoded.errors.push({ field: binding.field, code: 'required', message: 'A value is required.' })
+      const required = scoping.has(binding.field) || columns.some((column) => !fixed.has(column.name) && !column.nullable && !column.hasDefault && column.generated === 'none')
+      if (operation === 'create' && required) decoded.errors.push({ field: binding.field, ...REQUIRED })
       continue
     }
     const answer = answers.get(binding.field)
+    if (answer === null && scoping.has(binding.field)) {
+      decoded.errors.push({ field: binding.field, ...REQUIRED })
+      continue
+    }
     const outcome = binding.kind === 'column' ? columnAnswer(binding, columns[0] as ColumnMeta, answer, fixed) : lookupAnswer(binding, columns, answer, fixed)
     if (!outcome.ok) {
       decoded.errors.push(outcome.error)
@@ -187,13 +177,15 @@ export function planRead(snapshot: MetadataSnapshot, bindings: FormBindings, pol
   if (!prepared.addressable) return unaddressable(prepared)
   const filters = filtersFor(prepared, policy, context, 'read')
   if (!filters.ok) return filters
+  const through = throughFor(snapshot, bindings, prepared, policy, context, 'read')
+  if (!through.ok) return through
   const readable = readableFields(policy, context, bindings)
   if (!readable.ok) return readable
   const key = decodeRecordKey(prepared.target.identity, recordToken)
   if (!key.ok) return refuse('invalid-record-token', key.message)
   return {
     ok: true,
-    request: { target: prepared.target, key: key.key, columns: readColumns(prepared, bindings, readable.fields), filters: filters.filters },
+    request: { target: prepared.target, key: key.key, columns: readColumns(prepared, bindings, readable.fields), filters: filters.filters, through: through.through },
     fields: readable.fields,
   }
 }
@@ -237,11 +229,13 @@ export function planCreate(snapshot: MetadataSnapshot, bindings: FormBindings, p
   if (!pinned.ok) return pinned
   const allowed = checkSubmittedFields(policy, context, bindings, 'create', [...submitted.answers.keys()])
   if (!allowed.ok) return allowed
+  const scoping = throughFields(bindings, policy, context, 'create')
+  if (!scoping.ok) return scoping
   const drifted = driftRefusal(snapshot, bindings, policy, described, 'create')
   if (drifted !== undefined) return drifted
 
   const fixed = new Map(pinned.values.map((entry) => [entry.name, entry.value]))
-  const decoded = decodeAnswers(prepared, bindings, submitted.answers, fixed, 'create')
+  const decoded = decodeAnswers(prepared, bindings, submitted.answers, fixed, 'create', scoping.fields)
   if (decoded.errors.length > 0) return invalid(decoded.errors)
   const memberships = membershipChecks(snapshot, bindings, policy, context, 'create', decoded.selections)
   if (!memberships.ok) return memberships
@@ -349,6 +343,8 @@ export function planUpdate(
   if (!submitted.ok) return submitted
   const filters = filtersFor(prepared, policy, context, 'update')
   if (!filters.ok) return filters
+  const through = throughFor(snapshot, bindings, prepared, policy, context, 'update')
+  if (!through.ok) return through
   // The update increments its version column under this filter (0015); pinned
   // by it, the record would leave the rows the filter admits — its tenant.
   if (filters.filter.some((term) => term.column === concurrency.column)) {
@@ -372,7 +368,9 @@ export function planUpdate(
 
   const fixed = new Map<string, ApiValue>(filters.filter.map((term) => [term.column, term.value]))
   for (const part of key.key) if (!fixed.has(part.name)) fixed.set(part.name, part.value)
-  const decoded = decodeAnswers(prepared, bindings, unechoed.answers, fixed, 'update')
+  const scoping = throughFields(bindings, policy, context, 'update')
+  if (!scoping.ok) return scoping
+  const decoded = decodeAnswers(prepared, bindings, unechoed.answers, fixed, 'update', scoping.fields)
   if (decoded.errors.length > 0) return invalid(decoded.errors)
   // No statement sets nothing alike on both engines, so an empty patch is refused here, once.
   if (decoded.values.length === 0) return refuse('nothing-to-update', 'These answers change no column.')
@@ -387,6 +385,7 @@ export function planUpdate(
       set: inCatalogValues(prepared.root, decoded.values),
       expectedVersion,
       filters: filters.filters,
+      through: through.through,
       returning,
       definition: described.definition,
     },

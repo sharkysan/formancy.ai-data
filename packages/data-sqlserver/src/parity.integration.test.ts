@@ -183,7 +183,7 @@ describe('FILTER_PARITY: a row filter compares the canonical value exactly', () 
         await expect(lookups.search(config, PAGE, forged)).rejects.toThrow(/not spelled as its column holds it/)
         await expect(lookups.resolve(config, NAMED.map(token), forged)).rejects.toThrow(/not spelled as its column holds it/)
         const key = [parityValue(TENANT_ITEM, 'tenant_code', 'acme'), parityValue(TENANT_ITEM, 'item_no', '1')]
-        await expect(defined(createSqlServerRecords(owner)).read({ target: versioned(parity, TENANT_ITEM), key, columns: [], filters: forged })).rejects.toThrow(/not spelled as its column holds it/)
+        await expect(defined(createSqlServerRecords(owner)).read({ target: versioned(parity, TENANT_ITEM), key, columns: [], filters: forged, through: [] })).rejects.toThrow(/not spelled as its column holds it/)
         return
       }
       if (!scoped.ok) throw new Error(scoped.message)
@@ -204,7 +204,7 @@ describe('FILTER_PARITY: a row filter compares the canonical value exactly', () 
       for (const [tenantCode, itemNo] of NAMED) {
         const key = [parityValue(TENANT_ITEM, 'tenant_code', tenantCode), parityValue(TENANT_ITEM, 'item_no', itemNo)]
         const admitted = expected.includes(token([tenantCode, itemNo]))
-        const read = await records.read({ target, key, columns: [label], filters })
+        const read = await records.read({ target, key, columns: [label], filters, through: [] })
         expect(read.ok, `read ${tenantCode}`).toBe(admitted)
         const stored = await owner
           .request()
@@ -212,7 +212,7 @@ describe('FILTER_PARITY: a row filter compares the canonical value exactly', () 
           .query<{ label: string; version: number }>('select label, version from parity.tenant_item where item_no = @item')
         const row = stored.recordset[0]
         if (row === undefined) throw new Error(`item ${itemNo} is in the fixture`)
-        const update: Undefined<UpdateRequest> = { target, key, set: [{ ...label, value: row.label }], expectedVersion: String(row.version), filters, returning: [] }
+        const update: Undefined<UpdateRequest> = { target, key, set: [{ ...label, value: row.label }], expectedVersion: String(row.version), filters, through: [], returning: [] }
         expect(await records.update(update), `update ${tenantCode}`).toMatchObject(admitted ? { ok: true } : { ok: false, code: 'not-found' })
       }
     })
@@ -285,7 +285,7 @@ describe('DISPLAY_PARITY: a label is spelled from the canonical value', () => {
       target: { table: DISPLAY_KINDS, identity: [columnOf(parity, DISPLAY_KINDS, 'id')], concurrency: null },
       key: [parityValue(DISPLAY_KINDS, 'id', '1')],
       columns: [columnOf(parity, DISPLAY_KINDS, 'fixed'), columnOf(parity, DISPLAY_KINDS, 't')],
-      filters: EVERY_ROW,
+      filters: EVERY_ROW, through: [],
     })
     expect(read).toEqual({ ok: true, values: { fixed: 'AB', t: 'Text' }, version: null })
   })
@@ -303,7 +303,7 @@ describe('TEMPORAL_PARITY: an instant and a time are read cut to the shape', () 
       target: { table: DISPLAY_KINDS, identity: [columnOf(parity, DISPLAY_KINDS, 'id')], concurrency: null },
       key: [parityValue(DISPLAY_KINDS, 'id', '1')],
       columns: [columnOf(parity, DISPLAY_KINDS, 'tm'), columnOf(parity, DISPLAY_KINDS, 'ts')],
-      filters: EVERY_ROW,
+      filters: EVERY_ROW, through: [],
     })
     expect(read).toEqual({ ok: true, values: TEMPORAL_PARITY, version: null })
   })
@@ -348,7 +348,7 @@ describe('a varchar created under ANSI_PADDING OFF', () => {
     const target = versioned(local, UNPADDED)
     const trimmed = { ok: false, code: 'out-of-range', column: 'v', message: expect.stringContaining('trailing spaces') }
     expect(await records.insert({ target, values: [localValue(UNPADDED, 'id', '2'), localValue(UNPADDED, 'v', 'acme ')], returning: [] })).toMatchObject(trimmed)
-    const update: Undefined<UpdateRequest> = { target, key: [localValue(UNPADDED, 'id', '1')], set: [localValue(UNPADDED, 'v', 'acme ')], expectedVersion: '0', filters: EVERY_ROW, returning: [] }
+    const update: Undefined<UpdateRequest> = { target, key: [localValue(UNPADDED, 'id', '1')], set: [localValue(UNPADDED, 'v', 'acme ')], expectedVersion: '0', filters: EVERY_ROW, through: [], returning: [] }
     expect(await records.update(update)).toMatchObject(trimmed)
     const kept = await records.insert({ target, values: [localValue(UNPADDED, 'id', '3'), localValue(UNPADDED, 'n', 'acme ')], returning: [columnOf(local, UNPADDED, 'n')] })
     expect(kept).toMatchObject({ ok: true, values: { n: 'acme ' } })
@@ -382,7 +382,7 @@ describe('REFUSAL_PARITY: a refusal names the same code on both engines', () => 
       expect(await insert('2', 'odd')).toMatchObject({ ok: false, code: REFUSAL_PARITY.oddInsert, message: own('50000') })
       await owner.request().batch("if not exists (select 1 from parity.guarded where id = 10) insert into parity.guarded (id, note) values (10, N'fine')")
       for (const note of ['refuse', 'odd']) {
-        const update: Undefined<UpdateRequest> = { target, key: [parityValue(GUARDED, 'id', '10')], set: [parityValue(GUARDED, 'note', note)], expectedVersion: '0', filters: EVERY_ROW, returning: [] }
+        const update: Undefined<UpdateRequest> = { target, key: [parityValue(GUARDED, 'id', '10')], set: [parityValue(GUARDED, 'note', note)], expectedVersion: '0', filters: EVERY_ROW, through: [], returning: [] }
         expect(await records.update(update)).toMatchObject({ ok: false, code: REFUSAL_PARITY.guardedUpdate, message: own(note === 'refuse' ? '50001' : '50000') })
       }
       const stored = await owner.request().query<{ id: number; note: string; version: number }>('select id, note, version from parity.guarded')
@@ -429,7 +429,7 @@ describe('REFUSAL_PARITY: a refusal names the same code on both engines', () => 
       ] as const) {
         const insert = await records.insert({ target: drifting, values: [localValue(DRIFTING, 'id', '2'), localValue(DRIFTING, column, value)], returning: [] })
         expect(insert, `insert ${column}`).toMatchObject({ ok: false, code: 'schema-changed', message: expect.stringContaining(inserted) })
-        const update: Undefined<UpdateRequest> = { target: drifting, key: [localValue(DRIFTING, 'id', '1')], set: [localValue(DRIFTING, column, value)], expectedVersion: '0', filters: EVERY_ROW, returning: [] }
+        const update: Undefined<UpdateRequest> = { target: drifting, key: [localValue(DRIFTING, 'id', '1')], set: [localValue(DRIFTING, column, value)], expectedVersion: '0', filters: EVERY_ROW, through: [], returning: [] }
         expect(await records.update(update), `update ${column}`).toMatchObject({ ok: false, code: 'schema-changed', message: expect.stringContaining(updated) })
       }
     }
@@ -470,7 +470,7 @@ describe('REFUSAL_PARITY: a refusal names the same code on both engines', () => 
         key: [parityValue(CONTENDED, 'id', '1')],
         set: [parityValue(CONTENDED, 'note', 'changed')],
         expectedVersion: '0',
-        filters: EVERY_ROW,
+        filters: EVERY_ROW, through: [],
         returning: [],
       }
       const pending = defined(createSqlServerRecords(adapterPool)).update(update)
@@ -513,7 +513,7 @@ describe('REFUSAL_PARITY: a refusal names the same code on both engines', () => 
       const target = versioned(snapshot, NOTE)
       const unavailable = { ok: false, code: 'unavailable', message: expect.stringContaining('3906') }
       expect(await records.insert({ target, values: [value('id', '2'), value('note', 'two')], returning: [] })).toMatchObject(unavailable)
-      const update: Undefined<UpdateRequest> = { target, key: [value('id', '1')], set: [value('note', 'changed')], expectedVersion: '0', filters: EVERY_ROW, returning: [] }
+      const update: Undefined<UpdateRequest> = { target, key: [value('id', '1')], set: [value('note', 'changed')], expectedVersion: '0', filters: EVERY_ROW, through: [], returning: [] }
       expect(await records.update(update)).toMatchObject(unavailable)
       const stored = await reader.request().query<{ id: number; note: string; version: number }>('select id, note, version from dbo.note')
       expect(stored.recordset).toEqual([{ id: 1, note: 'one', version: 0 }])

@@ -208,7 +208,7 @@ describe('an answer lost after the write committed', () => {
         key: [valueOf(ORDER, 'id', id)],
         set: [valueOf(ORDER, 'notes', notes)],
         expectedVersion: sentVersion,
-        filters: { kind: 'unrestricted' },
+        filters: { kind: 'unrestricted' }, through: [],
         returning: [columnOf(ORDER, 'notes')],
       })
       await within(lost.matched, 'the marker never appeared in an answer')
@@ -216,7 +216,7 @@ describe('an answer lost after the write committed', () => {
       lost.cut()
       expect(await pending).toMatchObject({ ok: false, code: 'unknown-outcome' })
       expect(sent()).toBe(1)
-      const stored = await records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', id)], columns: [columnOf(ORDER, 'notes')], filters: { kind: 'unrestricted' } })
+      const stored = await records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', id)], columns: [columnOf(ORDER, 'notes')], filters: { kind: 'unrestricted' }, through: [] })
       expect(stored).toMatchObject({ ok: true, values: { notes } })
       expect((stored as RecordOutcome & { ok: true }).version).not.toBe(sentVersion)
     } finally {

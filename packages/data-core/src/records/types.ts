@@ -1,5 +1,5 @@
 import type { ApiValue } from '../codecs/codec.js'
-import type { RowFilters } from '../lookup/types.js'
+import type { LookupKeyColumn, RowFilters } from '../lookup/types.js'
 import type { ColumnMeta, NormalizedType, ObjectMeta, ObjectRef } from '../metadata.js'
 
 /**
@@ -43,16 +43,40 @@ export interface RecordTarget {
 }
 
 /**
- * Read one record by its key, through the trusted filters.
+ * A scope one foreign-key hop away (0043): a root row exists for the request
+ * only when the row of `target` its `columns` reference is one `filters`
+ * admits -- the target filter a policy's `through` lookup puts on it. An
+ * adapter puts it in every statement that locates a record, beside the
+ * root's own filters, as an EXISTS over the target, never as a second read.
  *
- * A record outside the filters does not exist for this call: another tenant's
+ * `columns` are the root's foreign-key columns and `targetColumns` the key
+ * they reference, paired by position, each of a kind `isThroughKeyType`
+ * accepts; the pair compares with the database's own equality, as the
+ * foreign key does. Every name is approved metadata, from the bindings and
+ * the lookup's config, and every filter value is typed and bound (0011).
+ * A row whose foreign key is NULL references nothing, and is outside.
+ */
+export interface Through {
+  columns: readonly RecordColumn[]
+  target: ObjectRef
+  targetColumns: readonly LookupKeyColumn[]
+  filters: RowFilters
+}
+
+/**
+ * Read one record by its key, through the trusted filters and every through.
+ *
+ * A record outside them does not exist for this call: another tenant's
  * row is `not-found`, never `forbidden`, so its existence is not disclosed.
+ * `through` is `[]` for a form whose policy names none, and is said either
+ * way, as the filters are.
  */
 export interface ReadRequest {
   target: RecordTarget
   key: readonly RecordValue[]
   columns: readonly RecordColumn[]
   filters: RowFilters
+  through: readonly Through[]
 }
 
 /** A column as `describe` reads it: what discovery says of its definition, without what the account may do or a comment. */
@@ -86,8 +110,10 @@ export interface InsertRequest {
 
 /**
  * Change exactly `set` on the record named by `key`, only if its version is
- * still `expectedVersion` and it is inside the filters — one statement, so
- * nothing can change between the check and the write.
+ * still `expectedVersion` and it is inside the filters and every through —
+ * one statement, so nothing can change between the check and the write. What
+ * tells a stale update from one aimed at nothing is inside them too, so a
+ * record outside them is `not-found` whatever version is sent.
  */
 export interface UpdateRequest {
   target: RecordTarget & { concurrency: RecordConcurrency }
@@ -96,6 +122,7 @@ export interface UpdateRequest {
   /** The token a read returned: hex for a rowversion, a decimal string for a version column. */
   expectedVersion: string
   filters: RowFilters
+  through: readonly Through[]
   returning: readonly RecordColumn[]
   /** The `definition` of the description this update was decided over: it runs only while the table still has it (0041). */
   definition: string

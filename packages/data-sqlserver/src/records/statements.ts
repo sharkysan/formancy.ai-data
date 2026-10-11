@@ -1,4 +1,4 @@
-import type { InsertRequest, ObjectRef, ReadRequest, RecordColumn, RecordConcurrency, RecordTarget, RecordValue, RowFilterTerm, UpdateRequest } from '@formancy/data-core'
+import type { InsertRequest, ObjectRef, ReadRequest, RecordColumn, RecordConcurrency, RecordTarget, RecordValue, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
 import mssql from 'mssql'
 import { quoteName, quoteTable } from '../sql/quote.js'
 import { Parameters } from '../sql/statement.js'
@@ -49,7 +49,7 @@ interface Selected {
 }
 
 /**
- * What every statement returns, from `source` — '' for a table, `inserted.`
+ * What every statement returns, from `source` — `[r].` for the table, `inserted.`
  * for an OUTPUT clause. `[found]` is always there, so a request for no
  * columns is still a statement. A rowversion comes back as its 8 bytes, which
  * `encodeRowversion` spells, so the adapter and the core cannot spell a token
@@ -71,13 +71,48 @@ function versionOf(concurrency: RecordConcurrency, source: string): Selected {
     : { name: '[version]', declared: 'nvarchar(20)', expression: `convert(nvarchar(20), ${column})` }
 }
 
+/**
+ * The alias of the target table in every record statement but an insert, so
+ * that every column a statement names says which table it is of: a
+ * correlated subquery over another table, or over the same one, can then
+ * never bind a bare name to the wrong row.
+ */
+const ROW = '[r]'
+
+function column(name: string): string {
+  return `${ROW}.${quoteName(name)}`
+}
+
 function keyPredicates(parameters: Parameters, key: readonly RecordValue[]): string[] {
-  return key.map((value) => `${quoteName(value.name)} = ${bindValue(parameters, value.type, value.value)}`)
+  return key.map((value) => `${column(value.name)} = ${bindValue(parameters, value.type, value.value)}`)
 }
 
 /** The trusted filters, each comparing the column's canonical value exactly (../sql/filters.ts, 0028). */
 function filterPredicates(parameters: Parameters, terms: readonly RowFilterTerm[]): string[] {
-  return terms.map((term) => filterPredicate(parameters, quoteName(term.column), term))
+  return terms.map((term) => filterPredicate(parameters, column(term.column), term))
+}
+
+/** The alias of a through's target inside its EXISTS. */
+const PARENT = '[p]'
+
+/**
+ * One through (0043) as a condition on the record: its parent row, the one
+ * the record's foreign-key columns reference, is one the target's filter
+ * admits. An EXISTS in the statement itself, under the statement's own
+ * locks. The pair compares with `=`, as the foreign key does; the filter
+ * terms compare exactly (0028). Every column is qualified, so a key onto the
+ * same table compares the parent's key with the record's column and never a
+ * row with itself. A record whose foreign key is NULL matches no parent.
+ */
+function throughPredicate(parameters: Parameters, through: ThroughTerms): string {
+  const pairs = through.pairs.map((pair) => `${PARENT}.${quoteName(pair.references)} = ${column(pair.column)}`)
+  const terms = through.terms.map((term) => filterPredicate(parameters, `${PARENT}.${quoteName(term.column)}`, term))
+  return `exists (select 1 from ${quoteTable(through.target)} as ${PARENT} where ${[...pairs, ...terms].join(' and ')})`
+}
+
+/** What locates a record in every statement but an insert: its key, the trusted filters and every through. */
+function located(parameters: Parameters, key: readonly RecordValue[], terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): string[] {
+  return [...keyPredicates(parameters, key), ...filterPredicates(parameters, terms), ...through.map((entry) => throughPredicate(parameters, entry))]
 }
 
 /** The table's quoted name, bound as `object_id` reads it. */
@@ -105,24 +140,29 @@ export function describeStatement(table: ObjectRef): Statement {
  * without reading every row it matched; one row with a NULL `[found]` when
  * none is inside the filters.
  */
-export function readStatement(request: ReadRequest, terms: readonly RowFilterTerm[]): Statement {
+export function readStatement(request: ReadRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): Statement {
   const parameters = new Parameters()
   const { select, from } = described(parameters, request.target.table)
-  const where = [...keyPredicates(parameters, request.key), ...filterPredicates(parameters, terms)]
-  const record = selection(request.columns, request.target.concurrency, '').map((column) => `${column.expression} as ${column.name}`)
-  return parameters.statement(`select ${select}, [r].* from ${from} outer apply (select top (2) ${record.join(', ')} from ${quoteTable(request.target.table)} where ${where.join(' and ')}) as [r]`)
+  const where = located(parameters, request.key, terms, through)
+  const record = selection(request.columns, request.target.concurrency, `${ROW}.`).map((selected) => `${selected.expression} as ${selected.name}`)
+  return parameters.statement(
+    `select ${select}, [record].* from ${from} outer apply (select top (2) ${record.join(', ')} from ${quoteTable(request.target.table)} as ${ROW} where ${where.join(' and ')}) as [record]`,
+  )
 }
 
 /**
  * Whether a record is there for this actor -- what tells a stale update from
  * one aimed at nothing -- and whether the table's definition is still the
- * one the update was decided over (0041), which comes first.
+ * one the update was decided over (0041), which comes first. Located as the
+ * update is, inside the filters and every through (0043), so a record outside
+ * them is not found whatever version was sent.
  */
-export function existsStatement(table: ObjectRef, key: readonly RecordValue[], terms: readonly RowFilterTerm[], definition: Buffer): Statement {
+export function existsStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], definition: Buffer): Statement {
   const parameters = new Parameters()
+  const table = request.target.table
   const same = `case when ${digestOf(factsOf(tableName(parameters, table)))} = ${parameters.add(mssql.VarBinary(32), definition)} then 1 else 0 end`
-  const where = [...keyPredicates(parameters, key), ...filterPredicates(parameters, terms)]
-  return parameters.statement(`select (select count(*) from ${quoteTable(table)} where ${where.join(' and ')}) as [found], ${same} as [same]`)
+  const where = located(parameters, request.key, terms, through)
+  return parameters.statement(`select (select count(*) from ${quoteTable(table)} as ${ROW} where ${where.join(' and ')}) as [found], ${same} as [same]`)
 }
 
 /** A value a write assigns — an insert's VALUES or an update's SET — and the SQL it was bound as. */
@@ -337,21 +377,24 @@ export function insertStatement(request: InsertRequest, definition: Buffer): Sta
 }
 
 /**
- * ONE guarded statement (0015): the key, the trusted filters and the expected
- * version in a single WHERE, and for a version column the increment in the
- * same SET, so nothing can change between the check and the write. A row the
- * filters exclude is not matched, so another tenant's record cannot be changed
- * even with its current version in hand. More than one row matched means the
- * identity is not a key, and the batch rolls back rather than change several.
+ * ONE guarded statement (0015): the key, the trusted filters, every through
+ * (0043) and the expected version in a single WHERE, and for a version column
+ * the increment in the same SET, so nothing can change between the check and
+ * the write. A row the filters or a through exclude is not matched, so another
+ * tenant's record cannot be changed even with its current version in hand.
+ * More than one row matched means the identity is not a key, and the batch
+ * rolls back rather than change several. The table is aliased, `update [r]
+ * … from <table> as [r]`, so that the through's EXISTS can name the row.
  */
-export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], expected: ExpectedVersion, definition: Buffer): Statement {
+export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], expected: ExpectedVersion, definition: Buffer): Statement {
   const parameters = new Parameters()
   const { target } = request
   const assigned = request.set.map((value) => ({ value, sql: bindValue(parameters, value.type, value.value) }))
+  // A SET names a column of the table updated, so it is not qualified; what it is set from is.
   const set = assigned.map(({ value, sql }) => `${quoteName(value.name)} = ${sql}`)
-  const version = quoteName(target.concurrency.column)
-  if (target.concurrency.kind === 'version-column') set.push(`${version} = ${version} + 1`)
-  const where = [...keyPredicates(parameters, request.key), ...filterPredicates(parameters, terms)]
+  const version = column(target.concurrency.column)
+  if (target.concurrency.kind === 'version-column') set.push(`${quoteName(target.concurrency.column)} = ${version} + 1`)
+  const where = located(parameters, request.key, terms, through)
   where.push(
     expected.kind === 'rowversion'
       ? `${version} = ${parameters.add(mssql.VarBinary(8), expected.bytes)}`
@@ -361,7 +404,7 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
     target,
     definition,
     operation: 'UPDATE',
-    statement: (output) => `update ${quoteTable(target.table)} set ${set.join(', ')} ${output} where ${where.join(' and ')}`,
+    statement: (output) => `update ${ROW} set ${set.join(', ')} ${output} from ${quoteTable(target.table)} as ${ROW} where ${where.join(' and ')}`,
     assigned,
     returned: selection(request.returning, target.concurrency, 'inserted.'),
     afterWrite: [`if @rows > 1 throw ${String(NOT_ONE_ROW)}, N'${NOT_ONE_ROW_MESSAGE}', 1;`],

@@ -97,7 +97,7 @@ async function held(table: string): Promise<{ row: string | null; rows: number }
 
 /** A write of `memo`, and a create of the case's answers and `memo`, typed from `snapshot`, under `definition`. */
 function writes(entry: DriftingCase, snapshot: MetadataSnapshot, version: string, definition: string) {
-  const update = { target: target(entry.table), key: [{ ...ID, value: '1' }], set: [value(snapshot, entry.table, 'memo', 'written')], expectedVersion: version, filters: { kind: 'unrestricted' } as const, returning: [], definition }
+  const update = { target: target(entry.table), key: [{ ...ID, value: '1' }], set: [value(snapshot, entry.table, 'memo', 'written')], expectedVersion: version, filters: { kind: 'unrestricted' } as const, through: [], returning: [], definition }
   const values = [...Object.entries(entry.insert).map(([name, held]) => value(snapshot, entry.table, name, held)), value(snapshot, entry.table, 'memo', 'created')]
   const insert = { target: target(entry.table), values, returning: [ID], definition }
   return { update, insert }
@@ -113,7 +113,7 @@ describe('the definition, change by change', () => {
     // would let a write through the change it was decided before.
     test(`${entry.name}: the definition moves exactly when the change is one a description reads, and a write decided before it is refused`, declared(entry), async () => {
     const records = createPostgresRecords(owner)
-    const read = { target: target(entry.table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const }
+    const read = { target: target(entry.table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const, through: [] }
     const before = described(await records.describe(ref(entry.table)))
     // The read's description is the table as that statement found it, and the same as describe's.
     const first = await records.read(read)
@@ -262,7 +262,7 @@ describe('what a description costs the catalog', () => {
     const describing = describeStatement(table)
     expect(await attributeScans(describing.text, describing.params)).toBe(reference)
     const id = { name: 'id', type: { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' } } as const
-    const reading = readStatement({ target: { table, identity: [id], concurrency: null }, key: [{ ...id, value: '1' }], columns: [id], filters: { kind: 'unrestricted' } }, [])
+    const reading = readStatement({ target: { table, identity: [id], concurrency: null }, key: [{ ...id, value: '1' }], columns: [id], filters: { kind: 'unrestricted' }, through: [] }, [], [])
     expect(await attributeScans(reading.text, reading.params)).toBe(reference)
   })
 })
@@ -399,7 +399,7 @@ describe('an ALTER that commits while a request waits for it', () => {
           const old = described(await records.describe(ref(entry.table))).definition
           expect(old.endsWith(`@${isolation}`)).toBe(true)
           const stale = writes(entry, snapshot, '1', old)
-          const read = { target: target(entry.table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const }
+          const read = { target: target(entry.table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const, through: [] }
           const altering = await holdAlter(entry)
           const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read)] as const
           await waiting(entry.table, 3)
@@ -472,7 +472,7 @@ describe('an ALTER that commits while a request waits for it', () => {
           target: { table: { schema: 'sales', name: table }, identity: key.map(({ name, type }) => ({ name, type })), concurrency: null },
           key,
           columns: columns.map((name) => ({ name, type: object?.columns.find((candidate) => candidate.name === name)?.type as RecordValue['type'] })),
-          filters: { kind: 'unrestricted' },
+          filters: { kind: 'unrestricted' }, through: [],
         })
         expect(read.ok ? undefined : read.code, `${new URL(uri).username} on ${table}`).toBe(code)
       } finally {

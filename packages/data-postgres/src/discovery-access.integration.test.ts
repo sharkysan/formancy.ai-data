@@ -408,10 +408,10 @@ describe('what the records operations do with what the snapshot reports', () => 
       { name: 'tenant_id', type: INT32, value: tenant },
     ]
     const update = (key: string) =>
-      records.update({ target, key: [{ ...id, value: key }], set: [{ name: 'note', type: TEXT, value: 'changed' }], expectedVersion: '1', filters: everyRow, returning: [] })
+      records.update({ target, key: [{ ...id, value: key }], set: [{ name: 'note', type: TEXT, value: 'changed' }], expectedVersion: '1', filters: everyRow, through: [], returning: [] })
 
     expect(failure(await records.insert({ target, values: row('3', '2'), returning: [] }))).toBe('permission-denied')
-    expect(failure(await records.read({ target, key: [{ ...id, value: '2' }], columns: [id], filters: everyRow }))).toBe('not-found')
+    expect(failure(await records.read({ target, key: [{ ...id, value: '2' }], columns: [id], filters: everyRow, through: [] }))).toBe('not-found')
     expect(failure(await update('2'))).toBe('not-found')
     expect(failure(await update('1'))).toBe('ok')
     expect(await owner`select id, note from probe.policed order by id`).toEqual([

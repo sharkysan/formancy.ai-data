@@ -1,5 +1,5 @@
-import { rowFilterTerms } from '@formancy/data-core'
-import type { ApiValue, DescribedRead, ObjectRef, RecordAdapter, RecordColumn, RecordFailure, RecordOutcome, RecordRead, RecordTarget, RowFilterTerm, UpdateRequest } from '@formancy/data-core'
+import { rowFilterTerms, throughTerms } from '@formancy/data-core'
+import type { ApiValue, DescribedRead, ObjectRef, RecordAdapter, RecordColumn, RecordFailure, RecordOutcome, RecordRead, RecordTarget, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
 import type { Sql, TransactionSql } from 'postgres'
 import { run } from '../sql/statement.js'
 import type { TextResult, TextRow } from '../sql/statement.js'
@@ -178,8 +178,9 @@ async function moved(sql: Sql, table: ObjectRef, definition: Definition, path: W
 /**
  * `stale`, `not-found` or declined, for an update that changed nothing -- or
  * that the table moved (0041), or that the connection's isolation refused:
- * one more statement, inside the same filters, so a record outside them is
- * not-found here too and its existence is not disclosed. The update's
+ * one more statement, inside the same filters and throughs (0043), so a
+ * record outside them is not-found here too, whatever its version, and its
+ * existence is not disclosed. The update's
  * outcome is known by now — nothing was written — so this is a read.
  *
  * A record that is there with the version the update was sent with was not
@@ -195,8 +196,15 @@ async function moved(sql: Sql, table: ObjectRef, definition: Definition, path: W
  * name another cause than the one that refused, and nothing was written
  * either way.
  */
-async function whyNothingChanged(sql: Sql, request: UpdateRequest, terms: readonly RowFilterTerm[], withVersion: boolean, definition: Definition, path: WritePath): Promise<RecordFailure> {
-  const asked = await attempt(sql, nothingChangedStatement(request, terms, withVersion, definition), 'read')
+async function whyNothingChanged(
+  sql: Sql,
+  request: UpdateRequest,
+  scope: { terms: readonly RowFilterTerm[]; through: readonly ThroughTerms[] },
+  withVersion: boolean,
+  definition: Definition,
+  path: WritePath,
+): Promise<RecordFailure> {
+  const asked = await attempt(sql, nothingChangedStatement(request, scope.terms, scope.through, withVersion, definition), 'read')
   if (!asked.ok) return asked.failure
   const [same, isolation, unchanged] = asked.result.rows[0] as TextRow
   if (same !== 'true') return DEFINITION_MOVED
@@ -259,8 +267,9 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
 
     async read(request) {
       const terms = rowFilterTerms(request.filters)
+      const through = throughTerms(request.through)
       checkKey(request.target, request.key)
-      const statement = readStatement(request, terms)
+      const statement = readStatement(request, terms, through)
       const first = readAnswer(request, await attempt(sql, statement, 'read'))
       if (first.isolation === undefined || first.isolation === READ_COMMITTED) return first.answer
       // Under another isolation the statement's snapshot is taken before it
@@ -287,6 +296,7 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
 
     async update(request): Promise<RecordOutcome> {
       const terms = rowFilterTerms(request.filters)
+      const scope = { terms, through: throughTerms(request.through) }
       checkUpdate(request, terms)
       const definition = parseDefinition(request.definition)
       const path = pathOf(definition)
@@ -294,17 +304,17 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       // A version that is not a number names no state the record was ever
       // in. Bound, it would be an error; it is answered as any other
       // mismatch, without sending it.
-      if (!isVersion(request.expectedVersion)) return whyNothingChanged(sql, request, terms, false, definition, path)
+      if (!isVersion(request.expectedVersion)) return whyNothingChanged(sql, request, scope, false, definition, path)
 
-      const ran = await sendWrite(sql, table, path, updateStatement(request, terms, definition, path))
+      const ran = await sendWrite(sql, table, path, updateStatement(request, terms, scope.through, definition, path))
       // Under REPEATABLE READ, which a composition root may make the
       // default, PostgreSQL answers a lost race with 40001 instead of 0 rows
       // (0006). Nothing was written either way, so it is answered the same
       // way — as a race, whatever the version reads now: under SERIALIZABLE
       // a conflict over other rows is 40001 too, with this one unchanged.
-      if (!ran.ok) return ran.state === '40001' ? whyNothingChanged(sql, request, terms, false, definition, path) : failedWrite(sql, table, definition, path, ran.failure)
+      if (!ran.ok) return ran.state === '40001' ? whyNothingChanged(sql, request, scope, false, definition, path) : failedWrite(sql, table, definition, path, ran.failure)
       const row = onlyRow(ran.result)
-      return row === undefined ? whyNothingChanged(sql, request, terms, true, definition, path) : { ok: true, ...recordOf(request.target, request.returning, row) }
+      return row === undefined ? whyNothingChanged(sql, request, scope, true, definition, path) : { ok: true, ...recordOf(request.target, request.returning, row) }
     },
   }
 }

@@ -29,8 +29,11 @@ import {
   INT32,
   INT64,
   INTAKE,
+  LINE_POLICY,
+  lineForm,
   MS,
   MS_ORDER,
+  ORDER_ID,
   ORDER_POLICY,
   ORDER_TARGET,
   ORDER_TOKEN,
@@ -321,6 +324,39 @@ describe('planCreate', () => {
     if (!outcome.ok && outcome.code === 'invalid-values') expect(outcome.fieldErrors.map(({ field, code }) => `${field}:${code}`)).toEqual(['customer:required', 'order_date:required', 'amount:required'])
     const planned = planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, ANSWERS, described(PG, PG_ORDER))
     expect(planned.ok && planned.request.values.some((entry) => entry.name === 'status')).toBe(false)
+  })
+
+  // A row whose through key is NULL references no parent, so no filter of
+  // anybody's admits it: created, nobody could read or update it (0043). The
+  // through field is required, omitted or null, even where its column may
+  // be NULL -- the order's employee is nullable, and without the through it
+  // may be left out or cleared as before.
+  test('requires a through field on create, omitted or null, even over a nullable column', () => {
+    const through: FormPolicy = { ...ORDER_POLICY, through: ['employee'] }
+    const { employee: _employee, ...omitted } = ANSWERS
+    for (const answers of [omitted, { ...ANSWERS, employee: null }]) {
+      expect(planCreate(PG, PG_ORDER, through, CLERK, answers, described(PG, PG_ORDER))).toMatchObject({
+        ok: false,
+        code: 'invalid-values',
+        fieldErrors: [{ field: 'employee', code: 'required', message: 'A value is required.' }],
+      })
+      expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, answers, described(PG, PG_ORDER))).toMatchObject({ ok: true })
+    }
+  })
+
+  // The insert carries no through: a create has no row yet to scope. Its
+  // parent is checked as every selection is, by `rejects` under the order
+  // lookup's filter before the insert runs (0018), so a line can be created
+  // only under an order this tenant may reference.
+  test("creates a line under its order, rechecked under the order lookup's filter", () => {
+    const bindings = lineForm(PG).bindings
+    const planned = planCreate(PG, bindings, LINE_POLICY, CLERK, { order: `k1:${ORDER_ID}`, line_no: 2, quantity: 1, unit_price: '0.10' }, described(PG, bindings))
+    expect(planned).toMatchObject({
+      ok: true,
+      request: { values: [value('order_id', INT64, ORDER_ID), value('line_no', INT32, '2'), value('quantity', INT32, '1'), value('unit_price', { kind: 'decimal', precision: 12, scale: 2 }, '0.10')] },
+      memberships: [{ field: 'order', config: buildLookupConfig(bindings, 'order', { snapshot: PG }), tokens: [`k1:${ORDER_ID}`], filters: TENANT_ONE }],
+    })
+    expect(planned.ok && Object.keys(planned.request)).toEqual(['target', 'values', 'returning', 'definition'])
   })
 
   // An intake role may create orders and read none. It still receives the

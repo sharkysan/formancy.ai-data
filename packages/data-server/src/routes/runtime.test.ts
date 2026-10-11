@@ -12,6 +12,7 @@ import type {
   LookupAdapter,
   NormalizedType,
   ObjectRef,
+  ReadRequest,
   RecordAdapter,
   RecordOutcome,
   UpdateRequest,
@@ -61,10 +62,43 @@ const SNAPSHOT = createSnapshot({
       checks: [],
       rowSecurity: 'none',
     },
+    // An order and its lines: a line has no tenant of its own, and is reached through its order (0043).
+    {
+      ref: ref('order'), kind: 'table', comment: null,
+      columns: [col('id', 1, INT32), col('tenant_id', 2, INT32), col('placed', 3, { kind: 'date' })],
+      primaryKey: { name: 'pk_order', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+    },
+    {
+      ref: ref('line'), kind: 'table', comment: null,
+      columns: [col('order_id', 1, INT32), col('line_no', 2, INT32), col('quantity', 3, INT32), col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' })],
+      primaryKey: { name: 'pk_line', columns: ['order_id', 'line_no'] }, uniqueKeys: [],
+      foreignKeys: [{ name: 'fk_line_order', columns: ['order_id'], references: { table: ref('order'), columns: ['id'] }, onUpdate: 'no-action', onDelete: 'cascade', enforced: true, validated: true }],
+      checks: [], rowSecurity: 'none',
+    },
+    // A memo on an order: its order is nullable and outside its key, so nothing but a through makes it required (0043).
+    {
+      ref: ref('memo'), kind: 'table', comment: null,
+      columns: [col('id', 1, INT32), col('order_id', 2, INT32, { nullable: true }), col('priority', 3, INT32)],
+      primaryKey: { name: 'pk_memo', columns: ['id'] }, uniqueKeys: [],
+      foreignKeys: [{ name: 'fk_memo_order', columns: ['order_id'], references: { table: ref('order'), columns: ['id'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }],
+      checks: [], rowSecurity: 'none',
+    },
   ],
 })
 
 const RW = { read: ['clerk'], write: ['clerk'] }
+
+/** The lines of the orders this tenant may reference (0043): no row filter of their own, the order lookup's in `through`. */
+const LINE_POLICY: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+  fields: { order: RW, line_no: RW, quantity: RW },
+  rowFilters: [],
+  lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+  through: ['order'],
+}
+/** Memos of the orders this tenant may reference, through an order a memo need not have (0043). With no version, read and create. */
+const MEMO_POLICY: FormPolicy = { ...LINE_POLICY, operations: { ...LINE_POLICY.operations, update: [] }, fields: { id: RW, order: RW, priority: RW } }
 const POLICY: FormPolicy = {
   version: 1,
   operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
@@ -90,6 +124,7 @@ const verifyIdentity: IdentityVerifier = async (token) =>
     : token === 'clerk-042' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '042' } } }
     : token === 'stranger' ? { ok: true, identity: { actor: { id: 's', roles: [] }, attributes: { tenant: '1' } } }
     : token === 'editor' ? { ok: true, identity: { actor: { id: 'e', roles: ['editor'] }, attributes: { tenant: '1' } } }
+    : token === 'clerk-untenanted' ? { ok: true, identity: { actor: { id: 'u', roles: ['clerk'] }, attributes: {} } }
       : { ok: false, reason: 'bad' }
 
 const STORED = { tenant_id: '1', customer_no: '7', name: 'Muster AG', country_code: 'CH', created_at: '2026-10-08T00:00:00Z' }
@@ -114,7 +149,7 @@ const NARROWED = describedAs(ref('customer'), (columns) => Object.assign(columns
 const RETYPED = describedAs(ref('customer'), (columns) => Object.assign(columns.find((column) => column.name === 'name') as object, { type: INT32, databaseType: 'int' }))
 
 /** What the fake ports were asked, and what they answer. Each test sets what it needs. */
-let calls: { inserts: InsertRequest[]; updates: UpdateRequest[]; rejects: string[][]; lookups: number; describes: number; reads: number }
+let calls: { inserts: InsertRequest[]; updates: UpdateRequest[]; rejects: string[][]; lookups: number; describes: number; reads: number; readRequests: ReadRequest[] }
 let writeOutcome: RecordOutcome
 /** What a fake insert waits for before it answers: settled, unless a case holds it. */
 let insertGate: Promise<void>
@@ -136,6 +171,7 @@ function registry(): ConnectionRegistry {
     },
     read: async (request) => {
       calls.reads += 1
+      calls.readRequests.push(request)
       const outcome = readOutcome ?? { ok: true, values: { ...STORED }, version: VERSION }
       if (!outcome.ok) return outcome
       const described = description(request.target.table)
@@ -171,7 +207,7 @@ function registry(): ConnectionRegistry {
 }
 
 beforeEach(async () => {
-  calls = { inserts: [], updates: [], rejects: [], lookups: 0, describes: 0, reads: 0 }
+  calls = { inserts: [], updates: [], rejects: [], lookups: 0, describes: 0, reads: 0, readRequests: [] }
   writeOutcome = { ok: true, values: { ...STORED }, version: VERSION }
   insertGate = Promise.resolve()
   readOutcome = undefined
@@ -196,6 +232,11 @@ beforeEach(async () => {
   const country = generateForm(SNAPSHOT, { connection: 'erp', root: ref('country'), formId: 'country', title: 'Country', lookups: [] })
   await store.publish('country', null, { ...bundle, form: country.form, bindings: country.bindings, policy: COUNTRY_POLICY })
   await store.publish('blind', null, { ...bundle, policy: BLIND_POLICY })
+  // An order's lines, scoped through their order (0043).
+  const line = generateForm(SNAPSHOT, { connection: 'erp', root: ref('line'), formId: 'line', title: 'Line', lookups: [{ foreignKey: 'fk_line_order', display: ['placed'] }] })
+  await store.publish('line', null, { ...bundle, form: line.form, bindings: line.bindings, policy: LINE_POLICY })
+  const memo = generateForm(SNAPSHOT, { connection: 'erp', root: ref('memo'), formId: 'memo', title: 'Memo', lookups: [{ foreignKey: 'fk_memo_order', display: ['placed'] }] })
+  await store.publish('memo', null, { ...bundle, form: memo.form, bindings: memo.bindings, policy: MEMO_POLICY })
   app = await createDataServer({ verifyIdentity, runtime: { registry: registry(), store } })
 })
 
@@ -379,6 +420,68 @@ describe('the runtime plane', () => {
     const unavailable = await post('/v1/forms/customer/records/create', { answers: NEW })
     expect(unavailable.statusCode).toBe(503)
     expect(unavailable.json()).toEqual({ code: 'unavailable', message: 'The database could not complete this now. Nothing was saved.' })
+  })
+})
+
+describe('a form reached through a parent (0043)', () => {
+  /** The order's scope as the planner types it, tenant 1's: what every read and update of a line carries to the port. */
+  const THROUGH = [
+    {
+      columns: [{ name: 'order_id', type: INT32 }],
+      target: ref('order'),
+      targetColumns: [{ name: 'id', type: INT32 }],
+      filters: { kind: 'restricted', equal: [{ column: 'tenant_id', type: INT32, value: '1' }] },
+    },
+  ]
+  const LINE = { order_id: '1', line_no: '1', quantity: '3' }
+
+  // The route sends what the planner made, and the planner's through is the
+  // scope: a read, an update, and the read that update makes first to tell
+  // an echo from a change each carry it to the port, where it is in the
+  // statement. A read before an update without it would compare the
+  // person's answers with a line of another tenant.
+  test('a read, an update and the read before it carry the through to the port', async () => {
+    readOutcome = { ok: true, values: LINE, version: VERSION }
+    writeOutcome = { ok: true, values: { ...LINE, quantity: '4' }, version: VERSION }
+    expect((await post('/v1/forms/line/records/read', { record: 'k1:1,1' })).json()).toMatchObject({ answers: { order: 'k1:1', quantity: 3 } })
+    expect((await post('/v1/forms/line/records/update', { record: 'k1:1,1', version: VERSION, answers: { quantity: 4 } })).statusCode).toBe(200)
+    expect(calls.readRequests.map((request) => request.through)).toEqual([THROUGH, THROUGH])
+    expect(calls.updates.map((request) => request.through)).toEqual([THROUGH])
+  })
+
+  // A memo with no order reaches no parent, and nobody could read it again:
+  // a create without one, omitted or null, is 422 `required`, with nothing
+  // checked or written, though its column is nullable and outside the key --
+  // so the through is all that requires it; a line's order, NOT NULL and in
+  // its key, would be required without one (watched failing with the
+  // planner's through rule taken out: the memo was planned and sent to the
+  // insert without an order). With one, the order is rechecked as every
+  // selection is, under the lookup's filter, and the record is created.
+  test('a create without the through field is 422 required, and one with it is rechecked and created', async () => {
+    for (const answers of [{ id: 2, priority: 1 }, { id: 2, order: null, priority: 1 }]) {
+      const refused = await post('/v1/forms/memo/records/create', { answers })
+      expect(refused.statusCode, JSON.stringify(refused.json())).toBe(422)
+      expect(refused.json()).toMatchObject({ code: 'invalid-values', fieldErrors: [{ field: 'order', code: 'required' }] })
+    }
+    expect([calls.rejects.length, calls.inserts.length]).toEqual([0, 0])
+    writeOutcome = { ok: true, values: { id: '2', order_id: '1', priority: '1' }, version: null }
+    expect((await post('/v1/forms/memo/records/create', { answers: { id: 2, order: 'k1:1', priority: 1 } })).statusCode).toBe(201)
+    expect(calls.rejects).toEqual([['k1:1']])
+    expect(calls.inserts).toHaveLength(1)
+  })
+
+  // A context without the through's attribute can read, create and update
+  // none of a line form's records: each request is refused missing-attribute.
+  // So the form is not offered to it at all, as one whose row filter it
+  // cannot supply is not, rather than listing operations that all fail
+  // (watched failing: 200).
+  test('is not offered to a context that cannot supply its through, and is to one that can', async () => {
+    const refused = await app.inject({ method: 'GET', url: '/v1/forms/line', headers: as('clerk-untenanted') })
+    expect(refused.statusCode).toBe(403)
+    expect(refused.json()).toMatchObject({ code: 'operation-denied' })
+    expect((await post('/v1/forms/line/records/read', { record: 'k1:1,1' }, 'clerk-untenanted')).json()).toMatchObject({ code: 'missing-attribute' })
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/line', headers: as('clerk') })).json().operations).toEqual(['read', 'create', 'update'])
+    expect(calls.reads).toBe(0)
   })
 })
 

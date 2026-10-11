@@ -19,7 +19,9 @@
 --   order         a reserved word as a table name and as a column name; a
 --                 composite foreign key; two foreign keys to one table; a check;
 --                 a bigint identity; an application-maintained version column
---   order_line    a cascading foreign key; a computed column
+--   order_line    a cascading foreign key; a computed column; a version
+--                 column of its own, so a line is updated as a child of its
+--                 order, through it (0043)
 --   shipment      a by-default identity (PostgreSQL) and a sequence default
 --                 (SQL Server); smallint, time, a zoneless timestamp, uuid,
 --                 double and real; a UTF-8 varchar on SQL Server; fixed and
@@ -87,6 +89,8 @@ create table sales.order_line (
   quantity integer not null,
   unit_price numeric(12, 2) not null,
   line_total numeric(14, 2) generated always as (quantity * unit_price) stored,
+  -- Application-maintained, as order's is (0043).
+  row_version bigint not null default 1,
   constraint pk_order_line primary key (order_id, line_no)
 );
 

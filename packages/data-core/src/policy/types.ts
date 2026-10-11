@@ -54,6 +54,15 @@ export interface FieldPolicy {
  *
  * `lookups` scope each lookup field's TARGET table in the same shape, keyed by
  * field key. `[]` says the target is shared by every tenant.
+ *
+ * `through` names lookup fields whose target's filter also scopes the root
+ * (0043): a record exists for read and update only when the row each one
+ * references is one that lookup's filter admits, and a create must name such
+ * a row. It is how a child table with no tenant column of its own -- an
+ * order's lines -- is kept to the tenant of its parent. Optional, and absent
+ * means none: a policy written before it means exactly what it meant, and a
+ * server older than it refuses a policy that uses it, as it refuses every
+ * property it does not read.
  */
 export interface FormPolicy {
   version: 1
@@ -61,6 +70,7 @@ export interface FormPolicy {
   fields: Record<string, FieldPolicy>
   rowFilters: RowFilterRule[]
   lookups: Record<string, RowFilterRule[]>
+  through?: string[]
 }
 
 /**
@@ -104,6 +114,9 @@ export type ReadableFields = { ok: true; fields: string[] } | PolicyRefusal
 export type RowFilterResult = { ok: true; filter: RowFilter } | PolicyRefusal
 
 export type ForcedValues = { ok: true; values: RowFilter } | PolicyRefusal
+
+/** Each lookup a policy's `through` names, with its filter on the lookup's target resolved from the context (0043). */
+export type ThroughFilters = { ok: true; through: Array<{ field: string; filter: RowFilter }> } | PolicyRefusal
 
 /** Every problem found, not only the first, because a person fixes a policy from this list. */
 export type PolicyValidation = { ok: true } | { ok: false; code: 'invalid-policy'; message: string; problems: string[] }

@@ -35,7 +35,11 @@ existed would be documented and inert.
   ([0027](../../docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).
   A row filter on a column a filter cannot compare — a boolean, a float, a
   time or a timestamp — or one the table lacks is refused the same way
-  ([0028](../../docs/decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)).
+  ([0028](../../docs/decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)),
+  and so is a policy's `through` over a lookup that offers every row, by
+  `validatePolicy`, or over a text key or a lookup that does not configure,
+  by `throughProblems`; the planner asks both too
+  ([0043](../../docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)).
   Since [0030](../../docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)
   a bundle is format 2: it also keeps the generation request, the generated
   base and the presentation chosen over it, and its form must be that base
@@ -81,10 +85,14 @@ existed would be documented and inert.
   `POST /v1/forms/:id/versions` refuses, 422 `keys-reassigned` with the
   `keys` and a sentence for each, a version whose policy gives a role, read
   or write, on a key the version it replaces bound to another column or
-  lookup, unless the body's `keysConfirmed` lists that key exactly as the
-  regeneration's `keysReassigned` reported it. A key with no role left
-  needs nothing, which is what removing its grants looks like — a lookup's
-  filter, which every lookup field has, is not a grant by itself; a stale
+  lookup, or names it in `through`, unless the body's `keysConfirmed` lists
+  that key exactly as the regeneration's `keysReassigned` reported it. A
+  through is a grant without a role: re-pointed to another foreign key, its
+  filter scopes the form's rows through another parent
+  ([0043](../../docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)).
+  A key with no role and no through left needs nothing, which is what
+  removing its grants looks like — a lookup's filter, which every lookup
+  field has, is not a grant by itself; a stale
   base is still 409 `conflict` first; a restore is not asked, because it
   brings a policy back with the bindings it was written for; and a publish
   over a version the server no longer serves, because its file does not
@@ -131,7 +139,9 @@ existed would be documented and inert.
   server -- and a write the form cannot make safely, with no insert, update
   or membership check sent. The log says which changes, by kind and the
   fields they affect. `GET /v1/forms/:id` lists only the operations the
-  database still allows, is 409 `drift` when the form cannot be read or
+  database still allows and the person's context can scope -- a row
+  filter's attribute and a through's (0043) -- is 403 when that leaves
+  none, is 409 `drift` when the form cannot be read or
   leaves the person nothing, and asks the database, so an unreachable one is
   503. A write the adapter refuses because the table moved since its
   description is 409 `schema-changed`, and nothing was written. Lookups are
