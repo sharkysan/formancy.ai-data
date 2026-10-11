@@ -6,7 +6,9 @@
 #
 # Built locally and never published: the studio is private (0024) and the host
 # page is an example (0029). It carries LICENSE.md and NOTICE because what it
-# serves is this repository's source-available code.
+# serves is this repository's source-available code, and each app's build
+# writes THIRD-PARTY-NOTICES.txt beside its index.html for the packages it
+# bundles (0046), served with the page.
 
 # ------------------------------------------------------------ manifests stage
 # What pnpm reads to install, cut from the whole checkout (less what

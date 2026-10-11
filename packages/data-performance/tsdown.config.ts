@@ -9,4 +9,7 @@ export default defineConfig({
   format: ['esm'],
   dts: false,
   clean: true,
+  // Nothing from node_modules is inlined (0046), as in every package: an
+  // undeclared run-time import fails the build instead of being copied in.
+  deps: { onlyBundle: [] },
 })

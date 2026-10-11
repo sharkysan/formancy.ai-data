@@ -7,13 +7,16 @@
 // operator or a log collector would read it.
 //
 // Node built-ins only, like the gate: it runs from a checkout with nothing
-// installed. The pure checks take what compose printed and return problems,
-// so stack.test.mjs can hold them to cases without Docker.
+// installed. The name of the notices file comes from the plugin that writes
+// it, ../third-party-notices.mjs, which imports nothing else either. The
+// pure checks take what compose printed and return problems, so
+// stack.test.mjs can hold them to cases without Docker.
 
 import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { connect } from 'node:net'
 import { dirname, join } from 'node:path'
+import { NOTICES_FILE } from '../third-party-notices.mjs'
 
 /** Every profile, so compose describes, logs and tears down every service the guide can start. */
 const PROFILES = ['--profile', 'stack', '--profile', 'tools']
@@ -383,6 +386,18 @@ export function styleReferences(css) {
 const isScript = (type) => /^(text|application)\/javascript\b/i.test(type)
 const isStyle = (type) => /^text\/css\b/i.test(type)
 
+/**
+ * What is wrong with how the web front answered for a page's third-party
+ * notices (0046): the file each app's build writes beside its index.html,
+ * served as text that says it is UTF-8 -- which nginx's `charset` makes it.
+ * A browser left to guess the encoding of a bare text/plain can garble a
+ * licence's accented name or copyright sign. Undefined when nothing is.
+ */
+export function noticesProblem(path, status, type) {
+  if (status === 200 && /^text\/plain;\s*charset=utf-8$/i.test(type.trim())) return undefined
+  return `${path} answered ${String(status)} ${type}, not 200 text/plain; charset=utf-8`
+}
+
 /** A GET as a browser's first request makes it: no redirect followed, the body read whole. */
 async function get(url) {
   const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(30_000) })
@@ -393,7 +408,8 @@ async function get(url) {
  * The web front as a browser meets it: `/` sends the browser to the studio,
  * anything else unknown is 404, both pages are HTML, and every script and
  * stylesheet they name -- and every file those stylesheets name -- is
- * served from this origin with its type, or is Google's fonts, or inline.
+ * served from this origin with its type, or is Google's fonts, or inline;
+ * and beside each page, its third-party notices as UTF-8 text.
  * A build without its base, or a proxy rule that lost a path, fails here.
  * Returns problems, checking everything rather than stopping at the first.
  */
@@ -409,6 +425,11 @@ export async function pageProblems(base) {
 
   for (const path of ['/studio/', '/host/']) {
     const pageUrl = new URL(path, base)
+    const noticesUrl = new URL(NOTICES_FILE, pageUrl)
+    const notices = await get(noticesUrl)
+    const noticesWrong = noticesProblem(noticesUrl.pathname, notices.status, notices.headers.get('content-type') ?? '')
+    if (noticesWrong !== undefined) problems.push(noticesWrong)
+
     const page = await get(pageUrl)
     const type = page.headers.get('content-type') ?? ''
     if (page.status !== 200 || !/^text\/html\b/i.test(type)) {

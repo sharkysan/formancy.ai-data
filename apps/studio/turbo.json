@@ -1,0 +1,12 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      // The build runs scripts/third-party-notices.mjs (0046), which is
+      // outside this package: without it here, an edit to the plugin alone
+      // would replay a cached dist/ and its old THIRD-PARTY-NOTICES.txt.
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/third-party-notices.mjs"]
+    }
+  }
+}
