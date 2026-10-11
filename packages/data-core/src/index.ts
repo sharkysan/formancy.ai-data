@@ -139,6 +139,10 @@ export type {
 } from './records/types.js'
 export { planCreate, planRead, planUpdate } from './records/plan.js'
 export { listable, listColumns, listOrder, planList, recordPage } from './records/list.js'
+export { childFields } from './records/children.js'
+export type { ChildLookup, ParentKey, PublishedTable } from './records/children.js'
+export { formMenu, grantedOperations, menuForm } from './records/menu.js'
+export type { MenuBundle, MenuForm } from './records/menu.js'
 export type { Listable } from './records/list.js'
 export { validateListQuery } from './records/list-query.js'
 export type { ListQueryCheck, ListQueryErrorCode, ListQueryRefusal } from './records/list-query.js'
@@ -162,5 +166,5 @@ export type {
   PlanRefusal,
   PlanRefusalCode,
 } from './records/plan-types.js'
-export type { ListColumns, ListSortTerm, PublishedForm, RecordList, RecordListQuery, ResolvedLookup, RuntimeRefusal, UnknownOutcome } from './runtime.js'
+export type { FormMenu, FormMenuChild, FormMenuEntry, ListColumns, ListSortTerm, PublishedForm, RecordList, RecordListQuery, ResolvedLookup, RuntimeRefusal, UnknownOutcome } from './runtime.js'
 export { LIST_PAGE_SIZE, WRITE_ID_HEADER } from './runtime.js'

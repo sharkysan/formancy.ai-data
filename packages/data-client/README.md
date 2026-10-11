@@ -3,7 +3,8 @@
 # @formancy/data-client
 
 The browser's side of Formancy Data's runtime plane: one function per route
-for a published form's definition, records and lookups, option sources that
+for the forms a person may read, a published form's definition, records and
+lookups, option sources that
 both formancy renderers take, and a refusal's field problems in the shape a
 form engine applies them
 ([0029](../../docs/decisions/0029-a-host-renders-a-published-form-through-one-client.md)).
@@ -20,7 +21,7 @@ Apache-2.0 `@formancy/spec` for types only.
 ## What it exports
 
 ```ts
-createDataClient({ token, base?, fetch? }) // → { form, read, create, update, reconcile, query, resolve }
+createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, create, update, reconcile, query, resolve }
 isUnknownWrite(outcome) // → whether a create or update's outcome is an UnknownWrite
 lookupSources(client, formId, form, operation | () => operation) // → { [source]: { resolve } }
 sourceNames(form)       // → every optionsSource the document names, once each, in document order
@@ -35,6 +36,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 
 | Function | Route |
 |---|---|
+| `forms(signal?)` | `GET /v1/forms` → `{ forms: [{ id, title, operations, children }] }` |
 | `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list }` |
 | `read(formId, record)` | `POST /v1/forms/:id/records/read` |
 | `list(formId, query?, signal?)` | `POST /v1/forms/:id/records/list` → `{ rows, hasMore }` |
@@ -44,9 +46,10 @@ only for an abort the caller asked for, with the AbortError it raised.
 | `query(formId, source, { operation, search, offset?, limit? }, signal?)` | `POST /v1/forms/:id/lookups/:source/query` |
 | `resolve(formId, source, { operation, tokens }, signal?)` | `POST /v1/forms/:id/lookups/:source/resolve` |
 
-The reply types — `PublishedForm`, `FormRecord`, `RecordList`,
-`RecordListQuery`, `ListSortTerm`, `ListColumns`, `LookupResult`,
-`LookupRow`, `FieldError` — and `LIST_PAGE_SIZE` are re-exported from
+The reply types — `FormMenu`, `FormMenuEntry`, `FormMenuChild`,
+`PublishedForm`, `FormRecord`, `RecordList`, `RecordListQuery`,
+`ListSortTerm`, `ListColumns`, `LookupResult`, `LookupRow`, `FieldError` —
+and `LIST_PAGE_SIZE` are re-exported from
 `@formancy/data-core`, where the server's handlers are checked against the
 same declarations. A form's `list`
 is `null` when the server would refuse this person a page, and otherwise
@@ -56,6 +59,17 @@ a `form` reply without one is `unexpected`, as from a server older than
 lists. `list` sends exactly `search`, `sort`, `parent`, `offset` and `limit`
 in a POST body, each left out the server's default, so the search is in no
 URL.
+
+`forms` is the menu
+([0045](../../docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)):
+the forms the server says this person may read, each with its title, the
+operations its policy grants them as published, and its children -- a
+child form and the lookup field its rows name this form's records by, so a
+host lists one record's children with
+`list(child.form, { parent: { field: child.field, record } })`. The server
+asks no database for it: `form(formId)` says what the database allows now,
+and can still refuse a form the menu named. An answer whose entries lack
+a title, operations or children is `unexpected`.
 
 ## The rules it keeps for a host
 

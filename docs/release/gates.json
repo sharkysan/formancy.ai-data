@@ -51,7 +51,8 @@
         { "file": "packages/data-postgres/src/through.integration.test.ts" },
         { "file": "packages/data-sqlserver/src/through.integration.test.ts" },
         { "file": "packages/data-postgres/src/list.integration.test.ts" },
-        { "file": "packages/data-sqlserver/src/list.integration.test.ts" }
+        { "file": "packages/data-sqlserver/src/list.integration.test.ts" },
+        { "file": "packages/data-server/src/routes/runtime-menu.test.ts" }
       ]
     },
     {

@@ -22,8 +22,8 @@ export const CONFIG = `${CONFIG_DIR}/config.yml`
  * reaches the server. The administrator's is the web front's origin, 8080,
  * with the studio, the host page and both planes; the runtime door's is the
  * server deploy/web/nginx.conf keeps for it, 8081, which serves no file and
- * forwards only /v1/forms/, so a path nginx resolves differently from
- * cloudflared reaches no file there.
+ * forwards only /v1/forms and what is below it, so a path nginx resolves
+ * differently from cloudflared reaches no file there.
  */
 export const SERVICES = { administrator: 'http://web:8080', runtime: 'http://web:8081' }
 export const TUNNEL_NAME = 'formancy-data'

@@ -85,7 +85,7 @@ replace with your own.
 |   <app host> + runtime pattern -> web:8081; any other path: 404, or the host application's own  |
 | web (nginx), on `edge` and compose's network:                                                   |
 |   8080: /studio/ and /host/ files; /v1/ and /health --plain HTTP--> server:4390                 |
-|   8081: no file; /v1/forms/ --plain HTTP--> server:4390; anything else 404                      |
+|   8081: no file; /v1/forms and /v1/forms/ --plain HTTP--> server:4390; anything else 404        |
 | server, on compose's network: refuses a path a proxy could read differently; verifies the host  |
 |   token; roles pick the plane; no-store on its answers; one rate-limit bucket; store on a       |
 |   volume; its log is the audit                                                                  |
@@ -150,7 +150,8 @@ be decrypted at Cloudflare, Cloudflare is not this deployment's edge.
   shape (a) of section 8, at the host application's own service, which then
   receives the request's headers, the token among them. What cloudflared
   forwards there goes to the web front's server for that door, 8081, which
-  serves no file and passes only `/v1/forms/` to the server. A path
+  serves no file and passes only `/v1/forms` and what is below it to the
+  server. A path
   cloudflared reads as a runtime route and nginx or the router reads
   otherwise -- cloudflared decodes `%2F` and `%5C`, counts a backslash as a
   slash and resolves `..` before it matches; nginx keeps a backslash; the
@@ -338,7 +339,7 @@ ingress:
         audTag:
           - '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
   - hostname: app.example.com
-    path: '^(?:/v1/forms/[^/]+|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/update)$'
+    path: '^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/update)$'
     service: http://web:8081
   - service: http_status:404
 ```
@@ -356,6 +357,7 @@ Every route the server registers, and what each door does with it:
 | `GET` | `/v1/connections/:id/metadata` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/connections/:id/test` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/form-proposals` | administrator | behind Access | not forwarded |
+| `GET` | `/v1/forms` | runtime | behind Access | forwarded |
 | `GET` | `/v1/forms/:id` | runtime | behind Access | forwarded |
 | `POST` | `/v1/forms/:id/drift` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/forms/:id/lookups/:source/query` | runtime | behind Access | forwarded |
@@ -375,7 +377,7 @@ Every route the server registers, and what each door does with it:
 The runtime door forwards a path only when it matches this pattern, which setup writes into the tunnel’s configuration and checks against cloudflared:
 
 ```text
-^(?:/v1/forms/[^/]+|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/update)$
+^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/update)$
 ```
 
 <!-- end generated -->
@@ -385,8 +387,11 @@ its headers, and its rule that a lost answer is never sent again
 ([0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md)) stay
 in the path. The administrator's door goes to the web front's origin,
 8080; the runtime door to the server `deploy/web/nginx.conf` keeps for it,
-8081, which serves no file and passes only `/v1/forms/`, where every
-runtime route is. On 8080 a path cloudflared reads as a runtime route could
+8081, which serves no file and passes only `/v1/forms` -- the menu of
+forms ([0045](../decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)),
+which nginx would otherwise answer itself with a redirect to
+`/v1/forms/` -- and what is below `/v1/forms/`, where every other runtime
+route is. On 8080 a path cloudflared reads as a runtime route could
 be the studio's page to nginx: cloudflared counts a backslash as a slash
 and nginx does not, so `/studio/..%5Cv1%5Cforms%5CZ/%2E%2E/index.html` is
 `/v1/forms/index.html` to one and `/studio/index.html` to the other
@@ -596,6 +601,7 @@ pass  GET https://formancy.example.com/v1/connections  Access answered first
 pass  GET https://formancy.example.com/v1/connections/erp/metadata  Access answered first
 pass  POST https://formancy.example.com/v1/connections/erp/test  Access answered first
 pass  POST https://formancy.example.com/v1/form-proposals  Access answered first
+pass  GET https://formancy.example.com/v1/forms  Access answered first
 pass  GET https://formancy.example.com/v1/forms/order  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/drift  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/lookups/customer/query  Access answered first
@@ -612,7 +618,7 @@ pass  GET https://formancy.example.com/v1/forms/order/versions/1  Access answere
 pass  GET https://formancy.example.com/v1/forms/order/versions/latest  Access answered first
 pass  GET https://formancy.example.com/v1/whoami  Access answered first
 pass  GET http://formancy.example.com/studio/  redirected to HTTPS
-23 requests, 23 as expected, 0 not.
+24 requests, 24 as expected, 0 not.
 ```
 
 <!-- end generated -->

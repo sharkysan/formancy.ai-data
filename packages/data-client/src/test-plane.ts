@@ -99,10 +99,12 @@ function headersOf(init: RequestInit | undefined): Record<string, string> {
 
 /**
  * Starts the server and publishes `pg-order` and `ms-order` through the
- * administrator's plane -- and, with `hops`, `pg-hop-order` and
- * `ms-hop-order` through a TCP hop each (`Lossy`).
+ * administrator's plane -- with `lines`, `pg-order-line` and
+ * `ms-order-line` too, an order's lines reached through their order (0043);
+ * and, with `hops`, `pg-hop-order` and `ms-hop-order` through a TCP hop
+ * each (`Lossy`).
  */
-export async function startPlane(options: { hops?: boolean } = {}): Promise<Plane> {
+export async function startPlane(options: { hops?: boolean; lines?: boolean } = {}): Promise<Plane> {
   const { pg, ms } = inject('databases')
   const connections: ConnectionConfig[] = [
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
@@ -155,6 +157,20 @@ export async function startPlane(options: { hops?: boolean } = {}): Promise<Plan
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     const policy = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
+    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+  }
+  for (const { connection, versionColumn } of options.lines === true ? ENGINES : []) {
+    const formId = `${connection}-order-line`
+    const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
+      connection,
+      root: { schema: 'sales', name: 'order_line' },
+      formId,
+      title: 'Order line',
+      lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
+      ...(versionColumn === undefined ? {} : { versionColumn }),
+    })
+    // No tenant column of its own: its rows are its tenant's orders' lines, through the order lookup's filter (0043).
+    const policy: FormPolicy = { ...clerkPolicy((bindings as { fields: FieldBinding[] }).fields), rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }
     await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
   }
 

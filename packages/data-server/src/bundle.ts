@@ -71,8 +71,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *   the one its base and bindings say they came from (`bundle-format2.ts`).
  *
  * Format 1 is still read, so every version published before 0030 is served.
+ *
+ * It never throws. A part of another shape than a check reads -- a hand
+ * edit's `null` where the bindings' fields belong -- is one more reason the
+ * version is not served: thrown, it would reach the server's default 500,
+ * which answers with the exception's message, and the menu of forms (0045)
+ * would have to tell it from a store that cannot be read.
  */
 export function validateBundle(document: unknown): BundleValidation {
+  try {
+    return checkedBundle(document)
+  } catch (error) {
+    return { ok: false, problems: [`the bundle has a part of another shape than it should: ${(error as Error).message}`] }
+  }
+}
+
+function checkedBundle(document: unknown): BundleValidation {
   if (!isRecord(document)) return { ok: false, problems: ['a bundle is an object'] }
   const problems: string[] = []
   const format = document['format']

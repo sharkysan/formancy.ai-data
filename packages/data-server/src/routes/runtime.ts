@@ -4,6 +4,7 @@ import {
   checkSubmittedFields,
   driftRefusal,
   findObject,
+  grantedOperations,
   intendedRecord,
   listable,
   listColumns,
@@ -45,6 +46,7 @@ import { auditedForm, auditRequests, recordReference } from '../audit.js'
 import { loadPublished } from '../published.js'
 import { planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
 import { registerListRoute } from './runtime-lists.js'
+import { registerMenuRoute } from './runtime-menu.js'
 import { createWriteOnce, INVALID_WRITE_ID, writeId } from './write-once.js'
 import type { WriteAnswer } from './write-once.js'
 
@@ -72,6 +74,7 @@ declare module 'fastify' {
  * every route the router holds and fails on an entry no route has.
  */
 export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
+  'GET /v1/forms': 'form-list',
   'GET /v1/forms/:id': 'form',
   'POST /v1/forms/:id/records/read': 'read',
   'POST /v1/forms/:id/records/list': 'list',
@@ -403,6 +406,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     return refused === undefined ? undefined : refusal(request, operation, refused)
   }
 
+  // The forms this person may read (0045): from the published bundles and the policy, asking no database.
+  registerMenuRoute(app, { store, connections: () => registry.ids(), context })
+
   /**
    * The form, what this person may do with it now, and which fields they may
    * see. The policy first, before any statement; then the root is described,
@@ -415,7 +421,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const bundle = await published(request.params.id, reply)
     if (bundle === undefined) return reply
     const actor = context(request)
-    const allowed = (['read', 'create', 'update'] as const).filter((operation) => bundle.bindings.operations[operation as 'create' | 'update'] !== false && authorizeOperation(bundle.policy, actor, operation).ok)
+    // What the policy grants of what the form offers, as the menu says it (0045); then what the database allows now.
+    const allowed = grantedOperations(bundle.bindings, bundle.policy, actor)
     if (allowed.length === 0) return reply.code(403).send({ code: 'operation-denied', message: 'This form is not available to you.' })
     const open = await connection(bundle, reply)
     if (open === undefined) return reply

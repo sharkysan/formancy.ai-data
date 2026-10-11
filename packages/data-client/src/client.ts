@@ -1,8 +1,8 @@
 import { WRITE_ID_HEADER } from '@formancy/data-core'
-import type { FieldError, FormRecord, LookupResult, LookupRow, PublishedForm, RecordList, RecordListQuery } from '@formancy/data-core'
+import type { FieldError, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordList, RecordListQuery } from '@formancy/data-core'
 import { reconcile } from './reconcile.js'
 import type { Reconciliation } from './reconcile.js'
-import { isFormRecord, isLookupResult, isPublishedForm, isRecordList, isResolved, refusalOf, UNEXPECTED } from './shapes.js'
+import { isFormMenu, isFormRecord, isLookupResult, isPublishedForm, isRecordList, isResolved, refusalOf, UNEXPECTED } from './shapes.js'
 import { writeOutcome } from './writes.js'
 import type { UnknownWrite, WriteAnswer, WriteIntent, WriteOutcome } from './writes.js'
 
@@ -181,6 +181,15 @@ export function createDataClient(options: DataClientOptions) {
     call({ method: 'POST', names: [formId, source], route: ([form, name]) => `/v1/forms/${String(form)}/lookups/${String(name)}/${action}`, body, read, signal })
 
   return {
+    /**
+     * `GET /v1/forms` (0045): the published forms this person may read, each
+     * with its title, the operations the policy grants them and the children
+     * a page may list under one of its records -- and nothing about any other
+     * form. Opening one with `form` says what the database allows now.
+     */
+    forms: (signal?: AbortSignal): Promise<Outcome<FormMenu>> =>
+      call({ method: 'GET', names: [], route: () => '/v1/forms', read: (body) => (isFormMenu(body) ? body : undefined), signal }),
+
     /** `GET /v1/forms/:id`: the published document, the operations this person may use, and the fields they may read. */
     form: (formId: string): Promise<Outcome<PublishedForm>> =>
       call({ method: 'GET', names: [formId], route: ([form]) => `/v1/forms/${String(form)}`, read: (body) => (isPublishedForm(body) ? body : undefined) }),

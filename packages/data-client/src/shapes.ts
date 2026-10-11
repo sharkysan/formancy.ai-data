@@ -1,4 +1,4 @@
-import type { FieldError, FormRecord, LookupResult, LookupRow, PublishedForm, RecordList } from '@formancy/data-core'
+import type { FieldError, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordList } from '@formancy/data-core'
 import type { Refusal } from './client.js'
 
 /*
@@ -45,6 +45,28 @@ export function isPublishedForm(body: unknown): body is PublishedForm {
     Array.isArray(body['readable']) &&
     isListColumns(body['list'])
   )
+}
+
+/** A child in a menu: the child form, and the field its list is narrowed by. */
+function isMenuChild(value: unknown): boolean {
+  return isRecord(value) && typeof value['form'] === 'string' && typeof value['field'] === 'string'
+}
+
+/** One menu entry: a page draws a link from it, and a grid per child. */
+function isMenuEntry(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value['id'] === 'string' &&
+    typeof value['title'] === 'string' &&
+    isStrings(value['operations']) &&
+    Array.isArray(value['children']) &&
+    value['children'].every(isMenuChild)
+  )
+}
+
+/** The menu (0045): every entry in the server's shape, children included, so an entry of a server with no children is not drawn as a form with none. */
+export function isFormMenu(body: unknown): body is FormMenu {
+  return isRecord(body) && Array.isArray(body['forms']) && body['forms'].every(isMenuEntry)
 }
 
 export function isFormRecord(body: unknown): body is FormRecord {

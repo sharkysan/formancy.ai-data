@@ -142,6 +142,12 @@ there would be either too loose to mean anything or flaky.
   ([0044](./decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)):
   what a page reads, its round trips and its time are not here, and no
   block of the harness sends one.
+- **No menu of forms.** `GET /v1/forms` came after the figures too
+  ([0045](./decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)):
+  it asks no database, and reads and validates every published form on
+  every request, so its time grows with every form published; no block of
+  the harness sends one. 0045 records one measurement in-process, outside
+  the harness and its protocol: about 2 ms a published form.
 - **PostgreSQL under READ COMMITTED only**, the fixture's default isolation.
   Under another, every read and write first locks the form's table in a
   transaction of its own (0041), which takes more round trips than the pins

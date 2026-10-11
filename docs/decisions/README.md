@@ -73,11 +73,11 @@ only enforcement is "we remember" says so plainly.
 | [0016](0016-postgres-operations.md) | PostgreSQL operations: canonical text in and out, every name from pg_catalog | accepted; narrowed by 0028, 0040, 0041; extended by 0031, 0043, 0044 |
 | [0017](0017-sqlserver-operations.md) | SQL Server operations: one guarded batch, and a write reported done only when the table holds it | accepted; narrowed by 0026, 0028, 0031, 0040, 0041; extended by 0027, 0031, 0043, 0044 |
 | [0018](0018-one-planner-turns-answers-into-requests.md) | One planner turns answers into requests, and leaves membership to the database | accepted; narrowed by 0028, 0041; extended by 0040, 0043, 0044 |
-| [0019](0019-a-published-form-is-checked-every-time-it-is-read.md) | A published form is one bundle, checked every time it is read; a form reaches only allowlisted databases | accepted; extended by 0030, 0041, 0042 |
+| [0019](0019-a-published-form-is-checked-every-time-it-is-read.md) | A published form is one bundle, checked every time it is read; a form reaches only allowlisted databases | accepted; extended by 0030, 0041, 0042, 0045 |
 | [0020](0020-administration-is-a-separate-plane.md) | Administration is a separate plane, held by a role in the host's token | accepted; extended by 0033 |
 | [0021](0021-generated-forms-preview-in-both-frameworks.md) | Generated forms are previewed in both frameworks, generated in the browser from a captured snapshot | accepted; narrowed by 0029 |
-| [0022](0022-the-runtime-plane-asks-the-policy-every-time.md) | The runtime plane asks the policy on every request, and removes only the echo it can prove | accepted; narrowed by 0031, 0040; extended by 0041, 0044 |
-| [0023](0023-the-audit-trail-is-operational-not-evidence.md) | The audit trail is operational, never holds a value, and is not evidence | accepted; extended by 0031, 0033, 0044 |
+| [0022](0022-the-runtime-plane-asks-the-policy-every-time.md) | The runtime plane asks the policy on every request, and removes only the echo it can prove | accepted; narrowed by 0031, 0040; extended by 0041, 0044, 0045 |
+| [0023](0023-the-audit-trail-is-operational-not-evidence.md) | The audit trail is operational, never holds a value, and is not evidence | accepted; extended by 0031, 0033, 0044, 0045 |
 | [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032 |
 | [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted |
 | [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted; narrowed by 0040 |
@@ -91,7 +91,7 @@ only enforcement is "we remember" says so plainly.
 | [0034](0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md) | Performance is measured through the shipped server against a sized lookup table, and held without a clock by rows read and round trips | accepted |
 | [0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md) | A release report is derived from the run that gated the release, and says what it did not test | accepted; extended by 0034 |
 | [0036](0036-a-merged-branch-is-deleted-by-the-merge.md) | A merged branch is deleted by the merge, and only by the merge | accepted |
-| [0037](0037-cloudflare-is-the-edge-not-the-runtime.md) | Cloudflare is the edge, not the runtime: one locally-managed tunnel with generated doors, and a server that refuses a path a proxy could read differently | accepted |
+| [0037](0037-cloudflare-is-the-edge-not-the-runtime.md) | Cloudflare is the edge, not the runtime: one locally-managed tunnel with generated doors, and a server that refuses a path a proxy could read differently | accepted; extended by 0045 |
 | [0038](0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md) | README pictures are taken by a script from states the product reaches, and held to the text they show | accepted |
 | [0039](0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md) | The server refuses a publish whose keys now name other columns, unless it says what happens to their grants | accepted; extended by 0043 |
 | [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md) | Instants and times are read to formancy's shape on both engines, and an unedited one is never written back | accepted; narrowed by 0041; extended by 0041 |
@@ -99,6 +99,7 @@ only enforcement is "we remember" says so plainly.
 | [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md) | Generated forms stay on spec 3 after spec 4 is released | accepted |
 | [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md) | A child form's rows are reached only through a parent its policy admits | accepted; extended by 0044 |
 | [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md) | A form's records are listed a page at a time under its read policy, searched and paged as a lookup is | accepted |
+| [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md) | The runtime plane lists the forms a person may read, and nothing about the others | accepted |
 | [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md) | A built app carries the licence and notice texts of everything it bundles | accepted |
 | [0048](0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md) | The licence is in force before a lawyer has read it | accepted; extended by 0054 |
 | [0054](0054-version-1-1-names-the-address-for-a-redistribution-agreement-too.md) | Version 1.1 of the licence names the address for a redistribution agreement too | accepted |
