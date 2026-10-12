@@ -1,4 +1,4 @@
-import { bindingsVersionProblem, createSnapshot, findObject, rowFilterColumnProblem, throughProblems, validatePolicy } from '@formancy/data-core'
+import { bindingsVersionProblem, createSnapshot, deleteProblems, findObject, rowFilterColumnProblem, throughProblems, validatePolicy } from '@formancy/data-core'
 import type { FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { format2Problems } from './bundle-format2.js'
@@ -144,16 +144,19 @@ function checkedBundle(document: unknown): BundleValidation {
 
 /**
  * Everything a policy does not fit: the bindings (`validatePolicy`), the
- * snapshot's columns a row filter compares (`unfilterableColumns`), and what
+ * snapshot's columns a row filter compares (`unfilterableColumns`), what
  * the snapshot says of each lookup a through names (`throughProblems`, 0043),
- * which the planner asks too. One function for the bundle check and for the
- * regeneration route's report, so the two cannot disagree about one policy.
+ * and what a delete it grants would also do to other tables
+ * (`deleteProblems`, 0050) -- each of which the planner asks too. One
+ * function for the bundle check, on publish and on every read, and for the
+ * regeneration route's report, so the three cannot disagree about one policy.
  */
 export function policyProblems(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy): string[] {
   return [
     ...fitProblems(policy, bindings),
     ...unfilterableColumns(snapshot, bindings, policy),
     ...throughProblems(snapshot, bindings, policy).map((problem) => `policy: ${problem}`),
+    ...(isRecord(bindings.root) ? deleteProblems(snapshot, bindings, policy).map((problem) => `policy: ${problem}`) : []),
   ]
 }
 

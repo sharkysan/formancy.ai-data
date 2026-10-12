@@ -167,13 +167,52 @@ describe('authorizeOperation', () => {
     }
   })
 
-  // `delete`, or a name every plain object inherits, is not an operation any
-  // role holds. Looked up on the policy object, `constructor` would find
+  // `archive`, or a name every plain object inherits, is not an operation
+  // any role holds. Looked up on the policy object, `constructor` would find
   // Object's constructor rather than "no such operation".
   test('refuses an operation this release does not have', () => {
-    for (const operation of ['delete', 'constructor', '']) {
+    for (const operation of ['archive', 'constructor', '']) {
       expect(authorizeOperation(ORDER_POLICY, MANAGER, operation as 'read')).toMatchObject({ ok: false, code: 'operation-denied' })
     }
+  })
+})
+
+describe('delete', () => {
+  const DELETABLE_LINE: FormBindings = { ...LINE, operations: { create: true, update: true, delete: true } }
+
+  // `operations.delete` is optional (0050): every policy written before it
+  // says nothing about delete, and must keep meaning what it meant -- nobody
+  // may. Read as granted, an absent list would let every role that holds
+  // anything delete (watched failing that way).
+  test('refuses delete to everybody when the policy says nothing of it, and grants it to the roles it lists', () => {
+    for (const actor of [CLERK, MANAGER]) {
+      expect(authorizeOperation(ORDER_POLICY, actor, 'delete')).toEqual({ ok: false, code: 'operation-denied', message: 'no role of this actor may delete with this form' })
+    }
+    const deleting = edited(ORDER_POLICY, (draft) => {
+      draft.operations.delete = ['manager']
+    })
+    expect(authorizeOperation(deleting, MANAGER, 'delete')).toEqual({ ok: true })
+    expect(authorizeOperation(deleting, CLERK, 'delete')).toMatchObject({ ok: false, code: 'operation-denied' })
+    expect(rowFilter(deleting, MANAGER, 'delete')).toEqual({ ok: true, filter: [{ column: 'tenant_id', value: '42' }] })
+    expect(rowFilter(deleting, { ...MANAGER, attributes: {} }, 'delete')).toMatchObject({ ok: false, code: 'missing-attribute' })
+  })
+
+  // A delete is scoped as an update is (0043): a line exists for it only
+  // through an order the actor's tenant may reference, and a context
+  // without the through's attribute is refused rather than scoped by less.
+  test('scopes a delete through a parent as it scopes an update', () => {
+    const deleting = { ...LINE_POLICY, operations: { ...LINE_POLICY.operations, delete: BOTH } }
+    expect(throughFilters(deleting, MANAGER, DELETABLE_LINE, 'delete')).toEqual({ ok: true, through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }] })
+    expect(throughFilters(deleting, { ...MANAGER, attributes: {} }, DELETABLE_LINE, 'delete')).toMatchObject({ ok: false, code: 'missing-attribute' })
+    expect(throughFilters(LINE_POLICY, MANAGER, DELETABLE_LINE, 'delete')).toMatchObject({ ok: false, code: 'operation-denied' })
+  })
+
+  // A delete writes no field and has no lookup to search: its options are
+  // nobody's, and a filter handed out for one would be a filter on a
+  // lookup no delete request carries.
+  test('offers no lookup to search for a delete', () => {
+    const deleting = { ...LINE_POLICY, operations: { ...LINE_POLICY.operations, delete: BOTH } }
+    expect(lookupRowFilter(deleting, MANAGER, DELETABLE_LINE, 'delete' as 'read', 'order')).toMatchObject({ ok: false, code: 'operation-denied' })
   })
 })
 

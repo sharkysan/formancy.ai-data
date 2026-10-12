@@ -1,11 +1,30 @@
-import { listTerms, rowFilterTerms, throughTerms } from '@formancy/data-core'
-import type { ApiValue, DescribedRead, ListOutcome, ListRequest, ObjectRef, RecordAdapter, RecordColumn, RecordFailure, RecordOutcome, RecordRead, RecordTarget, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
+import { deleteTerms, listTerms, rowFilterTerms, throughTerms } from '@formancy/data-core'
+import type {
+  ApiValue,
+  DeleteOutcome,
+  DeleteRequest,
+  DeleteTerms,
+  DescribedRead,
+  ListOutcome,
+  ListRequest,
+  ObjectRef,
+  RecordAdapter,
+  RecordColumn,
+  RecordFailure,
+  RecordOutcome,
+  RecordRead,
+  RecordTarget,
+  RowFilterTerm,
+  ThroughTerms,
+  UpdateRequest,
+} from '@formancy/data-core'
 import type { Sql, TransactionSql } from 'postgres'
 import { run } from '../sql/statement.js'
 import type { TextResult, TextRow } from '../sql/statement.js'
 import { decodeCanonical } from '../sql/values.js'
 import { describedFrom, parseDefinition, READ_COMMITTED } from './definition.js'
 import type { Definition } from './definition.js'
+import { deleteStatement, whyNotDeletedStatement } from './delete.js'
 import { connectionLost, recordFailure, sqlState } from './errors.js'
 import type { Phase } from './errors.js'
 import { listStatement } from './list.js'
@@ -56,6 +75,45 @@ const DEFINITION_MOVED: RecordFailure = {
   code: 'schema-changed',
   message: "The table's definition is not the one this write was decided over; nothing was written.",
 }
+/**
+ * A delete the server completed without deleting the row, without an
+ * error, though the row is there at the version sent: a BEFORE DELETE
+ * trigger that returned NULL, or a row security policy for DELETE stricter
+ * than the one for SELECT (measured, 0050 P4). `refused`, as a declined
+ * update is. A rule that acts on delete is told apart before this
+ * (`RULED`).
+ */
+const DECLINED_DELETE: RecordFailure = {
+  ok: false,
+  code: 'refused',
+  message: 'PostgreSQL completed the delete without deleting the row, though it exists at the version sent: a trigger or a row security policy declined it.',
+}
+/**
+ * A key that acts on delete now refers to the table, or to one below it,
+ * and the delete was not decided over it (0050): nothing was deleted. Drift
+ * review says which key.
+ */
+const REACH_MOVED: RecordFailure = {
+  ok: false,
+  code: 'schema-changed',
+  message: 'A foreign key now acts on a delete from this table that this delete was not decided over; nothing was deleted.',
+}
+/**
+ * A rule acts on a delete from the table (0050): PostgreSQL refuses the
+ * delete's statement under most rules itself, and the statement's guard
+ * under the one it would run in the delete's place (delete.ts), so nothing
+ * was deleted or done instead. `refused`: the same delete is refused again
+ * until the rule is gone, as SQL Server's batch refuses an INSTEAD OF
+ * trigger.
+ */
+const RULED: RecordFailure = {
+  ok: false,
+  code: 'refused',
+  message: 'A rule on this table acts on a delete, and this module does not delete from such a table; nothing was deleted.',
+}
+/** The SQLSTATE of a scalar subquery that returned more than one row: in a delete, the statement's own refusal of a second row (delete.ts). */
+const CARDINALITY = '21000'
+
 /** A table the catalog does not show as discovery describes one: gone, out of sight, a foreign table, a partition. Which, drift review says (0010). */
 const NOT_DESCRIBED: RecordFailure = { ok: false, code: 'schema-changed', message: 'The catalog does not show this table as discovery describes one.' }
 /** The read-committed path's write landed on a connection under another isolation: refused by its guard, so nothing was written. */
@@ -125,9 +183,9 @@ function untilLost<T>(statement: Promise<T>): Promise<T> {
 }
 
 /**
- * Runs `statement` in a transaction that first takes `mode` on the table,
- * which takes no snapshot, so the statement takes its snapshot after the
- * lock under any isolation (0041). In `sql.begin`, never on a reserved
+ * Runs `statement` in a transaction that first takes `lock`, which takes no
+ * snapshot, so the statement takes its snapshot after the lock under any
+ * isolation (0041). In `sql.begin`, never on a reserved
  * connection, whose statements never answer once its backend is gone; every
  * step through `untilLost`, and nothing translated inside the transaction, so
  * that a failure is either the server's, rolled back, or the connection's,
@@ -135,11 +193,10 @@ function untilLost<T>(statement: Promise<T>): Promise<T> {
  * statement had been sent when it failed, which decides between
  * `unavailable` and `unknown-outcome`.
  */
-async function lockedTransaction(sql: Sql, table: ObjectRef, mode: 'access share' | 'row exclusive', statement: RecordStatement): Promise<{ ok: true; result: TextResult } | { ok: false; error: unknown; sent: boolean }> {
+async function lockedTransaction(sql: Sql, lock: RecordStatement, statement: RecordStatement): Promise<{ ok: true; result: TextResult } | { ok: false; error: unknown; sent: boolean }> {
   let sent = false
   try {
     const result = await sql.begin(async (tx) => {
-      const lock = lockStatement(table, mode)
       await untilLost(run(tx, lock.text, lock.params))
       sent = true
       return untilLost(run(tx, statement.text, statement.params))
@@ -228,15 +285,37 @@ async function whyNothingChanged(
   return unchanged === 'true' ? DECLINED_UPDATE : STALE
 }
 
+/**
+ * `stale`, `not-found`, declined, a definition or a reach that moved, a
+ * rule, or an isolation that refused, for a delete that deleted nothing
+ * (0050): one more
+ * statement, inside the same filters and throughs, as for an update. A
+ * record that is there at the version sent was not changed by anybody else
+ * -- a version column on a table whose key the database numbers names one
+ * state of one record for good (0050) -- so the database declined the
+ * delete itself.
+ */
+async function whyNotDeleted(sql: Sql, request: DeleteRequest, terms: DeleteTerms, withVersion: boolean, definition: Definition, path: WritePath): Promise<RecordFailure> {
+  const asked = await attempt(sql, whyNotDeletedStatement(request, terms, withVersion, definition), 'read')
+  if (!asked.ok) return asked.failure
+  const [same, reach, rules, isolation, unchanged] = asked.result.rows[0] as TextRow
+  if (same !== 'true') return DEFINITION_MOVED
+  if (reach !== 'true') return REACH_MOVED
+  if (rules !== 'true') return RULED
+  if (path === 'read-committed' && isolation !== READ_COMMITTED) return ISOLATION_DIFFERS
+  if (unchanged === null || unchanged === undefined) return NOT_FOUND
+  return unchanged === 'true' ? DECLINED_DELETE : STALE
+}
+
 /** The path a definition's isolation chooses, before anything is sent, so a write is never sent twice (0015). */
 function pathOf(definition: Definition): WritePath {
   return definition.isolation === READ_COMMITTED ? 'read-committed' : 'locked'
 }
 
-/** One guarded write on its path: its rows, or what it failed with. */
-async function sendWrite(sql: Sql, table: ObjectRef, path: WritePath, statement: RecordStatement): Promise<Ran> {
+/** One guarded write on its path: its rows, or what it failed with. `lock` is what the locked path takes first. */
+async function sendWrite(sql: Sql, lock: RecordStatement, path: WritePath, statement: RecordStatement): Promise<Ran> {
   if (path === 'read-committed') return attempt(sql, statement, 'write')
-  const done = await lockedTransaction(sql, table, 'row exclusive', statement)
+  const done = await lockedTransaction(sql, lock, statement)
   if (done.ok) return { ok: true, result: done.result }
   return { ok: false, failure: recordFailure(done.error, done.sent ? 'write' : 'read'), state: sqlState(done.error) }
 }
@@ -292,7 +371,7 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       // waits for the table's lock: behind a rewriting ALTER it read the old
       // catalog and no row (measured). Its answer is set aside, and the read
       // asked again after the lock. A read may be asked again; a write never.
-      const again = await lockedTransaction(sql, request.target.table, 'access share', statement)
+      const again = await lockedTransaction(sql, lockStatement(request.target.table, 'access share'), statement)
       return readAnswer(request, again.ok ? again : { ok: false, failure: recordFailure(again.error, 'read'), state: sqlState(again.error) }).answer
     },
 
@@ -302,7 +381,7 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       const first = listAnswer(request, await attempt(sql, statement, 'read'))
       if (first.isolation === undefined || first.isolation === READ_COMMITTED) return first.answer
       // As a read (above): under another isolation the page is asked again after the table's lock.
-      const again = await lockedTransaction(sql, request.target.table, 'access share', statement)
+      const again = await lockedTransaction(sql, lockStatement(request.target.table, 'access share'), statement)
       return listAnswer(request, again.ok ? again : { ok: false, failure: recordFailure(again.error, 'read'), state: sqlState(again.error) }).answer
     },
 
@@ -311,7 +390,7 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       const definition = parseDefinition(request.definition)
       const path = pathOf(definition)
       const table = request.target.table
-      const ran = await sendWrite(sql, table, path, insertStatement(request, definition, path))
+      const ran = await sendWrite(sql, lockStatement(table, 'row exclusive'), path, insertStatement(request, definition, path))
       if (!ran.ok) return failedWrite(sql, table, definition, path, ran.failure)
       // INSERT 0 0, and no error: the guard, a trigger or a rule. Without
       // RETURNING there is no row to read either way, so the command tag is
@@ -332,7 +411,7 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       // mismatch, without sending it.
       if (!isVersion(request.expectedVersion)) return whyNothingChanged(sql, request, scope, false, definition, path)
 
-      const ran = await sendWrite(sql, table, path, updateStatement(request, terms, scope.through, definition, path))
+      const ran = await sendWrite(sql, lockStatement(table, 'row exclusive'), path, updateStatement(request, terms, scope.through, definition, path))
       // Under REPEATABLE READ, which a composition root may make the
       // default, PostgreSQL answers a lost race with 40001 instead of 0 rows
       // (0006). Nothing was written either way, so it is answered the same
@@ -341,6 +420,35 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       if (!ran.ok) return ran.state === '40001' ? whyNothingChanged(sql, request, scope, false, definition, path) : failedWrite(sql, table, definition, path, ran.failure)
       const row = onlyRow(ran.result)
       return row === undefined ? whyNothingChanged(sql, request, scope, true, definition, path) : { ok: true, ...recordOf(request.target, request.returning, row) }
+    },
+
+    async delete(request): Promise<DeleteOutcome> {
+      const terms = deleteTerms(request)
+      checkKey(request.target, terms.key)
+      if (request.target.concurrency.kind !== 'version-column') throw new Error('PostgreSQL has no rowversion; a delete here is guarded by a version column.')
+      const definition = parseDefinition(request.definition)
+      const path = pathOf(definition)
+      // A version that is not a number names no state the record was ever
+      // in, and is answered as any other mismatch without being sent.
+      if (!isVersion(terms.expectedVersion)) return whyNotDeleted(sql, request, terms, false, definition, path)
+
+      // The locked path locks every relation below the table too: under
+      // REPEATABLE READ the statement's snapshot is taken before it locks
+      // the partitions it plans, and a key added onto one while it waited
+      // would act unseen by the guard (delete.ts).
+      const ran = await sendWrite(sql, lockStatement(terms.root, 'row exclusive', 'below'), path, deleteStatement(request, terms, definition, path))
+      if (!ran.ok) {
+        // In a delete only: the statement's own refusal of a second row,
+        // with nothing deleted -- an identity that is not a key, a
+        // programming error (delete.ts). A trigger's own 21000 is reported
+        // as the same, and nothing was deleted either.
+        if (ran.state === CARDINALITY) throw new Error('The identity matched more than one row, so the delete was refused inside its statement and nothing was deleted: the bindings do not name a key.')
+        return ran.state === '40001' ? whyNotDeleted(sql, request, terms, false, definition, path) : failedWrite(sql, terms.root, definition, path, ran.failure)
+      }
+      const row = ran.result.rows[0]
+      if (row === undefined) return whyNotDeleted(sql, request, terms, true, definition, path)
+      const removed = recordOf(request.target, request.target.identity, row)
+      return { ok: true, deleted: { values: removed.values, version: removed.version as string } }
     },
   }
 }

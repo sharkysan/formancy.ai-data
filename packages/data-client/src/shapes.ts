@@ -1,4 +1,4 @@
-import type { FieldError, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordList } from '@formancy/data-core'
+import type { FieldError, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordList } from '@formancy/data-core'
 import type { Refusal } from './client.js'
 
 /*
@@ -36,6 +36,18 @@ function isListColumns(value: unknown): value is PublishedForm['list'] {
   return value === null || (isRecord(value) && isStrings(value['searchable']) && isStrings(value['sortable']))
 }
 
+/**
+ * What a delete also does (0050): `null` exactly when the form offers no
+ * delete, otherwise its three flags. A reply that says delete without them,
+ * or them without delete -- or neither, a server older than delete -- is no
+ * form this server sent, and a page that worded a confirmation from it
+ * would say what nobody decided.
+ */
+function isDeleting(value: unknown, operations: readonly unknown[]): value is PublishedForm['deleting'] {
+  if (!operations.includes('delete')) return value === null
+  return isRecord(value) && typeof value['cascades'] === 'boolean' && typeof value['clears'] === 'boolean' && typeof value['restricted'] === 'boolean'
+}
+
 export function isPublishedForm(body: unknown): body is PublishedForm {
   return (
     isRecord(body) &&
@@ -43,7 +55,8 @@ export function isPublishedForm(body: unknown): body is PublishedForm {
     isRecord(body['form']['model']) &&
     Array.isArray(body['operations']) &&
     Array.isArray(body['readable']) &&
-    isListColumns(body['list'])
+    isListColumns(body['list']) &&
+    isDeleting(body['deleting'], body['operations'] as unknown[])
   )
 }
 
@@ -67,6 +80,11 @@ function isMenuEntry(value: unknown): boolean {
 /** The menu (0045): every entry in the server's shape, children included, so an entry of a server with no children is not drawn as a form with none. */
 export function isFormMenu(body: unknown): body is FormMenu {
   return isRecord(body) && Array.isArray(body['forms']) && body['forms'].every(isMenuEntry)
+}
+
+/** A delete's answer (0050): the token of the row deleted, and `deleted: true`, nothing else that a 2xx could be mistaken for. */
+export function isRecordDeleted(body: unknown): body is RecordDeleted {
+  return isRecord(body) && typeof body['record'] === 'string' && body['deleted'] === true
 }
 
 export function isFormRecord(body: unknown): body is FormRecord {

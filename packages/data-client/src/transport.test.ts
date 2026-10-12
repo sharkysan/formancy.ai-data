@@ -76,7 +76,7 @@ describe('when the data server is not what answers', () => {
   // would offer a grid the server cannot serve. `null` and the columns are
   // both the server's. Watched failing with `list` left unchecked.
   test("a form without the server's list is unexpected, and a list of null or columns is the server's", async () => {
-    const FORM = { form: { model: {} }, operations: ['read'], readable: ['id'] }
+    const FORM = { form: { model: {} }, operations: ['read'], readable: ['id'], deleting: null }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
@@ -393,5 +393,109 @@ describe('a write id on every write (0031)', () => {
     expect(ids.slice(0, 3).every((id) => id !== undefined && /^[0-9a-f]{32}$/.test(id))).toBe(true)
     expect(new Set(ids.slice(0, 3)).size).toBe(3)
     expect(ids[3]).toBeUndefined()
+  })
+})
+
+describe('a delete (0050)', () => {
+  const DELETION = 'The answer to this deletion was lost between this page and the data server. It may have been deleted.'
+  const GONE = { record: 'k1:7', version: '00000000000007d1' }
+
+  // A delete is a POST with exactly the route's keys and a write id of its
+  // own, and is done only when the server says `{ record, deleted: true }`:
+  // the token of the row it deleted, which may be spelled otherwise than the
+  // one sent (0028).
+  test('posts the record and the version with a write id, and is done on the server’s deletion answer', async () => {
+    const seen: Array<{ url: string; id: unknown; body: string }> = []
+    const { base } = await serve((request, response) => {
+      void drained(request).then((body) => {
+        seen.push({ url: request.url ?? '', id: request.headers[WRITE_ID_HEADER], body })
+        response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ record: 'k1:07', deleted: true }))
+      })
+    })
+    const client = createDataClient({ token: () => 't', base })
+    expect(await client.delete('pg-ticket', { ...GONE, answers: { notes: 'never sent' } } as typeof GONE)).toEqual({ ok: true, value: { record: 'k1:07', deleted: true } })
+    expect(seen).toEqual([{ url: '/v1/forms/pg-ticket/records/delete', id: expect.stringMatching(/^[0-9a-f]{32}$/), body: JSON.stringify(GONE) }])
+  })
+
+  // A 2xx that is not a deletion answer -- a record, a body without its
+  // token, a `deleted` that is not `true` -- is not the server saying it
+  // deleted it, and may have been: an unknown write from the transport, in
+  // a deletion's words (watched failing with writeOutcome requiring a
+  // FormRecord: the deletion answer itself was unknown).
+  test('any other 2xx is an unknown deletion from the transport', async () => {
+    for (const body of [{ record: 'k1:7', version: 'v', answers: {} }, { deleted: true }, { record: 'k1:7', deleted: 'yes' }, { record: null, deleted: true }]) {
+      const { base } = await serve(json(200, body))
+      expect(await createDataClient({ token: () => 't', base }).delete('pg-ticket', GONE), JSON.stringify(body)).toEqual({
+        ok: false,
+        status: 200,
+        code: 'unknown-outcome',
+        message: DELETION,
+        operation: 'delete',
+        ...GONE,
+        origin: 'transport',
+      })
+    }
+  })
+
+  // The server's 502: the database lost the answer to a deletion, which
+  // may have been made; the server names the record and version sent.
+  test("the server's 502 is an unknown deletion from the database, sent once", async () => {
+    const message = 'The connection to the database failed after the deletion was sent. It may have been deleted.'
+    const { base, asked } = await serve(json(502, { code: 'unknown-outcome', message, operation: 'delete', ...GONE }))
+    expect(await createDataClient({ token: () => 't', base }).delete('pg-ticket', GONE)).toEqual({ ok: false, status: 502, code: 'unknown-outcome', message, operation: 'delete', ...GONE, origin: 'database' })
+    expect(asked).toHaveLength(1)
+  })
+
+  // A record not found, stale, or kept by the database for what refers to
+  // it: each is the server saying nothing was deleted -- a refusal, never
+  // unknown.
+  test('a 404, a 409 and a 422 are refusals', async () => {
+    for (const [status, code] of [[404, 'not-found'], [409, 'stale'], [422, 'referenced']] as const) {
+      const { base } = await serve(json(status, { code, message: 'Nothing was deleted.' }))
+      expect(await createDataClient({ token: () => 't', base }).delete('pg-ticket', GONE)).toEqual({ ok: false, status, code, message: 'Nothing was deleted.' })
+    }
+  })
+
+  // `deleting` is the server's exactly when `operations` holds delete, and
+  // null exactly when it does not (0050): a reply that says delete without
+  // what it also does, or what it also does without delete, or nothing at
+  // all, is no form this server sent, as a form without `list` is not
+  // (watched failing with `deleting` left unchecked).
+  test("a form's deleting is null exactly when it offers no delete", async () => {
+    const FORM = { form: { model: {} }, readable: ['id'], list: null }
+    const DELETING = { cascades: false, clears: false, restricted: true }
+    let body: unknown = FORM
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    for (const [operations, deleting] of [
+      [['read'], undefined],
+      [['read', 'delete'], null],
+      [['read'], DELETING],
+      [['read', 'delete'], { ...DELETING, restricted: 'yes' }],
+      [['read', 'delete'], { cascades: false, clears: false }],
+    ] as const) {
+      body = { ...FORM, operations, deleting }
+      expect(await client.form('pg-ticket'), JSON.stringify(body)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
+    for (const [operations, deleting] of [
+      [['read'], null],
+      [['read', 'delete'], DELETING],
+    ] as const) {
+      body = { ...FORM, operations, deleting }
+      expect(await client.form('pg-ticket')).toEqual({ ok: true, value: body })
+    }
+  })
+
+  // A server older than 0050 sends no `deleting` at all, and this client
+  // answers its form `unexpected`, as one since 0044 answers a reply
+  // without `list`: a host upgrades its server before its client, which
+  // the CHANGELOG and the limitations say.
+  test('a form reply from a server older than 0050, which has no deleting, is unexpected', async () => {
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ form: { model: {} }, operations: ['read', 'update'], readable: ['id'], list: null }))
+    })
+    expect(await createDataClient({ token: () => 't', base }).form('pg-ticket')).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
   })
 })

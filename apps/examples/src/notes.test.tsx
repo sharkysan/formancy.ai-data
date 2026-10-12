@@ -73,14 +73,15 @@ describe('the notes panel says what the generator said', () => {
       lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
       versionColumn: 'row_version',
     })
-    expect(form.bindings.operations).toEqual({ create: true, update: true })
+    // Delete too since 0050, which this panel does not list: the owner may DELETE, and the database numbers an order's key.
+    expect(form.bindings.operations).toEqual({ create: true, update: true, delete: true })
     expect(shown(form)).toEqual(expected(form))
   })
 
   // A view is read-only end to end, and every one of its fields says so.
   test('for a view: neither operation, and every field read-only', () => {
     const form = generated('customer_summary')
-    expect(form.bindings.operations).toEqual({ create: false, update: false })
+    expect(form.bindings.operations).toEqual({ create: false, update: false, delete: false })
     expect(shown(form)).toEqual(expected(form))
   })
 

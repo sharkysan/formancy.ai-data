@@ -113,11 +113,11 @@
       ]
     },
     "0010": {
-      "reviewed": "sha256:7430efab524d6e5e346d9f2bfd5aee830dd50e0235671ea6a8a5b1766ba235bf",
+      "reviewed": "sha256:8dcddf7c458a5b926ec21bfbd6831427fe4ae452e9ad4957677fc5035d6c9618",
       "limitations": [
         {
           "area": "forms",
-          "says": "Any change to a lookup's foreign key stops the lookup, including `ON DELETE`, which a form never exercises."
+          "says": "Any change to a lookup's foreign key stops the lookup, including `ON DELETE`, which only a delete of the lookup's target exercises."
         },
         {
           "area": "forms",
@@ -150,7 +150,7 @@
       ]
     },
     "0011": {
-      "reviewed": "sha256:26503a8e438bcc32b930a58e0b25ccddbe32b4b9aa69525d79767cf33841e0f1",
+      "reviewed": "sha256:aff815ad433330e5d428c6453198c0a50d321b84b5aac43a3d74284f323e33cc",
       "limitations": [
         {
           "area": "access",
@@ -234,7 +234,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:755ef40da917e5f1e37a38d9cddb71252e8e124d8e18d002277345be7782ca9e",
+      "reviewed": "sha256:1395048cd6b7e99e3447baad9ae1a9932f2583bbcb4ac0f6791933df473cc052",
       "limitations": [
         {
           "area": "databases",
@@ -247,7 +247,7 @@
       ]
     },
     "0016": {
-      "reviewed": "sha256:be2346c91bc2aa6c0acc546356ccab174da9296f5c32abc4e933e820d1e43d55",
+      "reviewed": "sha256:f6f1e7e93bcce8f65b7d9c51c21b19ef790a41f95f671c75641e56bbed02fa83",
       "limitations": [
         {
           "area": "databases",
@@ -289,7 +289,7 @@
       ]
     },
     "0017": {
-      "reviewed": "sha256:9c9bd74c4e790e894297b67f9d753f93e98cab4991cd087da13437638cf20b50",
+      "reviewed": "sha256:5867bcffc240f39b0fb2ed215cf14dc98822e3e1cf6c6ae0d0a7a464174e07b3",
       "limitations": [
         {
           "area": "writes",
@@ -335,7 +335,7 @@
       ]
     },
     "0018": {
-      "reviewed": "sha256:0abf948e2975e3aec7eb922b9676720bde2b5123405d5026f07a52e8d73e074f",
+      "reviewed": "sha256:15e4926f9a68e3fd467329d9a76a6925319a6b49d25c05f2412269cb0265ca59",
       "limitations": [
         {
           "area": "access",
@@ -403,7 +403,7 @@
       ]
     },
     "0022": {
-      "reviewed": "sha256:140ae2c0612539ee5555ec77f0eaf2c50c023cbbb56f8e996a5f2ece32ed6ce3",
+      "reviewed": "sha256:8d78c20d897e0f5cced18deb7073cec39aa37cfcd408066cbeeefd5b22799ec6",
       "limitations": [
         {
           "area": "writes",
@@ -416,7 +416,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:fa0d08ca0632740b3dd2f08be651619347d70091d06e8143fba3cd71a667a44e",
+      "reviewed": "sha256:7f5fd4a7489a3e7bbec9abfd6e7539c8ef262e5a1c384652e61e737ee6f5c250",
       "limitations": [
         {
           "area": "operations",
@@ -688,7 +688,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:34a564c8fdf087e06bfd636a6332aeab3ca6ff90a03a0b833ffa221cde2b0a7f",
+      "reviewed": "sha256:a12afcff0169b2dd173871b631fea2a8224f718882aaeaf7f5392590e7f9373b",
       "limitations": [
         {
           "area": "writes",
@@ -1050,7 +1050,7 @@
       ]
     },
     "0041": {
-      "reviewed": "sha256:3aa676c8679bcadafcab488301c8558a587c58fb3ff09116aa6eede60455f06e",
+      "reviewed": "sha256:9dff75b5e1fa15ded47b0e41fbac8f610dae372d225394eb259ba024c071e6b5",
       "limitations": [
         {
           "area": "forms",
@@ -1158,7 +1158,7 @@
       ]
     },
     "0043": {
-      "reviewed": "sha256:c104bc5bac9b62590249ccb9b2410ee3d2c331d3f10d43f926031061e8c2c609",
+      "reviewed": "sha256:f20487c3fe9308f65a8c16bd22531dbe250768792933d85e47f0c42bd72ac417",
       "limitations": [
         {
           "area": "access",
@@ -1266,7 +1266,7 @@
       ]
     },
     "0045": {
-      "reviewed": "sha256:47dcf2d820a25ebc1cf692b08f1d8652537d1f3ccb169c583a286e9e5672f774",
+      "reviewed": "sha256:2793225d9e048aac53f111fb1bebef4ab5a83dd07ade67bb30ba1ad73a4b24d1",
       "limitations": [
         {
           "area": "server",
@@ -1331,7 +1331,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:160f29aea91a9d44e6515364d4e7094ddcb1ede5cacb3a36d977f0ba4a293359",
+      "reviewed": "sha256:59d9eb56f72a5a47d5232106bf616cb3072389a525fbf95dd9a81fd8a1afb9fe",
       "limitations": [
         {
           "area": "host",
@@ -1400,7 +1400,7 @@
       ]
     },
     "0049": {
-      "reviewed": "sha256:3f08a5c72d1e1e8c0536211b06670e920b8c7d90abe661586a89e1517038ecb5",
+      "reviewed": "sha256:a8429aeed5e69aa01b2f75a611ea72c6644a53fc0fdeb841b46d3291a99b53bf",
       "limitations": [
         {
           "area": "databases",
@@ -1429,6 +1429,84 @@
         {
           "area": "operations",
           "says": "A server older than 0049 refuses a snapshot with a `referenced-by` gap, and so a form published from one, on every read."
+        }
+      ]
+    },
+    "0050": {
+      "reviewed": "sha256:97993d83d684894b4f31c91f8e3cbc65dff7da081b9c220d6367825d3571d0ef",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "A record is deleted one at a time, by its token and the version it was read at; a form without a confirmed concurrency token offers no delete.",
+          "heldBy": "packages/data-core/src/records/plan-delete.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A table whose version column the module maintains offers no delete unless the database numbers a column of its key, and a key a default fills is not numbered, so the fixture's order lines and its deliveries, keyed by a uuid from gen_random_uuid(), offer none on PostgreSQL.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A form offers delete only once it is regenerated and republished from a snapshot this release took.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A role that may delete must be granted read with the same form.",
+          "heldBy": "packages/data-core/src/policy/validate.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A policy may not grant delete while another table's foreign key cascades onto the form's table, clears its references or sets them to a default, so the fixture's orders, whose lines and deliveries cascade, and its deliveries, whose parcels do, cannot be deleted.",
+          "heldBy": "packages/data-core/src/policy/cascades.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A delete cannot be undone here, and the audit trail keeps only a keyed hash of its token, or nothing without an audit key."
+        },
+        {
+          "area": "writes",
+          "says": "A delete refused because other rows refer to the record says so, and names none of them.",
+          "heldBy": "packages/data-server/src/routes/runtime-deletes.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "Triggers that run on a delete are not seen, shown or governed: only an INSTEAD OF trigger on SQL Server and a delete PostgreSQL declined are refused.",
+          "heldBy": "packages/data-sqlserver/src/delete.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A row an AFTER DELETE trigger inserts again is reported deleted.",
+          "heldBy": "packages/data-postgres/src/delete.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL a rule that acts on a delete makes every delete of its table refused, a soft delete written as a rule included: PostgreSQL refuses the delete's statement under most rules, and the statement's own guard under an unconditional DO INSTEAD rule that returns a row.",
+          "heldBy": "packages/data-postgres/src/delete.integration.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "On PostgreSQL a delete that waits for its row while another transaction moves the row's parent out of the person's scope deletes it; SQL Server answers not found.",
+          "heldBy": "packages/data-postgres/src/delete.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL a version column moves only through this module's writes, so another application's delete and insert again of a typed key restarts it, and an update with the old version lands on the new record.",
+          "heldBy": "packages/data-postgres/src/delete.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL every delete reads pg_constraint, which has no index for the lookup, so its cost grows with the constraints of the whole database; not measured past the fixture's."
+        },
+        {
+          "area": "host",
+          "says": "The host page deletes nothing: the runtime plane serves a delete, and the workspace leaves it out of the open form's tags until it has a control for it (0053).",
+          "heldBy": "apps/host/src/operations.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A server older than 0050 refuses a policy that grants delete, and this release's client answers `unexpected` to a form reply from a server older than 0050, which carries no `deleting`, so a host upgrades its server first.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
         }
       ]
     },

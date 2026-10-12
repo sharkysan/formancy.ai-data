@@ -6,6 +6,8 @@ import {
   DEFINITION_MOVED_MESSAGE,
   NOT_ONE_ROW,
   NOT_ONE_ROW_MESSAGE,
+  REACH_MOVED,
+  REACH_MOVED_MESSAGE,
   TEXT_NOT_STORED,
   TEXT_NOT_STORED_MESSAGE,
   TRANSACTION_ENDED,
@@ -158,7 +160,8 @@ const ENDED_BY_TRIGGER = 'it may have committed, and it is not retried.'
  *   COMMIT stored (0031).
  * - A table whose definition moved is `schema-changed` (0041): the batch
  *   found, after its statement or in CATCH, that the table is not the one
- *   the write was decided over, and rolled it back.
+ *   the write was decided over, and rolled it back. So is a delete whose
+ *   reach moved, or whose account no longer sees every key (0050).
  */
 function ownError(error: ServerError, written: readonly RecordValue[]): RecordFailure | undefined {
   if (error.number === NOT_ONE_ROW && error.message === NOT_ONE_ROW_MESSAGE) {
@@ -180,6 +183,10 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
   if (error.number === DEFINITION_MOVED && error.message === DEFINITION_MOVED_MESSAGE) {
     // The batch rolled the write back, its triggers' work with it (0041).
     return failure('schema-changed', "The table's definition is not the one this write was decided over; nothing was written.")
+  }
+  if (error.number === REACH_MOVED && error.message === REACH_MOVED_MESSAGE) {
+    // The batch rolled the delete back, and whatever a key it was not decided over did with it (0050).
+    return failure('schema-changed', 'A foreign key now acts on a delete from this table that this delete was not decided over, or this account can no longer see every key that refers to it; nothing was deleted.')
   }
   const index = error.number === TEXT_NOT_STORED ? TEXT_NOT_STORED_MESSAGE.exec(error.message)?.[1] : undefined
   if (index === undefined) return undefined

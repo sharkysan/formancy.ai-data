@@ -14,8 +14,10 @@ import type { Plane, Sent } from './test-plane.js'
  *
  * The routes are the server's own table, `ROUTE_OPERATIONS`, read from the
  * package rather than listed here: a route the server adds is one the page
- * may send, and one the page sends that the table does not have fails. No
- * route deletes a record, so neither can the page.
+ * may send, and one the page sends that the table does not have fails. The
+ * delete route is the server's since 0050, and the page sends it from 0053,
+ * whose confirmation in place is its control: until then it is the one
+ * route the journey is not held to have used (`UNSENT`).
  */
 
 let plane: Plane
@@ -41,6 +43,9 @@ function pattern(route: string): RegExp {
 }
 
 const ROUTES = Object.entries(ROUTE_OPERATIONS).map(([route, operation]) => ({ route, operation, matches: pattern(route) }))
+
+/** The routes the page has no control for yet, each with the record that sends it. 0053 removes delete's. */
+const UNSENT: Readonly<Record<string, string>> = { 'POST /v1/forms/:id/records/delete': 'sent from 0053' }
 
 /** Every key anywhere in a parsed body, nested ones included. */
 function keys(value: unknown): string[] {
@@ -98,8 +103,11 @@ describe.each(ENGINES)('what the page sends on $engine', ({ formId, lines }) => 
     // something, a host's person does not have.
     expect(sent.map(line).filter((said) => !ROUTES.some(({ matches }) => matches.test(said)))).toEqual([])
     // And the journey used every one of them, so the table is not satisfied
-    // by a page that did less.
-    expect(ROUTES.filter(({ matches }) => !sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
+    // by a page that did less -- but for a route the page has no control
+    // for yet, which it must not send either.
+    expect(ROUTES.filter(({ route, matches }) => UNSENT[route] === undefined && !sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
+    expect(ROUTES.filter(({ route, matches }) => UNSENT[route] !== undefined && sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
+    expect(Object.keys(UNSENT).filter((route) => ROUTE_OPERATIONS[route] === undefined)).toEqual([])
 
     // Only the forms the menu named: a form is asked for by the id the
     // server listed, never one the page made up.

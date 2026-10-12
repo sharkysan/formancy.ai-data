@@ -172,6 +172,27 @@ existed would be documented and inert.
   says `list`, as the audit does. `routes/runtime-lists.test.ts` holds the
   route over fake ports.
 
+  `POST /v1/forms/:id/records/delete` deletes one record by its token and
+  the version its person read, `{ record, version }` with a write id, under
+  the policy's `operations.delete`
+  ([0050](../../docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)):
+  the policy before any statement, the table described and the delete
+  planned over it, one guarded statement that deletes one row or none and
+  refuses a foreign key that would act on the delete. 200 `{ record,
+  deleted: true }`, the token of the row deleted and nothing of its values;
+  404 not found or outside the person's rows; 409 `stale`, `drift` or
+  `schema-changed`; 422 `referenced` while other rows refer to it, naming
+  none -- the log names the key, at info, and no value -- or `refused`;
+  503 "Nothing was deleted."; 502 `unknown-outcome`
+  with `operation: 'delete'`, the record and the version, where deleting
+  again with that version deletes nothing else. Never a field error.
+  Audited as `delete`, by the record's keyed hash. `GET /v1/forms/:id`
+  lists `delete` where the bindings offer it, the policy grants it and the
+  database allows it, with `deleting: { cascades, clears, restricted }`,
+  `null` otherwise. `routes/runtime-deletes.test.ts` holds the route over
+  fake ports, and `e2e.integration.test.ts` and
+  `e2e-lost-answer.integration.test.ts` on both engines.
+
   `GET /v1/forms` answers the menu
   ([0045](../../docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)):
   every published form whose policy lets this person read, in codepoint

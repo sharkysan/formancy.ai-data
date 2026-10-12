@@ -1,4 +1,5 @@
 import { controlFor } from '../generate/controls.js'
+import { versionProvesRecord } from '../generate/offers.js'
 import type { FormBindings } from '../generate/types.js'
 import type { ColumnMeta } from '../metadata.js'
 import { cite, hiding, unseen } from './access.js'
@@ -78,10 +79,11 @@ function droppedColumn(comparison: Comparison, was: ColumnMeta): Draft | null {
     return { kind: 'column-dropped', subject, affects: [], stops: [], breaksReads: false, otherwise: 'info', message: `${was.name} is gone. No field of this form binds it.` }
   }
 
-  const stops: readonly Operation[] = token ? ['update'] : []
+  // A delete names the version as an update does (0050).
+  const stops: readonly Operation[] = token ? ['update', 'delete'] : []
   // A confirmed token is named by every read and by every create's RETURNING
   // or OUTPUT (0027), so gone or out of sight, it fails them all; a suggested
-  // one is named by nothing, and update was never offered over it.
+  // one is named by nothing, and neither update nor delete was offered over it.
   const named = token && bindings.concurrency?.confirmed === true
   if (gaps.length > 0) {
     // Out of sight fails a read as gone does. Before 0041 a gap here left the
@@ -107,7 +109,7 @@ function droppedColumn(comparison: Comparison, was: ColumnMeta): Draft | null {
       otherwise: 'info',
       message: named
         ? `${was.name}, the form's concurrency token, is gone, and every read and every create names it. The form is blocked until it is reviewed.`
-        : `${was.name}, the form's concurrency token, is gone, so a stale update could not be detected. Update is blocked until the form is reviewed.`,
+        : `${was.name}, the form's concurrency token, is gone, so a stale update or delete could not be detected. Update and delete are blocked until the form is reviewed.`,
     }
   }
   return {
@@ -142,16 +144,22 @@ function effectOf(bindings: FormBindings, kind: ColumnChangeKind, is: ColumnMeta
   const note = (consequence: string): Effect => ({ kind, stops: [], breaksReads: false, otherwise: 'info', consequence })
 
   if (bindings.concurrency?.column === is.name) {
-    return { kind: 'concurrency-changed', stops: ['update'], breaksReads: false, otherwise: 'info', consequence: "It is the form's concurrency token, so update is blocked until the form is reviewed." }
+    return {
+      kind: 'concurrency-changed',
+      stops: ['update', 'delete'],
+      breaksReads: false,
+      otherwise: 'info',
+      consequence: "It is the form's concurrency token, so update and delete are blocked until the form is reviewed.",
+    }
   }
   switch (kind) {
     case 'column-type-changed':
       if (fields.length > 0) {
         return { kind, stops: [], breaksReads: true, otherwise: 'review', consequence: `The form binds it to ${list(fields)} and reads it with the codec it was published with, so the form is blocked until it is reviewed.` }
       }
-      // A key column the form cannot show still addresses the record an update changes.
+      // A key column the form cannot show still addresses the record an update changes, or a delete removes.
       if (bindings.identity?.includes(is.name) === true) {
-        return { kind, stops: ['update'], breaksReads: false, otherwise: 'info', consequence: 'It identifies a record, so update is blocked until the form is reviewed.' }
+        return { kind, stops: ['update', 'delete'], breaksReads: false, otherwise: 'info', consequence: 'It identifies a record, so update and delete are blocked until the form is reviewed.' }
       }
       return note(unbound)
     case 'column-generation-changed':
@@ -187,6 +195,23 @@ function effectOf(bindings: FormBindings, kind: ColumnChangeKind, is: ColumnMeta
   }
 }
 
+/**
+ * The generator's version rule, asked again of the table as it is now
+ * (0050): on a version-column form, a key column the database numbered and
+ * numbers no more leaves a key people type, under which a record deleted and
+ * created again starts its version where the deleted one did. One predicate,
+ * `versionProvesRecord`, so review stops delete exactly where the generator
+ * would no longer offer it.
+ */
+function numberingLost(comparison: Comparison): boolean {
+  const { bindings, before, after } = comparison
+  const concurrency = bindings.concurrency
+  if (concurrency?.kind !== 'version-column' || bindings.identity === null) return false
+  return versionProvesRecord(before.columns, bindings.identity, concurrency) && !versionProvesRecord(after.columns, bindings.identity, concurrency)
+}
+
+const NUMBERING_LOST = 'The database no longer numbers a column of the key, so a record created again under a deleted one\'s key would start its version where the deleted one did: delete is blocked until the form is reviewed.'
+
 function changedColumn(comparison: Comparison, was: ColumnMeta, is: ColumnMeta): Draft | null {
   const found = classify(was, is)
   if (found === null) return null
@@ -194,14 +219,16 @@ function changedColumn(comparison: Comparison, was: ColumnMeta, is: ColumnMeta):
   const effect = effectOf(bindings, found.kind, is)
   // The generator's create rule, now: a change that leaves this column needing a value nobody gives stops create.
   const createLost = blocksCreate(bindings, is) && !blocksCreate(bindings, was)
+  const numbering = found.kind === 'column-generation-changed' && bindings.identity?.includes(is.name) === true && numberingLost(comparison)
+  const stops: Operation[] = [...effect.stops, ...(createLost ? ['create' as const] : []), ...(numbering && !effect.stops.includes('delete') ? ['delete' as const] : [])]
   return {
     kind: effect.kind,
     subject: { kind: 'column', object: comparison.after.ref, name: is.name },
     affects: fieldsOver(bindings, [is.name]),
-    stops: createLost ? [...effect.stops, 'create'] : effect.stops,
+    stops,
     breaksReads: effect.breaksReads,
-    otherwise: effect.otherwise,
-    message: `${is.name}: ${found.reasons.join('; ')}. ${effect.consequence}${createLost ? ` ${CREATE_LOST}` : ''}`,
+    otherwise: numbering ? 'review' : effect.otherwise,
+    message: `${is.name}: ${found.reasons.join('; ')}. ${effect.consequence}${createLost ? ` ${CREATE_LOST}` : ''}${numbering ? ` ${NUMBERING_LOST}` : ''}`,
   }
 }
 

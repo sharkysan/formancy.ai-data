@@ -37,6 +37,9 @@ export const TRANSACTION_ENDED_MESSAGE = 'formancy: a trigger ended the transact
 /** Raised when the table's definition is not the one the write was decided over (0041), after the statement or in CATCH. */
 export const DEFINITION_MOVED = 51706
 export const DEFINITION_MOVED_MESSAGE = 'formancy: table definition moved'
+/** Raised when a delete's account cannot see every key that refers to the table, or one acts on the delete that it was not decided over (0050). */
+export const REACH_MOVED = 51707
+export const REACH_MOVED_MESSAGE = 'formancy: what refers to the table moved'
 
 /** A version as it is compared: the 8 bytes of a rowversion, or a version column's decimal string. */
 export type ExpectedVersion = { kind: 'rowversion'; bytes: Buffer } | { kind: 'version-column'; value: string }
@@ -111,12 +114,12 @@ export function throughPredicate(parameters: Parameters, through: ThroughTerms):
 }
 
 /** What locates a record in every statement but an insert: its key, the trusted filters and every through. */
-function located(parameters: Parameters, key: readonly RecordValue[], terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): string[] {
+export function located(parameters: Parameters, key: readonly RecordValue[], terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): string[] {
   return [...keyPredicates(parameters, key), ...filterPredicates(parameters, terms), ...through.map((entry) => throughPredicate(parameters, entry))]
 }
 
 /** The table's quoted name, bound as `object_id` reads it. */
-function tableName(parameters: Parameters, table: ObjectRef): string {
+export function tableName(parameters: Parameters, table: ObjectRef): string {
   return parameters.add(mssql.NVarChar(mssql.MAX), quoteTable(table))
 }
 
@@ -174,7 +177,7 @@ export function readStatement(request: ReadRequest, terms: readonly RowFilterTer
  * update is, inside the filters and every through (0043), so a record outside
  * them is not found whatever version was sent.
  */
-export function existsStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], definition: Buffer): Statement {
+export function existsStatement(request: Pick<UpdateRequest, 'target' | 'key'>, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], definition: Buffer): Statement {
   const parameters = new Parameters()
   const table = request.target.table
   const same = `case when ${digestOf(factsOf(tableName(parameters, table)))} = ${parameters.add(mssql.VarBinary(32), definition)} then 1 else 0 end`
@@ -183,7 +186,7 @@ export function existsStatement(request: UpdateRequest, terms: readonly RowFilte
 }
 
 /** A value a write assigns — an insert's VALUES or an update's SET — and the SQL it was bound as. */
-interface Assigned {
+export interface Assigned {
   value: RecordValue
   sql: string
 }
@@ -244,7 +247,7 @@ function versionAfterTriggers(target: RecordTarget): Refind {
  * NULL; that branch could no longer be reached and is gone. The table's
  * name is bound, as `object_id` reads it.
  */
-function insteadOfGuard(name: string, operation: 'INSERT' | 'UPDATE'): string {
+function insteadOfGuard(name: string, operation: Write['operation']): string {
   const deciding =
     'select 1 from sys.triggers as [t] join sys.trigger_events as [e] on [e].[object_id] = [t].[object_id] ' +
     `where [t].[parent_id] = object_id(${name}) and [t].[is_instead_of_trigger] = 1 and [t].[is_disabled] = 0 and [e].[type_desc] = N'${operation}'`
@@ -261,11 +264,12 @@ function definitionGuard(table: string, definition: string): string[] {
 }
 
 /** One write: the statement given its OUTPUT clause, what it assigns, what it returns, and what is checked straight after it. */
-interface Write {
+export interface Write {
   target: RecordTarget
   /** The definition it was decided over (0041). */
   definition: Buffer
-  operation: 'INSERT' | 'UPDATE'
+  /** `DELETE` since 0050: it assigns nothing, and its row is not there to read a version back from. */
+  operation: 'INSERT' | 'UPDATE' | 'DELETE'
   statement: (output: string) => string
   assigned: readonly Assigned[]
   returned: Selected[]
@@ -325,14 +329,16 @@ interface Write {
  *   CATCH even when the transaction was doomed, once it is rolled back
  *   (measured, the probes before 0041).
  */
-function writeBatch(parameters: Parameters, { target, definition, operation, statement, assigned, returned, afterWrite }: Write): string {
+export function writeBatch(parameters: Parameters, { target, definition, operation, statement, assigned, returned, afterWrite }: Write): string {
   const guarded = assigned.flatMap(({ value, sql }, index) => (value.type.kind === 'text' && value.value !== null ? [{ value, sql, index }] : []))
   const stored = guarded.map(({ value }, position) => ({
     name: `[w${String(position)}]`,
     declared: 'nvarchar(max)',
     expression: canonicalText(value.type, `inserted.${quoteName(value.name)}`),
   }))
-  const refind = versionAfterTriggers(target)
+  // A deleted row's version is the one OUTPUT saw it deleted at: the row is
+  // gone, and one a trigger inserted again is another row's to read (0050).
+  const refind: Refind = operation === 'DELETE' ? { captured: [], declared: [], statements: [] } : versionAfterTriggers(target)
   const table = tableName(parameters, target.table)
   const moved = definitionGuard(table, parameters.add(mssql.VarBinary(32), definition))
   const captured = [...returned, ...stored, ...refind.captured]
@@ -393,6 +399,14 @@ export function insertStatement(request: InsertRequest, definition: Buffer): Sta
   return parameters.statement(sql)
 }
 
+/** Whether the row's version is still the one expected: a rowversion's 8 bytes, or a version column compared as a bigint. An update's and a delete's (0050). */
+export function versionIs(parameters: Parameters, concurrency: RecordConcurrency, expected: ExpectedVersion): string {
+  const version = column(concurrency.column)
+  return expected.kind === 'rowversion'
+    ? `${version} = ${parameters.add(mssql.VarBinary(8), expected.bytes)}`
+    : `${version} = convert(bigint, ${parameters.add(mssql.NVarChar(mssql.MAX), expected.value)})`
+}
+
 /**
  * ONE guarded statement (0015): the key, the trusted filters, every through
  * (0043) and the expected version in a single WHERE, and for a version column
@@ -411,12 +425,7 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
   const set = assigned.map(({ value, sql }) => `${quoteName(value.name)} = ${sql}`)
   const version = column(target.concurrency.column)
   if (target.concurrency.kind === 'version-column') set.push(`${quoteName(target.concurrency.column)} = ${version} + 1`)
-  const where = located(parameters, request.key, terms, through)
-  where.push(
-    expected.kind === 'rowversion'
-      ? `${version} = ${parameters.add(mssql.VarBinary(8), expected.bytes)}`
-      : `${version} = convert(bigint, ${parameters.add(mssql.NVarChar(mssql.MAX), expected.value)})`,
-  )
+  const where = [...located(parameters, request.key, terms, through), versionIs(parameters, target.concurrency, expected)]
   const sql = writeBatch(parameters, {
     target,
     definition,

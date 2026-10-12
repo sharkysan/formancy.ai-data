@@ -1,3 +1,4 @@
+import { offers } from '../generate/offers.js'
 import type { FormBindings } from '../generate/types.js'
 import { authorizeOperation } from '../policy/evaluate.js'
 import { byCodepoint, OPERATIONS } from '../policy/inputs.js'
@@ -19,14 +20,16 @@ import { listable } from './list.js'
 
 /**
  * The operations this person may use on the form as published, in read,
- * create, update order: those the policy grants them -- an operation it
- * cannot scope for their context is not granted (`authorizeOperation`) --
- * of those the bindings offer. `GET /v1/forms/:id` narrows this by the
- * database as it is now; the menu says it as it is. One function, so the
- * two cannot disagree about the policy.
+ * create, update, delete order: those the policy grants them -- an
+ * operation it cannot scope for their context is not granted
+ * (`authorizeOperation`) -- of those the bindings offer, by `offers()`,
+ * which reads an absent flag as not offered: every form published before
+ * 0050 says nothing of delete, and offers none (0050). `GET /v1/forms/:id`
+ * narrows this by the database as it is now; the menu says it as it is.
+ * One function, so the two cannot disagree about the policy.
  */
 export function grantedOperations(bindings: FormBindings, policy: FormPolicy, context: PolicyContext): PolicyOperation[] {
-  return OPERATIONS.filter((operation) => (operation === 'read' || bindings.operations[operation] !== false) && authorizeOperation(policy, context, operation).ok)
+  return OPERATIONS.filter((operation) => (operation === 'read' || offers(bindings, operation)) && authorizeOperation(policy, context, operation).ok)
 }
 
 /** One published form as the menu reads it: its id, its title, and what deciding its entry needs. */

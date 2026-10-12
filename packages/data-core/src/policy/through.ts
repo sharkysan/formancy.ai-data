@@ -29,7 +29,7 @@ export function isThroughKeyType(type: NormalizedType): type is ThroughKeyType {
 }
 
 /** The lookup keys a stored policy's through names, whatever shape a hand edit left it in; `validatePolicy` reports a bad shape. */
-function namedThrough(policy: FormPolicy): string[] {
+function namedThrough(policy: Pick<FormPolicy, 'through'>): string[] {
   const through: unknown = (policy as { through?: unknown }).through
   return Array.isArray(through) ? through.filter((key): key is string => typeof key === 'string') : []
 }
@@ -86,7 +86,7 @@ export function throughProblems(snapshot: MetadataSnapshot, bindings: FormBindin
  * a list is refused for it (0044): a policy may say every row is shared,
  * and this shape is how a line form had to say so before `through`.
  */
-export function unscopedLookups(bindings: FormBindings, policy: FormPolicy): string[] {
+export function unscopedLookups(bindings: FormBindings, policy: Pick<FormPolicy, 'rowFilters' | 'lookups' | 'through'>): string[] {
   if (policy.rowFilters.length > 0 || namedThrough(policy).length > 0) return []
   const filtered = (field: string): boolean => Object.hasOwn(policy.lookups, field) && (policy.lookups[field] as unknown[]).length > 0
   return bindings.fields.filter((binding) => binding.kind === 'lookup' && filtered(binding.field)).map((binding) => binding.field)

@@ -100,7 +100,11 @@ const token = (key: string): string => `k1:${key}`
  *   the snapshot spells as the engine does; the model's comparator holds the
  *   rest (`MODEL_CASES.owner`).
  * - `generated`: the generator shows the key in the Record section, never
- *   writes or requires it, and offers create and update.
+ *   writes or requires it, and offers create and update; delete on SQL
+ *   Server alone, where the delivery's rowversion proves a record whatever
+ *   its key. PostgreSQL's version column restarts at its default under a
+ *   key used again, and a key a default fills is not one the database
+ *   numbers: a default may hand out one value twice (0050).
  * - `token`: a delivery's record token spells its key in lower case on both
  *   engines, though SQL Server prints a uniqueidentifier in upper case
  *   (0017); a read by it finds the row, and the same key in upper case is
@@ -128,6 +132,15 @@ const token = (key: string): string => `k1:${key}`
  *   clerk the sixteen paged deliveries, tied on their carrier, in each
  *   engine's order of their keys, which ends a lookup's order; and a parcel
  *   created with a delivery chosen holds its key and is read through it.
+ * - `delete`: what a policy that lets tenant 1's clerk delete is told, by
+ *   the publish check's two halves -- the policy's fit and what a delete
+ *   also does. Granted on the delivery form, PostgreSQL's says the form
+ *   offers no delete, and both say the delete would reach the delivery's
+ *   parcels through their cascading key, which 0050 does not let a delete
+ *   do; granted on the order form, both say it would reach the order's
+ *   deliveries and its lines, each through its cascading key, so no order
+ *   is deleted yet. A parcel has no version column, so its form offers
+ *   neither update nor delete.
  */
 export const UUID_PARITY = {
   discovered: {
@@ -139,7 +152,10 @@ export const UUID_PARITY = {
     field: 'id',
     writes: { create: false, update: false },
     sections: ['Delivery', 'Record'],
-    operations: { create: true, update: true },
+    operations: {
+      postgres: { create: true, update: true, delete: false },
+      sqlserver: { create: true, update: true, delete: true },
+    },
   },
   token: {
     record: token(DELIVERIES.express),
@@ -184,6 +200,22 @@ export const UUID_PARITY = {
     rejected: [token(THEIRS_DELIVERY), token('00000000-0000-4000-8000-000000000000'), token(DELIVERIES.express.toUpperCase())],
     tied: { search: TIED, label: TIED, keys: ONE_BYTE },
     parcel: { label: 'Box 3', delivery: token(DELIVERIES.freight) },
+  },
+  delete: {
+    delivery: {
+      postgres: [
+        'operations.delete grants roles, and this form does not offer delete',
+        'operations.delete grants roles, and deleting a record of sales.delivery also deletes rows of sales.parcel (fk_parcel_delivery, ON DELETE CASCADE), which this release does not offer',
+      ],
+      sqlserver: [
+        'operations.delete grants roles, and deleting a record of sales.delivery also deletes rows of sales.parcel (fk_parcel_delivery, ON DELETE CASCADE), which this release does not offer',
+      ],
+    },
+    parcel: { update: false, delete: false },
+    order: [
+      'operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.delivery (fk_delivery_order, ON DELETE CASCADE), which this release does not offer',
+      'operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.order_line (fk_order_line_order, ON DELETE CASCADE), which this release does not offer',
+    ],
   },
 } as const
 

@@ -1,6 +1,6 @@
 # 0047 — A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md): the open form's tags leave out the delete the server offers, and the route test holds the journey to every runtime route but the delete route, which the page sends from 0053
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**

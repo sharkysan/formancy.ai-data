@@ -92,7 +92,16 @@ export interface FormBindings {
   /** The columns that identify one record, or `null` when nothing does. */
   identity: string[] | null
   concurrency: ConcurrencyBinding | null
-  operations: { create: boolean; update: boolean }
+  /**
+   * What the form offers besides reading. `delete` since 0050, which the
+   * generator always writes: a delete can be made against the table, by
+   * this account, with a version that proves the record. Bindings published
+   * before 0050 have none, and are compared with the generator at publish
+   * only, so every reader asks `offers()`, which reads an absent flag as
+   * `false`. What a delete also does to other tables is the policy's to
+   * accept (`deleteProblems`), never the generator's.
+   */
+  operations: { create: boolean; update: boolean; delete?: boolean }
   fields: FieldBinding[]
   /** The snapshot this was generated from. Drift review compares against it. */
   snapshotFingerprint: string

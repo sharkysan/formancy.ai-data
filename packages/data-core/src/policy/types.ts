@@ -17,7 +17,11 @@ export interface PolicyContext {
   attributes: Record<string, string>
 }
 
-export type PolicyOperation = 'read' | 'create' | 'update'
+/**
+ * What a policy grants roles. `delete` since 0050: one record at a time, by
+ * its token and the version its person read, scoped as an update is.
+ */
+export type PolicyOperation = 'read' | 'create' | 'update' | 'delete'
 
 /**
  * "This column must equal this trusted attribute": tenant isolation.
@@ -63,10 +67,17 @@ export interface FieldPolicy {
  * means none: a policy written before it means exactly what it meant, and a
  * server older than it refuses a policy that uses it, as it refuses every
  * property it does not read.
+ *
+ * `operations.delete` lists the roles that may delete a record (0050).
+ * Optional, and absent means nobody, for the same reason: a policy written
+ * before it keeps its meaning, and a server older than it refuses a policy
+ * that grants it. A delete is scoped by `rowFilters` and every `through`, as
+ * an update is, and grants no field: it writes none. Every role it lists
+ * must be granted read, because a delete names the version its person read.
  */
 export interface FormPolicy {
   version: 1
-  operations: { read: string[]; create: string[]; update: string[] }
+  operations: { read: string[]; create: string[]; update: string[]; delete?: string[] }
   fields: Record<string, FieldPolicy>
   rowFilters: RowFilterRule[]
   lookups: Record<string, RowFilterRule[]>

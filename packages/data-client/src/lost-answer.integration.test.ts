@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { answerBytes, EDGE_VALUES } from '@formancy/data-fixtures'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { createDataClient } from './client.js'
@@ -123,6 +124,39 @@ describe.each(ENGINES)('an answer lost after the commit, through the client, on 
     expect(await client.reconcile(formId, unknown)).toEqual({ ok: true, state: 'unverifiable' })
     expect(plane.sent.length).toBe(before)
     expect(await lossy.ordersWithNotes(connection, notes)).toBe(1)
+  })
+
+  // A deletion whose answer the database sent and the network lost (0050):
+  // the server's 502 reaches the host as an unknown deletion from the
+  // database, naming the record and version sent, and the deletion crossed
+  // to the database once -- its marker is the key's own text, a fresh UUID.
+  // Reconciling reads the record, finds it gone, and says absent, sending
+  // nothing but the read (watched failing with a deletion's 404 left to
+  // the read: reconciling answered the read's refusal, never absent).
+  test('a deletion is unknown from the database, sent once, and reconciles to absent', async () => {
+    const client = plane.client()
+    const code = randomUUID()
+    const record = await lossy.insertRemovable(connection, code)
+    const formId = `${connection}-hop-removable`
+    const hop = lossy.hops[connection]
+    const bytes = answerBytes(kind, code)
+    const sent = hop.countSent(bytes)
+    const lost = hop.swallowAnswersFrom(bytes)
+    const pending = client.delete(formId, { record, version: '1' })
+    await bounded(lost.matched, `the marker never appeared in an answer on ${engine}`)
+    const deadline = Date.now() + 20_000
+    while ((await lossy.removableCoded(connection, code)) !== 0) {
+      if (Date.now() > deadline) throw new Error('the deletion never became visible')
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+    lost.cut()
+    const unknown = expectUnknown(await pending)
+    expect(unknown).toMatchObject({ status: 502, operation: 'delete', record, version: '1', origin: 'database' })
+    expect(sent()).toBe(1)
+
+    const before = plane.sent.length
+    expect(await client.reconcile(formId, unknown)).toEqual({ ok: true, state: 'absent' })
+    expect(plane.sent.slice(before).map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual([`POST /v1/forms/${formId}/records/read`])
   })
 
   // What Chromium does below the page when a reused connection closes before

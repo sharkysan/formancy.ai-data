@@ -62,9 +62,21 @@ export type DriftKind =
   | 'foreign-key-changed'
   /** A check constraint of the root. The form does not translate checks, so the database is their only enforcer. */
   | 'check-changed'
-  /** The account may no longer SELECT, INSERT or UPDATE a column of the root or a lookup's target (0027). A grant, never a deletion. */
+  /**
+   * A foreign key that refers to the root and acts on delete -- cascades,
+   * sets NULL or a default -- is new (0050). Compared only between two
+   * snapshots that both record what refers to each table (0049).
+   */
+  | 'referrer-added'
+  /** A foreign key that refers to the root changed what it does, or is gone (0050). */
+  | 'referrer-changed'
+  /**
+   * The account may no longer SELECT, INSERT or UPDATE a column of the root or
+   * a lookup's target (0027), or DELETE from the root (0050). A grant, never a
+   * deletion.
+   */
   | 'privilege-narrowed'
-  /** The account may now do with a column what it could not when the form was generated. */
+  /** The account may now do with a column, or with the root, what it could not when the form was generated. */
   | 'privilege-widened'
   /** Whether row security applies to the account on the root or a lookup's target changed. Which rows, nothing says. */
   | 'row-security-changed'
@@ -97,7 +109,12 @@ export interface DriftChange {
 export interface DriftVerdict {
   /** No change breaks what the form shows: a record can still be read and shown faithfully. */
   readable: boolean
-  writable: { create: boolean; update: boolean }
+  /**
+   * `delete` since 0050: what the bindings offer less what a change stops,
+   * whether or not the policy lets anybody delete -- which decides only
+   * whether a change that stops it is `blocking`.
+   */
+  writable: { create: boolean; update: boolean; delete: boolean }
 }
 
 export interface DriftReport extends DriftVerdict {

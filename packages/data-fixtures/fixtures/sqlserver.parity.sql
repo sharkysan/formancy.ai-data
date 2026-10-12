@@ -124,4 +124,78 @@ begin
 end
 GO
 
+-- What a delete is held to (0050): postgres.parity.sql's tables. SQL Server
+-- has no RESTRICT, so removable_restrict's key is NO ACTION, which refuses
+-- the same delete with the same error number; it has no rules, so
+-- removable_ruled is a table and nothing more. A trigger runs AFTER the
+-- delete, so 'refuse' rolls it back, and 'restore' inserts the row again
+-- under IDENTITY_INSERT; removable_declined's INSTEAD OF trigger declines
+-- every delete without an error.
+create table parity.removable (
+  id int identity(1, 1) not null constraint pk_removable primary key,
+  tenant_id int not null,
+  note nvarchar(50) null,
+  version int not null constraint df_removable_version default 1
+);
+create table parity.removable_child (
+  id int identity(1, 1) not null constraint pk_removable_child primary key,
+  removable_id int not null constraint fk_removable_child_removable references parity.removable (id),
+  note nvarchar(50) null,
+  version int not null constraint df_removable_child_version default 1
+);
+create table parity.removable_restrict (
+  id int identity(1, 1) not null constraint pk_removable_restrict primary key,
+  removable_id int not null constraint fk_removable_restrict_removable references parity.removable (id)
+);
+create table parity.removable_self (
+  id int identity(1, 1) not null constraint pk_removable_self primary key,
+  parent_id int null constraint fk_removable_self_parent references parity.removable_self (id),
+  version int not null constraint df_removable_self_version default 1
+);
+create table parity.keyed (
+  code nvarchar(10) not null constraint pk_keyed primary key,
+  note nvarchar(50) null,
+  version int not null constraint df_keyed_version default 1
+);
+create table parity.removable_triggered (
+  id int identity(1, 1) not null constraint pk_removable_triggered primary key,
+  note nvarchar(50) null,
+  version int not null constraint df_removable_triggered_version default 1
+);
+create table parity.removable_log (
+  id int not null,
+  note nvarchar(50) null
+);
+GO
+create trigger parity.tr_removable_triggered on parity.removable_triggered after delete as
+begin
+  set nocount on;
+  if exists (select 1 from deleted where note = N'refuse') throw 50001, N'removable_triggered refuses this delete', 1;
+  if exists (select 1 from deleted where note = N'restore')
+  begin
+    set identity_insert parity.removable_triggered on;
+    insert into parity.removable_triggered (id, note, version) select id, note, version from deleted where note = N'restore';
+    set identity_insert parity.removable_triggered off;
+  end
+  insert into parity.removable_log (id, note) select id, note from deleted where note = N'log';
+end
+GO
+create table parity.removable_declined (
+  id int identity(1, 1) not null constraint pk_removable_declined primary key,
+  note nvarchar(50) null,
+  version int not null constraint df_removable_declined_version default 1
+);
+GO
+create trigger parity.tr_removable_declined on parity.removable_declined instead of delete as
+begin
+  set nocount on;
+end
+GO
+create table parity.removable_ruled (
+  id int identity(1, 1) not null constraint pk_removable_ruled primary key,
+  note nvarchar(50) null,
+  version int not null constraint df_removable_ruled_version default 1
+);
+GO
+
 update statistics parity.tenant_item with fullscan;

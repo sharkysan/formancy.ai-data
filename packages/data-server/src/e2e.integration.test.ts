@@ -97,6 +97,9 @@ beforeAll(async () => {
   connections.push(
     { ...pgConnection, id: 'pg-writer', user: WRITER.user, password: 'env:PG_WRITER_PASSWORD' },
     { ...msConnection, id: 'ms-writer', user: WRITER.user, password: 'env:MS_WRITER_PASSWORD' },
+    // The parity schema's tables a delete may be granted on (0050): every key there is one the database numbers.
+    { ...pgConnection, id: 'pg-parity', schemas: ['parity'] },
+    { ...msConnection, id: 'ms-parity', schemas: ['parity'] },
   )
   registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: {
@@ -176,7 +179,8 @@ describe.each([
     })
     expect(proposal.statusCode).toBe(200)
     const proposed = proposal.json() as Proposal
-    expect(proposed.bindings.operations).toEqual({ create: true, update: true })
+    // Delete too (0050): the database numbers an order's key. Nothing grants it: its lines cascade from it.
+    expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: true })
     const bundle = asProposed(connection, proposed, clerkPolicy(proposed.bindings.fields))
     const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle })
     expect(published.statusCode, published.body).toBe(201)
@@ -246,7 +250,8 @@ describe.each([
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
     const proposed = proposal.json() as Proposal
-    expect(proposed.bindings.operations).toEqual({ create: true, update: true })
+    // A line's key is typed: SQL Server's rowversion proves a line, a PostgreSQL version column does not (0050).
+    expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: versionColumn === undefined })
     const policy: FormPolicy = {
       ...clerkPolicy(proposed.bindings.fields),
       rowFilters: [],
@@ -323,6 +328,100 @@ describe.each([
   })
 })
 
+describe.each([
+  { engine: 'PostgreSQL', connection: 'pg-parity' },
+  { engine: 'SQL Server', connection: 'ms-parity' },
+])('deleting a record on $engine', ({ connection }) => {
+  const formId = `${connection}-removable`
+  const removable = (bearer: string, note: string) => call('POST', `/v1/forms/${formId}/records/create`, bearer, { answers: { note } })
+
+  // The administrator proposes a form over a table whose key the database
+  // numbers, and grants clerks delete within their tenant (0050).
+  test('an administrator publishes a form that clerks may delete with, within their tenant', async () => {
+    const proposal = await call('POST', '/v1/form-proposals', admin, {
+      connection,
+      root: { schema: 'parity', name: 'removable' },
+      formId,
+      title: 'Removable',
+      lookups: [],
+      versionColumn: 'version',
+      pinned: ['tenant_id'],
+    })
+    expect(proposal.statusCode, proposal.body).toBe(200)
+    const proposed = proposal.json() as Proposal
+    expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: true })
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'], delete: ['clerk'] },
+      fields: { id: { read: ['clerk'], write: [] }, tenant_id: { read: ['clerk'], write: [] }, note: { read: ['clerk'], write: ['clerk'] } },
+      rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+      lookups: {},
+    }
+    const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, policy) })
+    expect(published.statusCode, published.body).toBe(201)
+  })
+
+  // Clara deletes her record at the version she read, and it is then not
+  // found; Otto, another tenant, is told 404 for it -- the answer a record
+  // that does not exist gets -- and it stays; a delete at a version since
+  // superseded is stale; a delete sent again after it succeeded is not
+  // found, and deletes nothing else (watched failing with the route
+  // planning the delete without the policy's row filter: Otto deleted
+  // Clara's record, 200).
+  test('a clerk deletes her own record; another tenant is told 404, a stale delete is 409, and a second one 404', async () => {
+    const definition = (await call('GET', `/v1/forms/${formId}`, clerk)).json()
+    expect(definition).toMatchObject({ operations: ['read', 'create', 'update', 'delete'], deleting: { cascades: false, clears: false, restricted: true } })
+    const created = await removable(clerk, 'clara')
+    expect(created.statusCode, created.body).toBe(201)
+    const { record, version } = created.json()
+
+    const theirs = await call('POST', `/v1/forms/${formId}/records/delete`, otherClerk, { record, version })
+    expect([theirs.statusCode, theirs.json()]).toEqual([404, { code: 'not-found', message: 'No such record.' }])
+    expect((await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record })).statusCode).toBe(200)
+
+    const saved = await call('POST', `/v1/forms/${formId}/records/update`, clerk, { record, version, answers: { note: 'clara, changed' } })
+    expect(saved.statusCode, saved.body).toBe(200)
+    const stale = await call('POST', `/v1/forms/${formId}/records/delete`, clerk, { record, version })
+    expect([stale.statusCode, stale.json()]).toEqual([409, { code: 'stale', message: 'The record changed since it was read. Reload it and review the changes before deleting it.' }])
+
+    const current = saved.json().version as string
+    const deleted = await call('POST', `/v1/forms/${formId}/records/delete`, clerk, { record, version: current })
+    expect([deleted.statusCode, deleted.json()]).toEqual([200, { record, deleted: true }])
+    expect((await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record })).statusCode).toBe(404)
+    expect((await call('POST', `/v1/forms/${formId}/records/delete`, clerk, { record, version: current })).statusCode).toBe(404)
+  })
+})
+
+describe('deleting an order line through its order on SQL Server', () => {
+  // A line has no tenant (0043): on SQL Server its rowversion proves it, so
+  // its form offers delete, and a clerk deletes a line of her tenant's
+  // order while another tenant's clerk is told 404 for it (0050).
+  test("a clerk deletes a line of her order; another tenant's clerk is told 404", async () => {
+    const formId = 'ms-order-line-delete'
+    const proposal = await call('POST', '/v1/form-proposals', admin, {
+      connection: 'ms',
+      root: { schema: 'sales', name: 'order_line' },
+      formId,
+      title: 'Order line',
+      lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
+    })
+    expect(proposal.statusCode, proposal.body).toBe(200)
+    const proposed = proposal.json() as Proposal
+    const base = clerkPolicy(proposed.bindings.fields)
+    const policy: FormPolicy = { ...base, operations: { ...base.operations, delete: ['clerk'] }, rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }
+    expect((await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed('ms', proposed, policy) })).statusCode).toBe(201)
+
+    const order = `k1:${EDGE_VALUES.beyondSafeInteger}`
+    const created = await call('POST', `/v1/forms/${formId}/records/create`, clerk, { answers: { order, line_no: 7, quantity: 1, unit_price: '1.00' } })
+    expect(created.statusCode, created.body).toBe(201)
+    const { record, version } = created.json()
+    expect((await call('POST', `/v1/forms/${formId}/records/delete`, otherClerk, { record, version })).statusCode).toBe(404)
+    const deleted = await call('POST', `/v1/forms/${formId}/records/delete`, clerk, { record, version })
+    expect([deleted.statusCode, deleted.json()]).toEqual([200, { record, deleted: true }])
+    expect((await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record })).statusCode).toBe(404)
+  })
+})
+
 /** What the writer's order form writes on each operation, by engine: the two must agree. */
 const writerWrites = new Map<string, Array<[string, FieldWrites]>>()
 
@@ -349,7 +448,8 @@ describe.each([
     const proposed = proposal.json()
     const { bindings, snapshot, notes } = proposed
     expect(snapshot.account.user).toBe(WRITER.user)
-    expect(bindings.operations).toEqual({ create: true, update: true })
+    // The writer may DELETE orders (0049), and the database numbers their key (0050).
+    expect(bindings.operations).toEqual({ create: true, update: true, delete: true })
     const fields = bindings.fields as FieldBinding[]
     expect(fields.find((binding) => binding.field === 'amount')?.writes).toEqual({ create: true, update: false })
     expect(fields.find((binding) => binding.field === 'status')?.writes).toEqual({ create: true, update: true })
@@ -547,7 +647,8 @@ describe.each([
       ['check-changed', 'info'],
       ['column-loosened', 'info'],
     ])
-    expect(drift.runtime).toEqual({ readable: true, writable: { create: true, update: true } })
+    // The order form offers delete too (0050), which nothing here stops; no policy grants it.
+    expect(drift.runtime).toEqual({ readable: true, writable: { create: true, update: true, delete: true } })
     const record = `k1:${EDGE_VALUES.beyondSafeInteger}`
     const read = await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record })
     expect(read.statusCode, read.body).toBe(200)

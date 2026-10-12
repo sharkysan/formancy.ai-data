@@ -1,10 +1,10 @@
 import { WRITE_ID_HEADER } from '@formancy/data-core'
-import type { FieldError, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordList, RecordListQuery } from '@formancy/data-core'
+import type { FieldError, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordList, RecordListQuery } from '@formancy/data-core'
 import { reconcile } from './reconcile.js'
 import type { Reconciliation } from './reconcile.js'
 import { isFormMenu, isFormRecord, isLookupResult, isPublishedForm, isRecordList, isResolved, refusalOf, UNEXPECTED } from './shapes.js'
 import { writeOutcome } from './writes.js'
-import type { UnknownWrite, WriteAnswer, WriteIntent, WriteOutcome } from './writes.js'
+import type { DeleteOutcome, UnknownWrite, WriteAnswer, WriteIntent, WriteOutcome } from './writes.js'
 
 /*
  * One function per runtime route (0029), and the decisions every host would
@@ -161,8 +161,8 @@ export function createDataClient(options: DataClientOptions) {
   }
 
   /** A write: known only when the data server says what happened; otherwise unknown, and never sent again (0031). */
-  async function write(formId: string, intent: WriteIntent, body: Record<string, unknown>): Promise<WriteOutcome> {
-    const answer = await exchange({
+  async function sendWrite(formId: string, intent: WriteIntent, body: Record<string, unknown>): Promise<Exchange> {
+    return exchange({
       method: 'POST',
       names: [formId],
       route: ([form]) => `/v1/forms/${String(form)}/records/${intent.operation}`,
@@ -170,9 +170,12 @@ export function createDataClient(options: DataClientOptions) {
       // New for every call: one id on two saves would answer the second with the first's answer.
       headers: { [WRITE_ID_HEADER]: newWriteId() },
     })
+  }
+
+  async function write(formId: string, intent: WriteIntent & { operation: 'create' | 'update' }, body: Record<string, unknown>): Promise<WriteOutcome> {
+    const answer = await sendWrite(formId, intent, body)
     // Nothing was sent: a refusal like any other.
-    if ('sent' in answer) return invalidName
-    return writeOutcome(answer, intent)
+    return 'sent' in answer ? invalidName : writeOutcome(answer, intent)
   }
 
   const read = (formId: string, record: string): Promise<Outcome<FormRecord>> =>
@@ -231,6 +234,20 @@ export function createDataClient(options: DataClientOptions) {
      */
     update: (formId: string, change: { record: string; version: string; answers: Readonly<Record<string, unknown>> }): Promise<WriteOutcome> =>
       write(formId, { operation: 'update', record: change.record, version: change.version }, { record: change.record, version: change.version, answers: change.answers }),
+
+    /**
+     * `POST …/records/delete` (0050): the record, only if it is still at
+     * `version`, otherwise 409 `stale`; the answer is the deleted row's
+     * token and `deleted: true`, and nothing else is done. An `UnknownWrite`
+     * when nobody can say whether it was deleted -- deleting again with the
+     * same version then deletes nothing else. Exactly the route's keys are
+     * sent, with a write id of its own.
+     */
+    delete: async (formId: string, removal: { record: string; version: string }): Promise<DeleteOutcome> => {
+      const intent = { operation: 'delete', record: removal.record, version: removal.version } as const
+      const answer = await sendWrite(formId, intent, { record: removal.record, version: removal.version })
+      return 'sent' in answer ? invalidName : writeOutcome(answer, intent)
+    },
 
     /** Reads what an unknown write addressed and says what that shows; never sends the write again (0031). */
     reconcile: (formId: string, unknown: UnknownWrite): Promise<Reconciliation> => reconcile(read, formId, unknown),

@@ -30,6 +30,22 @@ export interface ListColumns {
 }
 
 /**
+ * What deleting a record of a published form does besides removing it
+ * (0050), for a page to word its confirmation by -- never by table names.
+ *
+ * `cascades` and `clears` say whether the policy accepts a key that
+ * deletes other rows, or sets NULL or a default in them; both are `false`
+ * in 0050, whose deletes reach nothing past the record. `restricted` says
+ * whether the snapshot shows a key that refuses a delete while a row refers
+ * to the record, so the database may keep it.
+ */
+export interface Deleting {
+  cascades: boolean
+  clears: boolean
+  restricted: boolean
+}
+
+/**
  * `GET /v1/forms/:id`: the published document, what this person may do with
  * it, and which of its fields they may see.
  *
@@ -39,13 +55,16 @@ export interface ListColumns {
  * arrives in no record. `list` is what a list of its records may be searched
  * and sorted by, or `null` when `listable` refuses this person a list -- a
  * key that can be NULL, or one held in a field they may not read -- so a
- * page never offers a grid the server would refuse (0044).
+ * page never offers a grid the server would refuse (0044). `deleting` is
+ * what a delete also does, exactly when `operations` holds `delete`, and
+ * `null` otherwise (0050).
  */
 export interface PublishedForm {
   form: FormSchema
   operations: PolicyOperation[]
   readable: string[]
   list: ListColumns | null
+  deleting: Deleting | null
 }
 
 /**
@@ -155,11 +174,29 @@ export interface RuntimeRefusal {
  */
 export interface UnknownOutcome extends RuntimeRefusal {
   code: 'unknown-outcome'
-  operation: 'create' | 'update'
-  /** Update: the token sent. Create: `intendedRecord(...)`, or null when the database numbers the key. */
+  /** `delete` since 0050. */
+  operation: 'create' | 'update' | 'delete'
+  /** Update and delete: the token sent. Create: `intendedRecord(...)`, or null when the database numbers the key. */
   record: string | null
-  /** Update: the version sent -- saving again with exactly it is stored at most once. Create: null. */
+  /**
+   * Update and delete: the version sent -- saving again with exactly it is
+   * stored at most once, and deleting again with it deletes nothing else.
+   * Create: null.
+   */
   version: string | null
+}
+
+/**
+ * `POST /v1/forms/:id/records/delete` deleted the record (0050): the token
+ * of the row the statement removed, spelled as the database held its key,
+ * which under a case-insensitive key collation may differ from the one sent
+ * (0028). A body, not a 204: a client counts a write done only when the
+ * answer says what happened (0031). Nothing of the record's values is kept
+ * for a resend to answer with.
+ */
+export interface RecordDeleted {
+  record: string
+  deleted: true
 }
 
 /**

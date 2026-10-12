@@ -120,6 +120,10 @@ function registry(): ConnectionRegistry {
       if (request.expectedVersion !== rowVersion) return { ok: false, code: 'stale', message: 'changed' }
       return { ok: true, values: { ...STORED }, version: NEWER }
     },
+    delete: async () => {
+      throw new Error('these routes never delete')
+    },
+
   }
   const lookups: LookupAdapter = { search: async () => ({ rows: [], hasMore: false, omitted: 0 }), resolve: async () => [], rejects: async () => [] }
   const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0' }), discover: async () => SNAPSHOT, close: async () => {} } as DatabaseAdapter

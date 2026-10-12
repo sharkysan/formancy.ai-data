@@ -61,6 +61,13 @@ const CUSTOMER = bindings(
   ['tenant_id', 'customer_no'],
 )
 
+/** An order's lines: no tenant column, and the order a lookup whose target, sales.order, has one (0043). */
+const LINE = bindings('order_line', [lookup('order', ['order_id'], 'order', ['id']), column('line_no'), column('quantity')], ['order_id', 'line_no'])
+
+/** The same forms as the generator writes them where it offers delete (0050). */
+const DELETABLE_ORDER: FormBindings = { ...ORDER, operations: { create: true, update: true, delete: true } }
+const DELETABLE_LINE: FormBindings = { ...LINE, operations: { create: true, update: true, delete: true } }
+
 const BOTH = ['clerk', 'manager']
 const TENANT = [{ column: 'tenant_id', attribute: 'tenant' }]
 
@@ -143,6 +150,53 @@ describe('validatePolicy', () => {
     const createOnly = { ...ORDER, operations: { create: true, update: false } }
     expect(problems(ORDER_POLICY, createOnly)).toEqual(['operations.update grants roles, and this form does not offer update'])
     expect(problems({ ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, update: [] } }, createOnly)).toEqual([])
+  })
+
+  // A delete is offered by the generator only where one can be made
+  // against the table, by its account, with a version that proves the
+  // record (0050). A grant on a form whose bindings do not offer it -- and
+  // every form published before 0050 says nothing about delete -- is a
+  // rule nothing could honour, so it is refused as an update's is; an
+  // absent list, or an empty one, grants nobody and fits any form.
+  test('refuses delete granted on a form that does not offer it, and reads an absent flag as not offered', () => {
+    const deleting = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, delete: ['manager'] } }
+    const refused = ['operations.delete grants roles, and this form does not offer delete']
+    expect(problems(deleting)).toEqual(refused)
+    expect(problems(deleting, { ...ORDER, operations: { create: true, update: true, delete: false } })).toEqual(refused)
+    expect(problems(deleting, DELETABLE_ORDER)).toEqual([])
+    expect(problems({ ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, delete: [] } })).toEqual([])
+    expect(problems(ORDER_POLICY, DELETABLE_ORDER)).toEqual([])
+  })
+
+  // A delete names the version its person read (0050): a role that may
+  // not read has no version but a guess, and a version column's versions
+  // are small integers that can be tried one after another. Every role
+  // that may delete must be granted read, named one by one in codepoint
+  // order (watched failing: every delete grant was accepted).
+  test('refuses delete granted to a role that may not read with the form', () => {
+    const deleting = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, delete: ['manager', 'purger', 'Archivist'] } }
+    const sentence = (role: string) => `operations.delete grants ${role}, who may not read with this form: a delete names the version its person read, so grant read to every role that may delete`
+    expect(problems(deleting, DELETABLE_ORDER)).toEqual([sentence('Archivist'), sentence('purger')])
+  })
+
+  // A child form published before 0043 scoped nothing of its own rows while
+  // its lookup's options were filtered. A read reaches another tenant's
+  // line there only by a guessed token; a delete granted on it would
+  // destroy one by a guessed token and version. Refused, as a list of such
+  // a form is (0044), and accepted once a through scopes the rows.
+  test('refuses delete on a form whose rows nothing scopes while a lookup is filtered', () => {
+    const unscoped: FormPolicy = {
+      version: 1,
+      operations: { read: BOTH, create: [], update: [], delete: BOTH },
+      fields: { order: { read: BOTH, write: [] }, line_no: { read: BOTH, write: [] }, quantity: { read: BOTH, write: [] } },
+      rowFilters: [],
+      lookups: { order: TENANT },
+    }
+    expect(problems(unscoped, DELETABLE_LINE)).toEqual([
+      'operations.delete grants roles, and nothing scopes the records of this form though the options of order are filtered, so a delete could reach a record of any tenant by its token: scope them with a row filter or a through',
+    ])
+    expect(problems({ ...unscoped, through: ['order'] }, DELETABLE_LINE)).toEqual([])
+    expect(problems({ ...unscoped, operations: { ...unscoped.operations, delete: [] } }, DELETABLE_LINE)).toEqual([])
   })
 
   // The tenant column's value comes from the context, on create and on
@@ -246,7 +300,7 @@ describe('validatePolicy', () => {
   test('refuses a malformed policy, naming every problem', () => {
     const malformed = {
       version: 2,
-      operations: { read: BOTH, create: 'clerk', update: ['manager', ''], delete: ['manager'] },
+      operations: { read: BOTH, create: 'clerk', update: ['manager', ''], archive: ['manager'] },
       fields: { amount: { read: BOTH, write: BOTH, update: ['manager'] }, notes: 'everyone' },
       rowFilters: [{ column: 'tenant_id', attribute: 'tenant', operator: '=' }, { column: '', attribute: 7 }, 'tenant_id'],
       lookups: { customer: { column: 'tenant_id', attribute: 'tenant' } },
@@ -255,7 +309,7 @@ describe('validatePolicy', () => {
     expect(problems(malformed)).toEqual([
       'columns is not something this release reads, so nothing would enforce it',
       'version is not 1, the only policy version this release reads',
-      'operations.delete is not something this release reads, so nothing would enforce it',
+      'operations.archive is not something this release reads, so nothing would enforce it',
       'operations.create is not a list of roles',
       'operations.update[1] is not a role name',
       'fields.amount.update is not something this release reads, so nothing would enforce it',

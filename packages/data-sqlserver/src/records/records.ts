@@ -1,9 +1,10 @@
-import type { RecordAdapter, RecordColumn, RecordConcurrency, RecordFailure, RecordRead, RecordTarget, RecordValue } from '@formancy/data-core'
-import { decodeRowversion, encodeRowversion, listTerms, rowFilterTerms, throughTerms } from '@formancy/data-core'
+import type { DeleteOutcome, RecordAdapter, RecordColumn, RecordConcurrency, RecordFailure, RecordRead, RecordTarget, RecordValue } from '@formancy/data-core'
+import { decodeRowversion, deleteTerms, encodeRowversion, listTerms, rowFilterTerms, throughTerms } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
 import { prepare, send } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
 import { fromCanonicalText } from '../sql/values.js'
+import { deleteStatement } from './delete.js'
 import { definitionBytes, describedFrom } from './definition.js'
 import { failureFor } from './errors.js'
 import type { Phase } from './errors.js'
@@ -203,6 +204,31 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
       // order, inside the same filters and throughs; the write changed
       // nothing, so its failure is a read's.
       const found = await attempt(pool, existsStatement(request, terms, through, definition), 'read')
+      if (!Array.isArray(found)) return found
+      if (Number(found[0]?.same ?? 0) !== 1) return DEFINITION_MOVED
+      return Number(found[0]?.found ?? 0) > 0 ? STALE : NOT_FOUND
+    },
+
+    async delete(request): Promise<DeleteOutcome> {
+      const { target } = request
+      const terms = deleteTerms(request)
+      checkKey(target, terms.key)
+      const definition = definitionBytes(request.definition)
+      const expected = expectedVersion(target.concurrency, terms.expectedVersion)
+      if (expected !== undefined) {
+        const rows = await attempt(pool, deleteStatement(request, terms, expected, definition), 'write')
+        if (!Array.isArray(rows)) return rows
+        const row = onlyRow(rows)
+        if (row !== undefined) {
+          const removed = recordFrom(row, target.identity, target.concurrency)
+          return { ok: true, deleted: { values: removed.values, version: removed.version as string } }
+        }
+      }
+      // Nothing was deleted: as for an update, a second query tells a moved
+      // definition, a stale version and no such record apart, inside the
+      // same filters and throughs. A reach that moved was refused by the
+      // batch itself, which raised it (delete.ts).
+      const found = await attempt(pool, existsStatement({ target, key: terms.key }, terms.terms, terms.through, definition), 'read')
       if (!Array.isArray(found)) return found
       if (Number(found[0]?.same ?? 0) !== 1) return DEFINITION_MOVED
       return Number(found[0]?.found ?? 0) > 0 ? STALE : NOT_FOUND

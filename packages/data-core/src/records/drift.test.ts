@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import type { ColumnMeta, NormalizedType, ObjectMeta } from '../metadata.js'
-import { driftRefusal, LIST_REFUSED, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './drift.js'
+import { DELETE_REFUSED, driftRefusal, LIST_REFUSED, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './drift.js'
 import { planCreate, planUpdate } from './plan.js'
 import type { DescribedTable } from './types.js'
-import { ANSWERS, AUDITOR, CLERK, DEFINITION, described, MS, MS_ORDER, ORDER_POLICY, ORDER_TOKEN, PG, PG_ORDER, snapshot, text } from './test-support.js'
+import { ANSWERS, AUDITOR, CLERK, DEFINITION, described, MS, MS_FACTS, MS_ORDER, ORDER_POLICY, ORDER_TOKEN, orderForm, PG, PG_ORDER, snapshot, text } from './test-support.js'
 
 /*
  * What the planners decide about the database as a request described it
@@ -40,6 +40,25 @@ describe('driftRefusal and runtimeOperations', () => {
     expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', KEY_DROPPED), 'update')).toMatchObject({ ok: false, code: 'drift' })
     expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', KEY_DROPPED), 'create')).toBeUndefined()
     expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, described(PG, PG_ORDER), 'update')).toBeUndefined()
+  })
+
+  // A delete is decided over the root's description as every write is
+  // (0041, 0050): a key gone stops it, with a sentence of its own that says
+  // nothing was deleted; a column the form writes, narrowed, does not --
+  // a delete writes no value (watched failing with delete undecided).
+  test('refuse a delete when a change stops it, and only then, in its own words', () => {
+    const bindings = orderForm(MS_FACTS).bindings
+    expect(driftRefusal(MS_FACTS, bindings, ORDER_POLICY, after('sqlserver', KEY_DROPPED), 'delete')).toMatchObject({
+      ok: false,
+      code: 'drift',
+      message: DELETE_REFUSED,
+      drift: [{ kind: 'identity-key-changed' }],
+    })
+    expect(driftRefusal(MS_FACTS, bindings, ORDER_POLICY, after('sqlserver', GROUP_NARROWED), 'delete')).toBeUndefined()
+    expect(driftRefusal(MS_FACTS, bindings, ORDER_POLICY, described(MS_FACTS, bindings), 'delete')).toBeUndefined()
+    // A form that offers no delete refuses one whatever the database says.
+    expect(driftRefusal(MS, MS_ORDER, ORDER_POLICY, described(MS, MS_ORDER), 'delete')).toMatchObject({ ok: false, code: 'drift', message: DELETE_REFUSED })
+    expect(DELETE_REFUSED).not.toMatch(/group|varchar|amount|id\b/)
   })
 
   // The person is told an administrator must review the form; the log is
@@ -83,8 +102,8 @@ describe('driftRefusal and runtimeOperations', () => {
 
   // What GET offers is the runtime's verdict, from the same report.
   test('runtimeOperations is the report’s runtime verdict', () => {
-    expect(runtimeOperations(MS, MS_ORDER, ORDER_POLICY, after('sqlserver', KEY_DROPPED))).toMatchObject({ ok: true, verdict: { readable: true, writable: { create: true, update: false } } })
-    expect(runtimeOperations(MS, MS_ORDER, ORDER_POLICY, described(MS, MS_ORDER))).toEqual({ ok: true, verdict: { readable: true, writable: { create: true, update: true } }, drift: [] })
+    expect(runtimeOperations(MS, MS_ORDER, ORDER_POLICY, after('sqlserver', KEY_DROPPED))).toMatchObject({ ok: true, verdict: { readable: true, writable: { create: true, update: false, delete: false } } })
+    expect(runtimeOperations(MS, MS_ORDER, ORDER_POLICY, described(MS, MS_ORDER))).toEqual({ ok: true, verdict: { readable: true, writable: { create: true, update: true, delete: false } }, drift: [] })
   })
 
   // Bindings that do not fit their own snapshot cannot be compared, and

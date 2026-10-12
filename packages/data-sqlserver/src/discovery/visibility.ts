@@ -44,13 +44,20 @@ const BINDS_ME = `(p.grantee_principal_id = database_principal_id() or is_member
  * role it is in -- but not the denied object's name or schema, so they are
  * counted rather than placed: any of them may be in scope. CONTROL is counted
  * too, because denying it denies everything it implies.
+ *
+ * A condition on `sys.database_permissions p`, exported, as `DENIED_SCHEMAS`
+ * and `VIEWS_DATABASE` are, for the delete's guard (0050): the batch that
+ * refuses a delete its account can no longer see every key of, and the
+ * snapshot's `referenced-by` gap, read the one condition.
  */
+export const DENIED_OBJECTS = `p.class = 1 and p.state = 'D' and p.permission_name in ('VIEW DEFINITION', 'CONTROL')
+    and ${BINDS_ME}
+    and object_name(p.major_id) is null`
+
 const DENIED_OBJECTS_SQL = `
   select count(*) as hidden
   from sys.database_permissions p
-  where p.class = 1 and p.state = 'D' and p.permission_name in ('VIEW DEFINITION', 'CONTROL')
-    and ${BINDS_ME}
-    and object_name(p.major_id) is null`
+  where ${DENIED_OBJECTS}`
 
 /**
  * Schemas this account is denied VIEW DEFINITION or CONTROL on (class 3).
@@ -68,12 +75,14 @@ const DENIED_OBJECTS_SQL = `
  * HAS_PERMS_BY_NAME applies the exemption and the deny's precedence, so a
  * schema whose definitions the account can still see is not counted.
  */
+export const DENIED_SCHEMAS = `p.class = 3 and p.state = 'D' and p.permission_name in ('VIEW DEFINITION', 'CONTROL')
+    and ${BINDS_ME}
+    and has_perms_by_name(quotename(schema_name(p.major_id)), N'SCHEMA', N'VIEW DEFINITION') = 0`
+
 const DENIED_SCHEMAS_SQL = `
   select count(*) as hidden
   from sys.database_permissions p
-  where p.class = 3 and p.state = 'D' and p.permission_name in ('VIEW DEFINITION', 'CONTROL')
-    and ${BINDS_ME}
-    and has_perms_by_name(quotename(schema_name(p.major_id)), N'SCHEMA', N'VIEW DEFINITION') = 0`
+  where ${DENIED_SCHEMAS}`
 
 /**
  * Whether the account may view every definition in the database, which is
@@ -85,7 +94,9 @@ const DENIED_SCHEMAS_SQL = `
  * HAS_PERMS_BY_NAME parses it, and in a database named `it's [odd] db` the
  * raw name answers NULL (B9).
  */
-const DATABASE_SQL = `select has_perms_by_name(quotename(db_name()), N'DATABASE', N'VIEW DEFINITION') as can_view_definitions`
+export const VIEWS_DATABASE = `has_perms_by_name(quotename(db_name()), N'DATABASE', N'VIEW DEFINITION')`
+
+const DATABASE_SQL = `select ${VIEWS_DATABASE} as can_view_definitions`
 
 /** VIEW DEFINITION or CONTROL denies that bind this account, by securable class. */
 export interface Denials {

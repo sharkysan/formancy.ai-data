@@ -17,6 +17,7 @@ import {
   INT64,
   kinds,
   named,
+  NO_FILTERS,
   object,
   only,
   ORDER,
@@ -41,7 +42,7 @@ describe('diffSnapshots: lookups', () => {
       affects: ['customer'],
       message: expect.stringMatching(/its target from crm\.customer \(tenant_id, customer_no\) to crm\.customer \(customer_no, tenant_id\)/),
     })
-    expect(swapped.writable).toEqual({ create: false, update: false })
+    expect(swapped.writable).toEqual({ create: false, update: false, delete: false })
 
     // Every property counts, the actions and enforcement included: a lookup
     // over a key the database stopped enforcing can hold values that resolve
@@ -75,7 +76,7 @@ describe('diffSnapshots: lookups', () => {
     const retargeted = drift(twins({ schema: 'a', name: 'b.c' }), { schemas }, ORDER, snapshot(twins({ schema: 'a.b', name: 'c' }), { schemas }))
     // The generator names the lookup's field after its target, here c.
     expect(only(retargeted)).toMatchObject({ kind: 'lookup-changed', severity: 'blocking', subject: { kind: 'foreign-key', object: ORDER_REF, name: 'fk_order_customer' }, affects: ['c'] })
-    expect(retargeted.writable).toEqual({ create: false, update: false })
+    expect(retargeted.writable).toEqual({ create: false, update: false, delete: false })
 
     // Both sides moved onto one column, and both still read (tenant_id, customer_no).
     const merged = drift((objects) => {
@@ -89,7 +90,7 @@ describe('diffSnapshots: lookups', () => {
       ['lookup-changed', 'blocking', 'fk_order_customer'],
       ['column-added', 'review', 'tenant_id, customer_no'],
     ])
-    expect(merged.writable).toEqual({ create: false, update: false })
+    expect(merged.writable).toEqual({ create: false, update: false, delete: false })
   })
 
   // The other half of the relationship: the key the foreign key points at,
@@ -98,7 +99,7 @@ describe('diffSnapshots: lookups', () => {
     const keyless = (objects: ObjectMeta[]) => (object(objects, 'customer').primaryKey = null)
     const report = drift(keyless)
     expect(only(report)).toMatchObject({ kind: 'lookup-changed', severity: 'blocking', subject: { kind: 'key', object: CUSTOMER_REF, name: 'pk_customer' }, affects: ['customer'] })
-    expect(report.writable).toEqual({ create: false, update: false })
+    expect(report.writable).toEqual({ create: false, update: false, delete: false })
 
     const display = (objects: ObjectMeta[]) => dropColumn(objects, 'customer', 'name')
     expect(only(drift(display))).toMatchObject({ kind: 'lookup-changed', subject: { kind: 'column', object: CUSTOMER_REF, name: 'name' } })
@@ -141,7 +142,7 @@ describe('diffSnapshots: lookups', () => {
       affects: ['customer'],
       message: expect.stringMatching(/"The target of fk_order_customer is not visible\."/),
     })
-    expect(report.writable).toEqual({ create: false, update: false })
+    expect(report.writable).toEqual({ create: false, update: false, delete: false })
     // The snapshot says so by itself, even with no gap.
     expect(only(drift(hidden))).toMatchObject({ kind: 'access-narrowed', message: expect.stringMatching(/^What fk_order_customer references is not visible to this connection\. /) })
 
@@ -165,7 +166,7 @@ describe('diffSnapshots: lookups', () => {
       affects: ['customer'],
       message: expect.stringMatching(/^name of crm\.customer: its type changed from nvarchar\(200\) to bit\. The customer lookup reads it as its label /),
     })
-    expect(display.writable).toEqual({ create: false, update: false })
+    expect(display.writable).toEqual({ create: false, update: false, delete: false })
     // A widening too: what the lookup binds and decodes is the published type, whatever the direction.
     expect(only(drift((objects) => retype(objects, 'customer', 'name', 'nvarchar(400)', text(400))))).toMatchObject({ kind: 'lookup-changed', subject: { name: 'name' } })
     // A key column the foreign key still matches, retyped on the target alone.
@@ -183,7 +184,7 @@ describe('diffSnapshots: lookups', () => {
       addColumn(objects, 'customer', region)
       retype(objects, 'customer', 'region', 'int', INT32)
     }
-    const byRegion = { lookups: { customer: [{ column: 'region', attribute: 'region' }] } }
+    const byRegion = { ...NO_FILTERS, lookups: { customer: [{ column: 'region', attribute: 'region' }] } }
     expect(only(drift(retyped, { policy: byRegion }, ORDER, base))).toMatchObject({
       kind: 'lookup-changed',
       severity: 'blocking',
@@ -210,7 +211,7 @@ describe('diffSnapshots: the identity', () => {
       affects: ['id'],
       message: expect.stringMatching(/^pk_order is over \(id, tenant_id\) where it was over \(id\)/),
     })
-    expect(widened.writable).toEqual({ create: true, update: false })
+    expect(widened.writable).toEqual({ create: true, update: false, delete: false })
 
     const keyless = (objects: ObjectMeta[]) => (object(objects, 'order').primaryKey = null)
     expect(only(drift(keyless))).toMatchObject({ kind: 'identity-key-changed', message: expect.stringMatching(/^pk_order is gone/) })
@@ -218,7 +219,7 @@ describe('diffSnapshots: the identity', () => {
     // Behind a gap, the key is out of sight, not gone.
     const hidden = drift(keyless, { gaps: [gap(ORDER_REF, 'keys')] })
     expect(only(hidden)).toMatchObject({ kind: 'access-narrowed', subject: { kind: 'key', object: ORDER_REF, name: 'pk_order' } })
-    expect(hidden.writable).toEqual({ create: true, update: false })
+    expect(hidden.writable).toEqual({ create: true, update: false, delete: false })
 
     // A form that never offered update loses nothing.
     expect(only(drift((objects) => (object(objects, 'employee').primaryKey = null), {}, EMPLOYEE)).severity).toBe('info')
@@ -230,7 +231,7 @@ describe('diffSnapshots: the identity', () => {
       ['key-changed', 'info', 'order_pkey'],
       ['key-changed', 'info', 'pk_order'],
     ])
-    expect(renamed.writable).toEqual({ create: true, update: true })
+    expect(renamed.writable).toEqual({ create: true, update: true, delete: false })
 
     // So does the primary key declared again as a unique key under its name:
     // the new role is noted, and update stays open.
@@ -240,7 +241,7 @@ describe('diffSnapshots: the identity', () => {
       order.uniqueKeys.push({ name: 'pk_order', columns: ['id'] })
     })
     expect(only(demoted)).toMatchObject({ kind: 'key-changed', severity: 'info', message: expect.stringMatching(/^pk_order changed: its role from primary to unique\./) })
-    expect(demoted.writable).toEqual({ create: true, update: true })
+    expect(demoted.writable).toEqual({ create: true, update: true, delete: false })
   })
 
   // A key column no field shows still addresses the record an update changes.
@@ -256,7 +257,7 @@ describe('diffSnapshots: the identity', () => {
     const request: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'node' }, formId: 'sales-node', title: 'Node', lookups: [] }
     const report = drift(node('nvarchar(4000)', text(4000)), {}, request, snapshot(node('hierarchyid', { kind: 'unsupported' })))
     expect(only(report)).toMatchObject({ kind: 'column-type-changed', severity: 'blocking', subject: { kind: 'column', name: 'path' }, affects: [] })
-    expect(report.writable).toEqual({ create: false, update: false })
+    expect(report.writable).toEqual({ create: false, update: false, delete: false })
   })
 })
 
@@ -302,7 +303,7 @@ describe('diffSnapshots: constraints the form does not rest on', () => {
     ])
     expect(report.changes[0]?.message).toMatch(/expression from \(\[amount\]>=\(0\)\) to \(\[amount\]>\(0\)\); validation from validated to not validated/)
     expect(report.changes[3]?.message).toMatch(/on delete from no-action to set-null; enforcement from enforced to not enforced/)
-    expect(report).toMatchObject({ blocking: false, writable: { create: true, update: true } })
+    expect(report).toMatchObject({ blocking: false, writable: { create: true, update: true, delete: false } })
 
     // Gone, or pointing at a target that can no longer be seen, they are still only noted.
     const gone = drift((objects) => {
@@ -374,7 +375,7 @@ describe('diffSnapshots: constraints the form does not rest on', () => {
       object(objects, 'customer').columns.push(col('segment', 'nvarchar(20)', text(20), { ordinal: 5 }))
       remove(objects, 'customer_summary')
     })
-    const everything = { readable: true, writable: { create: true, update: true } }
+    const everything = { readable: true, writable: { create: true, update: true, delete: false } }
     expect(report).toEqual({ changes: [], blocking: false, ...everything, runtime: everything })
   })
 })

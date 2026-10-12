@@ -1,6 +1,6 @@
 import type { CoverageAspect, CoverageGap, CoverageSubject, MetadataSnapshot, ObjectRef } from '../metadata.js'
 import { gapCovers, recordsDeleteFacts } from '../snapshot.js'
-import { allFields, type Comparison, describe, type Draft, fieldsOver, lookups, type Operation, refKey, stopped } from './context.js'
+import { allFields, type Comparison, describe, type Draft, fieldsOver, lookups, type Operation, refKey, stopped, WRITES } from './context.js'
 import type { DriftSubject } from './types.js'
 
 /*
@@ -65,7 +65,8 @@ export function absence(current: MetadataSnapshot, ref: ObjectRef): Absence {
   return gaps.length > 0 ? { why: 'access', gaps } : { why: 'gone' }
 }
 
-const BOTH: readonly Operation[] = ['create', 'update']
+/** What a lookup in doubt stops: the writes that select through it. A delete selects nothing (0050). */
+const SELECTING: readonly Operation[] = ['create', 'update']
 
 /** Aspects of a lookup's target the lookup rests on: the table, the display columns, the key it points at. */
 const TARGET_ASPECTS: ReadonlySet<CoverageAspect> = new Set(['objects', 'columns', 'keys'])
@@ -74,13 +75,16 @@ const TARGET_ASPECTS: ReadonlySet<CoverageAspect> = new Set(['objects', 'columns
  * What a gap puts in doubt for this form, or `null` when it is about a table
  * the form neither binds nor looks up.
  *
- * The root's columns are every field and every create. Its keys are the
- * identity, which only update uses. Its foreign keys are the lookups', and so
- * are their targets' columns and keys. Checks, comments and default
- * expressions are nothing the form relies on: generation reads none of them.
- * Row security that cannot be established on the root or a target is for a
- * person to review and stops nothing (0027): neither adapter reports a write
- * done that the table does not hold.
+ * The root's columns are every field and every write. Its keys are the
+ * identity, which update and delete use. Its foreign keys are the lookups',
+ * and so are their targets' columns and keys. What refers to the root is
+ * what a delete may also do (0050): a `referenced-by` gap on it stops
+ * delete, and is compared only between two snapshots that both record it
+ * (`gapChanges`). Checks, comments and default expressions are nothing the
+ * form relies on: generation reads none of them. Row security that cannot be
+ * established on the root or a target is for a person to review and stops
+ * nothing (0027): neither adapter reports a write done that the table does
+ * not hold.
  */
 function doubtOf(comparison: Comparison, gap: CoverageGap): { stops: Operation[]; affects: string[]; otherwise?: 'review' } | null {
   const { bindings } = comparison
@@ -98,10 +102,11 @@ function doubtOf(comparison: Comparison, gap: CoverageGap): { stops: Operation[]
     for (const operation of operations) stops.add(operation)
   }
 
-  if (onRoot && (gap.aspect === 'objects' || gap.aspect === 'columns')) block(allFields(bindings), BOTH)
-  if (onRoot && gap.aspect === 'keys' && bindings.identity !== null) block(fieldsOver(bindings, bindings.identity), ['update'])
+  if (onRoot && (gap.aspect === 'objects' || gap.aspect === 'columns')) block(allFields(bindings), WRITES)
+  if (onRoot && gap.aspect === 'keys' && bindings.identity !== null) block(fieldsOver(bindings, bindings.identity), ['update', 'delete'])
+  if (onRoot && gap.aspect === 'referenced-by') block([], ['delete'])
   const lookupsInDoubt = [...(onRoot && gap.aspect === 'foreign-keys' ? lookups(bindings) : []), ...(TARGET_ASPECTS.has(gap.aspect) ? targeted : [])]
-  if (lookupsInDoubt.length > 0) block(lookupsInDoubt.map((lookup) => lookup.field), BOTH)
+  if (lookupsInDoubt.length > 0) block(lookupsInDoubt.map((lookup) => lookup.field), SELECTING)
 
   return { stops: [...stops], affects: allFields(bindings).filter((field) => affected.has(field)) }
 }

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describedOf, findObject } from '@formancy/data-core'
-import type { ApiValue, ColumnMeta, Described, DescribedTable, MetadataSnapshot, ObjectRef, RecordOutcome, RecordTarget, RecordValue, UpdateRequest } from '@formancy/data-core'
+import type { ApiValue, ColumnMeta, DeleteRequest, Described, DescribedTable, MetadataSnapshot, ObjectRef, RecordOutcome, RecordTarget, RecordValue, UpdateRequest } from '@formancy/data-core'
 import { covers, driftingCase, driftingOn, FIXTURE_SCOPE, MODEL_CASES, PARITY_SCOPE, sharedDrifting, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { DriftingCase, SqlServerFixture } from '@formancy/data-fixtures'
 import mssql from 'mssql'
@@ -107,7 +107,9 @@ function writes(entry: DriftingCase, snapshot: MetadataSnapshot, version: string
   const update = { target: target(entry.table), key: [{ ...ID, value: '1' }], set: [value(snapshot, entry.table, 'memo', 'written')], expectedVersion: version, filters: { kind: 'unrestricted' } as const, through: [], returning: [], definition }
   const values = [...Object.entries(entry.insert).map(([name, given]) => value(snapshot, entry.table, name, given)), value(snapshot, entry.table, 'memo', 'created')]
   const insert = { target: target(entry.table), values, returning: [ID], definition }
-  return { update, insert }
+  // A delete of row 1 at the version given (0050).
+  const removal: DeleteRequest = { ...update, reach: { removed: [ref(entry.table)], cleared: [], accepted: [] } }
+  return { update, insert, removal }
 }
 
 const read = (table: string) => ({ target: target(table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const, through: [] })
@@ -160,6 +162,8 @@ describe('the definition, change by change', () => {
         const stale = writes(entry, published, version, before.definition)
         expect(await records.update(stale.update)).toMatchObject({ ok: false, code: 'schema-changed' })
         expect(await records.insert(stale.insert)).toMatchObject({ ok: false, code: 'schema-changed' })
+        // A delete at the row's own version too (0050): rolled back, the row as the ALTER left it.
+        expect(await records.delete(stale.removal)).toMatchObject({ ok: false, code: 'schema-changed' })
         expect(await asRestricted.insert(writes(entry, published, version, restrictedBefore.definition).insert)).toMatchObject({ ok: false, code: 'schema-changed' })
         expect(await held(entry.table)).toEqual(altered)
       }
@@ -379,12 +383,14 @@ describe('an ALTER that commits while a request waits for it', () => {
       await batches(transaction, entry.alter.sqlserver as readonly string[])
       const { target: table, columns, filters } = read(entry.table)
       const list = { target: table, columns, filters, through: [], equal: [], search: null, sort: [{ column: 'id', direction: 'asc', nulls: null }], offset: 0, limit: 50 } as const
-      const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read(entry.table)), records.list(list)] as const
-      await waiting(4)
+      const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read(entry.table)), records.list(list), records.delete(stale.removal)] as const
+      await waiting(5)
       await transaction.commit()
-      const [inserted, updated, reread, relisted] = await Promise.all(pending)
+      const [inserted, updated, reread, relisted, deleted] = await Promise.all(pending)
       expect(inserted).toMatchObject({ ok: false, code: 'schema-changed' })
       expect(updated).toMatchObject({ ok: false, code: 'schema-changed' })
+      // A delete at the row's own version, decided before the ALTER, deletes nothing (0050).
+      expect(deleted).toMatchObject({ ok: false, code: 'schema-changed' })
       const now = described(await records.describe(ref(entry.table)))
       expect(reread).toMatchObject({ ok: true, described: { definition: now.definition }, record: { version: expect.any(String) } })
       expect(relisted).toMatchObject({ ok: true, described: { definition: now.definition }, rows: [{ version: expect.any(String) }] })

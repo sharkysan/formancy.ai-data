@@ -201,16 +201,16 @@ describe('what holds the trail in place', () => {
     let ran = false
     const early = Fastify({ logger: { level: 'error', stream: { write: (line: string) => void lines.push(line) } } })
     void early.register(async (instance) => {
-      instance.post('/v1/forms/:id/records/delete', async () => {
+      instance.post('/v1/forms/:id/records/archive', async () => {
         ran = true
-        return { deleted: true }
+        return { archived: true }
       })
       await runtimeRoutes(instance, { registry: registry(), store, authenticate, audit: { sink } })
     })
     await early.ready()
-    const response = await early.inject({ method: 'POST', url: '/v1/forms/employee/records/delete', headers: as('clerk') })
+    const response = await early.inject({ method: 'POST', url: '/v1/forms/employee/records/archive', headers: as('clerk') })
     expect({ status: response.statusCode, body: response.json() as unknown, ran }).toEqual({ status: 500, body: { code: 'unaudited-route', message: expect.any(String) }, ran: false })
-    expect(lines.map((line) => (JSON.parse(line) as { msg: string }).msg)).toContain('POST /v1/forms/:id/records/delete has no audit name (0023, 0033)')
+    expect(lines.map((line) => (JSON.parse(line) as { msg: string }).msg)).toContain('POST /v1/forms/:id/records/archive has no audit name (0023, 0033)')
   })
 
   // An administrator's plane with no trail would publish and restore with

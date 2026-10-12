@@ -1,6 +1,25 @@
 import { describe, expect, test } from 'vitest'
 import { READER_ACCESS, WRITER_ACCESS } from './access.js'
-import { covers, displayCase, driftingCase, edgeCase, filterCase, listCase, MODEL_CASES, refusalCase, sharedCases, shipmentCase, temporalCase, THROUGH_CASES, throughCase, uuidCase } from './cases.js'
+import {
+  covers,
+  deleteCase,
+  displayCase,
+  driftingCase,
+  edgeCase,
+  filterCase,
+  listCase,
+  MODEL_CASES,
+  refusalCase,
+  sharedCases,
+  shipmentCase,
+  temporalCase,
+  THROUGH_CASES,
+  throughCase,
+  UPDATE_RECREATED_CASE,
+  uuidCase,
+} from './cases.js'
+import { DELETE_PARITY, UPDATE_RECREATED } from './deletes.js'
+import type { DeleteCase } from './deletes.js'
 import { sharedDrifting } from './drifting.js'
 import * as fixtures from './index.js'
 import { LIST_PARITY } from './lists.js'
@@ -36,6 +55,8 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   DRIFTING: sharedDrifting().map((entry) => driftingCase(entry.name)),
   THROUGH_CASES: THROUGH_CASES.map(throughCase),
   LIST_PARITY: (Object.keys(LIST_PARITY) as ListCase[]).map(listCase),
+  DELETE_PARITY: (Object.keys(DELETE_PARITY) as DeleteCase[]).map(deleteCase),
+  UPDATE_RECREATED: [UPDATE_RECREATED_CASE],
   UUID_PARITY: (Object.keys(UUID_PARITY) as UuidCase[]).map(uuidCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
@@ -54,6 +75,7 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   FIXTURE_SCOPE: 'a discovery scope',
   PARITY_SCOPE: 'a discovery scope',
   MODEL_CASES: 'the ids themselves',
+  UPDATE_RECREATED_CASE: "the id of UPDATE_RECREATED's case",
   SIZED_CUSTOMERS: "what the sized table is generated from (0034); what a lookup on it reads is sizedRowsRead()'s, a function",
   FIXTURE_CUSTOMERS: "the fixture's own customers, which the sized table holds beside the generated ones",
   SIZED_CHUNK_ROWS: 'how many rows one statement of the sized load carries',

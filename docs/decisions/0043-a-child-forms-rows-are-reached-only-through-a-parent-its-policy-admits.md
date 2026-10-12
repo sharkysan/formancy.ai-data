@@ -1,6 +1,6 @@
 # 0043 — A child form's rows are reached only through a parent its policy admits
 
-- **Status:** accepted; extended by [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md): a list of records carries every through from its first statement, and a form whose rows nothing scopes while a lookup's options are filtered offers no list
+- **Status:** accepted; extended by [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md): a list of records carries every through from its first statement, and a form whose rows nothing scopes while a lookup's options are filtered offers no list; extended by [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md): a delete is scoped by every through, as an update is
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**

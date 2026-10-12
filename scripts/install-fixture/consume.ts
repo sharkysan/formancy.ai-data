@@ -7,7 +7,7 @@
  * shipped. Connecting to a database is the integration suites' business.
  */
 import { createDataClient, fieldProblems, LIST_PAGE_SIZE, lookupSources, sourceNames } from '@formancy/data-client'
-import type { FormMenu, Outcome, PublishedForm, RecordList, Refusal } from '@formancy/data-client'
+import type { DeleteOutcome, FormMenu, Outcome, PublishedForm, RecordList, Refusal } from '@formancy/data-client'
 import { DATABASE_KINDS, isDatabaseKind } from '@formancy/data-core'
 import type { DatabaseAdapter, DatabaseKind } from '@formancy/data-core'
 import { connectPostgres, createPostgresAdapter } from '@formancy/data-postgres'
@@ -106,4 +106,15 @@ const menuClient = createDataClient({
 const menu: Outcome<FormMenu> = await menuClient.forms()
 if (!menu.ok || menu.value.forms[0]?.children[0]?.field !== 'order') throw new Error('forms() did not read the menu')
 
-console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists and the menu included; audit events`)
+// A deletion (0050): the client's delete() and its outcome's type through the
+// published entry points, read from a stub that answers as the server does --
+// a reply held to the deletion's shape by a guard the published code carries.
+const deleteClient = createDataClient({
+  token: () => 'unused',
+  base: 'http://127.0.0.1:9',
+  fetch: async () => new Response(JSON.stringify({ record: 'k1:7', deleted: true }), { status: 200, headers: { 'content-type': 'application/json' } }),
+})
+const deleted: DeleteOutcome = await deleteClient.delete('order', { record: 'k1:7', version: '1' })
+if (!deleted.ok || deleted.value.record !== 'k1:7' || deleted.value.deleted !== true) throw new Error('delete() did not read the deletion')
+
+console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists, the menu and deletion included; audit events`)

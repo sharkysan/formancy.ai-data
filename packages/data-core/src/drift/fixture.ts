@@ -3,8 +3,8 @@ import type { DatabaseKind } from '../adapter.js'
 import { generateForm } from '../generate/generate.js'
 import type { FormBindings, GenerationRequest } from '../generate/types.js'
 import type { ColumnMeta, CoverageAspect, CoverageGap, CoverageSubject, DiscoveryAccount, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
-import type { FormPolicy } from '../policy/types.js'
-import { createSnapshot, findObject } from '../snapshot.js'
+import { createSnapshot, findObject, recordsDeleteFacts } from '../snapshot.js'
+import type { DriftPolicy } from './context.js'
 import { describedOf, diffRootDefinition, diffSnapshots as review } from './diff.js'
 import type { DescribedRoot } from './diff.js'
 import type { DriftChange, DriftKind, DriftReport } from './types.js'
@@ -94,8 +94,15 @@ function model(kind: DatabaseKind): ObjectMeta[] {
   ]
 }
 
-/** A policy whose lookups filter nothing: what drift is given when a test is not about filter columns. */
-export const NO_FILTERS: Pick<FormPolicy, 'lookups'> = { lookups: {} }
+/**
+ * A policy whose lookups filter nothing and that grants nobody anything:
+ * what drift is given when a test is not about filter columns, or about who
+ * may delete (0050).
+ */
+export const NO_FILTERS: DriftPolicy = { lookups: {}, operations: { read: [], create: [], update: [] } }
+
+/** The same, and somebody may delete: a stop of delete is then `blocking` (0050). */
+export const DELETING: DriftPolicy = { lookups: {}, operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] } }
 
 export const OWNER: DiscoveryAccount = { user: 'owner', login: 'owner' }
 
@@ -105,14 +112,41 @@ export interface Options {
   kind?: DatabaseKind
   serverVersion?: string
   account?: DiscoveryAccount
-  /** The published policy's lookup filters, which drift compares by type on each target (0028). None by default. */
-  policy?: Pick<FormPolicy, 'lookups'>
+  /** The published policy's lookup filters, which drift compares by type on each target (0028), and its operations (0050). None by default. */
+  policy?: DriftPolicy
+  /**
+   * Record 0049's facts, as a snapshot taken since then does: whether the
+   * account may delete from each object -- yes from every table, unless the
+   * edit said otherwise -- and every key that refers to it, derived from the
+   * foreign keys, beside any the edit placed from outside the snapshot.
+   */
+  facts?: boolean
+}
+
+/** 0049's facts on every object, after `edit`: see `Options.facts`. */
+function recordFacts(objects: ObjectMeta[]): void {
+  const within = (ref: ObjectRef) => objects.some((object) => object.ref.schema === ref.schema && object.ref.name === ref.name)
+  const order = (left: { table: ObjectRef; name: string }, right: { table: ObjectRef; name: string }) => {
+    const a = `${left.table.schema}\u0000${left.table.name}\u0000${left.name}`
+    const b = `${right.table.schema}\u0000${right.table.name}\u0000${right.name}`
+    return a < b ? -1 : a > b ? 1 : 0
+  }
+  for (const object of objects) {
+    object.access ??= { delete: object.kind === 'table' }
+    const derived = objects.flatMap((referrer) =>
+      referrer.foreignKeys
+        .filter((key) => key.references !== null && key.references.table.schema === object.ref.schema && key.references.table.name === object.ref.name)
+        .map((key) => ({ table: { ...referrer.ref }, name: key.name, columns: [...key.columns], referencedColumns: [...(key.references?.columns ?? [])], onDelete: key.onDelete, onUpdate: key.onUpdate, enforced: key.enforced })),
+    )
+    object.referencedBy = [...derived, ...(object.referencedBy ?? []).filter((key) => !within(key.table))].sort(order)
+  }
 }
 
 export function snapshot(edit: (objects: ObjectMeta[]) => void = () => {}, options: Options = {}): MetadataSnapshot {
   const kind = options.kind ?? 'sqlserver'
   const objects = model(kind)
   edit(objects)
+  if (options.facts === true) recordFacts(objects)
   return createSnapshot({
     kind,
     serverVersion: options.serverVersion ?? '16.0.4125',
@@ -213,34 +247,54 @@ function onlyTheRootDefinition(base: MetadataSnapshot, current: MetadataSnapshot
   const is = findObject(current, root)
   if (was === undefined || is === undefined) return false
   if (was.comment !== is.comment || was.rowSecurity !== is.rowSecurity || JSON.stringify(was.checks) !== JSON.stringify(is.checks)) return false
+  // Whether the account may delete, and what refers to the root, are review's alone (0050).
+  if (JSON.stringify([was.access, was.referencedBy]) !== JSON.stringify([is.access, is.referencedBy])) return false
   return was.columns.every((column) => {
     const now = is.columns.find((candidate) => candidate.name === column.name)
     return now === undefined || (now.comment === column.comment && JSON.stringify(now.access) === JSON.stringify(column.access))
   })
 }
 
+/** `snapshot` as a server older than 0049 would have taken it: no facts about deleting, and no `referenced-by` gap. */
+function withoutDeleteFacts(snapshot: MetadataSnapshot): MetadataSnapshot {
+  const { fingerprint: _fingerprint, ...rest } = JSON.parse(JSON.stringify(snapshot)) as MetadataSnapshot
+  for (const object of rest.objects) {
+    delete object.access
+    delete object.referencedBy
+  }
+  return createSnapshot({ ...rest, gaps: rest.gaps.filter((gap) => gap.aspect !== 'referenced-by') })
+}
+
 /**
  * `diffSnapshots`, held on every call the drift suites make to what the
  * runtime rests on (0041), so every report any of them builds is a case of
- * both:
+ * all three:
  *
  * - The runtime is never stricter than review: whatever review allows -- a
- *   read, a create, an update -- the report's `runtime` allows. A runtime
- *   that refused more would refuse a form review calls usable.
+ *   read, a create, an update, a delete -- the report's `runtime` allows. A
+ *   runtime that refused more would refuse a form review calls usable.
  * - Where `current` differs from `base` only in the root's definition,
  *   `diffRootDefinition` over the root as `current` describes it gives the
  *   very report review gives: one decision, not two that agree today.
+ * - Against a base taken before 0049, the facts a current snapshot records
+ *   since then change nothing (0050): the report is the one review gives
+ *   against the same snapshot without them. Otherwise every key that refers
+ *   to a table, and every DELETE grant, would be reported as new on every
+ *   form published before 0049.
  */
-export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings, policy: Pick<FormPolicy, 'lookups'>): DriftReport {
+export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings, policy: DriftPolicy): DriftReport {
   const report = review(base, current, bindings, policy)
-  const allows = (operation: 'read' | 'create' | 'update', verdict: { readable: boolean; writable: { create: boolean; update: boolean } }) =>
+  const allows = (operation: 'read' | 'create' | 'update' | 'delete', verdict: { readable: boolean; writable: { create: boolean; update: boolean; delete: boolean } }) =>
     operation === 'read' ? verdict.readable : verdict.writable[operation]
-  for (const operation of ['read', 'create', 'update'] as const) {
+  for (const operation of ['read', 'create', 'update', 'delete'] as const) {
     expect(!allows(operation, report) || allows(operation, report.runtime), `review allows ${operation} and the runtime refuses it: ${JSON.stringify(report.changes.map((change) => change.kind))}`).toBe(true)
   }
   const targets = bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? [binding.target.table] : []))
   if (onlyTheRootDefinition(base, current, bindings.root, targets)) {
     expect(diffRootDefinition(base, describedOf(current, bindings.root) as DescribedRoot, bindings, policy)).toEqual(report)
+  }
+  if (!recordsDeleteFacts(base) && recordsDeleteFacts(current)) {
+    expect(review(base, withoutDeleteFacts(current), bindings, policy), 'the facts recorded since 0049 changed a report against a base taken before them').toEqual(report)
   }
   return report
 }
@@ -250,7 +304,7 @@ export function drift(
   edit?: (objects: ObjectMeta[]) => void,
   options: Options = {},
   request: GenerationRequest = ORDER,
-  base: MetadataSnapshot = snapshot(undefined, { kind: options.kind ?? 'sqlserver' }),
+  base: MetadataSnapshot = snapshot(undefined, { kind: options.kind ?? 'sqlserver', ...(options.facts === true ? { facts: true } : {}) }),
 ): DriftReport {
   const { bindings } = generateForm(base, request)
   return diffSnapshots(base, snapshot(edit, options), bindings, options.policy ?? NO_FILTERS)

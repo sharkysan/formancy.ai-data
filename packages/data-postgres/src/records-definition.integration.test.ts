@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describedOf, findObject } from '@formancy/data-core'
-import type { ApiValue, ColumnMeta, Described, DescribedTable, MetadataSnapshot, ObjectRef, RecordOutcome, RecordTarget, RecordValue, UpdateRequest } from '@formancy/data-core'
+import type { ApiValue, ColumnMeta, DeleteRequest, Described, DescribedTable, MetadataSnapshot, ObjectRef, RecordOutcome, RecordTarget, RecordValue, UpdateRequest } from '@formancy/data-core'
 import { covers, driftingCase, driftingOn, FIXTURE_SCOPE, MODEL_CASES, PARITY_SCOPE, sharedDrifting, startPostgresFixture } from '@formancy/data-fixtures'
 import type { DriftingCase, PostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
@@ -95,12 +95,13 @@ async function held(table: string): Promise<{ row: string | null; rows: number }
   return found as { row: string | null; rows: number }
 }
 
-/** A write of `memo`, and a create of the case's answers and `memo`, typed from `snapshot`, under `definition`. */
+/** A write of `memo`, a create of the case's answers and `memo`, and a delete of row 1 (0050), typed from `snapshot`, under `definition`. */
 function writes(entry: DriftingCase, snapshot: MetadataSnapshot, version: string, definition: string) {
   const update = { target: target(entry.table), key: [{ ...ID, value: '1' }], set: [value(snapshot, entry.table, 'memo', 'written')], expectedVersion: version, filters: { kind: 'unrestricted' } as const, through: [], returning: [], definition }
   const values = [...Object.entries(entry.insert).map(([name, held]) => value(snapshot, entry.table, name, held)), value(snapshot, entry.table, 'memo', 'created')]
   const insert = { target: target(entry.table), values, returning: [ID], definition }
-  return { update, insert }
+  const removal: DeleteRequest = { ...update, reach: { removed: [ref(entry.table)], cleared: [], accepted: [] } }
+  return { update, insert, removal }
 }
 
 const declared = (entry: DriftingCase) => (sharedDrifting().includes(entry) ? covers('postgres', driftingCase(entry.name)) : {})
@@ -147,9 +148,11 @@ describe('the definition, change by change', () => {
     expect(described(await asRestricted.describe(ref(entry.table))).definition, 'the writer describes what the owner does').toBe(now.described.definition)
 
     if (entry.moves) {
-      // Decided over the old definition: refused, and the row is as the ALTER left it.
+      // Decided over the old definition: refused, and the row is as the ALTER
+      // left it -- a delete at the row's version included (0050).
       expect(await records.update(stale.update)).toMatchObject({ ok: false, code: 'schema-changed' })
       expect(await records.insert(stale.insert)).toMatchObject({ ok: false, code: 'schema-changed' })
+      expect(await records.delete(stale.removal)).toMatchObject({ ok: false, code: 'schema-changed' })
       expect(await asRestricted.insert(stale.insert)).toMatchObject({ ok: false, code: 'schema-changed' })
       expect(await held(entry.table)).toEqual(altered)
     }
@@ -403,12 +406,14 @@ describe('an ALTER that commits while a request waits for it', () => {
           // A list is a read of a page, asked again after the lock as a read is (0044).
           const list = { target: read.target, columns: read.columns, filters: read.filters, through: [], equal: [], search: null, sort: [{ column: 'id', direction: 'asc', nulls: null }], offset: 0, limit: 50 } as const
           const altering = await holdAlter(entry)
-          const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read), records.list(list)] as const
-          await waiting(entry.table, 4)
+          const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read), records.list(list), records.delete(stale.removal)] as const
+          await waiting(entry.table, 5)
           await altering.commit()
-          const [inserted, updated, reread, relisted] = await Promise.all(pending)
+          const [inserted, updated, reread, relisted, deleted] = await Promise.all(pending)
           expect(inserted).toMatchObject({ ok: false, code: 'schema-changed' })
           expect(updated).toMatchObject({ ok: false, code: 'schema-changed' })
+          // A delete at the row's own version, decided before the ALTER, deletes nothing (0050).
+          expect(deleted).toMatchObject({ ok: false, code: 'schema-changed' })
           const now = described(await records.describe(ref(entry.table)))
           expect(reread).toMatchObject({ ok: true, described: { definition: now.definition }, record: { version: '1' } })
           expect(relisted).toMatchObject({ ok: true, described: { definition: now.definition }, rows: [{ version: '1' }] })

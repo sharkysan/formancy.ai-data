@@ -1,6 +1,6 @@
-import type { FormRecord } from '@formancy/data-core'
+import type { FormRecord, RecordDeleted } from '@formancy/data-core'
 import type { Outcome } from './client.js'
-import { isFormRecord, isNullableString, isRecord, refusalOf } from './shapes.js'
+import { isFormRecord, isNullableString, isRecord, isRecordDeleted, refusalOf } from './shapes.js'
 
 /*
  * What the answer to a write says happened (0031). A read that went wrong
@@ -20,10 +20,15 @@ export interface UnknownWrite {
   code: 'unknown-outcome'
   /** The server's sentence when the database lost the answer; the client's own when the page lost it. */
   message: string
-  operation: 'create' | 'update'
-  /** Update: the token sent. Create: the token the server says it would have, or null. */
+  /** `delete` since 0050. */
+  operation: 'create' | 'update' | 'delete'
+  /** Update and delete: the token sent. Create: the token the server says it would have, or null. */
   record: string | null
-  /** Update: the version sent -- saving again with exactly it is stored at most once. Create: null. */
+  /**
+   * Update and delete: the version sent -- saving again with exactly it is
+   * stored at most once, and deleting again with it deletes nothing else.
+   * Create: null.
+   */
   version: string | null
   /** `database`: the data server said so (its 502). `transport`: the answer was lost between page and server. */
   origin: 'database' | 'transport'
@@ -31,6 +36,9 @@ export interface UnknownWrite {
 
 /** What `create` and `update` resolve to. */
 export type WriteOutcome = Outcome<FormRecord> | UnknownWrite
+
+/** What `delete` resolves to (0050): the server's deletion answer, a refusal, or a deletion nobody here can say happened. */
+export type DeleteOutcome = Outcome<RecordDeleted> | UnknownWrite
 
 /** Whether an outcome is an unknown write, rather than a success or a refusal. */
 export function isUnknownWrite(outcome: { ok: boolean }): outcome is UnknownWrite {
@@ -41,7 +49,7 @@ export function isUnknownWrite(outcome: { ok: boolean }): outcome is UnknownWrit
 
 /** What a write addressed, as the call knows it: the transport can lose an answer, never the call's own arguments. */
 export interface WriteIntent {
-  operation: 'create' | 'update'
+  operation: 'create' | 'update' | 'delete'
   record: string | null
   version: string | null
 }
@@ -50,9 +58,10 @@ export interface WriteIntent {
 export type WriteAnswer = { answered: false } | { answered: true; status: number; body: unknown }
 
 const LOST_ON_THE_WAY = 'The answer to this save was lost between this page and the data server. It may have been saved.'
+const DELETION_LOST_ON_THE_WAY = 'The answer to this deletion was lost between this page and the data server. It may have been deleted.'
 
 function lost(intent: WriteIntent, status: number): UnknownWrite {
-  return { ok: false, status, code: 'unknown-outcome', message: LOST_ON_THE_WAY, ...intent, origin: 'transport' }
+  return { ok: false, status, code: 'unknown-outcome', message: intent.operation === 'delete' ? DELETION_LOST_ON_THE_WAY : LOST_ON_THE_WAY, ...intent, origin: 'transport' }
 }
 
 /**
@@ -61,7 +70,9 @@ function lost(intent: WriteIntent, status: number): UnknownWrite {
  * 1. Nothing arrived -- `fetch` rejected -- or the body is unreadable or not
  *    JSON, at any status: lost on the way. A proxy's page is not the data
  *    server's answer, and the request may have reached it.
- * 2. A 2xx with a record is the record stored; any other 2xx was lost.
+ * 2. A 2xx with a record is the record stored -- for a delete, a 2xx with
+ *    the deleted row's token and `deleted: true` is the record deleted
+ *    (0050); any other 2xx was lost.
  * 3. The data server's 502 `unknown-outcome` with a sentence: the database
  *    lost the answer. What was addressed comes from the body, or the call.
  * 4. A 4xx with a sentence is the server's refusal: nothing was written.
@@ -70,11 +81,16 @@ function lost(intent: WriteIntent, status: number): UnknownWrite {
  * 5. A 503 `unavailable` with a sentence: the database was not reached.
  * 6. Anything else -- a 500, another 502 or 504 -- was lost.
  */
-export function writeOutcome(answer: WriteAnswer, intent: WriteIntent): WriteOutcome {
+export function writeOutcome(answer: WriteAnswer, intent: WriteIntent & { operation: 'delete' }): DeleteOutcome
+export function writeOutcome(answer: WriteAnswer, intent: WriteIntent & { operation: 'create' | 'update' }): WriteOutcome
+export function writeOutcome(answer: WriteAnswer, intent: WriteIntent): WriteOutcome | DeleteOutcome {
   if (!answer.answered) return lost(intent, 0)
   const { status, body } = answer
   if (!isRecord(body)) return lost(intent, status)
-  if (status >= 200 && status <= 299) return isFormRecord(body) ? { ok: true, value: body } : lost(intent, status)
+  if (status >= 200 && status <= 299) {
+    if (intent.operation === 'delete') return isRecordDeleted(body) ? { ok: true, value: body } : lost(intent, status)
+    return isFormRecord(body) ? { ok: true, value: body } : lost(intent, status)
+  }
   const message = body['message']
   if (typeof message !== 'string') return lost(intent, status)
   if (status === 502 && body['code'] === 'unknown-outcome') {
