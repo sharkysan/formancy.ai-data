@@ -1,6 +1,7 @@
 // The report's results (0035): each package's suite, the repository's guards,
-// the browser, install and container gates, the build identity of every
-// published package, and what the gates measured on the way.
+// the browser gates in each browser, the install and container gates, the
+// build identity of every published package, and what the gates measured on
+// the way, per browser.
 //
 // Pure over the run's results. Two times are shown for a suite, each named
 // for what it is: the task's wall time from turbo's run summary, and vitest's
@@ -63,12 +64,14 @@ export function resultsInRun({ results, covered, published }) {
     repository: suiteRow(suites.filter((suite) => suite.package === null), servers, { name: null, path: '.', published: false }),
     browserGates: gates.map((gate) => ({
       gate: gate.gate,
+      asked: gate.asked ?? null,
       job: gate.job,
       ok: gate.checks?.ok ?? 0,
       failed: gate.checks?.failed ?? [],
       error: gate.error ?? null,
       widths: gate.widths ?? [],
       passes: gate.passes ?? 0,
+      made: gate.made ?? [],
       browser: gate.browser ?? null,
       axe: gate.axe ?? null,
       wallMs: Date.parse(gate.finishedAt) - Date.parse(gate.startedAt),
@@ -90,14 +93,27 @@ export function resultsInRun({ results, covered, published }) {
   }
 }
 
-/** Every measurement a gate recorded, grouped by gate, name and unit, with each value and the runner it was taken on. */
+/**
+ * What a browser gate's row says it did not do, which a gate that measured
+ * anything does: make a check, and make one in a pass at a viewport width.
+ * Each a phrase; none for a gate that did both. problems.mjs fails a run on
+ * each and gates.mjs a gate's evidence, so the two cannot disagree.
+ */
+export const unmeasured = (row) => [...(row.ok + row.failed.length === 0 ? ['made no check'] : []), ...(row.passes === 0 ? ['made no pass at a viewport width'] : [])]
+
+/**
+ * Every measurement a gate recorded, grouped by gate, browser, name and unit,
+ * with each value and the runner it was taken on: two browsers' measurements
+ * of one name are two observations, each on its own leg's runner.
+ */
 function observationsOf(gates) {
   const groups = new Map()
   for (const gate of gates) {
     for (const measurement of gate.measurements ?? []) {
-      const key = `${gate.gate}\0${measurement.name}\0${measurement.unit}`
+      const browser = gate.asked ?? null
+      const key = `${gate.gate}\0${String(browser)}\0${measurement.name}\0${measurement.unit}`
       const runner = gate.runner?.image == null ? gate.runner?.platform ?? null : `${gate.runner.image} ${gate.runner.imageVersion ?? ''}`.trim()
-      const group = groups.get(key) ?? { gate: gate.gate, name: measurement.name, unit: measurement.unit, values: [], passes: gate.passes ?? 0, runner }
+      const group = groups.get(key) ?? { gate: gate.gate, browser, name: measurement.name, unit: measurement.unit, values: [], passes: gate.passes ?? 0, runner }
       group.values.push(measurement.value)
       groups.set(key, group)
     }

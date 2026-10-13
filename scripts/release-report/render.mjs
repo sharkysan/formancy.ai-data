@@ -6,6 +6,7 @@
 // limitation the run shows cannot be left out by somebody forgetting it, and
 // the line per section saying where it comes from.
 
+import { browserName } from '../browsers.mjs'
 import { engineName } from './problems.mjs'
 
 const code = (text) => `\`${text}\``
@@ -13,7 +14,6 @@ const cell = (text) => String(text ?? '').replaceAll('|', '\\|').replaceAll('\n'
 const table = (head, rows) => [`| ${head.join(' | ')} |`, `| ${head.map(() => '---').join(' | ')} |`, ...rows.map((row) => `| ${row.map(cell).join(' | ')} |`)].join('\n')
 const prose = (items) => (items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`)
 const seconds = (ms) => (ms === null || ms === undefined || Number.isNaN(ms) ? '' : `${(ms / 1000).toFixed(1)} s`)
-const browserName = (name) => (name === 'chromium' ? 'Chromium' : name === 'firefox' ? 'Firefox' : name === 'webkit' ? 'WebKit' : name)
 
 /** `17.11`, or `16.0.4295.3 (CU20, Developer Edition (64-bit))`: an answer as a reader reads it. */
 const answer = (entry) => {
@@ -65,13 +65,17 @@ export function derivedLimitations(report) {
       : `The browser gates launched ${prose(testedOn.browsers.map((browser) => `${browserName(browser.name)} ${browser.version}`))} only.`,
   )
 
+  // One row per browser a gate ran in, and one sentence per app: the
+  // engines are the app's, whichever browser drew the page.
   for (const row of browserMatrix.filter((entry) => entry.engines.length < all.length)) {
     const label = row.source === 'gate' ? `The browser gate of ${row.app}` : `The suite of ${row.app}, in ${row.environment},`
-    if (row.engines.length > 0) sentences.push(`${label} ran against ${prose(row.engines.map(engineName))} only.`)
+    let sentence
+    if (row.engines.length > 0) sentence = `${label} ran against ${prose(row.engines.map(engineName))} only.`
     else {
       const snapshots = snapshotsOf(report, row.app)
-      sentences.push(snapshots === '' ? `${label} started no database.` : `${label} started no database; it runs on snapshots captured from ${snapshots}.`)
+      sentence = snapshots === '' ? `${label} started no database.` : `${label} started no database; it runs on snapshots captured from ${snapshots}.`
     }
+    if (!sentences.includes(sentence)) sentences.push(sentence)
   }
 
   const direct = testedOn.runtime.filter((entry) => entry.under === undefined)
@@ -128,7 +132,8 @@ function stated(item) {
 function evidenceCell(item) {
   const what = item.kind === 'file' ? code(item.value) : item.kind === 'browserGate' ? `the browser gate of ${item.value}` : item.kind === 'job' ? `the ${code(item.value)} job` : item.kind === 'sharedCases' ? 'every shared case on every engine' : code(item.value)
   if (item.kind === 'document') return stated(item)
-  return `${what}: ${item.outcome === 'absent' ? 'did not run' : item.kind === 'job' && item.outcome === 'failed' ? `ended ${String(item.result)}` : item.outcome}`
+  const where = item.missing === undefined ? '' : ` in ${prose(item.missing.map(browserName))}`
+  return `${what}: ${item.outcome === 'absent' ? `did not run${where}` : item.kind === 'job' && item.outcome === 'failed' ? `ended ${String(item.result)}` : item.outcome}`
 }
 
 const GATE_STATE = { passed: 'evidence passed in this run', failed: 'evidence did not pass in this run', stated: 'stated, not exercised by this run', open: 'open' }
@@ -148,7 +153,7 @@ function gatesSection({ gates }) {
 const METHOD = [
   ['Subject', 'the GitHub run’s environment (`GITHUB_SHA`, `GITHUB_RUN_ID`), the report job’s `needs`, `packages/data-core/package.json`, and each job’s results file'],
   ['Tested on', '`scripts/release-report/tested-on.mjs` over the checkout, and every `test-results/servers/*.json` a job left: data-fixtures’ `recordServer` for each container a suite or gate started, and the getting-started journey for each composed database, each with `docker image inspect` for its digest'],
-  ['Results', 'each package’s `test-results/vitest.json` and `coverage/coverage-summary.json`, turbo’s run summary (`--summarize`), each app’s `test-results/browser.json`, the install gate’s `test-results/install.json`, and `collect.mjs --job container`'],
+  ['Results', 'each package’s `test-results/vitest.json` and `coverage/coverage-summary.json`, turbo’s run summary (`--summarize`), each app’s `test-results/browser-<browser>.json` for each browser the gates run in, the install gate’s `test-results/install.json`, and `collect.mjs --job container`'],
   ['Shared cases', '`sharedCases()` from data-fixtures against the `covers()` each test declared, in vitest’s JSON'],
   ['The browser matrix', 'jsdom as each app loads it, each browser a gate launched, the renderers each app declares, and the engines its servers ran'],
   ['Build identity', '`scripts/release-report/dist-hash.mjs` over every published package’s `dist/` in every job, and over each tarball’s `package/dist/`'],
@@ -272,7 +277,7 @@ function closingSection(report) {
     '',
     'Not a performance figure (0034): what the gates measured on whatever machine ran them.',
     '',
-    table(['Gate', 'Observation', 'Values', 'Unit', 'Passes', 'Runner'], report.results.observations.map((entry) => [entry.gate, entry.name, entry.values.map((value) => String(Math.round(value * 100) / 100)).join(', '), entry.unit, entry.passes, entry.runner ?? ''])),
+    table(['Gate', 'Browser', 'Observation', 'Values', 'Unit', 'Passes', 'Runner'], report.results.observations.map((entry) => [entry.gate, entry.browser === null ? '' : browserName(entry.browser), entry.name, entry.values.map((value) => String(Math.round(value * 100) / 100)).join(', '), entry.unit, entry.passes, entry.runner ?? ''])),
     '',
     '## How this report was made',
     '',

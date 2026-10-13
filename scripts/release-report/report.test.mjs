@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { buildReport } from './report.mjs'
-import { CASES, ciJob, copy, DIST, greenCiRun, greenRun, job, server } from './synthetic-run.mjs'
+import { CASES, ciJob, copy, DIST, greenCiRun, greenRun, job, server, withFirefox } from './synthetic-run.mjs'
 
 /**
  * What fails a run (0035), for what the report shows of versions, results,
@@ -110,9 +110,40 @@ describe('versions', () => {
   test('fail the run when a gate launched a browser other than the pin', () => {
     expect(
       withDefect((inputs) => {
-        job(inputs, 'browser').browserGates[0].browser.version = '152.0.7000.1'
+        job(inputs, 'browser-chromium').browserGates[0].browser.version = '152.0.7000.1'
       }),
     ).toEqual(['the browser gates of apps/host launched chromium 152.0.7000.1, not the 153.0.8010.12 Playwright 1.63.0 pins'])
+  })
+
+  // A browser the checkout pins nothing for was held to nothing: a gate
+  // that launched it would be reported green at whatever version it was.
+  test('fail the run when a gate launched a browser no gate here runs', () => {
+    expect(
+      withDefect((inputs) => {
+        withFirefox(inputs)
+        inputs.facts.browser.pins = inputs.facts.browser.pins.filter((pin) => pin.browser !== 'firefox')
+      }),
+    ).toEqual(['the browser gates of apps/host launched firefox 155.0, which no gate here runs: the gates hold only Chromium to a build Playwright 1.63.0 pins'])
+  })
+
+  // Playwright 1.63.0 pins the headless shell and the full Chromium at one
+  // version, so the version check above passes either: a gate launched
+  // headed, on a channel, or under PWDEBUG, which makes Playwright launch
+  // headed, ran in the full browser and would be reported as the shell.
+  test('fail the run when a gate launched Chromium as another build than the headless shell Playwright pins', () => {
+    const launched = (browser) =>
+      withDefect((inputs) => {
+        Object.assign(job(inputs, 'browser-chromium').browserGates[0].browser, browser)
+      })
+    expect(launched({ headless: false, options: { headless: false } })).toEqual([
+      'the browser gate of apps/host in Chromium launched chromium 153.0.8010.12 headed, which starts chromium, not the chromium-headless-shell Playwright 1.63.0 pins',
+    ])
+    expect(launched({ options: { headless: true, channel: 'chromium' } })).toEqual([
+      'the browser gate of apps/host in Chromium launched chromium 153.0.8010.12 on its chromium channel, not the chromium-headless-shell Playwright 1.63.0 pins',
+    ])
+    expect(launched({ pwdebug: '1' })).toEqual([
+      'the browser gate of apps/host in Chromium launched chromium 153.0.8010.12 headed, as PWDEBUG=1 makes it, which starts chromium, not the chromium-headless-shell Playwright 1.63.0 pins',
+    ])
   })
 
   // A run whose PostgreSQL tests all started another image would report the
@@ -145,7 +176,7 @@ describe('build identity', () => {
         job(inputs, 'test-data-postgres').dist[0].distHash = other
       }),
     ).toEqual([
-      `@formancy/data-core: two jobs built different dist/ bytes: verify, test-data-sqlserver, browser, install built ${DIST.slice(0, 19)}; test-data-postgres built ${other.slice(0, 19)}`,
+      `@formancy/data-core: two jobs built different dist/ bytes: verify, test-data-sqlserver, browser-chromium, install built ${DIST.slice(0, 19)}; test-data-postgres built ${other.slice(0, 19)}`,
     ])
   })
 
@@ -176,7 +207,89 @@ describe('build identity', () => {
       withDefect((inputs) => {
         job(inputs, 'install').install.tarballs[1].distHash = `sha256:${'c'.repeat(64)}`
       }),
-    ).toEqual(['@formancy/data-postgres: the dist/ in its tarball differs from the dist/ built in verify, browser, install'])
+    ).toEqual(['@formancy/data-postgres: the dist/ in its tarball differs from the dist/ built in verify, browser-chromium, install'])
+  })
+})
+
+describe('the browser gates', () => {
+  // The control for the cases below, each a defect in this run: two legs'
+  // results for one app read as one job's twice would count its servers
+  // and checks double, and a second pinned browser flagged as unpinned
+  // would fail every run the gates make in more than one browser.
+  test('in every browser the gates run in are a green run', () => {
+    expect(problemsOf(withFirefox(copy(greenRun())))).toEqual([])
+  })
+
+  // A gate whose width list came back empty, or that returned before its
+  // first check, has measured nothing in that browser: counted as passed,
+  // the report and gates.json would call an app's layout held where no
+  // check ran.
+  test('fail the run for a gate that made no check, or no pass at a width', () => {
+    expect(
+      withDefect((inputs) => {
+        Object.assign(job(inputs, 'browser-chromium').browserGates[0], { checks: { ok: 0, failed: [] } })
+      }),
+    ).toEqual(['the browser gate of apps/host in Chromium made no check', 'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not pass'])
+    expect(
+      withDefect((inputs) => {
+        Object.assign(job(inputs, 'browser-chromium').browserGates[0], { passes: 0, widths: [] })
+      }),
+    ).toEqual(['the browser gate of apps/host in Chromium made no pass at a viewport width', 'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not pass'])
+  })
+
+  // An app's gate that ran in Chromium and left nothing in Firefox is a gate
+  // run in one browser and reported for the claim it makes in all: per app
+  // alone, Chromium's file would answer for both.
+  test('fail the run for an app with no results in one browser', () => {
+    expect(
+      withDefect((inputs) => {
+        withFirefox(inputs)
+        job(inputs, 'browser-firefox').browserGates = []
+      }),
+    ).toEqual(['the browser gate of apps/host left no results in Firefox', 'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not run in Firefox'])
+  })
+
+  // A gate's own failure, in the browser it failed in: with a file per
+  // browser, "the gate of apps/host failed" sends the reader to the wrong
+  // leg's log as often as the right one.
+  test('fail the run for a gate that ended in an error, failed a check or launched nothing, naming its browser', () => {
+    expect(
+      withDefect((inputs) => {
+        withFirefox(inputs)
+        Object.assign(job(inputs, 'browser-firefox').browserGates[0], { error: 'the server did not start', browser: null, checks: { ok: 39, failed: ['Signed out: no sideways scroll: 12px of horizontal overflow'] } })
+      }),
+    ).toEqual([
+      'the browser gate of apps/host in Firefox ended with an error: the server did not start',
+      'the browser gate of apps/host in Firefox failed 1 check(s): Signed out: no sideways scroll: 12px of horizontal overflow',
+      'the browser gate of apps/host in Firefox says no browser was launched',
+      'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not pass',
+    ])
+  })
+
+  // One measurement name in two browsers is two observations: merged, the
+  // row would show Firefox's value beside Chromium's under Chromium's runner,
+  // and credit one browser with the other's numbers.
+  test('keep two browsers’ same-named observations apart, each with its own runner', () => {
+    const observations = buildReport(withFirefox(copy(greenRun()))).results.observations
+    expect(observations.map(({ gate, browser, values, runner }) => ({ gate, browser, values, runner }))).toEqual([
+      { gate: 'apps/host', browser: 'chromium', values: [12.4, 9.6], runner: 'ubuntu24 20261005.1' },
+      { gate: 'apps/host', browser: 'firefox', values: [30.2], runner: 'ubuntu24-firefox 20261005.1' },
+    ])
+  })
+
+  // A gate's row with totals alone says how many checks a browser passed,
+  // not which: a browser that skipped one check and made another reads the
+  // same as one that made both. The report keeps each check by name under
+  // the pass it was made in, in each browser's own row.
+  test('keep each browser’s checks by name under the pass they were made in', () => {
+    const inputs = withFirefox(copy(greenRun()))
+    const made = (name) => [{ label: 'reflow, 320', width: 320, checks: [`Signed out: ${name}`] }]
+    job(inputs, 'browser-chromium').browserGates[0].made = made('no sideways scroll')
+    job(inputs, 'browser-firefox').browserGates[0].made = made('the first Tab reaches the skip link')
+    expect(buildReport(inputs).results.browserGates.map(({ asked, made: checks }) => ({ asked, checks }))).toEqual([
+      { asked: 'chromium', checks: made('no sideways scroll') },
+      { asked: 'firefox', checks: made('the first Tab reaches the skip link') },
+    ])
   })
 })
 

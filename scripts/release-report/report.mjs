@@ -114,6 +114,7 @@ export function buildReport(inputs) {
   report.gates = evaluateGates(inputs.gatesRegister, {
     fileOutcome: (file) => fileOutcome(results, file),
     browserGates: report.results.browserGates,
+    browsers: facts.browser.pins.map((pin) => pin.browser),
     needs: ci ? inputs.needs : null,
     sharedCasesPassed: unknown.length === 0 && withoutEngine.length === 0 && rows.every((row) => Object.values(row.cells).every((entry) => entry.state === 'passed')),
     documents: inputs.documents ?? {},

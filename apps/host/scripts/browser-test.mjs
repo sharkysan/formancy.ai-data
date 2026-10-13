@@ -1,4 +1,4 @@
-// What jsdom cannot see on the host page, measured in Chromium.
+// What jsdom cannot see on the host page, measured in the browser it is given.
 //
 // The studio's gate (apps/studio/scripts/browser-test.mjs), applied to the
 // host page as CLAUDE.md asks of every UI here. The suites in src/ run in
@@ -24,7 +24,7 @@
 //     anyway" on "Allow saving it again", and after a save that worked still
 //     on Save;
 //   - the grids' colours, which axe cannot decide behind AG Grid's painted
-//     layers: a header's and a cell's text against what Chromium painted
+//     layers: a header's and a cell's text against what the browser painted
 //     there, the focused cell's teal border at 3:1 on the open row and on
 //     another, and the open row's bar against its tint (UX-SPEC F1);
 //   - a create whose answer the network lost after the server stored it:
@@ -51,19 +51,24 @@
 // do not depend on the engine; what the engines answer is the jsdom suites'
 // and the client suite's, on both. Asserted as numbers and computed results,
 // never screenshots -- the colours inside a grid are read from the pixels
-// Chromium painted, which is a number too.
+// the browser painted, which is a number too.
 //
 // One module per reason to change, under scripts/browser/: the plane, the
 // server of the built page, the stylesheet's reads, the measurements, the
 // workspace's states and the record's journey.
 //
-// `pnpm test:browser`, which builds first. It needs Docker, for the database,
-// and Chromium, from `pnpm exec playwright install chromium` once per machine.
+// `pnpm test:browser`, which builds first, runs it once per browser
+// scripts/browsers.mjs names through recordedPerBrowser -- Chromium alone on
+// a machine unless FORMANCY_BROWSERS names more, each leg's browser in CI --
+// and each browser's run starts its own PostgreSQL and server: the report
+// credits a server to the gate whose time window it started in. It needs
+// Docker, for the database, and each browser, from `pnpm --filter
+// @formancy/data-examples exec playwright install <browser>` once per machine.
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { startTcpHop } from '@formancy/data-fixtures'
-import { recorded } from '../../../scripts/release-report/gate-results.mjs'
+import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { recordJourney } from './browser/journey.mjs'
 import { audit, decide, describeFocus, focusedOn, measureWidth } from './browser/measure.mjs'
 import { startPlane } from './browser/plane.mjs'
@@ -71,24 +76,21 @@ import { DIST, serve } from './browser/serve.mjs'
 import { widths } from './browser/styles.mjs'
 import { workspaceJourney } from './browser/workspace.mjs'
 
-/** The gate, reporting through `gate` (scripts/release-report/gate-results.mjs), which keeps what it found for the release report. */
-async function run(gate) {
-  if (!existsSync(join(DIST, 'index.html'))) throw new Error('no built page at apps/host/dist: run `pnpm build` first')
-  let chromium
+/** Playwright, for recordedPerBrowser to launch each browser with: the one import of playwright, here where the app declares it. */
+async function load() {
   try {
-    ;({ chromium } = await import('playwright'))
+    return await import('playwright')
   } catch {
     throw new Error('playwright is not installed: run `pnpm install`')
   }
-  // Before anything starts: a stylesheet whose widths the gate cannot read stops it.
+}
+
+/** The gate in one browser, reporting through `gate` (scripts/release-report/gate-results.mjs), which keeps what it found for the release report. */
+async function run(gate, browser) {
+  if (!existsSync(join(DIST, 'index.html'))) throw new Error('no built page at apps/host/dist: run `pnpm build` first')
+  // Before the database and the server start: a stylesheet whose widths the
+  // gate cannot read stops it.
   const list = widths()
-  let browser
-  try {
-    browser = await chromium.launch()
-  } catch (error) {
-    throw new Error(`could not launch Chromium (${String(error)}).\nRun \`pnpm exec playwright install chromium\`.`)
-  }
-  gate.launched(chromium, browser)
 
   const { check } = gate
   const measured = async (page, state) => {
@@ -113,15 +115,15 @@ async function run(gate) {
   const started = Date.now()
   const plane = await startPlane()
   const { http, port } = await serve(plane)
-  // Between Chromium and the page's origin: every byte the browser sends and
-  // receives crosses it, so what the browser itself does is counted there.
+  // Between the browser and the page's origin: every byte the browser sends
+  // and receives crosses it, so what the browser itself does is counted there.
   const hop = await startTcpHop({ kind: 'http', host: '127.0.0.1', port })
   console.log(`PostgreSQL and the server started in ${String(Math.round((Date.now() - started) / 1000))} s`)
   try {
     let pass = 0
     for (const { label, width, refuseFonts = false } of list) {
       pass += 1
-      gate.width(width)
+      gate.pass({ label, width })
       const page = await browser.newPage({ viewport: { width, height: 900 } })
       if (refuseFonts) await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort())
       try {
@@ -157,18 +159,17 @@ async function run(gate) {
       }
     }
   } finally {
-    await browser.close()
     await hop.close()
     http.close()
     await plane.close()
   }
 
   console.log('')
-  const failures = gate.failures()
-  if (failures.length > 0) throw new Error(`${String(failures.length)} browser check(s) failed:\n  ${failures.join('\n  ')}`)
+  // A failed check fails the run in recordedPerBrowser, which says so.
+  if (gate.failures().length > 0) return
   console.log(
     `browser checks passed: the host page's workspace and journey at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
   )
 }
 
-await recorded('apps/host', run)
+await recordedPerBrowser('apps/host', { load, run })

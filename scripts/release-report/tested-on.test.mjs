@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, test } from 'vitest'
 import YAML from 'yaml'
+import { BROWSERS } from '../browsers.mjs'
 import { stale } from './readme.mjs'
 import { dockerfileImages, installed, NESTED, published, testedOn, workspace } from './tested-on.mjs'
 
@@ -27,6 +28,19 @@ function repository(image) {
   const colon = base.indexOf(':', slash + 1)
   return colon === -1 ? base : base.slice(0, colon)
 }
+
+describe('the browsers’ pins', () => {
+  // A headless chromium.launch() starts the headless shell, a build of its
+  // own in Playwright's browsers.json; the `chromium` entry beside it is the
+  // full browser, another download, which Playwright 1.63.0 pins at the
+  // same version and revision. What this holds is the entry read: from
+  // `chromium`, the README's table and the report would name a build the
+  // gates never launch. That a run launched the shell is the report's to
+  // hold, from the options it launched with (problems.mjs, launchedBuild).
+  test('hold Chromium to the headless shell Playwright pins', () => {
+    expect(facts.browser.pins.find((pin) => pin.browser === 'chromium')).toMatchObject({ name: 'chromium-headless-shell' })
+  })
+})
 
 describe('the README blocks', () => {
   // A dependency or an image bumped without the README following would leave
@@ -130,10 +144,11 @@ describe('testedOn()', () => {
 
   // A lookup that found nothing would render an empty row that equals
   // itself, and the README test above would pass on a table of blanks.
-  test('finds a version for the browser, every tool and every package it names', () => {
+  test('finds a version for every browser, every tool and every package it names', () => {
     const version = /^\d+\.\d+/
     expect(facts.browser.playwright).toMatch(version)
-    expect(facts.browser.chromium).toMatchObject({ name: 'chromium-headless-shell', browserVersion: expect.stringMatching(version), revision: expect.stringMatching(/^\d+$/) })
+    expect(facts.browser.pins.map((pin) => pin.browser)).toEqual([...BROWSERS])
+    for (const pin of facts.browser.pins) expect(pin, pin.browser).toMatchObject({ browserVersion: expect.stringMatching(version), revision: expect.stringMatching(/^\d+$/) })
     for (const tool of facts.tooling) {
       expect(tool.versions.length, tool.name).toBeGreaterThan(0)
       for (const entry of tool.versions) expect(entry.version, tool.name).toMatch(version)

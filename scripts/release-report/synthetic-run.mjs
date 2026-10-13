@@ -82,13 +82,15 @@ export function greenRun() {
     servers: [server({ caller: 'apps/host/src/test-databases.ts', package: '@formancy/data-host' }), server({ ...SQLSERVER, caller: 'apps/host/src/test-databases.ts', package: '@formancy/data-host' })],
   }
   const browser = {
-    ...base('browser', 'browser'),
+    ...base('browser-chromium', 'browser'),
+    variant: 'chromium',
     browserGates: [
       {
         gate: 'apps/host',
+        asked: 'chromium',
         startedAt: new Date(T0).toISOString(),
         finishedAt: new Date(T0 + 30_000).toISOString(),
-        browser: { name: 'chromium', version: '153.0.8010.12', headless: true },
+        browser: { name: 'chromium', version: '153.0.8010.12', headless: true, options: { headless: true }, platform: 'linux', arch: 'x64' },
         axe: '4.14.0',
         widths: [320, 1440],
         passes: 2,
@@ -129,7 +131,7 @@ export function greenRun() {
       ],
       upstream: [{ name: '@formancy/spec', version: '0.3.0', declared: '0.3.0', direct: true }],
       node: { engines: '>=22.12.0', dockerfile: ['node:22.12-alpine', 'node:22.12-alpine'], ci: [{ workflow: 'gates.yml', job: 'verify', version: '22' }], declared: [] },
-      browser: { playwright: '1.63.0', chromium: { name: 'chromium-headless-shell', revision: '1243', browserVersion: '153.0.8010.12' } },
+      browser: { playwright: '1.63.0', pins: [{ browser: 'chromium', name: 'chromium-headless-shell', revision: '1243', browserVersion: '153.0.8010.12' }] },
       tooling: [{ name: 'jsdom', versions: [{ version: '30.1.2', from: ['apps/host'] }] }],
       snapshots: [{ file: 'apps/studio/src/fixtures/postgres-owner.json', kind: 'postgres', serverVersion: '17.11' }],
     },
@@ -209,3 +211,33 @@ export const copy = ({ exists, ...rest }) => ({ ...structuredClone(rest), exists
 
 /** The results file of `key` in `inputs`. */
 export const job = (inputs, key) => inputs.results.find((result) => result.key === key)
+
+/**
+ * `inputs` (a copy of greenRun()) as a run in which the gates run in
+ * Chromium and Firefox: Firefox pinned beside Chromium, and the browser
+ * job's Firefox leg, on a runner of its own, with the host gate's same
+ * checks and same-named measurements, which only the browser tells apart.
+ */
+export function withFirefox(inputs) {
+  inputs.facts.browser.pins.push({ browser: 'firefox', name: 'firefox', revision: '1543', browserVersion: '155.0' })
+  const chromium = job(inputs, 'browser-chromium')
+  const [gate] = chromium.browserGates
+  inputs.results.push({
+    ...structuredClone(chromium),
+    key: 'browser-firefox',
+    variant: 'firefox',
+    runner: { ...runner, image: 'ubuntu24-firefox' },
+    servers: [server({ caller: 'apps/host/scripts/browser-test.mjs', script: 'test-browser', package: 'apps/host', at: new Date(T0 + 60_500).toISOString() })],
+    browserGates: [
+      {
+        ...structuredClone(gate),
+        asked: 'firefox',
+        startedAt: new Date(T0 + 60_000).toISOString(),
+        finishedAt: new Date(T0 + 90_000).toISOString(),
+        browser: { ...gate.browser, name: 'firefox', version: '155.0' },
+        measurements: [{ name: gate.measurements[0].name, value: 30.2, unit: 'ms' }],
+      },
+    ],
+  })
+  return inputs
+}

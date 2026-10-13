@@ -81,7 +81,7 @@ describe('docs/release/gates.json', () => {
 })
 
 describe('evaluateGates', () => {
-  const run = (overrides = {}) => ({ fileOutcome: () => 'passed', browserGates: [], needs: { 'getting-started': { result: 'success' } }, sharedCasesPassed: true, documents: {}, ...overrides })
+  const run = (overrides = {}) => ({ fileOutcome: () => 'passed', browserGates: [], browsers: ['chromium'], needs: { 'getting-started': { result: 'success' } }, sharedCasesPassed: true, documents: {}, ...overrides })
   const history = { sha: 'abcdef1234567890abcdef1234567890abcdef12', date: '2026-10-01T10:00:00Z', behind: 4 }
 
   // A figures file from another commit read as "passed in this run" would be
@@ -109,13 +109,29 @@ describe('evaluateGates', () => {
     expect(eight).toEqual({ gate: 8, state: 'open', open: 'Nothing to test.', evidence: [] })
   })
 
-  // A browser gate passes only when it ran, without an error and without a failed check.
+  // A browser gate passes only when it ran, without an error and without a
+  // failed check, and made a check in a pass at a width: one that measured
+  // nothing would stand as evidence for a gate it never checked.
   test('judges a browser gate by its checks and its error', () => {
     const register = { gates: [{ gate: 2, evidence: [{ browserGate: 'apps/host' }] }] }
-    const green = { gate: 'apps/host', error: null, failed: [] }
+    const green = { gate: 'apps/host', asked: 'chromium', error: null, ok: 40, failed: [], passes: 2 }
     expect(evaluateGates(register, run({ browserGates: [green] }))[0].state).toBe('passed')
     expect(evaluateGates(register, run({ browserGates: [{ ...green, failed: ['contrast'] }] }))[0].state).toBe('failed')
     expect(evaluateGates(register, run({ browserGates: [{ ...green, error: 'timeout' }] }))[0].state).toBe('failed')
+    expect(evaluateGates(register, run({ browserGates: [{ ...green, ok: 0 }] }))[0].state).toBe('failed')
+    expect(evaluateGates(register, run({ browserGates: [{ ...green, passes: 0 }] }))[0].state).toBe('failed')
     expect(evaluateGates(register, run())[0].evidence[0].outcome).toBe('absent')
+  })
+
+  // A gate that passed in Chromium and never ran in Firefox has not passed
+  // where the gates claim to measure; and one that failed in a browser is
+  // failed, whatever another browser said.
+  test('passes a browser gate only when it passed in every browser the gates run in', () => {
+    const register = { gates: [{ gate: 2, evidence: [{ browserGate: 'apps/host' }] }] }
+    const green = { gate: 'apps/host', asked: 'chromium', error: null, ok: 40, failed: [], passes: 2 }
+    const browsers = ['chromium', 'firefox']
+    expect(evaluateGates(register, run({ browsers, browserGates: [green] }))[0].evidence[0]).toEqual({ kind: 'browserGate', value: 'apps/host', outcome: 'absent', missing: ['firefox'] })
+    expect(evaluateGates(register, run({ browsers, browserGates: [green, { ...green, asked: 'firefox' }] }))[0].state).toBe('passed')
+    expect(evaluateGates(register, run({ browsers, browserGates: [{ ...green, failed: ['contrast'] }] }))[0].evidence[0].outcome).toBe('failed')
   })
 })

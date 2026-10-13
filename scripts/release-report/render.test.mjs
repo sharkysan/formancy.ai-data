@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { derivedLimitations, renderContent, renderReport, renderSummary } from './render.mjs'
 import { buildReport } from './report.mjs'
-import { copy, greenCiRun, greenRun, job, server } from './synthetic-run.mjs'
+import { copy, greenCiRun, greenRun, job, server, withFirefox } from './synthetic-run.mjs'
 
 /**
  * The report's derived limitations and its Markdown (0035), over a run made
@@ -20,6 +20,14 @@ describe('the limitations a run shows', () => {
   // gate that someday starts both stops saying it without an edit here.
   test('name a gate that ran against fewer engines than the product speaks', () => {
     expect(derivedLimitations(report())).toContain('The browser gate of apps/host ran against PostgreSQL only.')
+  })
+
+  // One app's gate in two browsers is one gate on one engine: said once a
+  // browser, the sentence would read as two gates.
+  test('say an app’s gate ran against fewer engines once, however many browsers it ran in', () => {
+    const sentences = derivedLimitations(report(withFirefox))
+    expect(sentences.filter((sentence) => sentence === 'The browser gate of apps/host ran against PostgreSQL only.')).toHaveLength(1)
+    expect(sentences).toContain('The browser gates launched Chromium 153.0.8010.12 and Firefox 155.0 only.')
   })
 
   // An app whose suite starts no database renders from captured snapshots,
@@ -85,7 +93,7 @@ describe('the limitations a run shows', () => {
     // they built the adapters too.
     const identity = sentences.find((sentence) => sentence.includes('published dist/'))
     expect(identity).toBe(
-      "Each package's own suites ran its source; the published dist/ was run by the install gate, and each package's is byte-identical to its dist/ built in browser, install and verify, and in every other job that built it (*Build identity* names them).",
+      "Each package's own suites ran its source; the published dist/ was run by the install gate, and each package's is byte-identical to its dist/ built in browser-chromium, install and verify, and in every other job that built it (*Build identity* names them).",
     )
     expect(identity).not.toContain('test-data-')
     expect(sentences).toContain('The container gate ran the image it built from this commit; the release builds the published image again, named by its digest.')
@@ -103,7 +111,7 @@ describe('the Markdown', () => {
     const markdown = renderContent(built)
     const observations = markdown.slice(markdown.indexOf('## Observations on a shared runner'), markdown.indexOf('## Problems'))
     expect(observations).toContain('Not a performance figure (0034)')
-    expect(observations).toContain('| apps/host | Chromium resent the create after its connection closed | 12.4, 9.6 | ms | 2 | ubuntu24 20261005.1 |')
+    expect(observations).toContain('| apps/host | Chromium | Chromium resent the create after its connection closed | 12.4, 9.6 | ms | 2 | ubuntu24 20261005.1 |')
     expect(renderSummary(built)).not.toContain('Chromium resent the create')
     expect(markdown).toContain('None: nothing here fails the run.')
   })

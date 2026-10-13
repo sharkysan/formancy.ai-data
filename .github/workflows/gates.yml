@@ -211,10 +211,19 @@ jobs:
   # only -- layout, focus and colour do not depend on the engine.
   #
   # Its own job, as formancy.ai's is: "browser" says what is wrong, where a red
-  # "verify" sends the reader into a twenty-minute log to find out.
+  # "verify" sends the reader into a twenty-minute log to find out. One leg per
+  # browser the gates run in (scripts/browsers.mjs's BROWSERS, which
+  # scripts/browsers.test.mjs holds to this matrix), each told its browser
+  # through FORMANCY_BROWSERS and leaving its results under its own key, so a
+  # red leg names its browser and the report holds each to Playwright's pin.
   browser:
+    name: browser (${{ matrix.browser }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium]
     steps:
       - uses: actions/checkout@v4
 
@@ -236,29 +245,42 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Cached by the lockfile, which pins the playwright version the browser
-      # revision is tied to; in CI only, as the store is.
-      - name: Cache the Chromium download
+      # revision is tied to; in CI only, as the store is. The key carries the
+      # browser: with one key for every leg, the first leg to finish would save
+      # a cache the others restore without their browser.
+      - name: Cache the ${{ matrix.browser }} download
         uses: actions/cache@v4
         if: inputs.release == ''
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       # No `--with-deps`, for upstream's reason: it runs apt-get for libraries
       # the hosted runner already ships, and on formancy.ai that once sat for
       # nineteen minutes until the job timed out. If a library is ever missing,
       # Chromium fails to launch and the gate prints the command to run. The
       # step timeout is the backstop.
-      - run: pnpm --filter @formancy/data-examples exec playwright install chromium
+      - run: pnpm --filter @formancy/data-examples exec playwright install "$BROWSER"
+        env:
+          BROWSER: ${{ matrix.browser }}
         timeout-minutes: 5
 
-      # Builds the page first (turbo's `dependsOn`), then measures it.
+      # Builds the page first (turbo's `dependsOn`), then measures it, in this
+      # leg's browser alone: turbo passes FORMANCY_BROWSERS to the gates
+      # (turbo.json's passThroughEnv, which scripts/browsers.test.mjs holds).
+      # Were it dropped, a leg would run the machine default, Chromium, and
+      # the leg of any other browser would leave no file of its own, which
+      # the collect step below lists as missing.
       - run: pnpm test:browser
+        env:
+          FORMANCY_BROWSERS: ${{ matrix.browser }}
 
       - name: Keep what this job found, for the report
         id: collect
         if: ${{ !cancelled() }}
-        run: node scripts/release-report/collect.mjs --job browser
+        run: node scripts/release-report/collect.mjs --job browser --variant "$BROWSER"
+        env:
+          BROWSER: ${{ matrix.browser }}
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:

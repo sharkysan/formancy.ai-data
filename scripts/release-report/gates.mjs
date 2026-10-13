@@ -7,7 +7,7 @@
 // Evidence comes in five kinds:
 //
 //   { "file": "<repo-relative test file>" }   every test in it passed in this run
-//   { "browserGate": "<app dir>" }             that app's browser gate, no failed check and no error
+//   { "browserGate": "<app dir>" }             that app's browser gate in every browser, no failed check, no error, and a check made in a pass
 //   { "job": "<gates.yml job id>" }            that job's result in the report's needs is success
 //   { "sharedCases": true }                    every shared case passed on every engine
 //   { "document": "<committed file>" }         stated: shown with its last change, never as passed
@@ -20,6 +20,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { unmeasured } from './results.mjs'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -92,9 +93,14 @@ export function gatesProblems(register, context) {
 function outcomeOf({ kind, value }, run) {
   if (kind === 'file') return { outcome: run.fileOutcome(value) }
   if (kind === 'browserGate') {
+    // Failed in any browser is failed, and so is a run that measured
+    // nothing; passed is passed in every browser the gates run in, and
+    // absent, naming them, while one has not run.
     const ran = run.browserGates.filter((gate) => gate.gate === value)
     if (ran.length === 0) return { outcome: 'absent' }
-    return { outcome: ran.every((gate) => gate.error === null && gate.failed.length === 0) ? 'passed' : 'failed' }
+    if (ran.some((gate) => gate.error !== null || gate.failed.length > 0 || unmeasured(gate).length > 0)) return { outcome: 'failed' }
+    const missing = run.browsers.filter((browser) => !ran.some((gate) => gate.asked === browser))
+    return missing.length === 0 ? { outcome: 'passed' } : { outcome: 'absent', missing }
   }
   if (kind === 'job') {
     const result = run.needs?.[value]?.result
@@ -107,9 +113,10 @@ function outcomeOf({ kind, value }, run) {
 /**
  * Each gate as this run leaves it: `{ gate, state, evidence, open? }`, with
  * state `passed`, `failed`, `stated` or `open`. Pure. `run` gives
- * `fileOutcome(file)`, the run's `browserGates`, its `needs` (null locally),
- * whether `sharedCasesPassed`, and `documents`: each document's last change,
- * `{ sha, date, behind }`, or null when git has none.
+ * `fileOutcome(file)`, the run's `browserGates`, the `browsers` the gates run
+ * in, its `needs` (null locally), whether `sharedCasesPassed`, and
+ * `documents`: each document's last change, `{ sha, date, behind }`, or
+ * null when git has none.
  */
 export function evaluateGates(register, run) {
   return (register?.gates ?? []).map((entry) => {

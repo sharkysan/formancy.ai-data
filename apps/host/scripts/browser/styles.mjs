@@ -49,7 +49,7 @@ export function widths() {
 
 /**
  * Every rule of host.css that selects an element inside `container` -- a
- * paper, or a grid's well. Parsed by Chromium from the source, so a rule
+ * paper, or a grid's well. Parsed by the browser from the source, so a rule
  * added is checked without anybody listing it. A state the pointer or
  * keyboard puts an element in comes off the selector first, and a
  * pseudo-element is matched as the element it hangs off: a rule is matched
