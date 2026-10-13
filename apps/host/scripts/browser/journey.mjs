@@ -1,4 +1,4 @@
-// The record's journey in Chromium, state by state, on the workspace the
+// The record's journey in the browser, state by state, on the workspace the
 // gate's workspace states left open: a new order in both renderers, the
 // customer list, a record loaded by its token, a save, a stale save, a
 // refused selection, a save whose answer was lost and its check, a create
@@ -114,7 +114,8 @@ export function recordJourney(plane, hop, { check, measure }, run) {
       await paper(page, 'React').getByRole('option', { name: 'Muster AG' }).click(WITHIN)
       // The update reaches the real server, which stores it and answers; the
       // page is then told the connection was reset, as when a network drops
-      // after sending. Chromium's own answer to a lost response, not jsdom's.
+      // after sending. The browser's own answer to a lost response, not
+      // jsdom's.
       let lost = 0
       await page.route('**/v1/forms/*/records/update', async (route) => {
         lost += 1

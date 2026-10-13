@@ -212,13 +212,16 @@ describe('gates.yml', () => {
   })
 
   // Every artefact the report expects is derived from this file; the matrix
-  // jobs give one per package and one per Compose. No two share a key: the
-  // uploads overwrite, so that a job run again replaces its own earlier
-  // attempt, and a key two jobs wrote would leave only one of them.
-  test('gives the report one key per job, package and Compose, and no key twice', () => {
+  // jobs give one per package, one per browser and one per Compose. No two
+  // share a key: the uploads overwrite, so that a job run again replaces its
+  // own earlier attempt, and a key two jobs wrote would leave only one of
+  // them -- which, for the browser legs, is one browser's results reported
+  // as another's.
+  test('gives the report one key per job, package, browser and Compose, and no key twice', () => {
     const keys = expectedKeys(gates, namedPackages()).map((entry) => entry.key)
     expect(new Set(keys).size).toBe(keys.length)
-    expect(keys).toEqual(expect.arrayContaining(['verify', 'browser', 'install', 'container', 'getting-started-runner', 'getting-started-2.20.3']))
+    expect(keys).toEqual(expect.arrayContaining(['verify', 'browser-chromium', 'install', 'container', 'getting-started-runner', 'getting-started-2.20.3']))
+    expect(keys).not.toContain('browser')
     expect(keys.filter((key) => key.startsWith('test-')).sort()).toEqual(namedPackages().map((entry) => `test-${entry.id}`).sort())
   })
 

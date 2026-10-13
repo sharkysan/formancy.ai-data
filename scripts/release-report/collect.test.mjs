@@ -68,7 +68,7 @@ function workspace() {
     coverageMap: { 'apps/host/src/page.tsx': { s: { 0: 1 } } },
   })
   put(root, 'apps/host/coverage/coverage-summary.json', { total: { lines: { pct: 90 } }, 'src/page.tsx': {} })
-  put(root, 'apps/host/test-results/browser.json', { gate: 'apps/host', startedAt: at(30), finishedAt: at(40), checks: { ok: 1, failed: [] } })
+  put(root, 'apps/host/test-results/browser-chromium.json', { gate: 'apps/host', asked: 'chromium', startedAt: at(30), finishedAt: at(40), browser: { name: 'chromium', version: '153.0.8010.12' }, checks: { ok: 1, failed: [] } })
   put(root, 'apps/host/test-results/servers/test-coverage-postgres-1-1.json', record({ caller: join(root, 'apps/host/src/test-databases.ts') }))
   put(root, 'apps/host/test-results/servers/test-browser-postgres-2-1.json', record({ script: 'test-browser', at: at(31), caller: join(root, 'apps/host/scripts/browser-test.mjs') }))
   put(root, 'apps/host/test-results/servers/snapshot-postgres-3-1.json', record({ script: 'snapshot', at: at(2) }))
@@ -127,12 +127,58 @@ describe('a test job’s results', () => {
 })
 
 describe('the browser job’s results', () => {
-  // The gate's servers are the ones its script started while it ran.
-  test('keep each gate and the servers it started', () => {
+  // A leg runs one browser, and its results are that browser's file of each
+  // app's gate, under a key of its own; the gate's servers are the ones its
+  // script started while it ran.
+  test('keep each gate’s file of the leg’s browser, and the servers it started', () => {
     const root = workspace()
-    const result = collect({ root, job: 'browser', ...machine })
-    expect(result.browserGates.map((gate) => gate.gate)).toEqual(['apps/host'])
+    const result = collect({ root, job: 'browser', variant: 'chromium', ...machine })
+    expect(result).toMatchObject({ key: 'browser-chromium', variant: 'chromium', missing: [] })
+    expect(result.browserGates.map((gate) => [gate.gate, gate.asked])).toEqual([['apps/host', 'chromium']])
     expect(result.servers.map((server) => [server.script, server.package, server.caller])).toEqual([['test-browser', 'apps/host', 'apps/host/scripts/browser-test.mjs']])
+  })
+
+  // A leg whose gate wrote nothing for its browser -- FORMANCY_BROWSERS
+  // dropped on the way, so the gate ran the machine's default -- would leave
+  // the report reading another leg's browser as this one's, or nothing.
+  test('list an app whose gate left no file for the leg’s browser', () => {
+    const root = workspace()
+    rmSync(join(root, 'apps/host/test-results/browser-chromium.json'))
+    put(root, 'apps/host/test-results/browser-firefox.json', { gate: 'apps/host', asked: 'firefox', startedAt: at(30), finishedAt: at(40), browser: { name: 'firefox', version: '155.0' }, checks: { ok: 1, failed: [] } })
+    const result = collect({ root, job: 'browser', variant: 'chromium', ...machine })
+    expect(result.browserGates).toEqual([])
+    expect(result.missing).toEqual(['apps/host/test-results/browser-chromium.json'])
+  })
+
+  // A file whose gate launched another browser than its leg's is Firefox's
+  // checks reported as Chromium's, held to Chromium's pin.
+  test('list a file whose gate launched another browser than the leg’s', () => {
+    const root = workspace()
+    put(root, 'apps/host/test-results/browser-chromium.json', { gate: 'apps/host', asked: 'chromium', startedAt: at(30), finishedAt: at(40), browser: { name: 'firefox', version: '155.0' }, checks: { ok: 1, failed: [] } })
+    const result = collect({ root, job: 'browser', variant: 'chromium', ...machine })
+    expect(result.browserGates).toEqual([])
+    expect(result.missing).toEqual(['apps/host’s gate launched firefox in the chromium job: apps/host/test-results/browser-chromium.json'])
+  })
+
+  // A file a gate wrote for another browser -- one whose launch failed, so
+  // no browser names itself in it -- under this leg's name would be read as
+  // this leg's result, and the report would send the reader to the other
+  // browser's leg for this one's failure; a file with no browser asked for
+  // is no recorder's of this repository's.
+  test('list a file whose gate asked for another browser than the leg’s', () => {
+    const root = workspace()
+    put(root, 'apps/host/test-results/browser-chromium.json', { gate: 'apps/host', asked: 'firefox', startedAt: at(30), finishedAt: at(40), browser: null, error: 'could not launch Firefox', checks: { ok: 0, failed: [] } })
+    expect(collect({ root, job: 'browser', variant: 'chromium', ...machine })).toMatchObject({ browserGates: [], missing: ['apps/host’s gate asked for firefox in the chromium job: apps/host/test-results/browser-chromium.json'] })
+    put(root, 'apps/host/test-results/browser-chromium.json', { gate: 'apps/host', startedAt: at(30), finishedAt: at(40), browser: { name: 'chromium', version: '153.0.8010.12' }, checks: { ok: 1, failed: [] } })
+    expect(collect({ root, job: 'browser', variant: 'chromium', ...machine })).toMatchObject({ browserGates: [], missing: ['apps/host’s gate asked for no browser in the chromium job: apps/host/test-results/browser-chromium.json'] })
+  })
+
+  // Without its browser a leg's key would be every leg's, and the legs'
+  // uploads would overwrite one another; a browser the gates do not run in
+  // is a leg no pin holds.
+  test('refuse --job browser without a browser the gates run in', () => {
+    expect(() => collect({ root: workspace(), job: 'browser', ...machine })).toThrow('--job browser needs --variant <browser>, the browser its leg ran: one of chromium')
+    expect(() => collect({ root: workspace(), job: 'browser', variant: 'opera', ...machine })).toThrow('--job browser --variant opera: opera is no browser the gates run in (chromium)')
   })
 })
 
@@ -166,7 +212,16 @@ describe('local results', () => {
     expect(result.missing).toEqual(expect.arrayContaining([`stale: apps/host/test-results/vitest.json started ${at(0)}, before --since`]))
     const later = collect({ root, local: true, since: at(35), ...machine, env: {} })
     expect(later.browserGates).toEqual([])
-    expect(later.missing).toEqual(expect.arrayContaining([`stale: apps/host/test-results/browser.json started ${at(30)}, before --since`]))
+    expect(later.missing).toEqual(expect.arrayContaining([`stale: apps/host/test-results/browser-chromium.json started ${at(30)}, before --since`]))
+  })
+
+  // A machine runs Chromium alone unless FORMANCY_BROWSERS names more; a
+  // local report of every browser must not pass on Chromium's file alone,
+  // or the variable is a skip.
+  test('expect every browser the gates run in, for every app', () => {
+    const result = collect({ root: workspace(), local: true, since: at(10), browsers: ['chromium', 'firefox'], ...machine, env: {} })
+    expect(result.browserGates.map((gate) => gate.asked)).toEqual(['chromium'])
+    expect(result.missing).toEqual(expect.arrayContaining(['apps/host/test-results/browser-firefox.json']))
   })
 
   // A fresh vitest.json beside yesterday's turbo summary and coverage would

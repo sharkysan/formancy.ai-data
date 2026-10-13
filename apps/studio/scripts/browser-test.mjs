@@ -1,4 +1,4 @@
-// What jsdom cannot see in the studio, measured in Chromium.
+// What jsdom cannot see in the studio, measured in the browser it is given.
 //
 // The examples page's gate (apps/examples/scripts/browser-test.mjs), applied
 // to the studio as CLAUDE.md asks of every UI here. The suite in src/ runs in
@@ -28,8 +28,11 @@
 // sign-in needs its answers. Asserted as numbers and computed results, never
 // screenshots.
 //
-// `pnpm test:browser`, which builds first. The browser comes from
-// `pnpm exec playwright install chromium`, once per machine.
+// `pnpm test:browser`, which builds first, runs it once per browser
+// scripts/browsers.mjs names through recordedPerBrowser: Chromium alone on a
+// machine unless FORMANCY_BROWSERS names more, each leg's browser in CI. A
+// browser comes from `pnpm --filter @formancy/data-examples exec playwright
+// install <browser>`, once per machine.
 
 import { createServer } from 'node:http'
 import { createReadStream, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
@@ -41,7 +44,7 @@ import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
 import { createSnapshot } from '@formancy/data-core'
 import { renamedColumn } from '@formancy/data-fixtures'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
-import { recorded } from '../../../scripts/release-report/gate-results.mjs'
+import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(app, 'dist')
@@ -196,7 +199,7 @@ function describeFocus(page) {
  * Enter on `pressed`, as a keyboard user presses it; then, once `settled`
  * says the studio has answered, whether `expected` has the focus.
  *
- * In Chromium because what happens to the focus of an element React moves
+ * In a browser because what happens to the focus of an element React moves
  * or unmounts is the browser's to say, and jsdom has an answer of its own.
  */
 async function focusAfterEnter(page, pressed, settled, expected) {
@@ -209,7 +212,7 @@ async function focusAfterEnter(page, pressed, settled, expected) {
 /**
  * Every rule of studio.css that selects an element on the preview's paper.
  *
- * The stylesheet is read from the source and parsed by Chromium, so a rule
+ * The stylesheet is read from the source and parsed by the browser, so a rule
  * added to it is checked without anybody listing it here. A rule is matched
  * for every moment, not this one: a state the pointer or the keyboard puts an
  * element in (`:hover`, `:focus-visible`) comes off the selector first, and a
@@ -293,10 +296,11 @@ function journey(plane, check) {
     }],
     ['Presentation, a field moved down by keyboard', async (page) => {
       await nav(page, 'Presentation').click()
-      // React moves the row that holds the button pressed, and Chromium
-      // drops the focus of an element taken out of the document, even to be
-      // put back; React then gives it back. Watched failing with the rows
-      // keyed by position, which remounts the row instead of moving it.
+      // React moves the row that holds the button pressed, and a browser may
+      // drop the focus of an element taken out of the document, even to be
+      // put back, as Chromium does; React then gives it back. Watched
+      // failing with the rows keyed by position, which remounts the row
+      // instead of moving it.
       const presentation = step(page, 'Presentation')
       const down = presentation.getByRole('button', { name: 'Move down Customer' })
       check('Move down keeps the keyboard on the button pressed', await focusAfterEnter(page, down, () => presentation.getByText('Moved Customer down.').waitFor(), down))
@@ -378,22 +382,18 @@ function journey(plane, check) {
   ]
 }
 
-/** The gate, reporting through `gate` (scripts/release-report/gate-results.mjs), which keeps what it found for the release report. */
-async function run(gate) {
-  if (!existsSync(join(dist, 'index.html'))) throw new Error('no built studio at apps/studio/dist: run `pnpm build` first')
-  let chromium
+/** Playwright, for recordedPerBrowser to launch each browser with: the one import of playwright, here where the app declares it. */
+async function load() {
   try {
-    ;({ chromium } = await import('playwright'))
+    return await import('playwright')
   } catch {
     throw new Error('playwright is not installed: run `pnpm install`')
   }
-  let browser
-  try {
-    browser = await chromium.launch()
-  } catch (error) {
-    throw new Error(`could not launch Chromium (${String(error)}).\nRun \`pnpm exec playwright install chromium\`.`)
-  }
-  gate.launched(chromium, browser)
+}
+
+/** The gate in one browser, reporting through `gate` (scripts/release-report/gate-results.mjs), which keeps what it found for the release report. */
+async function run(gate, browser) {
+  if (!existsSync(join(dist, 'index.html'))) throw new Error('no built studio at apps/studio/dist: run `pnpm build` first')
 
   const { check } = gate
   const measured = async (page, state) => {
@@ -409,74 +409,70 @@ async function run(gate) {
   }
 
   const list = widths()
-  try {
-    for (const { label, width, refuseFonts = false } of list) {
-      gate.width(width)
-      const plane = await startPlane()
-      const { http, port } = await serve(plane)
-      const page = await browser.newPage({ viewport: { width, height: 900 } })
-      if (refuseFonts) await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort())
-      try {
-        await page.goto(`http://127.0.0.1:${String(port)}/`, { waitUntil: 'load' })
-        console.log(`\n${label} -- ${String(width)}x900`)
+  for (const { label, width, refuseFonts = false } of list) {
+    gate.pass({ label, width })
+    const plane = await startPlane()
+    const { http, port } = await serve(plane)
+    const page = await browser.newPage({ viewport: { width, height: 900 } })
+    if (refuseFonts) await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort())
+    try {
+      await page.goto(`http://127.0.0.1:${String(port)}/`, { waitUntil: 'load' })
+      console.log(`\n${label} -- ${String(width)}x900`)
 
-        // Sign in: the first Tab reaches the token, which is the whole screen's purpose.
-        // Once the screen is there: "load" fires before React has rendered it,
-        // and on a slow runner a Tab pressed into the empty page went nowhere.
-        const token = page.getByLabel('Host token')
-        await token.waitFor()
-        await page.keyboard.press('Tab')
-        const focused = await page.evaluate(() => {
-          const active = document.activeElement
-          return active === null ? 'nothing' : `<${active.tagName.toLowerCase()}${active.id === '' ? '' : ` id="${active.id}"`}>`
-        })
-        check('the first Tab reaches the host token', (await token.evaluate((input) => input === document.activeElement)) ? null : `focus went to ${focused} first`)
-        await measured(page, 'Sign in')
-        await token.fill(TOKEN)
-        await page.getByRole('button', { name: 'Sign in' }).click()
-        await page.getByRole('navigation', { name: 'Steps' }).waitFor()
+      // Sign in: the first Tab reaches the token, which is the whole screen's purpose.
+      // Once the screen is there: "load" fires before React has rendered it,
+      // and on a slow runner a Tab pressed into the empty page went nowhere.
+      const token = page.getByLabel('Host token')
+      await token.waitFor()
+      await page.keyboard.press('Tab')
+      const focused = await page.evaluate(() => {
+        const active = document.activeElement
+        return active === null ? 'nothing' : `<${active.tagName.toLowerCase()}${active.id === '' ? '' : ` id="${active.id}"`}>`
+      })
+      check('the first Tab reaches the host token', (await token.evaluate((input) => input === document.activeElement)) ? null : `focus went to ${focused} first`)
+      await measured(page, 'Sign in')
+      await token.fill(TOKEN)
+      await page.getByRole('button', { name: 'Sign in' }).click()
+      await page.getByRole('navigation', { name: 'Steps' }).waitFor()
 
-        // From the top of the workbench: the skip link, on screen, into the step.
-        await page.mouse.click(1, 1)
-        await page.keyboard.press('Tab')
-        const skip = page.getByRole('link', { name: 'Skip to the step' })
-        const shown = await skip.evaluate((link) => {
-          const box = link.getBoundingClientRect()
-          return { focused: link === document.activeElement, onScreen: box.top >= 0 && box.left >= 0 && box.right <= document.documentElement.clientWidth }
-        })
-        check('the first Tab in the workbench reaches the skip link', shown.focused ? null : 'focus went somewhere else first')
-        check('which is on screen while it has focus', shown.onScreen ? null : 'it stayed off screen')
-        const skipAudit = await audit(page, skip)
-        check('the skip link, shown: axe finds nothing', skipAudit.violations.length === 0 ? null : skipAudit.violations.join('; '))
-        await page.keyboard.press('Enter')
-        await page.keyboard.press('Tab')
-        const into = await page.getByRole('main').evaluate((main) => {
-          const tabbable = [...main.querySelectorAll('*')].filter((element) => element.tabIndex >= 0 && !element.disabled && element.getClientRects().length > 0)
-          return tabbable[0] === document.activeElement
-        })
-        check('and through it the next Tab reaches the first control of the step', into ? null : 'focus is elsewhere')
-        await measured(page, 'Connect')
+      // From the top of the workbench: the skip link, on screen, into the step.
+      await page.mouse.click(1, 1)
+      await page.keyboard.press('Tab')
+      const skip = page.getByRole('link', { name: 'Skip to the step' })
+      const shown = await skip.evaluate((link) => {
+        const box = link.getBoundingClientRect()
+        return { focused: link === document.activeElement, onScreen: box.top >= 0 && box.left >= 0 && box.right <= document.documentElement.clientWidth }
+      })
+      check('the first Tab in the workbench reaches the skip link', shown.focused ? null : 'focus went somewhere else first')
+      check('which is on screen while it has focus', shown.onScreen ? null : 'it stayed off screen')
+      const skipAudit = await audit(page, skip)
+      check('the skip link, shown: axe finds nothing', skipAudit.violations.length === 0 ? null : skipAudit.violations.join('; '))
+      await page.keyboard.press('Enter')
+      await page.keyboard.press('Tab')
+      const into = await page.getByRole('main').evaluate((main) => {
+        const tabbable = [...main.querySelectorAll('*')].filter((element) => element.tabIndex >= 0 && !element.disabled && element.getClientRects().length > 0)
+        return tabbable[0] === document.activeElement
+      })
+      check('and through it the next Tab reaches the first control of the step', into ? null : 'focus is elsewhere')
+      await measured(page, 'Connect')
 
-        for (const [state, act] of journey(plane, check)) {
-          await act(page)
-          await measured(page, state)
-        }
-      } finally {
-        await page.close()
-        http.close()
-        await plane.close()
+      for (const [state, act] of journey(plane, check)) {
+        await act(page)
+        await measured(page, state)
       }
+    } finally {
+      await page.close()
+      http.close()
+      await plane.close()
     }
-  } finally {
-    await browser.close()
   }
 
   console.log('')
-  const failures = gate.failures()
-  if (failures.length > 0) throw new Error(`${String(failures.length)} browser check(s) failed:\n  ${failures.join('\n  ')}`)
+  // A failed check fails the run in recordedPerBrowser, which says so.
+  if (gate.failures().length > 0) return
   console.log(
     `browser checks passed: the studio's whole journey at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, for the layout, focus and colour facts jsdom cannot represent`,
   )
 }
 
-await recorded('apps/studio', run)
+await recordedPerBrowser('apps/studio', { load, run })

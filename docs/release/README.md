@@ -33,7 +33,8 @@ builds the report from all of them (`scripts/release-report/report.mjs`).
 3. **Results:** a row per package with a suite -- files, tests, what did not
    pass, the task's wall time from turbo, vitest's span, the engines its run
    started, and coverage, reported and never gated -- then the repository's
-   guards, each browser gate, the install gate and the container gate.
+   guards, each browser gate in each browser, the install gate and the
+   container gate.
 4. **Shared cases on both engines:** every case `sharedCases()` derives from
    data-fixtures' shared tables, `passed`, `failed` or `missing` on each
    engine, from the tests that declare it with `covers()`
@@ -49,8 +50,8 @@ builds the report from all of them (`scripts/release-report/report.mjs`).
    run's facts, then those the decision records state, from
    [`limitations.json`](limitations.json).
 9. **Observations on a shared runner:** what a browser gate measured on the
-   way. Not a performance figure: a CI runner is shared, and published
-   figures are 0034's, measured on a machine that is not.
+   way, per browser. Not a performance figure: a CI runner is shared, and
+   published figures are 0034's, measured on a machine that is not.
 10. **How this report was made:** where each section comes from.
 11. **Problems:** what fails the run. Empty on a green run, and the report
     says so.
@@ -61,8 +62,13 @@ A job of the gates that ended other than success; a job's results missing,
 twice, under another job's name, or from another commit or run; a package
 with no results, no tests, a test that did not pass -- skipped is not passed
 -- a file that failed, or vitest calling the run unsuccessful; a browser gate
-missing, in error, with a failed check, or on another Chromium than
-Playwright pins; the install gate failed, packing other than one tarball
+missing in a browser the gates run in, in error, with a failed check, or
+having made no check or no pass at a viewport width; a browser launched at
+another version than Playwright pins for it, or as another build -- Chromium
+headed, on a channel, from an executable of its own or under `PWDEBUG`, which
+starts the full browser Playwright pins at the headless shell's version, as
+read from what the gate recorded of its launch -- or one no gate here runs;
+the install gate failed, packing other than one tarball
 per published package, or packing one at another version than data-core;
 the container gate missing; the getting-started job recording no composed
 database for a connection of its journey; a shared case missing or
@@ -117,7 +123,7 @@ that the reason still names the review is held by review.
 since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 pnpm build && pnpm test:repo
 pnpm exec turbo run test:coverage --force --summarize   # every package, fresh, with its wall time; needs Docker
-pnpm test:browser
+FORMANCY_BROWSERS=all pnpm test:browser   # every browser the gates run in: the report expects each
 node scripts/install-test.mjs
 node scripts/release-report/collect.mjs --local --since "$since"
 node scripts/release-report/report.mjs --local --allow-missing container,getting-started

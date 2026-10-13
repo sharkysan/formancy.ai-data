@@ -660,6 +660,14 @@ from what every other job found, and fails the run on anything wrong in it
 ([0035](./docs/decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)).
 [`CLAUDE.md`](./CLAUDE.md) says what each is for and what the bar is.
 
+`pnpm test:browser` runs each app's browser gate once for each browser
+`FORMANCY_BROWSERS` names, as a comma list or `all`, and each run leaves
+`test-results/browser-<browser>.json` for the report. Unset, a machine runs
+Chromium alone; CI runs one leg of the `browser` job per browser of
+[`scripts/browsers.mjs`](./scripts/browsers.mjs), the browsers
+[*What it is tested on*](#what-it-is-tested-on) names, and the report fails a
+run in which an app's gate left no results in one of them.
+
 The pictures in this README are taken by `pnpm pictures` from the built pages
 against the real data server, and each app's `pnpm test:browser` walks the
 same states and fails when a pictured element says something else

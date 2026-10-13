@@ -1,11 +1,12 @@
 // What this checkout is tested on, as far as the tree itself can say (0035):
 // the images the suites start unless a file names another, every runtime
 // dependency a published package declares and the version the suites load,
-// the upstream packages, Node, the browser the gates launch, and the tools.
+// the upstream packages, Node, the build of each browser the gates launch,
+// and the tools.
 //
 // Static facts, derived: nothing here is typed except NESTED, and a guard
 // holds that. What a run actually met -- each server's own version and image
-// digest, every other image a test started, the Node and the Chromium it
+// digest, every other image a test started, the Node and each browser it
 // launched -- comes from that run's results, in the report; this is what the
 // README's generated table and the report's "range -> loaded" columns read.
 //
@@ -16,6 +17,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import YAML from 'yaml'
+import { BROWSERS, PINNED_AS } from '../browsers.mjs'
 import { installed, mustBeInstalled } from './installed.mjs'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -150,14 +152,21 @@ function tooling(root, packages) {
   })
 }
 
-/** Playwright as the gates load it, and the Chromium build it pins: the headless shell `chromium.launch()` starts. */
+/**
+ * Playwright as the gates load it, and the build it pins for each browser of
+ * BROWSERS, in that order: the one PINNED_AS names, which for Chromium is the
+ * headless shell `chromium.launch()` starts.
+ */
 function browser(root) {
   const playwright = mustBeInstalled(join(root, 'apps', 'examples'), 'playwright')
   const core = mustBeInstalled(playwright.dir, 'playwright-core')
-  const pins = readJson(join(core.dir, 'browsers.json')).browsers
-  const shell = pins.find((entry) => entry.name === 'chromium-headless-shell')
-  if (shell === undefined) throw new Error(`playwright-core ${core.version} pins no chromium-headless-shell`)
-  return { playwright: playwright.version, chromium: { name: shell.name, revision: shell.revision, browserVersion: shell.browserVersion } }
+  const builds = readJson(join(core.dir, 'browsers.json')).browsers
+  const pins = BROWSERS.map((name) => {
+    const build = builds.find((entry) => entry.name === PINNED_AS[name])
+    if (build === undefined) throw new Error(`playwright-core ${core.version} pins no ${String(PINNED_AS[name])}, the build scripts/browsers.mjs says ${name} launches`)
+    return { browser: name, name: build.name, revision: build.revision, browserVersion: build.browserVersion }
+  })
+  return { playwright: playwright.version, pins }
 }
 
 /** The package manager corepack runs, from the root's `packageManager`: `pnpm@12.4.2` is pnpm 12.4.2, a `+sha…` suffix dropped. */

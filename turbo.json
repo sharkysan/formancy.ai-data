@@ -21,6 +21,7 @@
     },
     "test:browser": {
       "dependsOn": ["build"],
+      "passThroughEnv": ["FORMANCY_BROWSERS"],
       "cache": false
     }
   }

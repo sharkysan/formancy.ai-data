@@ -1,4 +1,4 @@
-// What the host gate measures in Chromium, as numbers and computed results:
+// What the host gate measures in the browser, as numbers and computed results:
 // sideways overflow, axe, the contrast axe cannot decide inside a grid, and
 // where the keyboard is.
 
@@ -96,7 +96,7 @@ export function parseColor(value) {
 }
 
 /**
- * The colours Chromium painted at `points` (viewport CSS pixels), read from
+ * The colours the browser painted at `points` (viewport CSS pixels), read from
  * a screenshot of the page decoded by the page itself: what a person sees,
  * whatever element or pseudo-element drew it. AG Grid paints a row's
  * selection and hover on a layer of its own, which no computed style of the
@@ -123,7 +123,7 @@ export async function painted(page, points) {
 /**
  * Decides what axe left undecided inside a grid -- a header or a cell whose
  * background axe "could not determine due to a pseudo element" (UX-SPEC F1)
- * -- by the text's computed colour against the background Chromium painted
+ * -- by the text's computed colour against the background the browser painted
  * in that cell's padding, at 4.5:1 or more. Anything axe left undecided
  * outside a grid, or for another reason, stays undecided: the gate fails it.
  */

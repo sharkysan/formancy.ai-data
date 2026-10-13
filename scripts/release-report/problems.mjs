@@ -7,6 +7,9 @@
 // may lack (verify, browser, install, container, getting-started); CI allows
 // none.
 
+import { browserName, launchedBuild, prose } from '../browsers.mjs'
+import { unmeasured } from './results.mjs'
+
 /** Readable names for the engines; a third engine without one shows its own name. */
 const ENGINE = { postgres: 'PostgreSQL', sqlserver: 'SQL Server' }
 export const engineName = (engine) => ENGINE[engine] ?? engine
@@ -33,25 +36,52 @@ function suiteProblems(row) {
   return problems
 }
 
-/** Every browser gate an app with `test:browser` has: present, no error, no failed check, the pinned browser. */
+/**
+ * Every browser gate an app with `test:browser` has, in every browser the
+ * gates run in (the browsers testedOn() pins): present, no error, no failed
+ * check, a check made in a pass at a width, and launched as the build
+ * Playwright pins for its browser; and every browser launched held to its
+ * pin's version, one with no pin failing.
+ */
 function gateProblems(report, browserApps, allowMissing) {
   const problems = []
   const gates = report.results.browserGates
+  const { playwright } = report.testedOn
+  const gated = playwright.pins.map((pin) => pin.browser)
   for (const app of browserApps) {
-    const ran = gates.filter((gate) => gate.gate === app)
-    if (ran.length === 0 && !allowMissing.includes('browser')) problems.push(`the browser gate of ${app} left no results`)
-    for (const gate of ran) {
-      if (gate.error !== null) problems.push(`the browser gate of ${app} ended with an error: ${gate.error}`)
-      if (gate.failed.length > 0) problems.push(`the browser gate of ${app} failed ${String(gate.failed.length)} check(s): ${list(gate.failed)}`)
-      if (gate.browser === null) problems.push(`the browser gate of ${app} says no browser was launched`)
+    for (const browser of gated) {
+      if (!allowMissing.includes('browser') && !gates.some((gate) => gate.gate === app && gate.asked === browser)) problems.push(`the browser gate of ${app} left no results in ${browserName(browser)}`)
+    }
+    for (const gate of gates.filter((entry) => entry.gate === app)) {
+      const which = `the browser gate of ${app} in ${browserName(gate.asked)}`
+      if (gate.error !== null) problems.push(`${which} ended with an error: ${gate.error}`)
+      if (gate.failed.length > 0) problems.push(`${which} failed ${String(gate.failed.length)} check(s): ${list(gate.failed)}`)
+      // One that ended in an error measured nothing for a reason it says.
+      if (gate.error === null) for (const what of unmeasured(gate)) problems.push(`${which} ${what}`)
+      if (gate.browser === null) problems.push(`${which} says no browser was launched`)
+      else problems.push(...buildProblems(which, gate.browser, playwright))
     }
   }
   for (const browser of report.testedOn.browsers) {
-    if (browser.pin !== null && browser.version !== browser.pin) {
-      problems.push(`the browser gates of ${browser.gates.join(', ')} launched ${browser.name} ${browser.version}, not the ${browser.pin} Playwright ${report.testedOn.playwright.playwright} pins`)
-    }
+    const launched = `the browser gates of ${browser.gates.join(', ')} launched ${browser.name} ${browser.version}`
+    if (browser.pin === null) problems.push(`${launched}, which no gate here runs: the gates hold only ${prose(gated.map(browserName))} to a build Playwright ${playwright.playwright} pins`)
+    else if (browser.version !== browser.pin) problems.push(`${launched}, not the ${browser.pin} Playwright ${playwright.playwright} pins`)
   }
   return problems
+}
+
+/**
+ * A launched browser whose launch started another build than its pin's: the
+ * version check above cannot see it, as Playwright pins Chromium's headless
+ * shell and its full browser at one version. A browser with no pin is
+ * failed above.
+ */
+function buildProblems(which, browser, playwright) {
+  const pin = playwright.pins.find((entry) => entry.browser === browser.name)
+  if (pin === undefined) return []
+  const { build, how } = launchedBuild(browser)
+  if (build === pin.name) return []
+  return [`${which} launched ${browser.name} ${browser.version} ${how}${build === null ? '' : `, which starts ${build}`}, not the ${pin.name} Playwright ${playwright.playwright} pins`]
 }
 
 /** The install gate passed and packed one tarball per published package, each at data-core's version; the container gate left its results. */
@@ -134,10 +164,11 @@ export function needsProblems(needs, jobs) {
   })
 }
 
-/** How an evidence item that did not pass is said. */
+/** How an evidence item that did not pass is said; a browser gate that ran in some browsers and not others names the others. */
 const unpassed = (item) => {
   const what = item.kind === 'file' ? item.value : item.kind === 'browserGate' ? `the browser gate of ${item.value}` : item.kind === 'job' ? `the ${item.value} job` : item.kind === 'sharedCases' ? 'the shared cases' : item.value
-  return `${what} ${item.outcome === 'absent' ? 'did not run' : item.kind === 'job' ? `ended ${String(item.result)}` : 'did not pass'}`
+  const where = item.missing === undefined ? '' : ` in ${item.missing.map(browserName).join(', ')}`
+  return `${what} ${item.outcome === 'absent' ? `did not run${where}` : item.kind === 'job' ? `ended ${String(item.result)}` : 'did not pass'}`
 }
 
 /**

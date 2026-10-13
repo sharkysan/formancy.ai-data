@@ -1,4 +1,4 @@
-// The report's "Tested on" (0035): what this run's servers, Node and browser
+// The report's "Tested on" (0035): what this run's servers, Node and browsers
 // said about themselves, beside what the checkout says it is tested on.
 //
 // Pure over the run's results and testedOn()'s facts. Every image any job
@@ -68,7 +68,8 @@ export function testedOnInRun({ results, facts }) {
     runners: byJson(results.map((result) => ({ image: result.runner?.image ?? null, imageVersion: result.runner?.imageVersion ?? null, docker: result.runner?.docker ?? null }))),
     browsers: byJson(gates.filter((gate) => gate.browser != null).map((gate) => ({ name: gate.browser.name, version: gate.browser.version }))).map((browser) => ({
       ...browser,
-      pin: browser.name === 'chromium' ? facts.browser.chromium.browserVersion : null,
+      // Null for a browser no gate here runs, which problems.mjs fails.
+      pin: facts.browser.pins.find((pin) => pin.browser === browser.name)?.browserVersion ?? null,
       gates: gates.filter((gate) => gate.browser?.name === browser.name && gate.browser?.version === browser.version).map((gate) => gate.gate),
     })),
     playwright: facts.browser,

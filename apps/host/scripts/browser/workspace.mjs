@@ -1,4 +1,4 @@
-// The workspace's states in Chromium (0047): signed in, a form's records in
+// The workspace's states in the browser (0047): signed in, a form's records in
 // each layout, a row open with its lines, a line open, the unsaved-changes
 // notice and a refused list -- each measured by the gate's `measured` on the
 // way -- and what only a real browser shows about the grids: one Tab stop
@@ -30,7 +30,7 @@ export async function carryOn(page, button) {
 const row = (page, name, first) => grid(page, name).getByRole('row').filter({ has: page.getByRole('gridcell', { name: first, exact: true }) }).first()
 
 /**
- * The focused cell's 1px border against what Chromium painted inside the
+ * The focused cell's 1px border against what the browser painted inside the
  * cell, which is the row's background with its hover or selection: 3:1 or
  * more (WCAG 1.4.11). Read from the computed border colour and the pixels.
  */
@@ -120,7 +120,7 @@ export function workspaceJourney(plane, { check }, run) {
         // first page, a column a search filled with a longer value is cut
         // until the separator is let go, and whole after: the run's order is
         // given a group wider than its column, beside the page, found by a
-        // search, then put back. A layout measure, so Chromium's.
+        // search, then put back. A layout measure, so the browser's.
         const wide = `refit ${String(run.customer)} northern loading bay`
         await plane.setGroup(run.record, wide)
         const search = records(page).getByRole('textbox', { name: 'Search' })

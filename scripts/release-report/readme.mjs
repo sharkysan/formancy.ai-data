@@ -8,12 +8,13 @@
 // documents whose block is stale and exits 1. tested-on.test.mjs fails until
 // they match, naming this command. They hold static facts only: what a run
 // answered -- each server's own build and digest, any other image a test
-// started, the Node and the Chromium it launched -- is the release report's,
+// started, the Node and each browser it launched -- is the release report's,
 // from that run.
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { browserName } from '../browsers.mjs'
 import { readBlock, replaceBlock } from '../generated-block.mjs'
 import { testedOn } from './tested-on.mjs'
 
@@ -62,11 +63,7 @@ export function readmeTable(facts) {
     ['Node, the server image', [...new Set(facts.node.dockerfile)].map(code).join(', ') + (new Set(facts.node.dockerfile).size === 1 && facts.node.dockerfile.length > 1 ? ', every stage' : ''), ''],
     ['Node, CI', [...new Set(facts.node.ci.map((entry) => entry.version))].join(', '), ''],
     [facts.packageManager.name, `${facts.packageManager.version}, through corepack`, `${code(facts.packageManager.declared)}, the root's \`packageManager\``],
-    [
-      'Chromium',
-      `${facts.browser.chromium.browserVersion}, the ${facts.browser.chromium.name} Playwright ${facts.browser.playwright} pins (revision ${facts.browser.chromium.revision})`,
-      '',
-    ],
+    ...facts.browser.pins.map((pin) => [browserName(pin.browser), `${pin.browserVersion}, the ${pin.name} Playwright ${facts.browser.playwright} pins (revision ${pin.revision})`, '']),
     ...facts.tooling.map((tool) => [code(tool.name), versions(tool), '']),
   ]
   return [
@@ -74,7 +71,7 @@ export function readmeTable(facts) {
     '| --- | --- | --- |',
     ...rows.map((row) => `| ${row.map(cell).join(' | ')} |`),
     '',
-    'What a run actually answered — each server’s own version and image digest, every other image a test started, the Node and Chromium it launched — is in the report every CI run produces and every release attaches, signed.',
+    `What a run actually answered — each server’s own version and image digest, every other image a test started, the Node and ${prose(facts.browser.pins.map((pin) => browserName(pin.browser)))} it launched — is in the report every CI run produces and every release attaches, signed.`,
   ].join('\n')
 }
 

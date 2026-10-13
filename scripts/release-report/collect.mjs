@@ -1,6 +1,7 @@
 // What one job of a run found, in one file the release report reads (0035).
 //
 //   node scripts/release-report/collect.mjs --job test --package @formancy/data-host
+//   node scripts/release-report/collect.mjs --job browser --variant chromium
 //   node scripts/release-report/collect.mjs --job getting-started --variant 2.20.3
 //   node scripts/release-report/collect.mjs --job container --image formancy/data-server:ci
 //   node scripts/release-report/collect.mjs --local --since 2026-10-09T20:00:00Z
@@ -11,19 +12,24 @@
 // codecov-config.mjs gives it, and the job with `--variant` appended for a
 // job a matrix runs more than once.
 //
-// Node's built-ins and coveredPackages() only: it runs in the container and
-// getting-started jobs, which install nothing.
+// Node's built-ins, coveredPackages() and scripts/browsers.mjs only: it runs
+// in the container and getting-started jobs, which install nothing.
 //
 // What it reads, each where its writer puts it: a suite's
 // `test-results/vitest.json` and `coverage/coverage-summary.json`, turbo's
 // `.turbo/runs/*.json` for the task's own start and end, every
 // `test-results/servers/*.json` record of a server a suite or a gate started
 // (data-fixtures, or the getting-started journey), a browser gate's
-// `test-results/browser.json`, the install gate's `test-results/install.json`,
-// and every published package's `dist/`. What it expected and did not find
-// it lists under `missing`, and the report fails on that.
+// `test-results/browser-<browser>.json` -- in the browser job, the one of the
+// leg's `--variant`, which must be a browser of BROWSERS -- the install gate's
+// `test-results/install.json`, and every published package's `dist/`. What it
+// expected and did not find it lists under `missing`, and the report fails
+// on that, as it does on a gate's file whose browser, asked for or launched,
+// is not the leg's.
 //
-// `--local` reads every package and app of one machine at once. It refuses
+// `--local` reads every package and app of one machine at once, every
+// browser of BROWSERS for each app's gate whatever FORMANCY_BROWSERS said on
+// the way, so a narrowed run is reported as missing a browser. It refuses
 // a results file that started before `--since`, which has no default: a
 // file left by an earlier run read as this one's is the failure local mode
 // has to rule out, and only the person running it knows from when.
@@ -32,6 +38,7 @@ import { execFileSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { BROWSERS } from '../browsers.mjs'
 import { coveredPackages } from '../codecov-config.mjs'
 import { distHash, filesUnder } from './dist-hash.mjs'
 
@@ -197,8 +204,16 @@ function withDigests(records, docker, missing) {
   })
 }
 
-/** Everything one job (or, locally, one machine) found. Pure over the files under `root` and the `docker` and `git` it is given. */
-export function collect({ root = repo, job, pkg, variant, image, local = false, since, env = process.env, docker = defaultDocker, git = defaultGit, now = () => new Date() }) {
+/**
+ * Everything one job (or, locally, one machine) found. Pure over the files
+ * under `root`, the `docker` and `git` it is given, and `browsers`, the
+ * browsers the gates run in.
+ */
+export function collect({ root = repo, job, pkg, variant, image, local = false, since, browsers = BROWSERS, env = process.env, docker = defaultDocker, git = defaultGit, now = () => new Date() }) {
+  if (!local && job === 'browser') {
+    if (variant === undefined) throw new Error(`--job browser needs --variant <browser>, the browser its leg ran: one of ${browsers.join(', ')}`)
+    if (!browsers.includes(variant)) throw new Error(`--job browser --variant ${variant}: ${variant} is no browser the gates run in (${browsers.join(', ')})`)
+  }
   const packages = namedPackages(root)
   const key = local ? 'local' : keyFor({ job, pkg, variant }, packages)
   const missing = []
@@ -233,11 +248,17 @@ export function collect({ root = repo, job, pkg, variant, image, local = false, 
   }
 
   const browserGates = []
-  const gateOf = (path) => {
-    const file = join(root, path, 'test-results', 'browser.json')
-    if (!existsSync(file)) return void missing.push(slash(join(path, 'test-results', 'browser.json')))
+  const gateOf = (path, browser) => {
+    const shown = slash(join(path, 'test-results', `browser-${browser}.json`))
+    const file = join(root, shown)
+    if (!existsSync(file)) return void missing.push(shown)
     const result = readJson(file)
-    if (!fresh(slash(join(path, 'test-results', 'browser.json')), result.startedAt)) return
+    if (!fresh(shown, result.startedAt)) return
+    // A file another browser's run wrote -- its launch failed, so no browser
+    // names itself in it -- would be that browser's failure under this one's
+    // name; one that launched another browser would be that browser's checks.
+    if (result.asked !== browser) return void missing.push(`${path}’s gate asked for ${result.asked === undefined ? 'no browser' : String(result.asked)} in the ${browser} job: ${shown}`)
+    if (result.browser != null && result.browser.name !== browser) return void missing.push(`${path}’s gate launched ${String(result.browser.name)} in the ${browser} job: ${shown}`)
     browserGates.push(result)
     servers.push(...within(serverRecords(root, path), GATE_SCRIPTS, time(result.startedAt), time(result.finishedAt), result.gate, root))
   }
@@ -254,14 +275,14 @@ export function collect({ root = repo, job, pkg, variant, image, local = false, 
   if (local) {
     for (const entry of packages) suiteOf(entry.path, entry.name)
     suiteOf('.', null)
-    for (const app of browserApps(root)) gateOf(app.path)
+    for (const app of browserApps(root)) for (const browser of browsers) gateOf(app.path, browser)
     installOf()
   } else if (job === 'test') {
     suiteOf(packages.find((entry) => entry.name === pkg).path, pkg)
   } else if (job === 'verify') {
     suiteOf('.', null)
   } else if (job === 'browser') {
-    for (const app of browserApps(root)) gateOf(app.path)
+    for (const app of browserApps(root)) gateOf(app.path, variant)
   } else if (job === 'install') {
     installOf()
   } else if (job === 'container') {

@@ -1,4 +1,5 @@
-// What jsdom cannot see on the examples page, measured in Chromium.
+// What jsdom cannot see on the examples page, measured in the browser it is
+// given.
 //
 // formancy.ai's browser gate (its scripts/browser-test.mjs), brought with this
 // repository's first UI as CLAUDE.md asks. The suite in src/ runs in jsdom,
@@ -20,8 +21,11 @@
 // numbers and computed results, never screenshots: a pixel baseline is a file
 // somebody updates when it goes red.
 //
-// `pnpm test:browser`, which builds first. The browser comes from
-// `pnpm exec playwright install chromium`, once per machine.
+// `pnpm test:browser`, which builds first, runs it once per browser
+// scripts/browsers.mjs names through recordedPerBrowser: Chromium alone on a
+// machine unless FORMANCY_BROWSERS names more, each leg's browser in CI. A
+// browser comes from `pnpm --filter @formancy/data-examples exec playwright
+// install <browser>`, once per machine.
 
 import { createServer } from 'node:http'
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
@@ -29,7 +33,7 @@ import { createRequire } from 'node:module'
 import { dirname, extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
-import { recorded } from '../../../scripts/release-report/gate-results.mjs'
+import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(app, 'dist')
@@ -231,30 +235,23 @@ async function failSubmit(page) {
   )
 }
 
-/** The gate, reporting through `gate` (scripts/release-report/gate-results.mjs), which keeps what it found for the release report. */
-async function run(gate) {
+/** Playwright, for recordedPerBrowser to launch each browser with: the one import of playwright, here where the app declares it. */
+async function load() {
+  try {
+    return await import('playwright')
+  } catch {
+    throw new Error('playwright is not installed: run `pnpm install`')
+  }
+}
+
+/** The gate in one browser, reporting through `gate` (scripts/release-report/gate-results.mjs), which keeps what it found for the release report. */
+async function run(gate, browser) {
   if (!existsSync(join(dist, 'index.html'))) {
     throw new Error('no built page at apps/examples/dist: run `pnpm build` first')
   }
 
-  let chromium
-  try {
-    ;({ chromium } = await import('playwright'))
-  } catch {
-    throw new Error('playwright is not installed: run `pnpm install`')
-  }
-
   const { server, port } = await serve(dist)
   const url = `http://127.0.0.1:${String(port)}/`
-
-  let browser
-  try {
-    browser = await chromium.launch()
-  } catch (error) {
-    server.close()
-    throw new Error(`could not launch Chromium (${String(error)}).\nRun \`pnpm exec playwright install chromium\`.`)
-  }
-  gate.launched(chromium, browser)
 
   const { check } = gate
   const sideways = (state, measured) => {
@@ -274,7 +271,7 @@ async function run(gate) {
   try {
     const list = widths()
     for (const { label, width, refuseFonts = false } of list) {
-      gate.width(width)
+      gate.pass({ label, width })
       const page = await browser.newPage({ viewport: { width, height: 900 } })
       if (refuseFonts) await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort())
       await page.goto(url, { waitUntil: 'load' })
@@ -324,18 +321,16 @@ async function run(gate) {
     }
 
     console.log('')
-    const failures = gate.failures()
-    if (failures.length > 0) {
-      throw new Error(`${String(failures.length)} browser check(s) failed:\n  ${failures.join('\n  ')}`)
-    }
+    // A failed check fails the run in recordedPerBrowser, which says so.
     const measured = new Set(list.map(({ width }) => width)).size
-    console.log(
-      `browser checks passed: the examples page at ${String(measured)} widths, one of them also with the web fonts refused, for the layout, focus and colour facts jsdom cannot represent`,
-    )
+    if (gate.failures().length === 0) {
+      console.log(
+        `browser checks passed: the examples page at ${String(measured)} widths, one of them also with the web fonts refused, for the layout, focus and colour facts jsdom cannot represent`,
+      )
+    }
   } finally {
-    await browser.close()
     server.close()
   }
 }
 
-await recorded('apps/examples', run)
+await recordedPerBrowser('apps/examples', { load, run })
