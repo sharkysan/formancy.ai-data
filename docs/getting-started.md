@@ -261,9 +261,11 @@ This is an evaluation stack on your own machine, not a production deployment:
   leaves the machine.
 - **A minted token.** The server verifies HS256 tokens signed with a key in
   the secrets volume, and `token` signs them. A deployment verifies its
-  identity provider's tokens with its public key, and nothing in it mints
-  any; the [data server's README](../packages/data-server/README.md) says how
-  it is configured.
+  identity provider's tokens with its key set
+  (`FORMANCY_DATA_IDENTITY_KEYS_FILE`, read again on SIGHUP) or its public
+  key, and nothing in it mints any; the
+  [data server's README](../packages/data-server/README.md) says how it is
+  configured and how a key is rotated.
 - **One replica, a file store on a local volume.** A write's id is remembered
   in the server's process only, so a resend that reached another replica would
   be applied again ([0031](./decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
@@ -299,8 +301,9 @@ This is an evaluation stack on your own machine, not a production deployment:
 
 What a real deployment changes:
 
-- its identity provider's public key instead of the shared secret, and no
-  minter (`FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE`, which
+- its identity provider's key set instead of the shared secret, and no
+  minter (`FORMANCY_DATA_IDENTITY_KEYS_FILE`, or one public key in
+  `FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE`, which
   `packages/data-server/src/main.ts` documents);
 - TLS at its own proxy, which takes the place of `deploy/web/nginx.conf` and
   keeps the studio, the host application and `/v1` on one origin, as 0024 and

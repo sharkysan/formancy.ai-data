@@ -5,8 +5,7 @@ import { createFileConfigurationStore } from './config-store.js'
 import { createConnectionRegistry, parseConnections } from './connections.js'
 import type { ConnectionRegistry } from './connections.js'
 import { DRIVER_FACTORIES } from './drivers.js'
-import { createIdentityVerifier } from './identity.js'
-import type { IdentityOptions } from './identity.js'
+import { identityKeySource, openIdentity, readAgainOnSignal } from './identity-settings.js'
 import { servedPlanes } from './planes.js'
 import { rateLimitSetting } from './rate-limit.js'
 import { resolveSecret } from './secrets.js'
@@ -14,14 +13,18 @@ import { resolveSecret } from './secrets.js'
 /**
  * The runnable server: `node dist/main.mjs`.
  *
- * Every setting is read here and nowhere else, and every missing one stops the
- * process with a sentence saying which, rather than starting a server that
- * accepts tokens from nobody or from everybody.
+ * Every setting the server runs on is read here -- the identity key's
+ * parsed and opened by identity-settings.ts, which identity-keys-cli.mjs
+ * shares -- and every missing one stops the process with a sentence saying
+ * which, rather than starting a server that accepts tokens from nobody or
+ * from everybody.
  *
  *   FORMANCY_DATA_ISSUER, FORMANCY_DATA_AUDIENCE   what the host's tokens say
  *   FORMANCY_DATA_IDENTITY_SECRET                  a secret reference: env:NAME or file:/path (HS256)
  *   FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE         or a PEM public key, with
  *   FORMANCY_DATA_IDENTITY_ALGORITHM               RS256, ES256 or EdDSA
+ *   FORMANCY_DATA_IDENTITY_KEYS_FILE               or the absolute path of a JSON Web Key Set, with
+ *   FORMANCY_DATA_IDENTITY_ALGORITHM               RS256, ES256, EdDSA or HS256; read again on SIGHUP (0059)
  *   FORMANCY_DATA_ATTRIBUTES                       e.g. "tenant=tid,region=reg"
  *   FORMANCY_DATA_RATE_LIMIT                       requests a minute per client address, default 600
  *   PORT                                           default 4390
@@ -48,22 +51,6 @@ function attributeMap(text: string | undefined): Record<string, string> {
   return map
 }
 
-async function identityKey(): Promise<IdentityOptions['key']> {
-  const secretReference = process.env['FORMANCY_DATA_IDENTITY_SECRET']
-  const publicKeyFile = process.env['FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE']
-  if ((secretReference === undefined) === (publicKeyFile === undefined)) {
-    console.error('Set exactly one of FORMANCY_DATA_IDENTITY_SECRET and FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE.')
-    process.exit(1)
-  }
-  if (secretReference !== undefined) return { kind: 'secret', secret: await resolveSecret(secretReference) }
-  const algorithm = required('FORMANCY_DATA_IDENTITY_ALGORITHM')
-  if (algorithm !== 'RS256' && algorithm !== 'ES256' && algorithm !== 'EdDSA') {
-    console.error('FORMANCY_DATA_IDENTITY_ALGORITHM is RS256, ES256 or EdDSA.')
-    process.exit(1)
-  }
-  return { kind: 'public-key', pem: await readFile(publicKeyFile ?? '', 'utf8'), algorithm }
-}
-
 // Read before anything opens: a limit nobody chose stops the process here,
 // not after the planes have connected.
 const limit = rateLimitSetting(process.env['FORMANCY_DATA_RATE_LIMIT'])
@@ -72,12 +59,25 @@ if (!limit.ok) {
   process.exit(1)
 }
 
-const verifyIdentity = await createIdentityVerifier({
-  key: await identityKey(),
-  issuer: required('FORMANCY_DATA_ISSUER'),
-  audience: required('FORMANCY_DATA_AUDIENCE'),
-  attributes: attributeMap(process.env['FORMANCY_DATA_ATTRIBUTES']),
-})
+// Which key, decided before any file is opened, and then opened
+// (identity-settings.ts): every refusal of it -- a secret or a file that
+// cannot be read, a short secret, a public key that does not import, a key
+// set refused -- stops the process here with one sentence.
+const identity = identityKeySource(process.env)
+if (!identity.ok) {
+  console.error(identity.problem)
+  process.exit(1)
+}
+const opened = await openIdentity(
+  identity.source,
+  { env: process.env, readFile: (path) => readFile(path, 'utf8') },
+  { issuer: required('FORMANCY_DATA_ISSUER'), audience: required('FORMANCY_DATA_AUDIENCE'), attributes: attributeMap(process.env['FORMANCY_DATA_ATTRIBUTES']) },
+)
+if (!opened.ok) {
+  console.error(opened.problem)
+  process.exit(1)
+}
+const { verifyIdentity, file: keyFile } = opened
 
 /**
  * The two planes, each on only when its configuration is present:
@@ -116,7 +116,13 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
 }
 
 const app = await createDataServer({ verifyIdentity, logger: true, rateLimit: limit.rateLimit, ...planes })
-app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, connections: registry?.ids() ?? [] }, 'planes')
+const identityKeys = keyFile === undefined ? {} : { identityKeys: { kids: keyFile.current().kids, leftOut: keyFile.current().leftOut } }
+app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, connections: registry?.ids() ?? [], ...identityKeys }, 'planes')
+
+// SIGHUP reads the key set file again, and with a one-key setting says it
+// read nothing; either way it no longer stops the server, which is Node's
+// default. Installed before listen, so no signal arrives without it.
+readAgainOnSignal(process, keyFile, app.log)
 
 // On SIGTERM a container stops taking requests, finishes the ones in flight,
 // and closes every database pool, so a rolling deploy leaves no half-open sessions.

@@ -518,6 +518,133 @@ jobs:
             fi
           done
 
+      # FORMANCY_DATA_IDENTITY_KEYS_FILE is read again on SIGHUP (0059).
+      # identity-file.test.ts and identity-settings.test.ts hold the reading
+      # and the listener on the source; only the image shows that Node as
+      # PID 1 receives docker's SIGHUP once main.ts listens for it, that the
+      # mounted file is the one read again, and that the image's
+      # identity-keys-cli.mjs refuses what the server would. Keys a and b are
+      # made here and kept outside the mounted directory; both tokens are
+      # minted inside the container before any file is swapped, from each key
+      # piped over stdin, and are never printed. Without the listener the
+      # first wait below times out. The log is searched last for every
+      # eight characters of each key, and for each token.
+      - name: A key set file is read again on SIGHUP, and a bad one leaves the set in force
+        run: |
+          material="$RUNNER_TEMP/material"
+          identity="$RUNNER_TEMP/identity"
+          mkdir -p "$material" "$identity"
+          chmod 755 "$identity"
+          node -e 'const { randomBytes } = require("node:crypto"); for (const kid of ["a", "b"]) require("node:fs").writeFileSync(`${process.argv[1]}/${kid}.json`, JSON.stringify({ kty: "oct", kid, k: randomBytes(32).toString("base64url") }))' "$material"
+          set_of() { node -e 'process.stdout.write(JSON.stringify({ keys: process.argv.slice(1).map((file) => JSON.parse(require("node:fs").readFileSync(file, "utf8"))) }))' "$@"; }
+          set_of "$material/a.json" > "$identity/keys.json"
+
+          docker run -d --name data-server-keys -p 127.0.0.1:4390:4390 \
+            -v "$identity:/run/identity:ro" \
+            -e FORMANCY_DATA_ISSUER=https://host.example \
+            -e FORMANCY_DATA_AUDIENCE=formancy-data \
+            -e FORMANCY_DATA_IDENTITY_KEYS_FILE=/run/identity/keys.json \
+            -e FORMANCY_DATA_IDENTITY_ALGORITHM=HS256 \
+            formancy/data-server:ci
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4390/health > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:4390/health > /dev/null || { docker logs data-server-keys; exit 1; }
+          if ! docker logs data-server-keys 2>&1 | grep -q '"identityKeys":{"kids":\["a"\]'; then
+            echo "::error::The planes line did not name the key set's kids"
+            exit 1
+          fi
+
+          mint=$(cat <<'JS'
+          import { createSecretKey } from 'node:crypto'
+          import { createRequire } from 'node:module'
+          import { pathToFileURL } from 'node:url'
+          const { SignJWT } = await import(pathToFileURL(createRequire('/app/package.json').resolve('jose')).href)
+          let text = ''
+          for await (const chunk of process.stdin) text += chunk
+          const jwk = JSON.parse(text)
+          process.stdout.write(await new SignJWT({ sub: 'ci' }).setProtectedHeader({ alg: 'HS256', kid: jwk.kid }).setIssuer('https://host.example').setAudience('formancy-data').setExpirationTime('10m').sign(createSecretKey(Buffer.from(jwk.k, 'base64url'))))
+          JS
+          )
+          A=$(docker exec -i data-server-keys node --input-type=module -e "$mint" < "$material/a.json")
+          B=$(docker exec -i data-server-keys node --input-type=module -e "$mint" < "$material/b.json")
+          [ -n "$A" ] && [ -n "$B" ] || { echo "::error::No token was minted inside the container"; exit 1; }
+
+          whoami() { curl -s -o /dev/null -w '%{http_code}' -H "authorization: Bearer $1" http://127.0.0.1:4390/v1/whoami; }
+          expect() {
+            local got
+            got="$(whoami "$A") $(whoami "$B")"
+            if [ "$got" != "$1" ]; then
+              echo "::error::$2: tokens A and B answered $got, expected $1"
+              docker logs data-server-keys
+              exit 1
+            fi
+          }
+          seen() { docker logs data-server-keys 2>&1 | grep -c "$1" || true; }
+          wait_for() {
+            for _ in $(seq 1 20); do
+              [ "$(seen "$1")" -ge "$2" ] && return 0
+              sleep 0.5
+            done
+            echo "::error::Waited 10 s for \"$1\" in the server's log after SIGHUP"
+            docker logs data-server-keys
+            exit 1
+          }
+          swap_in() {
+            mv "$identity/next.json" "$identity/keys.json"
+            docker kill --signal HUP data-server-keys > /dev/null
+          }
+
+          expect "200 401" "With the set {a}"
+
+          set_of "$material/a.json" "$material/b.json" > "$identity/next.json"
+          listed=$(docker exec data-server-keys node dist/identity-keys-cli.mjs check /run/identity/next.json HS256)
+          if [ "$listed" != "$(printf 'in force: a, b\nleft out: none')" ]; then
+            echo "::error::identity-keys-cli.mjs check listed: $listed"
+            exit 1
+          fi
+          swap_in
+          wait_for 'identity keys read again"' 1
+          expect "200 200" "After {a, b} was moved in and the server was sent SIGHUP"
+
+          set_of "$material/b.json" > "$identity/next.json"
+          swap_in
+          wait_for 'identity keys read again"' 2
+          expect "401 200" "After {b} was moved in and the server was sent SIGHUP"
+
+          printf '{"keys":[' > "$identity/next.json"
+          if docker exec data-server-keys node dist/identity-keys-cli.mjs check /run/identity/next.json HS256; then
+            echo "::error::identity-keys-cli.mjs check accepted a file that is not JSON"
+            exit 1
+          fi
+          swap_in
+          wait_for 'identity keys not read again' 1
+          expect "401 200" "After a malformed file was moved in and the server was sent SIGHUP"
+          if [ "$(docker inspect -f '{{.State.Running}}' data-server-keys)" != true ]; then
+            echo "::error::The server stopped after a SIGHUP"
+            exit 1
+          fi
+
+          logs=$(docker logs data-server-keys 2>&1)
+          docker rm -f data-server-keys > /dev/null
+          for kid in a b; do
+            k=$(node -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).k)' "$material/$kid.json")
+            for start in $(seq 0 $(( ${#k} - 8 ))); do
+              case "$logs" in *"${k:$start:8}"*)
+                echo "::error::The server's log holds eight characters of key $kid"
+                exit 1
+                ;;
+              esac
+            done
+          done
+          case "$logs" in *"$A"*|*"$B"*)
+            echo "::error::The server's log holds a token"
+            exit 1
+            ;;
+          esac
+          rm -rf "$material" "$identity"
+
       - name: Keep what this job found, for the report
         id: collect
         if: ${{ !cancelled() }}

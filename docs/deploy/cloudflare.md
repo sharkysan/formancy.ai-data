@@ -745,8 +745,11 @@ door, which fails closed; nothing reminds you.
 ## 9. From evaluation to production
 
 - **The licence:** a production licence, requested as section 0 says.
-- **Identity:** your identity provider's public key in
-  `FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE`, and no minter.
+- **Identity:** your identity provider's key set in
+  `FORMANCY_DATA_IDENTITY_KEYS_FILE`, read again on SIGHUP, or one public
+  key in `FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE`, and no minter; the
+  [data server's README](../../packages/data-server/README.md#rotating-the-identity-key)
+  says how a key is rotated.
 - **The rate limit:** `FORMANCY_DATA_RATE_LIMIT`, in the server's
   environment in your own override, for the one bucket everybody shares.
 - **Your own databases**, with TLS, reached from this machine and not
@@ -826,8 +829,8 @@ door, which fails closed; nothing reminds you.
 
 **Not supported:** Workers, Hyperdrive, Containers, Pages, D1, R2, KV or
 Durable Objects as the runtime or the store; SQL Server from any Cloudflare
-runtime; the Access identity as the host token (its keys rotate and are
-fetched, and 0014 pins one key and fetches none); and a trusted proxy's
+runtime; the Access identity as the host token (its keys rotate on
+Cloudflare's schedule, and the server fetches none: 0014, 0059); and a trusted proxy's
 forwarded address, which the server does not read.
 
 **What nobody has measured**, because no account was available:

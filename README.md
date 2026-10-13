@@ -197,6 +197,10 @@ is not licensed for production.
   runtime request but a page of records, the menu of forms and a delete, and held in CI by rows read and
   round trips, never a time
   ([0034](./docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
+- **A host identity key rotates without a restart.** A JSON Web Key Set
+  file, each key selected by the `kid` a token names and read again on
+  SIGHUP; a bad file leaves the keys in force, and nothing is fetched
+  ([0059](./docs/decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)).
 - **Every CI run ends in a report** of what it was tested on, which a release
   signs and attaches
   ([0035](./docs/decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)),
@@ -574,6 +578,19 @@ path holding a percent-escape that decodes, a backslash, an empty segment, a
 `.` or `..` segment, or a character a path does not carry as itself, before
 authentication: a proxy in front of it may read such a path differently, and
 no name the server accepts needs one.
+
+The host's tokens are verified offline, with a shared secret, a public key,
+or a key set file the server reads again when it is sent SIGHUP: a provider's
+document copied in as it is published, its keys that cannot verify the
+pinned algorithm left out and named, a kid selecting its key. A file that
+cannot be read, or is refused, leaves the set in force and is logged; the
+image's `dist/identity-keys-cli.mjs` checks a file before it is renamed into
+place, and converts the secret or public key in use into a set. The server
+fetches no key from anywhere: a provider's set is the operator's own job to
+copy ([0014](./docs/decisions/0014-host-identity-is-verified-offline.md),
+[0059](./docs/decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md);
+[the data server's README](./packages/data-server/README.md#rotating-the-identity-key)
+says how).
 
 ## What it is tested on
 

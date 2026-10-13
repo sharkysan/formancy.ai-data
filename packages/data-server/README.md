@@ -18,6 +18,13 @@ existed would be documented and inert.
 - **`createIdentityVerifier(options)`** — the host application's JWT, verified
   offline with a pinned algorithm, becomes an actor, roles and attributes such
   as the tenant ([0014](../../docs/decisions/0014-host-identity-is-verified-offline.md)).
+  Its key is a shared secret, a public key, or a key set whose `keys()` is
+  asked on every token and must return a set `readKeySet` or a builder made
+  ([0059](../../docs/decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)).
+- **`readKeySet(text, algorithm)`** and **`openKeySetFile(path, algorithm)`**
+  — a JSON Web Key Set, each key selected by the kid a token names, read from
+  a file now and again whenever `readAgain()` is called: a valid set replaces
+  the one in force, anything else leaves it (0059).
 - **`resolveSecret(reference)`** — `env:NAME` or `file:/absolute/path`. Never
   the secret itself, and no error ever repeats one.
 - **`createDataServer(options)`** — `GET /health`, and `GET /v1/whoami`, which
@@ -318,6 +325,21 @@ are turned on by configuration:
 Without the store and the allowlist the server verifies tokens and nothing
 else, which is how a host is wired in before any form exists.
 
+The host's identity is set by exactly one of three settings, beside
+`FORMANCY_DATA_ISSUER`, `FORMANCY_DATA_AUDIENCE` and
+`FORMANCY_DATA_ATTRIBUTES`
+([0014](../../docs/decisions/0014-host-identity-is-verified-offline.md),
+[0059](../../docs/decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)):
+
+| Variable | Key |
+| --- | --- |
+| `FORMANCY_DATA_IDENTITY_SECRET` | A shared secret, HS256, as a secret reference. `FORMANCY_DATA_IDENTITY_ALGORITHM` is not read. |
+| `FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE` | A PEM public key, with `FORMANCY_DATA_IDENTITY_ALGORITHM` RS256, ES256 or EdDSA. HS256 beside it stops the process: a public key's text is never a shared secret. |
+| `FORMANCY_DATA_IDENTITY_KEYS_FILE` | The absolute path of a JSON Web Key Set, with `FORMANCY_DATA_IDENTITY_ALGORITHM` RS256, ES256, EdDSA or HS256 for every key in it, read again on SIGHUP. |
+
+`src/identity-settings.test.ts` holds what these accept and refuse. The two
+one-key settings rotate by restart; a key set rotates as below.
+
 | Variable | Sets |
 | --- | --- |
 | `FORMANCY_DATA_RATE_LIMIT` | Requests a minute each client address may send to every route but `/health`: a whole number of at least 1, 600 when unset. Anything else stops the process with a sentence naming the setting. Behind a reverse proxy every client shares the proxy's address, so the limit is one bucket for all of them: Fastify's `trustProxy` is not offered, and the setting raises that bucket rather than splitting it. |
@@ -397,6 +419,79 @@ the database's size and the date it was measured on, is in
 [`docs/performance.md`](../../docs/performance.md)
 ([0034](../../docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md));
 lists came after those figures, and 0044 says what measuring them needs.
+
+### Rotating the identity key
+
+A key set file is `{"keys":[…]}`, a provider's certs document as it is
+published. Each key in force needs a `kid` of `A-Z a-z 0-9 . _ ~ + / = -`,
+which selects it for a token that names it; a token without one is tried
+against each key in turn. A key that cannot verify the pinned algorithm --
+another `kty` or `crv`, a `use` other than `sig`, a `key_ops` without
+`verify`, another `alg` -- is left out and named in the log with the member
+that left it out, as Keycloak's `rsa-enc-generated` is `because: 'use'`. A
+private key member anywhere, a kid missing or repeated among the keys in
+force, a key that does not import, an RSA key under 2048 bits or with a
+public exponent that is even or under 65537, an Ed25519 point of small order,
+or an HS256 key under 32 bytes refuses the whole file, in a sentence naming
+the key by kid or by place and never quoting it. A kid is logged as written,
+so an HS256 key's kid is a name, never key material: one that is its own `k`,
+or 43 base64 characters or more -- as long as a secret -- refuses the file.
+The path must be a regular file; a FIFO or a directory is refused.
+
+Moving from the secret or the public key is one command, run where the
+server's environment is -- in the server's container, for example -- so it
+reads the setting exactly as the server does:
+
+```bash
+(umask 077; docker exec <server> node dist/identity-keys-cli.mjs convert host-1 > keys.json)
+```
+
+It writes the key the server verifies with today, under the kid you give, and
+says on standard error which settings to change. For HS256 the file is the
+shared secret: keep it as `FORMANCY_DATA_IDENTITY_SECRET`'s file is kept,
+readable only by the server's user or handed over as a Docker or Kubernetes
+secret, and write every set after it with the same `umask`. Do not write the set by
+hand from a secret: the secret's text is itself valid base64url, so pasted as
+`k` it is accepted and is another key, and a secret file's bytes as read keep
+the newline the server removes. Either way every token is refused.
+
+To rotate:
+
+1. Write the new set beside the one in use, in the directory that is mounted
+   -- mount the directory, not the file: a file bind-mounted on its own keeps
+   the inode it was given, and on Docker 29.8.1 a file renamed over it on the
+   host was not seen inside the container.
+2. Check it with the server's own reading:
+   `docker exec <server> node dist/identity-keys-cli.mjs check /run/identity/next.json HS256`
+   prints `in force: …` and `left out: …` and exits 0, or prints the refusal
+   and exits 1.
+3. Rename it over the old one, and signal the server:
+   `docker kill --signal HUP <server>`, `docker compose kill -s HUP server`,
+   `kill -HUP 1` inside the container, or `ExecReload=/bin/kill -HUP $MAINPID`
+   under systemd.
+4. Read the line it logs: `identity keys read again` with the kids `added`,
+   `removed` and `replaced`, `identity keys read again; nothing changed`, or,
+   at `error`, `identity keys not read again; the set in force is unchanged`
+   with the reason. A failed read keeps the set in force, a key you removed
+   included, and the same file stops the next start until it is fixed --
+   which is why step 2 comes first. A read that never returns, from a
+   network mount that stalls, logs nothing, and every signal after it waits
+   behind it: no line within seconds is that.
+
+On Kubernetes, mount the Secret as a volume and never through `subPath`,
+which Kubernetes says "does not receive automated Secret updates"; a volume
+is updated eventually, so wait until `check` inside the pod lists the new
+kids before `kubectl exec <pod> -- kill -HUP 1`, then compare the logged
+`added`, `removed` and `replaced` with what was written. A signal sent too
+early logs that nothing changed. Neither has been run through a cluster here.
+
+A provider's set reaches the file through the operator's own job -- a cron
+entry, a systemd timer, a CronJob -- that fetches the document, writes it to
+a temporary file, runs `check`, renames it into place, sends SIGHUP and reads
+the line. The server fetches nothing (0014). Each instance reads its keys on
+its own signal, and where no process can be sent one, natively on Windows, a
+set is read only at start. The planes line at start names the kids in force
+and what was left out. No line holds key material or a hash of the file.
 
 ## Licence
 
