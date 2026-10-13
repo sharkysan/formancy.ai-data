@@ -1,4 +1,4 @@
-import type { PolicyContext, PolicyOperation, PolicyRefusal, RowFilterRule } from './types.js'
+import type { CascadeRule, DeleteAction, PolicyContext, PolicyOperation, PolicyRefusal, RowFilterRule } from './types.js'
 
 /*
  * The two things a host hands this module — a context and a policy — read at
@@ -87,6 +87,8 @@ export interface ParsedPolicy {
   lookups: ReadonlyMap<string, readonly RowFilterRule[]>
   /** The lookup fields whose target's filter scopes the root too (0043), each once, in the policy's order; empty when the policy names none. */
   through: readonly string[]
+  /** The foreign keys a delete may act through, with their actions (0051), each once, in the policy's order; empty when the policy names none. */
+  cascades: readonly CascadeRule[]
 }
 
 /**
@@ -175,6 +177,55 @@ function readThrough(value: unknown, problems: string[]): string[] {
   return keys
 }
 
+const DELETE_ACTIONS: readonly DeleteAction[] = ['cascade', 'set-null', 'set-default']
+
+/** A table as a cascade names it: an object of two names, its schema and its own. */
+function readTableName(value: unknown, where: string, problems: string[]): { schema: string; name: string } | null {
+  if (!isRecord(value) || nameOrNull(value['schema']) === null || nameOrNull(value['name']) === null) {
+    problems.push(`${where} is not a table named by its schema and its name`)
+    return null
+  }
+  const before = problems.length
+  unread(value, ['schema', 'name'], `${where}.`, problems)
+  return problems.length === before ? { schema: value['schema'] as string, name: value['name'] as string } : null
+}
+
+/**
+ * The foreign keys a delete may act through (0051), each once; an absent
+ * property is none. An entry is named only when nothing is wrong with it,
+ * so one refused for a property this release does not read is not also
+ * reported as named twice.
+ */
+function readCascades(value: unknown, problems: string[]): CascadeRule[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) {
+    problems.push('cascades is not a list of the foreign keys a delete may act through')
+    return []
+  }
+  const rules: CascadeRule[] = []
+  for (const [index, entry] of (value as unknown[]).entries()) {
+    const at = `cascades[${String(index)}]`
+    if (!isRecord(entry)) {
+      problems.push(`${at} is not a foreign key named by its table and its name`)
+      continue
+    }
+    const before = problems.length
+    unread(entry, ['table', 'foreignKey', 'onDelete'], `${at}.`, problems)
+    const table = readTableName(entry['table'], `${at}.table`, problems)
+    const foreignKey = nameOrNull(entry['foreignKey'])
+    if (foreignKey === null) problems.push(`${at} names no foreign key`)
+    const onDelete = DELETE_ACTIONS.find((action) => action === entry['onDelete'])
+    if (onDelete === undefined) problems.push(`${at}.onDelete is not cascade, set-null or set-default, the actions a delete acts through`)
+    if (problems.length > before || table === null || foreignKey === null || onDelete === undefined) continue
+    if (rules.some((rule) => rule.table.schema === table.schema && rule.table.name === table.name && rule.foreignKey === foreignKey)) {
+      problems.push(`${at} names ${foreignKey} of ${table.schema}.${table.name} a second time`)
+    } else {
+      rules.push({ table, foreignKey, onDelete })
+    }
+  }
+  return rules
+}
+
 /**
  * The policy as the rest of this module uses it, or every reason it cannot be.
  *
@@ -185,7 +236,7 @@ function readThrough(value: unknown, problems: string[]): string[] {
 export function readPolicy(policy: unknown): { parsed: ParsedPolicy; problems: [] } | { parsed: null; problems: string[] } {
   if (!isRecord(policy)) return { parsed: null, problems: ['the policy is not an object'] }
   const problems: string[] = []
-  unread(policy, ['version', 'operations', 'fields', 'rowFilters', 'lookups', 'through'], '', problems)
+  unread(policy, ['version', 'operations', 'fields', 'rowFilters', 'lookups', 'through', 'cascades'], '', problems)
   if (policy['version'] !== 1) problems.push('version is not 1, the only policy version this release reads')
 
   const rawOperations = policy['operations']
@@ -214,7 +265,8 @@ export function readPolicy(policy: unknown): { parsed: ParsedPolicy; problems: [
   }
 
   const through = readThrough(policy['through'], problems)
+  const cascades = readCascades(policy['cascades'], problems)
 
   if (problems.length > 0) return { parsed: null, problems }
-  return { parsed: { operations, fields, rowFilters, lookups, through }, problems: [] }
+  return { parsed: { operations, fields, rowFilters, lookups, through, cascades }, problems: [] }
 }

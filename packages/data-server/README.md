@@ -178,7 +178,8 @@ existed would be documented and inert.
   ([0050](../../docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)):
   the policy before any statement, the table described and the delete
   planned over it, one guarded statement that deletes one row or none and
-  refuses a foreign key that would act on the delete. 200 `{ record,
+  refuses a foreign key that would act on the delete unless the policy's
+  `cascades` names it with its action ([0051](../../docs/decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)). 200 `{ record,
   deleted: true }`, the token of the row deleted and nothing of its values;
   404 not found or outside the person's rows; 409 `stale`, `drift` or
   `schema-changed`; 422 `referenced` while other rows refer to it, naming
@@ -188,8 +189,9 @@ existed would be documented and inert.
   again with that version deletes nothing else. Never a field error.
   Audited as `delete`, by the record's keyed hash. `GET /v1/forms/:id`
   lists `delete` where the bindings offer it, the policy grants it and the
-  database allows it, with `deleting: { cascades, clears, restricted }`,
-  `null` otherwise. `routes/runtime-deletes.test.ts` holds the route over
+  database allows it, with `deleting: { cascades, clears, restricted }` --
+  whether a key the policy accepts deletes or clears other rows, and
+  whether one may refuse the delete -- `null` otherwise. `routes/runtime-deletes.test.ts` holds the route over
   fake ports, and `e2e.integration.test.ts` and
   `e2e-lost-answer.integration.test.ts` on both engines.
 

@@ -67,6 +67,8 @@ const POLICY: FormPolicy = {
   lookups: {},
 }
 const READ_ONLY: FormPolicy = { ...POLICY, operations: { read: ['clerk'], create: [], update: [] } }
+/** The same, and the lines' key named with its action, so a delete of an order takes its lines (0051). */
+const CASCADING: FormPolicy = { ...POLICY, cascades: [{ table: ref('line'), foreignKey: 'fk_line_order', onDelete: 'cascade' }] }
 
 const verifyIdentity: IdentityVerifier = async (token) =>
   token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '1' } } }
@@ -132,6 +134,7 @@ beforeEach(async () => {
   const ticket = bundleOf('ticket', POLICY)
   await store.publish('ticket', null, ticket)
   await store.publish('read-only', null, { ...ticket, policy: READ_ONLY })
+  await store.publish('order', null, bundleOf('order', CASCADING))
   // A form published before 0050: its bindings say nothing of delete.
   const { delete: _offered, ...before } = ticket.bindings.operations
   await store.publish('before', null, { ...ticket, bindings: { ...ticket.bindings, operations: before }, policy: READ_ONLY })
@@ -314,6 +317,21 @@ describe('GET /v1/forms/:id and delete', () => {
     expect((await opened('ticket')).json()).toMatchObject({ operations: ['read'], deleting: null })
   })
 
+  // An order whose policy names its lines' key: a page says a delete
+  // removes other records with it, from the accepted key's action, and the
+  // route hands the port the reach the planner made -- the lines, and the
+  // key with the table it refers to -- which the adapter locks and guards
+  // (watched failing with GET's `deleting` worked out without the policy:
+  // cascades false).
+  test("says a delete cascades where the policy names the key, and hands the port that reach", async () => {
+    expect((await opened('order')).json()).toMatchObject({ operations: ['read', 'delete'], deleting: { cascades: true, clears: false, restricted: false } })
+    const response = await remove('order', { record: 'k1:7', version: VERSION })
+    expect(response.statusCode, response.body).toBe(200)
+    expect(deletes.map((request) => request.reach)).toEqual([
+      { removed: [ref('order'), ref('line')], cleared: [], accepted: [{ from: ref('line'), name: 'fk_line_order', onto: ref('order'), onDelete: 'cascade' }] },
+    ])
+  })
+
   // A form published before 0050 says nothing of delete, and offers none
   // (`offers()`), where the route once offered every flag not `false`.
   test('offers no delete on a form whose bindings say nothing of it', async () => {
@@ -324,13 +342,15 @@ describe('GET /v1/forms/:id and delete', () => {
 describe('the published bundle', () => {
   // What a delete also does is checked on publish and on every read, by
   // the planner's own function: an order whose lines cascade from it may
-  // not be deleted in 0050, and a role that deletes must read.
-  test('is refused when its policy grants delete over a cascade, or to a role that may not read', () => {
+  // be deleted only where its policy names the key with its action (0051),
+  // and a role that deletes must read.
+  test('is refused when its policy grants delete over a cascade it does not name, or to a role that may not read', () => {
     const order = bundleOf('order', POLICY)
     expect(validateBundle(order)).toEqual({
       ok: false,
-      problems: ['policy: operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.line (fk_line_order, ON DELETE CASCADE), which this release does not offer'],
+      problems: ['policy: operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.line (fk_line_order, ON DELETE CASCADE), which cascades does not accept'],
     })
+    expect(validateBundle(bundleOf('order', CASCADING))).toMatchObject({ ok: true })
     expect(validateBundle(bundleOf('line', POLICY))).toMatchObject({ ok: true })
     const blind = bundleOf('ticket', { ...POLICY, operations: { ...POLICY.operations, delete: ['clerk', 'purger'] } })
     expect(validateBundle(blind)).toEqual({

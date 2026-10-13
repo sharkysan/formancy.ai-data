@@ -102,10 +102,12 @@ export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
 export { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter, throughFilters } from './policy/evaluate.js'
 export { validatePolicy } from './policy/validate.js'
 export { isThroughKeyType, throughProblems, unscopedLookups } from './policy/through.js'
-export { actsOnDelete, deleteEffects, deleteProblems, deleteReach, grantsDelete, unaccepted } from './policy/cascades.js'
+export { actsOnDelete, deleteEffects, deleteProblems, deleteReach, grantsDelete, reachOf, reachTables, unaccepted } from './policy/cascades.js'
 export type { DeleteReachFacts } from './policy/cascades.js'
 export type { ThroughKeyType } from './policy/through.js'
 export type {
+  CascadeRule,
+  DeleteAction,
   FieldPolicy,
   ForcedValues,
   FormPolicy,
@@ -149,8 +151,8 @@ export type {
 } from './records/types.js'
 export { planCreate, planRead, planUpdate } from './records/plan.js'
 export { planDelete } from './records/delete.js'
-export { deleteTerms } from './records/delete-terms.js'
-export type { DeleteTerms } from './records/delete-terms.js'
+export { deleteTerms, reachesPast } from './records/delete-terms.js'
+export type { DeleteTerms, ReachTerms } from './records/delete-terms.js'
 export { listable, listColumns, listOrder, planList, recordPage } from './records/list.js'
 export { childFields } from './records/children.js'
 export type { ChildLookup, ParentKey, PublishedTable } from './records/children.js'

@@ -25,6 +25,15 @@
     "rowFilters": [{ "column": "tenant_id", "attribute": "tenant" }],
     "lookups": { "customer": [{ "column": "tenant_id", "attribute": "tenant" }] }
   },
+  "deleting": {
+    "formSuffix": "-delete",
+    "order": "k1:9007199254740993",
+    "cascades": [
+      { "table": { "schema": "sales", "name": "delivery" }, "foreignKey": "fk_delivery_order", "onDelete": "cascade" },
+      { "table": { "schema": "sales", "name": "order_line" }, "foreignKey": "fk_order_line_order", "onDelete": "cascade" },
+      { "table": { "schema": "sales", "name": "parcel" }, "foreignKey": "fk_parcel_delivery", "onDelete": "cascade" }
+    ]
+  },
   "generator": {
     "createOnly": "amount",
     "rowLevelSecurity": { "field": "customer", "table": "sales.customer" }

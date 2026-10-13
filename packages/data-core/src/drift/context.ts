@@ -14,10 +14,12 @@ export const WRITES: readonly Operation[] = ['create', 'update', 'delete']
 
 /**
  * What drift reads of a published policy: each lookup's filter, whose target
- * columns its searches compare (0028), and who may do what, by which a stop
- * of delete is decided blocking only where somebody may delete (0050).
+ * columns its searches compare (0028), who may do what, by which a stop of
+ * delete is decided blocking only where somebody may delete (0050), and the
+ * keys a delete may act through, by which a key onto a table it reaches is
+ * one the policy accepts or one that stops it (0051).
  */
-export type DriftPolicy = Pick<FormPolicy, 'lookups' | 'operations'>
+export type DriftPolicy = Pick<FormPolicy, 'lookups' | 'operations' | 'cascades'>
 
 /**
  * A change before its severity is known. The severity depends on the form as

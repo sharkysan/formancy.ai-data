@@ -200,7 +200,33 @@ describe('planDelete', () => {
     expect(planDelete(cascading, bindings, DELETE_ORDERS, CLERK, ORDER_TOKEN, ROWVERSION, described(cascading, bindings))).toMatchObject({
       ok: false,
       code: 'invalid-policy',
-      message: expect.stringMatching(/deleting a record of sales\.order also deletes rows of sales\.order_line \(fk_order_line_order, ON DELETE CASCADE\)/),
+      message: expect.stringMatching(/deleting a record of sales\.order also deletes rows of sales\.order_line \(fk_order_line_order, ON DELETE CASCADE\), which cascades does not accept/),
+    })
+  })
+
+  // Named in `cascades`, the key is accepted (0051), and the request says
+  // what the delete reaches: the lines it removes besides the order, and
+  // the key it may act through, with the table it refers to -- which each
+  // adapter's guard holds the database to, so a key the policy did not
+  // name refuses the delete there too (watched failing with the reach of
+  // the root alone: the adapters would have locked and guarded the order
+  // only).
+  test('carries the reach a policy accepts: the tables a cascade removes rows of, and each key it acts through', () => {
+    const cascading = factsSnapshot('sqlserver', (objects) => {
+      const key = objects.find((object) => object.ref.name === 'order_line')?.foreignKeys.find((candidate) => candidate.name === 'fk_order_line_order')
+      if (key !== undefined) key.onDelete = 'cascade'
+    })
+    const bindings = orderForm(cascading).bindings
+    const accepting: FormPolicy = { ...DELETE_ORDERS, cascades: [{ table: sales('order_line'), foreignKey: 'fk_order_line_order', onDelete: 'cascade' }] }
+    expect(planDelete(cascading, bindings, accepting, CLERK, ORDER_TOKEN, ROWVERSION, described(cascading, bindings))).toMatchObject({
+      ok: true,
+      request: {
+        reach: {
+          removed: [sales('order'), sales('order_line')],
+          cleared: [],
+          accepted: [{ from: sales('order_line'), name: 'fk_order_line_order', onto: sales('order'), onDelete: 'cascade' }],
+        },
+      },
     })
   })
 

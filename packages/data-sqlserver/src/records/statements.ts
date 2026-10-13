@@ -37,9 +37,12 @@ export const TRANSACTION_ENDED_MESSAGE = 'formancy: a trigger ended the transact
 /** Raised when the table's definition is not the one the write was decided over (0041), after the statement or in CATCH. */
 export const DEFINITION_MOVED = 51706
 export const DEFINITION_MOVED_MESSAGE = 'formancy: table definition moved'
-/** Raised when a delete's account cannot see every key that refers to the table, or one acts on the delete that it was not decided over (0050). */
+/** Raised when a delete's account cannot see every key that refers to a table the delete reaches, or one acts on the delete that it was not decided over (0050, 0051). */
 export const REACH_MOVED = 51707
 export const REACH_MOVED_MESSAGE = 'formancy: what refers to the table moved'
+/** Raised when a delete's account may not DELETE from a table past the root the delete reaches (0051). */
+export const REACH_UNDELETABLE = 51708
+export const REACH_UNDELETABLE_MESSAGE = 'formancy: this account may not delete from a table the delete reaches'
 
 /** A version as it is compared: the 8 bytes of a rowversion, or a version column's decimal string. */
 export type ExpectedVersion = { kind: 'rowversion'; bytes: Buffer } | { kind: 'version-column'; value: string }

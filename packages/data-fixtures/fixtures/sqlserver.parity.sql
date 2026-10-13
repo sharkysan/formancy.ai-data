@@ -198,4 +198,34 @@ create table parity.removable_ruled (
 );
 GO
 
+-- What a delete reaches past its record (0051): postgres.parity.sql's
+-- tables. SQL Server's unique key treats NULLs as equal, so the one over
+-- removable_null's reference takes its id too, as PostgreSQL's does, and
+-- holds any number of cleared rows.
+create table parity.removable_parent (
+  id int identity(1, 1) not null constraint pk_removable_parent primary key,
+  tenant_id int not null,
+  note nvarchar(50) null,
+  version int not null constraint df_removable_parent_version default 1
+);
+create table parity.removable_cascade (
+  id int identity(1, 1) not null constraint pk_removable_cascade primary key,
+  parent_id int not null constraint fk_removable_cascade_parent references parity.removable_parent (id) on delete cascade,
+  note nvarchar(50) null,
+  version int not null constraint df_removable_cascade_version default 1
+);
+create table parity.removable_grandchild (
+  id int identity(1, 1) not null constraint pk_removable_grandchild primary key,
+  cascade_id int not null constraint fk_removable_grandchild_cascade references parity.removable_cascade (id) on delete cascade,
+  note nvarchar(50) null
+);
+create table parity.removable_null (
+  id int identity(1, 1) not null constraint pk_removable_null primary key,
+  parent_id int null constraint fk_removable_null_parent references parity.removable_parent (id) on delete set null,
+  note nvarchar(50) null,
+  version int not null constraint df_removable_null_version default 1,
+  constraint uq_removable_null_parent unique (parent_id, id)
+);
+GO
+
 update statistics parity.tenant_item with fullscan;

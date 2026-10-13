@@ -8,6 +8,8 @@ import {
   NOT_ONE_ROW_MESSAGE,
   REACH_MOVED,
   REACH_MOVED_MESSAGE,
+  REACH_UNDELETABLE,
+  REACH_UNDELETABLE_MESSAGE,
   TEXT_NOT_STORED,
   TEXT_NOT_STORED_MESSAGE,
   TRANSACTION_ENDED,
@@ -186,7 +188,14 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
   }
   if (error.number === REACH_MOVED && error.message === REACH_MOVED_MESSAGE) {
     // The batch rolled the delete back, and whatever a key it was not decided over did with it (0050).
-    return failure('schema-changed', 'A foreign key now acts on a delete from this table that this delete was not decided over, or this account can no longer see every key that refers to it; nothing was deleted.')
+    return failure(
+      'schema-changed',
+      'A foreign key now acts on this delete that it was not decided over, or this account can no longer see every key that refers to a table it reaches; nothing was deleted.',
+    )
+  }
+  if (error.number === REACH_UNDELETABLE && error.message === REACH_UNDELETABLE_MESSAGE) {
+    // The batch rolled the delete back, and what its cascade did with it (0051).
+    return failure('permission-denied', 'This account may not DELETE from a table this delete reaches, so the delete was refused and rolled back; nothing was deleted.')
   }
   const index = error.number === TEXT_NOT_STORED ? TEXT_NOT_STORED_MESSAGE.exec(error.message)?.[1] : undefined
   if (index === undefined) return undefined

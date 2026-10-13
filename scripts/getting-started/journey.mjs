@@ -167,8 +167,8 @@ export function writeServerRecord(record, dir = repo) {
 /** A write's id as data-client makes one: 32 hex characters, new for every write (0031). */
 const writeId = () => randomBytes(16).toString('hex')
 
-/** The admin's half for one form: propose through the writer's account and publish with journey.json's policy. */
-async function publish(base, admin, form, journey) {
+/** The admin's half for one form: propose through the writer's account and publish with journey.json's policy, or `policyOf`'s. */
+async function publish(base, admin, form, journey, policyOf = (policy) => policy) {
   const at = `${form.connection}:`
   const connections = await call(base, 'GET', '/v1/connections', { token: admin })
   expectStatus(`${at} GET /v1/connections`, connections, 200)
@@ -202,7 +202,7 @@ async function publish(base, admin, form, journey) {
     expectEqual(`${at} the label of ${entry.field}`, generated.model.fields.find((candidate) => candidate.key === entry.field)?.label, entry.label)
   }
 
-  const policy = { version: 1, ...journey.policy }
+  const policy = policyOf({ version: 1, ...journey.policy })
   policy.fields = fieldsFromOperations(policy, bindings)
   const bundle = { format: 2, connection: form.connection, generation, base: generated, presentation: EMPTY_PRESENTATION, form: generated, bindings, policy, snapshot }
   const published = await call(base, 'POST', `/v1/forms/${form.formId}/versions`, { token: admin, body: { expectedBase: null, bundle } })
@@ -269,10 +269,61 @@ async function use(base, tokens, form, journey) {
   return record
 }
 
-/** One engine's journey, admin then clerks. Returns the record tenant 1's clerk created. Throws a sentence naming the engine and the request. */
+/**
+ * A delete of an order with what it reaches (0051), on a second form over
+ * the same table: journey.json's policy, delete granted to the clerks, and
+ * every key a delete of an order acts through named in `cascades` -- its
+ * lines and deliveries, and the deliveries' parcels. The order is the
+ * fixture's own, tenant 1's, which has a line, three deliveries and two
+ * parcels, so the delete reaches rows in every one of those tables. The
+ * guide's own form stays as the studio publishes it, which has no delete
+ * roles to choose yet, and the order the journey created stays for the
+ * start after `down`. Tenant 1's clerk reads the order, tenant 2's is told
+ * 404 for its delete, tenant 1's deletes it, and it is then not found.
+ * Exported for journey.test.mjs.
+ */
+export async function deletion(base, tokens, form, journey) {
+  const at = `${form.connection}:`
+  const deleting = { ...form, formId: `${form.formId}${journey.deleting.formSuffix}` }
+  await publish(base, tokens.admin, deleting, journey, (policy) => ({
+    ...policy,
+    operations: { ...policy.operations, delete: [...policy.operations.read] },
+    cascades: journey.deleting.cascades,
+  }))
+  const definition = await call(base, 'GET', `/v1/forms/${deleting.formId}`, { token: tokens.clerk1 })
+  expectStatus(`${at} GET /v1/forms/${deleting.formId}`, definition, 200)
+  if (!definition.json.operations.includes('delete')) throw new Error(`${at} ${deleting.formId} does not offer tenant 1's clerk delete`)
+  expectEqual(`${at} what a delete of an order on ${deleting.formId} also does`, definition.json.deleting, { cascades: true, clears: false, restricted: false })
+
+  await deleteOrder(base, tokens, deleting.formId, journey.deleting.order, at)
+}
+
+/**
+ * The clerks' half of `deletion`, over HTTP: tenant 1's clerk reads the
+ * order for the version a delete names, tenant 2's delete of it is not
+ * found, tenant 1's deletes it -- answered with its token and nothing of it
+ * -- and reading it again is not found. Exported for journey.test.mjs.
+ */
+export async function deleteOrder(base, tokens, formId, record, at) {
+  const path = (rest) => `/v1/forms/${formId}/${rest}`
+  const read = await call(base, 'POST', path('records/read'), { token: tokens.clerk1, body: { record } })
+  expectStatus(`${at} reading the order on ${formId}`, read, 200)
+  const { version } = read.json
+  const theirs = await call(base, 'POST', path('records/delete'), { token: tokens.clerk2, body: { record, version }, headers: { 'formancy-write-id': writeId() } })
+  expectStatus(`${at} tenant 2 deleting tenant 1's order`, theirs, 404)
+  const deleted = await call(base, 'POST', path('records/delete'), { token: tokens.clerk1, body: { record, version }, headers: { 'formancy-write-id': writeId() } })
+  expectStatus(`${at} records/delete of tenant 1's order`, deleted, 200)
+  expectEqual(`${at} what records/delete answered`, deleted.json, { record, deleted: true })
+  const gone = await call(base, 'POST', path('records/read'), { token: tokens.clerk1, body: { record } })
+  expectStatus(`${at} reading the order tenant 1 deleted`, gone, 404)
+}
+
+/** One engine's journey, admin then clerks, then a delete. Returns the record tenant 1's clerk created and kept. Throws a sentence naming the engine and the request. */
 export async function journeyFor(base, tokens, form, journey) {
   await publish(base, tokens.admin, form, journey)
-  return use(base, tokens, form, journey)
+  const record = await use(base, tokens, form, journey)
+  await deletion(base, tokens, form, journey)
+  return record
 }
 
 /** One request with its target exactly as written, on a connection of its own: node:http sends the path it is given, where fetch's URL parser may rewrite one. */

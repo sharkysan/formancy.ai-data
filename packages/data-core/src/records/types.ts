@@ -173,17 +173,17 @@ export interface UpdateRequest {
 }
 
 /**
- * What a delete of one record reaches through foreign keys (0050), as the
- * planner decided it from the snapshot and the policy: what each adapter's
- * statement holds the database to, so a key that would act differently is
- * refused there rather than followed.
- *
- * In 0050 a delete reaches the root alone: `removed` is the root, and
- * `cleared` and `accepted` are empty. The shape is the one a delete that
- * cascades by name will fill in (0051).
+ * What a delete of one record reaches through foreign keys (0050, 0051), as
+ * the planner decided it from the snapshot and the policy: the tables it
+ * removes rows of, through every cascade the policy accepts and on from
+ * there, those whose references it sets NULL or to a default, and each key
+ * it acts through. What each adapter's statement holds the database to:
+ * the adapters lock and guard what it names, ask the account's DELETE on
+ * every table past the root, and refuse a delete through any key it does
+ * not name rather than follow it.
  */
 export interface DeleteReach {
-  /** The tables a delete removes rows of, the root first. */
+  /** The tables a delete removes rows of, the root first, then the rest in codepoint order of schema and name. */
   removed: readonly ObjectRef[]
   /** The tables whose referencing columns a delete sets NULL or to their default, and those columns. */
   cleared: ReadonlyArray<{ table: ObjectRef; columns: readonly string[] }>

@@ -26,6 +26,12 @@ import type { DescribedTable } from './types.js'
  * (0041); and then the token and the version. The policy comes first, so a
  * person it refuses is told only that (0044).
  *
+ * The request carries the reach (0051): every table a cascade the policy
+ * accepts removes rows of, every one a SET NULL or SET DEFAULT it accepts
+ * clears, and each key it accepts, with the table it refers to. The
+ * adapters lock and guard exactly that, so a key the policy did not name is
+ * refused there too.
+ *
  * No field is asked: a delete writes none, and a key field the actor may
  * not read is no reason to refuse -- a delete hands out nothing but the
  * token it was sent, as a read does, where a list hands out one per row.
@@ -72,7 +78,7 @@ export function planDelete(
       expectedVersion,
       filters: filters.filters,
       through: through.through,
-      reach: deleteReach(snapshot, bindings.root).reach,
+      reach: deleteReach(snapshot, bindings.root, policy).reach,
       definition: described.definition,
     },
   }

@@ -15,6 +15,7 @@ import {
   validatePolicy,
 } from '@formancy/data-core'
 import type {
+  CascadeRule,
   DeleteOutcome,
   FormBindings,
   FormPolicy,
@@ -130,6 +131,12 @@ beforeAll(async () => {
   }
   for (const [id, tenant, order, carrier] of UUID_ROWS.deliveries) {
     await owner.unsafe('insert into sales.delivery (id, tenant_id, order_id, carrier) values ($1::uuid, $2::int, $3::bigint, $4)', [id, tenant, order, carrier])
+  }
+  for (const [order, line] of UUID_ROWS.lines) {
+    await owner.unsafe('insert into sales.order_line (order_id, line_no, quantity, unit_price) values ($1::bigint, $2::int, 1, 1.00)', [order, line])
+  }
+  for (const [delivery, label] of UUID_ROWS.parcels) {
+    await owner.unsafe('insert into sales.parcel (delivery_id, label) values ($1::uuid, $2)', [delivery, label])
   }
   writer = postgres(fixture.writer, { onnotice: () => {} })
   snapshot = await discoverPostgres(writer, FIXTURE_SCOPE)
@@ -251,29 +258,88 @@ describe('generation', covers('postgres', uuidCase('generated')), () => {
 })
 
 describe('a delete', covers('postgres', uuidCase('delete')), () => {
-  // 0050 lets a delete reach nothing past its record through a foreign key,
-  // and 0056's tables cascade: a parcel's key from its delivery, and a
-  // delivery's from its order, beside a line's. Asked over what the order
-  // form's own account discovers, as the publish check asks it -- the
-  // policy's fit, then what a delete also does -- a grant of delete is
-  // refused on the delivery form, which offers one over its version column
-  // (0057), for the parcels a delete would take with it, and for nothing
-  // else; and on the order form for its deliveries and its lines, so no
-  // order is deleted yet. Without the grant, neither form is refused
+  const refused = (bindings: FormBindings, policy: FormPolicy): string[] => {
+    const fit = validatePolicy(policy, bindings)
+    return [...(fit.ok ? [] : fit.problems), ...deleteProblems(snapshot, bindings, policy)]
+  }
+  const deleting = (policy: FormPolicy, cascades?: ReadonlyArray<CascadeRule>): FormPolicy => ({
+    ...policy,
+    operations: { ...policy.operations, delete: ['clerk'] },
+    ...(cascades === undefined ? {} : { cascades: cascades.map((entry) => ({ ...entry, table: { ...entry.table } })) }),
+  })
+
+  // A delete reaches past its record only through a key the policy names
+  // in `cascades` with its action (0051), and 0056's tables cascade: a
+  // parcel's key from its delivery, and a delivery's from its order, beside
+  // a line's. Asked over what the order form's own account discovers, as
+  // the publish check asks it -- the policy's fit, then what a delete also
+  // does -- a grant of delete under a policy that names no key is refused
+  // on the delivery form, which offers one over its version column (0057),
+  // for the parcels a delete would take with it, and for nothing else; and
+  // on the order form for its deliveries, its lines and, through the
+  // deliveries, their parcels. Without the grant, neither form is refused
   // anything: the refusals are the delete's. A parcel has no version
   // column, so it offers no delete at all.
-  test('is refused on the delivery form for its parcels, and on the order form for its deliveries and its lines', () => {
-    const refused = (bindings: FormBindings, policy: FormPolicy): string[] => {
-      const fit = validatePolicy(policy, bindings)
-      return [...(fit.ok ? [] : fit.problems), ...deleteProblems(snapshot, bindings, policy)]
-    }
-    const deleting = (policy: FormPolicy): FormPolicy => ({ ...policy, operations: { ...policy.operations, delete: ['clerk'] } })
+  test('is refused on the delivery form for its parcels, and on the order form for its deliveries, its lines and their parcels', () => {
     expect(refused(deliveries, deleting(DELIVERY_POLICY))).toEqual(UUID_PARITY.delete.delivery)
     expect(refused(deliveries, DELIVERY_POLICY)).toEqual([])
     const orders = generateForm(snapshot, ORDER).bindings
     expect(refused(orders, deleting(ORDER_POLICY))).toEqual(UUID_PARITY.delete.order)
     expect(refused(orders, ORDER_POLICY)).toEqual([])
     expect({ update: parcels.operations.update, delete: parcels.operations.delete }).toEqual(UUID_PARITY.delete.parcel)
+  })
+
+  /** What is left of the delete case's order: the order, its line, its two deliveries and their parcels, counted by the owner. */
+  async function left(): Promise<{ orders: number; lines: number; deliveries: number; parcels: number }> {
+    const { order, deliveries: keys } = UUID_PARITY.delete.left
+    const [row] = await owner.unsafe<Array<{ orders: number; lines: number; deliveries: number; parcels: number }>>(
+      `select (select count(*)::int from sales."order" where id = $1::bigint) as orders,
+              (select count(*)::int from sales.order_line where order_id = $1::bigint) as lines,
+              (select count(*)::int from sales.delivery where id in ($2::uuid, $3::uuid)) as deliveries,
+              (select count(*)::int from sales.parcel where delivery_id in ($2::uuid, $3::uuid)) as parcels`,
+      [order, ...keys],
+    )
+    if (row === undefined) throw new Error('nothing counted')
+    return row
+  }
+
+  /** Tenant 2's delete of `record` as the server runs one: read for the version a person names, then planned over the table as it is now. */
+  async function removed(bindings: FormBindings, policy: FormPolicy, record: string): Promise<{ version: string; outcome: DeleteOutcome }> {
+    const reading = planRead(snapshot, bindings, policy, OTTO, record)
+    if (!reading.ok) throw new Error(`expected a read, got ${reading.code}: ${reading.message}`)
+    const found = await records.read(reading.request)
+    if (!found.ok || found.record === null) throw new Error(`expected ${record}`)
+    const version = found.record.version as string
+    const plan = planDelete(snapshot, bindings, policy, OTTO, record, version, await described(bindings))
+    if (!plan.ok) throw new Error(`expected a delete, got ${plan.code}: ${plan.message}`)
+    return { version, outcome: await records.delete(plan.request) }
+  }
+
+  // Named with their actions, the keys are the policy's to accept (0051):
+  // the delivery form's names its parcels' key, the order form's all three,
+  // and neither is refused anything. Tenant 2's clerk then deletes one of
+  // an order's deliveries by its uuid token, at the version its version
+  // column was read at, and its two parcels go with it; then that order,
+  // and its line, its other delivery and that delivery's parcel go with it.
+  // Each runs as the order form's own account and takes the locked path, a
+  // delete that reaches past its record: the delivery's, keyed by a uuid
+  // 0057 counts as numbered, is the one no other suite runs, and a guard or
+  // a lock that lost the uuid key's table, or a DELETE check that asked of
+  // the parcels anything the account lacks, would refuse it or delete
+  // nothing (watched failing with the guard accepting no key, as 0050's
+  // did: the delivery's delete was answered schema-changed).
+  test("deletes a delivery with its parcels, and then its order with its line, its other delivery and that one's parcel, once the policy names each key", async () => {
+    const { cascades, removed: sent, left: { counts } } = UUID_PARITY.delete
+    const orders = generateForm(snapshot, ORDER).bindings
+    const named = { delivery: deleting(DELIVERY_POLICY, cascades.delivery), order: deleting(ORDER_POLICY, cascades.order) }
+    expect([refused(deliveries, named.delivery), refused(orders, named.order)]).toEqual([[], []])
+    expect(await left()).toEqual(counts[0])
+    const delivery = await removed(deliveries, named.delivery, sent.delivery.record)
+    expect(delivery.outcome).toEqual({ ok: true, deleted: { values: sent.delivery.values, version: delivery.version } })
+    expect(await left()).toEqual(counts[1])
+    const order = await removed(orders, named.order, sent.order.record)
+    expect(order.outcome).toEqual({ ok: true, deleted: { values: sent.order.values, version: order.version } })
+    expect(await left()).toEqual(counts[2])
   })
 })
 

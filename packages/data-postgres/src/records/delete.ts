@@ -1,4 +1,4 @@
-import type { DeleteRequest, DeleteTerms, ObjectRef } from '@formancy/data-core'
+import type { DeleteRequest, DeleteTerms, ObjectRef, ReachTerms } from '@formancy/data-core'
 import { DECLARED_FOREIGN_KEY } from '../discovery/foreign-keys.js'
 import { op } from '../sql/catalog.js'
 import { quoteTable } from '../sql/identifiers.js'
@@ -14,58 +14,123 @@ import type { RecordStatement, WritePath } from './sql.js'
  * the statement that tells why it deleted nothing.
  */
 
-/**
- * Whether no declared foreign key that acts on delete -- cascades, sets NULL
- * or sets a default -- refers to `table` or to any relation below it (0050).
- * In 0050 a delete reaches nothing past its record, and the planner refuses
- * a grant over such a key by the snapshot (`deleteProblems`); this is the
- * same rule asked of the catalog in the statement, so a key added after
- * the form was published is refused there rather than followed.
- *
- * The table is found by its bound names, as the definition's facts find it.
- * Every declared key is read, its triggers enabled or not: a key one of
- * whose triggers is disabled may still act, and one enabled again acts with
- * nothing here noticing (0049). `DECLARED_FOREIGN_KEY` is discovery's own
- * condition, so the clones PostgreSQL makes onto each partition of a
- * partitioned table are not read twice. Below the table -- its partitions
- * at any depth, and the tables that inherit from it -- because a key that
- * names one of them acts on the rows a delete from the table removes there
- * (0049, P2b), and the snapshot names those only as a gap.
- *
- * Complete for a key added onto the table or a relation below it: ADD
- * FOREIGN KEY ... REFERENCES a relation needs SHARE ROW EXCLUSIVE on it, which
- * conflicts with the delete's ROW EXCLUSIVE, so such a key either committed
- * before the statement's snapshot, and is read here, or waits until the
- * delete ends. Under READ COMMITTED the statement takes its snapshot after
- * it has locked what it plans, partitions included. Under another
- * isolation it takes it before it plans, so the locked path first locks the
- * table with every relation below it (`lockStatement`): an ALTER onto a
- * partition locks the partition alone, and with only the table locked
- * first, a key onto a partition committed while the delete waited acted
- * unseen. The `reach-moved` cases and the partition case hold both orders,
- * the partition case on both paths; a key onto an inheritance child, and a
- * partition attached while the delete waits, are not tested (0050).
- * pg_constraint has no index on
- * confrelid: measured on postgres:17-alpine (17.11), 2026-10-11 (P8), the
- * lookup is a sequential scan of pg_constraint, which held 124 rows in that
- * database -- a cost per delete that grows with the constraints of the
- * whole database, not measured past that.
- */
-export function reachClear(statement: Statement, table: ObjectRef): string {
-  const schema = statement.text(table.schema)
-  const name = statement.text(table.name)
-  return `not exists (
-    with recursive "below"("relid") as (
-      select c.oid
-      from pg_catalog.pg_class c
-      join pg_catalog.pg_namespace n on n.oid ${op('=')} c.relnamespace
-      where n.nspname ${op('=')} ${schema} and c.relname ${op('=')} ${name}
+/** pg_constraint's code for each action a delete acts through. */
+const ACTION_CODES: Readonly<Record<ReachTerms['accepted'][number]['onDelete'], string>> = { cascade: 'c', 'set-null': 'n', 'set-default': 'd' }
+
+/** `tables` as the relations they name and every relation below each -- partitions at any depth, tables that inherit -- with `extra` carried along: a recursive CTE's two halves. */
+function below(statement: Statement, name: string, tables: ReadonlyArray<{ table: ObjectRef; extra?: string }>): string {
+  const carried = tables.some((entry) => entry.extra !== undefined)
+  const rows = tables.map(({ table, extra }) => `(${statement.text(table.schema)}, ${statement.text(table.name)}${carried ? `, ${statement.text(extra ?? null)}` : ''})`)
+  return `"${name}"("relid"${carried ? ', "extra"' : ''}) as (
+      select c.oid${carried ? ', "t"."extra"' : ''}
+      from (values ${rows.join(', ')}) as "t"("schema", "name"${carried ? ', "extra"' : ''})
+      join pg_catalog.pg_namespace n on n.nspname ${op('=')} "t"."schema"
+      join pg_catalog.pg_class c on c.relnamespace ${op('=')} n.oid and c.relname ${op('=')} "t"."name"
       union
-      select i.inhrelid from pg_catalog.pg_inherits i join "below" on i.inhparent ${op('=')} "below"."relid"
-    )
+      select i.inhrelid${carried ? ', "' + name + '"."extra"' : ''} from pg_catalog.pg_inherits i join "${name}" on i.inhparent ${op('=')} "${name}"."relid"
+    )`
+}
+
+/**
+ * Whether every declared foreign key that acts on delete -- cascades, sets
+ * NULL or sets a default -- onto a table the delete removes rows of, or onto
+ * any relation below one, is a key the reach accepts, by the table it is on,
+ * its name, the table it refers to and its action; and whether no key
+ * follows a column the delete clears by an ON UPDATE that acts (0050, 0051).
+ * The planner refuses a grant over any other by the snapshot
+ * (`deleteProblems`); this is the same rule asked of the catalog in the
+ * statement, so a key added after the form was published is refused there
+ * rather than followed.
+ *
+ * Every table is found by its bound names, as the definition's facts find
+ * it; no identifier is spliced. Every declared key is read, its triggers
+ * enabled or not: a key one of whose triggers is disabled may still act,
+ * and one enabled again acts with nothing here noticing (0049).
+ * `DECLARED_FOREIGN_KEY` is discovery's own condition, so the clones
+ * PostgreSQL makes onto each partition of a partitioned table are not read
+ * twice. Below each table -- its partitions at any depth, and the tables
+ * that inherit from it -- because a key that names one of them acts on the
+ * rows a delete from the table removes there (0049, P2b), and the snapshot
+ * names those only as a gap; such a key is never one the reach accepts,
+ * which names the table itself.
+ *
+ * Complete for a key added onto any table of the reach: ADD FOREIGN KEY
+ * ... REFERENCES a relation needs SHARE ROW EXCLUSIVE on it, which
+ * conflicts with ROW EXCLUSIVE, so such a key either committed before the
+ * statement's snapshot, and is read here, or waits until the delete ends --
+ * because the delete holds that lock on every table it reaches before its
+ * snapshot. On the root alone a statement takes it itself under READ
+ * COMMITTED; past it, a cascade opens each table only after the snapshot,
+ * so a delete that reaches past its root locks every table first
+ * (`reachLockStatement`), and one that reaches only its root locks it with
+ * every relation below it on the locked path (0050). The `reach-moved`
+ * cases hold both orders, on both paths; a key onto an inheritance child,
+ * and a partition attached while the delete waits, are not tested (0050).
+ * pg_constraint has no index on confrelid: measured on postgres:17-alpine
+ * (17.11), 2026-10-11 (P8), the lookup is a sequential scan of
+ * pg_constraint, which held 124 rows in that database -- a cost per delete
+ * that grows with the constraints of the whole database, not measured past
+ * that.
+ */
+export function reachClear(statement: Statement, reach: ReachTerms): string {
+  const accepted =
+    reach.accepted.length === 0
+      ? ''
+      : `
+      and not exists (
+        select from (values ${reach.accepted
+          .map((key) => `(${[key.from.schema, key.from.name, key.name, key.onto.schema, key.onto.name, ACTION_CODES[key.onDelete]].map((value) => statement.text(value)).join(', ')})`)
+          .join(', ')}) as "a"("from_schema", "from_name", "key", "onto_schema", "onto_name", "action")
+        join pg_catalog.pg_namespace fn on fn.nspname ${op('=')} "a"."from_schema"
+        join pg_catalog.pg_class f on f.relnamespace ${op('=')} fn.oid and f.relname ${op('=')} "a"."from_name"
+        join pg_catalog.pg_namespace tn on tn.nspname ${op('=')} "a"."onto_schema"
+        join pg_catalog.pg_class t on t.relnamespace ${op('=')} tn.oid and t.relname ${op('=')} "a"."onto_name"
+        where k.conrelid ${op('=')} f.oid and k.conname ${op('=')} "a"."key" and k.confrelid ${op('=')} t.oid and k.confdeltype ${op('=')} "a"."action"::pg_catalog."char"
+      )`
+  const removed = `not exists (
+    with recursive ${below(statement, 'removed', reach.removed.map((table) => ({ table })))}
     select from pg_catalog.pg_constraint k
-    join "below" on k.confrelid ${op('=')} "below"."relid"
-    where ${DECLARED_FOREIGN_KEY} and k.confdeltype ${op('=')} any ('{c,n,d}'::pg_catalog."char"[])
+    join "removed" on k.confrelid ${op('=')} "removed"."relid"
+    where ${DECLARED_FOREIGN_KEY} and k.confdeltype ${op('=')} any ('{c,n,d}'::pg_catalog."char"[])${accepted}
+  )`
+  if (reach.cleared.length === 0) return removed
+  const cleared = reach.cleared.flatMap(({ table, columns }) => columns.map((extra) => ({ table, extra })))
+  return `${removed} and not exists (
+    with recursive ${below(statement, 'cleared', cleared)}
+    select from pg_catalog.pg_constraint k
+    join "cleared" on k.confrelid ${op('=')} "cleared"."relid"
+    join pg_catalog.pg_attribute a on a.attrelid ${op('=')} k.confrelid and a.attnum ${op('=')} any (k.confkey) and a.attname ${op('=')} "cleared"."extra"
+    where ${DECLARED_FOREIGN_KEY} and k.confupdtype ${op('=')} any ('{c,n,d}'::pg_catalog."char"[])
+  )`
+}
+
+/**
+ * Whether the account may DELETE from every table past the root a delete
+ * reaches -- every other table it removes rows of, and every table it
+ * clears a reference in -- or nothing, for a delete that reaches no further
+ * than its root, whose own DELETE the statement asks itself (0051).
+ *
+ * PostgreSQL asks the deleting account nothing of those tables: a cascade
+ * or a SET NULL runs as the referring table's owner (0051 P5). And the ROW
+ * EXCLUSIVE lock the delete takes on each first is granted with any grant
+ * to write it, not DELETE alone -- measured on postgres:17-alpine (17.11),
+ * 2026-10-12: with INSERT on a cascaded table and DELETE revoked, the lock
+ * was taken and the cascade deleted its rows. So the statement asks:
+ * `has_table_privilege` reads the current user's grants as a DELETE from
+ * the table would, roles it inherits included, and a table the bound names
+ * no longer find is a refusal too. Asked by the statement, under the lock;
+ * the follow-up after no row asks the same, so the refusal is
+ * `permission-denied` with nothing deleted, as SQL Server's 51708 is.
+ */
+export function reachDeletable(statement: Statement, reach: ReachTerms): string | undefined {
+  const past = [...reach.removed.slice(1), ...reach.cleared.map((entry) => entry.table)]
+  if (past.length === 0) return undefined
+  const rows = past.map((table) => `(${statement.text(table.schema)}, ${statement.text(table.name)})`).join(', ')
+  return `not exists (
+    select from (values ${rows}) as "t"("schema", "name")
+    left join pg_catalog.pg_namespace n on n.nspname ${op('=')} "t"."schema"
+    left join pg_catalog.pg_class c on c.relnamespace ${op('=')} n.oid and c.relname ${op('=')} "t"."name"
+    where not coalesce(pg_catalog.has_table_privilege(c.oid, 'DELETE'), false)
   )`
 }
 
@@ -119,9 +184,11 @@ export function deleteStatement(request: DeleteRequest, terms: DeleteTerms, defi
     ...located(statement, terms.key, terms.terms, terms.through),
     versionIs(statement, { target: request.target, expectedVersion: terms.expectedVersion }),
     ...guard(statement, terms.root, definition, path),
-    reachClear(statement, terms.root),
+    reachClear(statement, terms.reach),
     unruled(statement, terms.root),
   ]
+  const deletable = reachDeletable(statement, terms.reach)
+  if (deletable !== undefined) where.push(deletable)
   const returning = request.target.identity.map((entry, index) => `${canonicalText(entry.type, column(entry.name))} as "c${String(index)}"`)
   returning.push(`${column(request.target.concurrency.column)}::pg_catalog.text as "version"`)
   const text = [
@@ -137,21 +204,24 @@ export function deleteStatement(request: DeleteRequest, terms: DeleteTerms, defi
 /**
  * Why a delete deleted nothing, in one statement, on any connection: whether
  * the table's definition is still the one it was decided over, whether
- * anything now acts on delete through a key onto it, whether no rule acts
- * on a delete from it, the isolation this connection runs under, and
- * whether the record exists inside the filters and throughs and, when
- * `withVersion`, still has the version sent -- `true`, `false`, or NULL for
- * no such record. None of the digest, the reach and the rules depends on a
- * session (definition.ts), so any connection answers them as the delete's
- * would.
+ * anything now acts on delete through a key onto a table it reaches,
+ * whether the account may still DELETE from every table past the root,
+ * whether no rule acts on a delete from it, the isolation this connection
+ * runs under, and whether the record exists inside the filters and throughs
+ * and, when `withVersion`, still has the version sent -- `true`, `false`,
+ * or NULL for no such record. None of the digest, the reach and the rules
+ * depends on a session (definition.ts), and the grants are the current
+ * user's, the account every connection of the pool logs in as, so any
+ * connection answers them as the delete's would.
  */
 export function whyNotDeletedStatement(request: DeleteRequest, terms: DeleteTerms, withVersion: boolean, definition: Definition): RecordStatement {
   const statement = new Statement()
   const same = `(${digestOf(factsOf(statement, terms.root))} ${op('=')} ${statement.text(definition.digest)})::pg_catalog.text`
-  const reach = `(${reachClear(statement, terms.root)})::pg_catalog.text`
+  const reach = `(${reachClear(statement, terms.reach)})::pg_catalog.text`
+  const deletable = `(${reachDeletable(statement, terms.reach) ?? 'true'})::pg_catalog.text`
   const rules = `(${unruled(statement, terms.root)})::pg_catalog.text`
   const where = located(statement, terms.key, terms.terms, terms.through)
   const unchanged = withVersion ? `(${versionIs(statement, { target: request.target, expectedVersion: terms.expectedVersion })})::pg_catalog.text` : `'false'`
   const found = `${selectFrom(terms.root, [`${unchanged} as "unchanged"`], where)}\nlimit 1`
-  return { text: `select ${same}, ${reach}, ${rules}, ${ISOLATION}, "found"."unchanged"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`, params: statement.params }
+  return { text: `select ${same}, ${reach}, ${deletable}, ${rules}, ${ISOLATION}, "found"."unchanged"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`, params: statement.params }
 }

@@ -24,9 +24,9 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > **Status: in development, nothing released.** Each line under *What it does*
 > links the decision record whose **Verified by** names what fails when the
 > line stops being true. Not yet: a release, a page here that deletes a
-> record, a delete that reaches another table through a foreign key, a
-> policy step in the studio that grants delete, a host page that draws a
-> field an update may not write as read-only
+> record, a policy step in the studio that grants delete or names what a
+> delete may act through, a delete figure on the performance page, a host
+> page that draws a field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
 > a run through a real Cloudflare tunnel, and a licence a lawyer has
 > reviewed.
@@ -144,15 +144,24 @@ is not licensed for production.
   `gen_random_uuid()` or `newsequentialid()` fills, as the snapshot spells
   the default, and that no foreign key includes -- so PostgreSQL's
   deliveries offer it, and its order lines, whose key people type, do
-  not. A policy may not grant it while another table's foreign key would
-  cascade, clear or set a default on a delete, so the fixture's orders,
-  whose lines and deliveries cascade, and its deliveries, whose parcels
-  do, are not deleted yet.
-  Triggers that run on a delete are the database's, and on PostgreSQL a
-  rule that acts on one makes every delete of its table refused. No page
+  not. Triggers that run on a delete are the database's, and on PostgreSQL
+  a rule that acts on one makes every delete of its table refused. No page
   here deletes yet
   ([0050](./docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md),
   [0057](./docs/decisions/0057-a-key-of-one-column-filled-by-a-never-repeating-default-counts-as-numbered.md)).
+- **A delete reaches other tables only through the foreign keys its policy
+  names**, each in `cascades` with what it does -- CASCADE, SET NULL or SET
+  DEFAULT -- and only where the account may DELETE from every table it
+  reaches: the fixture's deliveries are deleted with their parcels, on both
+  engines, once a policy names `fk_parcel_delivery`, and its orders with
+  their lines, deliveries and parcels once one names `fk_order_line_order`,
+  `fk_delivery_order` and `fk_parcel_delivery`. A key nobody named, one
+  whose action changed, a table outside the scope or a SET NULL another
+  key follows ON UPDATE refuses the delete, at publish and in the
+  database's own statement, and nothing is deleted; on PostgreSQL such a
+  delete locks every table it reaches first. The rows a cascade reaches
+  are the database's, asked of no form's policy
+  ([0051](./docs/decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)).
 - **A person is shown the forms they may read**, and nothing about any
   other, each with the forms whose rows a page may list below one of its
   records, derived from the published forms' foreign keys and types without
@@ -185,7 +194,7 @@ is not licensed for production.
   key there is none
   ([0050](./docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md));
   performance measured through the shipped server on both engines, for every
-  runtime request but a page of records and the menu of forms, and held in CI by rows read and
+  runtime request but a page of records, the menu of forms and a delete, and held in CI by rows read and
   round trips, never a time
   ([0034](./docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
 - **Every CI run ends in a report** of what it was tested on, which a release

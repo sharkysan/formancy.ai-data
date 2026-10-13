@@ -1,4 +1,4 @@
-import { deleteTerms, listTerms, rowFilterTerms, throughTerms } from '@formancy/data-core'
+import { deleteTerms, listTerms, reachesPast, rowFilterTerms, throughTerms } from '@formancy/data-core'
 import type {
   ApiValue,
   DeleteOutcome,
@@ -36,6 +36,7 @@ import {
   insertStatement,
   lockStatement,
   nothingChangedStatement,
+  reachLockStatement,
   readStatement,
   updateStatement,
 } from './sql.js'
@@ -97,6 +98,17 @@ const REACH_MOVED: RecordFailure = {
   ok: false,
   code: 'schema-changed',
   message: 'A foreign key now acts on a delete from this table that this delete was not decided over; nothing was deleted.',
+}
+/**
+ * The account may not DELETE from a table past the root the delete reaches
+ * (0051): the statement's own check refused it under the lock, so nothing
+ * was deleted. The lock itself is refused, 42501, to an account with no
+ * grant to write the table at all.
+ */
+const REACH_UNDELETABLE: RecordFailure = {
+  ok: false,
+  code: 'permission-denied',
+  message: 'This account may not DELETE from a table this delete reaches; nothing was deleted.',
 }
 /**
  * A rule acts on a delete from the table (0050): PostgreSQL refuses the
@@ -287,7 +299,8 @@ async function whyNothingChanged(
 
 /**
  * `stale`, `not-found`, declined, a definition or a reach that moved, a
- * rule, or an isolation that refused, for a delete that deleted nothing
+ * table past the root the account may no longer DELETE from, a rule, or an
+ * isolation that refused, for a delete that deleted nothing
  * (0050): one more
  * statement, inside the same filters and throughs, as for an update. A
  * record that is there at the version sent was not changed by anybody else
@@ -298,9 +311,10 @@ async function whyNothingChanged(
 async function whyNotDeleted(sql: Sql, request: DeleteRequest, terms: DeleteTerms, withVersion: boolean, definition: Definition, path: WritePath): Promise<RecordFailure> {
   const asked = await attempt(sql, whyNotDeletedStatement(request, terms, withVersion, definition), 'read')
   if (!asked.ok) return asked.failure
-  const [same, reach, rules, isolation, unchanged] = asked.result.rows[0] as TextRow
+  const [same, reach, deletable, rules, isolation, unchanged] = asked.result.rows[0] as TextRow
   if (same !== 'true') return DEFINITION_MOVED
   if (reach !== 'true') return REACH_MOVED
+  if (deletable !== 'true') return REACH_UNDELETABLE
   if (rules !== 'true') return RULED
   if (path === 'read-committed' && isolation !== READ_COMMITTED) return ISOLATION_DIFFERS
   if (unchanged === null || unchanged === undefined) return NOT_FOUND
@@ -427,7 +441,12 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       checkKey(request.target, terms.key)
       if (request.target.concurrency.kind !== 'version-column') throw new Error('PostgreSQL has no rowversion; a delete here is guarded by a version column.')
       const definition = parseDefinition(request.definition)
-      const path = pathOf(definition)
+      // Past its root, a delete takes the locked path whatever the
+      // isolation (0051): a cascade opens each table it reaches only after
+      // the statement's snapshot, so every one is locked before it, and the
+      // guard reads every key that could act on the delete.
+      const past = reachesPast(terms.reach)
+      const path = past ? 'locked' : pathOf(definition)
       // A version that is not a number names no state the record was ever
       // in, and is answered as any other mismatch without being sent.
       if (!isVersion(terms.expectedVersion)) return whyNotDeleted(sql, request, terms, false, definition, path)
@@ -436,7 +455,8 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       // REPEATABLE READ the statement's snapshot is taken before it locks
       // the partitions it plans, and a key added onto one while it waited
       // would act unseen by the guard (delete.ts).
-      const ran = await sendWrite(sql, lockStatement(terms.root, 'row exclusive', 'below'), path, deleteStatement(request, terms, definition, path))
+      const lock = past ? reachLockStatement(terms.reach) : lockStatement(terms.root, 'row exclusive', 'below')
+      const ran = await sendWrite(sql, lock, path, deleteStatement(request, terms, definition, path))
       if (!ran.ok) {
         // In a delete only: the statement's own refusal of a second row,
         // with nothing deleted -- an identity that is not a key, a

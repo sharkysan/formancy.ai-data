@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import { READER_ACCESS, WRITER_ACCESS } from './access.js'
+import { CASCADE_PARITY } from './cascades.js'
+import type { CascadeCase } from './cascades.js'
 import {
+  cascadeCase,
   covers,
   deleteCase,
   displayCase,
@@ -57,6 +60,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   LIST_PARITY: (Object.keys(LIST_PARITY) as ListCase[]).map(listCase),
   DELETE_PARITY: (Object.keys(DELETE_PARITY) as DeleteCase[]).map(deleteCase),
   UPDATE_RECREATED: [UPDATE_RECREATED_CASE],
+  CASCADE_PARITY: (Object.keys(CASCADE_PARITY) as CascadeCase[]).map(cascadeCase),
   UUID_PARITY: (Object.keys(UUID_PARITY) as UuidCase[]).map(uuidCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
@@ -82,6 +86,8 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   LIST_ROWS: "the rows the list suites insert; what a list shows of them is LIST_PARITY's",
   UUID_ROWS: "the rows the uuid suites insert; what the suites show of them is UUID_PARITY's",
   DELIVERIES: "the fixture's delivery keys, which UUID_PARITY's cases name",
+  PARITY_CASCADES: "the keys CASCADE_PARITY's policy names; what a delete does through them is CASCADE_PARITY's",
+  REACH_PRIVILEGE_LOSSES: "the grants reach-privilege takes away, each on both engines; what a delete answers then is CASCADE_PARITY's",
 }
 
 /** What a call made while a file is collected gave: its options, or the sentence it threw. */

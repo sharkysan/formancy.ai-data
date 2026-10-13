@@ -33,11 +33,11 @@ export interface ListColumns {
  * What deleting a record of a published form does besides removing it
  * (0050), for a page to word its confirmation by -- never by table names.
  *
- * `cascades` and `clears` say whether the policy accepts a key that
- * deletes other rows, or sets NULL or a default in them; both are `false`
- * in 0050, whose deletes reach nothing past the record. `restricted` says
- * whether the snapshot shows a key that refuses a delete while a row refers
- * to the record, so the database may keep it.
+ * `cascades` and `clears` say whether the policy's `cascades` accepts a key
+ * that deletes other rows, or sets NULL or a default in them (0051).
+ * `restricted` says whether the snapshot shows a key that refuses a delete
+ * while a row refers to the record, or to a row the delete reaches, so the
+ * database may keep it.
  */
 export interface Deleting {
   cascades: boolean

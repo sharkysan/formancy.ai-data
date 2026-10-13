@@ -13,7 +13,13 @@ every pull request and before every release
 ([0032](./decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
 The job then does over HTTP what sections 4 and 5 have you do in the browser,
 with the values in this guide's tables, on both engines; the tables are
-generated from the same file the job reads. What the job does not do is click
+generated from the same file the job reads. On each engine it then also
+deletes the fixture's order with its line, deliveries and parcels, through a
+second order form whose policy grants clerks delete and names each foreign
+key that delete acts through
+([0051](./decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)),
+which this guide does not have you do: the studio offers no delete roles yet,
+and the host page no delete. What the job does not do is click
 through the studio and the host page. Their own suites do: each goes down
 section 4's or section 5's table by the names this guide gives every control,
 and the studio's journey test proves it makes exactly the requests the job

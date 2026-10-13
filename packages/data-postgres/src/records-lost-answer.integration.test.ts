@@ -1,7 +1,7 @@
 import { findObject } from '@formancy/data-core'
 import type { ApiValue, DeleteOutcome, MetadataSnapshot, RecordColumn, RecordFailure, RecordOutcome, RecordTarget, RecordValue, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture, TcpHop } from '@formancy/data-fixtures'
-import { answerBytes, defined, startPostgresFixture, startTcpHop } from '@formancy/data-fixtures'
+import { answerBytes, cascadeCase, covers, defined, startPostgresFixture, startTcpHop } from '@formancy/data-fixtures'
 import { randomUUID } from 'node:crypto'
 import v8 from 'node:v8'
 import vm from 'node:vm'
@@ -63,6 +63,17 @@ beforeAll(async () => {
       code text not null,
       version integer not null default 1,
       primary key (id, code)
+    );
+    create table lost.cascading (
+      id integer generated always as identity,
+      code text not null,
+      version integer not null default 1,
+      primary key (id, code)
+    );
+    create table lost.cascading_line (
+      cascading_id integer not null,
+      cascading_code text not null,
+      constraint fk_cascading_line_cascading foreign key (cascading_id, cascading_code) references lost.cascading (id, code) on delete cascade
     );
   `)
   snapshot = await discoverPostgres(owner, { schemas: ['sales', 'lost'] })
@@ -141,6 +152,12 @@ async function ordersNoted(notes: string): Promise<number> {
 async function removableCoded(code: string): Promise<number> {
   const [row] = await owner<{ n: number }[]>`select count(*)::int as n from lost.removable where code = ${code}`
   return row?.n ?? 0
+}
+
+/** The rows of lost.cascading and of its lines that carry `code`. */
+async function cascadingCoded(code: string): Promise<[number, number]> {
+  const [row] = await owner<{ rows: number; lines: number }[]>`select (select count(*)::int from lost.cascading where code = ${code}) as rows, (select count(*)::int from lost.cascading_line where cascading_code = ${code}) as lines`
+  return [row?.rows ?? 0, row?.lines ?? 0]
 }
 
 async function codesTaken(code: string): Promise<number> {
@@ -253,6 +270,51 @@ describe('an answer lost after a delete committed', () => {
     expect([outcome.code, outcome.message]).toEqual(['unknown-outcome', expect.stringMatching(/CONNECTION_CLOSED/)])
     expect(sent()).toBe(1)
     expect(await removableCoded(code)).toBe(0)
+  })
+})
+
+describe('an answer lost after a delete that cascades', () => {
+  // A delete that reaches past its record takes the locked path (0051):
+  // BEGIN, the lock of every table it reaches, the statement, COMMIT. The
+  // statement's row came back -- the marker crossed -- and the connection
+  // was cut before the commit was sent, so PostgreSQL rolled the
+  // transaction back with the connection: unknown to the adapter, which
+  // cannot tell a commit that was lost from one never sent, sent once, and
+  // the row and its line both still there once nothing holds their locks.
+  // SQL Server's batch commits before it answers, so there the same cut
+  // leaves both gone (its own suite).
+  test('a cascading delete on the locked path is unknown-outcome, was sent once, and its rows are still there', covers('postgres', cascadeCase('lost-answer')), async () => {
+    const code = marker('delete, cascading')
+    const [row] = await owner<{ id: string }[]>`insert into lost.cascading (code) values (${code}) returning id::text as id`
+    await owner`insert into lost.cascading_line (cascading_id, cascading_code) values (${row?.id ?? null}::integer, ${code})`
+    const table = { schema: 'lost', name: 'cascading' }
+    const line = { schema: 'lost', name: 'cascading_line' }
+    const target = { table, identity: [col('lost', 'cascading', 'id'), col('lost', 'cascading', 'code')], concurrency: { kind: 'version-column', column: 'version' } } as const
+    const bytes = answerBytes('postgres', code)
+    const sent = hop.countSent(bytes)
+    const lost = hop.swallowAnswersFrom(bytes)
+    const pending = defined(createPostgresRecords(viaHop)).delete({
+      target,
+      key: [
+        { ...col('lost', 'cascading', 'id'), value: row?.id ?? null },
+        { ...col('lost', 'cascading', 'code'), value: code },
+      ],
+      expectedVersion: '1',
+      filters: { kind: 'unrestricted' },
+      through: [],
+      reach: { removed: [table, line], cleared: [], accepted: [{ from: line, name: 'fk_cascading_line_cascading', onto: table, onDelete: 'cascade' }] },
+    })
+
+    await within(lost.matched, 'the marker never appeared in an answer')
+    lost.cut()
+
+    const outcome = failed(await pending)
+    expect([outcome.code, outcome.message]).toEqual(['unknown-outcome', expect.stringMatching(/CONNECTION_CLOSED/)])
+    expect(sent()).toBe(1)
+    // Once the server has noticed the cut, nothing holds the tables the
+    // delete locked, and what is there is what was committed.
+    await until(async () => [...(await owner`select count(*)::int as n from pg_locks where relation = 'lost.cascading'::regclass and pid <> pg_backend_pid()`)], [{ n: 0 }])
+    expect(await cascadingCoded(code)).toEqual([1, 1])
   })
 })
 
