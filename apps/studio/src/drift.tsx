@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
+import { grantsDelete, offers } from '@formancy/data-core'
 import type { DriftSeverity } from '@formancy/data-core'
 import type { Regeneration } from '@formancy/data-server'
 import type { AdminClient, Drift, Published } from './api.js'
@@ -35,12 +36,24 @@ function spoken(words: readonly string[]): string {
  * The operations review blocks and the server still allows (0041): the
  * server compares only the form's own table when a request arrives, so what
  * blocks them is a change only review sees. Empty when the two agree.
+ *
+ * Delete only where the published policy lets somebody delete (0052):
+ * otherwise the policy refuses every delete whatever drift says. What
+ * blocks one in review alone -- what refers to a table it reaches, DELETE
+ * on one, a gap over either -- is not always what its own statement
+ * refuses: a key nobody accepted that acts on it, and a table it reaches
+ * without DELETE, are refused there (0050, 0051), but a gap that hides
+ * only a key that refuses lets a delete of a record nothing refers to run.
+ * So delete is said exactly as a create or an update is, from the server's
+ * verdict, and the sentence says what the statement still refuses rather
+ * than the studio deciding, change by change, which of them it would.
  */
-function stillAllowedByServer(drift: Drift, offered: { create: boolean; update: boolean } | undefined): string[] {
+function stillAllowedByServer(drift: Drift, offered: { create: boolean; update: boolean } | undefined, deleting: boolean): string[] {
   const runtime = drift.runtime
   return [
     ...(!drift.readable && runtime.readable ? ['read'] : []),
     ...(['create', 'update'] as const).filter((operation) => offered?.[operation] !== false && !drift.writable[operation] && runtime.writable[operation]),
+    ...(deleting && !drift.writable.delete && runtime.writable.delete ? ['delete'] : []),
   ]
 }
 
@@ -167,7 +180,15 @@ function reported(drift: Drift, regenerated: Regenerated | null): Drift {
 function DriftReportView({ drift, published, formId }: { drift: Drift; published: Published | null; formId: string }): ReactElement {
   const blocking = drift.changes.filter((change) => change.severity === 'blocking').length
   const offered = published?.bundle.bindings.operations
-  const allowedByServer = stillAllowedByServer(drift, offered)
+  // Delete is the published form's only where its policy lets somebody delete (0050): a form nobody may delete with says nothing of it.
+  const deleting = published !== null && offers(published.bundle.bindings, 'delete') && grantsDelete(published.bundle.policy)
+  const allowedByServer = stillAllowedByServer(drift, offered, deleting)
+  // What a delete compares that a create or an update does not, and what its own statement still refuses (0051).
+  const deletes = allowedByServer.includes('delete')
+  const comparedForDelete = deletes ? 'what refers to a table a delete reaches, ' : ''
+  const refusedForDelete = deletes
+    ? ', and each delete’s own statement refuses a foreign key that acts on it and that the policy does not accept, or a table it reaches that the account may not DELETE from'
+    : ''
   return (
     <section className="drift" aria-labelledby="drift-heading">
       <h3 id="drift-heading">
@@ -183,11 +204,13 @@ function DriftReportView({ drift, published, formId }: { drift: Drift; published
         <li>Read: {drift.readable ? 'still allowed' : 'blocked by the changes below'}</li>
         <li>Create: {operationState(offered?.create, drift.writable.create)}</li>
         <li>Update: {operationState(offered?.update, drift.writable.update)}</li>
+        {deleting ? <li>Delete: {operationState(true, drift.writable.delete)}</li> : null}
         <li>{drift.blocking ? 'As a whole: not to be used as published until the blocking changes are reviewed.' : 'As a whole: usable as published.'}</li>
         {allowedByServer.length === 0 ? null : (
           <li>
             The server still allows {spoken(allowedByServer)}: what blocks {allowedByServer.length === 1 ? 'it' : 'them'} is a change it does not compare when a request arrives (a
-            lookup&rsquo;s table, privileges, row security or the account). The database still refuses what the account may not do. Review the form and publish it again.
+            lookup&rsquo;s table, {comparedForDelete}privileges, row security or the account). The database still refuses what the account may not do{refusedForDelete}.
+            Review the form and publish it again.
           </li>
         )}
       </ul>

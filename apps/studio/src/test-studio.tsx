@@ -111,6 +111,19 @@ export async function writeOrderPolicy(user: User): Promise<HTMLElement> {
 }
 
 /**
+ * The order's delete granted to clerks on the Policy step `writeOrderPolicy`
+ * left, with every foreign key it acts through accepted by its box (0052):
+ * a policy the server publishes, deleting an order with its lines,
+ * deliveries and parcels.
+ */
+export async function grantOrderDelete(user: User, policy: HTMLElement): Promise<void> {
+  await user.type(within(policy).getByLabelText('Roles that may delete'), 'clerk')
+  const reach = within(policy).getByRole('group', { name: 'What deleting a record of sales.order also does' })
+  for (const box of within(reach).getAllByRole('checkbox')) await user.click(box)
+  await waitFor(() => expect(within(within(policy).getByRole('region', { name: 'Policy check' })).getByRole('status').textContent).toMatch(/fits this form/))
+}
+
+/**
  * axe over the whole document at WCAG 2.2 AA, with only what jsdom cannot
  * measure switched off, and the page-structure rules a form fragment is
  * excused from upstream -- this is an application, not a fragment.

@@ -78,7 +78,7 @@ only enforcement is "we remember" says so plainly.
 | [0021](0021-generated-forms-preview-in-both-frameworks.md) | Generated forms are previewed in both frameworks, generated in the browser from a captured snapshot | accepted; narrowed by 0029 |
 | [0022](0022-the-runtime-plane-asks-the-policy-every-time.md) | The runtime plane asks the policy on every request, and removes only the echo it can prove | accepted; narrowed by 0031, 0040; extended by 0041, 0044, 0045, 0050 |
 | [0023](0023-the-audit-trail-is-operational-not-evidence.md) | The audit trail is operational, never holds a value, and is not evidence | accepted; extended by 0031, 0033, 0044, 0045, 0050 |
-| [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032 |
+| [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032, 0052 |
 | [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted |
 | [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted; narrowed by 0040 |
 | [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted; extended by 0049 |
@@ -104,8 +104,9 @@ only enforcement is "we remember" says so plainly.
 | [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md) | A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone | accepted; extended by 0050 |
 | [0048](0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md) | The licence is in force before a lawyer has read it | accepted; extended by 0054 |
 | [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md) | A snapshot says whether its account may delete from each table, and every foreign key that refers to it | accepted; narrowed by 0050; extended by 0056 |
-| [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md) | A record is deleted one at a time, by its token and the version its person read, under the form's policy, in one guarded statement | accepted; extended by 0051, 0057 |
-| [0051](0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md) | A delete reaches other tables only through foreign keys the policy names, each with what it does | accepted |
+| [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md) | A record is deleted one at a time, by its token and the version its person read, under the form's policy, in one guarded statement | accepted; extended by 0051, 0052, 0057 |
+| [0051](0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md) | A delete reaches other tables only through foreign keys the policy names, each with what it does | accepted; extended by 0052 |
+| [0052](0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md) | The studio says before publication who may delete and what a delete also does, and asks for each foreign key by name | accepted |
 | [0054](0054-version-1-1-names-the-address-for-a-redistribution-agreement-too.md) | Version 1.1 of the licence names the address for a redistribution agreement too | accepted |
 | [0055](0055-an-upstream-release-is-adopted-the-day-it-is-published.md) | An upstream release is adopted the day it is published, and only upstream is exempt from the release age | accepted |
 | [0056](0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md) | A key the database fills is never written by a form unless the person gives another part of it, and a uuid is ordered as each engine orders it | accepted |

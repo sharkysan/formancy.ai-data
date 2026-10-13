@@ -430,7 +430,7 @@
       ]
     },
     "0024": {
-      "reviewed": "sha256:7f8df6fe9f1100e1765e36dc6711e329b30e463080e6fc4e140b690ea3655c88",
+      "reviewed": "sha256:25b845623ba033cad52bffee1edcee17a23a36abe20165c346ad3635efa6a495",
       "limitations": [
         {
           "area": "studio",
@@ -1434,7 +1434,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:94e93250ff50cbb3d133d27ae277c1958cc65b5b26ab32c369b2aadc2a8aa9b3",
+      "reviewed": "sha256:52eff68a5b8ffc4f8f5583181a2e1e9aabf99af53e2845772457a386ff3c1a44",
       "limitations": [
         {
           "area": "writes",
@@ -1512,7 +1512,7 @@
       ]
     },
     "0051": {
-      "reviewed": "sha256:63ea0402f66b157701d0f789d3e356fe68a479662e1e4bc2e365e6e667706eb3",
+      "reviewed": "sha256:f88685d04171a23fbf4d9e20acf545a663e7038f554a1e91333eaaf19c19e142",
       "limitations": [
         {
           "area": "forms",
@@ -1569,6 +1569,31 @@
         {
           "area": "operations",
           "says": "A server older than 0051 refuses a policy that names `cascades`."
+        }
+      ]
+    },
+    "0052": {
+      "reviewed": "sha256:edecaf72813ef5cce264647afe5aabf4c71392529f3fbfa54d05194874e6a706",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "The studio's list of what a delete also does is as complete as its snapshot says it is, and covers foreign keys only: a trigger or a rule that runs on a delete is not listed, and does what the database defines.",
+          "heldBy": "apps/studio/src/delete-reach.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "The Policy step lists the keys of the snapshot the form was generated from: a key added since is asked about only once the form is generated again, though drift review reports it, and one that acts blocks delete there.",
+          "heldBy": "apps/studio/src/drift.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "Where only review sees what blocks a delete -- a key nobody accepted, DELETE revoked on a table it reaches, a gap over what refers to one -- the server still lets a host send deletes until the form is published again: the Drift step says so, with what each delete's own statement still refuses, and not which of those changes it would refuse.",
+          "heldBy": "apps/studio/src/drift.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "Clearing the roles that may delete leaves the keys accepted, and the policy is refused until each is unticked.",
+          "heldBy": "apps/studio/src/delete-reach.test.tsx"
         }
       ]
     },

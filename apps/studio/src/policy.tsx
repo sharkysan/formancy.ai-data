@@ -1,13 +1,27 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
-import { findObject, rowFilterColumnProblem, unscopedLookups, validatePolicy } from '@formancy/data-core'
+import { findObject, offers, rowFilterColumnProblem, unscopedLookups } from '@formancy/data-core'
 import type { FormBindings, FormPolicy, MetadataSnapshot, ReassignedKey } from '@formancy/data-core'
 import { describeRef, throughBlocker } from './choice.js'
+import { DeleteReach } from './delete-reach.js'
 import { labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
 import { LookupFilters, RowFilters } from './policy-filters.js'
-import { boundColumns, fillFromOperations, formatRoles, lookupBindings, orphanFields, orphanLookups, parseRoles, withFieldRoles, withoutLookup, withThrough } from './policy-model.js'
+import {
+  boundColumns,
+  fillFromOperations,
+  formatRoles,
+  lookupBindings,
+  orphanFields,
+  orphanLookups,
+  parseRoles,
+  policyCheck,
+  withFieldRoles,
+  withOperationRoles,
+  withoutLookup,
+  withThrough,
+} from './policy-model.js'
 import { ReassignedKeys } from './reassigned.js'
 
 /**
@@ -41,7 +55,7 @@ function RolesInput({ id, label, roles, onRoles }: { id: string; label: ReactEle
   )
 }
 
-const OPERATIONS = ['read', 'create', 'update'] as const
+const OPERATIONS = ['read', 'create', 'update', 'delete'] as const
 
 /** The policy check's id: where the keyboard goes when a removal closes the note it was made from. */
 const CHECK = 'policy-check'
@@ -62,9 +76,10 @@ const orphanRemove = (key: string) => `orphan-${key}-remove`
 const strayRemove = (key: string) => `stray-lookup-${key}-remove`
 
 /**
- * Whether the policy fits the form, in the words `validatePolicy` uses -- the
- * function the server runs on publish (0019) -- recomputed on every change.
- * The summary is a polite live region; the list is what a person fixes from.
+ * Whether the policy fits the form, in the words `validatePolicy` and
+ * `deleteProblems` use -- the functions the server runs on publish (0019,
+ * 0052) -- recomputed on every change. The summary is a polite live region;
+ * the list is what a person fixes from.
  */
 function PolicyCheck({ problems }: { problems: readonly string[] }): ReactElement {
   return (
@@ -120,7 +135,8 @@ function UnscopedNote({ root, filtered }: { root: string; filtered: readonly str
  * Deny by default, as the policy is: an operation lists the roles that may
  * perform it, a field nobody is given is nobody's, and a lookup nobody
  * decided is refused. Nothing here judges whether the policy fits -- that is
- * `validatePolicy`, run on every change and shown in its own words.
+ * `validatePolicy` and `deleteProblems` (`policyCheck`), run on every change
+ * and shown in their own words.
  */
 export function PolicyStep({
   bindings,
@@ -145,8 +161,7 @@ export function PolicyStep({
   onDecided?: (key: string, decision: 'keep' | 'remove') => void
 }): ReactElement {
   const document = useDocument(session)
-  const checked = validatePolicy(policy, bindings)
-  const problems = checked.ok ? [] : checked.problems
+  const problems = policyCheck(policy, bindings, snapshot)
   const labels = Object.fromEntries(bindings.fields.map((binding) => [binding.field, labelOf(document, binding.field)]))
   const pinned = new Set(policy.rowFilters.map((rule) => rule.column))
   // Only what a filter can compare (0028): the server refuses any other column at publish.
@@ -178,8 +193,8 @@ export function PolicyStep({
   return (
     <>
       <p className="lede">
-        Who may read, create and update with this form, field by field, and which rows of {describeRef(bindings.root)} and
-        of each lookup it reaches. Roles are the names your host puts in its tokens, separated by commas.
+        Who may read, create, update and delete with this form, field by field, and which rows of {describeRef(bindings.root)}{' '}
+        and of each lookup it reaches. Roles are the names your host puts in its tokens, separated by commas.
       </p>
       <PolicyCheck problems={problems} />
       <ReassignedKeys keys={reassigned} after={CHECK} onDecide={decide} />
@@ -191,15 +206,17 @@ export function PolicyStep({
             key={operation}
             id={`operation-${operation}`}
             label={`Roles that may ${operation}`}
-            roles={policy.operations[operation]}
-            onRoles={(roles) => onPolicy({ ...policy, operations: { ...policy.operations, [operation]: roles } })}
+            roles={policy.operations[operation] ?? []}
+            onRoles={(roles) => onPolicy(withOperationRoles(policy, operation, roles))}
           />
         ))}
         <p className="hint">
-          This form offers create: {bindings.operations.create ? 'yes' : 'no'}; update: {bindings.operations.update ? 'yes' : 'no'}.
-          A role granted an operation the form does not offer is refused.
+          This form offers create: {bindings.operations.create ? 'yes' : 'no'}; update: {bindings.operations.update ? 'yes' : 'no'}; delete:{' '}
+          {offers(bindings, 'delete') ? 'yes' : 'no'}. A role granted an operation the form does not offer is refused. A role that may
+          delete must also be able to read, so its delete names the version it read.
         </p>
       </fieldset>
+      <DeleteReach bindings={bindings} snapshot={snapshot} policy={policy} onPolicy={onPolicy} check={CHECK} />
 
       <fieldset>
         <legend>Fields</legend>

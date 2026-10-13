@@ -257,6 +257,11 @@ export function deleteEffect(root: ObjectRef, key: Pick<InboundKey, 'table' | 'n
   return `deleting a record of ${describe(root)} also sets ${columns} of ${of} to ${key.onDelete === 'set-null' ? 'NULL' : 'its default'} in the rows that refer to it (${key.name}, ${action})`
 }
 
+/** Whether `rule` names a key the delete acts through, with the action that key has. */
+function actsThrough(walked: Walk, rule: CascadeRule): boolean {
+  return walked.acting.some(({ key }) => names(rule, key) && key.onDelete === rule.onDelete)
+}
+
 /**
  * Each `cascades` entry that names no key a delete acts through, or names it
  * with another action than it has. Only a key onto a table the delete
@@ -264,10 +269,15 @@ export function deleteEffect(root: ObjectRef, key: Pick<InboundKey, 'table' | 'n
  * its ON UPDATE, and its ON DELETE never runs, so naming it says the delete
  * does what it does not.
  */
+function strays(policy: Pick<FormPolicy, 'cascades'>, walked: Walk): Array<{ rule: CascadeRule; index: number }> {
+  return acceptances(policy).filter(({ rule }) => !actsThrough(walked, rule))
+}
+
+/** Why each stray acceptance says something untrue, as the publish check words it. */
 function strayAcceptances(policy: Pick<FormPolicy, 'cascades'>, walked: Walk, root: ObjectRef): string[] {
   const onDelete = [...walked.acting, ...walked.restricting.filter(({ on }) => on === 'delete')]
   const onUpdate = [...walked.restricting.filter(({ on }) => on === 'update'), ...walked.following]
-  return acceptances(policy).flatMap(({ rule, index }) => {
+  return strays(policy, walked).flatMap(({ rule, index }) => {
     const at = `cascades[${String(index)}] accepts ${rule.foreignKey} of ${describe(rule.table)}`
     const keys = onDelete.filter(({ key }) => names(rule, key))
     if (keys.length === 0) {
@@ -278,8 +288,49 @@ function strayAcceptances(policy: Pick<FormPolicy, 'cascades'>, walked: Walk, ro
           : `${at}, and a delete of ${describe(root)} does not act through it: it refers to ${describe(kept.onto)}, whose rows a delete keeps and clears a reference in`,
       ]
     }
-    return keys.filter(({ key }) => key.onDelete !== rule.onDelete).map(({ key }) => `${at} as ON DELETE ${SPELLED[rule.onDelete]}, and it is ON DELETE ${SPELLED[key.onDelete]}`)
+    return keys.map(({ key }) => `${at} as ON DELETE ${SPELLED[rule.onDelete]}, and it is ON DELETE ${SPELLED[key.onDelete]}`)
   })
+}
+
+/** What every refusal of a grant of delete starts with: what follows is the clause. */
+const GRANTED = 'operations.delete grants roles, and'
+
+/** A snapshot taken before 0049, which does not record what refers to the root. */
+function unrecorded(root: ObjectRef): string {
+  return `this snapshot does not record what refers to ${describe(root)}, so what a delete also does cannot be seen: discover again`
+}
+
+/**
+ * Why a grant of delete is refused whatever `cascades` names, as clauses
+ * that follow `GRANTED`, kind by kind: a `referenced-by` gap over a table of
+ * the reach; a table the walk could not look past, outside the scope or
+ * unrecorded; a cleared column another key follows ON UPDATE; and a table
+ * past the root the account may not DELETE from.
+ */
+function blockers(walked: Walk, root: ObjectRef): { hidden: string[]; unseen: string[]; following: string[]; undeletable: string[] } {
+  const table = describe(root)
+  return {
+    hidden: walked.hidden.map(({ table: covered, gap }) =>
+      sameRef(covered, root)
+        ? `this snapshot cannot show everything that refers to ${table}: ${gap.detail}`
+        : `this snapshot cannot show everything that refers to ${describe(covered)}, which a delete of ${table} reaches: ${gap.detail}`,
+    ),
+    unseen: walked.unseen.map(({ table: unseen, how, why }) =>
+      why === 'unrecorded'
+        ? `this snapshot does not record what refers to ${describe(unseen)}, which a delete of ${table} reaches, so what a delete also does cannot be seen: discover again`
+        : how === 'removed'
+          ? `deleting a record of ${table} also deletes rows of ${describe(unseen)}, outside the approved schemas, and what that reaches in turn cannot be seen`
+          : `deleting a record of ${table} also changes rows of ${describe(unseen)}, outside the approved schemas, and what follows from that change cannot be seen`,
+    ),
+    following: walked.following.map(
+      ({ key, cleared, columns }) =>
+        `${deleteEffect(root, cleared)}, and ${key.name} of ${describe(key.table)} follows ${columns.join(', ')} ON UPDATE ${SPELLED[key.onUpdate]}, which a delete does not follow`,
+    ),
+    undeletable: walked.undeletable.map(
+      (undeletable) =>
+        `deleting a record of ${table} reaches ${describe(undeletable)}, which this connection's account may not DELETE from: a delete is held to the account's DELETE on every table it reaches`,
+    ),
+  }
 }
 
 /**
@@ -303,36 +354,86 @@ export function deleteProblems(snapshot: MetadataSnapshot, bindings: FormBinding
   const root = findObject(snapshot, bindings.root)
   // A root the snapshot lacks is the bindings' problem, reported as such.
   if (root === undefined) return []
-  const table = describe(root.ref)
-  if (root.referencedBy === undefined) {
-    return [`operations.delete grants roles, and this snapshot does not record what refers to ${table}, so what a delete also does cannot be seen: discover again`]
-  }
+  const granted = (clause: string) => `${GRANTED} ${clause}`
+  if (root.referencedBy === undefined) return [granted(unrecorded(root.ref))]
   const walked = walk(snapshot, root.ref)
-  const granted = 'operations.delete grants roles, and'
+  const blocked = blockers(walked, root.ref)
   return [
-    ...walked.hidden.map(({ table: covered, gap }) =>
-      sameRef(covered, root.ref)
-        ? `${granted} this snapshot cannot show everything that refers to ${table}: ${gap.detail}`
-        : `${granted} this snapshot cannot show everything that refers to ${describe(covered)}, which a delete of ${table} reaches: ${gap.detail}`,
-    ),
-    ...walked.acting.filter(({ key }) => unaccepted(policy, key)).map(({ key }) => `${granted} ${deleteEffect(root.ref, key)}, which cascades does not accept`),
-    ...walked.unseen.map(({ table: unseen, how, why }) =>
-      why === 'unrecorded'
-        ? `${granted} this snapshot does not record what refers to ${describe(unseen)}, which a delete of ${table} reaches, so what a delete also does cannot be seen: discover again`
-        : how === 'removed'
-          ? `${granted} deleting a record of ${table} also deletes rows of ${describe(unseen)}, outside the approved schemas, and what that reaches in turn cannot be seen`
-          : `${granted} deleting a record of ${table} also changes rows of ${describe(unseen)}, outside the approved schemas, and what follows from that change cannot be seen`,
-    ),
-    ...walked.following.map(
-      ({ key, cleared, columns }) =>
-        `${granted} ${deleteEffect(root.ref, cleared)}, and ${key.name} of ${describe(key.table)} follows ${columns.join(', ')} ON UPDATE ${SPELLED[key.onUpdate]}, which a delete does not follow`,
-    ),
-    ...walked.undeletable.map(
-      (undeletable) =>
-        `${granted} deleting a record of ${table} reaches ${describe(undeletable)}, which this connection's account may not DELETE from: a delete is held to the account's DELETE on every table it reaches`,
-    ),
+    ...blocked.hidden.map(granted),
+    ...walked.acting.filter(({ key }) => unaccepted(policy, key)).map(({ key }) => granted(`${deleteEffect(root.ref, key)}, which cascades does not accept`)),
+    ...blocked.unseen.map(granted),
+    ...blocked.following.map(granted),
+    ...blocked.undeletable.map(granted),
     ...strayAcceptances(policy, walked, root.ref),
   ]
+}
+
+/** One key a delete reaches, with the table of the reach it refers to. */
+export interface ReachedKey {
+  key: InboundKey
+  onto: ObjectRef
+}
+
+/**
+ * What a delete of a record of a form's root acts through, may be refused
+ * by, and cannot be granted over, key by key, as the snapshot shows it: what
+ * an administrator is asked to accept one key at a time before anybody may
+ * delete (0052). The walk is `deleteProblems`', and so are the words.
+ */
+export interface DeleteReview {
+  /**
+   * Every key that acts on a delete -- cascades, sets NULL or a default --
+   * onto a table the delete removes rows of, past the root too, in the order
+   * the walk meets it, each with whether `cascades` names it with its action
+   * (`unaccepted`). A grant of delete is refused while one is not.
+   */
+  acting: Array<ReachedKey & { accepted: boolean }>
+  /**
+   * Every key that only refuses: NO ACTION or RESTRICT on delete onto a
+   * table the delete removes rows of (`on: 'delete'`), or on update onto a
+   * column it clears (`on: 'update'`). The database refuses the delete while
+   * a row refers through one; nothing is named for it.
+   */
+  restricting: Array<ReachedKey & { on: 'delete' | 'update' }>
+  /** Each `cascades` entry, by its place in the list, that names no key the delete acts through with the action that key has. */
+  stray: Array<{ index: number; rule: CascadeRule }>
+  /**
+   * Why a grant of delete is refused whatever `cascades` names, in
+   * `deleteProblems`' words after its "operations.delete grants roles,
+   * and": with every key of `acting` named and nothing else, those are its
+   * problems, these, in this order.
+   */
+  blocked: string[]
+  /**
+   * Whether the keys named here -- in `acting`, `restricting` and `blocked`
+   * -- are every key the catalog shows onto the tables the delete removes
+   * rows of, and onto the columns it clears: no table of the reach behind a
+   * `referenced-by` gap, outside the scope or unrecorded. A key onto another
+   * column of a row the delete only clears is not affected, and not named.
+   */
+  complete: boolean
+}
+
+/**
+ * The review of a delete of a record of `root` against `policy` (0052),
+ * whoever the policy lets delete: the keys a delete acts through, with
+ * whether each is accepted, the keys that may refuse it, the acceptances
+ * that name nothing it acts through, and what no acceptance can fix.
+ */
+export function deleteReview(snapshot: MetadataSnapshot, root: ObjectRef, policy: Pick<FormPolicy, 'cascades'>): DeleteReview {
+  const object = findObject(snapshot, root)
+  // A root the snapshot lacks is the bindings' problem, reported as such.
+  if (object === undefined) return { acting: [], restricting: [], stray: [], blocked: [], complete: false }
+  if (object.referencedBy === undefined) return { acting: [], restricting: [], stray: [], blocked: [unrecorded(object.ref)], complete: false }
+  const walked = walk(snapshot, object.ref)
+  const blocked = blockers(walked, object.ref)
+  return {
+    acting: walked.acting.map(({ key, onto }) => ({ key, onto, accepted: !unaccepted(policy, key) })),
+    restricting: walked.restricting.map(({ key, onto, on }) => ({ key, onto, on })),
+    stray: strays(policy, walked).map(({ rule, index }) => ({ index, rule })),
+    blocked: [...blocked.hidden, ...blocked.unseen, ...blocked.following, ...blocked.undeletable],
+    complete: walked.hidden.length === 0 && walked.unseen.length === 0,
+  }
 }
 
 /**

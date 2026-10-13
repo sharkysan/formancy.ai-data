@@ -17,7 +17,8 @@
 //     anything on it, so the preview shows what the published form will;
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules jsdom cannot measure -- on every step, including the states
-//     that add colour: gaps, a refused policy, a failed preview, a conflict,
+//     that add colour: gaps, a refused policy, a delete refused for what it
+//     also does and its reach accepted (0052), a failed preview, a conflict,
 //     a blocking drift, a refused restore, a regeneration and what it
 //     carried (0030).
 //
@@ -292,6 +293,20 @@ function journey(plane, check) {
       await policy.getByRole('button', { name: 'Add a filter to the Customer list' }).click()
       for (const operation of ['read', 'create', 'update']) await policy.getByLabel(`Roles that may ${operation}`).fill('clerk')
       await policy.getByRole('button', { name: 'Fill every field from the operations' }).click()
+      await policy.getByText('The policy fits this form.').waitFor()
+    }],
+    // Delete granted and the keys it acts through not yet accepted, then
+    // each accepted by its own box (0052): the order is published deleting
+    // from here on.
+    ['Policy, delete refused for what it also does', async (page) => {
+      const policy = step(page, 'Policy')
+      await policy.getByLabel('Roles that may delete').fill('clerk')
+      await policy.getByText('3 problems: the server refuses this policy until they are fixed.').waitFor()
+    }],
+    ['Policy, with a reach', async (page) => {
+      const policy = step(page, 'Policy')
+      const reach = policy.getByRole('group', { name: 'What deleting a record of sales.order also does' })
+      for (const box of await reach.getByRole('checkbox').all()) await box.check()
       await policy.getByText('The policy fits this form.').waitFor()
     }],
     ['Presentation, a field moved down by keyboard', async (page) => {
