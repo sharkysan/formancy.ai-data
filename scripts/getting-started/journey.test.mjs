@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { checkedRecord } from '../release-report/collect.mjs'
-import { composedServer, proxyProblems, writeServerRecord } from './journey.mjs'
+import { composedServer, deleteOrder, proxyProblems, writeServerRecord } from './journey.mjs'
 
 /**
  * The getting-started journey's record of each composed database (0035),
@@ -98,6 +98,64 @@ describe('what a proxy in front of the stack sees', () => {
         'GET /v1/whoami without a token answered 200 with Cache-Control no-cache, not no-store',
         'GET /v1/forms/a/versions/..%2F..%2Fb, sent as written, answered 404 unknown-form, not 400 path-not-plain: nginx did not forward it as sent, or the server routed it',
       ])
+    } finally {
+      await stand.close()
+    }
+  })
+})
+
+describe('deleting an order over HTTP', () => {
+  // The journey's delete (0051), asked of a loopback server standing in for
+  // the stack's web port that scopes one order to tenant 1 as the server
+  // does: tenant 2's delete is not found, tenant 1's deletes it at the
+  // version read, and it is then not found -- every request with the token
+  // and the write id it should carry (watched failing with tenant 2's token
+  // sent for tenant 1's delete: "records/delete of tenant 1's order answered
+  // 404, not 200").
+  async function plane() {
+    const seen = []
+    let present = true
+    const tenants = { 'clerk-1': '1', 'clerk-2': '2' }
+    const stand = createServer((request, response) => {
+      let text = ''
+      request.on('data', (chunk) => (text += chunk))
+      request.on('end', () => {
+        const tenant = tenants[(request.headers.authorization ?? '').replace('Bearer ', '')]
+        const body = text === '' ? undefined : JSON.parse(text)
+        seen.push({ url: request.url, tenant, body, writeId: request.headers['formancy-write-id'] !== undefined })
+        const answer = (status, json) => response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(json))
+        const visible = present && tenant === '1' && body?.record === 'k1:7'
+        if (request.url.endsWith('/records/read')) return visible ? answer(200, { record: 'k1:7', version: '3', answers: {} }) : answer(404, { code: 'not-found', message: 'No such record.' })
+        if (!visible || body?.version !== '3') return answer(404, { code: 'not-found', message: 'No such record.' })
+        present = false
+        return answer(200, { record: 'k1:7', deleted: true })
+      })
+    })
+    await new Promise((ready) => stand.listen(0, '127.0.0.1', ready))
+    return { seen, url: `http://127.0.0.1:${String(stand.address().port)}/`, close: () => new Promise((done) => stand.close(done)) }
+  }
+
+  test("tenant 2 is told not found, tenant 1 deletes the order, and it is then not found", async () => {
+    const stand = await plane()
+    try {
+      await deleteOrder(stand.url, { clerk1: 'clerk-1', clerk2: 'clerk-2' }, 'pg-order-delete', 'k1:7', 'pg:')
+      expect(stand.seen.map(({ url, tenant, body, writeId }) => [url, tenant, body?.version, writeId])).toEqual([
+        ['/v1/forms/pg-order-delete/records/read', '1', undefined, false],
+        ['/v1/forms/pg-order-delete/records/delete', '2', '3', true],
+        ['/v1/forms/pg-order-delete/records/delete', '1', '3', true],
+        ['/v1/forms/pg-order-delete/records/read', '1', undefined, false],
+      ])
+    } finally {
+      await stand.close()
+    }
+  })
+
+  // A delete another tenant could make, or one answered without the token,
+  // is a sentence naming the request.
+  test('names a delete another tenant made', async () => {
+    const stand = await plane()
+    try {
+      await expect(deleteOrder(stand.url, { clerk1: 'clerk-1', clerk2: 'clerk-1' }, 'pg-order-delete', 'k1:7', 'pg:')).rejects.toThrow(/tenant 2 deleting tenant 1's order answered 200, not 404/)
     } finally {
       await stand.close()
     }

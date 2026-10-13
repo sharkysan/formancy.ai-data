@@ -2,6 +2,8 @@ import type { DatabaseKind } from '@formancy/data-core'
 import { DATABASE_KINDS } from '@formancy/data-core'
 import type { TestOptions } from 'vitest'
 import { TestRunner } from 'vitest'
+import { CASCADE_PARITY } from './cascades.js'
+import type { CascadeCase } from './cascades.js'
 import { DELETE_PARITY } from './deletes.js'
 import type { DeleteCase } from './deletes.js'
 import { sharedDrifting } from './drifting.js'
@@ -75,6 +77,9 @@ export const listCase = (name: ListCase): string => `list: ${name}`
 /** What a delete of one record does on each engine (0050), by the name of its entry in DELETE_PARITY. */
 export const deleteCase = (name: DeleteCase): string => `delete: ${name}`
 
+/** What a delete does past its record on each engine (0051), by the name of its entry in CASCADE_PARITY. */
+export const cascadeCase = (name: CascadeCase): string => `cascade: ${name}`
+
 /** An update that lands on a record created again under a deleted one's typed key (0050): characterised on both engines. */
 export const UPDATE_RECREATED_CASE = 'update: recreated'
 
@@ -86,8 +91,8 @@ export const uuidCase = (name: UuidCase): string => `uuid: ${name}`
  * every filter, label, temporal read, refusal and edge value, then the two
  * shipments, then every change to a form's own table both engines run (0041),
  * then what a form scoped through a parent shows (0043), then what a list of
- * a form's records shows (0044), then what a delete does (0050), then what
- * a uuid key does (0056).
+ * a form's records shows (0044), then what a delete does (0050) and what it
+ * does past its record (0051), then what a uuid key does (0056).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -106,6 +111,7 @@ export function sharedCases(): string[] {
     ...(Object.keys(LIST_PARITY) as ListCase[]).map(listCase),
     ...(Object.keys(DELETE_PARITY) as DeleteCase[]).map(deleteCase),
     UPDATE_RECREATED_CASE,
+    ...(Object.keys(CASCADE_PARITY) as CascadeCase[]).map(cascadeCase),
     ...(Object.keys(UUID_PARITY) as UuidCase[]).map(uuidCase),
   ]
   const seen = new Set<string>()

@@ -74,6 +74,10 @@ export interface FieldPolicy {
  * that grants it. A delete is scoped by `rowFilters` and every `through`, as
  * an update is, and grants no field: it writes none. Every role it lists
  * must be granted read, because a delete names the version its person read.
+ *
+ * `cascades` names each foreign key a delete may act through, with what it
+ * does (0051): optional, absent is none, and refused while nobody may
+ * delete.
  */
 export interface FormPolicy {
   version: 1
@@ -82,6 +86,30 @@ export interface FormPolicy {
   rowFilters: RowFilterRule[]
   lookups: Record<string, RowFilterRule[]>
   through?: string[]
+  cascades?: CascadeRule[]
+}
+
+/** What a foreign key does on delete to the rows that refer to the record deleted, where it does anything: deletes them, or sets their reference to NULL or to its default. */
+export type DeleteAction = 'cascade' | 'set-null' | 'set-default'
+
+/**
+ * One foreign key a delete of the form's records may act through (0051):
+ * the table the key is on, its name, and what it does on delete. A server
+ * older than 0051 refuses a policy that names one, as it refuses every
+ * property it does not read.
+ *
+ * The key's table as two parts, never a dotted string, since an identifier
+ * may hold a dot (0016). Its action as well as its name: a key accepted as
+ * a cascade that has become SET NULL does something else, which nobody
+ * accepted. Every key a delete reaches through that acts on delete must be
+ * named, and nothing else may be (`deleteProblems`). The rows it reaches
+ * are asked of no form's policy -- the database deletes or clears them --
+ * and naming the key is how an administrator says they know it.
+ */
+export interface CascadeRule {
+  table: { schema: string; name: string }
+  foreignKey: string
+  onDelete: DeleteAction
 }
 
 /**

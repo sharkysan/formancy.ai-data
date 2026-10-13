@@ -1,5 +1,6 @@
 import type { FormBindings } from '../generate/types.js'
 import type { ColumnAccess, ColumnMeta, MetadataSnapshot, ObjectMeta, ObjectRef, RowSecurity } from '../metadata.js'
+import { reachTables } from '../policy/cascades.js'
 import { findObject, recordsDeleteFacts } from '../snapshot.js'
 import { allFields, type Comparison, describe, type Draft, fieldsOver, list, lookups, type Operation, objectIn, sameRef, writesOn } from './context.js'
 
@@ -233,11 +234,38 @@ function deleteDraft(comparison: Comparison): Draft[] {
   ]
 }
 
+/**
+ * Whether the account may still DELETE from every table past the root a
+ * delete of the published form's records reaches (0051), as the snapshot
+ * it was published from shows the reach: a delete is held to the account's
+ * DELETE on each -- PostgreSQL's statement asks it under the delete's
+ * locks, SQL Server's batch asks it after the statement -- so one revoked
+ * stops delete here first. A grant gained there changes nothing a form
+ * offers, and is not said.
+ */
+function reachDeleteDrafts(comparison: Comparison): Draft[] {
+  const { base, current, after } = comparison
+  if (!recordsDeleteFacts(base) || !recordsDeleteFacts(current)) return []
+  return reachTables(base, comparison.bindings.root)
+    .filter((table) => !sameRef(table, after.ref))
+    .filter((table) => findObject(base, table)?.access?.delete === true && findObject(current, table)?.access?.delete === false)
+    .map((table) => ({
+      kind: 'privilege-narrowed',
+      subject: { kind: 'object', object: table },
+      affects: [],
+      stops: ['delete'],
+      breaksReads: false,
+      otherwise: 'review',
+      message: `This connection's account may no longer DELETE from ${describe(table)}, which a delete of ${describe(after.ref)} reaches, so delete is blocked. This is a privilege change, not a schema change: restore the grant, or review the form.`,
+    }))
+}
+
 /** Every privilege, row-security and account change the form rests on, for the root and each lookup's target. */
 export function privilegeChanges(comparison: Comparison): Draft[] {
   return [
     ...comparedObjects(comparison).flatMap(({ before, after }) => [...columnDrafts(comparison, before, after), ...rowSecurityDraft(comparison, before, after)]),
     ...deleteDraft(comparison),
+    ...reachDeleteDrafts(comparison),
     ...accountChanges(comparison.base, comparison.current, comparison.bindings),
   ]
 }

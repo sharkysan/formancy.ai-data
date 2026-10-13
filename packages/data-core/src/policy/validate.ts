@@ -109,7 +109,9 @@ function fitProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
  */
 function deleteGrantProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
   const deleting = policy.operations.delete
-  if (deleting.size === 0) return []
+  // What a delete may act through says something only where somebody may
+  // delete (0051); which keys it names is `deleteProblems`' question.
+  if (deleting.size === 0) return policy.cascades.length > 0 ? ['cascades accepts what a delete does, and nobody may delete with this form'] : []
   const problems = [...deleting]
     .filter((role) => !policy.operations.read.has(role))
     .sort(byCodepoint)

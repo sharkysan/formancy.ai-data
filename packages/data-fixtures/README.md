@@ -90,20 +90,26 @@ dropped the key from the end of its order would show on both engines.
   discovered with its default, generated read-only, one token on both
   engines, created, updated and stale, another tenant's not found, listed
   under an order, paged, and offered by `sales.parcel`'s lookup; what a
-  delete is allowed (0050, 0057): the delivery form offers one on both
-  engines, by SQL Server's rowversion and over PostgreSQL's version column
-  because `gen_random_uuid()` fills the whole key, and a grant of it is
-  refused for the parcels that cascade from a delivery, as one on the order
-  form is for its deliveries and its lines; and which default makes a uuid
-  key one a version column proves a record over (`defaults`, 0057): the
+  delete is allowed and does (0050, 0051, 0057): the delivery form offers
+  one on both engines, by SQL Server's rowversion and over PostgreSQL's
+  version column because `gen_random_uuid()` fills the whole key; a grant
+  of it under a policy that names no key in `cascades` is refused for the
+  parcels that cascade from a delivery, as one on the order form is for its
+  deliveries, its lines and their parcels; named with their actions, those
+  keys are accepted, and tenant 2's clerk deletes a delivery with its
+  parcels, then its order with its line, its other delivery and that one's
+  parcel; and which default makes a uuid key one a version column proves a
+  record over (`defaults`, 0057): the
   engine's own that never repeats, filling the whole key, however the DDL
   writes it, and no other -- a constant, `uuid_generate_v4()` or `newid()`,
   a function of the suites' own schema named like the engine's, or the
   engine's own beside a pinned tenant or on a key that refers to another
   table's -- each spelled as discovery reports it. `UUID_ROWS`
-  is what those suites insert first: two orders of tenant 2's, one delivery
-  under the first and sixteen under the second, each keyed with one byte
-  set and all of one carrier, so a lookup's options tie on it. The one
+  is what those suites insert first: three orders of tenant 2's, one
+  delivery under the first, sixteen under the second, each keyed with one
+  byte set and all of one carrier, so a lookup's options tie on it, and
+  under the third, which the delete case deletes, a line and two deliveries
+  with three parcels between them. The one
   answer the engines give differently is the order of uuid values, and
   `uuidOrder(kind, keys)` is each engine's: PostgreSQL's bytes in turn, SQL
   Server's byte groups, the last six bytes first. Measured on both servers
@@ -117,6 +123,17 @@ dropped the key from the end of its order would show on both engines.
   `deleteAnswer(name, engine)` reads. `UPDATE_RECREATED` is the update an
   application's delete and insert again of a typed key lets land on the new
   record, characterised on both.
+- `CASCADE_PARITY` is what both adapters' `cascade.integration.test.ts`, and
+  their lost-answer suites for `lost-answer`, expect of a delete that
+  reaches past its record (0051): a `removable_parent` row of the parity
+  schema with its `removable_cascade` rows, their `removable_grandchild`
+  rows, and the `removable_null` rows whose reference it clears, under a
+  policy that names the three keys, `PARITY_CASCADES`, in `cascades`.
+  `cascadeAnswer(name, engine)` reads it. `REACH_PRIVILEGE_LOSSES` is how
+  `reach-privilege` takes DELETE away on both engines: from the
+  grandchildren with no grant to write them kept, or with INSERT kept, and
+  from the cleared table with UPDATE kept -- PostgreSQL's lock is taken with
+  either.
 
 - `startTcpHop({ kind, host, port })` puts a TCP hop in front of a database that
   can lose an answer after the database has sent it (0031). `kind` is what
@@ -211,14 +228,16 @@ value, the two shipments, each change of `DRIFTING` both engines run, and
 each of `THROUGH_CASES`, what a form reached through a parent shows (0043),
 the one where the engines answer differently, `moved-parent`, included, each
 `LIST_PARITY` case (0044), each `DELETE_PARITY` case and
-`update: recreated` (0050), and each `UUID_PARITY` case (0056), `order`
-included, whose expectation is each engine's own order.
+`update: recreated` (0050), each `CASCADE_PARITY` case (0051), and each
+`UUID_PARITY` case (0056), `order` included, whose expectation is each
+engine's own order.
 The ids are derived from the shared data --
 `filterCase(entry)`, `displayCase(column)`, `temporalCase(column)`,
 `refusalCase(name)`, `edgeCase(name)`,
 `shipmentCase('first')`, `driftingCase(name)`, `throughCase(name)`,
 `listCase(name)`, `deleteCase(name)`, `UPDATE_RECREATED_CASE`,
-`uuidCase(name)`, `MODEL_CASES.owner` -- so no test types one.
+`cascadeCase(name)`, `uuidCase(name)`, `MODEL_CASES.owner` -- so no test
+types one.
 
 `DRIFTING` is the table of changes to a form's own table after it was
 published ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)):

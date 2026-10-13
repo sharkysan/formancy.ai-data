@@ -289,6 +289,17 @@ const saved = await records.update({ target, key, set, expectedVersion: read.rec
 // or { ok: false, code: 'stale' | 'not-found' | 'schema-changed' | 'unique-violation' | …, message }
 ```
 
+Past its record, the reach guard reads every table the delete removes rows
+of and accepts exactly the keys its policy names in `cascades`, by the
+object each is on, its name, the object it refers to and its action, and
+refuses a key that follows a cleared column ON UPDATE; then 51708
+(`permission-denied`) refuses a delete whose account may not DELETE from a
+table it reaches, whatever other grant it holds there, which SQL Server's
+own cascade never asks. Either rolls back what the cascade did
+([0051](../../docs/decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)).
+`cascade.integration.test.ts` holds every case `CASCADE_PARITY` names but
+`lost-answer`, which `records-lost-answer.integration.test.ts` holds.
+
 - **A record is located by its key, the filters and every through**
   ([0043](../../docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)).
   The read, the update and the query that tells `stale` from `not-found`
@@ -460,8 +471,11 @@ record operation fails, a write whose answer is lost on the way back, and a
 uuid key end to end (`uuid.integration.test.ts`, 0056: discovered, generated
 read-only, its token in lower case, created, updated, listed in this
 engine's order and offered by a lookup, tied options in that order too,
-each case `UUID_PARITY`'s, and which default makes a version column prove
-a record over such a key (0057): `newsequentialid()` filling the whole key,
+a delivery deleted by its uuid token with its parcels and then its order
+with what it reaches once the policy names each key the delete acts
+through (0051), each case `UUID_PARITY`'s, and which default makes a
+version column prove a record over such a key (0057): `newsequentialid()`
+filling the whole key,
 however the DDL writes it, and not a constant, `newid()`, a function of
 another schema named `newsequentialid`, or `newsequentialid()` beside a
 pinned tenant or on a key that refers to another table's, each as the

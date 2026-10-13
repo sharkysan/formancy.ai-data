@@ -230,4 +230,36 @@ create table parity.removable_ruled (
 );
 create rule removable_ruled_also as on delete to parity.removable_ruled do also insert into parity.removable_log (id, note) values (old.id, 'ruled');
 
+-- What a delete reaches past its record (0051): a removable_parent's rows
+-- take their removable_cascade rows with them, and those their
+-- removable_grandchild rows, and a removable_null row keeps its place and
+-- loses its reference. A policy names each key with its action before a
+-- delete may act through it. Every key is numbered by the database, as
+-- 0050's tables' are; removable_null's unique key over its reference is one
+-- another key can follow, which a case adds and removes.
+create table parity.removable_parent (
+  id int generated always as identity constraint pk_removable_parent primary key,
+  tenant_id int not null,
+  note varchar(50) null,
+  version int not null default 1
+);
+create table parity.removable_cascade (
+  id int generated always as identity constraint pk_removable_cascade primary key,
+  parent_id int not null constraint fk_removable_cascade_parent references parity.removable_parent (id) on delete cascade,
+  note varchar(50) null,
+  version int not null default 1
+);
+create table parity.removable_grandchild (
+  id int generated always as identity constraint pk_removable_grandchild primary key,
+  cascade_id int not null constraint fk_removable_grandchild_cascade references parity.removable_cascade (id) on delete cascade,
+  note varchar(50) null
+);
+create table parity.removable_null (
+  id int generated always as identity constraint pk_removable_null primary key,
+  parent_id int null constraint fk_removable_null_parent references parity.removable_parent (id) on delete set null,
+  note varchar(50) null,
+  version int not null default 1,
+  constraint uq_removable_null_parent unique (parent_id, id)
+);
+
 analyze parity.tenant_item;

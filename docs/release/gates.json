@@ -60,7 +60,9 @@
         { "file": "packages/data-core/src/records/plan-delete.test.ts" },
         { "file": "packages/data-postgres/src/delete.integration.test.ts" },
         { "file": "packages/data-sqlserver/src/delete.integration.test.ts" },
-        { "file": "packages/data-server/src/routes/runtime-deletes.test.ts" }
+        { "file": "packages/data-server/src/routes/runtime-deletes.test.ts" },
+        { "file": "packages/data-postgres/src/cascade.integration.test.ts" },
+        { "file": "packages/data-sqlserver/src/cascade.integration.test.ts" }
       ]
     },
     {

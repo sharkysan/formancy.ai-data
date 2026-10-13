@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ApiValue, MetadataSnapshot, ObjectRef, RecordColumn, RecordConcurrency, RecordOutcome, RecordTarget, RecordValue } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
 import type { SqlServerFixture, TcpHop } from '@formancy/data-fixtures'
-import { answerBytes, defined, startSqlServerFixture, startTcpHop } from '@formancy/data-fixtures'
+import { answerBytes, cascadeCase, covers, defined, startSqlServerFixture, startTcpHop } from '@formancy/data-fixtures'
 import { createSqlServerRecords, discoverSqlServer } from './index.js'
 
 /**
@@ -59,6 +59,17 @@ beforeAll(async () => {
     code nvarchar(100) not null,
     version int not null constraint df_lost_removable_version default 1,
     constraint pk_lost_removable primary key (id, code)
+  )`)
+  await owner.request().batch(`create table lost.cascading (
+    id int identity(1, 1) not null,
+    code nvarchar(100) not null,
+    version int not null constraint df_lost_cascading_version default 1,
+    constraint pk_lost_cascading primary key (id, code)
+  )`)
+  await owner.request().batch(`create table lost.cascading_line (
+    cascading_id int not null,
+    cascading_code nvarchar(100) not null,
+    constraint fk_cascading_line_cascading foreign key (cascading_id, cascading_code) references lost.cascading (id, code) on delete cascade
   )`)
   snapshot = await discoverSqlServer(owner, { schemas: ['sales', 'lost'] })
 })
@@ -134,6 +145,15 @@ async function ordersWith(notes: string): Promise<number> {
 async function removableCoded(code: string): Promise<number> {
   const found = await owner.request().input('code', mssql.NVarChar(100), code).query<{ n: number }>('select count(*) as n from lost.removable where code = @code')
   return found.recordset[0]?.n ?? -1
+}
+
+/** The rows of lost.cascading and of its lines that carry `code`. */
+async function cascadingCoded(code: string): Promise<[number, number]> {
+  const found = await owner
+    .request()
+    .input('code', mssql.NVarChar(100), code)
+    .query<{ rows: number; lines: number }>('select (select count(*) from lost.cascading where code = @code) as rows, (select count(*) from lost.cascading_line where cascading_code = @code) as lines')
+  return [found.recordset[0]?.rows ?? -1, found.recordset[0]?.lines ?? -1]
 }
 
 async function countriesNamed(name: string): Promise<number> {
@@ -266,6 +286,42 @@ describe('an answer lost after the write committed', () => {
       expect(await pending).toMatchObject({ ok: false, code: 'unknown-outcome' })
       expect(sent()).toBe(1)
       expect(await removableCoded(code)).toBe(0)
+    } finally {
+      await close()
+    }
+  })
+
+  // A delete that reaches past its record runs in the same batch (0051):
+  // the statement, its cascade, the guards and the commit, then the select
+  // that echoes the marker. Cut after the marker crossed, the cascade has
+  // committed with the record: unknown, sent once, both gone -- where
+  // PostgreSQL's locked path never sent its commit and keeps both.
+  test('a cascading delete is unknown-outcome, sent once, and its rows are gone', covers('sqlserver', cascadeCase('lost-answer')), async () => {
+    const code = markerText()
+    const created = await owner.request().input('code', mssql.NVarChar(100), code).query<{ id: number }>('insert into lost.cascading (code) output inserted.id values (@code)')
+    const id = String(created.recordset[0]?.id)
+    await owner.request().input('id', mssql.Int, Number(id)).input('code', mssql.NVarChar(100), code).query('insert into lost.cascading_line (cascading_id, cascading_code) values (@id, @code)')
+    const table: ObjectRef = { schema: 'lost', name: 'cascading' }
+    const line: ObjectRef = { schema: 'lost', name: 'cascading_line' }
+    const { hop, pool, close } = await throughHop()
+    try {
+      const bytes = answerBytes('sqlserver', code)
+      const sent = hop.countSent(bytes)
+      const lost = hop.swallowAnswersFrom(bytes)
+      const pending = defined(createSqlServerRecords(pool)).delete({
+        target: { table, identity: [columnOf(table, 'id'), columnOf(table, 'code')], concurrency: { kind: 'version-column', column: 'version' } },
+        key: [valueOf(table, 'id', id), valueOf(table, 'code', code)],
+        expectedVersion: '1',
+        filters: { kind: 'unrestricted' },
+        through: [],
+        reach: { removed: [table, line], cleared: [], accepted: [{ from: line, name: 'fk_cascading_line_cascading', onto: table, onDelete: 'cascade' }] },
+      })
+      await within(lost.matched, 'the marker never appeared in an answer')
+      await until(async () => (await cascadingCoded(code)).join() === '0,0', 'the delete never became visible')
+      lost.cut()
+      expect(await pending).toMatchObject({ ok: false, code: 'unknown-outcome' })
+      expect(sent()).toBe(1)
+      expect(await cascadingCoded(code)).toEqual([0, 0])
     } finally {
       await close()
     }

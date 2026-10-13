@@ -1,4 +1,4 @@
-import type { InsertRequest, ObjectRef, ReadRequest, RecordColumn, RecordTarget, RecordValue, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
+import type { InsertRequest, ObjectRef, ReachTerms, ReadRequest, RecordColumn, RecordTarget, RecordValue, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
 import { op } from '../sql/catalog.js'
 import { filterSql } from '../sql/filters.js'
 import { quoteIdentifier, quoteTable } from '../sql/identifiers.js'
@@ -240,4 +240,34 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
  */
 export function lockStatement(table: ObjectRef, mode: 'access share' | 'row exclusive', extent: 'only' | 'below' = 'only'): RecordStatement {
   return { text: `lock table ${extent === 'only' ? 'only ' : ''}${quoteTable(table)} in ${mode} mode`, params: [] }
+}
+
+/**
+ * The lock a delete that reaches past its root takes first, whatever the
+ * isolation (0051): every table it removes rows of or clears, each with every
+ * relation below it, ROW EXCLUSIVE, in one statement and in codepoint order
+ * of schema and name, so two deletes never take them in different orders.
+ * LOCK takes no snapshot, so the statement after it takes its snapshot with
+ * every table of the reach held, and a key added onto any of them -- which
+ * needs SHARE ROW EXCLUSIVE, which waits for ROW EXCLUSIVE -- either
+ * committed before and is read by the guard, or waits until the delete ends.
+ *
+ * ROW EXCLUSIVE asks a grant to write each table, and any one will do:
+ * measured on postgres:17-alpine (17.11), 2026-10-12 (0051 P5), an account
+ * with DELETE on the root and nothing on a table its cascade reaches was
+ * refused, 42501, and one that kept INSERT there, or UPDATE on a table it
+ * clears, with DELETE revoked, was not. So the lock refuses only an account
+ * with no grant to write a table at all; the statement asks DELETE itself
+ * (`reachDeletable`, delete.ts), since the cascade runs as each table's owner
+ * and asks the account nothing. Identifiers come from the planner's reach,
+ * which came from approved metadata, and are quoted here.
+ */
+export function reachLockStatement(reach: ReachTerms): RecordStatement {
+  const tables: ObjectRef[] = []
+  for (const table of [...reach.removed, ...reach.cleared.map((entry) => entry.table)]) {
+    if (!tables.some((known) => known.schema === table.schema && known.name === table.name)) tables.push(table)
+  }
+  const order = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0)
+  tables.sort((left, right) => order(left.schema, right.schema) || order(left.name, right.name))
+  return { text: `lock table ${tables.map(quoteTable).join(', ')} in row exclusive mode`, params: [] }
 }

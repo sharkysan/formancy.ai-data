@@ -8,8 +8,8 @@
  */
 import { createDataClient, fieldProblems, LIST_PAGE_SIZE, lookupSources, sourceNames } from '@formancy/data-client'
 import type { DeleteOutcome, FormMenu, Outcome, PublishedForm, RecordList, Refusal } from '@formancy/data-client'
-import { DATABASE_KINDS, isDatabaseKind } from '@formancy/data-core'
-import type { DatabaseAdapter, DatabaseKind } from '@formancy/data-core'
+import { DATABASE_KINDS, isDatabaseKind, reachesPast } from '@formancy/data-core'
+import type { CascadeRule, DatabaseAdapter, DatabaseKind, FormPolicy } from '@formancy/data-core'
 import { connectPostgres, createPostgresAdapter } from '@formancy/data-postgres'
 import { DRIVER_FACTORIES } from '@formancy/data-server'
 import type { AdminAuditEvent, AuditEvent, AuditSink, RuntimeAuditEvent } from '@formancy/data-server'
@@ -117,4 +117,11 @@ const deleteClient = createDataClient({
 const deleted: DeleteOutcome = await deleteClient.delete('order', { record: 'k1:7', version: '1' })
 if (!deleted.ok || deleted.value.record !== 'k1:7' || deleted.value.deleted !== true) throw new Error('delete() did not read the deletion')
 
-console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists, the menu and deletion included; audit events`)
+// What a delete may act through (0051): a policy that names a key with its
+// action, typed by what the published core declares, and the core's own
+// reading of a reach that goes past its root.
+const lines: CascadeRule = { table: { schema: 'sales', name: 'order_line' }, foreignKey: 'fk_order_line_order', onDelete: 'cascade' }
+const cascading: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] }, fields: {}, rowFilters: [], lookups: {}, cascades: [lines] }
+if (!reachesPast({ removed: [{ schema: 'sales', name: 'order' }, lines.table], cleared: [] }) || cascading.cascades?.length !== 1) throw new Error('reachesPast() did not read a reach past its root')
+
+console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists, the menu, deletion and cascades included; audit events`)

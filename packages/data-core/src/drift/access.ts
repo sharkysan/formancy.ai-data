@@ -1,5 +1,6 @@
 import type { CoverageAspect, CoverageGap, CoverageSubject, MetadataSnapshot, ObjectRef } from '../metadata.js'
 import { gapCovers, recordsDeleteFacts } from '../snapshot.js'
+import { reachTables } from '../policy/cascades.js'
 import { allFields, type Comparison, describe, type Draft, fieldsOver, lookups, type Operation, refKey, stopped, WRITES } from './context.js'
 import type { DriftSubject } from './types.js'
 
@@ -78,7 +79,8 @@ const TARGET_ASPECTS: ReadonlySet<CoverageAspect> = new Set(['objects', 'columns
  * The root's columns are every field and every write. Its keys are the
  * identity, which update and delete use. Its foreign keys are the lookups',
  * and so are their targets' columns and keys. What refers to the root is
- * what a delete may also do (0050): a `referenced-by` gap on it stops
+ * what a delete may also do (0050), and so is what refers to every table a
+ * delete of one reaches (0051): a `referenced-by` gap on any of them stops
  * delete, and is compared only between two snapshots that both record it
  * (`gapChanges`). Checks, comments and default expressions are nothing the
  * form relies on: generation reads none of them. Row security that cannot be
@@ -90,6 +92,10 @@ function doubtOf(comparison: Comparison, gap: CoverageGap): { stops: Operation[]
   const { bindings } = comparison
   const onRoot = gapCovers(gap, bindings.root)
   const targeted = lookups(bindings).filter((lookup) => gapCovers(gap, lookup.target.table))
+  // Past the root (0051): what refers to a table a delete of the published
+  // form's records reaches is what that delete may also do.
+  const onReach = gap.aspect === 'referenced-by' && reachTables(comparison.base, bindings.root).some((table) => gapCovers(gap, table))
+  if (onReach) return { stops: ['delete'], affects: [] }
   if (!onRoot && targeted.length === 0) return null
   if (gap.aspect === 'row-security') {
     return { stops: [], affects: allFields(bindings).filter((field) => onRoot || targeted.some((lookup) => lookup.field === field)), otherwise: 'review' }

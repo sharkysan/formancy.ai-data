@@ -199,6 +199,57 @@ describe('validatePolicy', () => {
     expect(problems({ ...unscoped, operations: { ...unscoped.operations, delete: [] } }, DELETABLE_LINE)).toEqual([])
   })
 
+  // `cascades` names each foreign key a delete may act through, with its
+  // action (0051): a name is two parts, never a dotted string, since an
+  // identifier may hold a dot; an action that does nothing on delete
+  // accepts nothing, and a key named twice says the same thing twice or
+  // two contradicting things. Each is a policy that says something nothing
+  // enforces, refused as an unread property is (watched failing with the
+  // property unread).
+  test('refuses a cascade that is not a key named by its table, with an action that acts on delete, or one named twice', () => {
+    const deleting = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, delete: ['manager'] } }
+    const line = { table: { schema: 'sales', name: 'order_line' }, foreignKey: 'fk_order_line_order', onDelete: 'cascade' }
+    expect(problems({ ...deleting, cascades: [line] }, DELETABLE_ORDER)).toEqual([])
+    expect(problems({ ...deleting, cascades: 'fk_order_line_order' }, DELETABLE_ORDER)).toEqual(['cascades is not a list of the foreign keys a delete may act through'])
+    expect(
+      problems(
+        {
+          ...deleting,
+          cascades: [
+            'sales.order_line.fk_order_line_order',
+            { ...line, table: 'sales.order_line' },
+            { ...line, table: { schema: 'sales', name: '' } },
+            { ...line, foreignKey: '' },
+            { ...line, onDelete: 'no-action' },
+            { ...line, columns: ['order_id'] },
+            { ...line, table: { ...line.table, database: 'erp' } },
+            line,
+            { ...line, onDelete: 'set-null' },
+          ],
+        },
+        DELETABLE_ORDER,
+      ),
+    ).toEqual([
+      'cascades[0] is not a foreign key named by its table and its name',
+      'cascades[1].table is not a table named by its schema and its name',
+      'cascades[2].table is not a table named by its schema and its name',
+      'cascades[3] names no foreign key',
+      'cascades[4].onDelete is not cascade, set-null or set-default, the actions a delete acts through',
+      'cascades[5].columns is not something this release reads, so nothing would enforce it',
+      'cascades[6].table.database is not something this release reads, so nothing would enforce it',
+      'cascades[8] names fk_order_line_order of sales.order_line a second time',
+    ])
+  })
+
+  // An acceptance of what a delete does says something only where somebody
+  // may delete; with nobody granted delete it is a rule about nothing
+  // (0051), refused as a through over every row is.
+  test('refuses cascades on a form nobody may delete with', () => {
+    const cascades = [{ table: { schema: 'sales', name: 'order_line' }, foreignKey: 'fk_order_line_order', onDelete: 'cascade' as const }]
+    expect(problems({ ...ORDER_POLICY, cascades }, DELETABLE_ORDER)).toEqual(['cascades accepts what a delete does, and nobody may delete with this form'])
+    expect(problems({ ...ORDER_POLICY, cascades: [] }, DELETABLE_ORDER)).toEqual([])
+  })
+
   // The tenant column's value comes from the context, on create and on
   // update. A grant to write it is a grant nobody can use, and says otherwise.
   test('refuses write on a column a row filter pins', () => {

@@ -51,15 +51,40 @@ const ONE_BYTE: readonly string[] = Array.from({ length: 16 }, (_, at) => {
 /** The delivery of tenant 2's order: a row that exists, which no request of tenant 1's may find, and tenant 2 updates. */
 const THEIRS_DELIVERY = 'f00dfeed-0000-4000-8000-000000000002'
 
+/**
+ * 2^53 + 4, an order of tenant 2's that the delete case deletes (0051), with
+ * a line and two deliveries: the first, which has two parcels, deleted
+ * alone first; the second, which has one, deleted with the order.
+ */
+const REMOVED = {
+  order: '9007199254740996',
+  deliveries: ['f00dfeed-0000-4000-8000-000000000003', 'f00dfeed-0000-4000-8000-000000000004'],
+} as const
+/** Their carrier: a label no search of another case matches. */
+const REMOVING = 'Removed'
+
 /** The rows each uuid suite inserts as the fixture's owner, before it asks anything. */
 export const UUID_ROWS = {
   /** `id`, `tenant_id`; customer 1001 of that tenant. */
   orders: [
     [THEIRS, '2'],
     [PAGED, '2'],
+    [REMOVED.order, '2'],
   ],
   /** `id`, `tenant_id`, `order_id`, `carrier`. The sixteen paged deliveries share one carrier, so a lookup's options tie on it. */
-  deliveries: [[THEIRS_DELIVERY, '2', THEIRS, 'Theirs'], ...ONE_BYTE.map((key) => [key, '2', PAGED, TIED])],
+  deliveries: [
+    [THEIRS_DELIVERY, '2', THEIRS, 'Theirs'],
+    ...ONE_BYTE.map((key) => [key, '2', PAGED, TIED]),
+    ...REMOVED.deliveries.map((key) => [key, '2', REMOVED.order, REMOVING]),
+  ],
+  /** `order_id`, `line_no`; quantity 1 at 1.00. */
+  lines: [[REMOVED.order, '1']],
+  /** `delivery_id`, `label`; the key is the parcel's identity. */
+  parcels: [
+    [REMOVED.deliveries[0], 'Box 4'],
+    [REMOVED.deliveries[0], 'Box 5'],
+    [REMOVED.deliveries[1], 'Box 6'],
+  ],
 } as const
 
 /**
@@ -92,6 +117,9 @@ export function uuidOrder(kind: DatabaseKind, keys: readonly string[]): string[]
 }
 
 const token = (key: string): string => `k1:${key}`
+
+/** A key a delete of the fixture's deliveries or orders acts through, and its action, as a policy's `cascades` names it (0051, 0056). */
+const cascadeOf = (name: string, foreignKey: string) => ({ table: { schema: 'sales', name }, foreignKey, onDelete: 'cascade' }) as const
 
 /** The schema of the uuid suites' own whose tables differ in their key's default (0057). */
 const MINTED = 'minted'
@@ -138,15 +166,22 @@ const FIXED = '2b7e1516-28ae-4d2a-a6f7-15880945cf4f'
  *   clerk the sixteen paged deliveries, tied on their carrier, in each
  *   engine's order of their keys, which ends a lookup's order; and a parcel
  *   created with a delivery chosen holds its key and is read through it.
- * - `delete`: what a policy that lets tenant 1's clerk delete is told, by
- *   the publish check's two halves -- the policy's fit and what a delete
- *   also does. Granted on the delivery form, which offers delete on both
- *   engines, both say only that the delete would reach the delivery's
- *   parcels through their cascading key, which 0050 does not let a delete
- *   do; granted on the order form, both say it would reach the order's
- *   deliveries and its lines, each through its cascading key, so no order
- *   is deleted yet. A parcel has no version column, so its form offers
- *   neither update nor delete.
+ * - `delete`: what a policy that lets the clerks delete is told by the
+ *   publish check's two halves -- the policy's fit and what a delete
+ *   also does -- and what the delete then does (0051). Granted on the
+ *   delivery form, which offers delete on both engines (0057), under a
+ *   policy that names no key in `cascades`, both say only that the delete
+ *   would reach the delivery's parcels through their cascading key, which
+ *   the policy does not accept; granted on the order form, both say it
+ *   would reach the order's deliveries and its lines, and through the
+ *   deliveries their parcels, each through its cascading key. Naming those
+ *   keys with their actions -- the parcels' for a delivery, all three for
+ *   an order -- nothing is refused, and tenant 2's clerk deletes a delivery
+ *   of `REMOVED` with its two parcels, then that order with its line, its
+ *   other delivery and that delivery's parcel; each is answered with its
+ *   key, and `left` is what remains of the order's rows before, after the
+ *   first and after the second. A parcel has no version column, so its
+ *   form offers neither update nor delete.
  * - `defaults`: which default makes a uuid key one a version column proves
  *   a record over (0057). In a schema of the suites' own, tables keyed by a
  *   uuid, each guarded by a version column, differ in the default that
@@ -222,13 +257,34 @@ export const UUID_PARITY = {
   },
   delete: {
     delivery: [
-      'operations.delete grants roles, and deleting a record of sales.delivery also deletes rows of sales.parcel (fk_parcel_delivery, ON DELETE CASCADE), which this release does not offer',
+      'operations.delete grants roles, and deleting a record of sales.delivery also deletes rows of sales.parcel (fk_parcel_delivery, ON DELETE CASCADE), which cascades does not accept',
     ],
     parcel: { update: false, delete: false },
     order: [
-      'operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.delivery (fk_delivery_order, ON DELETE CASCADE), which this release does not offer',
-      'operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.order_line (fk_order_line_order, ON DELETE CASCADE), which this release does not offer',
+      'operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.delivery (fk_delivery_order, ON DELETE CASCADE), which cascades does not accept',
+      'operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.order_line (fk_order_line_order, ON DELETE CASCADE), which cascades does not accept',
+      'operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.parcel (fk_parcel_delivery, ON DELETE CASCADE), which cascades does not accept',
     ],
+    /** What each form's policy names in `cascades` to be refused nothing: a delivery's parcels; an order's deliveries and lines, and the deliveries' parcels. */
+    cascades: {
+      delivery: [cascadeOf('parcel', 'fk_parcel_delivery')],
+      order: [cascadeOf('delivery', 'fk_delivery_order'), cascadeOf('order_line', 'fk_order_line_order'), cascadeOf('parcel', 'fk_parcel_delivery')],
+    },
+    /** What tenant 2's clerk deletes, in turn -- a delivery of `REMOVED`'s, then that order -- each answered with the key of the row it deleted. */
+    removed: {
+      delivery: { record: token(REMOVED.deliveries[0]), values: { id: REMOVED.deliveries[0] } },
+      order: { record: token(REMOVED.order), values: { id: REMOVED.order } },
+    },
+    /** What is left of `REMOVED`'s rows -- the order, its line, its deliveries and their parcels -- before either delete, after the delivery's, and after the order's. */
+    left: {
+      order: REMOVED.order,
+      deliveries: REMOVED.deliveries,
+      counts: [
+        { orders: 1, lines: 1, deliveries: 2, parcels: 3 },
+        { orders: 1, lines: 1, deliveries: 1, parcels: 1 },
+        { orders: 0, lines: 0, deliveries: 0, parcels: 0 },
+      ],
+    },
   },
   defaults: {
     schema: MINTED,

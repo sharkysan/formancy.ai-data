@@ -508,6 +508,121 @@ describe("the order form's own account on both engines", () => {
   })
 })
 
+/** The keys a delete of an order acts through on the fixture, with their actions: its lines and deliveries, and the deliveries' parcels (0051, 0056). */
+const ORDER_CASCADES: NonNullable<FormPolicy['cascades']> = [
+  { table: { schema: 'sales', name: 'order_line' }, foreignKey: 'fk_order_line_order', onDelete: 'cascade' },
+  { table: { schema: 'sales', name: 'delivery' }, foreignKey: 'fk_delivery_order', onDelete: 'cascade' },
+  { table: { schema: 'sales', name: 'parcel' }, foreignKey: 'fk_parcel_delivery', onDelete: 'cascade' },
+]
+
+describe.each([
+  { engine: 'PostgreSQL', connection: 'pg-writer', db: 'pg' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'SQL Server', connection: 'ms-writer', db: 'ms' as const, versionColumn: undefined },
+])("deleting an order with what it reaches, through the order form's own account on $engine", ({ connection, db, versionColumn }) => {
+  const formId = `${connection}-order-delete`
+  let rows: Awaited<ReturnType<typeof owner>>
+  let count: (order: string) => Promise<{ lines: number; deliveries: number; parcels: number }>
+
+  beforeAll(async () => {
+    rows = await owner(db)
+    count = async (order) => {
+      if (db === 'pg') {
+        const url = new URL(pg.admin)
+        const sql = connectPostgres({ host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: decodeURIComponent(url.password), tls: { enabled: false, rejectUnauthorized: false } })
+        try {
+          const [row] = await sql.unsafe<Array<{ lines: number; deliveries: number; parcels: number }>>(
+            `select (select count(*)::int from sales.order_line where order_id = $1::text::bigint) as lines,
+                    (select count(*)::int from sales.delivery where order_id = $1::text::bigint) as deliveries,
+                    (select count(*)::int from sales.parcel p join sales.delivery d on d.id = p.delivery_id where d.order_id = $1::text::bigint) as parcels`,
+            [order],
+          )
+          return row as { lines: number; deliveries: number; parcels: number }
+        } finally {
+          await sql.end({ timeout: 5 })
+        }
+      }
+      const pool = await connectSqlServer({ host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true })
+      try {
+        const result = await pool.request().input('id', order).query<{ lines: number; deliveries: number; parcels: number }>(
+          `select (select count(*) from sales.order_line where order_id = convert(bigint, @id)) as lines,
+                  (select count(*) from sales.delivery where order_id = convert(bigint, @id)) as deliveries,
+                  (select count(*) from sales.parcel p join sales.delivery d on d.id = p.delivery_id where d.order_id = convert(bigint, @id)) as parcels`,
+        )
+        return result.recordset[0] as { lines: number; deliveries: number; parcels: number }
+      } finally {
+        await pool.close()
+      }
+    }
+  })
+  afterAll(async () => {
+    await rows?.close()
+  })
+
+  // A delete of an order reaches its lines and deliveries, and the
+  // deliveries' parcels, all of which the order form's account may delete
+  // (0049, 0056). A policy that names the first two keys and not the third
+  // is refused naming it; one that names all three publishes (0051).
+  test('an administrator publishes the order form with delete for clerks, once its policy names every key a delete acts through', async () => {
+    const proposal = await call('POST', '/v1/form-proposals', admin, {
+      connection,
+      root: { schema: 'sales', name: 'order' },
+      formId,
+      title: 'Order',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+      ...(versionColumn === undefined ? {} : { versionColumn }),
+    })
+    expect(proposal.statusCode, proposal.body).toBe(200)
+    const proposed = proposal.json() as Proposal
+    expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: true })
+    const base = clerkPolicy(proposed.bindings.fields)
+    const policy: FormPolicy = { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES }
+    const partial = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, { ...policy, cascades: ORDER_CASCADES.slice(0, 2) }) })
+    expect([partial.statusCode, partial.json().problems]).toEqual([
+      422,
+      ['policy: operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.parcel (fk_parcel_delivery, ON DELETE CASCADE), which cascades does not accept'],
+    ])
+    const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, policy) })
+    expect(published.statusCode, published.body).toBe(201)
+  })
+
+  // Clara deletes her order, and its lines, deliveries and parcels go with
+  // it; Otto, another tenant, is told 404 for it, and nothing of it goes
+  // (watched failing against 0050's adapters, whose guard accepts no key:
+  // both clerks were answered 409 schema-changed, and nothing went).
+  test("a clerk deletes her order with its lines, deliveries and parcels; another tenant's clerk is told 404", async () => {
+    const definition = (await call('GET', `/v1/forms/${formId}`, clerk)).json()
+    expect(definition).toMatchObject({ operations: ['read', 'create', 'update', 'delete'], deleting: { cascades: true, clears: false, restricted: false } })
+    const source = definition.form.model.fields.find((field: { key: string }) => field.key === 'customer').optionsSource as string
+    const customer = (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json().rows[0].token as string
+    const created = await call('POST', `/v1/forms/${formId}/records/create`, clerk, { answers: { customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '5', notes: 'deleted with its lines' } })
+    expect(created.statusCode, created.body).toBe(201)
+    const { record, version } = created.json() as { record: string; version: string }
+    const id = record.slice('k1:'.length)
+    await rows.run(
+      db === 'pg'
+        ? [
+            `insert into sales.order_line (order_id, line_no, quantity, unit_price) values (${id}, 1, 1, 1.00), (${id}, 2, 2, 2.00)`,
+            `insert into sales.delivery (tenant_id, order_id, carrier) values (1, ${id}, 'deleted with its order')`,
+            `insert into sales.parcel (delivery_id, label) select id, 'deleted with its delivery' from sales.delivery where order_id = ${id}`,
+          ]
+        : [
+            `insert into sales.order_line (order_id, line_no, quantity, unit_price) values (${id}, 1, 1, 1.00), (${id}, 2, 2, 2.00)`,
+            `insert into sales.delivery (tenant_id, order_id, carrier) values (1, ${id}, N'deleted with its order')`,
+            `insert into sales.parcel (delivery_id, label) select id, N'deleted with its delivery' from sales.delivery where order_id = ${id}`,
+          ],
+    )
+    expect(await count(id)).toEqual({ lines: 2, deliveries: 1, parcels: 1 })
+
+    expect((await call('POST', `/v1/forms/${formId}/records/delete`, otherClerk, { record, version })).statusCode).toBe(404)
+    expect(await count(id)).toEqual({ lines: 2, deliveries: 1, parcels: 1 })
+
+    const deleted = await call('POST', `/v1/forms/${formId}/records/delete`, clerk, { record, version })
+    expect([deleted.statusCode, deleted.json()]).toEqual([200, { record, deleted: true }])
+    expect((await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record })).statusCode).toBe(404)
+    expect(await count(id)).toEqual({ lines: 0, deliveries: 0, parcels: 0 })
+  })
+})
+
 /**
  * Statements on the database's owner, which is who changes a schema. The
  * DDL is plan section 14's step 8, measured on both servers first

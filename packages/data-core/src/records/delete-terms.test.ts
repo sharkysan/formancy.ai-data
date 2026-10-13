@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { deleteTerms } from './delete-terms.js'
+import { deleteTerms, reachesPast } from './delete-terms.js'
 import { INT32, INT64, ORDER_ID, ORDER_TARGET, sales, TENANT_ONE, value } from './test-support.js'
 import type { DeleteRequest } from './types.js'
 
@@ -32,6 +32,7 @@ describe('deleteTerms', () => {
       terms: [{ column: 'tenant_id', type: INT32, value: '1' }],
       through: [],
       root: sales('order'),
+      reach: { removed: [sales('order')], cleared: [], accepted: [] },
     })
   })
 
@@ -61,16 +62,60 @@ describe('deleteTerms', () => {
     expect(() => deleteTerms(altered({ filters: { kind: 'restricted', equal: [] } }))).toThrow()
   })
 
-  // 0050 deletes from its root and nothing else. A reach that starts
-  // elsewhere names another table to delete from; one that goes past the
-  // root is one these statements cannot hold the database to.
-  test('refuses a reach that does not begin with the root, or goes past it', () => {
+  // A reach that starts elsewhere names another table to delete from as
+  // though it were the record's.
+  test('refuses a reach that does not begin with the root', () => {
     expect(() => deleteTerms(altered({ reach: undefined }))).toThrow(/says what it reaches/)
     expect(() => deleteTerms(altered({ reach: { removed: [sales('order_line')], cleared: [], accepted: [] } }))).toThrow(/removes rows of its root first/)
-    expect(() => deleteTerms(altered({ reach: { removed: [sales('order'), sales('order_line')], cleared: [], accepted: [] } }))).toThrow(/reaches past its root/)
-    expect(() => deleteTerms(altered({ reach: { removed: [sales('order')], cleared: [{ table: sales('x'), columns: ['a'] }], accepted: [] } }))).toThrow(/reaches past its root/)
-    expect(() =>
-      deleteTerms(altered({ reach: { removed: [sales('order')], cleared: [], accepted: [{ from: sales('order_line'), name: 'fk', onto: sales('order'), onDelete: 'cascade' }] } })),
-    ).toThrow(/reaches past its root/)
+    expect(() => deleteTerms(altered({ reach: { removed: [sales('order'), sales('order')], cleared: [], accepted: [] } }))).toThrow(/each table it removes rows of once/)
+  })
+
+  // Past the root since 0051: the tables a cascade removes rows of, those a
+  // key clears, and each key accepted with the table it refers to -- read
+  // fresh, as the guards and the locks are built from it.
+  test('reads a reach past the root that the keys it accepts account for', () => {
+    const reach = {
+      removed: [sales('order'), sales('order_line')],
+      cleared: [{ table: sales('order_memo'), columns: ['order_id'] }],
+      accepted: [
+        { from: sales('order_line'), name: 'fk_order_line_order', onto: sales('order'), onDelete: 'cascade' },
+        { from: sales('order_memo'), name: 'fk_order_memo_order', onto: sales('order'), onDelete: 'set-null' },
+      ],
+    }
+    expect(deleteTerms(altered({ reach })).reach).toEqual(reach)
+  })
+
+  // The adapters lock and guard what the reach names, and match each key
+  // the database shows against the accepted ones. A table removed or
+  // cleared that no accepted key reaches, a key onto a table the delete
+  // does not remove rows of, or one whose table the reach leaves out, is a
+  // reach the planner never makes: thrown, so the statements are never
+  // built from tables and keys that do not agree (watched failing with
+  // every reach past the root accepted as it came).
+  test('refuses a reach whose tables and accepted keys do not agree', () => {
+    const line = { from: sales('order_line'), name: 'fk_order_line_order', onto: sales('order'), onDelete: 'cascade' }
+    const memo = { from: sales('order_memo'), name: 'fk_order_memo_order', onto: sales('order'), onDelete: 'set-null' }
+    const reach = (removed: unknown[], cleared: unknown[], accepted: unknown[]) => altered({ reach: { removed, cleared, accepted } })
+    expect(() => deleteTerms(reach([sales('order'), sales('order_line')], [], []))).toThrow(/no key it accepts cascades into/)
+    expect(() => deleteTerms(reach([sales('order')], [], [line]))).toThrow(/a cascade into a table it does not say it removes rows of/)
+    expect(() => deleteTerms(reach([sales('order'), sales('order_line')], [], [{ ...line, onto: sales('customer') }]))).toThrow(/a key onto a table it does not remove rows of/)
+    expect(() => deleteTerms(reach([sales('order')], [{ table: sales('order_memo'), columns: ['order_id'] }], []))).toThrow(/no key it accepts clears/)
+    expect(() => deleteTerms(reach([sales('order')], [], [memo]))).toThrow(/a key that clears a table it does not say it clears/)
+    expect(() => deleteTerms(reach([sales('order')], [{ table: sales('order_memo'), columns: [] }], [memo]))).toThrow(/each table it clears with the columns it clears/)
+    expect(() => deleteTerms(reach([sales('order'), sales('order_line')], [], [{ ...line, onDelete: 'no-action' }]))).toThrow(/each key it accepts by/)
+  })
+})
+
+describe('reachesPast', () => {
+  // Whether PostgreSQL takes the locked path whatever the isolation, and
+  // locks every table of the reach before its statement (0051). A delete
+  // that only clears a reference reaches past its root as much as one that
+  // cascades: read as reaching its root alone, it would lock nothing but the
+  // root, and a key added onto the cleared table while it waited would carry
+  // the change on unseen (watched failing with the cleared tables left out).
+  test('is true for a reach that removes rows of another table or clears one, and false for the root alone', () => {
+    expect(reachesPast({ removed: [sales('order')], cleared: [] })).toBe(false)
+    expect(reachesPast({ removed: [sales('order'), sales('order_line')], cleared: [] })).toBe(true)
+    expect(reachesPast({ removed: [sales('order')], cleared: [{ table: sales('order_memo'), columns: ['order_id'] }] })).toBe(true)
   })
 })

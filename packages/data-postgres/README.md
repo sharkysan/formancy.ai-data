@@ -278,6 +278,26 @@ whose action would otherwise be answered as the deletion.
 `delete.integration.test.ts` holds every case `DELETE_PARITY` names, a DO
 ALSO and a DO INSTEAD rule, and a key onto a partition on both paths.
 
+A delete that reaches past its record, through the keys its policy names in
+`cascades` ([0051](../../docs/decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)), takes the locked path whatever the isolation: `begin`,
+one `lock table` of every table it removes rows of or clears, in codepoint
+order, ROW EXCLUSIVE and with every relation below each, the statement,
+`commit`. The lock is what lets the guard see every key onto the reach --
+a cascade opens each table only after the statement's snapshot. It is
+refused (42501, `permission-denied`) to an account with no grant to write
+one of those tables, but any grant to write takes it, INSERT or UPDATE as
+well as DELETE, and the cascade itself runs as the referring table's owner
+and asks the account nothing; so the statement asks `has_table_privilege`
+for DELETE on every table past the root, under the lock, and deletes
+nothing where one is refused, which the follow-up answers
+`permission-denied`. The guard accepts exactly the keys the request names,
+by the table each is on, its name, the table it refers to and its action,
+and refuses a key that follows a cleared column by an ON UPDATE that acts.
+A cascaded table's BEFORE DELETE triggers and its rules run as that table's
+owner, its AFTER DELETE triggers as the deleting account.
+`cascade.integration.test.ts` holds every case `CASCADE_PARITY` names but
+`lost-answer`, which `records-lost-answer.integration.test.ts` holds.
+
 ### What a lookup reads
 
 [0034](../../docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)
@@ -582,8 +602,12 @@ The suites start `postgres:17-alpine` unless a test names another image, through
   chose, an update and a stale one, another tenant's delivery not found, a
   list under an order in PostgreSQL's order of uuid -- its bytes in turn,
   where SQL Server's is its byte groups -- and `sales.parcel`'s lookup onto
-  the uuid, whose options tied on one carrier come in that same order; and
-  which default makes a version column prove a record over a uuid key
+  the uuid, whose options tied on one carrier come in that same order; a
+  delivery deleted by its uuid token with its parcels, and then its order
+  with its line, its other delivery and that one's parcel, each on the
+  locked path, once the policy names each key the delete acts through
+  (0051); and which default makes a version column prove a record over a
+  uuid key
   (0057): `gen_random_uuid()` filling the whole key, however the DDL writes
   it, and not a constant, `uuid_generate_v4()`, a function of another
   schema named `gen_random_uuid`, or `gen_random_uuid()` beside a pinned

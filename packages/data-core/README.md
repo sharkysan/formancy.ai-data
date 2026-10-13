@@ -385,13 +385,22 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   filters and throughs scope a delete as an update's do -- then whether the
   form offers delete (`offers()`, where an absent flag is not offered) with
   a confirmed token, as its own snapshot says it can (`deleteUnoffered`),
-  what a delete also does (`deleteProblems`, which refuses a grant while a
-  key that refers to the root cascades, clears or sets a default), the
-  description (`driftRefusal(…, 'delete')`, `DELETE_REFUSED`), the token
-  and the version. The request's `reach` is the root alone; an adapter
-  reads it through `deleteTerms`, which throws on a key that is not the
-  identity, a missing version, filter or through, and a reach that goes
-  past the root.
+  what a delete also does (`deleteProblems`), the description
+  (`driftRefusal(…, 'delete')`, `DELETE_REFUSED`), the token and the
+  version. What a delete also does is walked from the snapshot (0051):
+  every key onto the root, and onto every table a cascade reaches, that
+  cascades, sets NULL or sets a default must be named in the policy's
+  `cascades` with its action, the account must be able to DELETE from
+  every table reached, and a table outside the scope, a `referenced-by`
+  gap, a SET NULL another key follows ON UPDATE and a `cascades` entry
+  that names a key the delete does not act through are refused. `deleteReach` gives
+  the request's `reach` -- the tables removed, the root first, the tables
+  cleared with their columns, and each accepted key with the table it
+  refers to -- and `deleteEffects` what a page says of it. An adapter
+  reads the request through `deleteTerms`, which throws on a key that is
+  not the identity, a missing version, filter or through, and a reach
+  that does not begin with the root or whose tables and keys do not account
+  for each other; `reachesPast` says whether it reaches past the root.
 - **A person's menu** (0045). `menuForm(bundle, context)` reads one
   published form alone for this person -- a bundle it cannot read throws
   there, for the caller to leave out -- and `formMenu(forms)` names, in

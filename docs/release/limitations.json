@@ -113,7 +113,7 @@
       ]
     },
     "0010": {
-      "reviewed": "sha256:8dcddf7c458a5b926ec21bfbd6831427fe4ae452e9ad4957677fc5035d6c9618",
+      "reviewed": "sha256:82e8c9ae129e3c02624eb40363b6006cf61fe6877f6502652cd55013dca7f874",
       "limitations": [
         {
           "area": "forms",
@@ -247,7 +247,7 @@
       ]
     },
     "0016": {
-      "reviewed": "sha256:f6f1e7e93bcce8f65b7d9c51c21b19ef790a41f95f671c75641e56bbed02fa83",
+      "reviewed": "sha256:be063d5af546f35f631ca0897d7052074528c4057a7265b187e4e281e62d5fef",
       "limitations": [
         {
           "area": "databases",
@@ -289,7 +289,7 @@
       ]
     },
     "0017": {
-      "reviewed": "sha256:5867bcffc240f39b0fb2ed215cf14dc98822e3e1cf6c6ae0d0a7a464174e07b3",
+      "reviewed": "sha256:ea380a18d6516b0a331bea5d1a51194109e068c12d4edab87e8d305c763b9c6d",
       "limitations": [
         {
           "area": "writes",
@@ -741,7 +741,7 @@
       ]
     },
     "0032": {
-      "reviewed": "sha256:bd2f372dce87bd1371aabeb3a652963268335026ed1c40e261751285b0ac0487",
+      "reviewed": "sha256:2f0998093eafc400d6de2e628e6952a7b322d052c652914aacbdbbc420df23a9",
       "limitations": [
         {
           "area": "operations",
@@ -1050,7 +1050,7 @@
       ]
     },
     "0041": {
-      "reviewed": "sha256:9dff75b5e1fa15ded47b0e41fbac8f610dae372d225394eb259ba024c071e6b5",
+      "reviewed": "sha256:042c94b87b9852399587e290feedd83bbf827b7fc1500c1c8e4b49eb4553581c",
       "limitations": [
         {
           "area": "forms",
@@ -1433,7 +1433,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:db32b1151fd26a285c462ad965ecd4d352f3bce573d194e50cbc8da3a22e3204",
+      "reviewed": "sha256:94e93250ff50cbb3d133d27ae277c1958cc65b5b26ab32c369b2aadc2a8aa9b3",
       "limitations": [
         {
           "area": "writes",
@@ -1457,7 +1457,7 @@
         },
         {
           "area": "forms",
-          "says": "A policy may not grant delete while another table's foreign key cascades onto the form's table, clears its references or sets them to a default, so the fixture's orders, whose lines and deliveries cascade, and its deliveries, whose parcels do, cannot be deleted.",
+          "says": "A policy may grant delete over another table's foreign key that cascades onto the form's table, clears its references or sets them to a default only where its `cascades` names that key with its action (0051): without it, the fixture's orders, whose lines and deliveries cascade, and its deliveries, whose parcels do, cannot be deleted.",
           "heldBy": "packages/data-core/src/policy/cascades.test.ts"
         },
         {
@@ -1507,6 +1507,67 @@
           "area": "operations",
           "says": "A server older than 0050 refuses a policy that grants delete, and this release's client answers `unexpected` to a form reply from a server older than 0050, which carries no `deleting`, so a host upgrades its server first.",
           "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0051": {
+      "reviewed": "sha256:63ea0402f66b157701d0f789d3e356fe68a479662e1e4bc2e365e6e667706eb3",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A delete that cascades into other tables, or clears their references, is offered only where the policy's `cascades` names each such foreign key with its action and the account may DELETE from every table it reaches; the rows it reaches are asked of no form's policy.",
+          "heldBy": "packages/data-core/src/policy/cascades.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A cascade or a SET NULL into a table outside the approved schemas, and a SET NULL whose cleared column another key follows by an ON UPDATE that acts, are refused even where the policy names the key.",
+          "heldBy": "packages/data-core/src/policy/cascades.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "On both engines a cascade deletes the rows it reaches whatever the deleting account's row security says of them, FORCE included on PostgreSQL, a filter or a block predicate on SQL Server.",
+          "heldBy": "packages/data-postgres/src/cascade.integration.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A delete is held to the account's DELETE on every table it reaches, though neither engine asks it for a cascade and PostgreSQL's lock is taken with any grant to write: an account that lost DELETE there is refused, whatever other grant it kept, and nothing is deleted.",
+          "heldBy": "packages/data-postgres/src/cascade.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A reference a delete clears does not move the referring row's version column, so a person editing that row is not told it changed; a rowversion moves.",
+          "heldBy": "packages/data-sqlserver/src/cascade.integration.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A new foreign key that acts on a delete of any table a delete reaches, an accepted key whose action changed, and DELETE revoked on any of those tables refuse every delete of the form until it is reviewed and republished.",
+          "heldBy": "packages/data-core/src/drift/referrers.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL a delete that reaches past its record locks every table it reaches, ROW EXCLUSIVE, before its statement, whatever the isolation, in a transaction of its own; how many round trips that costs is not measured."
+        },
+        {
+          "area": "writes",
+          "says": "A delete that reaches past its record and whose answer is lost is unknown, and what it left depends on where the answer was lost: on PostgreSQL, lost before the commit was sent, nothing of it was committed; on SQL Server, lost after the batch committed, all of it. A PostgreSQL answer lost after the commit was sent, and a SQL Server one lost before the commit, are not tested.",
+          "heldBy": "packages/data-postgres/src/records-lost-answer.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL a cascaded table's BEFORE DELETE triggers and its rules run as that table's owner, with the owner's grants, and may do what the deleting account could not; its AFTER DELETE triggers run as the deleting account. Neither is seen nor refused here.",
+          "heldBy": "packages/data-postgres/src/cascade.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a cascaded table's triggers run as the deleting account, and are neither seen nor refused here."
+        },
+        {
+          "area": "operations",
+          "says": "No delete is measured: the performance page has no figure for one."
+        },
+        {
+          "area": "operations",
+          "says": "A server older than 0051 refuses a policy that names `cascades`."
         }
       ]
     },
