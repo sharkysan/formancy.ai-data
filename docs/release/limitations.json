@@ -217,11 +217,12 @@
       ]
     },
     "0014": {
-      "reviewed": "sha256:ab957eacd80cf4c1e347cbdb6926469f33e2ad31d88cb4d2785881704fc1a3aa",
+      "reviewed": "sha256:0172731be7cb155fde9e02c1fbde566b4a5002cb497f8e576785d7c077cba38b",
       "limitations": [
         {
           "area": "operations",
-          "says": "Rotating the host identity key is a restart with a new key, not a fetched key set."
+          "says": "Rotating a key named by `FORMANCY_DATA_IDENTITY_SECRET` or `FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE` is a restart; only a key set file is read again without one (0059).",
+          "heldBy": "packages/data-server/src/identity-settings.test.ts"
         },
         {
           "area": "host",
@@ -741,7 +742,7 @@
       ]
     },
     "0032": {
-      "reviewed": "sha256:2f0998093eafc400d6de2e628e6952a7b322d052c652914aacbdbbc420df23a9",
+      "reviewed": "sha256:aeb5af97bd8d423e2a82521def95b7f354882670ba8f839ffdc2b102d9e2ceba",
       "limitations": [
         {
           "area": "operations",
@@ -1642,6 +1643,73 @@
         {
           "area": "writes",
           "says": "A row filter on a key column that is the whole key writes the key from the context on every create, so a record deleted is created again under its key by the next create in that context, its version starting where the deleted one's did, as over a by-default identity; inferred from the planner, not tested."
+        }
+      ]
+    },
+    "0059": {
+      "reviewed": "sha256:43a8465e5d1dbd0ea16534c49a7bcd526a511252e0403133114933882db84c95",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "A key set is read again only when the server is sent SIGHUP, and nothing fetches a provider's keys, so a provider's new key verifies only once the operator's file holds it and the server has been signalled.",
+          "heldBy": "packages/data-server/src/identity-file.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A key set file that cannot be read, or is refused, when SIGHUP arrives leaves the set in force, a key the file removed included, and only the log says so; the same file stops the next start until it is fixed.",
+          "heldBy": "packages/data-server/src/identity-file.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A secret pasted into a key set as `k` as it stands is accepted and verifies no token; `identity-keys-cli.mjs convert` writes the key the server verifies with today.",
+          "heldBy": "packages/data-server/src/identity-keys-tool.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A key its provider marks for another use or algorithm is left out of force and named in the log, so a signing key the provider re-marks leaves force at the next read.",
+          "heldBy": "packages/data-server/src/identity-keys.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "One algorithm per server: moving a key set to another algorithm, or changing the issuer, the audience or the claim mapping, is a restart."
+        },
+        {
+          "area": "server",
+          "says": "A token without a `kid` costs one signature check per key in force before it is refused."
+        },
+        {
+          "area": "operations",
+          "says": "An HS256 key's kid that is its own `k`, or 43 base64 characters or more, refuses the key set, because a kid is logged; a 32-byte thumbprint cannot name an HS256 key.",
+          "heldBy": "packages/data-server/src/identity-keys.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "A key set's keys are checked for their length and for the weaknesses under which anyone signs, an RSA exponent of 1 and an Ed25519 point of small order, not for every weak key, and the public key file is not checked for those weaknesses."
+        },
+        {
+          "area": "operations",
+          "says": "A key set file read again that never returns, from a network mount that stalls, holds every SIGHUP after it, which logs nothing until it does, and SIGTERM's exit waits for it; a path that is not a regular file is refused at once."
+        },
+        {
+          "area": "server",
+          "says": "A server started in a terminal keeps running when the terminal closes, because SIGHUP reads the key set again, or says it read nothing, rather than stopping it.",
+          "heldBy": "packages/data-server/src/identity-settings.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Where no process can be sent SIGHUP, natively on Windows, a key set is read only at start."
+        },
+        {
+          "area": "operations",
+          "says": "A key set mounted through a Kubernetes `subPath` is never updated, and a secret volume is updated eventually, so a SIGHUP sent before the file changed logs that nothing changed."
+        },
+        {
+          "area": "operations",
+          "says": "A key set file bind-mounted on its own is not seen after it is replaced by a rename; mount its directory."
+        },
+        {
+          "area": "operations",
+          "says": "Each instance of the server reads its key set on its own signal, and only its log says which keys it holds."
         }
       ]
     }

@@ -1,6 +1,5 @@
-import { createSecretKey } from 'node:crypto'
-import { importSPKI, jwtVerify } from 'jose'
-import type { CryptoKey, JWTPayload, KeyObject } from 'jose'
+import type { JWTPayload } from 'jose'
+import { isKeySet, KeySet, verifyWithKeySet } from './identity-keys.js'
 
 /**
  * Who is asking, as the host application vouched for it.
@@ -19,14 +18,18 @@ export type IdentityOutcome = { ok: true; identity: HostIdentity } | { ok: false
 
 export type IdentityVerifier = (token: string) => Promise<IdentityOutcome>
 
+/** A setting that names one key: a shared secret, or a public key's PEM. Its tokens' kid is ignored. */
+export type OneKey = { kind: 'secret'; secret: string } | { kind: 'public-key'; pem: string; algorithm: 'RS256' | 'ES256' | 'EdDSA' }
+
 export interface IdentityOptions {
   /**
-   * How tokens are signed. A shared secret (HS256), or a public key the host
-   * signs against with its private one. Never a URL to fetch keys from: that
-   * would be an outbound request from inside a customer's network on every
-   * cold start, and a key set that changes under a running server.
+   * How tokens are signed. A shared secret (HS256), a public key the host
+   * signs against with its private one, or a key set read from a file and
+   * read again on SIGHUP, whose `keys` is asked on every token. Never a URL,
+   * and never a key or a URL a token names: an outbound request from inside
+   * a customer's network, and a key the token chooses (0014, 0059).
    */
-  key: { kind: 'secret'; secret: string } | { kind: 'public-key'; pem: string; algorithm: 'RS256' | 'ES256' | 'EdDSA' }
+  key: OneKey | { kind: 'key-set'; keys: () => KeySet }
   issuer: string
   audience: string
   /** Attribute name to claim name, e.g. `{ tenant: 'tid' }`. Only these claims are read. */
@@ -37,39 +40,58 @@ export interface IdentityOptions {
   clockToleranceSeconds?: number
 }
 
-/** 256 bits, the strength HS256 offers. A shorter secret is a weaker key than the algorithm claims. */
-const MIN_SECRET_BYTES = 32
+/** Why a token is refused when the verifier is handed something that is not a set the builders made. */
+const NOT_A_KEY_SET = 'the identity key set is not one readKeySet made'
+
+/**
+ * The set a one-key setting verifies with: a secret's UTF-8 bytes, at least
+ * 32 of them, or the PEM as jose imports it. What `identity-keys-cli.mjs
+ * convert` writes is this set's key, so the two never differ.
+ */
+export async function oneKeySet(key: OneKey): Promise<KeySet> {
+  return key.kind === 'secret' ? KeySet.fromSecret(key.secret) : KeySet.fromPem(key.pem, key.algorithm)
+}
 
 /**
  * A verifier for the host application's tokens, built once at startup.
  *
  * Fails at construction on a configuration that would accept forgeries — a
- * short secret, a key that does not parse — rather than on the first request.
- * The algorithm is pinned per key kind, so a token cannot choose `none` or
- * swap an asymmetric key for a shared one.
+ * short secret, a key that does not parse, a key set no builder checked —
+ * rather than on the first request. The algorithm is pinned per key kind, and
+ * for a whole key set, so a token cannot choose `none` or swap an asymmetric
+ * key for a shared one.
+ *
+ * A key set's `keys` is asked once per token, so a set read again replaces
+ * the one in force between tokens, and a verification that has begun
+ * finishes on the set it began with.
  */
 export async function createIdentityVerifier(options: IdentityOptions): Promise<IdentityVerifier> {
-  let key: KeyObject | CryptoKey
-  let algorithm: string
-  if (options.key.kind === 'secret') {
-    if (Buffer.byteLength(options.key.secret, 'utf8') < MIN_SECRET_BYTES) {
-      throw new Error(`the identity secret must be at least ${String(MIN_SECRET_BYTES)} bytes`)
-    }
-    key = createSecretKey(Buffer.from(options.key.secret, 'utf8'))
-    algorithm = 'HS256'
+  let keys: () => unknown
+  if (options.key.kind === 'key-set') {
+    keys = options.key.keys
+    if (!isKeySet(keys())) throw new Error(NOT_A_KEY_SET)
   } else {
-    key = await importSPKI(options.key.pem, options.key.algorithm)
-    algorithm = options.key.algorithm
+    const set = await oneKeySet(options.key)
+    keys = () => set
   }
 
   const rolesClaim = options.rolesClaim ?? 'roles'
   const tolerance = options.clockToleranceSeconds ?? 30
 
   return async (token) => {
+    let set: unknown
+    try {
+      set = keys()
+    } catch {
+      set = undefined
+    }
+    if (!isKeySet(set)) return { ok: false, reason: NOT_A_KEY_SET }
+
     let payload: JWTPayload
     try {
-      ;({ payload } = await jwtVerify(token, key, {
-        algorithms: [algorithm],
+      // Never a method looked up on the set: its class is frozen, and its
+      // verification is reached only through this module function (0059).
+      ;({ payload } = await verifyWithKeySet(set, token, {
         issuer: options.issuer,
         audience: options.audience,
         clockTolerance: tolerance,

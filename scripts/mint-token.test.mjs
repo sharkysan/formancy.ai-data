@@ -160,6 +160,12 @@ describe('the minter refuses', () => {
     // provider's private key, which this minter does not have and must not
     // pretend to: HS256 only, said.
     { why: 'a public-key identity', args: ['--subject', 'ada'], settings: { FORMANCY_DATA_IDENTITY_SECRET: undefined, FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/run/keys/host.pem' }, says: /HS256/ },
+    // A server that reads a key set (0059) verifies whatever keys its file
+    // holds. A minter that signed with FORMANCY_DATA_IDENTITY_SECRET beside
+    // it -- a setting the server would refuse to start with -- would print
+    // tokens for a key the server may not hold, with nothing but a 401 to
+    // say so.
+    { why: 'a key set identity, even beside a secret', args: ['--subject', 'ada'], settings: { FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: 'HS256' }, says: /FORMANCY_DATA_IDENTITY_KEYS_FILE/ },
     { why: 'no identity at all', args: ['--subject', 'ada'], settings: { FORMANCY_DATA_IDENTITY_SECRET: undefined }, says: /FORMANCY_DATA_IDENTITY_SECRET/ },
     // The mistake resolveSecret's own wording is for: the secret pasted where
     // its reference belongs.
