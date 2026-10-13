@@ -60,7 +60,7 @@
     "title": "Generate",
     "step": "3. Generate",
     "caption": "The generator says what it chose and what it refused, kind by kind, from what this account may do: a column it may not update is “Read-only on update”, and “Row-level security applies” to it on `sales.customer`, named as the database's own limit ([0009](./docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md), [0027](./docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).",
-    "alt": "The generator's notes: create and update offered, nothing blocked, read-only notes for id, customer, order_date, amount and created_by, the inferred controls with their column types, and an access note that row-level security applies on sales.customer.",
+    "alt": "The generator's notes: create, update and delete offered, nothing blocked, read-only notes for id, customer, order_date, amount and created_by, the inferred controls with their column types, and an access note that row-level security applies on sales.customer.",
     "quotes": {
       "Read-only on update": ["Chose"],
       "Row-level security applies": ["Chose"]

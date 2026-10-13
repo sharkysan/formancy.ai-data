@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
-import { presentationOf, validatePolicy } from '@formancy/data-core'
+import { presentationOf } from '@formancy/data-core'
 import type { FormPolicy, ReassignedKey } from '@formancy/data-core'
 import type { AdminClient, Bundle, Proposal, Published } from './api.js'
 import { describeRef } from './choice.js'
 import { useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
+import { policyCheck } from './policy-model.js'
 
 /** The publish button's id, for the keyboard to return to. */
 const PUBLISH = 'publish'
@@ -144,9 +145,10 @@ export function PublishStep({
 
   // Derived from the document that will be sent, on every edit: the one source of truth for what the presentation is.
   const derived = useMemo(() => presentationOf(proposal.form, document, proposal.bindings), [proposal, document])
-  const checked = validatePolicy(policy, proposal.bindings)
+  // The Policy step's own check, so the two cannot disagree about whether the server will take the policy.
+  const problems = policyCheck(policy, proposal.bindings, proposal.snapshot)
   const blockers = [
-    checked.ok ? null : `The policy has ${String(checked.problems.length)} ${checked.problems.length === 1 ? 'problem' : 'problems'}: the Policy step lists ${checked.problems.length === 1 ? 'it' : 'them'}.`,
+    problems.length === 0 ? null : `The policy has ${String(problems.length)} ${problems.length === 1 ? 'problem' : 'problems'}: the Policy step lists ${problems.length === 1 ? 'it' : 'them'}.`,
     stale ? 'The row filters changed since the form was generated: generate it again from the Policy step.' : null,
     undecided.length === 0
       ? null

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import type { CoverageGap, ForeignKeyMeta, InboundKey, ObjectMeta } from '../metadata.js'
 import { col, factsSnapshot, fk, INT32, INT64, MS, MS_FACTS, ORDER_POLICY, orderForm, sales, table, text } from '../records/test-support.js'
 import { createSnapshot } from '../snapshot.js'
-import { deleteEffects, deleteProblems, deleteReach, unaccepted } from './cascades.js'
+import { deleteEffects, deleteProblems, deleteReach, deleteReview, unaccepted } from './cascades.js'
 import type { CascadeRule, FormPolicy } from './types.js'
 
 /*
@@ -321,5 +321,96 @@ describe('deleteEffects', () => {
     expect(deleteEffects(lines('cascade'), sales('order'), accepting(LINE_KEY))).toEqual({ cascades: true, clears: false, restricted: false })
     expect(deleteEffects(lines('no-action', true, memo('no-action')), sales('order'), accepting(MEMO_KEY))).toEqual({ cascades: false, clears: true, restricted: true })
     expect(deleteEffects(lines('no-action'), sales('order'), DELETING)).toEqual({ cascades: false, clears: false, restricted: true })
+  })
+})
+
+describe('deleteReview', () => {
+  const review = (snapshot: ReturnType<typeof lines>, policy: FormPolicy) => deleteReview(snapshot, sales('order'), policy)
+  const named = ({ key, onto }: { key: InboundKey; onto: { name: string } }) => `${key.name} onto ${onto.name}`
+
+  // The studio asks for each key by name, never all at once (0052): every
+  // key that acts on a delete, in the order the walk meets it, the ones past
+  // the root included, each with whether `cascades` names it with its
+  // action -- the publish check's own `unaccepted` -- whoever may delete.
+  // A box per key the publish check refuses unnamed, and no other (watched
+  // failing with a key accepted by its name alone, whatever its action).
+  test('lists every key a delete acts through, past the root too, with whether the policy names it with its action', () => {
+    const snapshot = lines('cascade', true, noted())
+    expect(review(snapshot, accepting(LINE_KEY)).acting.map((entry) => [named(entry), entry.accepted])).toEqual([
+      ['fk_order_line_order onto order', true],
+      ['fk_line_note_line onto order_line', false],
+    ])
+    expect(review(snapshot, ORDER_POLICY).acting.map((entry) => entry.accepted)).toEqual([false, false])
+    expect(review(lines('set-null'), accepting(LINE_KEY)).acting.map((entry) => [named(entry), entry.key.onDelete, entry.accepted])).toEqual([
+      ['fk_order_line_order onto order', 'set-null', false],
+    ])
+  })
+
+  // A key that only refuses is the database's to enforce, and a person is
+  // told of it before they meet the refusal: on delete onto a table the
+  // delete removes rows of, or on update onto a column it clears.
+  test('lists every key that only refuses, on delete or on the update a cleared reference is', () => {
+    expect(review(lines('restrict'), DELETING).restricting.map((entry) => [named(entry), entry.on])).toEqual([['fk_order_line_order onto order', 'delete']])
+    expect(review(lines('restrict'), DELETING).acting).toEqual([])
+    expect(review(lines('no-action', true, memo('no-action')), accepting(MEMO_KEY)).restricting.map((entry) => [named(entry), entry.on])).toEqual([
+      ['fk_order_line_order onto order', 'delete'],
+      ['fk_memo_copy_memo onto order_memo', 'update'],
+    ])
+  })
+
+  // An acceptance of a key the delete does not act through, or with another
+  // action, is what the publish check refuses as untrue; the studio offers
+  // to remove each, by its place in the list, and only those (watched
+  // failing with a key matched by its name alone).
+  test('names each acceptance the delete does not act through, by its place', () => {
+    const country: CascadeRule = { table: sales('customer'), foreignKey: 'fk_customer_country', onDelete: 'cascade' }
+    expect(review(lines('cascade'), accepting(LINE_KEY, country)).stray).toEqual([{ index: 1, rule: country }])
+    expect(review(lines('set-null'), accepting(LINE_KEY)).stray).toEqual([{ index: 0, rule: LINE_KEY }])
+    expect(review(lines('no-action', true, memo('no-action', 'cascade')), accepting(MEMO_KEY, MEMO_COPY_KEY)).stray).toEqual([{ index: 1, rule: MEMO_COPY_KEY }])
+    expect(review(lines('cascade'), accepting(LINE_KEY)).stray).toEqual([])
+  })
+
+  // What no box can make grantable is said in the publish check's own
+  // words: with every acting key named and nothing else, `deleteProblems`
+  // refuses a grant for exactly these, each after its "operations.delete
+  // grants roles, and". So the studio and the server cannot disagree about
+  // what is left once every box is ticked.
+  test('says what refuses a grant whatever is named, in the publish check’s words', () => {
+    const notLines = (object: ObjectMeta) => object.ref.name !== 'order_line'
+    const cases = [
+      lines('cascade', true, () => {}, notLines),
+      lines('no-action', true, memo('cascade')),
+      copied('cascade'),
+      copied('set-null'),
+      gapped(lines('cascade'), [{ subject: { kind: 'object', object: sales('order_line') }, aspect: 'referenced-by', detail: 'a key onto a partition' }]),
+      lines('cascade', true, noted()),
+    ]
+    for (const snapshot of cases) {
+      const said = review(snapshot, DELETING)
+      const everyKey = accepting(...said.acting.map(({ key }) => ({ table: key.table, foreignKey: key.name, onDelete: key.onDelete as CascadeRule['onDelete'] })))
+      expect(problems(snapshot, everyKey)).toEqual(said.blocked.map((clause) => `operations.delete grants roles, and ${clause}`))
+    }
+    expect(review(lines('cascade', true, () => {}, notLines), DELETING).blocked).toEqual([
+      "deleting a record of sales.order reaches sales.order_line, which this connection's account may not DELETE from: a delete is held to the account's DELETE on every table it reaches",
+    ])
+    expect(review(lines('cascade', true, noted()), DELETING).blocked).toEqual([])
+    expect(deleteReview(MS, sales('order'), DELETING).blocked).toEqual(['this snapshot does not record what refers to sales.order, so what a delete also does cannot be seen: discover again'])
+  })
+
+  // "These are every key the catalog shows" is true only where nothing in
+  // the reach is behind a gap, outside the scope, or unrecorded.
+  test('says whether the list is every key the snapshot can show', () => {
+    expect(review(lines('cascade', true, noted()), DELETING).complete).toBe(true)
+    expect(review(copied('cascade'), DELETING).complete).toBe(false)
+    expect(review(gapped(MS_FACTS, [{ subject: { kind: 'scope' }, aspect: 'referenced-by', detail: 'no VIEW DEFINITION' }]), DELETING).complete).toBe(false)
+    expect(deleteReview(MS, sales('order'), DELETING).complete).toBe(false)
+  })
+
+  // A root the snapshot lacks is the bindings' problem, which the publish
+  // check reports as such: there is nothing to list for it, and the list is
+  // never called complete, or the studio would say that no key acts on a
+  // table it never saw (fail closed; watched failing with `complete: true`).
+  test('lists nothing for a root the snapshot lacks, and never calls that every key', () => {
+    expect(deleteReview(lines('cascade'), sales('invoice'), accepting(LINE_KEY))).toEqual({ acting: [], restricting: [], stray: [], blocked: [], complete: false })
   })
 })

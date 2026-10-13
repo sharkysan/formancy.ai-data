@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { offers } from '@formancy/data-core'
 import type { GenerationNote } from '@formancy/data-core'
 import type { Proposal } from './api.js'
 import { describeRef } from './choice.js'
@@ -28,11 +29,13 @@ export const NOTE_KINDS: ReadonlyArray<{ kind: GenerationNote['kind']; heading: 
  * Saying what was chosen is the product (0009): the notes are shown as the
  * generator wrote them, kind by kind, and the operations are printed from the
  * bindings, so a blocked update is never contradicted by a line that says the
- * form updates.
+ * form updates. Delete is read through `offers`, where an absent flag is not
+ * offered, as every reader of the bindings reads it (0050).
  */
 export function GenerateStep({ proposal, onNext }: { proposal: Proposal; onNext: () => void }): ReactElement {
   const { form, bindings, notes } = proposal
   const { create, update } = bindings.operations
+  const deletes = offers(bindings, 'delete')
   return (
     <>
       <p className="lede">
@@ -48,6 +51,9 @@ export function GenerateStep({ proposal, onNext }: { proposal: Proposal; onNext:
           </li>
           <li data-offered={update}>
             Update: <strong>{update ? 'offered' : 'not offered'}</strong>
+          </li>
+          <li data-offered={deletes}>
+            Delete: <strong>{deletes ? 'offered' : 'not offered'}</strong>
           </li>
         </ul>
         {NOTE_KINDS.map(({ kind, heading, means, none }) => {

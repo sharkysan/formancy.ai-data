@@ -1,6 +1,6 @@
 # 0024 — The studio speaks only the administrator plane
 
-- **Status:** accepted; presentation survives regeneration, and an edit that is not presentation is refused at publish, narrowed by [0030](0030-presentation-is-a-patch-over-the-generated-base.md); the one reverse proxy is `deploy/web/nginx.conf` in the composed stack, serving the studio at `/studio/` beside `/v1`, extended by [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)
+- **Status:** accepted; presentation survives regeneration, and an edit that is not presentation is refused at publish, narrowed by [0030](0030-presentation-is-a-patch-over-the-generated-base.md); the one reverse proxy is `deploy/web/nginx.conf` in the composed stack, serving the studio at `/studio/` beside `/v1`, extended by [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md); extended by [0052](0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md): the Policy step grants delete and asks for each foreign key a delete acts through by its own box, checking the policy with `deleteProblems` as the server does, and Generate and Drift say delete
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `apps/studio/src/journey.test.tsx` — every request the

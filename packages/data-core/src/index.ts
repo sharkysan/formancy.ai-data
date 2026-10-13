@@ -102,8 +102,8 @@ export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
 export { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter, throughFilters } from './policy/evaluate.js'
 export { validatePolicy } from './policy/validate.js'
 export { isThroughKeyType, throughProblems, unscopedLookups } from './policy/through.js'
-export { actsOnDelete, deleteEffects, deleteProblems, deleteReach, grantsDelete, reachOf, reachTables, unaccepted } from './policy/cascades.js'
-export type { DeleteReachFacts } from './policy/cascades.js'
+export { actsOnDelete, deleteEffects, deleteProblems, deleteReach, deleteReview, grantsDelete, reachOf, reachTables, unaccepted } from './policy/cascades.js'
+export type { DeleteReachFacts, DeleteReview, ReachedKey } from './policy/cascades.js'
 export type { ThroughKeyType } from './policy/through.js'
 export type {
   CascadeRule,

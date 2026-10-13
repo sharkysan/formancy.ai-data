@@ -24,8 +24,7 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > **Status: in development, nothing released.** Each line under *What it does*
 > links the decision record whose **Verified by** names what fails when the
 > line stops being true. Not yet: a release, a page here that deletes a
-> record, a policy step in the studio that grants delete or names what a
-> delete may act through, a delete figure on the performance page, a host
+> record, a delete figure on the performance page, a host
 > page that draws a field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
 > a run through a real Cloudflare tunnel, and a licence a lawyer has
@@ -79,6 +78,14 @@ is not licensed for production.
   refuses. A through is one hop and never over a text key, and on PostgreSQL
   an update racing a move of its parent to another tenant may be written
   ([0043](./docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)).
+  Who may delete is granted there too, and each foreign key a delete acts
+  through -- for the fixture's order, the keys of its lines, its deliveries
+  and, past them, their parcels -- is accepted by its own box, never all at
+  once; a key that only refuses is listed, what no box can fix is said in
+  the server's words, and triggers and rules are said not to be listed. The
+  step checks a delete grant with the function the server's publish check
+  refuses one by
+  ([0052](./docs/decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md)).
 - **Keeps presentation as a patch over the generated form**, carried through
   a regeneration by what each field stands for
   ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
@@ -270,7 +277,7 @@ speaks only to the server's administrator plane and `/v1/whoami`
 
 </details>
 
-<img src="./docs/images/readme/studio-generate.webp" width="874" alt="The generator's notes: create and update offered, nothing blocked, read-only notes for id, customer, order_date, amount and created_by, the inferred controls with their column types, and an access note that row-level security applies on sales.customer.">
+<img src="./docs/images/readme/studio-generate.webp" width="874" alt="The generator's notes: create, update and delete offered, nothing blocked, read-only notes for id, customer, order_date, amount and created_by, the inferred controls with their column types, and an access note that row-level security applies on sales.customer.">
 
 **Step 3, Generate.** *The generator says what it chose and what it refused, kind by kind, from what this account may do: a column it may not update is “Read-only on update”, and “Row-level security applies” to it on `sales.customer`, named as the database's own limit ([0009](./docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md), [0027](./docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).*
 

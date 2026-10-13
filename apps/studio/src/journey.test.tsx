@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
-import { audit, discover, generateOrder, goTo, signIn, step, unnamed, writeOrderPolicy } from './test-studio.js'
+import { audit, discover, generateOrder, goTo, grantOrderDelete, signIn, step, unnamed, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { OWNER_SNAPSHOT, startPlane, withoutColumn } from './test-server.js'
 import type { TestPlane } from './test-server.js'
@@ -83,8 +83,16 @@ describe('the journey', () => {
     await record('Generate')
     await goTo(user, 'Choose')
     await record('Choose')
-    await writeOrderPolicy(user)
+    const policy = await writeOrderPolicy(user)
     await record('Policy')
+    // Delete granted, its keys not yet accepted, then each accepted by its
+    // box (0052): the published form deletes from here on, through
+    // publishing, drift, restoring and regenerating.
+    await user.type(within(policy).getByLabelText('Roles that may delete'), 'clerk')
+    await record('Policy, delete refused for what it also does')
+    await user.clear(within(policy).getByLabelText('Roles that may delete'))
+    await grantOrderDelete(user, policy)
+    await record('Policy, with a reach')
     await goTo(user, 'Presentation')
     await record('Presentation')
     await goTo(user, 'Preview')

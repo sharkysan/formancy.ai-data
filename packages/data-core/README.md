@@ -396,7 +396,12 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   that names a key the delete does not act through are refused. `deleteReach` gives
   the request's `reach` -- the tables removed, the root first, the tables
   cleared with their columns, and each accepted key with the table it
-  refers to -- and `deleteEffects` what a page says of it. An adapter
+  refers to -- `deleteEffects` what a page says of it, and `deleteReview`
+  the same walk key by key, for an administrator to accept each (0052):
+  every key that acts with whether `cascades` names it with its action,
+  every key that only refuses, each acceptance that names nothing the
+  delete acts through, and in `deleteProblems`' own words what no
+  acceptance can fix. An adapter
   reads the request through `deleteTerms`, which throws on a key that is
   not the identity, a missing version, filter or through, and a reach
   that does not begin with the root or whose tables and keys do not account

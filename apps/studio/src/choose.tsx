@@ -177,7 +177,7 @@ function VersionColumn({ root, choice, onChoice }: { root: ObjectMeta; choice: C
         value={choice.versionColumn ?? ''}
         onChange={(event) => onChoice({ ...choice, versionColumn: event.target.value === '' ? null : event.target.value })}
       >
-        <option value="">None: update is not offered</option>
+        <option value="">None: update and delete are not offered</option>
         {versionCandidates(root).map((column) => (
           <option key={column.name} value={column.name}>
             {column.name}
@@ -186,7 +186,7 @@ function VersionColumn({ root, choice, onChoice }: { root: ObjectMeta; choice: C
       </select>
       <p id="version-column-hint" className="hint">
         {describeRef(root.ref)} has no rowversion. Confirm a column only if every writer of the table increments it on each
-        update; without one the form offers no update, because a stale save could not be detected.
+        update; without one the form offers no update and no delete, because a stale save or delete could not be detected.
       </p>
     </div>
   )

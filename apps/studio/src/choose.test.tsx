@@ -97,7 +97,7 @@ describe('choosing', () => {
     await user.selectOptions(within(choose).getByLabelText('Version column'), 'row_version')
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     const generated = await screen.findByRole('main', { name: 'Generate' })
-    expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: offered'])
+    expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: offered', 'Delete: offered'])
     expect(list(generated, 'Access')).toContainEqual(expect.stringMatching(/^customer Row-level security applies to this connection on sales\.customer: /))
     expect(list(generated, 'Read-only')).toContain("amount Read-only on update: this connection's account may not UPDATE amount.")
     expect(await audit()).toEqual([])
@@ -160,14 +160,20 @@ describe('choosing', () => {
   })
 
   // PostgreSQL has no rowversion. Without a confirmed version column the
-  // generator offers no update, and says why; confirmed, update is offered.
+  // generator offers no update and no delete, and says why, as the choice
+  // and its hint do (watched failing with the hint's earlier words, update
+  // alone); confirmed, both are offered.
   test('offers update only once a version column is confirmed', async () => {
     const user = await signIn(plane)
     const choose = await toChoose(user)
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
+    expect(within(within(choose).getByLabelText('Version column')).getByRole('option', { selected: true }).textContent).toBe('None: update and delete are not offered')
+    expect(within(choose).getByText(/has no rowversion/).textContent).toBe(
+      'sales.order has no rowversion. Confirm a column only if every writer of the table increments it on each update; without one the form offers no update and no delete, because a stale save or delete could not be detected.',
+    )
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     let generated = await screen.findByRole('main', { name: 'Generate' })
-    expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: not offered'])
+    expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: not offered', 'Delete: not offered'])
     // A delete names its version as an update does, so one note says both (0050).
     expect(list(generated, 'Blocked')).toEqual(['order Update and delete are not offered until row_version is confirmed as a version column.'])
 
@@ -175,7 +181,7 @@ describe('choosing', () => {
     await user.selectOptions(within(step('Choose')).getByLabelText('Version column'), 'row_version')
     await user.click(within(step('Choose')).getByRole('button', { name: 'Generate the form' }))
     generated = await screen.findByRole('main', { name: 'Generate' })
-    expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: offered'])
+    expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: offered', 'Delete: offered'])
   })
 
   // SQL Server keeps a rowversion, which the database changes on every update:
@@ -191,7 +197,39 @@ describe('choosing', () => {
     )
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     const generated = await screen.findByRole('main', { name: 'Generate' })
-    expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: offered'])
+    expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: offered', 'Delete: offered'])
+  })
+
+  // Delete is offered where a version names one record for good and the
+  // account may delete (0050), and the line says it from the bindings, so
+  // a delete the generator blocked is never contradicted by a line that
+  // says the form deletes (0052). PostgreSQL's order lines are keyed by
+  // what people type, so a version column cannot tell a line from one
+  // created again under its key: update is offered and delete is not, in
+  // the generator's words; the restricted reader may not DELETE at all
+  // (watched failing with the line printed for update's flag).
+  test('says delete is not offered where the generator blocks it, in its words', async () => {
+    const user = await signIn(plane)
+    let choose = await toChoose(user)
+    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order_line')
+    await user.selectOptions(within(choose).getByLabelText('Version column'), 'row_version')
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    let generated = await screen.findByRole('main', { name: 'Generate' })
+    const lines = await proposalFromServer({ connection: 'fixture', root: { schema: 'sales', name: 'order_line' }, formId: 'sales-order_line', title: 'Order line', lookups: [], pinned: [], versionColumn: 'row_version' })
+    expect(lines.bindings.operations).toEqual({ create: true, update: true, delete: false })
+    expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: offered', 'Delete: not offered'])
+    expect(list(generated, 'Blocked')).toEqual(lines.notes.filter((note) => note.kind === 'blocked').map((note) => `${note.subject} ${note.message}`))
+    expect(list(generated, 'Blocked')).toEqual([expect.stringMatching(/^order_line Delete is not offered: a record of sales\.order_line created again with a deleted record's key starts its row_version where the deleted one did/)])
+
+    await user.click(within(screen.getByRole('navigation', { name: 'Steps' })).getByRole('button', { name: '1. Connect' }))
+    // SQL Server's reader: a rowversion it may read, and no DELETE.
+    choose = await toChoose(user, 'fixture-sqlserver-reader')
+    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    generated = await screen.findByRole('main', { name: 'Generate' })
+    expect(list(generated, 'Operations').at(-1)).toBe('Delete: not offered')
+    expect(list(generated, 'Blocked')).toContain("order Delete is not offered: this connection's account may not DELETE from sales.order.")
+    expect(await audit()).toEqual([])
   })
 
   // What the studio can see is wrong is said, all of it, and nothing is

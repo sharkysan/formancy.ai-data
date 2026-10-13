@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, RecordAdapter } from '@formancy/data-core'
+import type { ColumnMeta, CoverageGap, DatabaseAdapter, LookupAdapter, MetadataSnapshot, RecordAdapter, ReferentialAction } from '@formancy/data-core'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
 import type { ConfigurationStore, ConnectionRegistry, IdentityVerifier } from '@formancy/data-server'
 import owner from './fixtures/postgres-owner.json'
@@ -203,4 +203,61 @@ export function withColumn(base: MetadataSnapshot, table: string, column: Column
   object.columns.push(structuredClone(column))
   object.columns.sort((left, right) => left.ordinal - right.ordinal)
   return createSnapshot(contents)
+}
+
+/**
+ * A snapshot of `base` with a foreign key from one table of the order's
+ * schema onto another, said on both sides as discovery says it -- the
+ * referring table's `foreignKeys` and the referred one's `referencedBy`
+ * (0049) -- and made the one way a snapshot is made: the database after
+ * `alter table ... add constraint ... foreign key ... on delete ...`. A key
+ * of that name there already is replaced, which is the database after it
+ * was dropped and added again with another action.
+ */
+export function withForeignKey(
+  base: MetadataSnapshot,
+  key: { from: string; name: string; columns: string[]; onto: string; referencedColumns: string[]; onDelete: ReferentialAction },
+): MetadataSnapshot {
+  const { fingerprint: _, ...contents } = structuredClone(base)
+  const find = (name: string) => {
+    const object = contents.objects.find((candidate) => candidate.ref.name === name)
+    if (object === undefined) throw new Error(`the snapshot has no ${name}`)
+    return object
+  }
+  const from = find(key.from)
+  const onto = find(key.onto)
+  from.foreignKeys = [
+    ...from.foreignKeys.filter((candidate) => candidate.name !== key.name),
+    { name: key.name, columns: key.columns, references: { table: onto.ref, columns: key.referencedColumns }, onUpdate: 'no-action', onDelete: key.onDelete, enforced: true, validated: true },
+  ]
+  onto.referencedBy = [
+    ...(onto.referencedBy ?? []).filter((candidate) => candidate.name !== key.name || candidate.table.name !== key.from),
+    { table: from.ref, name: key.name, columns: key.columns, referencedColumns: key.referencedColumns, onDelete: key.onDelete, onUpdate: 'no-action', enforced: true },
+  ]
+  return createSnapshot(contents)
+}
+
+/** A snapshot of `base` in which its account may, or may not, DELETE from `table`, as discovery says it (0049). */
+function withDeleteGrant(base: MetadataSnapshot, table: string, granted: boolean): MetadataSnapshot {
+  const { fingerprint: _, ...contents } = structuredClone(base)
+  const object = contents.objects.find((candidate) => candidate.ref.name === table)
+  if (object?.access === undefined) throw new Error(`the snapshot has no ${table} with access facts`)
+  object.access = { ...object.access, delete: granted }
+  return createSnapshot(contents)
+}
+
+/** A snapshot of `base` in which its account may no longer DELETE from `table`: the database after `revoke delete on ...` (0049). */
+export function withoutDelete(base: MetadataSnapshot, table: string): MetadataSnapshot {
+  return withDeleteGrant(base, table, false)
+}
+
+/** A snapshot of `base` in which its account may DELETE from `table`: the database after `grant delete on ...` (0049). */
+export function withDelete(base: MetadataSnapshot, table: string): MetadataSnapshot {
+  return withDeleteGrant(base, table, true)
+}
+
+/** A snapshot of `base` with one more gap: what the catalog hid from its account, as discovery says it (0004). */
+export function withGap(base: MetadataSnapshot, gap: CoverageGap): MetadataSnapshot {
+  const { fingerprint: _, ...contents } = structuredClone(base)
+  return createSnapshot({ ...contents, gaps: [...contents.gaps, gap] })
 }

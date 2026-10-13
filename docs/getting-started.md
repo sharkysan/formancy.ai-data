@@ -18,8 +18,10 @@ deletes the fixture's order with its line, deliveries and parcels, through a
 second order form whose policy grants clerks delete and names each foreign
 key that delete acts through
 ([0051](./decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)),
-which this guide does not have you do: the studio offers no delete roles yet,
-and the host page no delete. What the job does not do is click
+which this guide does not have you do: the studio's Policy step can grant
+that delete and accept each key
+([0052](./decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md)),
+and the host page offers no delete yet. What the job does not do is click
 through the studio and the host page. Their own suites do: each goes down
 section 4's or section 5's table by the names this guide gives every control,
 and the studio's journey test proves it makes exactly the requests the job
