@@ -23,8 +23,8 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 
 > **Status: in development, nothing released.** Each line under *What it does*
 > links the decision record whose **Verified by** names what fails when the
-> line stops being true. Not yet: a release, a page here that deletes a
-> record, a delete figure on the performance page, a host
+> line stops being true. Not yet: a release, a delete figure on the
+> performance page, a host
 > page that draws a field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
 > a run through a real Cloudflare tunnel, and a licence a lawyer has
@@ -152,9 +152,11 @@ is not licensed for production.
   the default, and that no foreign key includes -- so PostgreSQL's
   deliveries offer it, and its order lines, whose key people type, do
   not. Triggers that run on a delete are the database's, and on PostgreSQL
-  a rule that acts on one makes every delete of its table refused. No page
-  here deletes yet
+  a rule that acts on one makes every delete of its table refused. The host
+  page deletes from the open record's detail and from each grid row, after
+  a confirmation in place
   ([0050](./docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md),
+  [0053](./docs/decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md),
   [0057](./docs/decisions/0057-a-key-of-one-column-filled-by-a-never-repeating-default-counts-as-numbered.md)).
 - **A delete reaches other tables only through the foreign keys its policy
   names**, each in `cascades` with what it does -- CASCADE, SET NULL or SET
@@ -388,7 +390,24 @@ whose rows reference it lists them -- an order's lines -- and each child row
 opens in its own form; a new one is created under the open record. The
 records and the record are side by side, stacked, or separate views, and
 the address says which form and layout, never which record. Open by record
-token loads one by its token. Nothing on the page deletes.
+token loads one by its token.
+
+Where the server offers you delete, the open record's header has Delete
+record, a child row's its own Delete, and each grid row a Delete button
+named for its record, which the arrow keys reach without making the grid
+more than one Tab stop; no key deletes. Each asks first, in place under
+what you pressed, naming the record and saying what the delete also does
+-- other records deleted with it, or the database keeping it while others
+refer to it -- in the server's terms, never which tables or how many, and
+listing any form of it that holds unsaved work; Keep it comes before Delete
+it. A row's delete names the version the row was listed with, the open
+record's the newest its forms heard. Once it is
+deleted, the grid says so, with the keyboard on its heading; a record the
+delete cannot find is closed, never called deleted; a refusal is said in
+the server's words; and a deletion whose answer was lost may have been
+done, is checked by reading the record, and is repeated only after asking
+again
+([0053](./docs/decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
 
 Each form keeps its own draft and version, so loading one record into both
 renderers, saving in one and then in the other is the stale case: the
@@ -418,11 +437,8 @@ Of the host page's suites and checks, only that picture's check below holds
 the page to it, and on PostgreSQL alone
 ([0038](./docs/decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 
-What it does not do yet: it deletes nothing, though the runtime plane
-serves a delete -- the open form's tags of what a person may do leave delete
-out until the page has a control for it
-([0050](./docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md));
-and on a loaded record it draws the fields an update may not write --
+What it does not do yet: no bulk delete and no undo; and on a loaded
+record it draws the fields an update may not write --
 Customer, Order date, Amount and Created by for the order form's own
 account -- as editable, and the server refuses a changed one, which is
 [filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong).
@@ -445,7 +461,7 @@ guide's section 5 uses.
 *Two drafts of one record. React saved first; Angular's save, made against the version it read, is refused as stale instead of overwriting it: “Your changes are still in the form.”, with a button to “Load the saved record” ([0015](./docs/decisions/0015-a-record-operation-is-one-guarded-statement.md)).*
 
 <details>
-<summary>More: A refused choice, A save whose answer was lost, Leaving unsaved work, A save after the table changed, Another tenant's record</summary>
+<summary>More: A refused choice, A save whose answer was lost, Leaving unsaved work, Deleting a record, A save after the table changed, Another tenant's record</summary>
 
 <img src="./docs/images/readme/host-refused.webp" width="561" alt="The React pane of a new order with an error summary “There is 1 problem to fix” and, under Customer, the refusal.">
 
@@ -458,6 +474,10 @@ guide's section 5 uses.
 <img src="./docs/images/readme/host-unsaved.webp" width="1165" alt="A notice “Unsaved changes”: starting a new record closes the React form of order k1:9007199254740993, which holds “a save that may have been stored, not yet checked.”, with the buttons Keep editing and Discard and continue.">
 
 *The save whose answer was lost, above, is work a person could lose: New record would drop the form that holds it, so the workspace asks first. It names what was asked for and what each form holds, and waits: “Keep editing” changes nothing and gives the keyboard back, “Discard and continue” carries the request out. Every way of leaving a form asks the same -- another row, Load, another form, Back, Sign out, a child row and hiding a renderer ([0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).*
+
+<img src="./docs/images/readme/host-delete.webp" width="1165" alt="A Records grid scrolled to its last column, Delete, with one order of Muster AG and its Delete button, and under the grid a confirmation “Delete Order k1:9007199254740993?” saying that it is removed from the database for everyone who can see it, that other records that refer to it are deleted with it, and the buttons Keep it and Delete it.">
+
+*`pg-order-delete`, the getting-started job's second order form, which the capture script publishes as the job does: it grants clerks delete and names each foreign key a delete of an order acts through ([0051](./docs/decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)). Each row of its grid has a Delete, a real button named for its record and reached by the arrow keys. Pressed, it asks in place, under the grid, with no overlay: the question names the record, and what the delete also does is said in the server's terms -- “Other records that refer to it are deleted with it.” -- never which tables or how many. “Keep it” comes first, so the keyboard is never put on the button that deletes ([0053](./docs/decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).*
 
 <img src="./docs/images/readme/host-drift.webp" width="561" alt="The React pane with a notice “Not saved” saying that the database changed since this form was published, in a way this form cannot save safely, that nothing was saved and that an administrator must review the form, above the loaded order with the notes clara typed still in it.">
 
@@ -475,8 +495,8 @@ Its suites run the real server against PostgreSQL and SQL Server through the
 real drivers, with literal tokens and a `fetch` that goes through
 `app.inject`. `pnpm test:browser` measures the page in Chromium against the
 real server on PostgreSQL, which needs Docker: the workspace in every layout
-down to 320 pixels, the grids' keyboard and colours, and the record's
-journey.
+down to 320 pixels, the grids' keyboard and colours, the record's journey,
+and a delete's confirmations and answers.
 
 ## Examples
 

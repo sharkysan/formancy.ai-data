@@ -48,9 +48,16 @@ export const EDGES = inject('edges')
  * twice under one parent, which this clerk may only read.
  */
 export const ENGINES = [
-  { engine: 'PostgreSQL', connection: 'pg', formId: 'pg-order', versionColumn: 'row_version' as string | undefined, lines: 'pg-order-line', employees: 'pg-employee', staff: 'pg-order-staff' },
-  { engine: 'SQL Server', connection: 'ms', formId: 'ms-order', versionColumn: undefined, lines: 'ms-order-line', employees: 'ms-employee', staff: 'ms-order-staff' },
+  { engine: 'PostgreSQL', connection: 'pg', formId: 'pg-order', versionColumn: 'row_version' as string | undefined, lines: 'pg-order-line', employees: 'pg-employee', staff: 'pg-order-staff', parity: 'pg-parity', removable: 'pg-removable' },
+  { engine: 'SQL Server', connection: 'ms', formId: 'ms-order', versionColumn: undefined, lines: 'ms-order-line', employees: 'ms-employee', staff: 'ms-order-staff', parity: 'ms-parity', removable: 'ms-removable' },
 ] as const
+
+/** The keys a delete of an order acts through on the fixture, with their actions: its lines and deliveries, and the deliveries' parcels (0051, 0056). */
+const ORDER_CASCADES: NonNullable<FormPolicy['cascades']> = [
+  { table: { schema: 'sales', name: 'order_line' }, foreignKey: 'fk_order_line_order', onDelete: 'cascade' },
+  { table: { schema: 'sales', name: 'delivery' }, foreignKey: 'fk_delivery_order', onDelete: 'cascade' },
+  { table: { schema: 'sales', name: 'parcel' }, foreignKey: 'fk_parcel_delivery', onDelete: 'cascade' },
+]
 
 export type Engine = (typeof ENGINES)[number]
 
@@ -96,6 +103,8 @@ export interface Plane {
     countOrders(connection: Engine['connection'], notes: string): Promise<number>
     /** `count` orders of tenant 1's, for Muster AG, noted `<notes> <n>`, written by the owner in one statement: more than a page. */
     insertOrders(connection: Engine['connection'], count: number, notes: string): Promise<void>
+    /** A row of `parity.removable_child` that refers to the removable record `record`, with NO ACTION: a delete of it is refused while this row is there. */
+    referToRemovable(connection: Engine['connection'], record: string): Promise<void>
     /**
      * An order of tenant 1's approved by employee `approver`, written by the
      * owner -- the clerk may only read the form that names approvers -- and
@@ -261,13 +270,13 @@ export interface Losing {
  * exactly what it would see in a page. Once, unless `times` says more: what
  * the page does next is what is under test, and it must reach the server.
  */
-export function losingWrites(fetch: typeof globalThis.fetch, { when, times = 1 }: { when: 'after' | 'before'; times?: number }): Losing {
+export function losingWrites(fetch: typeof globalThis.fetch, { when, times = 1, writes = /\/records\/(create|update)$/ }: { when: 'after' | 'before'; times?: number; writes?: RegExp }): Losing {
   const lost: string[] = []
   return {
     lost,
     fetch: async (input, init) => {
       const path = new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname
-      if (lost.length >= times || !/\/records\/(create|update)$/.test(path)) return fetch(input, init)
+      if (lost.length >= times || !writes.test(path)) return fetch(input, init)
       lost.push(path)
       if (when === 'after') await fetch(input, init)
       throw new TypeError('Failed to fetch')
@@ -278,17 +287,17 @@ export function losingWrites(fetch: typeof globalThis.fetch, { when, times = 1 }
 /** The bindings as a proposal answers them: what the policy below is derived from. */
 interface Proposed {
   fields: FieldBinding[]
-  operations: { create?: unknown; update?: unknown }
+  operations: { create?: unknown; update?: unknown; delete?: unknown }
 }
 
 /** The lookup fields of a proposal, each with its foreign key. */
 const lookupsOf = (bindings: Proposed): Array<{ field: string; foreignKey: string }> =>
   bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? [{ field: binding.field, foreignKey: binding.foreignKey }] : []))
 
-/** Each operation the form offers, granted to the clerk, unless `readOnly`. */
-function offered(bindings: Proposed, readOnly = false): FormPolicy['operations'] {
+/** Each operation the form offers, granted to the clerk, unless `readOnly` -- delete only when `deletes` asks for it (0053). */
+function offered(bindings: Proposed, readOnly = false, deletes = false): FormPolicy['operations'] {
   const grant = (operation: unknown): string[] => (readOnly || operation === false || operation === undefined ? [] : ['clerk'])
-  return { read: ['clerk'], create: grant(bindings.operations.create), update: grant(bindings.operations.update) }
+  return { read: ['clerk'], create: grant(bindings.operations.create), update: grant(bindings.operations.update), ...(deletes ? { delete: grant(bindings.operations.delete) } : {}) }
 }
 
 /**
@@ -297,7 +306,7 @@ function offered(bindings: Proposed, readOnly = false): FormPolicy['operations']
  * two of them in the studio, and its policy for tenant 1's clerk, derived
  * from the bindings.
  */
-function childForms(engine: Engine): Array<{
+function childForms(engine: Engine, deletes: boolean): Array<{
   formId: string
   title: string
   table: string
@@ -317,7 +326,7 @@ function childForms(engine: Engine): Array<{
       lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
       ...version,
       // No tenant column of its own: its rows are its tenant's orders' lines, through the order lookup's filter (0043).
-      policy: (bindings) => ({ ...clerkPolicy(bindings.fields), operations: offered(bindings), rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }),
+      policy: (bindings) => ({ ...clerkPolicy(bindings.fields), operations: offered(bindings, false, deletes), rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }),
     },
     {
       formId: engine.employees,
@@ -349,13 +358,22 @@ function childForms(engine: Engine): Array<{
 /**
  * Starts the server and publishes `pg-order` and `ms-order` through the
  * administrator's plane -- with `children`, each engine's child forms of
- * `ENGINES` too.
+ * `ENGINES` too. With `deletes` (0053), the clerk may also delete with each
+ * form that offers it -- an order, its lines on SQL Server, whose rowversion
+ * proves them, where on PostgreSQL their typed key offers none -- the order
+ * form's policy naming every key a delete of an order acts through; and
+ * each engine's `parity.removable`, which other rows refer to with NO ACTION
+ * and RESTRICT, is published as `removable` of `ENGINES`, on a connection
+ * scoped to `parity`.
  */
-export async function startPlane(options: { children?: boolean } = {}): Promise<Plane> {
+export async function startPlane(options: { children?: boolean; deletes?: boolean } = {}): Promise<Plane> {
   const { pg, ms } = inject('databases')
+  const deletes = options.deletes === true
   const connections: ConnectionConfig[] = [
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
     { id: 'ms', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true } },
+    { id: 'pg-parity', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['parity'], tls: { enabled: false } },
+    { id: 'ms-parity', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: ['parity'], tls: { enabled: false, trustServerCertificate: true } },
   ]
   const real = createConnectionRegistry(connections, DRIVER_FACTORIES, { env: { PG_PASSWORD: pg.password, MS_PASSWORD: ms.password }, readFile: async () => '' })
   const unreachable = new Set<string>()
@@ -403,11 +421,24 @@ export async function startPlane(options: { children?: boolean } = {}): Promise<
       lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
-    const policy = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
+    const base = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
+    const policy: FormPolicy = deletes ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES } : base
+    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+  }
+  for (const { parity: connection, removable: formId } of deletes ? ENGINES : []) {
+    // A table whose key the database numbers, so its version column proves a record (0050); its tenant pinned to the clerk's.
+    const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', { connection, root: { schema: 'parity', name: 'removable' }, formId, title: 'Removable', lookups: [], versionColumn: 'version', pinned: ['tenant_id'] })
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'], delete: ['clerk'] },
+      fields: { id: { read: ['clerk'], write: [] }, tenant_id: { read: ['clerk'], write: [] }, note: { read: ['clerk'], write: ['clerk'] } },
+      rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+      lookups: {},
+    }
     await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
   }
   for (const engine of options.children === true ? ENGINES : []) {
-    for (const child of childForms(engine)) {
+    for (const child of childForms(engine, deletes)) {
       const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
         connection: engine.connection,
         root: { schema: 'sales', name: child.table },
@@ -480,6 +511,11 @@ export async function startPlane(options: { children?: boolean } = {}): Promise<
           .input('approver', mssql.Int, approver)
           .query<{ id: string }>("insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, approved_by) output cast(inserted.id as nvarchar(40)) as id values (1, 1001, '2026-10-08', 'placed', 1, @approver)")
         return `k1:${String(result.recordset[0]?.id)}`
+      },
+      referToRemovable: async (connection, record) => {
+        const id = Number(record.slice('k1:'.length))
+        if (connection === 'pg') await pgAdmin`insert into parity.removable_child (removable_id, note) values (${id}, 'refers to it')`
+        else await msAdmin.request().input('id', mssql.Int, id).query("insert into parity.removable_child (removable_id, note) values (@id, N'refers to it')")
       },
       countOrders: async (connection, notes) => {
         if (connection === 'pg') return (await pgAdmin<Array<{ n: number }>>`select count(*)::int as n from sales."order" where notes = ${notes}`)[0]?.n ?? 0

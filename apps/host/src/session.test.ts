@@ -228,6 +228,25 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     expect(plane.sent.length).toBe(sent)
   })
 
+  // While its record's deletion is out (0053), a press of Save sends nothing
+  // and says why: an update sent then would be answered stale or not found
+  // by the delete it raced, or land just before it. Released, the press
+  // sends again; and a save held by nothing else is never refused by a
+  // hold that was lifted (watched failing with the hold left out of Save:
+  // "Saved.").
+  test('a session held for its deletion sends nothing on a press and says so, until released', async () => {
+    const session = createSession({ client: client(), formId, definition: await definition(formId), renderer: 'react' })
+    session.open()
+    const answers = { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '3', notes: 'held by a deletion' }
+    expect((await session.save(submitted(session, answers)))?.kind).toBe('created')
+    session.hold('A deletion of this record has not been answered yet; nothing was sent.')
+    const sent = plane.sent.length
+    expect(await session.save(submitted(session, { notes: 'held by a deletion, pressed' }))).toEqual({ kind: 'held', message: 'A deletion of this record has not been answered yet; nothing was sent.' })
+    expect(plane.sent.length).toBe(sent)
+    session.release()
+    expect((await session.save(submitted(session, { notes: 'held by a deletion, pressed' })))?.kind).toBe('saved')
+  })
+
   // "Load the saved record" on a form that was never saved has nothing to
   // load, and says so rather than sending a read for no record -- which the
   // server would refuse in words about a request the person never made.

@@ -68,8 +68,9 @@ export function useOpening({ client, formId, owner, sessions }: { client: DataCl
       const record: FormRecord = answer.value
       // Asked again: the person may have typed while the read was out. A
       // request made while this question waits replaces it, so its answer
-      // is always this read's.
-      guard.ask(
+      // is always this read's. An answer's question: it closes nothing the
+      // person may be answering meanwhile -- a delete's confirmation (0053).
+      guard.askOnAnswer(
         request,
         (again) => {
           for (const session of sessions) session.open(structuredClone(record))
@@ -86,7 +87,7 @@ export function useOpening({ client, formId, owner, sessions }: { client: DataCl
     const token = record.record
     // The keyboard was where the save was pressed; Keep editing gives it back there.
     const at = document.activeElement
-    guard.ask(
+    guard.askOnAnswer(
       { kind: 'created', owner, record: token, by: from.renderer },
       (discarded) => {
         asked.current += 1

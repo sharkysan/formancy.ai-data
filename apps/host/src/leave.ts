@@ -8,24 +8,38 @@ import type { Renderer } from './session.js'
  *
  * | Request                                                        | Discards                                 |
  * |----------------------------------------------------------------|------------------------------------------|
- * | another record row; New record; Load; another form; Back or    | the record's panes and every child's     |
- * | Forward; Sign out                                              |                                          |
+ * | another record row; New record; Load                           | the record's panes and every child's     |
+ * | another form; Back or Forward; Sign out                        | those, and the records grid's deletion   |
  * | another child row; New <child>                                 | that child's panes                       |
  * | a record created in one of the record's panes                  | the record's other panes and every       |
  * |                                                                | child's                                  |
  * | a child row created in one of a child's panes                  | that child's other panes                 |
  * | a renderer hidden by the renderer switch                       | that renderer's panes, everywhere        |
  * | a layout or view change; paging; search; sort                  | nothing: every view stays mounted        |
+ *
+ * A deletion out, or unknown (0053), is listed with its owner's panes and
+ * goes where they go, but for a renderer hidden: it is drawn by none. One
+ * asked from a grid's row that is not the record open in the detail is its
+ * grid's (`gridOwner`): the records grid's goes only with the grid --
+ * another form, Back or Forward, Sign out -- and a child grid's with its
+ * section, as that child's panes do but for its own rows and its New.
  */
 
-/** What a pane holds that a discard would lose: answers changed since it was opened or saved, a save out, or a save whose outcome is unknown (0031). */
-export type Work = 'changed' | 'saving' | 'unknown'
+/**
+ * What a pane holds that a discard would lose: answers changed since it was
+ * opened or saved, a save out, or a save whose outcome is unknown (0031) --
+ * and, of a record or a child row, a deletion out or one that may have been
+ * done and is not checked (0053).
+ */
+export type Work = 'changed' | 'saving' | 'unknown' | 'deleting' | 'delete-unknown'
 
 /** Each kind of work, as the notice says it after a pane's name. */
 export const WORK: Readonly<Record<Work, string>> = {
   changed: 'changes that are not saved.',
   saving: 'a save the server has not answered yet.',
   unknown: 'a save that may have been stored, not yet checked.',
+  deleting: 'a deletion the server has not answered yet.',
+  'delete-unknown': 'a deletion that may have been done, not yet checked.',
 }
 
 /** How a renderer is written for a person. */
@@ -56,17 +70,38 @@ export type LeaveRequest =
 /** Which panes a request drops: by owner -- `master` for the record's, or a child section's key -- and by renderer, but for the one it `keeps`. */
 export interface Discarded {
   owners: 'all' | readonly string[]
+  /** Owners `all` leaves out: the records grid's deletion, which a request that replaces only the record leaves where it is. */
+  spares?: readonly string[]
   renderers: 'all' | readonly Renderer[]
   keeps?: { owner: string; renderer: Renderer }
 }
 
-/** One mounted pane, as the guard sees it: whose it is, which renderer, how it is named, and what it holds. */
+/**
+ * One mounted pane, as the guard sees it: whose it is, which renderer, how it
+ * is named, and what it holds. A deletion is its owner's, the record's or a
+ * child section's, and no renderer's (`null`): what drops its owner drops
+ * it, and hiding a renderer does not.
+ */
 export interface PaneWork {
   owner: string
-  renderer: Renderer
+  renderer: Renderer | null
   name: Said
   work: Work | null
 }
+
+/**
+ * The owner of a deletion asked from a row of `owner`'s grid that is not the
+ * record open in its detail (0053): the grid's, not the detail's. A request
+ * that replaces the record leaves the records grid where it is, and its
+ * deletion with it; a child's grid is its section's, which goes with the
+ * record.
+ */
+export function gridOwner(owner: string): string {
+  return `${owner} grid`
+}
+
+/** What the record's requests leave: the records grid stays, and so does a deletion asked from one of its rows. */
+const RECORDS_GRID: readonly string[] = [gridOwner('master')]
 
 /** What `request` would discard, or null when it discards nothing. */
 export function discards(request: LeaveRequest): Discarded | null {
@@ -74,6 +109,7 @@ export function discards(request: LeaveRequest): Discarded | null {
     case 'row':
     case 'new':
     case 'load':
+      return { owners: 'all', spares: RECORDS_GRID, renderers: 'all' }
     case 'form':
     case 'history':
     case 'sign-out':
@@ -81,9 +117,11 @@ export function discards(request: LeaveRequest): Discarded | null {
     case 'child-row':
     case 'child-new':
       return { owners: [request.owner], renderers: 'all' }
-    case 'created':
+    case 'created': {
       // The record's own: its children are the record's, and go with it.
-      return { owners: request.owner === 'master' ? 'all' : [request.owner], renderers: 'all', keeps: { owner: request.owner, renderer: request.by } }
+      const keeps = { owner: request.owner, renderer: request.by }
+      return request.owner === 'master' ? { owners: 'all', spares: RECORDS_GRID, renderers: 'all', keeps } : { owners: [request.owner], renderers: 'all', keeps }
+    }
     case 'renderer':
       return { owners: 'all', renderers: request.hides }
     case 'layout':
@@ -103,8 +141,8 @@ export function atRisk(request: LeaveRequest, panes: readonly PaneWork[]): PaneW
   return panes.filter(
     (pane) =>
       pane.work !== null &&
-      (dropped.owners === 'all' || dropped.owners.includes(pane.owner)) &&
-      (dropped.renderers === 'all' || dropped.renderers.includes(pane.renderer)) &&
+      (dropped.owners === 'all' ? !(dropped.spares?.includes(pane.owner) ?? false) : dropped.owners.includes(pane.owner)) &&
+      (dropped.renderers === 'all' || (pane.renderer !== null && dropped.renderers.includes(pane.renderer))) &&
       !(keeps !== undefined && keeps.owner === pane.owner && keeps.renderer === pane.renderer),
   )
 }

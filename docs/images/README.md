@@ -26,7 +26,11 @@ page does not restate them.
   (`POSTGRES_IMAGE` from `@formancy/data-fixtures`, through testcontainers),
   connected as the order form's own account, whose grants and row-level
   security bind it. ada publishes `pg-order` with the guide's request and
-  policy; clara is a clerk of tenant 1 and otto a clerk of tenant 2. That
+  policy, and, when host-delete's scene starts, `pg-order-delete`, the
+  getting-started job's second form -- the same request with delete
+  granted to whoever may read and every foreign key a delete of an order
+  acts through named (0051), journey.json's `deleting`; clara is a clerk
+  of tenant 1 and otto a clerk of tenant 2. That
   account may not read `sales.order_line`, so no child grid is pictured. The
   database the pictures were taken over is in each record's `database`, and
   is never compared.
@@ -55,6 +59,9 @@ listens on a port.
 - *A save whose answer was lost*: the update is handed to the server, required
   to answer 200 and to have been sent once, and the page is then told the
   connection was reset.
+- *A row's confirmation*: the second form above, published by the script
+  through the same plane as the first; the order its row asks about is
+  kept, and host-drift loads it after.
 - *A save after the table changed*: `sales.order.status` narrowed from
   `varchar(20)` to `varchar(8)` through the database's owner, after clara
   loaded the record: the shape of the shared drift case `tightened-text`.
@@ -116,7 +123,8 @@ runtime too, and that the save after it was sent once, answered 409 `drift`
 and left the row as it was; that the regeneration over the moved key reports
 `order_date` and nothing else, and that the Publish step waits for it with
 its button disabled (watched failing with the button left enabled for
-undecided keys); and that the lines' form notes that nothing scopes its rows
+undecided keys); that host-delete's confirmation, under the grid, takes the
+keyboard and offers Keep it before Delete it; and that the lines' form notes that nothing scopes its rows
 until the box is ticked (watched failing with the note taken out of the
 step). They run at every capture and every `--check`.
 

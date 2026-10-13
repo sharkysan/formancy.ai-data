@@ -21,7 +21,9 @@ key that delete acts through
 which this guide does not have you do: the studio's Policy step can grant
 that delete and accept each key
 ([0052](./decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md)),
-and the host page offers no delete yet. What the job does not do is click
+and the host page offers its delete
+([0053](./decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md))
+only on a form that does. What the job does not do is click
 through the studio and the host page. Their own suites do: each goes down
 section 4's or section 5's table by the names this guide gives every control,
 and the studio's journey test proves it makes exactly the requests the job

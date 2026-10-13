@@ -17,6 +17,8 @@
         { "file": "apps/host/src/in-flight.test.tsx" },
         { "file": "apps/host/src/workspace.test.tsx" },
         { "file": "apps/host/src/children.test.tsx" },
+        { "file": "apps/host/src/delete.test.tsx" },
+        { "file": "apps/host/src/delete-rows.test.tsx" },
         { "file": "apps/examples/src/previews.test.tsx" },
         { "browserGate": "apps/examples" },
         { "browserGate": "apps/host" }
@@ -77,6 +79,7 @@
         { "file": "packages/data-client/src/lost-answer.integration.test.ts" },
         { "file": "apps/host/src/stale.test.tsx" },
         { "file": "apps/host/src/in-flight.test.tsx" },
+        { "file": "apps/host/src/unknown-delete.test.tsx" },
         { "browserGate": "apps/host" }
       ]
     },

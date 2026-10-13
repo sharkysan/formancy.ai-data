@@ -9,10 +9,12 @@ import type { Plane } from './test-plane.js'
 /*
  * The keys a record grid answers, and the ones it does not (0047, UX-SPEC
  * §7.3), in AG Grid Community as the page configures it, against the real
- * server: Delete and Backspace clear nothing and send nothing, because no
- * cell is editable -- nothing in this module deletes; and no column
- * resizes. And every option the page sets has its module: AG Grid says so
- * on the console otherwise, and does nothing.
+ * server, on a form that offers delete: Delete and Backspace clear nothing,
+ * send nothing and ask nothing, because no cell is editable and no key
+ * deletes -- a record is deleted from its detail's Delete record or its
+ * row's Delete, behind a confirmation (0053); and no column resizes. And
+ * every option the page sets has its module: AG Grid says so on the
+ * console otherwise, and does nothing.
  *
  * That no column moves is the browser gate's: AG Grid moves a header by
  * where it is drawn, and jsdom draws nothing, so a movable column moved
@@ -33,7 +35,7 @@ import type { Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane()
+  plane = await startPlane({ deletes: true })
 })
 
 afterAll(async () => {
@@ -79,14 +81,19 @@ async function settled(): Promise<void> {
 
 describe.each(ENGINES)('the record grid on $engine', ({ formId }) => {
   // No cell is editable, so Delete and Backspace clear nothing and nothing
-  // is sent: a delete is no route and no key of this page.
-  test('clears and sends nothing on Delete or Backspace', async () => {
+  // is sent, and no key deletes: not even a confirmation opens, on a form
+  // the person may delete with (watched failing with Delete turned into a
+  // request, and with it mapped to the row's Delete: the confirmation
+  // opened).
+  test('clears, sends and asks nothing on Delete or Backspace', async () => {
     const user = await inTheGrid(formId)
+    expect(within(records()).getAllByRole('columnheader').map((header) => header.textContent?.trim())).toContain('Delete')
     const before = within(records()).getAllByRole('gridcell').map((cell) => cell.textContent)
     const sent = plane.sent.length
     await user.keyboard('{Delete}{Backspace}')
     expect(within(records()).getAllByRole('gridcell').map((cell) => cell.textContent)).toEqual(before)
     expect(plane.sent.slice(sent).map((request) => `${request.method} ${request.path}`)).toEqual([])
+    expect(screen.queryByRole('region', { name: /^Delete / })).toBeNull()
   })
 
   // AG Grid resizes a header with Alt and an arrow; the columns are at

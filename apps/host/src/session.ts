@@ -44,6 +44,8 @@ import { disableFields, drawLookupsAsTypeaheads } from './widgets.js'
  * opened or last saved.
  *
  * A submit the engine refused sends nothing: the renderer already says why.
+ * So does a press while the record's deletion is out (`hold`, 0053): the
+ * update would race the delete.
  * A press while a save is unanswered sends nothing either, and says so
  * (**busy**): the guard is the form's that set it, so a replaced form's save
  * settling late cannot lift it. And an answer that arrives after Load or New
@@ -176,6 +178,12 @@ export function createSession({ client, formId, definition, renderer, namespace,
   /** The last save of a form whose outcome is unknown, and whether it holds that form. */
   let lost: { write: UnknownWrite; generation: number; held: boolean } | undefined
   const lostHere = () => (lost !== undefined && lost.generation === opened?.generation ? lost : undefined)
+  /** What a press says while the record's deletion is out (0053): set by `hold`, lifted by `release`. */
+  let deleting: string | undefined
+  /** A form opened, a save sent or a save answered: each is a change `subscribe`'s listeners hear. */
+  const notify = (): void => {
+    for (const listener of listeners) listener()
+  }
 
   /** Read through a getter, so moving from create to update needs no new map -- in Angular, no new application. */
   const sources = lookupSources(client, formId, form, () => state.operation)
@@ -193,7 +201,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
     state = { record: token, version: record?.version ?? undefined, operation: operationFor(token) }
     baseline = structuredClone(engine.value()) as Record<string, unknown>
     opened = { engine, generation: (opened?.generation ?? 0) + 1 }
-    for (const listener of listeners) listener()
+    notify()
     return engine
   }
 
@@ -334,12 +342,29 @@ export function createSession({ client, formId, definition, renderer, namespace,
       const { engine, generation } = current()
       if (saving?.generation === generation) return { kind: 'busy', message: BUSY }
       if (lostHere()?.held === true) return { kind: 'held', message: HELD }
+      if (deleting !== undefined) return { kind: 'held', message: deleting }
       const promise: Promise<SaveResult | null> = send(engine, generation, submitted.data).finally(() => {
         // Only its own: a later form's save may hold the guard by now.
         if (saving?.promise === promise) saving = undefined
+        notify()
       })
       saving = { promise, generation }
+      notify()
       return promise
+    },
+    /** Whether this form's save is out, asked without opening a form: the detail's Delete waits for it (0053). */
+    isSaving(): boolean {
+      return saving !== undefined && saving.generation === opened?.generation
+    },
+    /**
+     * While the record's deletion is out (0053), a press sends nothing and
+     * says `message`; `release` lifts it, whatever the deletion came to.
+     */
+    hold(message: string): void {
+      deleting = message
+    },
+    release(): void {
+      deleting = undefined
     },
     /** This form's last save whose outcome is unknown, if any. */
     unknown: (): UnknownWrite | undefined => lostHere()?.write,

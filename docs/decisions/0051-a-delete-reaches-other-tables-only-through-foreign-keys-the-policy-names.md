@@ -1,6 +1,6 @@
 # 0051 — A delete reaches other tables only through foreign keys the policy names, each with what it does
 
-- **Status:** accepted; extended by [0052](0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md): the studio writes `cascades`, a box per key a delete acts through, from `deleteReview`, the walk `deleteProblems` takes, which data-core now exports
+- **Status:** accepted; extended by [0052](0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md): the studio writes `cascades`, a box per key a delete acts through, from `deleteReview`, the walk `deleteProblems` takes, which data-core now exports; extended by [0053](0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md): the host page's confirmation says from `deleting` whether a delete also deletes or clears other records, never which or how many
 - **Date:** 2026-10-12
 - **Deciders:** Daniel Bacher
 - **Verified by:**

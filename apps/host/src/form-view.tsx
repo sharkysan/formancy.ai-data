@@ -4,10 +4,15 @@ import type { DataClient, FormMenuEntry, PublishedForm } from '@formancy/data-cl
 import { useAfterRender } from './after-render.js'
 import { ChildSection } from './children.js'
 import type { ChildForm } from './children.js'
+import { DeleteRegion } from './delete-confirm.js'
+import { useDeleteFlow } from './delete-flow.js'
+import { detailTarget, gone, rowTarget, SAVE_OUT } from './deletion.js'
+import type { DeleteTarget } from './deletion.js'
 import { Detail } from './detail.js'
 import type { MasterOpen } from './detail.js'
 import { columnsOf } from './grid-datasource.js'
-import { useGuardContext, useRegistered } from './guard.js'
+import type { GridRow } from './grid-datasource.js'
+import { paneEntry, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
 import type { Said } from './leave.js'
 import { LAYOUTS } from './layout.js'
@@ -16,6 +21,7 @@ import { useOpening } from './opening.js'
 import { operationTags } from './operations.js'
 import { renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
+import { DELETE_COLUMN } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
 import { Records } from './records.js'
 import { Segmented, focusChoice } from './segmented.js'
@@ -84,6 +90,8 @@ function FormHead({
  * grid keeps its page, sort and search. Mounted again for another form.
  *
  * The record is the page's, in memory: never in the address (layout.ts).
+ * Where the server offers delete, the record's header and each row of the
+ * grid ask for one, in place, under what asked (0053, delete-flow.ts).
  */
 export function FormView({
   client,
@@ -119,7 +127,8 @@ export function FormView({
   notice: ReactNode
   headingRef: RefObject<HTMLHeadingElement | null>
   onLayout: (layout: Layout) => void
-  onView: (view: View) => void
+  /** `replace`: the view changed without a step of its own in the history -- after a delete, the record view is not one to go back to. */
+  onView: (view: View, replace?: boolean) => void
   onRenderer: (choice: RendererChoice) => void
   onSplit: (share: number) => void
   onSplitSettled: (share: number) => void
@@ -143,6 +152,7 @@ export function FormView({
   const [loadRefusal, setLoadRefusal] = useState<string | null>(null)
   /** How many times the separator has been let go: each grid in the lanes fits its columns again. */
   const [released, setReleased] = useState(0)
+  const deleteButton = useRef<HTMLButtonElement>(null)
 
   const title = entry.title
   const canCreate = definition.operations.includes('create')
@@ -150,22 +160,47 @@ export function FormView({
   const sessions = useMemo(() => (['react', 'angular'] as const).map((which) => createSession({ client, formId, definition, renderer: which })), [client, formId, definition])
   const entries = useMemo<PaneEntry[]>(
     () =>
-      sessions.map((session) => ({
-        owner: 'master',
-        renderer: session.renderer,
-        session,
-        name: (): Said => {
+      sessions.map((session) =>
+        paneEntry('master', session, (): Said => {
           const now = openRef.current
           return now?.kind === 'record' ? [`${title} `, { code: now.token }] : ['New record']
-        },
-      })),
+        }),
+      ),
     [sessions, title],
   )
   useRegistered(entries)
   const opening = useOpening({ client, formId, owner: 'master', sessions })
+  const canDelete = definition.operations.includes('delete') && definition.deleting !== null
+  const removal = useDeleteFlow({
+    client,
+    formId,
+    owner: 'master',
+    sessions,
+    discards: { kind: 'new' },
+    onGone: (target, word, quiet) => recordGone(target, word, quiet),
+    onLoad: (target) => {
+      // The row's version moves with the record: the grid lists it again.
+      grid.current?.reload()
+      load(target.record)
+    },
+    onBack: (target) => {
+      if (target.from.kind === 'detail') deleteButton.current?.focus()
+      // The row by its record, which a search, a sort or a page may have moved or taken away: then the grid's heading.
+      else if (grid.current?.focusRecord(target.record, DELETE_COLUMN) !== true) recordsHeading.current?.focus()
+    },
+    onShow: (target) => reveal(target.from.kind === 'detail' ? 'record' : 'records'),
+  })
+  const { saving } = removal
 
   const both = renderer === 'both'
   const say = (said: Said, kind: 'answer' | 'refused' = 'answer'): void => setLine({ said, kind })
+
+  /** In Separate views, `half` shown if it is not, without a step of its own in the history: the page moved there, the person did not. True when it was hidden. */
+  function reveal(half: View): boolean {
+    if (layout !== 'separate' || view === half) return false
+    onView(half, true)
+    return true
+  }
 
   /** The detail, with the keyboard on its heading: in Separate views, the record view. */
   function toDetail(): void {
@@ -276,6 +311,46 @@ export function FormView({
     opening.answered(result, session, (now) => opened(now.token, now.discarded ? [...DISCARDED, 'Opened ', { code: now.token }, '.'] : undefined))
   }
 
+  /** The open record's Delete, in the detail's header (0053). While a save of it is out, it waits for the answer, and says so. */
+  function deleteOpen(): void {
+    const now = openRef.current
+    if (now?.kind !== 'record') return
+    if (saving) say([SAVE_OUT], 'refused')
+    else removal.ask(detailTarget(title, now.token, removal.heard(now.token)))
+  }
+
+  /** A row's Delete (0053); the open record's row waits for a save of it, as its header's Delete does. */
+  function deleteRow(row: GridRow): void {
+    const now = openRef.current
+    const target = rowTarget(title, row, now?.kind === 'record' ? { record: now.token, heard: removal.heard(now.token) } : null)
+    if (target === null) return
+    if (target.open && saving) grid.current?.say([SAVE_OUT])
+    else removal.ask(target)
+  }
+
+  /**
+   * The record has gone from the page: deleted, or not found and closed.
+   * Open, the detail is emptied; the grid asks for its page again and says
+   * so first; and the keyboard goes to the Records heading -- in Separate
+   * views the records view, without a step back to the record view. Quiet
+   * when the person moved on before the answer: the grid alone hears it.
+   */
+  function recordGone(target: DeleteTarget, word: 'Deleted' | 'Closed', quiet: boolean): void {
+    const now = openRef.current
+    if (now?.kind === 'record' && now.token === target.record) {
+      opening.replaced()
+      for (const session of sessions) session.open()
+      openRef.current = null
+      setOpen(null)
+      setLoadRefusal(null)
+      say([])
+    }
+    grid.current?.removed(gone(target, word))
+    if (quiet) return
+    if (layout === 'separate') onView('records', true)
+    after(() => recordsHeading.current?.focus())
+  }
+
   // Back or Forward between the two views of Separate views: the half the
   // keyboard was in is hidden now, so it goes where the view's own buttons
   // would send it -- without what those buttons also do, writing an entry,
@@ -316,6 +391,8 @@ export function FormView({
           onSearch={setSearch}
           onNew={startNew}
           onOpen={askRow}
+          remove={canDelete ? { noun: title, press: deleteRow } : undefined}
+          after={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="records-delete" /> : null}
         />
         {sideBySide ? (
           <Split
@@ -348,6 +425,11 @@ export function FormView({
           onLoad={load}
           sessions={sessions}
           onAnswer={answered}
+          canDelete={canDelete}
+          saving={saving}
+          deleteRef={deleteButton}
+          onDelete={deleteOpen}
+          deleteRegion={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'detail' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="detail-delete" /> : null}
         >
           {parent === null
             ? null
@@ -362,6 +444,7 @@ export function FormView({
                   parent={parent}
                   renderer={renderer}
                   refit={released}
+                  onShow={() => reveal('record')}
                 />
               ))}
         </Detail>
