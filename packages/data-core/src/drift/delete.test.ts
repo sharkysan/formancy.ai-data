@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { generateForm } from '../generate/generate.js'
 import type { GenerationRequest } from '../generate/types.js'
 import type { InboundKey, ObjectMeta } from '../metadata.js'
-import { DELETING, drift, gap, INT32, NO_FILTERS, object, only, ORDER, ORDER_REF, retype, snapshot, text } from './fixture.js'
+import { DELETING, drift, gap, INT32, INT64, NO_FILTERS, object, only, ORDER, ORDER_REF, retype, snapshot, text } from './fixture.js'
 
 /*
  * What stops a delete in drift review (0050). A delete is a read's WHERE
@@ -31,6 +31,33 @@ function numbering(generated: 'none' | 'identity-by-default'): (objects: ObjectM
   return (objects) => {
     const id = object(objects, 'order').columns.find((candidate) => candidate.name === 'id') as ObjectMeta['columns'][number]
     id.generated = generated
+  }
+}
+
+/** The default each engine fills a key with that never repeats, as its catalog spells it (0057). */
+const NEVER_REPEATING = { postgres: 'gen_random_uuid()', sqlserver: '(newsequentialid())' } as const
+
+/**
+ * The order keyed by a uuid its default fills, the default spelled
+ * `expression` -- `null` for none, or for one whose definition the account
+ * may not read where `hasDefault` says it has one (0056, 0057). On SQL
+ * Server its token is a version column the module maintains too, not the
+ * rowversion, which proves a record whatever its key.
+ */
+function uuidKey(kind: 'postgres' | 'sqlserver', expression: string | null, hasDefault = expression !== null): (objects: ObjectMeta[]) => void {
+  return (objects) => {
+    const order = object(objects, 'order')
+    const id = order.columns.find((candidate) => candidate.name === 'id') as ObjectMeta['columns'][number]
+    Object.assign(id, { databaseType: kind === 'postgres' ? 'uuid' : 'uniqueidentifier', type: { kind: 'uuid' }, generated: 'none', hasDefault, defaultExpression: expression })
+    const version = order.columns.find((candidate) => candidate.name === 'row_version') as ObjectMeta['columns'][number]
+    if (kind === 'sqlserver') Object.assign(version, { databaseType: 'bigint', type: INT64, generated: 'none', hasDefault: true, defaultExpression: '((0))' })
+  }
+}
+
+/** A foreign key of the order over `columns`, onto the employee's id, as one added since the form was published. */
+function referring(name: string, columns: string[]): (objects: ObjectMeta[]) => void {
+  return (objects) => {
+    object(objects, 'order').foreignKeys.push({ name, columns, references: { table: { schema: 'sales', name: 'employee' }, columns: ['id'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true })
   }
 }
 
@@ -116,6 +143,92 @@ describe('diffSnapshots: delete', () => {
     expect(typed.changes.find((change) => change.kind === 'column-generation-changed')).toMatchObject({ severity: 'blocking', message: expect.stringMatching(/no longer numbers a column of the key/) })
     const byDefault = drift(numbering('identity-by-default'), { kind: 'postgres', ...FACTS, policy: DELETING }, request, base)
     expect(byDefault.writable.delete).toBe(true)
+  })
+
+  // The same rule over a key a default fills (0057), on each engine: the
+  // order keyed by a uuid from the engine's never-repeating default offers
+  // delete over its version column, and the key's default changed to
+  // anything else -- a constant, another function -- dropped, or hidden
+  // from the account leaves a key a record can be created again under, so
+  // review and the runtime stop delete, blocking where somebody may delete.
+  // The default spelled the same, or another column's default changed,
+  // stops nothing (watched failing with the rule asked only when the key's
+  // generation changes: review and the runtime kept delete for each, and
+  // called the constant and the other function a note; and on SQL Server
+  // with the rule asked of PostgreSQL's spelling: its key counted neither
+  // before nor after, and every change kept delete).
+  test('a key whose never-repeating default is changed, dropped or hidden stops delete on a version-column form, on either engine', () => {
+    const request: GenerationRequest = { ...ORDER, versionColumn: 'row_version' }
+    const changes: Record<'postgres' | 'sqlserver', Array<[string, string | null, boolean?]>> = {
+      postgres: [
+        ['a constant', "'2b7e1516-28ae-4d2a-a6f7-15880945cf4f'::uuid"],
+        ['another function', 'uuid_generate_v4()'],
+        ['dropped', null],
+      ],
+      sqlserver: [
+        ['a constant', "('2b7e1516-28ae-4d2a-a6f7-15880945cf4f')"],
+        ['another function', '(newid())'],
+        ['dropped', null],
+        ['hidden', null, true],
+      ],
+    }
+    for (const kind of ['postgres', 'sqlserver'] as const) {
+      const base = snapshot(uuidKey(kind, NEVER_REPEATING[kind]), { kind, facts: true })
+      expect({ kind, delete: generateForm(base, request).bindings.operations.delete }).toEqual({ kind, delete: true })
+      const reports = changes[kind].map(([name, expression, hasDefault]) => {
+        const report = drift(uuidKey(kind, expression, hasDefault), { kind, ...FACTS, policy: DELETING }, request, base)
+        const key = report.changes.find((change) => change.subject.kind === 'column' && change.subject.name === 'id')
+        return { kind, name, delete: report.writable.delete, runtime: report.runtime.writable.delete, severity: key?.severity, numbering: key?.message.includes('no longer numbers a column of the key') }
+      })
+      expect(reports).toEqual(changes[kind].map(([name]) => ({ kind, name, delete: false, runtime: false, severity: 'blocking', numbering: true })))
+      const same = drift(uuidKey(kind, NEVER_REPEATING[kind]), { kind, ...FACTS, policy: DELETING }, request, base)
+      expect({ kind, changes: same.changes }).toEqual({ kind, changes: [] })
+      const status = drift(
+        (objects) => {
+          uuidKey(kind, NEVER_REPEATING[kind])(objects)
+          const column = object(objects, 'order').columns.find((candidate) => candidate.name === 'status') as ObjectMeta['columns'][number]
+          column.defaultExpression = "('open')"
+        },
+        { kind, ...FACTS, policy: DELETING },
+        request,
+        base,
+      )
+      expect({ kind, delete: status.writable.delete }).toEqual({ kind, delete: true })
+    }
+  })
+
+  // A foreign key added over such a key is a lookup any form may offer, and
+  // a lookup writes the key from the record a person chooses, so a record
+  // deleted is created again under its key the next time that record is
+  // chosen: review and the runtime stop delete, blocking where somebody may
+  // delete, and say so on the foreign key. One over another column stops
+  // nothing (watched failing with the foreign keys not asked: both engines
+  // kept delete in review and at runtime, and called the key a note).
+  test('a foreign key added over a key its never-repeating default fills stops delete, on either engine', () => {
+    const request: GenerationRequest = { ...ORDER, versionColumn: 'row_version' }
+    for (const kind of ['postgres', 'sqlserver'] as const) {
+      const keyed = uuidKey(kind, NEVER_REPEATING[kind])
+      const base = snapshot(keyed, { kind, facts: true })
+      const over = (columns: string[]) =>
+        drift(
+          (objects) => {
+            keyed(objects)
+            referring('fk_order_employee', columns)(objects)
+          },
+          { kind, ...FACTS, policy: DELETING },
+          request,
+          base,
+        )
+      const key = over(['id'])
+      expect({ kind, delete: key.writable.delete, runtime: key.runtime.writable.delete, change: key.changes.find((change) => change.kind === 'foreign-key-changed') }).toEqual({
+        kind,
+        delete: false,
+        runtime: false,
+        change: expect.objectContaining({ severity: 'blocking', subject: { kind: 'foreign-key', object: ORDER_REF, name: 'fk_order_employee' }, message: expect.stringMatching(/a lookup over it writes the key/) }),
+      })
+      const other = over(['created_by'])
+      expect({ kind, delete: other.writable.delete, runtime: other.runtime.writable.delete, severity: other.changes.find((change) => change.kind === 'foreign-key-changed')?.severity }).toEqual({ kind, delete: true, runtime: true, severity: 'info' })
+    }
   })
 
   // What refers to the root is what a delete also does. A new key that

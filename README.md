@@ -139,16 +139,20 @@ is not licensed for production.
   that deletes one row or none, through the runtime plane and
   `@formancy/data-client`; a deletion whose answer was lost is safe to send
   again with the same version. A form offers delete once regenerated from a
-  snapshot this release took, where the database numbers its key or SQL
-  Server's rowversion guards it -- not on PostgreSQL's order lines, nor its
-  deliveries, whose uuid key a default fills -- and a policy may not grant
-  it while another table's foreign key would cascade, clear or set a
-  default on a delete, so the fixture's orders, whose lines and deliveries
-  cascade, and its deliveries, whose parcels do, are not deleted yet.
+  snapshot this release took, where SQL Server's rowversion guards it or
+  the database numbers its key: an identity, or a key of one column that
+  `gen_random_uuid()` or `newsequentialid()` fills, as the snapshot spells
+  the default, and that no foreign key includes -- so PostgreSQL's
+  deliveries offer it, and its order lines, whose key people type, do
+  not. A policy may not grant it while another table's foreign key would
+  cascade, clear or set a default on a delete, so the fixture's orders,
+  whose lines and deliveries cascade, and its deliveries, whose parcels
+  do, are not deleted yet.
   Triggers that run on a delete are the database's, and on PostgreSQL a
   rule that acts on one makes every delete of its table refused. No page
   here deletes yet
-  ([0050](./docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)).
+  ([0050](./docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md),
+  [0057](./docs/decisions/0057-a-key-of-one-column-filled-by-a-never-repeating-default-counts-as-numbered.md)).
 - **A person is shown the forms they may read**, and nothing about any
   other, each with the forms whose rows a page may list below one of its
   records, derived from the published forms' foreign keys and types without

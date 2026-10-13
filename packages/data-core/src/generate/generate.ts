@@ -83,7 +83,7 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     if (plan !== null) planned.push(plan)
   }
 
-  const operations = operationsFor(root, identity, concurrency, planned, { pinned, fixedOut }, notes)
+  const operations = operationsFor(snapshot.kind, root, identity, concurrency, planned, { pinned, fixedOut }, notes)
   rowSecurityNotes(snapshot, [root, ...lookups.map((entry) => entry.target)], notes)
   const rules: LogicRule[] = planned
     .filter((entry) => !entry.binding.writes.create && !entry.binding.writes.update)
@@ -370,6 +370,7 @@ function createFor(root: ObjectMeta, planned: readonly Planned[], { pinned, fixe
 }
 
 function operationsFor(
+  kind: MetadataSnapshot['kind'],
   root: ObjectMeta,
   identity: string[] | null,
   concurrency: ConcurrencyBinding | null,
@@ -420,7 +421,7 @@ function operationsFor(
   // What the delete also does to other tables is never read here: that is
   // the policy's to accept (deleteProblems), one decision for publish,
   // planning, drift and the studio.
-  const unoffered = deleteUnoffered(root, identity, concurrency)
+  const unoffered = deleteUnoffered(kind, root, identity, concurrency)
   if (unoffered !== null) notes.push({ subject: root.ref.name, kind: 'blocked', message: unoffered })
   return { create, update, delete: unoffered === null }
 }

@@ -460,7 +460,13 @@ record operation fails, a write whose answer is lost on the way back, and a
 uuid key end to end (`uuid.integration.test.ts`, 0056: discovered, generated
 read-only, its token in lower case, created, updated, listed in this
 engine's order and offered by a lookup, tied options in that order too,
-each case `UUID_PARITY`'s; and, this engine's own, how it stores and orders
+each case `UUID_PARITY`'s, and which default makes a version column prove
+a record over such a key (0057): `newsequentialid()` filling the whole key,
+however the DDL writes it, and not a constant, `newid()`, a function of
+another schema named `newsequentialid`, or `newsequentialid()` beside a
+pinned tenant or on a key that refers to another table's, each as the
+catalog spells it -- with a row of the first read and deleted by its token
+and answered in lower case; and, this engine's own, how it stores and orders
 a uniqueidentifier, and that `newsequentialid()`'s keys rise across
 tenants). It
 needs Docker and, the first time, a

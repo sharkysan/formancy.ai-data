@@ -52,7 +52,7 @@ export function planDelete(
   if (!offers(bindings, 'delete') || concurrency === null) return refuse('operation-unavailable', 'This form does not offer delete.')
   // The generator's own rule, asked of the bindings' own snapshot: a hand
   // edit that offers what it would not is refused, never planned (0050).
-  const unoffered = deleteUnoffered(prepared.root, prepared.target.identity.map((column) => column.name), concurrency)
+  const unoffered = deleteUnoffered(snapshot.kind, prepared.root, prepared.target.identity.map((column) => column.name), concurrency)
   if (unoffered !== null) return refuse('invalid-bindings', `The bindings offer delete, and their snapshot says: ${unoffered}`)
   if (!prepared.addressable) return unaddressable(prepared)
   const problems = deleteProblems(snapshot, bindings, policy)

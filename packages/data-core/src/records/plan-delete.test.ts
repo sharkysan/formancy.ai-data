@@ -123,6 +123,46 @@ describe('planDelete', () => {
     })
   })
 
+  // The generator's rule over a key a default fills, asked again of the
+  // bindings' own snapshot (0057): an order keyed by a uuid that
+  // gen_random_uuid() fills is planned on PostgreSQL, over its version
+  // column, by the snapshot's own engine; the same claim over a key whose
+  // default is a constant, or over one a foreign key includes, which a
+  // lookup writes, is a hand edit the planner refuses (watched failing with
+  // the planner asking SQL Server's rule of the PostgreSQL snapshot: the
+  // first was refused; and with the foreign keys not asked: the last was
+  // planned).
+  test("plans a delete over a key of one column the engine's never-repeating default fills, and refuses one over a constant or a foreign key", () => {
+    const keyed = (expression: string, referring = false) =>
+      factsSnapshot('postgres', (objects) => {
+        const order = objects.find((object) => object.ref.name === 'order')
+        const id = order?.columns.find((candidate) => candidate.name === 'id')
+        if (id !== undefined) Object.assign(id, { databaseType: 'uuid', type: { kind: 'uuid' }, generated: 'none', hasDefault: true, defaultExpression: expression })
+        if (referring) {
+          order?.foreignKeys.push({ name: 'fk_order_parent', columns: ['id'], references: { table: { schema: 'sales', name: 'order' }, columns: ['id'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true })
+        }
+      })
+    const token = 'k1:1d3e5a70-9c2b-4f61-8e44-3c0a7d9b2e51'
+    const drawn = keyed('gen_random_uuid()')
+    const bindings = orderForm(drawn).bindings
+    expect(bindings.operations.delete).toBe(true)
+    expect(planDelete(drawn, bindings, DELETE_ORDERS, CLERK, token, '1', described(drawn, bindings))).toMatchObject({ ok: true, request: { key: [{ name: 'id', value: '1d3e5a70-9c2b-4f61-8e44-3c0a7d9b2e51' }], expectedVersion: '1' } })
+    const constant = keyed("'2b7e1516-28ae-4d2a-a6f7-15880945cf4f'::uuid")
+    const claimed = edited(orderForm(constant).bindings, (draft) => {
+      draft.operations.delete = true
+    })
+    expect(planDelete(constant, claimed, DELETE_ORDERS, CLERK, token, '1', described(constant, claimed))).toMatchObject({
+      ok: false,
+      code: 'invalid-bindings',
+      message: expect.stringMatching(/a key of one column that gen_random_uuid\(\) fills and no foreign key includes/),
+    })
+    const referred = keyed('gen_random_uuid()', true)
+    const over = edited(orderForm(referred).bindings, (draft) => {
+      draft.operations.delete = true
+    })
+    expect(planDelete(referred, over, DELETE_ORDERS, CLERK, token, '1', described(referred, over))).toMatchObject({ ok: false, code: 'invalid-bindings' })
+  })
+
   // A key no token can carry addresses nothing to delete.
   test('refuses a form whose key no token can carry', () => {
     const stamped = factsSnapshot('sqlserver', (objects) => {

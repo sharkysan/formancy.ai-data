@@ -426,7 +426,14 @@ over 10,000 columns took about 200 ms, against 8 ms for the same
 `pg_attribute` read alone.
 
 Every catalog query runs in one `REPEATABLE READ`, read-only transaction, and
-every schema name is a bound parameter.
+every schema name is a bound parameter. The transaction searches
+`pg_catalog` first, before the connection's own `search_path`, so
+`format_type` and `pg_get_expr` spell PostgreSQL's own types and functions
+without their schema and anything a schema on the path holds under the same
+name with it: a key's default is told apart by that spelling, whole
+([0057](../../docs/decisions/0057-a-key-of-one-column-filled-by-a-never-repeating-default-counts-as-numbered.md)).
+Under a path that does not name `pg_catalog` -- the default among them --
+it is searched first already, and nothing is spelled otherwise.
 
 ### What the catalog is read as
 
@@ -575,7 +582,17 @@ The suites start `postgres:17-alpine` unless a test names another image, through
   chose, an update and a stale one, another tenant's delivery not found, a
   list under an order in PostgreSQL's order of uuid -- its bytes in turn,
   where SQL Server's is its byte groups -- and `sales.parcel`'s lookup onto
-  the uuid, whose options tied on one carrier come in that same order.
+  the uuid, whose options tied on one carrier come in that same order; and
+  which default makes a version column prove a record over a uuid key
+  (0057): `gen_random_uuid()` filling the whole key, however the DDL writes
+  it, and not a constant, `uuid_generate_v4()`, a function of another
+  schema named `gen_random_uuid`, or `gen_random_uuid()` beside a pinned
+  tenant or on a key that refers to another table's, each as `pg_get_expr`
+  spells it -- with a row of the first read and deleted by its token; and,
+  this engine's own, that a `search_path` naming that other schema before
+  `pg_catalog` changes no spelling discovery reports, which reads every
+  default with `pg_catalog` first, while a description read under it
+  spells `pg_catalog.gen_random_uuid()` and the runtime refuses the delete.
 - `records-lost-answer.integration.test.ts` — an insert and an update whose
   answer the hop drops after the commit, counted at the wire; a deferred
   unique constraint refused after the row was sent, with and without the

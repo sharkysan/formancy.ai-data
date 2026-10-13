@@ -37,7 +37,7 @@
       "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
     },
     "0006": {
-      "reviewed": "sha256:688390de68404a7b97d5d3269905efac1074a6ae5c0936898e10a6fbfe171c89",
+      "reviewed": "sha256:1c07494da5cb6dafb8ed58673ac695a13b02d182b12d64c65a799e1f7c2b80c4",
       "limitations": [
         {
           "area": "databases",
@@ -1433,7 +1433,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:97993d83d684894b4f31c91f8e3cbc65dff7da081b9c220d6367825d3571d0ef",
+      "reviewed": "sha256:db32b1151fd26a285c462ad965ecd4d352f3bce573d194e50cbc8da3a22e3204",
       "limitations": [
         {
           "area": "writes",
@@ -1442,7 +1442,7 @@
         },
         {
           "area": "forms",
-          "says": "A table whose version column the module maintains offers no delete unless the database numbers a column of its key, and a key a default fills is not numbered, so the fixture's order lines and its deliveries, keyed by a uuid from gen_random_uuid(), offer none on PostgreSQL.",
+          "says": "A table whose version column the module maintains offers no delete unless the database numbers a column of its key, so the fixture's order lines, whose key people type, offer none on PostgreSQL.",
           "heldBy": "packages/data-core/src/generate/generate.test.ts"
         },
         {
@@ -1558,6 +1558,29 @@
         {
           "area": "forms",
           "says": "A one-column key whose default is a constant fills one record, and every later create of that form is refused on the key; inferred from the rule, not tested."
+        }
+      ]
+    },
+    "0057": {
+      "reviewed": "sha256:7b797e9f0db5ce92c41e13fbc2f1b3bbc0d5a7889e9bbc2e208b6d75f64fc1ca",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A version column proves a record over a uuid key only where the key is one column filled by gen_random_uuid() on PostgreSQL or newsequentialid() on SQL Server, as the catalog spells it, and no foreign key includes it; a key filled by a constant, uuid_generate_v4(), newid() or any other default, by one of those two beside another key column, or by one of those two on a key that is also a foreign key, offers no delete over a version column.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "That gen_random_uuid() and newsequentialid() never hand out one value twice is their design, not something this release measured; a repeat after a delete would start the new record's version where the deleted one's did."
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL a request's description is read under the connection's search_path, so where that path names pg_catalog after a schema holding a function called gen_random_uuid, every delete over a key PostgreSQL's own gen_random_uuid() fills is refused as drift, which drift review does not report.",
+          "heldBy": "packages/data-postgres/src/uuid.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A row filter on a key column that is the whole key writes the key from the context on every create, so a record deleted is created again under its key by the next create in that context, its version starting where the deleted one's did, as over a by-default identity; inferred from the planner, not tested."
         }
       ]
     }

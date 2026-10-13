@@ -93,6 +93,11 @@ export function uuidOrder(kind: DatabaseKind, keys: readonly string[]): string[]
 
 const token = (key: string): string => `k1:${key}`
 
+/** The schema of the uuid suites' own whose tables differ in their key's default (0057). */
+const MINTED = 'minted'
+/** The constant one of them fills its key with, and the lookalike function returns. */
+const FIXED = '2b7e1516-28ae-4d2a-a6f7-15880945cf4f'
+
 /**
  * The shared expectations, by case. `uuidCase(name)` is each one's id.
  *
@@ -100,11 +105,12 @@ const token = (key: string): string => `k1:${key}`
  *   the snapshot spells as the engine does; the model's comparator holds the
  *   rest (`MODEL_CASES.owner`).
  * - `generated`: the generator shows the key in the Record section, never
- *   writes or requires it, and offers create and update; delete on SQL
- *   Server alone, where the delivery's rowversion proves a record whatever
- *   its key. PostgreSQL's version column restarts at its default under a
- *   key used again, and a key a default fills is not one the database
- *   numbers: a default may hand out one value twice (0050).
+ *   writes or requires it, and offers create, update and delete on both
+ *   engines: on SQL Server by the delivery's rowversion, which proves a
+ *   record whatever its key, and on PostgreSQL by its version column over a
+ *   key of one column that gen_random_uuid() fills, which never hands out
+ *   one value twice, so a record deleted is never created again under its
+ *   key (0057).
  * - `token`: a delivery's record token spells its key in lower case on both
  *   engines, though SQL Server prints a uniqueidentifier in upper case
  *   (0017); a read by it finds the row, and the same key in upper case is
@@ -134,13 +140,29 @@ const token = (key: string): string => `k1:${key}`
  *   created with a delivery chosen holds its key and is read through it.
  * - `delete`: what a policy that lets tenant 1's clerk delete is told, by
  *   the publish check's two halves -- the policy's fit and what a delete
- *   also does. Granted on the delivery form, PostgreSQL's says the form
- *   offers no delete, and both say the delete would reach the delivery's
+ *   also does. Granted on the delivery form, which offers delete on both
+ *   engines, both say only that the delete would reach the delivery's
  *   parcels through their cascading key, which 0050 does not let a delete
  *   do; granted on the order form, both say it would reach the order's
  *   deliveries and its lines, each through its cascading key, so no order
  *   is deleted yet. A parcel has no version column, so its form offers
  *   neither update nor delete.
+ * - `defaults`: which default makes a uuid key one a version column proves
+ *   a record over (0057). In a schema of the suites' own, tables keyed by a
+ *   uuid, each guarded by a version column, differ in the default that
+ *   fills the key: the engine's own that never repeats; a constant; another
+ *   function that makes uuids, uuid_generate_v4() and newid(), which this
+ *   release has not named; a function of the schema's own named like the
+ *   engine's. Two differ in one more thing and fill their key with the
+ *   engine's own: one has a tenant beside it in its key, pinned; one's key
+ *   refers to the first's, a foreign key any form may look up through and
+ *   so write. And the engine's own written three other ways in the DDL --
+ *   in upper case, in mixed case, in parentheses -- is spelled as the first.
+ *   Discovered as the order form's account, each default is spelled as
+ *   `spelled` says, and a form offers delete as `offered` says. A row of the
+ *   first, inserted by the owner, is read by its token at version 1, the
+ *   version column's default, deleted at that version, answered with its
+ *   key in lower case and gone; the same delete again is not found.
  */
 export const UUID_PARITY = {
   discovered: {
@@ -152,10 +174,7 @@ export const UUID_PARITY = {
     field: 'id',
     writes: { create: false, update: false },
     sections: ['Delivery', 'Record'],
-    operations: {
-      postgres: { create: true, update: true, delete: false },
-      sqlserver: { create: true, update: true, delete: true },
-    },
+    operations: { create: true, update: true, delete: true },
   },
   token: {
     record: token(DELIVERIES.express),
@@ -202,20 +221,58 @@ export const UUID_PARITY = {
     parcel: { label: 'Box 3', delivery: token(DELIVERIES.freight) },
   },
   delete: {
-    delivery: {
-      postgres: [
-        'operations.delete grants roles, and this form does not offer delete',
-        'operations.delete grants roles, and deleting a record of sales.delivery also deletes rows of sales.parcel (fk_parcel_delivery, ON DELETE CASCADE), which this release does not offer',
-      ],
-      sqlserver: [
-        'operations.delete grants roles, and deleting a record of sales.delivery also deletes rows of sales.parcel (fk_parcel_delivery, ON DELETE CASCADE), which this release does not offer',
-      ],
-    },
+    delivery: [
+      'operations.delete grants roles, and deleting a record of sales.delivery also deletes rows of sales.parcel (fk_parcel_delivery, ON DELETE CASCADE), which this release does not offer',
+    ],
     parcel: { update: false, delete: false },
     order: [
       'operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.delivery (fk_delivery_order, ON DELETE CASCADE), which this release does not offer',
       'operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.order_line (fk_order_line_order, ON DELETE CASCADE), which this release does not offer',
     ],
+  },
+  defaults: {
+    schema: MINTED,
+    /** The uuid the `fixed` table's default and the lookalike function hand out, every time. */
+    constant: FIXED,
+    /** Each table's key default as discovery spells it, by engine: the suites create each table with the default its name says. */
+    spelled: {
+      postgres: {
+        never_repeating: 'gen_random_uuid()',
+        fixed: `'${FIXED}'::uuid`,
+        other_function: 'uuid_generate_v4()',
+        lookalike: `${MINTED}.gen_random_uuid()`,
+        two_columns: 'gen_random_uuid()',
+        foreign_key: 'gen_random_uuid()',
+        upper_case: 'gen_random_uuid()',
+        mixed_case: 'gen_random_uuid()',
+        parenthesised: 'gen_random_uuid()',
+      },
+      sqlserver: {
+        never_repeating: '(newsequentialid())',
+        fixed: `('${FIXED}')`,
+        other_function: '(newid())',
+        lookalike: `([${MINTED}].[newsequentialid]())`,
+        two_columns: '(newsequentialid())',
+        foreign_key: '(newsequentialid())',
+        upper_case: '(newsequentialid())',
+        mixed_case: '(newsequentialid())',
+        parenthesised: '(newsequentialid())',
+      },
+    },
+    /** Whether a form over each, its version column confirmed, offers delete. */
+    offered: {
+      never_repeating: true,
+      fixed: false,
+      other_function: false,
+      lookalike: false,
+      two_columns: false,
+      foreign_key: false,
+      upper_case: true,
+      mixed_case: true,
+      parenthesised: true,
+    },
+    /** A row of `never_repeating` read at `version`, the version column's default, and deleted at it; then the same delete sent again. */
+    deleted: { version: '1', again: 'not-found' },
   },
 } as const
 

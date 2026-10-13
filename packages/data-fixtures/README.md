@@ -89,11 +89,18 @@ dropped the key from the end of its order would show on both engines.
   `uuid.integration.test.ts` expect of a uuid key end to end (0056):
   discovered with its default, generated read-only, one token on both
   engines, created, updated and stale, another tenant's not found, listed
-  under an order, paged, and offered by `sales.parcel`'s lookup; and what a
-  delete is allowed (0050): the delivery form offers one on SQL Server
-  alone, by its rowversion, and a grant of it is refused for the parcels
-  that cascade from a delivery, as one on the order form is for its
-  deliveries and its lines. `UUID_ROWS`
+  under an order, paged, and offered by `sales.parcel`'s lookup; what a
+  delete is allowed (0050, 0057): the delivery form offers one on both
+  engines, by SQL Server's rowversion and over PostgreSQL's version column
+  because `gen_random_uuid()` fills the whole key, and a grant of it is
+  refused for the parcels that cascade from a delivery, as one on the order
+  form is for its deliveries and its lines; and which default makes a uuid
+  key one a version column proves a record over (`defaults`, 0057): the
+  engine's own that never repeats, filling the whole key, however the DDL
+  writes it, and no other -- a constant, `uuid_generate_v4()` or `newid()`,
+  a function of the suites' own schema named like the engine's, or the
+  engine's own beside a pinned tenant or on a key that refers to another
+  table's -- each spelled as discovery reports it. `UUID_ROWS`
   is what those suites insert first: two orders of tenant 2's, one delivery
   under the first and sixteen under the second, each keyed with one byte
   set and all of one carrier, so a lookup's options tie on it. The one

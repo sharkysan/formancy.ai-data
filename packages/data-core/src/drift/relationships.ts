@@ -1,3 +1,4 @@
+import { numbersKey, versionProvesRecord } from '../generate/offers.js'
 import type { FieldBinding } from '../generate/types.js'
 import type { CheckMeta, CoverageAspect, ForeignKeyMeta, ForeignKeyTarget, KeyMeta, ObjectMeta } from '../metadata.js'
 import { findObject } from '../snapshot.js'
@@ -320,7 +321,7 @@ function keyChanges(comparison: Comparison, reported: ReadonlySet<string>): Draf
 }
 
 function foreignKeyChanges(comparison: Comparison, used: ReadonlySet<string>): Draft[] {
-  return unboundChanges(comparison, comparison.before.foreignKeys, comparison.after.foreignKeys, used, {
+  const drafts = unboundChanges(comparison, comparison.before.foreignKeys, comparison.after.foreignKeys, used, {
     kind: 'foreign-key-changed',
     subject: 'foreign-key',
     aspect: 'foreign-keys',
@@ -329,6 +330,31 @@ function foreignKeyChanges(comparison: Comparison, used: ReadonlySet<string>): D
     added: (key) => `${key.name} is a new foreign key over (${list(key.columns)}); it could be offered as a lookup.`,
     tail: 'No lookup of this form uses it.',
   })
+  return drafts.map((draft) => (draft.subject.kind === 'foreign-key' && takesKey(comparison, draft.subject.name) ? { ...draft, stops: ['delete'], otherwise: 'review', message: `${draft.message} ${KEY_TAKEN}` } : draft))
+}
+
+const KEY_TAKEN = "It includes the record's key, and a lookup over it writes the key from the record a person chooses, so a record created again under a deleted one's key would start its version where the deleted one did: delete is blocked until the form is reviewed."
+
+/**
+ * The generator's version rule, asked again (0050, 0057): whether the
+ * foreign key `name` now includes a key column that the engine's
+ * never-repeating default numbered, so that the key counts no more. Any
+ * form may offer a lookup over that key, and a lookup writes the key, so on
+ * a version-column form delete stops, as where the default itself changed
+ * (`columns.ts`), which says it on the column: here only a key whose column
+ * still counts over the foreign keys the table had, so the loss is said once.
+ */
+function takesKey(comparison: Comparison, name: string): boolean {
+  const { bindings, base, current, before, after } = comparison
+  const concurrency = bindings.concurrency
+  const identity = bindings.identity
+  const key = after.foreignKeys.find((candidate) => candidate.name === name)
+  if (concurrency?.kind !== 'version-column' || identity === null || key === undefined) return false
+  const taken = identity.some((column) => {
+    const is = after.columns.find((candidate) => candidate.name === column)
+    return is !== undefined && key.columns.includes(column) && numbersKey(current.kind, before, is, identity) && !numbersKey(current.kind, after, is, identity)
+  })
+  return taken && versionProvesRecord(base.kind, before, identity, concurrency) && !versionProvesRecord(current.kind, after, identity, concurrency)
 }
 
 /** The root's checks: information only, and a family of its own, which the runtime does not compare (0041). */
