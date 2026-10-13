@@ -82,12 +82,14 @@ async function until(condition: () => boolean, what: string): Promise<void> {
 }
 
 /** A hop in front of a target playing `kind`; PostgreSQL unless a case is about what crosses it. */
-async function setUp({ halfOpen = false, kind = 'postgres' }: { halfOpen?: boolean; kind?: HopKind } = {}): Promise<{ hop: TcpHop; connect: () => Promise<Ends> }> {
+async function setUp({ halfOpen = false, kind = 'postgres' }: { halfOpen?: boolean; kind?: HopKind } = {}): Promise<{ hop: TcpHop; connect: (options?: { halfOpen?: boolean }) => Promise<Ends> }> {
   const target = await startTarget(halfOpen)
   const hop = await startTcpHop({ kind, host: '127.0.0.1', port: target.port })
   closing.push(() => hop.close())
-  const connect = async (): Promise<Ends> => {
-    const client = net.connect(hop.port, '127.0.0.1')
+  // A client half-open on request: one that keeps its side after the server
+  // ended its own, as a browser does until it notices.
+  const connect = async ({ halfOpen: clientHalfOpen = false }: { halfOpen?: boolean } = {}): Promise<Ends> => {
+    const client = net.connect({ port: hop.port, host: '127.0.0.1', allowHalfOpen: clientHalfOpen })
     client.on('error', () => {})
     const atClient = collect(client)
     const server = await target.next()
@@ -261,6 +263,73 @@ describe('a TCP hop', () => {
     const another = await connect()
     await fromClient(another, Buffer.concat([MARKER, text('|'), MARKER]))
     expect(sent()).toBe(3)
+  })
+
+  // Whether a browser sends a lost POST again depends on the connection it
+  // took: Chromium and Firefox restart one on a connection that carried a
+  // request before, and not on a new one (0058). So the hop says, for each
+  // sending of a marker, which connection carried it and how many requests
+  // that connection had carried first -- a request is a client turn, which on
+  // HTTP/1.1 without pipelining is one request. A count for the whole hop
+  // would credit one connection with another's requests.
+  test('says of each sending of a marker which connection carried it, and how many requests that connection carried before', async () => {
+    const { hop, connect } = await setUp({ kind: 'http' })
+    const reused = await connect()
+    const bystander = await connect()
+    await fromClient(bystander, text('GET /a'))
+    await fromServer(bystander, text('200 a'))
+    await fromClient(bystander, text('GET /b'))
+    await fromServer(bystander, text('200 b'))
+    await fromClient(reused, text('GET /form'))
+    await fromServer(reused, text('200 form'))
+    const sentOn = hop.sentOn(MARKER)
+    await fromClient(reused, Buffer.concat([text('POST /create '), MARKER.subarray(0, 4)]))
+    await fromClient(reused, MARKER.subarray(4))
+    const fresh = await connect()
+    await fromClient(fresh, Buffer.concat([text('POST /create '), MARKER]))
+    expect(sentOn()).toEqual([
+      { connection: 1, earlier: 1, passedOver: 0 },
+      { connection: 3, earlier: 0, passedOver: 1 },
+    ])
+    expect(hop.countSent(MARKER)()).toBe(0)
+  })
+
+  // A browser that takes an idle kept-alive connection for a POST where it
+  // has one (0058's postConnection) and is seen sending it on a new one has
+  // either changed or had none to take, and only the second leaves 0031's
+  // resend unexercised without anything having changed. So the hop says, of
+  // each sending, how many other connections stood idle -- answered, open on
+  // both sides, unused since -- from before the connection that carried it
+  // opened until it carried it: the ones the browser passed over. One
+  // answered only after that connection opened, one still waiting for its
+  // answer, one the server ended -- its client not yet closed, as a browser
+  // that has not noticed -- and one that never carried a request were none
+  // it could have taken. Counted at the marker alone, the late one would
+  // count, and a gate would fail a browser for passing over a connection
+  // that was busy when it chose (watched: 2); counted without the end, a
+  // browser would fail for not reusing a connection the server had ended
+  // (watched: 2).
+  test('says how many idle kept-alive connections a sending passed over, from before its connection opened', async () => {
+    const { hop, connect } = await setUp({ kind: 'http' })
+    const idle = await connect()
+    await fromClient(idle, text('GET /a'))
+    await fromServer(idle, text('200 a'))
+    const waiting = await connect()
+    await fromClient(waiting, text('GET /slow'))
+    const ended = await connect({ halfOpen: true })
+    await fromClient(ended, text('GET /c'))
+    await fromServer(ended, text('200 c'))
+    const heard = new Promise((resolve) => ended.client.once('end', resolve))
+    ended.server.end()
+    await bounded(heard.then(() => undefined), 'the server’s end never reached the client')
+    await connect()
+    const late = await connect()
+    await fromClient(late, text('GET /late'))
+    const sentOn = hop.sentOn(MARKER)
+    const fresh = await connect()
+    await fromServer(late, text('200 late'))
+    await fromClient(fresh, Buffer.concat([text('POST /create '), MARKER]))
+    expect(sentOn()).toEqual([{ connection: 6, earlier: 0, passedOver: 1 }])
   })
 
   // PostgreSQL puts a bound value whole inside its Bind message: nothing on

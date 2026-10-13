@@ -13,7 +13,7 @@
 // alone, on SQL Server (page.test.tsx).
 
 import { carryOn } from './workspace.mjs'
-import { contrast, describeFocus, focusedOn, painted, parseColor, until, WITHIN } from './measure.mjs'
+import { contrast, describeFocus, focusedOn, paintedWhere, parseColor, until, WITHIN } from './measure.mjs'
 
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
 const grid = (page) => page.getByRole('grid', { name: 'Records', exact: true })
@@ -26,17 +26,24 @@ const row = (page, first) => grid(page).getByRole('row').filter({ has: page.getB
 /**
  * The confirmation's frame -- its 1px `--invalid` border -- against the
  * glass the browser painted just outside it: 3:1 or more (WCAG 1.4.11).
- * Read from the computed border colour and the pixels.
+ * Read from the computed border colour and the pixels, of a page that held
+ * still between finding the point and the screenshot (paintedWhere, 0058).
  */
 async function frame(region) {
-  const at = await region.evaluate((element) => {
-    const style = getComputedStyle(element)
-    const box = element.getBoundingClientRect()
-    return { border: style.borderTopColor, width: style.borderTopWidth, x: box.left + box.width / 2, y: box.top - 3 }
-  })
+  const at = await paintedWhere(region.page(), () =>
+    region.evaluate((element) => {
+      const style = getComputedStyle(element)
+      const box = element.getBoundingClientRect()
+      const point = { x: box.left + box.width / 2, y: box.top - 3 }
+      // What is painted there is the page around the region, in the window: a screenshot has no pixel outside it.
+      const hit = document.elementFromPoint(point.x, point.y)
+      return { border: style.borderTopColor, width: style.borderTopWidth, points: [point], around: hit !== null && !element.contains(hit) }
+    }),
+  )
   const border = parseColor(at.border)
   if (border === null || at.width === '0px') return { problem: `the region has no border the gate reads: ${at.width} ${at.border}` }
-  const [outside] = await painted(region.page(), [{ x: at.x, y: at.y }])
+  if (!at.around) return { problem: 'the glass just above the region is not in the window, so nothing painted it there' }
+  const [outside] = at.colours
   return { ratio: contrast(border.rgb, outside) }
 }
 

@@ -28,7 +28,8 @@ builds the report from all of them (`scripts/release-report/report.mjs`).
    reports no edition; every runtime dependency of every published package, its
    published range, the version the suites loaded and what a clean
    `npm install` resolved; upstream `@formancy/*`; Node; the browsers and axe
-   as launched; the tools; and each captured snapshot against what this run
+   as launched, and what each browser said it was to the page and of the
+   machine; the tools; and each captured snapshot against what this run
    answered.
 3. **Results:** a row per package with a suite -- files, tests, what did not
    pass, the task's wall time from turbo, vitest's span, the engines its run
@@ -41,19 +42,24 @@ builds the report from all of them (`scripts/release-report/report.mjs`).
    ([packages/data-fixtures](../../packages/data-fixtures/README.md) says how).
 5. **The browser matrix:** each environment, app, renderer and engine as the
    run had them.
-6. **Build identity:** each published package's tarball as the install gate
+6. **What the browsers disagree on:** every row of `scripts/browsers.mjs`'s
+   `FACTS`, with the checks that hold it, each browser's value, where it was
+   read and how it was measured; the run fails when the gate a row names
+   did not make one of its checks in a browser
+   ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
+7. **Build identity:** each published package's tarball as the install gate
    packed, installed and ran it, by sha256, and the hash of its `dist/`
    against the `dist/` every job built.
-7. **Release gates:** each of the plan's twelve, by number, from
+8. **Release gates:** each of the plan's twelve, by number, from
    [`gates.json`](gates.json).
-8. **Known limitations:** those the run shows, as fixed sentences with the
+9. **Known limitations:** those the run shows, as fixed sentences with the
    run's facts, then those the decision records state, from
    [`limitations.json`](limitations.json).
-9. **Observations on a shared runner:** what a browser gate measured on the
-   way, per browser. Not a performance figure: a CI runner is shared, and
-   published figures are 0034's, measured on a machine that is not.
-10. **How this report was made:** where each section comes from.
-11. **Problems:** what fails the run. Empty on a green run, and the report
+10. **Observations on a shared runner:** what a browser gate measured on the
+    way, per browser. Not a performance figure: a CI runner is shared, and
+    published figures are 0034's, measured on a machine that is not.
+11. **How this report was made:** where each section comes from.
+12. **Problems:** what fails the run. Empty on a green run, and the report
     says so.
 
 ## What fails it
@@ -62,8 +68,12 @@ A job of the gates that ended other than success; a job's results missing,
 twice, under another job's name, or from another commit or run; a package
 with no results, no tests, a test that did not pass -- skipped is not passed
 -- a file that failed, or vitest calling the run unsuccessful; a browser gate
-missing in a browser the gates run in, in error, with a failed check, or
-having made no check or no pass at a viewport width; a browser launched at
+missing in a browser the gates run in, in error, with a failed check, having
+made no check or no pass at a viewport width, or having made another list of
+passes, or in a pass another check by name, than the app's gate made in
+another browser
+([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md));
+a browser launched at
 another version than Playwright pins for it, or as another build -- Chromium
 headed, on a channel, from an executable of its own or under `PWDEBUG`, which
 starts the full browser Playwright pins at the headless shell's version, as
@@ -124,6 +134,7 @@ since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 pnpm build && pnpm test:repo
 pnpm exec turbo run test:coverage --force --summarize   # every package, fresh, with its wall time; needs Docker
 FORMANCY_BROWSERS=all pnpm test:browser   # every browser the gates run in: the report expects each
+pnpm test:pictures                        # the README's pictures, in Chromium
 node scripts/install-test.mjs
 node scripts/release-report/collect.mjs --local --since "$since"
 node scripts/release-report/report.mjs --local --allow-missing container,getting-started

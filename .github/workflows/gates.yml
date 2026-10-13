@@ -195,8 +195,9 @@ jobs:
           overwrite: true
 
   # What jsdom cannot see on the examples page, in the studio and on the host
-  # page, measured in Chromium: no sideways scroll down to 320px, the keyboard
-  # path through the skip link, colour contrast and target size -- on the
+  # page, measured in Chromium, Firefox and WebKit: no sideways scroll down to
+  # 320px, the keyboard path through the skip link, colour contrast and target
+  # size -- on the
   # examples clean and after a failed submit (0021), in the studio at every
   # step of the journey against the real server, with the preview's paper kept
   # free of the studio's rules (0024), and on the host page at every state of a
@@ -206,24 +207,39 @@ jobs:
   # check until this job.
   #
   # The host page's gate starts PostgreSQL through testcontainers on the
-  # runner's Docker, which ubuntu-latest has: what the page shows after a save
+  # runner's Docker, which ubuntu-24.04 has: what the page shows after a save
   # is the database's answer, and there is no mocked driver (0003). PostgreSQL
   # only -- layout, focus and colour do not depend on the engine.
   #
   # Its own job, as formancy.ai's is: "browser" says what is wrong, where a red
   # "verify" sends the reader into a twenty-minute log to find out. One leg per
   # browser the gates run in (scripts/browsers.mjs's BROWSERS, which
-  # scripts/browsers.test.mjs holds to this matrix), each told its browser
-  # through FORMANCY_BROWSERS and leaving its results under its own key, so a
-  # red leg names its browser and the report holds each to Playwright's pin.
+  # scripts/browsers.test.mjs holds to this matrix) -- Chromium, Firefox and
+  # WebKit, every check in every one (0058) -- each told its browser through
+  # FORMANCY_BROWSERS and leaving its results under its own key, so a red leg
+  # names its browser and the report holds each to Playwright's pin. Each leg
+  # fails the run and its report, and so blocks a release, whose publish
+  # needs the gates, as Chromium's always has. Nothing blocks a merge
+  # mechanically: main's ruleset requires no status check (GOVERNANCE.md),
+  # and a merge waits for a green run because the merge process says so;
+  # `report` is the check to require if that ever changes.
+  #
+  # Pinned, not ubuntu-latest: WebKit's networking (libsoup), its TLS, its
+  # EGL and every leg's fallback fonts are the image's, not Playwright's, so a
+  # label that moved would move 0058's facts with no change here.
+  # ubuntu-latest was ubuntu-24.04 on 2026-10-12. The thirty minutes are
+  # not measured on CI yet: on a 20-CPU sandbox on 2026-10-14 WebKit's three
+  # gates took about 8.5 minutes before its install, so fifteen left too little
+  # for a slower runner. Each leg keeps thirty until three green runs give a
+  # slowest time to triple, as the report job's comment says of its own.
   browser:
     name: browser (${{ matrix.browser }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium]
+        browser: [chromium, firefox, webkit]
     steps:
       - uses: actions/checkout@v4
 
@@ -258,11 +274,25 @@ jobs:
       # No `--with-deps`, for upstream's reason: it runs apt-get for libraries
       # the hosted runner already ships, and on formancy.ai that once sat for
       # nineteen minutes until the job timed out. If a library is ever missing,
-      # Chromium fails to launch and the gate prints the command to run. The
+      # the browser fails to launch and the gate prints the command to run. The
       # step timeout is the backstop.
       - run: pnpm --filter @formancy/data-examples exec playwright install "$BROWSER"
         env:
           BROWSER: ${{ matrix.browser }}
+        timeout-minutes: 5
+
+      # WebKit's system libraries -- GTK 4, GStreamer, WPE, libsoup 3 and
+      # Playwright's tools group (xvfb and its fonts) with them -- and only
+      # WebKit's: the other legs run no apt (upstream's nineteen minutes).
+      # On a clean ubuntu:24.04 container on 2026-10-13, `install --with-deps
+      # webkit` installed 372 packages in 81 s; what the runner's image
+      # already has was not measured, and the step stays until the first CI
+      # run shows whether WebKit launches there without it (0058).
+      # install-deps runs apt-get through sudo itself. Skipped by a typo in
+      # the condition, WebKit fails to launch, naming what is missing: closed.
+      - name: WebKit's system libraries
+        if: matrix.browser == 'webkit'
+        run: pnpm --filter @formancy/data-examples exec playwright install-deps webkit
         timeout-minutes: 5
 
       # Builds the page first (turbo's `dependsOn`), then measures it, in this
@@ -281,6 +311,63 @@ jobs:
         run: node scripts/release-report/collect.mjs --job browser --variant "$BROWSER"
         env:
           BROWSER: ${{ matrix.browser }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: release-results-${{ steps.collect.outputs.key }}
+          path: release-results/
+          if-no-files-found: error
+          overwrite: true
+
+  # The README's pictures, held to the text they show (0038): each app's
+  # `pictures.mjs --check`, in Chromium alone, which is the one look the
+  # pictures were taken in. A job of its own, not a step of the Chromium leg:
+  # a step behind `if: matrix.browser == 'chromium'` that a rename skipped
+  # would go unnoticed, where a job is in the report's needs and leaves a
+  # results key the report expects. The host's pictures start PostgreSQL
+  # through the runner's Docker, as its gate does; pinned to the Chromium
+  # leg's image, for its fonts.
+  pictures:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      # The Chromium leg's cache, by the same key.
+      - name: Cache the chromium download
+        uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - run: pnpm --filter @formancy/data-examples exec playwright install chromium
+        timeout-minutes: 5
+
+      # Builds the pages first (turbo's `dependsOn`), then walks every scene.
+      - run: pnpm test:pictures
+
+      - name: Keep what this job found, for the report
+        id: collect
+        if: ${{ !cancelled() }}
+        run: node scripts/release-report/collect.mjs --job pictures
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -918,7 +1005,7 @@ jobs:
   # triple (0035 says so). The checkout keeps the whole history, for a
   # document's last change when a gate's evidence is a document.
   report:
-    needs: [verify, test, browser, install, container, getting-started, cloudflare]
+    needs: [verify, test, browser, pictures, install, container, getting-started, cloudflare]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15

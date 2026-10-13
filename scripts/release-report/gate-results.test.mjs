@@ -123,6 +123,29 @@ describe('a browser gate’s results', () => {
   })
 })
 
+describe('what a browser said it was', () => {
+  // The report says which page and machine each browser's checks were made
+  // on: the user agent AG Grid reads, the pointer and hover the page's
+  // media queries meet, the system's fallback family and the runner's
+  // packages WebKit's networking, TLS and EGL come from (0058). Written once
+  // per browser's run, and null in a file whose run never reached a page.
+  test('is kept in that browser’s file as the gate recorded it, and is null when it was not', () => {
+    const environment = {
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15',
+      platform: 'Linux x86_64',
+      maxTouchPoints: 0,
+      pointerFine: true,
+      hover: true,
+      system: { fallback: { family: 'DejaVu Sans' }, packages: [{ name: 'libsoup-3.0-0', gives: 'networking', version: '3.6.6-1ubuntu0.1' }] },
+    }
+    const gate = gateRecorder('apps/host', { browser: 'webkit', log: quiet })
+    expect(gate.asked).toBe('webkit')
+    gate.environment(environment)
+    expect(gate.write(scratch()).environment).toEqual(environment)
+    expect(gateRecorder('apps/host', { browser: 'webkit', log: quiet }).write(scratch()).environment).toBeNull()
+  })
+})
+
 describe('a gate run once per browser', () => {
   // A gate that threw in one browser and stopped there would leave the next
   // browser unmeasured and, to the report, never run; a local run should

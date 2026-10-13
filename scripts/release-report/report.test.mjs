@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { buildReport } from './report.mjs'
-import { CASES, ciJob, copy, DIST, greenCiRun, greenRun, job, server, withFirefox } from './synthetic-run.mjs'
+import { CASES, ciJob, copy, DIST, greenCiRun, greenRun, heldChecks, job, server, withFirefox, withWebKit } from './synthetic-run.mjs'
 
 /**
  * What fails a run (0035), for what the report shows of versions, results,
@@ -290,6 +290,106 @@ describe('the browser gates', () => {
       { asked: 'chromium', checks: made('no sideways scroll') },
       { asked: 'firefox', checks: made('the first Tab reaches the skip link') },
     ])
+  })
+})
+
+describe('the same checks in every browser', () => {
+  const NOBODY = 'a check made in one browser and not another is a claim made for that browser by nobody'
+  const pass = (label, width, checks) => ({ label, width, checks })
+  const host = (inputs, browser) => job(inputs, `browser-${browser}`).browserGates[0]
+  const both = (change) => {
+    const inputs = withWebKit(copy(greenRun()))
+    const made = [
+      pass(null, null, []),
+      pass('reflow, 320', 320, ['Signed out: no sideways scroll', ...heldChecks('apps/host'), 'Records, side by side: dragging the separator moves it, within its limits, and keeps it']),
+      pass('laptop, 1440', 1440, ['Signed out: no sideways scroll']),
+    ]
+    host(inputs, 'chromium').made = structuredClone(made)
+    host(inputs, 'webkit').made = structuredClone(made)
+    change(inputs)
+    return problemsOf(inputs)
+  }
+
+  // The control: the same checks by name and pass in both browsers.
+  test('pass a run in which each browser made the same checks in the same passes', () => {
+    expect(both(() => {})).toEqual([])
+  })
+
+  // Totals say how many checks a browser passed, not which: a WebKit that
+  // never reached the separator at 320 and made one check more at 1440
+  // counts the same as Chromium, and only the names, compared pass by
+  // pass, say that the drag was measured in one browser and not the other.
+  test('fail a run in which one browser made a check another did not, at one pass, though the totals are equal', () => {
+    expect(
+      both((inputs) => {
+        const made = host(inputs, 'webkit').made
+        made[1].checks.pop()
+        made[2].checks.push('Signed out: the first Tab reaches the skip link')
+      }),
+    ).toEqual([
+      `the browser gate of apps/host made "Records, side by side: dragging the separator moves it, within its limits, and keeps it" at "reflow, 320" in Chromium and not in WebKit: ${NOBODY}`,
+      `the browser gate of apps/host made "Signed out: the first Tab reaches the skip link" at "laptop, 1440" in WebKit and not in Chromium: ${NOBODY}`,
+    ])
+  })
+
+  // A check made twice in one browser's pass and once in another's is a
+  // state reached twice in one: compared as sets, the two would agree.
+  test('count a check made more often in one browser than another', () => {
+    expect(both((inputs) => host(inputs, 'chromium').made[2].checks.push('Signed out: no sideways scroll'))).toEqual([
+      `the browser gate of apps/host made "Signed out: no sideways scroll" at "laptop, 1440" 2 times in Chromium and 1 time in WebKit: ${NOBODY}`,
+    ])
+  })
+
+  // A browser that made another list of passes measured other widths: its
+  // checks cannot be compared pass by pass, and the passes are said instead.
+  test('fail a run in which one browser made other passes than another', () => {
+    expect(both((inputs) => host(inputs, 'webkit').made.pop())).toEqual([
+      'the browser gate of apps/host made its passes as (before any pass), "reflow, 320", "laptop, 1440" in Chromium and as (before any pass), "reflow, 320" in WebKit: a pass made in one browser and not another is a width measured for that browser by nobody',
+    ])
+  })
+
+  // A gate that ended in an error stopped where it stopped, and its error is
+  // already a problem; compared, it would add a sentence for every check it
+  // never reached, burying the one that says why.
+  test('leave a gate that ended in an error out of the comparison', () => {
+    expect(
+      both((inputs) => {
+        Object.assign(host(inputs, 'webkit'), { error: 'the server did not start' })
+        host(inputs, 'webkit').made = [pass(null, null, [])]
+      }),
+    ).toEqual(['the browser gate of apps/host in WebKit ended with an error: the server did not start', 'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not pass'])
+  })
+})
+
+describe('0058’s facts, each held by its checks', () => {
+  const NOBODY = 'a row no check holds is a sentence nobody measured'
+  const host = (inputs, browser) => job(inputs, `browser-${browser}`).browserGates[0]
+  const drop = (gate, name) => {
+    for (const entry of gate.made) entry.checks = entry.checks.filter((check) => check !== name)
+  }
+
+  // sameChecks compares each browser with the others: a fact's check taken
+  // out of the gate in every browser at once is the same in all of them,
+  // and the row, the report's sentence that each row is held, and every
+  // leg stayed green. The row names its checks, and each browser's gate of
+  // that app must have made every one.
+  test('fail a run in which the gate a row names did not make one of its checks, in every browser at once', () => {
+    const inputs = withWebKit(copy(greenRun()))
+    for (const browser of ['chromium', 'webkit']) drop(host(inputs, browser), 'the browser names its platform to AG Grid as 0058’s table says')
+    expect(problemsOf(inputs)).toEqual([
+      `the browser gate of apps/host in Chromium never made "the browser names its platform to AG Grid as 0058’s table says", which holds 0058's claimsMacOs: ${NOBODY}`,
+      `the browser gate of apps/host in WebKit never made "the browser names its platform to AG Grid as 0058’s table says", which holds 0058's claimsMacOs: ${NOBODY}`,
+    ])
+  })
+
+  // A check made once per run -- the run's resend row -- is held too: made
+  // in any pass is made.
+  test('pass a row whose check was made in one pass alone', () => {
+    const inputs = copy(greenRun())
+    const gate = host(inputs, 'chromium')
+    drop(gate, 'the run measured 0058’s row for the connection this browser takes when it can choose')
+    gate.made.at(-1).checks.push('the run measured 0058’s row for the connection this browser takes when it can choose')
+    expect(problemsOf(inputs)).toEqual([])
   })
 })
 

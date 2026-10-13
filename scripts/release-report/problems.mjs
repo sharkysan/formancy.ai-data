@@ -7,7 +7,7 @@
 // may lack (verify, browser, install, container, getting-started); CI allows
 // none.
 
-import { browserName, launchedBuild, prose } from '../browsers.mjs'
+import { browserName, FACTS, launchedBuild, prose } from '../browsers.mjs'
 import { unmeasured } from './results.mjs'
 
 /** Readable names for the engines; a third engine without one shows its own name. */
@@ -62,10 +62,76 @@ function gateProblems(report, browserApps, allowMissing) {
       else problems.push(...buildProblems(which, gate.browser, playwright))
     }
   }
+  for (const app of browserApps) {
+    // Gates that ended in an error stopped where they stopped; their error is already a problem.
+    const ran = gated.flatMap((browser) => gates.filter((gate) => gate.gate === app && gate.asked === browser && gate.error === null))
+    problems.push(...sameChecks(app, ran), ...unheldFacts(app, ran))
+  }
   for (const browser of report.testedOn.browsers) {
     const launched = `the browser gates of ${browser.gates.join(', ')} launched ${browser.name} ${browser.version}`
     if (browser.pin === null) problems.push(`${launched}, which no gate here runs: the gates hold only ${prose(gated.map(browserName))} to a build Playwright ${playwright.playwright} pins`)
     else if (browser.version !== browser.pin) problems.push(`${launched}, not the ${browser.pin} Playwright ${playwright.playwright} pins`)
+  }
+  return problems
+}
+
+const NOBODY_CHECKED = 'a check made in one browser and not another is a claim made for that browser by nobody'
+const NOBODY_MEASURED = 'a pass made in one browser and not another is a width measured for that browser by nobody'
+const passName = (label) => (label === null ? '(before any pass)' : `"${label}"`)
+const times = (count) => `${String(count)} ${count === 1 ? 'time' : 'times'}`
+
+/** How often each check was made in one pass: name -> count. */
+const tally = (checks) => checks.reduce((counts, name) => counts.set(name, (counts.get(name) ?? 0) + 1), new Map())
+
+/**
+ * One app's gates, one per browser in the order the gates run in, compared
+ * with the first (0058): the same passes, by label and in order, and in
+ * each pass the same checks by name, as often. A gate's check names carry
+ * no value of its run, so the names alone say whether two browsers were
+ * asked the same questions; a difference in an answer is a failed check,
+ * never a missing one.
+ */
+function sameChecks(app, ran) {
+  const [first, ...others] = ran
+  const problems = []
+  for (const other of others) {
+    const [a, b] = [first, other].map((gate) => gate.made.map((entry) => entry.label))
+    const [one, two] = [browserName(first.asked), browserName(other.asked)]
+    if (a.join('\0') !== b.join('\0')) {
+      problems.push(`the browser gate of ${app} made its passes as ${a.map(passName).join(', ')} in ${one} and as ${b.map(passName).join(', ')} in ${two}: ${NOBODY_MEASURED}`)
+      continue
+    }
+    for (const [at, entry] of first.made.entries()) {
+      const [counts, theirs] = [tally(entry.checks), tally(other.made[at].checks)]
+      for (const name of new Set([...counts.keys(), ...theirs.keys()])) {
+        const [x, y] = [counts.get(name) ?? 0, theirs.get(name) ?? 0]
+        if (x === y) continue
+        const where = `"${name}" at ${passName(entry.label)}`
+        const said = y === 0 ? `${where} in ${one} and not in ${two}` : x === 0 ? `${where} in ${two} and not in ${one}` : `${where} ${times(x)} in ${one} and ${times(y)} in ${two}`
+        problems.push(`the browser gate of ${app} made ${said}: ${NOBODY_CHECKED}`)
+      }
+    }
+  }
+  return problems
+}
+
+/**
+ * Each of 0058's FACTS rows whose `heldBy` names `app`'s gate, against that
+ * gate's run in each browser (`ran`, none in an error): every check the row
+ * names, made in some pass. sameChecks compares the browsers with each
+ * other, so a check taken out of the gate in every browser at once is no
+ * difference there; here it is a row nobody holds.
+ */
+function unheldFacts(app, ran) {
+  const problems = []
+  for (const [id, fact] of Object.entries(FACTS)) {
+    if (fact.heldBy.gate !== app) continue
+    for (const gate of ran) {
+      const made = new Set(gate.made.flatMap((entry) => entry.checks))
+      for (const name of fact.heldBy.checks) {
+        if (!made.has(name)) problems.push(`the browser gate of ${app} in ${browserName(gate.asked)} never made "${name}", which holds 0058's ${id}: a row no check holds is a sentence nobody measured`)
+      }
+    }
   }
   return problems
 }

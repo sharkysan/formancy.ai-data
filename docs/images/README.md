@@ -2,9 +2,9 @@
 
 Every picture in the [README](../../README.md) is taken by `pnpm pictures`, in
 Chromium, from a state the product reaches: the built page against the real
-data server, never a mock-up, and never retouched. The browser job then walks
-the same states and fails when a picture's elements no longer say what they
-said when it was taken
+data server, never a mock-up, and never retouched. The pictures job then walks
+the same states, in Chromium, and fails when a picture's elements no longer
+say what they said when it was taken
 ([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 This page says how, and what that does not hold.
 
@@ -140,7 +140,7 @@ the network for Google Fonts at capture, and Docker for the host page.
 | `pnpm pictures --scene <id>` | Retakes those scenes; repeatable. |
 | `pnpm pictures --app <app> --all` | Retakes every picture of one app, on this machine's look. |
 | `pnpm pictures --all` | Retakes every picture on an empty record: the one way to a new look (another Chromium, Playwright or font version). |
-| `pnpm pictures --check` | Walks every scene with Google Fonts refused and compares each part's text with the record; writes nothing. Each app's `pnpm test:browser` runs it. |
+| `pnpm pictures --check` | Walks every scene with Google Fonts refused and compares each part's text with the record; writes nothing. Each app's `pnpm test:pictures` runs it, in the pictures job, in Chromium alone, where the browser gates run in every browser ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)). |
 | `--review <dir>` | Also writes each new picture, decoded to PNG, into a directory outside the repository. |
 
 ## Before a picture is committed

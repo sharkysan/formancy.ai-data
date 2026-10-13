@@ -9,10 +9,14 @@
 //     step of the journey, down to a 320px phone;
 //   - the keyboard path: the first Tab on the sign-in screen reaches the
 //     token, and in the workbench the skip link comes on screen and leads
-//     into the step; and where Enter moves or removes the button it was
-//     pressed on -- a field moved down, a filter removed, a conflict rebased,
-//     a restore refused, a dropped label given -- the keyboard is somewhere
-//     deliberate afterwards, not on the page;
+//     into the step, from the top of the page as the harness puts it there
+//     (scripts/browser-gate.mjs's fromTheTop); a click on the workbench's
+//     corner and then Tab reaches the skip link in the browsers 0058's
+//     FACTS.clickThenTab says it does, and not in Firefox, which starts from
+//     the caret the click left; and where Enter moves or removes the button
+//     it was pressed on -- a field moved down, a filter removed, a conflict
+//     rebased, a restore refused, a dropped label given -- the keyboard is
+//     somewhere deliberate afterwards, not on the page;
 //   - the preview's paper is the theme's: no rule of studio.css selects
 //     anything on it, so the preview shows what the published form will;
 //   - the colours have enough contrast and the targets are big enough -- the
@@ -20,7 +24,10 @@
 //     that add colour: gaps, a refused policy, a delete refused for what it
 //     also does and its reach accepted (0052), a failed preview, a conflict,
 //     a blocking drift, a refused restore, a regeneration and what it
-//     carried (0030).
+//     carried (0030);
+//   - every web font the built studio asks for had loaded by the end of
+//     each pass, and in the pass that refuses them, none had (0058): a
+//     state measured before a late family swapped in is not caught.
 //
 // Against the page `vite build` produces, served over HTTP from the same
 // origin as the real data server -- createDataServer, in this process, with
@@ -30,10 +37,11 @@
 // screenshots.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
-// scripts/browsers.mjs names through recordedPerBrowser: Chromium alone on a
-// machine unless FORMANCY_BROWSERS names more, each leg's browser in CI. A
-// browser comes from `pnpm --filter @formancy/data-examples exec playwright
-// install <browser>`, once per machine.
+// scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
+// and WebKit, each in a CI leg of its own; Chromium alone on a machine
+// unless FORMANCY_BROWSERS names more -- with every check in every browser.
+// A browser comes from installCommand() in scripts/browsers.mjs, once per
+// machine.
 
 import { createServer } from 'node:http'
 import { createReadStream, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
@@ -45,6 +53,8 @@ import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
 import { createSnapshot } from '@formancy/data-core'
 import { renamedColumn } from '@formancy/data-fixtures'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
+import { afterEveryPass, fromTheTop, unlikeTheTable } from '../../../scripts/browser-gate.mjs'
+import { FACTS } from '../../../scripts/browsers.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -450,10 +460,23 @@ async function run(gate, browser) {
       await page.getByRole('button', { name: 'Sign in' }).click()
       await page.getByRole('navigation', { name: 'Steps' }).waitFor()
 
-      // From the top of the workbench: the skip link, on screen, into the step.
+      // A click on the workbench's corner, then Tab, as a person does it: in
+      // Firefox the keyboard starts from the caret the click left, past the
+      // skip link, which is 0058's FACTS.clickThenTab, held here by name in
+      // every browser.
+      const skip = page.getByRole('link', { name: 'Skip to the step' })
       await page.mouse.click(1, 1)
       await page.keyboard.press('Tab')
-      const skip = page.getByRole('link', { name: 'Skip to the step' })
+      const reached = await skip.evaluate((link) => link === document.activeElement)
+      const table = FACTS.clickThenTab.values[gate.asked]
+      check(
+        'a click on the workbench’s corner, then Tab: as 0058’s table says of this browser',
+        reached === table ? null : unlikeTheTable(gate.asked, { did: reached ? 'reached the skip link' : `went to ${await describeFocus(page)}, not the skip link`, says: table ? 'it reaches it' : 'it does not' }),
+      )
+
+      // From the top of the workbench, as the harness puts it there: the skip link, on screen, into the step.
+      await fromTheTop(page)
+      await page.keyboard.press('Tab')
       const shown = await skip.evaluate((link) => {
         const box = link.getBoundingClientRect()
         return { focused: link === document.activeElement, onScreen: box.top >= 0 && box.left >= 0 && box.right <= document.documentElement.clientWidth }
@@ -475,6 +498,8 @@ async function run(gate, browser) {
         await act(page)
         await measured(page, state)
       }
+      // Whether every web font had loaded by the end of the pass, or, where it refuses them, none had.
+      await afterEveryPass(gate, page, { dist, refused: refuseFonts })
     } finally {
       await page.close()
       http.close()

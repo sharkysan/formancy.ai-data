@@ -220,9 +220,36 @@ describe('gates.yml', () => {
   test('gives the report one key per job, package, browser and Compose, and no key twice', () => {
     const keys = expectedKeys(gates, namedPackages()).map((entry) => entry.key)
     expect(new Set(keys).size).toBe(keys.length)
-    expect(keys).toEqual(expect.arrayContaining(['verify', 'browser-chromium', 'install', 'container', 'getting-started-runner', 'getting-started-2.20.3']))
+    expect(keys).toEqual(expect.arrayContaining(['verify', 'browser-chromium', 'browser-firefox', 'browser-webkit', 'pictures', 'install', 'container', 'getting-started-runner', 'getting-started-2.20.3']))
     expect(keys).not.toContain('browser')
     expect(keys.filter((key) => key.startsWith('test-')).sort()).toEqual(namedPackages().map((entry) => `test-${entry.id}`).sort())
+  })
+
+  // The README's pictures are one look, Chromium's (0038): their check runs
+  // in a job of its own, which the report waits for and expects a results
+  // key from, never as a step of one browser's leg that a rename could skip,
+  // and never in the gates, which run in every browser (0058).
+  test('checks every app’s pictures in the pictures job, in Chromium, and in no browser leg', () => {
+    const apps = ['examples', 'host', 'studio'].map((app) => JSON.parse(readFileSync(join(repo, 'apps', app, 'package.json'), 'utf8')))
+    for (const manifest of apps) {
+      expect(manifest.scripts['test:pictures'], manifest.name).toBe('node scripts/pictures.mjs --check')
+      expect(manifest.scripts['test:browser'], manifest.name).not.toContain('pictures')
+    }
+    const runs = (id) => gates.jobs[id].steps.map((step) => step.run).filter(Boolean)
+    expect(runs('pictures')).toContain('pnpm test:pictures')
+    expect(runs('pictures')).toContain('pnpm --filter @formancy/data-examples exec playwright install chromium')
+    expect(runs('browser').filter((run) => run.includes('pictures'))).toEqual([])
+    expect(gates.jobs.report.needs).toContain('pictures')
+  })
+
+  // WebKit's networking, EGL and fallback fonts are the runner image's: a
+  // label that moved would move 0058's facts under the WebKit leg with no
+  // change in the repository, and the pictures' fonts with them.
+  test('runs the browser legs and the pictures on a pinned image, and installs system libraries for WebKit alone', () => {
+    expect(gates.jobs.browser['runs-on']).toBe('ubuntu-24.04')
+    expect(gates.jobs.pictures['runs-on']).toBe('ubuntu-24.04')
+    const deps = gates.jobs.browser.steps.filter((step) => String(step.run).includes('install-deps') || String(step.run).includes('--with-deps'))
+    expect(deps.map((step) => ({ if: step.if, run: step.run }))).toEqual([{ if: "matrix.browser == 'webkit'", run: 'pnpm --filter @formancy/data-examples exec playwright install-deps webkit' }])
   })
 
   // Without --force a suite's results could be a cached replay of another

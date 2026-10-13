@@ -54,6 +54,20 @@ export interface TcpHop {
   /** How many times the client has sent `marker`, on every connection, since this call -- across reads. */
   countSent(marker: Buffer): () => number
   /**
+   * Each sending of `marker` by the client since this call, in order: the
+   * connection that carried it, numbered from 1 in the order the hop
+   * accepted them; how many requests that connection had carried before the
+   * one that carried it -- a request is a turn, as countRoundTrips counts
+   * them, on that connection alone, and on HTTP/1.1 without pipelining one
+   * turn is one request; and how many other connections the client passed
+   * over for it, each idle from before the carrying connection opened until
+   * the marker crossed: its last word the server's, nothing sent on it
+   * since, and neither side ended or closed. Whether a browser sends a lost
+   * POST again depends on the connection it took, and whether it had an
+   * idle one to take (0058).
+   */
+  sentOn(marker: Buffer): () => SentOn[]
+  /**
    * Turns since this call, on every connection: each time a client chunk
    * arrives on a connection whose last word, as the client heard it, was not
    * the client's. Two writes before an answer are one turn; an answer in
@@ -72,6 +86,13 @@ export interface TcpHop {
   /** Destroys every connection, both sides, and disarms every marker; later connections are forwarded. */
   cut(): void
   close(): Promise<void>
+}
+
+/** One sending of a marker: the connection that carried it, the requests that connection carried before it, and the idle connections passed over for it. */
+export interface SentOn {
+  readonly connection: number
+  readonly earlier: number
+  readonly passedOver: number
 }
 
 /** What crosses a hop: one engine's protocol, or HTTP, which is how the host page's browser gate reaches the page. */
@@ -143,6 +164,16 @@ export type Schedule = (callback: () => void, ms: number) => unknown
 interface Pair {
   client: net.Socket
   upstream: net.Socket
+  /** This connection's number in the hop, from 1, in the order the hop accepted them. */
+  ordinal: number
+  /** The client's turns on this connection since it opened: the request in progress is the last of them. */
+  turns: number
+  /** The hop's clock when it accepted this connection. */
+  opened: number
+  /** The hop's clock at the last server chunk the client heard on it: idle from then, if the client has not spoken since. */
+  answeredAt: number
+  /** Neither side has ended or closed it: a connection the client could still send on. */
+  open: boolean
   /** Set once an answer on this connection matched: nothing more reaches the client. */
   swallowing: boolean
   /** Who last spoke on this connection as the client heard it: the client's chunk arriving, or a server chunk forwarded to it. */
@@ -164,6 +195,12 @@ interface Count {
   marker: Buffer
   watchers: WeakMap<Pair, (chunk: Buffer) => number>
   total: number
+}
+
+interface Sendings {
+  marker: Buffer
+  watchers: WeakMap<Pair, (chunk: Buffer) => number>
+  found: SentOn[]
 }
 
 function watcherFor(watchers: WeakMap<Pair, (chunk: Buffer) => number>, pair: Pair, marker: Buffer, cutBy: number): (chunk: Buffer) => number {
@@ -192,13 +229,26 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
   const pairs = new Set<Pair>()
   const arms = new Set<Arm>()
   const counts: Count[] = []
+  const sendings: Sendings[] = []
+  let accepted = 0
+  /** Orders the hop's events -- an accept, a chunk heard by the client -- for passedOver; no time, so a test needs no clock. */
+  let clock = 0
   const turnCounters: Array<{ total: number }> = []
   let delay: { ms: number; schedule: Schedule } = { ms: 0, schedule: setTimeout }
 
   /** A chunk the client hears: the server has spoken, as far as the client knows. */
   function deliver(pair: Pair, chunk: Buffer): void {
     pair.lastSpoke = 'server'
+    clock += 1
+    pair.answeredAt = clock
     pair.client.write(chunk)
+  }
+
+  /** The other connections idle from before `pair` opened until now: answered, unused since, open on both sides. */
+  function passedOver(pair: Pair): number {
+    let idle = 0
+    for (const other of pairs) if (other !== pair && other.open && other.lastSpoke === 'server' && other.answeredAt < pair.opened) idle += 1
+    return idle
   }
 
   /** Forwards every held chunk whose wait is over, oldest first, stopping at the first still waiting; then a held end. */
@@ -235,10 +285,17 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
   }
 
   function fromClient(pair: Pair, chunk: Buffer): void {
-    if (pair.lastSpoke !== 'client') for (const counter of turnCounters) counter.total += 1
+    if (pair.lastSpoke !== 'client') {
+      pair.turns += 1
+      for (const counter of turnCounters) counter.total += 1
+    }
     pair.lastSpoke = 'client'
     pair.upstream.write(chunk)
     for (const count of counts) count.total += watcherFor(count.watchers, pair, count.marker, cutBy)(chunk)
+    for (const entry of sendings) {
+      const found = watcherFor(entry.watchers, pair, entry.marker, cutBy)(chunk)
+      for (let at = 0; at < found; at += 1) entry.found.push({ connection: pair.ordinal, earlier: pair.turns - 1, passedOver: passedOver(pair) })
+    }
   }
 
   // Half-open on both sides, so a FIN is passed on as a FIN, and only after
@@ -256,10 +313,16 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
     const upstream = net.connect({ port: target.port, host: target.host, allowHalfOpen: true })
     client.setNoDelay(true)
     upstream.setNoDelay(true)
-    const pair: Pair = { client, upstream, swallowing: false, lastSpoke: undefined, held: [], endHeld: false }
+    accepted += 1
+    clock += 1
+    const pair: Pair = { client, upstream, ordinal: accepted, turns: 0, opened: clock, answeredAt: 0, open: true, swallowing: false, lastSpoke: undefined, held: [], endHeld: false }
     pairs.add(pair)
-    client.on('end', () => upstream.end())
+    client.on('end', () => {
+      pair.open = false
+      upstream.end()
+    })
     upstream.on('end', () => {
+      pair.open = false
       if (pair.held.length === 0) client.end()
       else pair.endHeld = true
     })
@@ -267,6 +330,7 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
       // A cut is the point; its errors are the drivers' to report, not the hop's.
       socket.on('error', () => {})
       socket.on('close', (hadError) => {
+        pair.open = false
         if (hadError) destroy(pair)
         if (client.destroyed && upstream.destroyed) pairs.delete(pair)
       })
@@ -300,6 +364,11 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
       const count: Count = { marker, watchers: new WeakMap(), total: 0 }
       counts.push(count)
       return () => count.total
+    },
+    sentOn(marker) {
+      const entry: Sendings = { marker, watchers: new WeakMap(), found: [] }
+      sendings.push(entry)
+      return () => [...entry.found]
     },
     countRoundTrips() {
       const counter = { total: 0 }

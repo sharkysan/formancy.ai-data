@@ -27,12 +27,23 @@
 //     layers: a header's and a cell's text against what the browser painted
 //     there, the focused cell's teal border at 3:1 on the open row and on
 //     another, and the open row's bar against its tint (UX-SPEC F1);
-//   - a create whose answer the network lost after the server stored it:
-//     Chromium sends it again on its own, below the page, when the connection
-//     it reused closes before any answer -- measured at the socket, through a
-//     TCP hop between the browser and the server -- and the server answers
-//     that second sending with the first one's answer, so one order is
-//     stored and the page says what was created (0031);
+//   - a create whose answer the network lost after the server stored it,
+//     measured at the socket through a TCP hop between the browser and the
+//     server: it went out on the connection 0058's FACTS.postConnection says
+//     of this browser -- Chromium and Firefox on an idle kept-alive one where
+//     one stood idle, WebKit on a new one -- and was sent again on its own,
+//     below the page, as often as FACTS.resendsLostPost says for that
+//     connection -- Chromium and Firefox on a connection they reused, WebKit
+//     never -- and one order is stored, the server answering a second
+//     sending with the first one's answer (0031); the page then says what
+//     was created, or, where nothing was sent again, that it may have been
+//     saved, with the keyboard on that; and the run fails unless one of its
+//     passes reached the row of the connection the browser takes when it
+//     can choose, which for Chromium and Firefox is the resend;
+//   - the browser names itself and its platform to AG Grid as
+//     FACTS.claimsSafari and claimsMacOs say, which decide the code paths
+//     the grids take: Playwright's Linux WebKit names itself Safari on a
+//     Mac, and its platform Linux;
 //   - a delete (0053): a row's Delete reached by the arrow keys as a real
 //     button named for its record, from which Tab leaves the grid in one
 //     stop; the confirmation under the grid that asked, or under the
@@ -51,7 +62,10 @@
 //   - every `@media` condition is one the gate reads: a `max-width` in rem,
 //     from which it takes its widths (0047);
 //   - the colours have enough contrast and the targets are big enough -- the
-//     two rules jsdom cannot measure -- in every state below.
+//     two rules jsdom cannot measure -- in every state below;
+//   - every web font the built page asks for had loaded by the end of each
+//     pass, and in the pass that refuses them, none had (0058): a state
+//     measured before a late family swapped in is not caught.
 //
 // Against the page `vite build` produces, served over HTTP from the same
 // origin as the real data server -- createDataServer, in this process, over
@@ -67,16 +81,18 @@
 // workspace's states, the record's journey and a delete's states.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
-// scripts/browsers.mjs names through recordedPerBrowser -- Chromium alone on
-// a machine unless FORMANCY_BROWSERS names more, each leg's browser in CI --
+// scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
+// and WebKit, each in a CI leg of its own; Chromium alone on a machine
+// unless FORMANCY_BROWSERS names more -- with every check in every browser,
 // and each browser's run starts its own PostgreSQL and server: the report
 // credits a server to the gate whose time window it started in. It needs
-// Docker, for the database, and each browser, from `pnpm --filter
-// @formancy/data-examples exec playwright install <browser>` once per machine.
+// Docker, for the database, and each browser, from installCommand() in
+// scripts/browsers.mjs once per machine.
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { startTcpHop } from '@formancy/data-fixtures'
+import { afterEveryPass, agGridRowProblem, environmentOf, rowUnmeasured } from '../../../scripts/browser-gate.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { deleteJourney } from './browser/deleting.mjs'
 import { recordJourney } from './browser/journey.mjs'
@@ -120,6 +136,8 @@ async function run(gate, browser) {
     const decided = await decide(page, result.undecided)
     check(`${state}: the contrast of every text decided`, decided.left.length === 0 ? null : `undecided: ${decided.left.slice(0, 4).join('; ')}`)
     check(`${state}: the grids' text, decided on the pixels, at 4.5:1 or more`, decided.failing.length === 0 ? null : decided.failing.map((entry) => `${entry.name} ${String(entry.ratio)}:1`).join('; '))
+    // What axe asked about and no screen shows in this state, said rather than counted: its grid has scrolled it out of view, or covers it.
+    if (decided.hidden.length > 0) console.log(`  shown nowhere: ${decided.hidden.join('; ')}`)
   }
 
   const started = Date.now()
@@ -129,6 +147,9 @@ async function run(gate, browser) {
   // and receives crosses it, so what the browser itself does is counted there.
   const hop = await startTcpHop({ kind: 'http', host: '127.0.0.1', port })
   console.log(`PostgreSQL and the server started in ${String(Math.round((Date.now() - started) / 1000))} s`)
+  // The connections the run's lost creates took, one per pass: held once the
+  // run is over, since each pass holds only the row its create reached.
+  const reached = new Set()
   try {
     let pass = 0
     for (const { label, width, refuseFonts = false } of list) {
@@ -139,6 +160,12 @@ async function run(gate, browser) {
       try {
         await page.goto(`http://127.0.0.1:${String(hop.port)}/`, { waitUntil: 'load' })
         console.log(`\n${label} -- ${String(width)}x900`)
+        // AG Grid's own tests, copied with its release into 0058's rows,
+        // against what the page's browser says it is: they decide the code
+        // paths the grids take.
+        const said = await environmentOf(page)
+        check('the browser names itself to AG Grid as 0058’s table says', agGridRowProblem(gate.asked, 'claimsSafari', said))
+        check('the browser names its platform to AG Grid as 0058’s table says', agGridRowProblem(gate.asked, 'claimsMacOs', said))
 
         // Signed out: the skip link first, on screen, and then the token --
         // the whole screen's purpose. Once the screen is there: "load" fires
@@ -159,15 +186,21 @@ async function run(gate, browser) {
         check('and the next Tab reaches the host token', await focusedOn(page, token))
         await measured(page, 'Signed out')
 
-        const run = { record: await plane.order(2), customer: 9000 + pass }
+        const run = { record: await plane.order(2), customer: 9000 + pass, reached }
         for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run)]) {
           await act(page)
           await measured(page, state)
         }
+        // Whether every web font had loaded by the end of the pass, or, where it refuses them, none had.
+        await afterEveryPass(gate, page, { dist: DIST, refused: refuseFonts })
       } finally {
         await page.close()
       }
     }
+    // Every pass held the row its lost create reached; the run, the row the
+    // browser takes when it can choose, which for Chromium and Firefox is
+    // the resend 0031 rests on.
+    check('the run measured 0058’s row for the connection this browser takes when it can choose', rowUnmeasured(gate.asked, reached))
   } finally {
     await hop.close()
     http.close()

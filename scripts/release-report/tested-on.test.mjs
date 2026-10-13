@@ -40,6 +40,17 @@ describe('the browsers’ pins', () => {
   test('hold Chromium to the headless shell Playwright pins', () => {
     expect(facts.browser.pins.find((pin) => pin.browser === 'chromium')).toMatchObject({ name: 'chromium-headless-shell' })
   })
+
+  // Every browser the gates run in is held to a build Playwright pins: a
+  // browser without one would be reported at whatever version a machine
+  // had, and the README's table would leave it out (0058).
+  test('pin a build of Playwright’s for every browser the gates run in, in their order', () => {
+    expect(facts.browser.pins.map((pin) => [pin.browser, pin.name])).toEqual([
+      ['chromium', 'chromium-headless-shell'],
+      ['firefox', 'firefox'],
+      ['webkit', 'webkit'],
+    ])
+  })
 })
 
 describe('the README blocks', () => {

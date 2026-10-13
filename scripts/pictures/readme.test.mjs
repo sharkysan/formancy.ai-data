@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest'
+import { readWorkflow } from '../release-report/workflows.mjs'
 import { entry, pictureOf, serialize } from './record.mjs'
 import {
   END,
   guardProblems,
+  HERO_LINE,
   integrityProblems,
   linkProblems,
   lookProblems,
@@ -181,6 +183,16 @@ describe('each check, on a small repository', () => {
       ].join('\n'),
     )
     expect(render(list, record).hero).toMatch(/^<img src="\.\/docs\/images\/readme\/host-loaded\.webp"[\s\S]*\n\nEvery picture in this README is taken by `pnpm pictures`/)
+  })
+
+  // The hero line tells a reader which job goes red on a picture whose text
+  // the page no longer shows: since 0058 that is the pictures job, in
+  // Chromium, not the browser job, whose legs run in every browser. Read
+  // from the workflow, so a job renamed or a check moved again fails here.
+  test('the hero line names the job that runs the pictures’ check', () => {
+    const named = /the (\S+) job fails/.exec(HERO_LINE)?.[1]
+    const job = readWorkflow().jobs[named]
+    expect(job?.steps.map((step) => step.run), `the ${String(named)} job`).toContain('pnpm test:pictures')
   })
 
   // Watched failing with: one caption edited in scenes.json without `readme.mjs --write`.

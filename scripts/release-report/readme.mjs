@@ -71,7 +71,7 @@ export function readmeTable(facts) {
     '| --- | --- | --- |',
     ...rows.map((row) => `| ${row.map(cell).join(' | ')} |`),
     '',
-    `What a run actually answered — each server’s own version and image digest, every other image a test started, the Node and ${prose(facts.browser.pins.map((pin) => browserName(pin.browser)))} it launched — is in the report every CI run produces and every release attaches, signed.`,
+    `What a run actually answered — each server’s own version and image digest, every other image a test started, the Node and ${facts.browser.pins.length === 1 ? browserName(facts.browser.pins[0].browser) : 'each browser'} it launched — is in the report every CI run produces and every release attaches, signed.`,
   ].join('\n')
 }
 

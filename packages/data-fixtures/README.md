@@ -144,7 +144,14 @@ dropped the key from the end of its order would show on both engines.
   encoding, `answerBytes('postgres' | 'sqlserver', text)` -- completes; its
   `cut()` ends only the connections that swallowed. `countSent(marker)`
   counts the marker on its way to the database, which is how a suite shows a
-  write was not sent again. On SQL Server a match tolerates one 8-byte TDS
+  write was not sent again, and `sentOn(marker)` says of each sending which
+  connection carried it, how many requests that connection had carried
+  before, a request being a client turn on it, and how many other
+  connections stood idle -- answered, open on both sides, unused since --
+  from before it opened until the marker crossed: whether a browser sends a
+  lost POST again depends on whether its connection was reused, and whether
+  it had an idle one to reuse
+  ([0058](../../docs/decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)). On SQL Server a match tolerates one 8-byte TDS
   packet header inside the marker, because a packet can cut it there.
   PostgreSQL sends a bound value whole inside one message and HTTP has no
   8-byte packet header, so on those a marker is matched only whole: the
@@ -153,7 +160,7 @@ dropped the key from the end of its order would show on both engines.
   `cut()` ends every connection. Every byte is the driver's and the server's,
   and a close is passed on only after every byte before it, so a suite behind
   it is not a mocked driver; only a cut loses what is in flight. The host
-  page's browser gate puts one between Chromium and the page too. A matched answer is not proof
+  page's browser gate puts one between the browser and the page too. A matched answer is not proof
   of a commit -- PostgreSQL sends a deferred constraint's refusal after the
   row -- so a suite polls a connection of its own until the write is visible
   before it cuts.
