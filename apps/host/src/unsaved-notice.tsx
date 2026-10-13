@@ -58,8 +58,9 @@ export function UnsavedNotice({ pending, onKeep, onDiscard }: { pending: Pending
         </div>
         <ul id="unsaved-list">
           {pending.risky.map((pane) => (
-            <li key={`${pane.owner} ${pane.renderer}`}>
-              <Words said={pane.name} />, {RENDERER_NAMES[pane.renderer]}: {pane.work === null ? '' : WORK[pane.work]}
+            <li key={`${pane.owner} ${String(pane.renderer)}`}>
+              <Words said={pane.name} />
+              {pane.renderer === null ? '' : `, ${RENDERER_NAMES[pane.renderer]}`}: {pane.work === null ? '' : WORK[pane.work]}
             </li>
           ))}
         </ul>

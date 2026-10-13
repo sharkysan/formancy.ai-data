@@ -34,9 +34,16 @@
 // not read sales.order_line, so no child section is pictured: the guide's
 // setup has no line form to publish (0047 says what nothing grants it).
 //
+// host-delete publishes the getting-started job's second form,
+// journey.json's `deleting` -- pg-order with delete granted to whoever may
+// read and every key a delete of an order acts through named (0051) -- when
+// its scene starts, so the scenes before it show the guide's one form; it
+// pictures a row's confirmation under the grid and keeps the order, which
+// host-drift loads after it (0053).
+//
 // Walk order: typeahead, the hero, stale, refused, unknown, the unsaved
-// notice, another tenant, drift -- last, because it changes the table; the
-// README shows them in scenes.json's order.
+// notice, another tenant, a delete's confirmation, drift -- last, because it
+// changes the table; the README shows them in scenes.json's order.
 // Elements are found by role and accessible name, with one exception, said
 // where it is: the host token is a password field, which has no role, so it
 // is found by its label.
@@ -311,7 +318,35 @@ function actsOver(plane) {
       return { parts: { Records: records(page), Record: detail(page, 'No record open') } }
     },
 
+    'host-delete': async (page) => {
+      // The guide's second form, published as the getting-started job publishes it (journey.mjs, `deletion`).
+      const formId = `${FORM.formId}${journey.deleting.formSuffix}`
+      const ada = { authorization: `Bearer ${TOKENS.ada}` }
+      const { connection, root: table, title, lookups, pinned, versionColumn } = FORM
+      const proposal = await plane.server.inject({ method: 'POST', url: '/v1/form-proposals', headers: ada, payload: { connection, root: table, formId, title, lookups, pinned, versionColumn } })
+      if (proposal.statusCode !== 200) throw new Error(`the proposal for ${formId} answered ${String(proposal.statusCode)}`)
+      const { form, bindings, snapshot, generation } = proposal.json()
+      const operations = { ...journey.policy.operations, delete: [...journey.policy.operations.read] }
+      const policy = { version: 1, ...journey.policy, operations, fields: fieldsFromOperations(journey.policy, bindings), cascades: journey.deleting.cascades }
+      const published = await plane.server.inject({ method: 'POST', url: `/v1/forms/${formId}/versions`, headers: ada, payload: { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } } })
+      if (published.statusCode !== 201) throw new Error(`publishing ${formId} answered ${String(published.statusCode)}: ${published.body}`)
+      await carryOn(page, page.getByRole('button', { name: HOST.signOut, exact: true }))
+      await signIn(page, TOKENS.clara, formId)
+      // The order's own row: its Delete is a button named for it, which asks under the grid.
+      const question = `Delete Order ${RECORD}?`
+      await records(page).getByRole('button', { name: `Delete Order ${RECORD}`, exact: true }).click()
+      const confirmation = records(page).getByRole('region', { name: question, exact: true })
+      await confirmation.waitFor()
+      if (!(await confirmation.evaluate((element) => element === document.activeElement))) throw new Error('the confirmation did not take the keyboard')
+      // "Keep it" first, so the keyboard is never put on the button that deletes: the next Tab is on it.
+      const answers = await confirmation.getByRole('button').allTextContents()
+      if (JSON.stringify(answers.map((text) => text.trim())) !== JSON.stringify(['Keep it', 'Delete it'])) throw new Error(`the confirmation's answers are ${JSON.stringify(answers)}, not Keep it then Delete it`)
+      return { parts: { Records: records(page) }, keepFocus: true }
+    },
+
     'host-drift': async (page) => {
+      // The delete's confirmation, kept: the order is the drift scene's.
+      await records(page).getByRole('button', { name: 'Keep it', exact: true }).click()
       await carryOn(page, page.getByRole('button', { name: HOST.signOut, exact: true }))
       await signIn(page, TOKENS.clara)
       // Stacked, as clara arrived, whatever layout the address kept through Sign out.
@@ -353,11 +388,11 @@ function actsOver(plane) {
   }
 }
 
-/** Signed in with `token`, pg-order chosen under Forms and its records listed. The token is a password field, which has no role. */
-async function signIn(page, token) {
+/** Signed in with `token`, pg-order -- or `formId` -- chosen under Forms and its records listed. The token is a password field, which has no role. */
+async function signIn(page, token, formId = FORM.formId) {
   await page.getByLabel(HOST.token, { exact: true }).fill(token)
   await page.getByRole('button', { name: HOST.signIn, exact: true }).click()
-  await page.getByRole('navigation', { name: HOST.forms, exact: true }).getByRole('link', { name: `${FORM.title} ${FORM.formId}`, exact: true }).click()
+  await page.getByRole('navigation', { name: HOST.forms, exact: true }).getByRole('link', { name: `${FORM.title} ${formId}`, exact: true }).click()
   await page.getByRole('region', { name: 'Records', exact: true }).getByRole('status').filter({ hasText: /^(Rows|No records)/ }).waitFor()
 }
 

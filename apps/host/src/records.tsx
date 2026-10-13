@@ -1,9 +1,9 @@
 import { forwardRef, useState } from 'react'
-import type { ReactElement, RefObject } from 'react'
+import type { ReactElement, ReactNode, RefObject } from 'react'
 import type { DataClient, PublishedForm } from '@formancy/data-client'
 import type { GridColumn } from './grid-datasource.js'
 import { RecordGrid } from './record-grid.js'
-import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
+import type { OpenHow, RecordGridHandle, RowAt, RowDelete } from './record-grid.js'
 
 /** `['Order number', 'Status', 'Notes']` as "Order number, Status and Notes". */
 function listed(words: readonly string[]): string {
@@ -36,8 +36,12 @@ export const Records = forwardRef<
     onSearch: (search: string) => void
     onNew: () => void
     onOpen: (token: string, how: OpenHow, at: RowAt) => void
+    /** Where the form offers delete: each row's Delete (0053). */
+    remove: RowDelete | undefined
+    /** A row's delete confirmation, in place under the grid. */
+    after: ReactNode
   }
->(function Records({ client, formId, definition, columns, hidden, openToken, canCreate, headingRef, newRef, searchRef, search, refit, onSearch, onNew, onOpen }, grid): ReactElement {
+>(function Records({ client, formId, definition, columns, hidden, openToken, canCreate, headingRef, newRef, searchRef, search, refit, onSearch, onNew, onOpen, remove, after }, grid): ReactElement {
   const [typed, setTyped] = useState(search)
   const labels = new Map(columns.map((column) => [column.key, column.label]))
   const searchable = (definition.list?.searchable ?? []).map((key) => labels.get(key) ?? key)
@@ -92,6 +96,8 @@ export const Records = forwardRef<
         toolbarStart={searchBlock}
         refit={refit}
         bench="master-bench"
+        {...(remove === undefined ? {} : { remove })}
+        after={after}
         onOpen={onOpen}
         onClearSearch={() => {
           setTyped('')

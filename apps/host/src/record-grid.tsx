@@ -7,13 +7,14 @@ import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { answered, CANNOT_OPEN, createDatasource, loading } from './grid-datasource.js'
 import type { DatasourceHooks, GridColumn, GridRow } from './grid-datasource.js'
 import { columnDefsOf, gridOptionsFor } from './grid-options.js'
-import type { OpenHow } from './grid-options.js'
+import type { OpenHow, RowDelete } from './grid-options.js'
 import { ROW_HEIGHT } from './grid-theme.js'
 import type { Said } from './leave.js'
 import { Pager } from './pager.js'
 import type { Status } from './pager.js'
 
-export type { OpenHow } from './grid-options.js'
+export type { OpenHow, RowDelete } from './grid-options.js'
+export { DELETE_COLUMN } from './grid-options.js'
 
 /*
  * One record grid: AG Grid Community over the infinite row model, a page of
@@ -27,6 +28,11 @@ export type { OpenHow } from './grid-options.js'
  * and the bar say what the detail shows -- and the well as tall as its page,
  * its columns sized to the first page and again each time the separator is
  * let go.
+ *
+ * A record gone from it (0053) -- deleted, or not found by a delete and
+ * closed -- is said once, before the sentence of the page asked for again;
+ * a page left empty that is not the first says nothing, and AG Grid shows
+ * the page before it.
  */
 
 /** Where a row was asked for from, so the keyboard can be given back there. */
@@ -36,14 +42,16 @@ export interface RowAt {
 }
 
 export interface RecordGridHandle {
-  /** The open record's cell, focused, when its row is on this page; false otherwise. */
-  focusRecord(token: string): boolean
+  /** A record's cell -- its first, or the column `colId` names -- focused, when its row is on this page; false otherwise. */
+  focusRecord(token: string, colId?: string): boolean
   /** The keyboard back on the cell a request came from. */
   focusAt(at: RowAt): void
   /** The page asked for again: after a save, so stored values show. */
   reload(): void
   /** A sentence of the page's own on the status line, until the next answer. */
   say(line: Said): void
+  /** A record gone from the grid: the page asked for again, and `line` said once, before its sentence. */
+  removed(line: Said): void
 }
 
 export interface RecordGridProps {
@@ -71,6 +79,10 @@ export interface RecordGridProps {
    */
   refit?: number
   bench: 'master-bench' | 'child-bench'
+  /** Where the form offers delete: each row's Delete names it with this noun, and a press asks the page (0053). */
+  remove?: RowDelete
+  /** What the panel holds after the well: a row's delete confirmation, in place. */
+  after?: ReactNode
   onOpen(token: string, how: OpenHow, at: RowAt): void
   onClearSearch?(): void
 }
@@ -103,7 +115,7 @@ function wellHeight(header: number, rows: number, cap: number): number {
 }
 
 export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function RecordGrid(props, handle): ReactElement {
-  const { client, formId, columns, labelledBy, parent, search, openToken, quiet = false, toolbarStart, refit = 0, bench, onClearSearch } = props
+  const { client, formId, columns, labelledBy, parent, search, openToken, quiet = false, toolbarStart, refit = 0, bench, after, onClearSearch } = props
   const api = useRef<GridApi<GridRow> | null>(null)
   const well = useRef<HTMLDivElement>(null)
   const retryButton = useRef<HTMLButtonElement>(null)
@@ -113,6 +125,14 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   const [status, setStatus] = useState<Status>({ kind: 'loading', text: [quiet ? '' : loading(0, LIST_PAGE_SIZE, props.noun)], help: null, clear: false, retry: false })
   const [pager, setPager] = useState({ page: 0, hasMore: false })
   const shown = useRef({ rows: 0, loaded: false, sized: false, quiet, retrying: false })
+  /** What a record gone from the grid says before the next page's sentence, once. */
+  const removedLine = useRef<Said | null>(null)
+  /** The sentence of a page, after the removal said first if there is one -- which it then is not again. */
+  const first = (said: Said): Said => {
+    const before = removedLine.current
+    removedLine.current = null
+    return before === null ? said : [...before, ' ', ...said]
+  }
   const firstColumn = columns[0]?.key ?? ''
 
   const applySelection = useCallback(() => {
@@ -170,12 +190,18 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         setPager((before) => ({ ...before, page: Math.floor(start / LIST_PAGE_SIZE) }))
       },
       answered: (start, rows, hasMore) => {
+        // A page left empty that is not the first -- its last row deleted --
+        // says nothing: with fewer rows than the page starts at, AG Grid's
+        // pagination moves to the last page there is and asks for it, which
+        // says what the grid shows (P7, measured in delete-rows.test.tsx,
+        // 0053).
+        if (rows.length === 0 && start > 0) return
         const fromRetry = shown.current.retrying && document.activeElement === retryButton.current
         shown.current = { ...shown.current, rows: rows.length, loaded: true, retrying: false }
         api.current?.setGridAriaProperty('busy', null)
         const { noun, canCreate } = latest.current
         const said = answered({ start, count: rows.length, hasMore, search: latest.current.search, untokened: rows.filter((row) => row.record === null).length, canCreate, ...(noun === undefined ? {} : { noun }) })
-        setStatus({ kind: 'answer', text: [said.text], help: said.help, clear: said.clear, retry: false })
+        setStatus({ kind: 'answer', text: first([said.text]), help: said.help, clear: said.clear, retry: false })
         setPager({ page: Math.floor(start / LIST_PAGE_SIZE), hasMore })
         applySelection()
         fit()
@@ -186,7 +212,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
       refused: (message) => {
         shown.current = { ...shown.current, rows: 0, loaded: true, retrying: false }
         api.current?.setGridAriaProperty('busy', null)
-        setStatus({ kind: 'refused', text: [message], help: null, clear: false, retry: true })
+        setStatus({ kind: 'refused', text: first([message]), help: null, clear: false, retry: true })
         setPager((before) => ({ ...before, hasMore: false }))
         fit()
       },
@@ -207,12 +233,12 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   useImperativeHandle(
     handle,
     () => ({
-      focusRecord(token) {
+      focusRecord(token, colId = firstColumn) {
         const grid = api.current
         const node = grid?.getRowNode(token)
-        if (grid === null || grid === undefined || node === undefined || node.rowIndex === null) return false
+        if (grid === null || grid === undefined || grid.isDestroyed() || node === undefined || node.rowIndex === null) return false
         grid.ensureIndexVisible(node.rowIndex)
-        grid.setFocusedCell(node.rowIndex, firstColumn)
+        grid.setFocusedCell(node.rowIndex, colId)
         return true
       },
       focusAt({ rowIndex, colId }) {
@@ -227,11 +253,20 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
       say(line) {
         setStatus({ kind: 'answer', text: line, help: null, clear: false, retry: false })
       },
+      removed(line) {
+        removedLine.current = line
+        api.current?.purgeInfiniteCache()
+      },
     }),
     [firstColumn],
   )
 
-  const columnDefs = useMemo(() => columnDefsOf(columns), [columns])
+  // A row's Delete reads the page's handler when pressed: the column is made once per noun.
+  const removeNoun = props.remove?.noun
+  const columnDefs = useMemo(
+    () => columnDefsOf(columns, removeNoun === undefined ? undefined : { noun: removeNoun, press: (row) => latest.current.remove?.press(row) }),
+    [columns, removeNoun],
+  )
   const options = useMemo(
     () =>
       gridOptionsFor({
@@ -283,6 +318,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
       <div className={`grid-bench ${bench}`} ref={well}>
         <AgGridReact<GridRow> gridOptions={options} columnDefs={columnDefs} datasource={datasource} />
       </div>
+      {after}
     </>
   )
 })

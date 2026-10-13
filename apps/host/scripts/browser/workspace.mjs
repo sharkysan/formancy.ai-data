@@ -168,12 +168,14 @@ export function workspaceJourney(plane, { check }, run) {
       await page.keyboard.press('ArrowDown')
       const plain = await focusRing(page)
       check('the focused cell on another row: its teal border at 3:1 or more', plain.problem ?? (plain.ratio >= 3 ? null : `${String(plain.ratio)}:1`))
-      // End: the last row's last cell, in view inside the grid's own scroller.
+      // End: the last row's last cell, in view inside the grid's own scroller
+      // -- the row's Delete, whose button the cell hands the keyboard to
+      // (0053), so the cell is the one that holds the focus.
       await page.keyboard.press('End')
       const last = await page.evaluate(() => {
-        const cell = document.activeElement
+        const cell = document.activeElement?.closest('[role="gridcell"]')
         const scroller = cell?.closest('[role="grid"]')
-        if (cell?.getAttribute('role') !== 'gridcell' || scroller === null || scroller === undefined) return { problem: 'the focus left the grid' }
+        if (cell === null || cell === undefined || scroller === null || scroller === undefined) return { problem: 'the focus left the grid' }
         const row = cell.closest('[role="row"]')
         const cells = [...(row?.querySelectorAll('[role="gridcell"]') ?? [])]
         const box = cell.getBoundingClientRect()

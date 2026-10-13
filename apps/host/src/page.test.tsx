@@ -3,7 +3,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleName } from 'dom-accessibility-api'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
 import { answer, answerable, chooseCustomer, chooseForm, chooseRenderer, gridSection, load, mount, newRecord, notice, openForm, openWith, pane, paper, RENDERERS, said, save, shows, signIn, unknownNotice, unsavedNotice } from './test-host.js'
-import { EDGES, ENGINES, losingWrites, startPlane, TOKENS } from './test-plane.js'
+import { EDGES, ENGINES, holdingWrites, losingWrites, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 import { PREFERENCES } from './prefs.js'
 import { CHANGED_SINCE_UNKNOWN } from './session.js'
@@ -22,7 +22,7 @@ import { CHANGED_SINCE_UNKNOWN } from './session.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true })
+  plane = await startPlane({ children: true, deletes: true })
 })
 
 afterAll(async () => {
@@ -42,14 +42,14 @@ async function floor(state: string): Promise<{ state: string; axe: string[]; unn
 
 const CLEAN = (state: string) => ({ state, axe: [], unnamed: [] })
 
-/** A fresh order of tenant 1's, made beside the page: the case is what happens to it, not how it was made. */
-async function freshOrder(formId: string): Promise<string> {
+/** A fresh order of tenant 1's, made beside the page: the case is what happens to it, not how it was made. `notes` finds it again. */
+async function freshOrder(formId: string, notes?: string): Promise<string> {
   const definition = await plane.clerk.form(formId)
   if (!definition.ok) throw new Error(definition.message)
   const name = definition.value.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
   const found = await plane.clerk.query(formId, name, { operation: 'create', search: 'Muster' })
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
-  const created = await plane.clerk.create(formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '1' })
+  const created = await plane.clerk.create(formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '1', ...(notes === undefined ? {} : { notes }) })
   if (!created.ok || created.value.record === null) throw new Error('the order was not created')
   return created.value.record
 }
@@ -67,7 +67,7 @@ test('signed out, the page asks for a token alone, and passes the floor', async 
   expect(await floor('signed out')).toEqual(CLEAN('signed out'))
 })
 
-describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
+describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) => {
   // The definition is the server's: every field it publishes, in both
   // renderers, by the label it carries -- a field one renderer dropped, or
   // a renderer that never started, is a name missing from one list.
@@ -83,7 +83,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
       expect({ renderer, names }).toEqual({ renderer, names: labels })
     }
     // What the definition allows, said from the server's answer, as tags.
-    expect(within(screen.getByRole('list', { name: 'Operations' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Read', 'Create', 'Update'])
+    expect(within(screen.getByRole('list', { name: 'Operations' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Read', 'Create', 'Update', 'Delete'])
     // New record took the keyboard to the record's heading.
     expect(focusedName()).toBe('New record')
   })
@@ -169,6 +169,104 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId }) => {
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Search' }))
     await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe('The database cannot be reached. Nothing was saved.'), { timeout: 15_000 })
     expect(await floor('a refused list')).toEqual(CLEAN('a refused list'))
+  })
+
+  // A delete's states, each held to the floor (0053): the record's
+  // confirmation, and with a save of it out, Delete it waiting and described
+  // by why; a row's, and on SQL Server a child row's and its row's,
+  // "Not deleted", "Cannot find" and the grid saying the record was closed,
+  // "It may have been deleted" before and after its check, and the grid
+  // saying what was deleted. Their headings' levels are delete.test.tsx's
+  // and delete-rows.test.tsx's to hold: axe's heading-order flags a level
+  // skipped downwards, never one too high (seen: every confirmation an h4
+  // passed here).
+  test("passes the floor in a delete's states", async () => {
+    let lose = false
+    let hold = false
+    const losing = losingWrites(plane.fetch, { when: 'before', writes: /\/records\/delete$/ })
+    const holding = holdingWrites(plane.fetch)
+    const fetch: typeof globalThis.fetch = (input, init) => (lose ? losing.fetch(input, init) : hold ? holding.fetch(input, init) : plane.fetch(input, init))
+    const notes = `floor of a delete ${connection} ${String(Date.now())}`
+    const kept = await freshOrder(formId, notes)
+    const other = await freshOrder(formId, notes)
+    if (connection === 'ms') await plane.clerk.create(lines, { order: kept, line_no: '1', quantity: '1', unit_price: '1.00' })
+    const user = mount(fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, formId)
+    await chooseRenderer(user)
+    await user.type(screen.getByRole('textbox', { name: 'Search' }), notes)
+    await user.click(within(gridSection('Records')).getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe('Rows 1–2.'), { timeout: 15_000 })
+    const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
+    await user.click(within(grid).getAllByRole('gridcell')[0] as HTMLElement)
+    await screen.findByRole('heading', { level: 3, name: `Order ${kept}` }, { timeout: 15_000 })
+    await shows('Angular', 'Customer', 'Muster AG')
+    const keep = async (question: string): Promise<void> => user.click(within(screen.getByRole('region', { name: question })).getByRole('button', { name: 'Keep it' }))
+
+    await user.click(screen.getByRole('button', { name: 'Delete record' }))
+    expect(await floor('the record, confirming')).toEqual(CLEAN('the record, confirming'))
+    hold = true
+    await answer(user, 'React', 'Notes', `${notes} saving`)
+    await save(user, 'React')
+    await waitFor(() => expect(holding.held).toHaveLength(1), { timeout: 15_000 })
+    await waitFor(() => expect(within(screen.getByRole('region', { name: `Delete Order ${kept}?` })).getByRole('button', { name: 'Delete it' }).getAttribute('aria-disabled')).toBe('true'))
+    expect(await floor('the record, confirming while a save is out')).toEqual(CLEAN('the record, confirming while a save is out'))
+    holding.answer()
+    hold = false
+    await said('React', /^Saved\./)
+    await keep(`Delete Order ${kept}?`)
+    // The save's answer lists the page again: its rows are drawn anew.
+    await user.click(await within(grid).findByRole('button', { name: `Delete Order ${other}` }, { timeout: 15_000 }))
+    expect(await floor('a row, confirming')).toEqual(CLEAN('a row, confirming'))
+    await keep(`Delete Order ${other}?`)
+
+    if (connection === 'ms') {
+      const line = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
+      await waitFor(() => expect(within(line).queryAllByRole('gridcell').length).toBeGreaterThan(0), { timeout: 15_000 })
+      await user.click(within(line).getAllByRole('gridcell')[0] as HTMLElement)
+      await screen.findByRole('heading', { level: 5, name: `Order line ${kept},1` }, { timeout: 15_000 })
+      await user.click(screen.getByRole('button', { name: 'Delete Order line' }))
+      expect(await floor('a line, confirming')).toEqual(CLEAN('a line, confirming'))
+      await keep(`Delete Order line ${kept},1?`)
+      await user.click(within(line).getByRole('button', { name: `Delete Order line ${kept},1` }))
+      expect(await floor("a line's row, confirming")).toEqual(CLEAN("a line's row, confirming"))
+      await keep(`Delete Order line ${kept},1?`)
+    }
+
+    const theirs = await plane.clerk.read(formId, other)
+    if (!theirs.ok || theirs.value.version === null) throw new Error('the other order did not read')
+    await plane.clerk.delete(formId, { record: other, version: theirs.value.version })
+    await user.click(within(grid).getByRole('button', { name: `Delete Order ${other}` }))
+    await user.click(within(screen.getByRole('region', { name: `Delete Order ${other}?` })).getByRole('button', { name: 'Delete it' }))
+    await screen.findByRole('region', { name: `Cannot find Order ${other}` }, { timeout: 15_000 })
+    expect(await floor('cannot find it')).toEqual(CLEAN('cannot find it'))
+    await user.click(screen.getByRole('button', { name: 'Close the record' }))
+    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toMatch(/^Closed Order /), { timeout: 15_000 })
+    expect(await floor('closed')).toEqual(CLEAN('closed'))
+
+    const read = await plane.clerk.read(formId, kept)
+    if (!read.ok || read.value.version === null) throw new Error('the order did not read')
+    await plane.clerk.update(formId, { record: kept, version: read.value.version, answers: { notes: `${notes} moved` } })
+    await user.click(screen.getByRole('button', { name: 'Delete record' }))
+    await user.click(within(screen.getByRole('region', { name: `Delete Order ${kept}?` })).getByRole('button', { name: 'Delete it' }))
+    await screen.findByRole('region', { name: 'Not deleted' }, { timeout: 15_000 })
+    expect(await floor('not deleted')).toEqual(CLEAN('not deleted'))
+    await user.click(within(screen.getByRole('region', { name: 'Not deleted' })).getByRole('button', { name: 'Load the saved record' }))
+    await shows('Angular', 'Notes', `${notes} moved`)
+
+    lose = true
+    await user.click(screen.getByRole('button', { name: 'Delete record' }))
+    await user.click(within(screen.getByRole('region', { name: `Delete Order ${kept}?` })).getByRole('button', { name: 'Delete it' }))
+    await screen.findByRole('region', { name: 'It may have been deleted' }, { timeout: 15_000 })
+    expect(await floor('may have been deleted')).toEqual(CLEAN('may have been deleted'))
+    lose = false
+    await user.click(screen.getByRole('button', { name: 'Check whether it was deleted' }))
+    await screen.findByRole('button', { name: 'Delete it again' }, { timeout: 15_000 })
+    expect(await floor('may have been deleted, checked')).toEqual(CLEAN('may have been deleted, checked'))
+    await user.click(screen.getByRole('button', { name: 'Delete it again' }))
+    await user.click(within(screen.getByRole('region', { name: `Delete Order ${kept}?` })).getByRole('button', { name: 'Delete it' }))
+    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toMatch(/^Deleted Order /), { timeout: 15_000 })
+    expect(await floor('deleted')).toEqual(CLEAN('deleted'))
   })
 
   // The server's refusal, in its words, where the person asked: a page that

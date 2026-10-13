@@ -2,18 +2,23 @@ import { useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DataClient, FormMenuChild, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { columnsOf } from './grid-datasource.js'
-import { useGuardContext, useRegistered } from './guard.js'
+import { paneEntry, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
 import type { Said } from './leave.js'
 import { useOpening } from './opening.js'
 import { Pane } from './pane.js'
 import { renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
-import { RecordGrid } from './record-grid.js'
+import { DELETE_COLUMN, RecordGrid } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
 import { createSession } from './session.js'
 import type { SaveResult } from './session.js'
 import { useAfterRender } from './after-render.js'
+import { DeleteRegion } from './delete-confirm.js'
+import { useDeleteFlow } from './delete-flow.js'
+import { detailTarget, gone, rowTarget, SAVE_OUT } from './deletion.js'
+import type { DeleteTarget } from './deletion.js'
+import type { GridRow } from './grid-datasource.js'
 import { Words } from './words.js'
 
 /** What the record above a child section is: a saved record, or a new one not saved yet. */
@@ -44,6 +49,10 @@ type ChildOpen = null | { kind: 'new' } | { kind: 'record'; token: string }
  * The section is mounted again for every parent, so its rows, its open row
  * and its forms are that parent's; the workspace asks before a request drops
  * a child row's work.
+ *
+ * Where the child form offers delete, a child row is deleted from its own
+ * detail's header or from its row, after a confirmation in place, as the
+ * record is (0053); then the keyboard goes to this section's heading.
  */
 export function ChildSection({
   client,
@@ -54,6 +63,7 @@ export function ChildSection({
   parent,
   renderer,
   refit,
+  onShow,
 }: {
   client: DataClient
   form: ChildForm
@@ -65,6 +75,8 @@ export function ChildSection({
   renderer: RendererChoice
   /** How many times the separator has been let go: the grid's columns fit again each time. */
   refit: number
+  /** The record view shown, in Separate views: a deletion's answer may come once the person has gone to the records. True when it was hidden. */
+  onShow: () => boolean
 }): ReactElement {
   const { child, menu, definition } = form
   const owner = `${child.form}~${child.field}`
@@ -73,6 +85,8 @@ export function ChildSection({
   const grid = useRef<RecordGridHandle>(null)
   const newButton = useRef<HTMLButtonElement>(null)
   const detailHeading = useRef<HTMLHeadingElement>(null)
+  const sectionHeading = useRef<HTMLHeadingElement>(null)
+  const deleteButton = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState<ChildOpen>(null)
   const [line, setLine] = useState<Said>([])
   const [waitingShown, setWaitingShown] = useState(true)
@@ -92,20 +106,37 @@ export function ChildSection({
   )
   const entries = useMemo<PaneEntry[]>(
     () =>
-      sessions.map((session) => ({
-        owner,
-        renderer: session.renderer,
-        session,
-        name: (): Said => {
+      sessions.map((session) =>
+        paneEntry(owner, session, (): Said => {
           const now = openRef.current
           return now?.kind === 'record' ? [`${title} `, { code: now.token }] : [`New ${title}`]
-        },
-      })),
+        }),
+      ),
     [sessions, owner, title],
   )
   useRegistered(entries)
   const opening = useOpening({ client, formId: child.form, owner, sessions })
   const columns = useMemo(() => columnsOf(definition, child.field), [definition, child.field])
+  const canDelete = menu.operations.includes('delete') && definition.operations.includes('delete') && definition.deleting !== null
+  const removal = useDeleteFlow({
+    client,
+    formId: child.form,
+    owner,
+    sessions,
+    discards: { kind: 'child-new', owner, title },
+    onGone: (target, word, quiet) => rowGone(target, word, quiet),
+    onLoad: (target) => {
+      grid.current?.reload()
+      openRow(target.record, 'enter', () => detailHeading.current?.focus())
+    },
+    onBack: (target) => {
+      if (target.from.kind === 'detail') deleteButton.current?.focus()
+      // The row by its record, which the grid may have moved or taken away: then this section's heading.
+      else if (grid.current?.focusRecord(target.record, DELETE_COLUMN) !== true) sectionHeading.current?.focus()
+    },
+    onShow,
+  })
+  const { saving } = removal
 
   const prefix = (discarded: boolean): Said => (discarded ? ['Discarded the unsaved changes. '] : [])
 
@@ -114,8 +145,12 @@ export function ChildSection({
       if (how === 'enter') detailHeading.current?.focus()
       return
     }
+    openRow(token, how, () => grid.current?.focusAt(at))
+  }
+
+  /** Read the row and open it in this section's forms, through the guard; `toRow` gives the keyboard back. */
+  function openRow(token: string, how: OpenHow, toRow: () => void): void {
     const request = { kind: 'child-row', owner, record: token } as const
-    const toRow = (): void => grid.current?.focusAt(at)
     ask(
       request,
       (discarded) =>
@@ -133,6 +168,37 @@ export function ChildSection({
         }),
       toRow,
     )
+  }
+
+  /** The open row's Delete, in its detail's header (0053); while a save of it is out, it waits, and says so. */
+  function deleteOpen(): void {
+    const now = openRef.current
+    if (now?.kind !== 'record') return
+    if (saving) setLine([SAVE_OUT])
+    else removal.ask(detailTarget(title, now.token, removal.heard(now.token)))
+  }
+
+  /** A row's Delete (0053); the open row's waits for a save of it, as its header's Delete does. */
+  function deleteRow(row: GridRow): void {
+    const now = openRef.current
+    const target = rowTarget(title, row, now?.kind === 'record' ? { record: now.token, heard: removal.heard(now.token) } : null)
+    if (target === null) return
+    if (target.open && saving) grid.current?.say([SAVE_OUT])
+    else removal.ask(target)
+  }
+
+  /** The row has gone from the page: its detail emptied when open, the grid asked again and saying so first, the keyboard on this section's heading. */
+  function rowGone(target: DeleteTarget, word: 'Deleted' | 'Closed', quiet: boolean): void {
+    const now = openRef.current
+    if (now?.kind === 'record' && now.token === target.record) {
+      opening.replaced()
+      for (const session of sessions) session.open()
+      openRef.current = null
+      setOpen(null)
+      setLine([])
+    }
+    grid.current?.removed(gone(target, word))
+    if (!quiet) after(() => sectionHeading.current?.focus())
   }
 
   function startNew(): void {
@@ -169,7 +235,7 @@ export function ChildSection({
   return (
     <section className="child" aria-labelledby={headingId}>
       <div className="section-head">
-        <h4 id={headingId} className="child-heading">
+        <h4 id={headingId} className="child-heading" tabIndex={-1} ref={sectionHeading}>
           {twice ? `${title}, ${fieldLabel}` : title}
         </h4>
         {canCreate ? (
@@ -209,15 +275,30 @@ export function ChildSection({
             quiet
             refit={refit}
             bench="child-bench"
+            {...(canDelete ? { remove: { noun: title, press: deleteRow } } : {})}
+            after={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={5} idBase={`${headingId}-row-delete`} /> : null}
             onOpen={askRow}
           />
         </>
       )}
       {open === null ? null : (
         <div className="child-detail">
-          <h5 id={`${headingId}-detail`} className="child-detail-heading" tabIndex={-1} ref={detailHeading}>
-            <Words said={open.kind === 'record' ? [`${title} `, { code: open.token }] : [`New ${title}`]} />
-          </h5>
+          <div className="title-row">
+            <h5 id={`${headingId}-detail`} className="child-detail-heading" tabIndex={-1} ref={detailHeading}>
+              <Words said={open.kind === 'record' ? [`${title} `, { code: open.token }] : [`New ${title}`]} />
+            </h5>
+            {canDelete && open.kind === 'record' ? (
+              <button type="button" className="button danger" ref={deleteButton} aria-disabled={saving ? 'true' : undefined} aria-describedby={saving ? `${headingId}-delete-waits` : undefined} onClick={deleteOpen}>
+                Delete {title}
+              </button>
+            ) : null}
+            {saving ? (
+              <span id={`${headingId}-delete-waits`} hidden>
+                {SAVE_OUT}
+              </span>
+            ) : null}
+          </div>
+          {removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'detail' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={6} idBase={`${headingId}-delete`} /> : null}
           <p role="status" className="status quiet-line">
             <Words said={line} />
           </p>

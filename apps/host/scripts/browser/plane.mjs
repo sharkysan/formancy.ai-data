@@ -1,9 +1,12 @@
 // The host gate's plane: the real server over the shared fixture on a real
 // PostgreSQL 17 through the real driver (0029), with the order form and the
-// order line form published as the suites publish them (src/test-plane.ts):
-// as the generator made them, clerks of tenant 1 allowed everything they
-// offer, an order's lines reached through their order (0043). The identity
-// verifier takes two literal tokens, as the studio's gate does.
+// order line form published as the suites publish them (src/test-plane.ts,
+// with `deletes`): as the generator made them, clerks of tenant 1 allowed
+// everything they offer -- delete of an order included, its policy naming
+// every key a delete of an order acts through (0051, 0053) -- and an order's
+// lines reached through their order (0043), whose typed key offers no
+// delete on PostgreSQL (0050). The identity verifier takes two literal
+// tokens, as the studio's gate does.
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -16,6 +19,13 @@ import postgres from 'postgres'
 export const FORM = 'pg-order'
 export const LINES = 'pg-order-line'
 export const TOKENS = { admin: 'browser-gate-administrator', clerk: 'browser-gate-clerk' }
+
+/** The keys a delete of an order acts through on the fixture, with their actions: its lines and deliveries, and the deliveries' parcels. */
+const ORDER_CASCADES = [
+  { table: { schema: 'sales', name: 'order_line' }, foreignKey: 'fk_order_line_order', onDelete: 'cascade' },
+  { table: { schema: 'sales', name: 'delivery' }, foreignKey: 'fk_delivery_order', onDelete: 'cascade' },
+  { table: { schema: 'sales', name: 'parcel' }, foreignKey: 'fk_parcel_delivery', onDelete: 'cascade' },
+]
 
 /** A clerk of tenant 1 may do everything the form offers, on the fields it writes. */
 function clerkPolicy(bindings, extra = {}) {
@@ -73,7 +83,13 @@ export async function startPlane() {
     await call(TOKENS.admin, `/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection: 'pg', generation: proposal.generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings: proposal.bindings, policy: policy(proposal.bindings), snapshot: proposal.snapshot } })
     return form
   }
-  const form = await publish({ formId: FORM, title: 'Order', table: 'order', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }], policy: (bindings) => clerkPolicy(bindings) })
+  const form = await publish({
+    formId: FORM,
+    title: 'Order',
+    table: 'order',
+    lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+    policy: (bindings) => clerkPolicy(bindings, { operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'], delete: ['clerk'] }, cascades: ORDER_CASCADES }),
+  })
   // No tenant column of its own: its rows are its tenant's orders' lines, through the order lookup's filter (0043).
   await publish({
     formId: LINES,
@@ -86,10 +102,10 @@ export async function startPlane() {
   const sql = postgres(fixture.admin, { onnotice: () => {} })
   return {
     server,
-    /** A fresh order of tenant 1's with `lines` lines, for one width's run, made the way the page would make it. */
-    order: async (lines = 0) => {
+    /** A fresh order of tenant 1's with `lines` lines, for one width's run, made the way the page would make it; `notes` finds it. */
+    order: async (lines = 0, notes = null) => {
       const customer = (await call(TOKENS.clerk, `/v1/forms/${FORM}/lookups/${source}/query`, { operation: 'create', search: 'Muster' })).rows[0].token
-      const record = (await call(TOKENS.clerk, `/v1/forms/${FORM}/records/create`, { answers: { customer, order_date: '2026-10-08', status: 'placed', amount: '1' } })).record
+      const record = (await call(TOKENS.clerk, `/v1/forms/${FORM}/records/create`, { answers: { customer, order_date: '2026-10-08', status: 'placed', amount: '1', notes } })).record
       for (let no = 1; no <= lines; no += 1) await call(TOKENS.clerk, `/v1/forms/${LINES}/records/create`, { answers: { order: record, line_no: String(no), quantity: String(no), unit_price: '2.50' } })
       return record
     },
@@ -99,6 +115,18 @@ export async function startPlane() {
     deleteCustomer: (no) => sql`delete from sales.customer where tenant_id = 1 and customer_no = ${no}`,
     /** An order's group written beside the page, as the database's owner; `null` puts it back. */
     setGroup: (record, group) => sql`update sales."order" set "group" = ${group} where id = ${record.slice('k1:'.length)}`,
+    /** An order changed beside the page, through the server as tenant 1's clerk: its version moves on. */
+    change: async (record, notes) => {
+      const { version } = await call(TOKENS.clerk, `/v1/forms/${FORM}/records/read`, { record })
+      await call(TOKENS.clerk, `/v1/forms/${FORM}/records/update`, { record, version, answers: { notes } })
+    },
+    /** An order deleted beside the page, through the server as tenant 1's clerk. */
+    remove: async (record) => {
+      const { version } = await call(TOKENS.clerk, `/v1/forms/${FORM}/records/read`, { record })
+      await call(TOKENS.clerk, `/v1/forms/${FORM}/records/delete`, { record, version })
+    },
+    /** Whether an order is there, asked of the database's owner. */
+    stored: async (record) => (await sql`select count(*)::int as n from sales."order" where id = ${record.slice('k1:'.length)}`)[0].n === 1,
     /** The next request's database out of reach. */
     refuseNext: () => {
       refusing = 1

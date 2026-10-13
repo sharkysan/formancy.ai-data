@@ -135,10 +135,11 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     write(next, false)
   }
 
-  const changeView = (view: View): void => {
+  /** A view chosen pushes an entry; one the page moves to by itself -- the records after a delete -- replaces it. */
+  const changeView = (view: View, replace = false): void => {
     const next: Place = { ...placeRef.current, view }
     setPlace(next)
-    write(next, true)
+    write(next, !replace)
   }
 
   const chooseRenderer = (choice: RendererChoice): void => {

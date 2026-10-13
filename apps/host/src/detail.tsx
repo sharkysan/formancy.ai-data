@@ -5,6 +5,7 @@ import { Pane } from './pane.js'
 import { CHOICES, renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
 import { RecordBar } from './record-bar.js'
+import { SAVE_OUT } from './deletion.js'
 import { Segmented } from './segmented.js'
 import type { SaveResult, Session } from './session.js'
 import { Words } from './words.js'
@@ -14,7 +15,8 @@ export type MasterOpen = null | { kind: 'new' } | { kind: 'record'; token: strin
 
 /**
  * The detail (UX-SPEC §5.10, §5.11): the open record's heading, the way back
- * to its row, a status line, the renderer switch, opening by token, the
+ * to its row, Delete record where the form offers it and its confirmation
+ * in place (0053), a status line, the renderer switch, opening by token, the
  * record's form in the renderers chosen, and the child sections below.
  *
  * Only the chosen renderer's form is mounted (the person's decision of
@@ -42,6 +44,11 @@ export function Detail({
   onLoad,
   sessions,
   onAnswer,
+  canDelete,
+  saving,
+  deleteRef,
+  onDelete,
+  deleteRegion,
   children,
 }: {
   formTitle: string
@@ -62,6 +69,14 @@ export function Detail({
   onLoad: (token: string) => void
   sessions: readonly Session[]
   onAnswer: (result: SaveResult, session: Session) => void
+  /** The form offers this person delete (0053): Delete record in the header of an open record. */
+  canDelete: boolean
+  /** A save of the record is out: Delete record waits for its answer. */
+  saving: boolean
+  deleteRef: RefObject<HTMLButtonElement | null>
+  onDelete: () => void
+  /** The delete's confirmation, right after the header row that holds Delete record. */
+  deleteRegion: ReactNode
   children: ReactNode
 }): ReactElement {
   const separate = layout === 'separate'
@@ -85,7 +100,19 @@ export function Detail({
               {separate ? 'Back to the records' : 'Go to its row'}
             </button>
           ) : null}
+          {canDelete && open?.kind === 'record' ? (
+            // An outline in --invalid, never a fill: the one control here that cannot be taken back.
+            <button type="button" className="button danger" ref={deleteRef} aria-disabled={saving ? 'true' : undefined} aria-describedby={saving ? 'detail-delete-waits' : undefined} onClick={onDelete}>
+              Delete record
+            </button>
+          ) : null}
+          {saving ? (
+            <span id="detail-delete-waits" hidden>
+              {SAVE_OUT}
+            </span>
+          ) : null}
         </div>
+        {deleteRegion}
         <p role="status" className="status quiet-line" data-kind={line.kind}>
           <Words said={line.said} />
         </p>

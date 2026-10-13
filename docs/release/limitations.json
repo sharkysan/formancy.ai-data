@@ -689,7 +689,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:a12afcff0169b2dd173871b631fea2a8224f718882aaeaf7f5392590e7f9373b",
+      "reviewed": "sha256:a8b192cf6f11616e94a7e155dde24141b944feff310afa7a77079691d06d40e4",
       "limitations": [
         {
           "area": "writes",
@@ -1332,7 +1332,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:59d9eb56f72a5a47d5232106bf616cb3072389a525fbf95dd9a81fd8a1afb9fe",
+      "reviewed": "sha256:28e3bf6a1c1c40f5d9c0fa07023d527fbddd3f2bafb16bdb0dcc45d18f55716d",
       "limitations": [
         {
           "area": "host",
@@ -1434,7 +1434,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:52eff68a5b8ffc4f8f5583181a2e1e9aabf99af53e2845772457a386ff3c1a44",
+      "reviewed": "sha256:369088fbc185aef02d34f8e4c811a0e5abe6e99199a49c1529a78c8842a33e3e",
       "limitations": [
         {
           "area": "writes",
@@ -1500,11 +1500,6 @@
           "says": "On PostgreSQL every delete reads pg_constraint, which has no index for the lookup, so its cost grows with the constraints of the whole database; not measured past the fixture's."
         },
         {
-          "area": "host",
-          "says": "The host page deletes nothing: the runtime plane serves a delete, and the workspace leaves it out of the open form's tags until it has a control for it (0053).",
-          "heldBy": "apps/host/src/operations.test.ts"
-        },
-        {
           "area": "operations",
           "says": "A server older than 0050 refuses a policy that grants delete, and this release's client answers `unexpected` to a form reply from a server older than 0050, which carries no `deleting`, so a host upgrades its server first.",
           "heldBy": "packages/data-client/src/transport.test.ts"
@@ -1512,7 +1507,7 @@
       ]
     },
     "0051": {
-      "reviewed": "sha256:f88685d04171a23fbf4d9e20acf545a663e7038f554a1e91333eaaf19c19e142",
+      "reviewed": "sha256:226be55f50c769f6167443bff69ab8395110356404083b635b00422013958ba2",
       "limitations": [
         {
           "area": "forms",
@@ -1594,6 +1589,57 @@
           "area": "studio",
           "says": "Clearing the roles that may delete leaves the keys accepted, and the policy is refused until each is unticked.",
           "heldBy": "apps/studio/src/delete-reach.test.tsx"
+        }
+      ]
+    },
+    "0053": {
+      "reviewed": "sha256:de48eb0c70a2eb612b9faa013fbb3115efbf2f1d937720ab6390c6f3641fa8af",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "The host page deletes one record at a time, from its open detail or its grid row, after a confirmation in place; no key deletes, and there is no bulk delete and no undo.",
+          "heldBy": "apps/host/src/delete.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "The host page's confirmation says whether a delete also deletes or clears other records, and that the database may keep a record others refer to, from what the server says, never which records or how many.",
+          "heldBy": "apps/host/src/delete.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A record a delete cannot find is closed on the host page, never called deleted: it cannot be told from one the person may no longer see.",
+          "heldBy": "apps/host/src/delete.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A grid row's delete names the version the row was listed with, so a record changed since its page was listed is refused as stale until the page is listed again or the record is opened.",
+          "heldBy": "apps/host/src/delete-rows.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "While a deletion is out, the record's forms on the host page send nothing on Save; a deletion discarded while out is heard of again in its grid only if it was done, and one discarded while unknown is not heard of again.",
+          "heldBy": "apps/host/src/delete.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "In Separate views, a deletion's answer that asks something of the person shows the view it is drawn in, though they had gone to the other.",
+          "heldBy": "apps/host/src/delete.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Every grid of a form that offers delete has one more column, its rows' Delete, which a narrow window reaches only by scrolling the grid."
+        },
+        {
+          "area": "host",
+          "says": "A row's Delete is dressed by its own style attribute in the room's variables, which the palette guard does not read."
+        },
+        {
+          "area": "testing",
+          "says": "The host's browser gate draws no child row's delete confirmation: on PostgreSQL no child of the fixture's order offers delete, and jsdom holds it on SQL Server alone."
+        },
+        {
+          "area": "operations",
+          "says": "The getting-started guide's form grants no delete, since the studio writes no delete roles yet, so the guide does not delete on the host page."
         }
       ]
     },

@@ -1,4 +1,5 @@
-import type { ReactElement } from 'react'
+import { useEffect, useRef } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
 import { ColumnAutoSizeModule, InfiniteRowModelModule, LocaleModule, ModuleRegistry, PaginationModule, RenderApiModule, RowApiModule, RowSelectionModule, ScrollApiModule } from 'ag-grid-community'
 import type { CellKeyDownEvent, ColDef, GridApi, GridOptions, ICellRendererParams, Module, RowClickedEvent } from 'ag-grid-community'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
@@ -23,6 +24,11 @@ import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
  *   in the cache (0022, 0029). No count is asked for, so no paging panel.
  * - **Nothing edits, moves or resizes**, so Delete and Backspace clear
  *   nothing and nothing is sent from here but the page's list.
+ * - **A row's Delete is a real button** (0053), in a last column where the
+ *   form offers delete: a cell the arrow keys reach, whose button takes the
+ *   keyboard when the cell does. It is out of the Tab order, so the grid
+ *   stays one stop, and its Enter and Space are its own, never the row's.
+ *   It asks the page, which confirms in place; no key deletes.
  */
 
 /**
@@ -63,6 +69,64 @@ function OpenCell(params: ICellRendererParams<GridRow>): ReactElement {
   )
 }
 
+/** The column of a row's Delete: `~` is in no field key (session.ts), so it never names a field's column. */
+export const DELETE_COLUMN = '~delete'
+
+/** What a row's Delete asks: the form's title, which its name gives, and what a press does. */
+export interface RowDelete {
+  noun: string
+  press(row: GridRow): void
+}
+
+/**
+ * A row's Delete: an outline in the room's `--invalid`, text and border and
+ * never a fill. Its own style attribute, in room variables, because no rule
+ * of host.css reaches into a grid (0047); 28 pixels tall, past the 24 of
+ * WCAG 2.5.8, inside the 36 of a row.
+ */
+const DELETE_LOOK: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  minHeight: '28px',
+  padding: '0 10px',
+  border: '1px solid var(--invalid)',
+  borderRadius: '999px',
+  background: 'transparent',
+  color: 'var(--invalid)',
+  font: 'inherit',
+  fontSize: '13px',
+  lineHeight: 1,
+  cursor: 'pointer',
+}
+
+/**
+ * The cell of a row's Delete. AG Grid moves the keyboard between cells, and
+ * this cell hands it to its button whenever the cell itself is focused, so
+ * the arrow keys reach a real button named for the record; the button is
+ * `tabIndex` -1, so Tab still leaves the grid in one stop. A row with no
+ * token has none: it cannot be addressed.
+ */
+function DeleteCell(params: ICellRendererParams<GridRow> & { remove: RowDelete }): ReactElement | null {
+  const button = useRef<HTMLButtonElement>(null)
+  const cell = params.eGridCell
+  useEffect(() => {
+    const forward = (event: FocusEvent): void => {
+      if (event.target === cell) button.current?.focus({ preventScroll: true })
+    }
+    cell.addEventListener('focus', forward)
+    if (document.activeElement === cell) button.current?.focus({ preventScroll: true })
+    return () => cell.removeEventListener('focus', forward)
+  }, [cell])
+  const row = params.data
+  if (row === undefined || row.record === null) return null
+  const { remove } = params
+  return (
+    <button type="button" tabIndex={-1} ref={button} style={DELETE_LOOK} aria-label={`Delete ${remove.noun} ${row.record}`} onClick={() => remove.press(row)}>
+      Delete
+    </button>
+  )
+}
+
 /**
  * The narrowest a column may be: its header's widest word, so a header wraps
  * between words and never cuts one, with WCAG 1.4.12's letter-spacing
@@ -87,8 +151,8 @@ function headerMinWidth(label: string, sortable: boolean): number {
  * below what its header needs, and capped so one long note does not take
  * the well. The first carries the open row's bar.
  */
-export function columnDefsOf(columns: readonly GridColumn[]): ColDef<GridRow>[] {
-  return columns.map((column, index) => ({
+export function columnDefsOf(columns: readonly GridColumn[], remove?: RowDelete): ColDef<GridRow>[] {
+  const fields: ColDef<GridRow>[] = columns.map((column, index) => ({
     colId: column.key,
     headerName: column.label,
     valueGetter: (params) => cellText(params.data, column),
@@ -98,6 +162,9 @@ export function columnDefsOf(columns: readonly GridColumn[]): ColDef<GridRow>[] 
     maxWidth: 320,
     ...(index === 0 ? { cellRenderer: OpenCell } : {}),
   }))
+  if (remove === undefined) return fields
+  // Last, so Tab into the grid still lands on the open row's first column, and the bar stays first.
+  return [...fields, { colId: DELETE_COLUMN, headerName: 'Delete', valueGetter: () => '', sortable: false, minWidth: headerMinWidth('Delete', false), maxWidth: 160, cellRenderer: DeleteCell, cellRendererParams: { remove } }]
 }
 
 /** What a grid tells the page, and asks of it. */
@@ -166,10 +233,15 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
       on.ready(event.api)
     },
     onGridSizeChanged: () => on.resized(),
-    onRowClicked: (event: RowClickedEvent<GridRow>) => on.asked(event.data, 'click', event.rowIndex, firstColumn),
+    onRowClicked: (event: RowClickedEvent<GridRow>) => {
+      // A press of the row's Delete is the button's, never the row's: it does not open the record it asks about.
+      if (event.event?.target instanceof Element && event.event.target.closest('button') !== null) return
+      on.asked(event.data, 'click', event.rowIndex, firstColumn)
+    },
     onCellKeyDown: (event: CellKeyDownEvent<GridRow>) => {
       const key = (event.event as KeyboardEvent | null | undefined)?.key ?? ''
-      if (!SPACE_OR_ENTER(key)) return
+      // Space and Enter on a row's Delete are its button's: the browser presses it.
+      if (!SPACE_OR_ENTER(key) || event.column.getColId() === DELETE_COLUMN) return
       event.event?.preventDefault()
       on.asked(event.data, key === 'Enter' ? 'enter' : 'space', event.rowIndex, event.column.getColId())
     },

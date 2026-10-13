@@ -109,6 +109,32 @@
   color: var(--server);
 }
 
+/* A delete's confirmation (0053): framed in the colour of what cannot be
+   taken back, as text and border and never a fill; its question in the
+   page's own text colour, and the words say what is at stake. */
+.notice[data-kind='confirm'] {
+  border-color: var(--invalid);
+  background: transparent;
+}
+
+.notice[data-kind='confirm'] .notice-heading,
+.notice[data-kind='gone'] .notice-heading {
+  color: var(--text);
+}
+
+/* A record a delete could not find: neither a refusal nor done, so neither
+   the warm colour nor teal -- the room's own edge. */
+.notice[data-kind='gone'] {
+  border-color: var(--edge-strong);
+  background: transparent;
+}
+
+/* The forms a delete drops with its record, as the unsaved notice lists them. */
+.notice-list {
+  margin: 0.25rem 0;
+  padding-inline-start: 1.25rem;
+}
+
 /* Its buttons, and the confirmation's, in a row that wraps on a phone. */
 .notice-actions {
   display: flex;

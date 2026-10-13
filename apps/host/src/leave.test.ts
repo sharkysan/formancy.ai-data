@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { atRisk, discards, lead, WORK } from './leave.js'
+import { atRisk, discards, gridOwner, lead, WORK } from './leave.js'
 import type { LeaveRequest, PaneWork } from './leave.js'
 
 /*
@@ -35,7 +35,7 @@ describe('what each way of leaving a form discards', () => {
     { kind: 'history', direction: 'forward' },
     { kind: 'sign-out' },
   ])('$kind drops the record and every child section', (request) => {
-    expect(discards(request)).toEqual({ owners: 'all', renderers: 'all' })
+    expect(discards(request)).toMatchObject({ owners: 'all', renderers: 'all' })
     expect(owners(request)).toEqual(['master react', 'lines react', 'lines angular', 'staff react'])
   })
 
@@ -65,6 +65,43 @@ describe('what each way of leaving a form discards', () => {
     expect(owners({ kind: 'renderer', hides: ['react'], shows: 'Angular' })).toEqual(['master react', 'lines react', 'staff react'])
     expect(owners({ kind: 'renderer', hides: ['angular'], shows: 'React' })).toEqual(['lines angular'])
     expect(owners({ kind: 'renderer', hides: [], shows: 'Both' })).toEqual([])
+  })
+
+  // A deletion out, or one that may have been done, is the record's or the
+  // child row's work too (0053), drawn by no renderer: what drops its owner
+  // asks about it, and hiding a renderer, which drops no record, does not
+  // (watched failing with a deletion dropped by every renderer request:
+  // hiding React asked about an order's unanswered delete).
+  test("a deletion is its owner's work, and no renderer's", () => {
+    const deletions: PaneWork[] = [...PANES, { owner: 'master', renderer: null, name: ['Order ', { code: 'k1:1' }], work: 'deleting' }, { owner: 'lines', renderer: null, name: ['Order line ', { code: 'k1:1,1' }], work: 'delete-unknown' }]
+    const of = (request: LeaveRequest): string[] => atRisk(request, deletions).map((pane) => `${pane.owner} ${String(pane.renderer)}`)
+    expect(of({ kind: 'row', record: 'k1:2' })).toEqual(['master react', 'lines react', 'lines angular', 'staff react', 'master null', 'lines null'])
+    expect(of({ kind: 'child-row', owner: 'lines', record: 'k1:1,2' })).toEqual(['lines react', 'lines angular', 'lines null'])
+    expect(of({ kind: 'renderer', hides: ['react'], shows: 'Angular' })).toEqual(['master react', 'lines react', 'staff react'])
+    expect(of({ kind: 'created', owner: 'lines', record: 'k1:1,3', by: 'react' })).toEqual(['lines angular', 'lines null'])
+  })
+
+  // A deletion asked from a grid's row that is not open in the detail is
+  // that grid's (0053): what replaces the detail -- another row, New, Load,
+  // a record created in a pane -- leaves the records grid where it is, so it
+  // asks nothing about its deletion, and only what takes the grid away does:
+  // another form, Back or Forward, Sign out. A child's grid goes with its
+  // section, so the record's requests ask about it, and its own section's
+  // rows do not (watched failing with the row's deletion its detail's work:
+  // a record created in New asked about it, and Discard dropped what its
+  // answer would have said).
+  test("a deletion from a row not open is its grid's, asked about only by what takes the grid away", () => {
+    const grids: PaneWork[] = [
+      { owner: gridOwner('master'), renderer: null, name: ['Order ', { code: 'k1:8' }], work: 'deleting' },
+      { owner: gridOwner('lines'), renderer: null, name: ['Order line ', { code: 'k1:1,3' }], work: 'delete-unknown' },
+    ]
+    const of = (request: LeaveRequest): string[] => atRisk(request, grids).map((pane) => pane.owner)
+    const keeps: LeaveRequest[] = [{ kind: 'row', record: 'k1:2' }, { kind: 'new' }, { kind: 'load', record: 'k1:3' }, { kind: 'created', owner: 'master', record: 'k1:5', by: 'react' }]
+    for (const request of keeps) expect({ request: request.kind, asks: of(request) }).toEqual({ request: request.kind, asks: [gridOwner('lines')] })
+    const takes: LeaveRequest[] = [{ kind: 'form', title: 'Customer' }, { kind: 'history', direction: 'back' }, { kind: 'sign-out' }]
+    for (const request of takes) expect({ request: request.kind, asks: of(request) }).toEqual({ request: request.kind, asks: [gridOwner('master'), gridOwner('lines')] })
+    const leaves: LeaveRequest[] = [{ kind: 'child-row', owner: 'lines', record: 'k1:1,2' }, { kind: 'child-new', owner: 'lines', title: 'Order line' }, { kind: 'created', owner: 'lines', record: 'k1:1,4', by: 'angular' }, { kind: 'renderer', hides: ['react', 'angular'], shows: 'Both' }]
+    for (const request of leaves) expect({ request: request.kind, asks: of(request) }).toEqual({ request: request.kind, asks: [] })
   })
 
   // Everything stays mounted across a layout or view change, a page, a
@@ -101,6 +138,8 @@ describe('what the notice says', () => {
       changed: 'changes that are not saved.',
       saving: 'a save the server has not answered yet.',
       unknown: 'a save that may have been stored, not yet checked.',
+      deleting: 'a deletion the server has not answered yet.',
+      'delete-unknown': 'a deletion that may have been done, not yet checked.',
     })
   })
 })

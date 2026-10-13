@@ -258,6 +258,19 @@
     }
   },
   {
+    "id": "host-delete",
+    "app": "host",
+    "placement": "more",
+    "title": "Deleting a record",
+    "caption": "`pg-order-delete`, the getting-started job's second order form, which the capture script publishes as the job does: it grants clerks delete and names each foreign key a delete of an order acts through ([0051](./docs/decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)). Each row of its grid has a Delete, a real button named for its record and reached by the arrow keys. Pressed, it asks in place, under the grid, with no overlay: the question names the record, and what the delete also does is said in the server's terms -- “Other records that refer to it are deleted with it.” -- never which tables or how many. “Keep it” comes first, so the keyboard is never put on the button that deletes ([0053](./docs/decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).",
+    "alt": "A Records grid scrolled to its last column, Delete, with one order of Muster AG and its Delete button, and under the grid a confirmation “Delete Order k1:9007199254740993?” saying that it is removed from the database for everyone who can see it, that other records that refer to it are deleted with it, and the buttons Keep it and Delete it.",
+    "quotes": {
+      "Other records that refer to it are deleted with it.": ["Records"],
+      "Keep it": ["Records"],
+      "Delete Order k1:9007199254740993?": ["Records"]
+    }
+  },
+  {
     "id": "host-drift",
     "app": "host",
     "placement": "more",

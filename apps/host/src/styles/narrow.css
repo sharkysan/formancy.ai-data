@@ -136,6 +136,17 @@
 }
 
 @media (max-width: 40rem) {
+  /* A delete's two answers, one under the other on a phone: Keep it first,
+     each the width of the region, so neither is pressed for the other. */
+  .delete-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .delete-actions .button {
+    justify-content: center;
+  }
+
   .page {
     gap: 0.5rem;
     padding: 0.5rem;
