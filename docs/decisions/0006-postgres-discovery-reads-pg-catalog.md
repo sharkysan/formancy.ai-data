@@ -1,6 +1,6 @@
 # 0006 — Discover PostgreSQL from pg_catalog, and ask separately what the account may use
 
-- **Status:** accepted; describing only usable objects, and the `columns` gap, narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md); whether the account may delete from each table, every declared key from any schema that refers to it, and a `referenced-by` gap for a key onto a partition or an inheriting table below it, extended by [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md)
+- **Status:** accepted; describing only usable objects, and the `columns` gap, narrowed by [0027](0027-a-snapshot-says-what-its-account-may-do.md); whether the account may delete from each table, every declared key from any schema that refers to it, and a `referenced-by` gap for a key onto a partition or an inheriting table below it, extended by [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md); discovery reads with `pg_catalog` first in its transaction's `search_path`, before the session's own, so a function planted under a name like PostgreSQL's own is spelled with its schema whatever the composition root's path, extended by [0057](0057-a-key-of-one-column-filled-by-a-never-repeating-default-counts-as-numbered.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-postgres/src/discovery.integration.test.ts`

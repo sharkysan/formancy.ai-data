@@ -50,6 +50,7 @@ import { readKeysBelow, readReferencedBy } from './referenced-by.js'
 export async function discoverPostgres(sql: Sql, scope: DiscoveryScope): Promise<MetadataSnapshot> {
   const schemas = [...scope.schemas]
   return sql.begin('isolation level repeatable read read only', async (tx) => {
+    await searchCatalogFirst(tx)
     const { version: serverVersion, encoding } = await readSettings(tx)
     const [account, inScope, columns, access, deletes, keys, foreignKeys, referencedBy, keysBelow, checks, comments] = await Promise.all([
       readAccount(tx),
@@ -99,6 +100,32 @@ export async function discoverPostgres(sql: Sql, scope: DiscoveryScope): Promise
 }
 
 const NOTHING: ColumnAccess = { select: false, insert: false, update: false }
+
+/**
+ * Puts pg_catalog first in this transaction's search_path, before the
+ * session's own path, which is the composition root's (0057).
+ *
+ * `pg_get_expr` and `format_type` leave an object's schema out where the
+ * path finds it by its bare name. PostgreSQL searches pg_catalog first unless
+ * the path names it later, so under a path that does not name it -- the
+ * default, `"$user", public`, among them -- this spells nothing otherwise,
+ * and no snapshot's fingerprint moves. Under one that names it after another
+ * schema, a function of that schema named like PostgreSQL's own was spelled
+ * bare and PostgreSQL's with its schema; and a key's default is told apart
+ * by its spelling, whole (`numbersKey`), so whoever may CREATE in that schema
+ * chose which key counted as numbered. With pg_catalog first, PostgreSQL's
+ * own is the one spelled bare, whatever else the path holds. Local to the
+ * transaction: the session's path is the composition root's again after it.
+ *
+ * A request's description of the root is read in the request's own
+ * statement, under the session's path (`records/definition.ts`): there such a
+ * path still spells PostgreSQL's own with its schema, and the runtime reads
+ * a key's default as changed and refuses a delete -- it withdraws an offer,
+ * and never makes one.
+ */
+async function searchCatalogFirst(sql: TransactionSql): Promise<void> {
+  await sql`select pg_catalog.set_config('search_path', pg_catalog.concat_ws(', ', 'pg_catalog', nullif(pg_catalog.current_setting('search_path'), '')), true)`
+}
 
 /**
  * The server's version — the same setting `createPostgresAdapter().ping()`

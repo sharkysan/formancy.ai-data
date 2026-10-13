@@ -5,6 +5,7 @@ import {
   generateForm,
   lookupRowFilter,
   planCreate,
+  planDelete,
   planList,
   planRead,
   planUpdate,
@@ -14,6 +15,7 @@ import {
   validatePolicy,
 } from '@formancy/data-core'
 import type {
+  DeleteOutcome,
   FormBindings,
   FormPolicy,
   FormRecord,
@@ -233,16 +235,17 @@ describe('generation', covers('postgres', uuidCase('generated')), () => {
   // The catalog calls the key 'none', because the column takes a value; a
   // form that offered it would let a person write the record's address. It
   // is shown in the Record section, never written or required, and create
-  // stays offered because the database fills it (0056). Delete is not: the
-  // version column starts at its default again under a key used again, and
-  // a key a default fills is not one the database numbers (0050).
-  test('makes the key read-only, never required, and still offers create and update, and no delete', () => {
+  // stays offered because the database fills it (0056). So is delete, over
+  // the version column: the key is all of it and gen_random_uuid() fills
+  // it, as this account's snapshot spells the default, and that default
+  // never hands out one value twice (0057).
+  test('makes the key read-only, never required, and offers create, update and delete', () => {
     const { form, bindings } = generateForm(snapshot, DELIVERY)
     const expected = UUID_PARITY.generated
     expect(bindings.fields.find((binding) => binding.field === expected.field)?.writes).toEqual(expected.writes)
     expect(form.model.fields.find((field) => field.key === expected.field)).not.toHaveProperty('required')
     expect(form.layouts?.[0]?.nodes.map((node) => ('label' in node ? node.label : undefined))).toEqual(expected.sections)
-    expect(bindings.operations).toEqual(expected.operations.postgres)
+    expect(bindings.operations).toEqual(expected.operations)
     expect(bindings.identity).toEqual(UUID_PARITY.discovered.key)
   })
 })
@@ -253,19 +256,19 @@ describe('a delete', covers('postgres', uuidCase('delete')), () => {
   // delivery's from its order, beside a line's. Asked over what the order
   // form's own account discovers, as the publish check asks it -- the
   // policy's fit, then what a delete also does -- a grant of delete is
-  // refused on the delivery form, which here offers none at all, its
-  // version column guarding a key a default fills, and for the parcels a
-  // delete would take with it; and on the order form for its deliveries and
-  // its lines, so no order is deleted yet. Without the grant, neither form
-  // is refused anything: the refusals are the delete's. A parcel has no
-  // version column, so it offers no delete at all.
+  // refused on the delivery form, which offers one over its version column
+  // (0057), for the parcels a delete would take with it, and for nothing
+  // else; and on the order form for its deliveries and its lines, so no
+  // order is deleted yet. Without the grant, neither form is refused
+  // anything: the refusals are the delete's. A parcel has no version
+  // column, so it offers no delete at all.
   test('is refused on the delivery form for its parcels, and on the order form for its deliveries and its lines', () => {
     const refused = (bindings: FormBindings, policy: FormPolicy): string[] => {
       const fit = validatePolicy(policy, bindings)
       return [...(fit.ok ? [] : fit.problems), ...deleteProblems(snapshot, bindings, policy)]
     }
     const deleting = (policy: FormPolicy): FormPolicy => ({ ...policy, operations: { ...policy.operations, delete: ['clerk'] } })
-    expect(refused(deliveries, deleting(DELIVERY_POLICY))).toEqual(UUID_PARITY.delete.delivery.postgres)
+    expect(refused(deliveries, deleting(DELIVERY_POLICY))).toEqual(UUID_PARITY.delete.delivery)
     expect(refused(deliveries, DELIVERY_POLICY)).toEqual([])
     const orders = generateForm(snapshot, ORDER).bindings
     expect(refused(orders, deleting(ORDER_POLICY))).toEqual(UUID_PARITY.delete.order)
@@ -412,5 +415,136 @@ describe("a lookup onto the delivery's uuid", covers('postgres', uuidCase('looku
     expect(made.answers).toMatchObject({ delivery, label })
     expect(await read(parcels, PARCEL_POLICY, CLARA, made.record as string)).toEqual(made)
     expect(await read(parcels, PARCEL_POLICY, OTTO, made.record as string)).toBeNull()
+  })
+})
+
+describe("the default that fills a uuid key", covers('postgres', uuidCase('defaults')), () => {
+  // Which default makes a key one a version column proves a record over
+  // (0057): tables keyed by a uuid, created by the owner in a schema of
+  // this suite's own and discovered as the order form's account, which may
+  // read, insert into, update and delete from each. Only gen_random_uuid(),
+  // which never hands out one value twice, filling a key that is all of it
+  // and that no foreign key includes, counts. A constant does not; nor does
+  // uuid_generate_v4(), which this release has not named; nor a function of
+  // the schema's own named gen_random_uuid, which the catalog spells with
+  // its schema; nor gen_random_uuid() beside a pinned tenant; nor
+  // gen_random_uuid() on a key that refers to another table's, which a
+  // lookup writes. However the DDL writes PostgreSQL's own -- in upper case,
+  // mixed case, qualified and in parentheses -- pg_get_expr spells it one
+  // way, from the stored expression. Each is told apart by the default as
+  // this account's snapshot spells it, whole (watched failing before the
+  // rule: no table offered delete; with the default matched by the
+  // function's name inside it: the lookalike offered delete; and with the
+  // foreign keys not asked: the key that refers to another offered delete).
+  const { schema, constant, spelled, offered, deleted } = UUID_PARITY.defaults
+  const tables = Object.keys(offered) as Array<keyof typeof offered>
+  const DEFAULTS: Record<keyof typeof offered, string> = {
+    never_repeating: 'gen_random_uuid()',
+    fixed: `'${constant}'::uuid`,
+    other_function: 'public.uuid_generate_v4()',
+    lookalike: `${schema}.gen_random_uuid()`,
+    two_columns: 'gen_random_uuid()',
+    foreign_key: 'gen_random_uuid()',
+    upper_case: 'GEN_RANDOM_UUID()',
+    mixed_case: 'Gen_Random_Uuid()',
+    parenthesised: '(pg_catalog.gen_random_uuid())',
+  }
+  const REMOVING: FormPolicy = {
+    version: 1,
+    operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] },
+    fields: { id: READ, note: READ },
+    rowFilters: [],
+    lookups: {},
+  }
+  let minted: MetadataSnapshot
+
+  const request = (name: string): GenerationRequest => ({
+    connection: 'test',
+    root: { schema, name },
+    formId: name.replaceAll('_', '-'),
+    title: name,
+    lookups: [],
+    versionColumn: 'version',
+    ...(name === 'two_columns' ? { pinned: ['tenant_id'] } : {}),
+  })
+
+  /** Each table's key default in `found`, and whether a form over each offers delete. */
+  const defaultsIn = (found: MetadataSnapshot) => ({
+    spelled: Object.fromEntries(tables.map((name) => [name, findObject(found, { schema, name })?.columns.find((column) => column.name === 'id')?.defaultExpression])),
+    offered: Object.fromEntries(tables.map((name) => [name, generateForm(found, request(name)).bindings.operations.delete])),
+  })
+
+  beforeAll(async () => {
+    await owner.unsafe(`create schema ${schema}`)
+    await owner.unsafe('create extension "uuid-ossp" schema public')
+    await owner.unsafe(`create function ${schema}.gen_random_uuid() returns uuid language sql as $$ select '${constant}'::uuid $$`)
+    for (const name of tables) {
+      const tenant = name === 'two_columns' ? 'tenant_id int not null, ' : ''
+      const key = name === 'two_columns' ? 'tenant_id, id' : 'id'
+      const refers = name === 'foreign_key' ? `, constraint fk_${name}_never_repeating foreign key (id) references ${schema}.never_repeating (id)` : ''
+      await owner.unsafe(`create table ${schema}.${name} (${tenant}id uuid not null default ${DEFAULTS[name]}, note varchar(50) null, version int not null default 1, constraint pk_${name} primary key (${key})${refers})`)
+      await owner.unsafe(`grant update (note, version) on ${schema}.${name} to formancy_forms`)
+    }
+    await owner.unsafe(`grant usage on schema ${schema} to formancy_forms`)
+    await owner.unsafe(`grant select, insert, delete on all tables in schema ${schema} to formancy_forms`)
+    minted = await discoverPostgres(writer, { schemas: [schema] })
+  })
+
+  test("reports each key's default as PostgreSQL spells it, and offers delete over gen_random_uuid() on a key of its own alone", () => {
+    expect(defaultsIn(minted)).toEqual({ spelled: spelled.postgres, offered })
+  })
+
+  // The delete runs as the server runs one: the row read by its token, then
+  // planned over the table as this request describes it, which still has
+  // the default the form was generated over, at the version that read
+  // returned -- the version column's default -- by the key in lower case.
+  test('deletes a row of the table whose key never repeats by its token at the version read, and the same delete again is not found', async () => {
+    const [row] = await owner.unsafe<Array<{ id: string }>>(`insert into ${schema}.never_repeating (note) values ('deleted') returning id::text as id`)
+    if (row === undefined) throw new Error('nothing inserted')
+    const bindings = generateForm(minted, request('never_repeating')).bindings
+    const reading = planRead(minted, bindings, REMOVING, CLARA, token(row.id))
+    if (!reading.ok) throw new Error(`expected a read, got ${reading.code}: ${reading.message}`)
+    const found = await records.read(reading.request)
+    if (!found.ok || found.record === null) throw new Error('expected the row')
+    const version = found.record.version as string
+    expect(version).toBe(deleted.version)
+    const removed = async (): Promise<DeleteOutcome> => {
+      const now = await records.describe(bindings.root)
+      if (!now.ok) throw new Error(`expected a description, got ${now.code}`)
+      const plan = planDelete(minted, bindings, REMOVING, CLARA, token(row.id), version, now.described)
+      if (!plan.ok) throw new Error(`expected a delete, got ${plan.code}: ${plan.message}`)
+      return records.delete(plan.request)
+    }
+    expect(await removed()).toEqual({ ok: true, deleted: { values: { id: row.id }, version } })
+    expect(await owner.unsafe(`select id from ${schema}.never_repeating where id = $1::uuid`, [row.id])).toHaveLength(0)
+    expect(await removed()).toMatchObject({ ok: false, code: deleted.again })
+  })
+
+  // PostgreSQL's alone: pg_get_expr leaves a function's schema out where
+  // the session's search_path finds that function by its bare name, and
+  // the path is the composition root's. Discovery reads every default with
+  // pg_catalog searched first, so a path that names the schema of the
+  // lookalike before pg_catalog changes no spelling and no offer: the
+  // lookalike is spelled with its schema and PostgreSQL's own without one
+  // (watched failing with discovery under the session's path: the
+  // lookalike was spelled bare and offered delete, and the six keys
+  // PostgreSQL's own fills were spelled pg_catalog.gen_random_uuid(), the
+  // four of them that offer delete offering none). A description is read
+  // in the request's own statement, under the session's path, so
+  // there it spells PostgreSQL's own with its schema: the runtime reads the
+  // key's default as changed, and refuses the delete as drift -- it can
+  // withdraw an offer under such a path, never make one.
+  test('a search_path that names the lookalike before pg_catalog changes no spelling and no offer, and the runtime then refuses the delete', async () => {
+    const catalogLast = postgres(fixture.writer, { onnotice: () => {}, connection: { search_path: `${schema}, public, pg_catalog` } })
+    try {
+      expect(defaultsIn(await discoverPostgres(catalogLast, { schemas: [schema] }))).toEqual({ spelled: spelled.postgres, offered })
+      const bindings = generateForm(minted, request('never_repeating')).bindings
+      const now = await createPostgresRecords(catalogLast).describe(bindings.root)
+      if (!now.ok) throw new Error(`expected a description, got ${now.code}`)
+      expect(now.described.columns.find((column) => column.name === 'id')?.defaultExpression).toBe('pg_catalog.gen_random_uuid()')
+      expect(planDelete(minted, bindings, REMOVING, CLARA, token(constant), deleted.version, now.described)).toMatchObject({ ok: false, code: 'drift' })
+    } finally {
+      await catalogLast.end()
+    }
   })
 })

@@ -90,10 +90,18 @@ never JavaScript numbers. Update is offered only with a proven concurrency
 token. See [0009](../../docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md).
 Delete is offered with one too, where the account may DELETE and the version
 proves the record for good: a rowversion, or a version column on a table
-whose key the database numbers. A key a default fills does not count, since
-a default may hand out one value twice, so a uuid key from
-`gen_random_uuid()` guarded by a version column offers no delete
-([0050](../../docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)).
+whose key the database numbers -- an identity, or a key of one column that
+the engine's never-repeating default fills, `gen_random_uuid()` on
+PostgreSQL or `newsequentialid()` on SQL Server, compared whole as the
+snapshot spells it, and that no foreign key of the table includes
+(`numbersKey`). Any other default does not count -- a constant hands out
+one value twice, and `uuid_generate_v4()` or `newid()` are not named --
+and neither does such a default beside another key column, which a form
+without the pin writes, or on a key a foreign key includes, which a lookup
+through it writes; drift review stops delete when such a key's default
+changes or a foreign key comes to include it
+([0050](../../docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md),
+[0057](../../docs/decisions/0057-a-key-of-one-column-filled-by-a-never-repeating-default-counts-as-numbered.md)).
 
 ## Drift review
 

@@ -673,6 +673,31 @@ function deleteNotes(notes: ReturnType<typeof generateForm>['notes']): string[] 
   return notes.filter((note) => note.kind === 'blocked' && /delete/i.test(note.message)).map((note) => note.message)
 }
 
+/**
+ * A delivery keyed by a uuid its default fills (0056), the default spelled
+ * `expression` as the catalog would spell it -- `null` where the account may
+ * not read the definition -- guarded by a version column or a rowversion;
+ * `composite` puts a tenant before the uuid in the key.
+ */
+function deliveries(kind: DatabaseKind, expression: string | null, token: 'version-column' | 'rowversion' = 'version-column', composite = false): MetadataSnapshot {
+  return withDeleteFacts(kind, (objects) => {
+    objects.push(
+      table(
+        'delivery',
+        [
+          ...(composite ? [col('tenant_id', INT32)] : []),
+          col('id', { kind: 'uuid' }, { hasDefault: true, defaultExpression: expression }),
+          col('carrier', { kind: 'text', maxLength: 40, lengthUnit: 'utf16-code-units', fixedLength: false }),
+          token === 'rowversion' ? col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' }) : col('row_version', INT64, { hasDefault: true }),
+        ],
+        { primaryKey: { name: 'pk_delivery', columns: composite ? ['tenant_id', 'id'] : ['id'] } },
+      ),
+    )
+  })
+}
+
+const DELIVERY: GenerationRequest = { ...ORDER, root: { schema: 'sales', name: 'delivery' }, lookups: [] }
+
 describe('delete (0050)', () => {
   // A delete can be made against the order: a table, a key the database
   // numbers, a token that proves the record -- a rowversion, or a confirmed
@@ -706,7 +731,7 @@ describe('delete (0050)', () => {
     const postgres = generateForm(withDeleteFacts('postgres'), { ...LINE, versionColumn: 'row_version' })
     expect(postgres.bindings.operations).toEqual({ create: true, update: true, delete: false })
     expect(deleteNotes(postgres.notes)).toEqual([
-      "Delete is not offered: a record of sales.order_line created again with a deleted record's key starts its row_version where the deleted one did, so a version cannot tell the two apart. A key the database numbers, or SQL Server's rowversion, can.",
+      "Delete is not offered: a record of sales.order_line created again with a deleted record's key starts its row_version where the deleted one did, so a version cannot tell the two apart. A key with an identity column, a key of one column that gen_random_uuid() fills and no foreign key includes, or SQL Server's rowversion, can.",
     ])
     const serial = withDeleteFacts('postgres', (objects) => {
       objects.push(table('ticket', [col('id', INT32, { generated: 'identity-by-default', hasDefault: true }), col('note', { kind: 'text', maxLength: 50, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', INT64, { hasDefault: true })], {
@@ -717,39 +742,121 @@ describe('delete (0050)', () => {
   })
 
   // A key the database fills by its default (0056) is never written by a
-  // form, as a numbered one is not, but a default is not a sequence: it may
-  // hand out one value twice -- a constant on a one-row table does -- and a
-  // record created again under it starts its version column where the
-  // deleted one did. So such a key proves no record on its own: a delivery
-  // guarded by PostgreSQL's version column offers no delete, and the note
-  // says why; one guarded by SQL Server's rowversion does, whatever its key.
-  // What the delete also does to its parcels is the policy's (watched failing
-  // with a filled key counted as numbered: PostgreSQL's delivery offered delete).
-  test("offers no delete where a version column guards a key the database fills by its default; a rowversion's table does", () => {
-    const deliveries = (kind: DatabaseKind): MetadataSnapshot =>
-      withDeleteFacts(kind, (objects) => {
-        objects.push(
-          table(
-            'delivery',
-            [
-              col('id', { kind: 'uuid' }, { hasDefault: true, defaultExpression: kind === 'postgres' ? 'gen_random_uuid()' : '(newsequentialid())' }),
-              col('carrier', { kind: 'text', maxLength: 40, lengthUnit: 'utf16-code-units', fixedLength: false }),
-              kind === 'sqlserver' ? col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' }) : col('row_version', INT64, { hasDefault: true }),
-            ],
-            { primaryKey: { name: 'pk_delivery', columns: ['id'] } },
-          ),
-        )
-      })
-    const request: GenerationRequest = { ...ORDER, root: { schema: 'sales', name: 'delivery' }, lookups: [] }
-    const postgres = generateForm(deliveries('postgres'), { ...request, versionColumn: 'row_version' })
+  // form, as a numbered one is not. Where it is the whole key, and the
+  // default is the engine's own that never hands out one value twice --
+  // gen_random_uuid() on PostgreSQL, newsequentialid() on SQL Server, as
+  // each catalog spells it -- a record deleted is never created again under
+  // its key, and a version column proves a record as it does over an
+  // identity (0057). So a delivery guarded by a version column offers delete
+  // on either engine, and one guarded by SQL Server's rowversion does
+  // whatever its key. What the delete also does to its parcels is the
+  // policy's (watched failing before the rule: PostgreSQL's delivery offered
+  // no delete).
+  test('offers delete where a version column guards a key of one column that the engine\'s never-repeating default fills', () => {
+    const postgres = generateForm(deliveries('postgres', 'gen_random_uuid()'), { ...DELIVERY, versionColumn: 'row_version' })
     expect(postgres.bindings.fields.find((binding) => binding.field === 'id')?.writes).toEqual({ create: false, update: false })
-    expect(postgres.bindings.operations).toEqual({ create: true, update: true, delete: false })
-    expect(deleteNotes(postgres.notes)).toEqual([
-      "Delete is not offered: a record of sales.delivery created again with a deleted record's key starts its row_version where the deleted one did, so a version cannot tell the two apart. A key the database numbers, or SQL Server's rowversion, can.",
-    ])
-    const sqlServer = generateForm(deliveries('sqlserver'), request)
+    expect(postgres.bindings.operations).toEqual({ create: true, update: true, delete: true })
+    expect(deleteNotes(postgres.notes)).toEqual([])
+    const sqlServer = generateForm(deliveries('sqlserver', '(newsequentialid())'), { ...DELIVERY, versionColumn: 'row_version' })
     expect(sqlServer.bindings.operations).toEqual({ create: true, update: true, delete: true })
     expect(deleteNotes(sqlServer.notes)).toEqual([])
+    const rowversion = generateForm(deliveries('sqlserver', '(newsequentialid())', 'rowversion'), DELIVERY)
+    expect(rowversion.bindings.operations).toEqual({ create: true, update: true, delete: true })
+  })
+
+  // Any other default may hand out one value twice, or is not known not to:
+  // a constant fills one record and then the same key again after a delete;
+  // another function -- uuid_generate_v4(), newid() -- is not one this
+  // release has named; a function of the database's own named like the
+  // engine's, in another schema, is spelled with its schema and is a
+  // different function; the other engine's spelling is not this engine's
+  // default; a definition the account may not read says nothing; and a key
+  // of two columns is one a form without the pin writes. Each is compared
+  // as the catalog spells it, whole, never by a part of a name somebody can
+  // choose (watched failing with every default on a one-column key counted:
+  // all ten of one column offered delete, the hidden definition and the
+  // other engine's spellings among them; with the expression matched by the
+  // function's name inside it: the three lookalikes offered delete; and with
+  // the one-column rule removed: both keys of two columns offered delete).
+  test('offers no delete where the key\'s default is a constant, another function, a lookalike, hidden, or on a key of two columns', () => {
+    const note = (kind: DatabaseKind) =>
+      `Delete is not offered: a record of sales.delivery created again with a deleted record's key starts its row_version where the deleted one did, so a version cannot tell the two apart. A key with an identity column, a key of one column that ${kind === 'postgres' ? 'gen_random_uuid()' : 'newsequentialid()'} fills and no foreign key includes, or SQL Server's rowversion, can.`
+    const cases: Array<[DatabaseKind, string | null, string?]> = [
+      ['postgres', "'2b7e1516-28ae-4d2a-a6f7-15880945cf4f'::uuid"],
+      ['postgres', 'uuid_generate_v4()'],
+      ['postgres', 'minted.gen_random_uuid()'],
+      ['postgres', 'public.gen_random_uuid()'],
+      ['postgres', '(newsequentialid())'],
+      ['sqlserver', "('2b7e1516-28ae-4d2a-a6f7-15880945cf4f')"],
+      ['sqlserver', '(newid())'],
+      ['sqlserver', '([minted].[newsequentialid]())'],
+      ['sqlserver', 'gen_random_uuid()'],
+      ['sqlserver', null],
+      ['postgres', 'gen_random_uuid()', 'composite'],
+      ['sqlserver', '(newsequentialid())', 'composite'],
+    ]
+    const generated = cases.map(([kind, expression, shape]) => {
+      const { bindings, notes } = generateForm(deliveries(kind, expression, 'version-column', shape === 'composite'), {
+        ...DELIVERY,
+        versionColumn: 'row_version',
+        ...(shape === 'composite' ? { pinned: ['tenant_id'] } : {}),
+      })
+      return { kind, expression, shape, operations: bindings.operations, notes: deleteNotes(notes) }
+    })
+    expect(generated).toEqual(cases.map(([kind, expression, shape]) => ({ kind, expression, shape, operations: { create: true, update: true, delete: false }, notes: [note(kind)] })))
+  })
+
+  // A key that is also a foreign key is one a form writes, whatever fills
+  // it: a lookup over that key gives it the key of the record a person
+  // chooses, so a note deleted at version 1 is created again under its key
+  // the next time its delivery is chosen, at version 1 too, and a stale
+  // delete lands on it. Any form over the table may offer that lookup, so
+  // the default counts only where no foreign key of the table includes the
+  // key column, whether this form looks up through it or not (watched
+  // failing with the foreign key not asked: both forms offered delete on
+  // both engines, and the lookup wrote the key on create).
+  test('offers no delete where the key a never-repeating default fills is also a foreign key, looked up through or not', () => {
+    const spelled = (kind: DatabaseKind) => (kind === 'postgres' ? 'gen_random_uuid()' : '(newsequentialid())')
+    const noted = (kind: DatabaseKind): MetadataSnapshot =>
+      withDeleteFacts(kind, (objects) => {
+        const uuid = (name: string) => col(name, { kind: 'uuid' }, { hasDefault: true, defaultExpression: spelled(kind) })
+        const text = (name: string) => col(name, { kind: 'text', maxLength: 40, lengthUnit: 'utf16-code-units', fixedLength: false })
+        objects.push(
+          table('delivery', [uuid('id'), text('carrier'), col('row_version', INT64, { hasDefault: true })], { primaryKey: { name: 'pk_delivery', columns: ['id'] } }),
+          table('delivery_note', [uuid('id'), text('note'), col('row_version', INT64, { hasDefault: true })], {
+            primaryKey: { name: 'pk_delivery_note', columns: ['id'] },
+            foreignKeys: [
+              {
+                name: 'fk_delivery_note_delivery',
+                columns: ['id'],
+                references: { table: { schema: 'sales', name: 'delivery' }, columns: ['id'] },
+                onUpdate: 'no-action',
+                onDelete: 'no-action',
+                enforced: true,
+                validated: true,
+              },
+            ],
+          }),
+        )
+      })
+    const NOTE: GenerationRequest = { ...DELIVERY, root: { schema: 'sales', name: 'delivery_note' }, versionColumn: 'row_version' }
+    const generated = (['postgres', 'sqlserver'] as const).flatMap((kind) =>
+      [NOTE, { ...NOTE, lookups: [{ foreignKey: 'fk_delivery_note_delivery', display: ['carrier'] }] }].map((request) => {
+        const { bindings, notes } = generateForm(noted(kind), request)
+        const key = bindings.fields.find((binding) => binding.kind === 'lookup' || binding.field === 'id')
+        return { kind, lookup: request.lookups.length > 0, keyCreated: key?.writes.create, delete: bindings.operations.delete, notes: deleteNotes(notes) }
+      }),
+    )
+    const note = (kind: DatabaseKind) =>
+      `Delete is not offered: a record of sales.delivery_note created again with a deleted record's key starts its row_version where the deleted one did, so a version cannot tell the two apart. A key with an identity column, a key of one column that ${kind === 'postgres' ? 'gen_random_uuid()' : 'newsequentialid()'} fills and no foreign key includes, or SQL Server's rowversion, can.`
+    expect(generated).toEqual(
+      (['postgres', 'sqlserver'] as const).flatMap((kind) => [
+        { kind, lookup: false, keyCreated: false, delete: false, notes: [note(kind)] },
+        { kind, lookup: true, keyCreated: true, delete: false, notes: [note(kind)] },
+      ]),
+    )
+    // The table it refers to, whose key no foreign key includes, still offers delete.
+    expect(generateForm(noted('postgres'), { ...DELIVERY, versionColumn: 'row_version' }).bindings.operations.delete).toBe(true)
   })
 
   // A form does not offer what its account cannot do (0027). The reader may

@@ -1,6 +1,6 @@
 # 0050 — A record is deleted one at a time, by its token and the version its person read, under the form's policy, in one guarded statement
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0057](0057-a-key-of-one-column-filled-by-a-never-repeating-default-counts-as-numbered.md): a key of one column that `gen_random_uuid()` fills on PostgreSQL, or `newsequentialid()` on SQL Server, compared whole as the snapshot spells it, counts as numbered where no foreign key of the table includes it, so a version column proves a record over it and PostgreSQL's deliveries offer delete -- the alternative *Count a key a default fills as numbered*, lost here for now, decided for those two defaults and no other -- and drift stops delete when such a key's default changes or a foreign key comes to include it
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**

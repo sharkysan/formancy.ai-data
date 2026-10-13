@@ -5,6 +5,7 @@ import {
   generateForm,
   lookupRowFilter,
   planCreate,
+  planDelete,
   planList,
   planRead,
   planUpdate,
@@ -14,6 +15,7 @@ import {
   validatePolicy,
 } from '@formancy/data-core'
 import type {
+  DeleteOutcome,
   FormBindings,
   FormPolicy,
   FormRecord,
@@ -249,7 +251,7 @@ describe('generation', covers('sqlserver', uuidCase('generated')), () => {
     expect(bindings.fields.find((binding) => binding.field === expected.field)?.writes).toEqual(expected.writes)
     expect(form.model.fields.find((field) => field.key === expected.field)).not.toHaveProperty('required')
     expect(form.layouts?.[0]?.nodes.map((node) => ('label' in node ? node.label : undefined))).toEqual(expected.sections)
-    expect(bindings.operations).toEqual(expected.operations.sqlserver)
+    expect(bindings.operations).toEqual(expected.operations)
     expect(bindings.identity).toEqual(UUID_PARITY.discovered.key)
   })
 })
@@ -271,7 +273,7 @@ describe('a delete', covers('sqlserver', uuidCase('delete')), () => {
       return [...(fit.ok ? [] : fit.problems), ...deleteProblems(snapshot, bindings, policy)]
     }
     const deleting = (policy: FormPolicy): FormPolicy => ({ ...policy, operations: { ...policy.operations, delete: ['clerk'] } })
-    expect(refused(deliveries, deleting(DELIVERY_POLICY))).toEqual(UUID_PARITY.delete.delivery.sqlserver)
+    expect(refused(deliveries, deleting(DELIVERY_POLICY))).toEqual(UUID_PARITY.delete.delivery)
     expect(refused(deliveries, DELIVERY_POLICY)).toEqual([])
     const orders = generateForm(snapshot, ORDER).bindings
     expect(refused(orders, deleting(ORDER_POLICY))).toEqual(UUID_PARITY.delete.order)
@@ -469,5 +471,111 @@ describe('uniqueidentifier, as SQL Server stores and orders it', () => {
     const last = String((await create(deliveries, DELIVERY_POLICY, OTTO, answers)).answers['id'])
     expect(uuidOrder('sqlserver', [last, between, first])).toEqual([first, between, last])
     expect(new Set([first, between, last].map((key) => key.slice(19)))).toEqual(new Set([first.slice(19)]))
+  })
+})
+
+describe("the default that fills a uuid key", covers('sqlserver', uuidCase('defaults')), () => {
+  // Which default makes a key one a version column proves a record over
+  // (0057): tables keyed by a uniqueidentifier, each guarded by an int
+  // version column the module maintains -- not a rowversion, which proves a
+  // record whatever its key -- created by the owner in a schema of this
+  // suite's own and discovered as the order form's account, which may read,
+  // insert into, update and delete from each. Only newsequentialid(), which
+  // never hands out one value twice, filling a key that is all of it and
+  // that no foreign key includes, counts. A constant does not; nor does
+  // newid(), which this release has not named; nor a function of the
+  // schema's own named newsequentialid, which the catalog spells with its
+  // schema; nor newsequentialid() beside a pinned tenant; nor
+  // newsequentialid() on a key that refers to another table's, which a
+  // lookup writes. However the DDL writes SQL Server's own -- in upper case,
+  // mixed case or in more parentheses -- object_definition spells it one
+  // way. Each is told apart by the default as this account's snapshot
+  // spells it, whole (watched failing before the rule: no table offered
+  // delete; and with the default matched by the function's name inside it:
+  // the lookalike offered delete; and with the foreign keys not asked: the
+  // key that refers to another offered delete).
+  const { schema, constant, spelled, offered, deleted } = UUID_PARITY.defaults
+  const tables = Object.keys(offered) as Array<keyof typeof offered>
+  const DEFAULTS: Record<keyof typeof offered, string> = {
+    never_repeating: 'newsequentialid()',
+    fixed: `'${constant}'`,
+    other_function: 'newid()',
+    lookalike: `${schema}.newsequentialid()`,
+    two_columns: 'newsequentialid()',
+    foreign_key: 'newsequentialid()',
+    upper_case: 'NEWSEQUENTIALID()',
+    mixed_case: '(NewSequentialId())',
+    parenthesised: '((newsequentialid()))',
+  }
+  const REMOVING: FormPolicy = {
+    version: 1,
+    operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] },
+    fields: { id: READ, note: READ },
+    rowFilters: [],
+    lookups: {},
+  }
+  let minted: MetadataSnapshot
+
+  const request = (name: string): GenerationRequest => ({
+    connection: 'test',
+    root: { schema, name },
+    formId: name.replaceAll('_', '-'),
+    title: name,
+    lookups: [],
+    versionColumn: 'version',
+    ...(name === 'two_columns' ? { pinned: ['tenant_id'] } : {}),
+  })
+
+  beforeAll(async () => {
+    await owner.request().batch(`create schema ${schema}`)
+    await owner.request().batch(`create function ${schema}.newsequentialid() returns uniqueidentifier as begin return cast('${constant}' as uniqueidentifier) end`)
+    for (const name of tables) {
+      const tenant = name === 'two_columns' ? 'tenant_id int not null, ' : ''
+      const key = name === 'two_columns' ? 'tenant_id, id' : 'id'
+      const refers = name === 'foreign_key' ? `, constraint fk_${name}_never_repeating foreign key (id) references ${schema}.never_repeating (id)` : ''
+      await owner
+        .request()
+        .batch(
+          `create table ${schema}.${name} (${tenant}id uniqueidentifier not null constraint df_${name}_id default ${DEFAULTS[name]}, note nvarchar(50) null, version int not null constraint df_${name}_version default 1, constraint pk_${name} primary key (${key})${refers})`,
+        )
+      await owner.request().batch(`grant update (note, version) on ${schema}.${name} to formancy_forms`)
+    }
+    await owner.request().batch(`grant select, insert, delete on schema::${schema} to formancy_forms`)
+    minted = await discoverSqlServer(writer, { schemas: [schema] })
+  })
+
+  test("reports each key's default as SQL Server spells it, and offers delete over newsequentialid() on a key of its own alone", () => {
+    const found = Object.fromEntries(tables.map((name) => [name, findObject(minted, { schema, name })?.columns.find((column) => column.name === 'id')?.defaultExpression]))
+    expect(found).toEqual(spelled.sqlserver)
+    expect(Object.fromEntries(tables.map((name) => [name, generateForm(minted, request(name)).bindings.operations.delete]))).toEqual(offered)
+  })
+
+  // The delete runs as the server runs one: the row read by its token, then
+  // planned over the table as this request describes it, which still has
+  // the default the form was generated over, at the version that read
+  // returned -- the version column's default -- by the key in lower case:
+  // SQL Server prints it in upper case, and the answer spells it as the
+  // token does (0056).
+  test('deletes a row of the table whose key never repeats by its token at the version read, and the same delete again is not found', async () => {
+    const inserted = await owner.request().query<{ id: string }>(`insert into ${schema}.never_repeating (note) output lower(convert(nchar(36), inserted.id)) as id values (N'deleted')`)
+    const id = String(inserted.recordset[0]?.id)
+    const bindings = generateForm(minted, request('never_repeating')).bindings
+    const reading = planRead(minted, bindings, REMOVING, CLARA, token(id))
+    if (!reading.ok) throw new Error(`expected a read, got ${reading.code}: ${reading.message}`)
+    const found = await records.read(reading.request)
+    if (!found.ok || found.record === null) throw new Error('expected the row')
+    const version = found.record.version as string
+    expect(version).toBe(deleted.version)
+    const removed = async (): Promise<DeleteOutcome> => {
+      const now = await records.describe(bindings.root)
+      if (!now.ok) throw new Error(`expected a description, got ${now.code}`)
+      const plan = planDelete(minted, bindings, REMOVING, CLARA, token(id), version, now.described)
+      if (!plan.ok) throw new Error(`expected a delete, got ${plan.code}: ${plan.message}`)
+      return records.delete(plan.request)
+    }
+    expect(await removed()).toEqual({ ok: true, deleted: { values: { id }, version } })
+    const left = await owner.request().input('id', mssql.UniqueIdentifier, id).query(`select id from ${schema}.never_repeating where id = @id`)
+    expect(left.recordset).toHaveLength(0)
+    expect(await removed()).toMatchObject({ ok: false, code: deleted.again })
   })
 })

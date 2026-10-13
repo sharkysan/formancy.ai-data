@@ -1,5 +1,5 @@
 import { controlFor } from '../generate/controls.js'
-import { versionProvesRecord } from '../generate/offers.js'
+import { numbersKey, versionProvesRecord } from '../generate/offers.js'
 import type { FormBindings } from '../generate/types.js'
 import type { ColumnMeta } from '../metadata.js'
 import { cite, hiding, unseen } from './access.js'
@@ -199,15 +199,27 @@ function effectOf(bindings: FormBindings, kind: ColumnChangeKind, is: ColumnMeta
  * The generator's version rule, asked again of the table as it is now
  * (0050): on a version-column form, a key column the database numbered and
  * numbers no more leaves a key people type, under which a record deleted and
- * created again starts its version where the deleted one did. One predicate,
- * `versionProvesRecord`, so review stops delete exactly where the generator
- * would no longer offer it.
+ * created again starts its version where the deleted one did. Since 0057 a
+ * key of one column filled by the engine's never-repeating default is
+ * numbered too, so its default changed, dropped or hidden is the same loss as
+ * an identity dropped, whatever else the column's change is called. One
+ * predicate, `versionProvesRecord`, so review stops delete exactly where the
+ * generator would no longer offer it. Said here on the key column when the
+ * column's own change lost it -- asked over the foreign keys the table had,
+ * so a key that a new foreign key takes is said on that key instead
+ * (`relationships.ts`), and the loss is said once.
  */
-function numberingLost(comparison: Comparison): boolean {
-  const { bindings, before, after } = comparison
+function numberingLost(comparison: Comparison, was: ColumnMeta, is: ColumnMeta): boolean {
+  const { bindings, base, current, before, after } = comparison
   const concurrency = bindings.concurrency
-  if (concurrency?.kind !== 'version-column' || bindings.identity === null) return false
-  return versionProvesRecord(before.columns, bindings.identity, concurrency) && !versionProvesRecord(after.columns, bindings.identity, concurrency)
+  const identity = bindings.identity
+  if (concurrency?.kind !== 'version-column' || identity === null || !identity.includes(is.name)) return false
+  return (
+    numbersKey(base.kind, before, was, identity) &&
+    !numbersKey(current.kind, before, is, identity) &&
+    versionProvesRecord(base.kind, before, identity, concurrency) &&
+    !versionProvesRecord(current.kind, after, identity, concurrency)
+  )
 }
 
 const NUMBERING_LOST = 'The database no longer numbers a column of the key, so a record created again under a deleted one\'s key would start its version where the deleted one did: delete is blocked until the form is reviewed.'
@@ -219,7 +231,7 @@ function changedColumn(comparison: Comparison, was: ColumnMeta, is: ColumnMeta):
   const effect = effectOf(bindings, found.kind, is)
   // The generator's create rule, now: a change that leaves this column needing a value nobody gives stops create.
   const createLost = blocksCreate(bindings, is) && !blocksCreate(bindings, was)
-  const numbering = found.kind === 'column-generation-changed' && bindings.identity?.includes(is.name) === true && numberingLost(comparison)
+  const numbering = numberingLost(comparison, was, is)
   const stops: Operation[] = [...effect.stops, ...(createLost ? ['create' as const] : []), ...(numbering && !effect.stops.includes('delete') ? ['delete' as const] : [])]
   return {
     kind: effect.kind,
