@@ -1,20 +1,20 @@
-import { describeReassigned, diffSnapshots, generateForm } from '@formancy/data-core'
-import type { FormBindings, FormPolicy, MetadataSnapshot, ReassignedKey } from '@formancy/data-core'
+import { diffSnapshots, generateForm } from '@formancy/data-core'
+import type { MetadataSnapshot } from '@formancy/data-core'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { auditRequests } from '../audit.js'
 import type { AuditSink } from '../audit.js'
-import { generatedProblems } from '../bundle-format2.js'
-import { validateBundle } from '../bundle.js'
 import type { PublishedBundle } from '../bundle.js'
-import { UnparsableVersionError } from '../config-store.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry, OpenConnection } from '../connections.js'
 import { readGeneration } from '../generation.js'
 import type { HostIdentity } from '../identity.js'
-import { FORM_ID, loadPublished, loadVersion } from '../published.js'
-import { readKeysConfirmed, unconfirmedKeys } from '../reassigned.js'
+import { FORM_ID, loadPublished } from '../published.js'
+import { conflictOver, keysRefusal, storable } from '../publishing.js'
+import type { Refusal } from '../publishing.js'
+import { readKeysConfirmed } from '../reassigned.js'
 import { ADMIN_OPERATIONS, adminTrail, describeAdmin } from './admin-audit.js'
 import { evolutionRoutes } from './admin-evolution.js'
+import { promotionRoutes } from './admin-promotion.js'
 
 export interface AdminOptions {
   registry: ConnectionRegistry
@@ -38,6 +38,11 @@ export type Discover = (connection: string, reply: FastifyReply) => Promise<Meta
 
 function refuse(reply: FastifyReply, status: number, code: string, message: string, extra: Record<string, unknown> = {}) {
   return reply.code(status).send({ code, message, ...extra })
+}
+
+/** Sends a refusal `publishing.ts` decided. */
+function send(reply: FastifyReply, refusal: Refusal): FastifyReply {
+  return refuse(reply, refusal.status, refusal.code, refusal.message, refusal.extra)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -159,59 +164,20 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     if (confirmed === undefined) {
       return refuse(reply, 400, 'invalid-request', 'Expected keysConfirmed, when sent, to list { field, was, now } as a regeneration reports them in keysReassigned.')
     }
-    const checked = validateBundle(body['bundle'])
-    if (!checked.ok) return refuse(reply, 422, 'invalid-bundle', 'The bundle cannot be published.', { problems: checked.problems })
+    const checked = storable(body['bundle'], id, (name) => registry.scope(name) !== undefined)
+    if (!checked.ok) {
+      if (checked.connection !== undefined) trail.connection = checked.connection
+      return send(reply, checked.refusal)
+    }
     const bundle = checked.bundle
     trail.connection = bundle.connection
-    if (bundle.format === 1) {
-      return refuse(reply, 422, 'invalid-bundle', 'The bundle cannot be published.', { problems: ['publish format 2: since 0030 a version keeps its generation request, generated base and presentation'] })
-    }
-    if (bundle.form.id !== id) return refuse(reply, 422, 'invalid-bundle', `The form's id is ${bundle.form.id}, not ${id}.`)
-    if (registry.scope(bundle.connection) === undefined) {
-      return refuse(reply, 422, 'invalid-bundle', `No connection is called ${bundle.connection}.`)
-    }
-    // At publish only: on read, a later generator must not make a stored version corrupt (0030).
-    const generated = generatedProblems(bundle)
-    if (generated.length > 0) return refuse(reply, 422, 'invalid-bundle', 'The bundle cannot be published.', { problems: generated })
-    const conflict = (current: number | null) => refuse(reply, 409, 'conflict', 'Somebody published first. Rebase on the current version and try again.', { current })
-    const keys = await unconfirmedAgainst(id, expectedBase, bundle, confirmed, reply)
-    if (keys.length > 0) {
-      // Compared with a version somebody has replaced, the keys may say something else: the conflict is the answer.
-      const current = await store.latest(id)
-      if (current !== expectedBase) return conflict(current)
-      return refuse(reply, 422, 'keys-reassigned', `Version ${String(expectedBase)} bound ${keys.map((key) => key.field).join(', ')} to other columns or lookups: confirm the grants on each for what it stands for now, or remove them. A grant is a role on the key's field, or a through that scopes this form's rows by it.`, {
-        keys,
-        problems: keys.map(describeReassigned),
-      })
-    }
+    const keys = await keysRefusal(store, id, expectedBase, bundle, confirmed, reply.log)
+    if (keys !== undefined) return send(reply, keys)
     const outcome = await store.publish(id, expectedBase, bundle)
-    if (!outcome.ok) return conflict(outcome.current)
+    if (!outcome.ok) return send(reply, conflictOver(outcome.current))
     trail.formVersion = outcome.version
     return reply.code(201).send({ version: outcome.version })
   })
-
-  /**
-   * The keys a publish over `expectedBase` grants on that the version it
-   * replaces bound to something else, and that it does not confirm (0039).
-   * Nothing to compare for a first version, or for a base that is not there
-   * -- below 1, or past the newest -- which the store's compare-and-swap
-   * refuses; nor for a version that does not validate, or whose file does
-   * not parse, which is not served (0019), so none of its grants is in
-   * effect -- and publishing over it is how it is replaced. Any other
-   * failure to read the base throws: a check that cannot answer refuses.
-   */
-  async function unconfirmedAgainst(id: string, expectedBase: number | null, bundle: { bindings: FormBindings; policy: FormPolicy }, confirmed: readonly ReassignedKey[], reply: FastifyReply): Promise<ReassignedKey[]> {
-    if (expectedBase === null || expectedBase < 1) return []
-    let replaced: Awaited<ReturnType<typeof loadVersion>>
-    try {
-      replaced = await loadVersion(store, id, expectedBase, reply.log)
-    } catch (error) {
-      if (!(error instanceof UnparsableVersionError)) throw error
-      reply.log.error({ form: id, version: expectedBase }, 'a published version does not parse, and is not compared')
-      return []
-    }
-    return replaced.ok ? unconfirmedKeys(replaced.bundle.bindings, bundle, confirmed) : []
-  }
 
   /** The newest published bundle, re-validated, or a reply already sent. */
   async function latest(id: string, reply: FastifyReply): Promise<{ version: number; bundle: PublishedBundle } | undefined> {
@@ -240,4 +206,5 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
 
   // After the role check above, which covers every route registered on this instance.
   evolutionRoutes(app, { store, discover, refuse })
+  promotionRoutes(app, { store, allowlisted: (name) => registry.scope(name) !== undefined, discover, refuse })
 }

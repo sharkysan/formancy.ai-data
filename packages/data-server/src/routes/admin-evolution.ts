@@ -19,6 +19,8 @@ import { policyProblems } from '../bundle.js'
 import type { BundleV2 } from '../bundle.js'
 import type { ConfigurationStore } from '../config-store.js'
 import { FORM_ID, loadPublished, loadVersion } from '../published.js'
+import { servable } from '../publishing.js'
+import type { Servable } from '../publishing.js'
 import { adminTrail } from './admin-audit.js'
 import type { Discover, Refuse } from './admin.js'
 
@@ -227,17 +229,19 @@ export function evolutionRoutes(app: FastifyInstance, { store, discover, refuse 
     const current = await discover(loaded.bundle.connection, reply)
     if (current === undefined) return reply
 
-    let drift: DriftReport
+    let served: Servable
     try {
-      drift = diffSnapshots(loaded.bundle.snapshot, current, loaded.bundle.bindings, loaded.bundle.policy)
+      served = servable(loaded.bundle, current)
     } catch (error) {
       return internal(reply, id, error)
     }
-    if (drift.blocking) {
-      return refuse(reply, 409, 'incompatible', `Version ${String(version)} cannot be restored: the database has changed in a way it cannot serve.`, {
-        changes: drift.changes.filter((change) => change.severity === 'blocking'),
-      })
+    if (!served.ok && served.code === 'other-engine') {
+      return refuse(reply, 422, 'other-engine', `Version ${String(version)} cannot be restored: connection ${loaded.bundle.connection} is a ${served.database} database now, and the version is bound to ${served.bound}. A form's bindings belong to one engine.`)
     }
+    if (!served.ok) {
+      return refuse(reply, 409, 'incompatible', `Version ${String(version)} cannot be restored: the database has changed in a way it cannot serve.`, { changes: served.changes })
+    }
+    const drift = served.drift
     // The document as it was read and validated, written as the store writes every version: a copy, never a re-generation.
     // The same bytes only for a version this store wrote; one reformatted on the volume comes back in the store's spelling.
     const outcome = await store.publish(id, body['expectedBase'], loaded.bundle)

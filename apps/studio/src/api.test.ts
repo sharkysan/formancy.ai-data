@@ -2,13 +2,15 @@
 //
 // Node rather than jsdom: nothing here renders. The client against the real
 // server, route by route.
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { FormPolicy } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { AdminClient, Bundle, ProposalRequest } from './api.js'
 import { isFormId } from './choice.js'
-import { OWNER_SNAPSHOT, startPlane, TOKENS, withoutColumn } from './test-server.js'
+import { OWNER_SNAPSHOT, renamedOrderColumn, startPlane, TOKENS, withoutColumn } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
 let plane: TestPlane
@@ -150,6 +152,40 @@ describe('the administrator plane, through the studio client', () => {
     const cannot = await admin.regenerate('sales-order')
     expect(cannot).toMatchObject({ ok: false, status: 422, code: 'cannot-generate' })
     expect(!cannot.ok && cannot.drift?.changes.map((change) => change.kind)).toEqual(['concurrency-changed'])
+  })
+
+  // An import (0062) answers with the version written and the drift that
+  // allowed it, and a refusal over reassigned keys carries the keys, which
+  // the confirmation sends back exactly. A client that dropped `keys` would
+  // leave the studio with a sentence and nothing to confirm, and an import
+  // that can never be completed from the studio.
+  test('imports a version file in the shape the server sends, and carries the keys of a refused one', async () => {
+    const source = await startPlane()
+    try {
+      // Here: version 1 over the database as captured, granting on order_date.
+      const granting: FormPolicy = { ...READ_ONLY, fields: { order_date: { read: ['clerk'], write: [] } } }
+      expect(await admin.publish('sales-order', null, await bundle(granting))).toEqual({ ok: true, value: { version: 1 } })
+      // Both databases then renamed order_date to "order date", and the other deployment published from that.
+      const renamed = renamedOrderColumn(OWNER_SNAPSHOT, 'order_date', 'order date')
+      plane.databases.set('fixture', renamed)
+      source.databases.set('fixture', renamed)
+      const there = createAdminClient({ token: TOKENS.admin, fetch: source.fetch })
+      const proposal = await there.propose(ORDER)
+      if (!proposal.ok) throw new Error(proposal.message)
+      const { form, bindings, snapshot, generation } = proposal.value
+      expect(await there.publish('sales-order', null, { format: 2, connection: 'fixture', generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy: granting, snapshot })).toMatchObject({ ok: true })
+      const file = JSON.parse(await readFile(join(source.root, 'sales-order', '1.json'), 'utf8')) as unknown
+
+      const refused = await admin.importVersion('sales-order', 1, file)
+      expect(refused).toMatchObject({ ok: false, status: 422, code: 'keys-reassigned' })
+      const keys = refused.ok ? undefined : refused.keys
+      expect(keys).toEqual([{ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } }])
+      const nothing = { readable: true, writable: { create: true, update: true, delete: true } }
+      expect(await admin.importVersion('sales-order', 1, file, keys)).toEqual({ ok: true, value: { version: 2, drift: { changes: [], blocking: false, ...nothing, runtime: nothing } } })
+      expect(plane.requests.at(-1)).toEqual({ method: 'POST', path: '/v1/forms/sales-order/imports', body: { expectedBase: 1, bundle: file, keysConfirmed: keys } })
+    } finally {
+      await source.close()
+    }
   })
 
   // Drift runs against the database as it is now, through the real diff.

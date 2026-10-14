@@ -360,6 +360,7 @@ Every route the server registers, and what each door does with it:
 | `GET` | `/v1/forms` | runtime | behind Access | forwarded |
 | `GET` | `/v1/forms/:id` | runtime | behind Access | forwarded |
 | `POST` | `/v1/forms/:id/drift` | administrator | behind Access | not forwarded |
+| `POST` | `/v1/forms/:id/imports` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/forms/:id/lookups/:source/query` | runtime | behind Access | forwarded |
 | `POST` | `/v1/forms/:id/lookups/:source/resolve` | runtime | behind Access | forwarded |
 | `POST` | `/v1/forms/:id/records/create` | runtime | behind Access | forwarded |
@@ -605,6 +606,7 @@ pass  POST https://formancy.example.com/v1/form-proposals  Access answered first
 pass  GET https://formancy.example.com/v1/forms  Access answered first
 pass  GET https://formancy.example.com/v1/forms/order  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/drift  Access answered first
+pass  POST https://formancy.example.com/v1/forms/order/imports  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/lookups/customer/query  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/lookups/customer/resolve  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/records/create  Access answered first
@@ -620,7 +622,7 @@ pass  GET https://formancy.example.com/v1/forms/order/versions/1  Access answere
 pass  GET https://formancy.example.com/v1/forms/order/versions/latest  Access answered first
 pass  GET https://formancy.example.com/v1/whoami  Access answered first
 pass  GET http://formancy.example.com/studio/  redirected to HTTPS
-25 requests, 25 as expected, 0 not.
+26 requests, 26 as expected, 0 not.
 ```
 
 <!-- end generated -->

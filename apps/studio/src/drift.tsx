@@ -6,6 +6,7 @@ import type { Regeneration } from '@formancy/data-server'
 import type { AdminClient, Drift, Published } from './api.js'
 import { isFormId } from './choice.js'
 import { Change } from './drift-change.js'
+import { ImportPanel } from './import.js'
 import { regenerateForm, RegenerationView } from './regenerate.js'
 import type { Regenerated } from './regenerate.js'
 import { VersionsPanel } from './versions.js'
@@ -81,6 +82,10 @@ const VERSIONS_STILL_OFFERED = new Set(['corrupt-bundle', 'unavailable'])
  * publish; or restore an older version, when the database can still serve
  * it. The versions are offered too when the newest one is not served or the
  * database cannot be read, because a restore over it is the way back.
+ *
+ * And a version from another deployment, imported from its file (0062):
+ * the form it names is checked again here when it is the one shown, since
+ * the import made a newer version than the report describes.
  */
 export function DriftStep({
   client,
@@ -97,6 +102,10 @@ export function DriftStep({
   const [checked, setChecked] = useState<Checked | null>(null)
   const [regenerating, setRegenerating] = useState(false)
   const [regenerated, setRegenerated] = useState<Regenerated | null>(null)
+  // Versions of the form shown that an import wrote, for its version list to be read again.
+  const [imported, setImported] = useState(0)
+  // Versions a restore here wrote, for the import to name the version after them.
+  const [restored, setRestored] = useState(0)
 
   async function run(id: string): Promise<void> {
     setChecking(true)
@@ -164,8 +173,26 @@ export function DriftStep({
       )}
       {versionsOf === undefined ? null : (
         // Keyed by form: one form's chosen version and restore outcome are never shown under another's heading.
-        <VersionsPanel key={versionsOf} client={client} formId={versionsOf} onRestored={() => void run(versionsOf)} />
+        <VersionsPanel
+          key={versionsOf}
+          client={client}
+          formId={versionsOf}
+          published={imported}
+          onRestored={() => {
+            setRestored((count) => count + 1)
+            void run(versionsOf)
+          }}
+        />
       )}
+      <ImportPanel
+        client={client}
+        written={restored}
+        onImported={(id) => {
+          if (id !== versionsOf) return
+          setImported((count) => count + 1)
+          void run(id)
+        }}
+      />
     </>
   )
 }

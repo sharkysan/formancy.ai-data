@@ -17,7 +17,9 @@
 //
 // Decoded here, so a caption's quote is matched against what a person reads
 // and not against the escaping. Node only, no import, and pure: the camera
-// checks quotes through it before it writes, and readme.test.mjs after.
+// checks quotes through it before it writes, and readme.test.mjs after. One
+// thing is taken out of the text before it is recorded or compared, by
+// steadied below: the UUID of an object URL, which is new on every walk.
 
 const LINE = /^((?: {2})*)- (.*)$/
 /**
@@ -113,3 +115,19 @@ export function occursIn(quote, snapshot) {
 export function strings(snapshot) {
   return decode(snapshot).flatMap((entry) => [entry.name, entry.value].filter((text) => typeof text === 'string'))
 }
+
+/**
+ * A `/url` line whose whole value is an object URL, as the File API makes
+ * one: `blob:`, the page's origin, and a UUID the browser draws afresh for
+ * every `URL.createObjectURL`.
+ */
+const OBJECT_URL = /^((?: {2})*- \/url: blob:[a-z][a-z0-9+.-]*:\/\/[^\s"/]+\/)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/gm
+
+/**
+ * `snapshot` with the UUID of each link's object URL said as `<uuid>`: what
+ * the camera records and `--check` compares. The studio's download link
+ * (0062) is an object URL, so its UUID is new on every walk, and a record
+ * holding one walk's would differ from every other. Nothing else changes:
+ * text, and an address of any other kind, is what the page says.
+ */
+export const steadied = (snapshot) => snapshot.replaceAll(OBJECT_URL, '$1<uuid>')

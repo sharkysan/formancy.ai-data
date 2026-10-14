@@ -69,6 +69,14 @@
     },
     {
       "method": "POST",
+      "path": "/v1/forms/:id/imports",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/imports",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "POST",
       "path": "/v1/forms/:id/lookups/:source/query",
       "plane": "runtime",
       "sample": "/v1/forms/order/lookups/customer/query",

@@ -1,5 +1,5 @@
 import type { DriftChange, DriftReport, GeneratedForm, GenerationRequest, LookupChoice, MetadataSnapshot, ObjectRef, ReassignedKey, ServerIdentity } from '@formancy/data-core'
-import type { BundleV2, HostIdentity, PublishedBundle, Regeneration, Restoration } from '@formancy/data-server'
+import type { BundleV2, HostIdentity, Importation, PublishedBundle, Regeneration, Restoration } from '@formancy/data-server'
 
 /**
  * The studio's whole vocabulary: the data server's administrator plane, and
@@ -15,7 +15,7 @@ import type { BundleV2, HostIdentity, PublishedBundle, Regeneration, Restoration
  * blank pane.
  */
 
-/** Why the server, or the network, said no. `problems`, `current`, `changes` and `drift` are carried when the server sends them. */
+/** Why the server, or the network, said no. `problems`, `current`, `changes`, `drift` and `keys` are carried when the server sends them. */
 export interface Failure {
   ok: false
   /** The HTTP status, or 0 when nothing answered. */
@@ -32,6 +32,8 @@ export interface Failure {
   changes?: DriftChange[]
   /** The drift of a form that can no longer be generated (422 `cannot-generate`). */
   drift?: DriftReport
+  /** The keys a publish or an import grants on that stood for something else in the version it replaces, not confirmed (422 `keys-reassigned`, 0039). */
+  keys?: ReassignedKey[]
 }
 
 export type Outcome<T> = { ok: true; value: T } | Failure
@@ -84,6 +86,14 @@ export interface AdminClient {
   regenerate(formId: string): Promise<Outcome<Regeneration>>
   /** Republish `version` as the next one, when drift against it blocks nothing. */
   restore(formId: string, version: number, expectedBase: number): Promise<Outcome<Restoration>>
+  /**
+   * Write another deployment's version file as the next version here (0062),
+   * over `expectedBase`, the newest version here or `null` for none. The
+   * file is sent as it was read: the server checks it as a publish, and
+   * gates it on this deployment's database as a restore, and the studio
+   * does neither for it. `keysConfirmed`: exactly the keys a refusal listed.
+   */
+  importVersion(formId: string, expectedBase: number | null, bundle: unknown, keysConfirmed?: readonly ReassignedKey[]): Promise<Outcome<Importation>>
 }
 
 /**
@@ -106,6 +116,7 @@ function failure(status: number, body: unknown): Failure {
   const current = body['current']
   const changes = body['changes']
   const drift = body['drift']
+  const keys = body['keys']
   return {
     ok: false,
     status,
@@ -116,6 +127,7 @@ function failure(status: number, body: unknown): Failure {
     // The server's own drift types, as every success here is read: a shape it changes is its tests' to catch.
     ...(Array.isArray(changes) ? { changes: changes as DriftChange[] } : {}),
     ...(isRecord(drift) ? { drift: drift as unknown as DriftReport } : {}),
+    ...(Array.isArray(keys) ? { keys: keys as ReassignedKey[] } : {}),
   }
 }
 
@@ -177,5 +189,7 @@ export function createAdminClient({ token, fetch, base = '' }: { token: string; 
     version: (formId, version) => call('GET', `/v1/forms/${segment(formId)}/versions/${String(version)}`),
     regenerate: (formId) => call('POST', `/v1/forms/${segment(formId)}/regenerations`),
     restore: (formId, version, expectedBase) => call('POST', `/v1/forms/${segment(formId)}/restorations`, { version, expectedBase }),
+    importVersion: (formId, expectedBase, bundle, keysConfirmed = []) =>
+      call('POST', `/v1/forms/${segment(formId)}/imports`, { expectedBase, bundle, ...(keysConfirmed.length === 0 ? {} : { keysConfirmed }) }),
   }
 }

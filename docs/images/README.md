@@ -101,6 +101,12 @@ listens on a port.
 - **Secrets.** It refuses a part whose text holds a token, password or
   connection URL the plane holds, and names the scene and the part, never the
   value.
+- **Object URLs.** A link whose address is an object URL -- the studio's
+  version download
+  ([0062](../decisions/0062-a-published-version-moves-between-deployments-as-its-version-file.md))
+  -- is recorded with the URL's UUID said as `<uuid>`, because the browser
+  draws a new one on every load and a record holding one walk's would differ
+  from every walk after. Nothing else in a part's text is changed.
 
 ## Parts, quotes and holds
 

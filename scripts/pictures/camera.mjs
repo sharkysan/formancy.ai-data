@@ -41,7 +41,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { extname, join, normalize, sep } from 'node:path'
-import { strings } from './aria-text.mjs'
+import { steadied, strings } from './aria-text.mjs'
 
 /** §3 of the design, for every scene: what a context is opened with. Nothing here reads the colour scheme; light is Playwright's default, said. */
 export const SETTINGS = Object.freeze({ deviceScaleFactor: 2, locale: 'en-US', timezoneId: 'UTC', reducedMotion: 'reduce', colorScheme: 'light', height: 900 })
@@ -493,7 +493,8 @@ export const decodedPng = (browser, picture) => encode(browser, picture, { from:
  * holds and `--check` compares. Refuses an empty one, and one that holds any
  * of `secrets` -- the tokens, passwords and connection URLs the app's plane
  * holds -- raw or decoded; the refusal names the scene and the part, never
- * the value.
+ * the value. An object URL's UUID, new on every walk, is said as `<uuid>`
+ * (aria-text.mjs's steadied).
  */
 export async function text(parts, { scene, secrets = [] }) {
   const said = {}
@@ -504,7 +505,7 @@ export async function text(parts, { scene, secrets = [] }) {
     if (secrets.some((secret) => secret !== '' && readable.some((line) => line.includes(secret)))) {
       throw new Error(`${scene}: the part ${name} shows one of the plane's secrets -- a token, a password or a connection URL -- so it is neither recorded nor printed`)
     }
-    said[name] = snapshot
+    said[name] = steadied(snapshot)
   }
   return said
 }

@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
 import { audit, discover, generateOrder, goTo, grantOrderDelete, signIn, step, unnamed, writeOrderPolicy } from './test-studio.js'
@@ -34,13 +36,16 @@ const ADMIN_PLANE = [
   /^GET \/v1\/forms\/[^/]+\/versions\/\d+$/,
   /^POST \/v1\/forms\/[^/]+\/regenerations$/,
   /^POST \/v1\/forms\/[^/]+\/restorations$/,
+  /^POST \/v1\/forms\/[^/]+\/imports$/,
 ]
 
 /**
  * From a published version 1 to the Drift step's answers (0030): version 2
  * published, the drift checked, a restore of version 1 refused by a dropped
  * column and the database put back, version 1 restored, and the form
- * regenerated and taken up as the draft. `record` is called at each state.
+ * regenerated and taken up as the draft; then, back on the Drift step,
+ * version 1's file imported as the next version (0062), as another
+ * deployment would import it. `record` is called at each state.
  */
 async function evolve(user: User, plane: TestPlane, record: (name: string) => Promise<void>): Promise<void> {
   const publish = await goTo(user, 'Publish')
@@ -64,6 +69,13 @@ async function evolve(user: User, plane: TestPlane, record: (name: string) => Pr
   await user.click(within(regenerated).getByRole('button', { name: 'Continue to presentation' }))
   await screen.findByRole('region', { name: 'Carried from version 3' })
   await record('Presentation, carried')
+  const importing = within(await goTo(user, 'Drift')).getByRole('region', { name: 'Import a version' })
+  const file = new File([await readFile(join(plane.root, 'sales-order', '1.json'))], 'sales-order-1.json', { type: 'application/json' })
+  await user.upload(within(importing).getByLabelText('Version file'), file)
+  await record('Drift, a version file chosen')
+  await user.click(await within(importing).findByRole('button', { name: 'Import as version 4' }))
+  await within(importing).findByText(/^Imported as version 4 of sales-order/)
+  await record('Drift, a version imported')
 }
 
 describe('the journey', () => {
@@ -111,9 +123,9 @@ describe('the journey', () => {
 
   // The studio talks to the administrator plane and to nothing else: no
   // record route, no lookup route, nothing outside /v1 -- through the
-  // versions, regeneration and restore of 0030 too. A preview that
-  // fetched customers through the runtime plane would be the studio writing
-  // with a clerk's permissions.
+  // versions, regeneration and restore of 0030 and the import of 0062 too.
+  // A preview that fetched customers through the runtime plane would be the
+  // studio writing with a clerk's permissions.
   test('speaks only the administrator plane', async () => {
     const user = await signIn(plane)
     await generateOrder(user)
@@ -128,7 +140,7 @@ describe('the journey', () => {
     // Not vacuous: every route the journey has a reason to call, it called.
     // (Testing a connection is the one it skips.)
     const used = new Set(calls.map((call) => ADMIN_PLANE.findIndex((route) => route.test(call))))
-    expect([...used].sort((a, b) => a - b)).toEqual([0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    expect([...used].sort((a, b) => a - b)).toEqual([0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
   })
 
   // A step that cannot work yet is listed, disabled, and says what it waits
