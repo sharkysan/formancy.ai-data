@@ -6,6 +6,7 @@ import { createServer } from 'node:net'
 import type { AddressInfo } from 'node:net'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
+import { MAX_LOOKUP_DEADLINE_MS } from '@formancy/data-core'
 import { loadSizedCustomers, startPostgresFixture, startSqlServerFixture, startTcpHop, WRITER } from '@formancy/data-fixtures'
 import type { PostgresFixture, SizedLoad, SqlServerFixture, TcpHop } from '@formancy/data-fixtures'
 import mssql from 'mssql'
@@ -157,6 +158,11 @@ export async function startStack(options: { runDir: string; rateLimit: number })
       FORMANCY_DATA_ADMIN_ROLES: 'data-admin',
       FORMANCY_DATA_AUDIT_KEY: 'env:PERF_AUDIT_KEY',
       FORMANCY_DATA_RATE_LIMIT: String(options.rateLimit),
+      // The longest a timer holds, set as an operator sets it, for the reason
+      // the rate limit is set high: no deadline may answer inside a run, and
+      // the default deadline is derived from what the run measures (0061). A
+      // run cut at today's default could never measure past it.
+      FORMANCY_DATA_LOOKUP_DEADLINE_MS: String(MAX_LOOKUP_DEADLINE_MS),
       PORT: String(port),
       NODE_ENV: 'production',
     }

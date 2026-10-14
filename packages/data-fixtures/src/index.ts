@@ -65,6 +65,8 @@ export { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 export { DELIVERIES, UUID_PARITY, UUID_ROWS, uuidOrder } from './uuid.js'
 export type { UuidCase } from './uuid.js'
 export { answerBytes, startTcpHop } from './tcp-hop.js'
+export { blockTable } from './blocking.js'
+export type { BlockedTable, BlockingDatabase } from './blocking.js'
 export type { HopKind, LostAnswer, Schedule, SentOn, TcpHop } from './tcp-hop.js'
 export {
   FIXTURE_CUSTOMERS,

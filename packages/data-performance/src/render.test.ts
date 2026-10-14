@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { END_MARKER, renderPerformance, replaceGenerated, START_MARKER, UNMEASURED_MARKER } from './render.js'
 import type { Results } from './results.js'
+import { lookupDeadlineFrom } from './deadline.js'
 import { publishedResults } from './test-results.js'
 
 /** The lines of one section of the region, from its heading to the next. */
@@ -192,5 +193,29 @@ describe('replacing the region', () => {
   test('refuses a page without both markers', () => {
     expect(() => replaceGenerated('# Performance\n', 'x')).toThrow(/markers/)
     expect(() => replaceGenerated(`${END_MARKER}\n${START_MARKER}\n`, 'x')).toThrow(/markers/)
+  })
+})
+
+describe('the default lookup deadline', () => {
+  // data-core's default deadline is derived from these figures (0061); the
+  // page says from which block, so a reader can see the number is the
+  // slowest lookup answer measured and not a choice, and on what it rests.
+  test('is said with the block it comes from, when the catalogue names each operation', () => {
+    const results = publishedResults()
+    const derived = lookupDeadlineFrom(results.scenarios, results.catalogue)
+    const label = results.catalogue.scenarios.find((entry) => entry.name === derived.scenario)?.label ?? ''
+    expect(section(renderPerformance(results), 'How it was measured')).toContain(
+      `- The default lookup deadline, ${String(derived.ms)} ms, is the slowest lookup or resolve answer in these figures: ${derived.engine === 'pg' ? 'PostgreSQL' : 'SQL Server'}, ${label}, ${String(derived.concurrency)} in flight.`,
+    )
+  })
+
+  // A result measured before 0061 carries a catalogue that names no
+  // operation. The page then says nothing about the deadline rather than
+  // guess which rows were lookups from their names -- and the committed
+  // page, rendered from such a result, stays what it was.
+  test('is not said for a result whose catalogue names no operation', () => {
+    const results = structuredClone(publishedResults())
+    for (const entry of results.catalogue.scenarios) delete (entry as { operation?: unknown }).operation
+    expect(renderPerformance(results)).not.toContain('lookup deadline')
   })
 })

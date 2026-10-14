@@ -155,6 +155,29 @@ existed would be documented and inert.
   commit, on both engines, and fails if the write crosses to the database a
   second time.
 
+  A lookup's statement stops when its request is abandoned or its deadline
+  passes ([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)). The route passes the adapter a signal that aborts
+  when the response or its socket closes before the answer
+  (`routes/abandoned.ts`), or when `lookupDeadlineMs` passes, counted from
+  when the adapter is asked for the statement, so a wait for a pooled
+  connection counts and reading the form and opening its connection do not;
+  the adapter stops the statement with its driver's own cancel. A search
+  past the deadline is 503 `lookup-timeout`, whose sentence says the same
+  search will take as long again; a resolve, which reads by key and so
+  waited rather than read too much, is 503 `unavailable`, which invites
+  another try, the log naming the deadline; one whose client left is
+  answered 499 `abandoned`, which nobody reads and the audit trail records;
+  each membership check inside a create or an update has a deadline of its
+  own and no abandonment, since a write goes on after its client leaves,
+  and past it is the usual 503 `unavailable`, nothing saved, the log saying
+  the deadline passed. A lookup that completes
+  is answered as before. On PostgreSQL the lookups run on a client of their
+  own, `application_name` `formancy-data lookups` (`drivers.ts`), so a
+  cancel PostgreSQL delivers late can stop only another lookup, never a
+  record's statement; each allowlisted PostgreSQL database may use up to
+  twice the connections. `routes/runtime-lookup-limits.integration.test.ts`
+  holds each on both engines with a statement waiting behind a lock.
+
   Every record request, and opening a form, is decided over the form's
   table as the catalog describes it then
   ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)),
@@ -371,10 +394,12 @@ one-key settings rotate by restart; a key set rotates as below.
 | --- | --- |
 | `FORMANCY_DATA_RATE_LIMIT` | Requests a minute each client address may send to every route but `/health`: a whole number of at least 1, 600 when unset. Anything else stops the process with a sentence naming the setting. Behind a reverse proxy every client shares the proxy's address, so the limit is one bucket for all of them: Fastify's `trustProxy` is not offered, and the setting raises that bucket rather than splitting it. |
 | `FORMANCY_DATA_CORS_ORIGINS` | The origins a page may call the runtime plane from, comma-separated, each exactly as a browser sends `Origin`: `https://app.example`, or plain HTTP on `localhost`, `127.0.0.1` or `[::1]`. Empty or unset, none. A wildcard, a pattern, `null`, a path or a spelling no browser sends stops the process, and so does a list without the runtime plane. Read at start ([0060](../../docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md)); see *Across origins*, below. |
+| `FORMANCY_DATA_LOOKUP_DEADLINE_MS` | How long a lookup statement may run, in milliseconds counted from when the adapter is asked for it, before the server stops it ([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)): a whole number from 1 to 2147483647, the longest a Node timer holds. Unset, `DEFAULT_LOOKUP_DEADLINE_MS` from `@formancy/data-core`, the slowest lookup answer `docs/performance.md` measured, which describes that machine and data: a slower or larger deployment raises it. Anything else stops the process with a sentence naming the setting, and `createDataServer` refuses the same as `runtime.lookupDeadlineMs`. On SQL Server mssql's default request timeout of 15 s still cuts any deadline set above it, answered `unavailable`. |
 | `PORT` | The port it listens on, 4390 when unset. |
 
 `src/rate-limit.test.ts` holds what the rate-limit setting accepts and
-refuses, and `src/cors.test.ts` what the origin list does.
+refuses, `src/cors.test.ts` what the origin list does, and
+`src/lookup-deadline.test.ts` what the lookup deadline accepts.
 
 The log is JSON lines on standard output: Fastify's lines for each request,
 and the audit trail. A request is logged by its method and the route it

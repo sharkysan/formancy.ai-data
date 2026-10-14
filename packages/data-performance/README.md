@@ -13,7 +13,9 @@ Nothing in it is a contract.
 The shipped server, `@formancy/data-server`'s `dist/main.mjs`, started as a
 child process and configured only through its environment, as an operator
 configures it, with `FORMANCY_DATA_RATE_LIMIT` raised so the per-address limit
-never answers inside a run. Its log goes to a file it is handed as its output,
+never answers inside a run, and `FORMANCY_DATA_LOOKUP_DEADLINE_MS` at the
+longest a timer holds so no lookup is cut: the default deadline is derived
+from what a run measures ([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)). Its log goes to a file it is handed as its output,
 not to a pipe, and stays on, audit included. In front of it, the requests a
 host sends, through `@formancy/data-client` and Node's `fetch` over loopback:
 the form, the customer lookup's first page and three searches, on the
@@ -32,8 +34,9 @@ granted to the writer (`src/drifted.ts`); each must be answered 409 `drift`
 and ask the database for the description it was decided over and nothing
 more.
 
-`src/catalogue.ts` names every request, what the page calls it and the
-database round trips it makes on each engine; `src/protocol.ts` holds the
+`src/catalogue.ts` names every request, what the page calls it, the runtime
+operation it addresses as the audit trail names it, and the database round
+trips it makes on each engine; `src/protocol.ts` holds the
 publish protocol, every value with its reason, and the smoke protocol the
 test runs.
 
@@ -54,8 +57,9 @@ test runs.
    compared with.
 4. **Counting pass**: each request and each refusal once through the hop,
    after one to warm it, counted, and held to the catalogue's pins; a
-   refusal must also answer as the catalogue says. A difference refuses the
-   run.
+   refusal must also answer as the catalogue says, and a request must
+   address exactly the runtime operation the catalogue names for it. A
+   difference refuses the run.
 5. **Fixed costs**, in this process: token verification, the store read and
    check every request makes, and the database floor.
 6. **Rounds**, engine order alternating: every request one at a time, then
@@ -114,3 +118,15 @@ time. It needs Docker, and it loads the sized customers into both engines.
 ## Licence
 
 Source-available, not open source. See [`LICENSE.md`](../../LICENSE.md).
+
+## The default lookup deadline
+
+`src/deadline.ts`'s `lookupDeadlineFrom` takes the slowest answer of every
+scenario the catalogue says addresses `lookup-query` or `lookup-resolve`,
+on both engines and at every in-flight level, and rounds it up to the
+millisecond ([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)). `src/deadline.test.ts` fails when
+`@formancy/data-core`'s `DEFAULT_LOOKUP_DEADLINE_MS` is not what
+`docs/performance/results.json` derives, so after `pnpm performance` the
+constant follows the figures. The page says which block it came from; a
+result measured before 0061, whose catalogue names no operations, says
+nothing about it.

@@ -1,7 +1,7 @@
-import type { FoundRow, LookupAdapter, LookupConfig, RowFilterTerm } from '@formancy/data-core'
+import type { FoundRow, LookupAdapter, LookupConfig, LookupSignal, RowFilterTerm } from '@formancy/data-core'
 import { lookupKeys, lookupPage, rejectedTokens, resolvedRows, rowFilterTerms } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
-import { run } from '../sql/statement.js'
+import { runUntil, stopIfAborted } from '../sql/statement.js'
 import { fromCanonicalText } from '../sql/values.js'
 import { keyGroups, keysStatement, pageStatement } from './statements.js'
 
@@ -24,7 +24,9 @@ function foundRow(config: LookupConfig, row: Row): FoundRow {
 /**
  * The rows under the filters whose key is one of `keys`, read in as many
  * statements as the parameter limit needs, one after another so a long list
- * holds one connection rather than the pool.
+ * holds one connection rather than the pool. Each group runs until `signal`
+ * aborts, and `runUntil` checks it before building the next, so an aborted
+ * resolve sends no further group (0061).
  */
 async function findKeys(
   pool: ConnectionPool,
@@ -32,10 +34,11 @@ async function findKeys(
   keys: readonly (readonly string[])[],
   terms: readonly RowFilterTerm[],
   withDisplay: boolean,
+  signal: LookupSignal,
 ): Promise<FoundRow[]> {
   const found: FoundRow[] = []
   for (const group of keyGroups(config, keys, terms.length)) {
-    const rows = await run<Row>(pool, keysStatement(config, group, terms, withDisplay))
+    const rows = await runUntil<Row>(pool, keysStatement(config, group, terms, withDisplay), signal)
     for (const row of rows) found.push(foundRow(config, row))
   }
   return found
@@ -64,12 +67,23 @@ async function findKeys(
  *
  * A database error propagates: a lookup that cannot answer refuses, and
  * formancy turns that into a refused submission.
+ *
+ * Every statement runs until the caller's signal aborts, and is then stopped
+ * in the database by `request.cancel()`, a TDS attention (0061,
+ * ../sql/statement.ts). A signal already aborted is refused before the
+ * filters are read or a key is parsed, so a request already gone costs
+ * nothing. The pool is the one records use: an attention travels on the
+ * statement's own connection, so unlike PostgreSQL's cancel request it
+ * cannot stop anyone else's statement. No per-request `requestTimeout` is
+ * set; mssql's default of 15 s, which it hands tedious for every request
+ * (lib/tedious/connection-pool.js), still bounds every statement.
  */
 export function createSqlServerLookups(pool: ConnectionPool): LookupAdapter {
   return {
-    async search(config, query, filters) {
+    async search(config, query, filters, signal) {
+      stopIfAborted(signal)
       const terms = rowFilterTerms(filters)
-      const rows = await run<Row>(pool, pageStatement(config, query, terms))
+      const rows = await runUntil<Row>(pool, pageStatement(config, query, terms), signal)
       return lookupPage(
         config,
         rows.map((row) => foundRow(config, row)),
@@ -77,17 +91,19 @@ export function createSqlServerLookups(pool: ConnectionPool): LookupAdapter {
       )
     },
 
-    async resolve(config, tokens, filters) {
+    async resolve(config, tokens, filters, signal) {
+      stopIfAborted(signal)
       const terms = rowFilterTerms(filters)
       const keys = lookupKeys(config, tokens)
       if (keys.length === 0) return []
-      return resolvedRows(config, tokens, await findKeys(pool, config, keys, terms, true))
+      return resolvedRows(config, tokens, await findKeys(pool, config, keys, terms, true, signal))
     },
 
-    async rejects(config, tokens, filters) {
+    async rejects(config, tokens, filters, signal) {
+      stopIfAborted(signal)
       const terms = rowFilterTerms(filters)
       const keys = lookupKeys(config, tokens)
-      const found = keys.length === 0 ? [] : await findKeys(pool, config, keys, terms, false)
+      const found = keys.length === 0 ? [] : await findKeys(pool, config, keys, terms, false, signal)
       return rejectedTokens(
         tokens,
         found.map((row) => row.key),

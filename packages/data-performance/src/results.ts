@@ -34,6 +34,15 @@ export interface CatalogueScenario {
   roundTrips: Readonly<Record<EngineKey, number>>
   /** What the database reads, or null where no suite holds it. */
   rowsRead: RowsRead | null
+  /**
+   * The runtime plane's audit operation one request of it addresses --
+   * `lookup-query`, `create` -- or null for a request outside that plane.
+   * The counting pass refuses a run whose requests address another, and the
+   * audit reconciliation equates what was addressed with what the server
+   * recorded, so the name is the server's own. Absent in results measured
+   * before 0061, whose catalogue did not carry it.
+   */
+  operation?: string | null
 }
 
 /** A request the server refuses, counted through the hop and never timed: what a stopped request still asks the database. */

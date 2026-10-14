@@ -24,7 +24,7 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > **Status: in development, nothing released.** Each line under *What it does*
 > links the decision record whose **Verified by** names what fails when the
 > line stops being true. Not yet: a release, a delete figure on the
-> performance page, a host
+> performance page, figures measured with the lookup limits, a host
 > page that draws a field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
 > a host page on another origin run in a browser, a run through a real
@@ -122,6 +122,10 @@ is not licensed for production.
   ([0012](./docs/decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md),
   [0018](./docs/decisions/0018-one-planner-turns-answers-into-requests.md),
   [0028](./docs/decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)).
+  A search the page abandons, or one that runs past the server's lookup
+  deadline, is stopped in the database rather than left to finish for
+  nobody; a search still reads every row the filter admits
+  ([0061](./docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)).
 - **Every write is one guarded statement.** A stale save is refused instead
   of overwriting
   ([0015](./docs/decisions/0015-a-record-operation-is-one-guarded-statement.md));

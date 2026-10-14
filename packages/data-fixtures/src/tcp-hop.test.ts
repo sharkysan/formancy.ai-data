@@ -611,6 +611,112 @@ describe('delayed answers', () => {
   })
 })
 
+describe('held connections', () => {
+  // A PostgreSQL cancel request travels on a connection of its own, opened
+  // when the cancel is asked for (0061). The proof that a late cancel lands on
+  // the next statement, and that the adapter runs that statement again, needs
+  // the cancel to arrive late on purpose: held at the hop until the test has
+  // put the next statement on the same backend. Timing it instead would make
+  // the proof pass or fail by the scheduler. What was opened before the call
+  // -- the pool's connection that runs the statements -- must not be held, or
+  // the statement the cancel is meant to land on would never be sent.
+  test('holds what a connection opened after the call sends, in order, until release; earlier connections flow', async () => {
+    const { hop, connect } = await setUp()
+    const earlier = await connect()
+    const gate = hop.holdNewConnections()
+    const held = await connect()
+    held.client.write(text('cancel '))
+    held.client.write(text('request'))
+    await fromClient(earlier, text('the statement'))
+    await fromServer(earlier, text('its answer'))
+    // Absence has no event: by now the earlier connection has crossed the hop
+    // both ways, and loopback has had 200 ms more for anything held to leak.
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(held.atServer().length).toBe(0)
+    gate.release()
+    await until(() => held.atServer().toString('latin1') === 'cancel request', 'the held bytes arrived, in order')
+    await fromClient(held, text(' and after'))
+    expect(held.atServer().toString('latin1')).toBe('cancel request and after')
+  })
+
+  // Only the connection is held, not the conversation's other half: the
+  // server can still speak to a held client. And a release ends the hold for
+  // good, so a connection opened afterwards flows from its first byte -- a
+  // gate left on would hold the next suite's pool.
+  test('answers still reach a held client, and a connection opened after release is not held', async () => {
+    const { hop, connect } = await setUp()
+    const gate = hop.holdNewConnections()
+    const held = await connect()
+    await fromServer(held, text('server speaks first'))
+    gate.release()
+    const later = await connect()
+    await fromClient(later, text('flows at once'))
+  })
+
+  // A client that sends its request and closes its half -- as a cancel
+  // request's sender may -- must not have the close overtake the bytes held
+  // before it: the server would see an empty connection and cancel nothing.
+  test('a close from a held client is passed on after the bytes held before it', async () => {
+    const { hop, connect } = await setUp({ halfOpen: true })
+    const gate = hop.holdNewConnections()
+    const held = await connect()
+    const ended = new Promise<void>((resolve) => held.server.once('end', () => resolve()))
+    held.client.end(text('last words'))
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(held.atServer().length).toBe(0)
+    gate.release()
+    await bounded(ended, 'the close never arrived')
+    expect(held.atServer().toString('latin1')).toBe('last words')
+  })
+
+  // The proof counts the statement the late cancel lands on by how often its
+  // text was sent (`countSent`), and the bytes a release forwards are sent
+  // then, not when the client wrote them: a count taken at arrival would
+  // count a cancel that never reached the server.
+  test('counts held bytes as sent, and as a turn, when they are released', async () => {
+    const { hop, connect } = await setUp()
+    const sent = hop.countSent(MARKER)
+    const turns = hop.countRoundTrips()
+    const gate = hop.holdNewConnections()
+    const held = await connect()
+    held.client.write(MARKER)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect({ sent: sent(), turns: turns() }).toEqual({ sent: 0, turns: 0 })
+    gate.release()
+    await until(() => held.atServer().equals(MARKER), 'the marker was released')
+    expect({ sent: sent(), turns: turns() }).toEqual({ sent: 1, turns: 1 })
+  })
+})
+
+describe('refused connections', () => {
+  // A database whose listener went away while its open sessions still
+  // answer: what a PostgreSQL cancel request meets when it is the only
+  // connection opened while the database stops accepting (0061). The driver
+  // reports that failure on a promise of its own, and a lookup that let it go
+  // unhandled ended the server's process; the adapter's proof needs the
+  // refusal made, not waited for. A refused connection must be an error the
+  // client sees -- a quiet close would read as a cancel the server accepted
+  // -- and must never reach the target, or the cancel would arrive after all.
+  test('resets every connection opened after the call before it reaches the target; earlier ones flow; release ends it', async () => {
+    const { hop, connect } = await setUp()
+    const earlier = await connect()
+    const refusal = hop.refuseNewConnections()
+    const refused = net.connect(hop.port, '127.0.0.1')
+    const failed = new Promise<NodeJS.ErrnoException>((resolve) => refused.once('error', resolve))
+    refused.write(text('cancel request'))
+    expect((await failed).code).toBe('ECONNRESET')
+    expect(refusal.refused()).toBe(1)
+    await fromClient(earlier, text('the statement'))
+    await fromServer(earlier, text('its answer'))
+    refusal.release()
+    // The next connection the target is handed is the one opened after release:
+    // the refused one never arrived, or `connect` would be handed it instead.
+    const later = await connect()
+    await fromClient(later, text('flows again'))
+    expect(refusal.refused()).toBe(1)
+  })
+})
+
 describe('answerBytes', () => {
   // postgres.js speaks UTF-8 and tedious UTF-16LE: the same marker in the
   // wrong encoding is never found, and the suite times out saying so.

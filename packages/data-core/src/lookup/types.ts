@@ -145,6 +145,20 @@ export interface RowFilterTerm {
 export type RowFilters = { readonly kind: 'unrestricted' } | { readonly kind: 'restricted'; readonly equal: readonly [RowFilterTerm, ...RowFilterTerm[]] }
 
 /**
+ * The caller's AbortSignal, as much of it as an adapter reads. Spelled out
+ * because data-core is built with no DOM and no Node types (formancy.ai
+ * 0008); the platform's `AbortSignal` is assignable to it, and that is
+ * what the server passes (0061).
+ */
+export interface LookupSignal {
+  readonly aborted: boolean
+  /** What the caller aborted with: a lookup that stopped rejects with exactly this. */
+  readonly reason: unknown
+  addEventListener(type: 'abort', listener: () => void, options?: { once?: boolean }): void
+  removeEventListener(type: 'abort', listener: () => void): void
+}
+
+/**
  * The lookup half of the database port, which both adapters implement and one
  * conformance suite holds them to.
  *
@@ -158,6 +172,21 @@ export type RowFilters = { readonly kind: 'unrestricted' } | { readonly kind: 'r
  * each adapter spells it. The order of text — and of UUIDs on SQL Server — is
  * each engine's own; that is a real difference between the engines and the
  * adapters say so rather than hide it.
+ *
+ * Every method takes the caller's `signal`, last and required, so the type
+ * checker finds every caller (0061). The server aborts it when the browser
+ * abandons the request or the lookup deadline passes. The contract:
+ *
+ * - Already aborted: reject with `signal.reason` and send nothing.
+ * - Aborted before the answer is read: ask the driver to stop the statement
+ *   (PostgreSQL's cancel request, SQL Server's attention) and reject with
+ *   `signal.reason` at once, without waiting for the database. The
+ *   connection returns to the pool when the driver settles the statement.
+ * - An answer read before the abort is returned unchanged: a limit never
+ *   changes what a completed lookup answers (0012, 0028).
+ * - The reason is never translated or wrapped, so a caller tells its own
+ *   abort from a database failure by `error === signal.reason`.
+ * - No statement but the lookup's own is ever stopped by its cancel.
  */
 export interface LookupAdapter {
   /**
@@ -165,14 +194,14 @@ export interface LookupAdapter {
    * literal: `%`, `_` and `[` match themselves. How case and accents compare is
    * each engine's collation, written down in the adapter. Built with `lookupPage`.
    */
-  search(config: LookupConfig, query: LookupQuery, filters: RowFilters): Promise<LookupResult>
+  search(config: LookupConfig, query: LookupQuery, filters: RowFilters, signal: LookupSignal): Promise<LookupResult>
 
   /**
    * Labels for tokens a form already holds and the current page does not show.
    * A token that names no row this actor may see is left out, not an error:
    * formancy then shows the stored value. Built with `lookupKeys` and `resolvedRows`.
    */
-  resolve(config: LookupConfig, tokens: readonly string[], filters: RowFilters): Promise<LookupRow[]>
+  resolve(config: LookupConfig, tokens: readonly string[], filters: RowFilters, signal: LookupSignal): Promise<LookupRow[]>
 
   /**
    * The tokens that are NOT members: invented, malformed, another tenant's, or
@@ -181,7 +210,7 @@ export interface LookupAdapter {
    * clause. Built with `lookupKeys` and `rejectedTokens`. Throws when the
    * database cannot answer, which formancy turns into a refused submission.
    */
-  rejects(config: LookupConfig, tokens: readonly string[], filters: RowFilters): Promise<string[]>
+  rejects(config: LookupConfig, tokens: readonly string[], filters: RowFilters, signal: LookupSignal): Promise<string[]>
 }
 
 export type LookupSearch = LookupAdapter['search']

@@ -114,6 +114,17 @@ a title, operations or children is `unexpected`.
   `unexpected` when what answered was not the data server's shape — a proxy's
   HTML page, a redirect, a captive portal's `200`. A refusal with a sentence
   and no code is `http-<status>`.
+- **An abort stops the lookup in the database.** The signal a renderer
+  passes a source, or a host passes `query` and `resolve`, aborts the
+  request; the server notices its client left and stops the statement it
+  started, on both engines, and the call rejects with the AbortError
+  ([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)).
+  A search that runs past the server's deadline is refused 503
+  `lookup-timeout`, whose sentence says the same search will take as long
+  again, where `unavailable` invites another try; a resolve past it is
+  `unavailable`, since trying again helps a read by key. A source rejects
+  with either, and a renderer shows "could not be loaded". The 499 `abandoned` the server
+  answers an abandoned lookup reaches nobody: it is the audit trail's.
 - **A write is known only when the data server says what happened**
   ([0031](../../docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
   A record, the server's 502 `unknown-outcome`, a 4xx with a sentence, or a

@@ -1,5 +1,7 @@
+import { blockTable } from '@formancy/data-fixtures'
+import type { BlockedTable } from '@formancy/data-fixtures'
 import type { FormSchema } from '@formancy/spec'
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, inject, test } from 'vitest'
 import type { Refusal } from './client.js'
 import { lookupSources, sourceNames } from './lookups.js'
 import type { LookupOperation, LookupRequest } from './lookups.js'
@@ -16,7 +18,7 @@ import type { Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane()
+  plane = await startPlane({ countries: true })
 })
 
 afterAll(async () => {
@@ -35,6 +37,35 @@ function expectOk<T>(outcome: { ok: true; value: T } | Refusal): T {
 /** A request as a renderer makes one: the fields the source reads, and a live signal. */
 function request(kind: LookupRequest['kind'], options: { query?: string; values?: readonly string[]; limit?: number; signal?: AbortSignal } = {}): LookupRequest {
   return { kind, query: options.query ?? '', values: options.values ?? [], limit: options.limit ?? 50, signal: options.signal ?? new AbortController().signal }
+}
+
+/**
+ * The run's database, held behind a lock on `sales.country` by its owner, on
+ * a connection of the helper's own. Every file of this package shares the
+ * database and runs beside this one, and `waiting()` counts every session
+ * the lock holds up: a lock on `sales.customer`, which the order form's
+ * lookup and every order's membership check and foreign key read, would
+ * count another file's statement as this case's and hold it until release
+ * (2026-10-15 review). Only `pg-customer` and `ms-customer`, this file's
+ * own, read `sales.country`.
+ */
+function countriesLocked(connection: string): Promise<BlockedTable> {
+  const { pg, ms } = inject('databases')
+  const table = { schema: 'sales', name: 'country' }
+  if (connection === 'pg') {
+    const admin = `postgres://${encodeURIComponent(pg.user)}:${encodeURIComponent(pg.password)}@${pg.host}:${String(pg.port)}/${encodeURIComponent(pg.database)}`
+    return blockTable({ kind: 'postgres', admin }, table)
+  }
+  return blockTable({ kind: 'sqlserver', admin: { server: ms.host, port: ms.port, database: ms.database, user: ms.user, password: ms.password, options: { encrypt: false, trustServerCertificate: true } } }, table)
+}
+
+/** Polls until `condition` holds, or fails naming what never happened. */
+async function until(condition: () => Promise<boolean>, what: string): Promise<void> {
+  const deadline = Date.now() + 10_000
+  while (!(await condition())) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting until ${what}`)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
 }
 
 /** The body of the n-th request sent, parsed. */
@@ -145,6 +176,32 @@ describe.each(ENGINES)('lookups on $engine', ({ connection }) => {
     const pending = lookupSources(plane.client(), formId, form, 'create')[source]?.resolve(request('search', { query: 'Muster', signal: controller.signal }))
     controller.abort()
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  // (k) The end-to-end proof of 0061's first decision: a renderer's abort
+  // stops the statement in the database, not only the browser's wait. The
+  // search is made to wait behind a lock its owner holds; once it waits, the
+  // signal the renderer passes is aborted, the source rejects with the
+  // AbortError, and the statement stops waiting while the lock is still
+  // held. Before 0061 the server passed no signal to the adapter, and the
+  // statement waited until the lock went -- "the database finishes every
+  // scan it started".
+  test('an abort while the statement waits rejects with the AbortError, and the statement is gone', async () => {
+    const customers = `${connection}-customer`
+    const { form } = expectOk(await plane.client().form(customers))
+    const [source] = sourceNames(form)
+    if (source === undefined) throw new Error('the generated customer form names no source')
+    const blocked = await countriesLocked(connection)
+    try {
+      const controller = new AbortController()
+      const pending = lookupSources(plane.client(), customers, form, 'create')[source]?.resolve(request('search', { query: 'Sw', signal: controller.signal }))
+      await until(async () => (await blocked.waiting()) === 1, 'the search waited behind the lock')
+      controller.abort()
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+      await until(async () => (await blocked.waiting()) === 0, 'the statement stopped waiting while the lock was held')
+    } finally {
+      await blocked.release()
+    }
   })
 
   // (g) A document is untrusted input to the route: a name that tries to

@@ -8,6 +8,7 @@ import { corsOriginsSetting } from './cors.js'
 import { DRIVER_FACTORIES } from './drivers.js'
 import { identityKeySource, openIdentity, readAgainOnSignal } from './identity-settings.js'
 import { servedPlanes } from './planes.js'
+import { lookupDeadlineSetting } from './lookup-deadline.js'
 import { rateLimitSetting } from './rate-limit.js'
 import { resolveSecret } from './secrets.js'
 
@@ -30,6 +31,9 @@ import { resolveSecret } from './secrets.js'
  *   FORMANCY_DATA_RATE_LIMIT                       requests a minute per client address, default 600
  *   FORMANCY_DATA_CORS_ORIGINS                     origins the runtime plane answers, comma-separated, each
  *                                                  exactly as a browser sends Origin; empty or unset: none (0060)
+ *   FORMANCY_DATA_LOOKUP_DEADLINE_MS               how long a lookup statement may run before it is stopped,
+ *                                                  1 to 2147483647 ms; default DEFAULT_LOOKUP_DEADLINE_MS, derived
+ *                                                  from docs/performance/results.json (0061)
  *   PORT                                           default 4390
  */
 function required(name: string): string {
@@ -59,6 +63,14 @@ function attributeMap(text: string | undefined): Record<string, string> {
 const limit = rateLimitSetting(process.env['FORMANCY_DATA_RATE_LIMIT'])
 if (!limit.ok) {
   console.error(limit.problem)
+  process.exit(1)
+}
+
+// Read before anything opens, as the limit is: a deadline of 0, junk, or one
+// longer than a timer holds stops the process here (lookup-deadline.ts, 0061).
+const deadline = lookupDeadlineSetting(process.env['FORMANCY_DATA_LOOKUP_DEADLINE_MS'])
+if (!deadline.ok) {
+  console.error(deadline.problem)
   process.exit(1)
 }
 
@@ -128,7 +140,7 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
   const auditReference = process.env['FORMANCY_DATA_AUDIT_KEY']
   const auditKey = auditReference === undefined ? undefined : await resolveSecret(auditReference)
   // One trail for both planes, the server's own log (0033).
-  planes = servedPlanes({ registry, store, adminRoles, auditKey, origins: origins.origins, log: () => app.log })
+  planes = servedPlanes({ registry, store, adminRoles, auditKey, origins: origins.origins, lookupDeadlineMs: deadline.ms, log: () => app.log })
 }
 
 const app = await createDataServer({ verifyIdentity, logger: true, rateLimit: limit.rateLimit, ...planes })

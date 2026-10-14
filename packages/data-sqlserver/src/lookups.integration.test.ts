@@ -21,6 +21,9 @@ let owner: mssql.ConnectionPool
 let reader: mssql.ConnectionPool
 let snapshot: MetadataSnapshot
 
+/** A signal nobody aborts: every lookup here completes, and answers exactly what it answered before the port carried a signal (0061). */
+const NOT_ABORTED = new AbortController().signal
+
 const ORDER: ObjectRef = { schema: 'sales', name: 'order' }
 const CUSTOMER: ObjectRef = { schema: 'sales', name: 'customer' }
 const CODE_USE: ObjectRef = { schema: 'ops', name: 'code_use' }
@@ -86,7 +89,7 @@ describe('the tenant filter', () => {
   // filter after the query, or not at all, would offer it.
   test("offers only the tenant's own customers", async () => {
     const lookups = createSqlServerLookups(owner)
-    expect(await lookups.search(customers(), page(''), tenant('1'))).toEqual({
+    expect(await lookups.search(customers(), page(''), tenant('1'), NOT_ABORTED)).toEqual({
       rows: [{ token: 'k1:1,1001', label: 'Muster AG' }],
       hasMore: false,
       omitted: 0,
@@ -100,10 +103,10 @@ describe('the tenant filter', () => {
   test("rejects another tenant's token, and resolve leaves it out", async () => {
     const lookups = createSqlServerLookups(owner)
     const tokens = ['k1:1,1001', 'k1:2,1001', 'k1:1,9999', 'not a token']
-    expect(await lookups.rejects(customers(), tokens, tenant('1'))).toEqual(['k1:2,1001', 'k1:1,9999', 'not a token'])
-    expect(await lookups.resolve(customers(), tokens, tenant('1'))).toEqual([{ token: 'k1:1,1001', label: 'Muster AG' }])
+    expect(await lookups.rejects(customers(), tokens, tenant('1'), NOT_ABORTED)).toEqual(['k1:2,1001', 'k1:1,9999', 'not a token'])
+    expect(await lookups.resolve(customers(), tokens, tenant('1'), NOT_ABORTED)).toEqual([{ token: 'k1:1,1001', label: 'Muster AG' }])
     // The same token for the tenant it belongs to is a member: the 1 above was the filter's doing.
-    expect(await lookups.rejects(customers(), ['k1:2,1001'], tenant('2'))).toEqual([])
+    expect(await lookups.rejects(customers(), ['k1:2,1001'], tenant('2'), NOT_ABORTED)).toEqual([])
   })
 
   // An empty restriction is what a missing policy defaults to, so it must not
@@ -113,13 +116,13 @@ describe('the tenant filter', () => {
   test('every row is only ever offered when the filters say unrestricted', async () => {
     const lookups = createSqlServerLookups(owner)
     const empty = { kind: 'restricted', equal: [] } as unknown as RowFilters
-    await expect(lookups.search(customers(), page(''), empty)).rejects.toThrow(/Row filters are/)
-    await expect(lookups.rejects(customers(), ['k1:1,1001'], empty)).rejects.toThrow(/Row filters are/)
-    await expect(lookups.resolve(customers(), ['k1:1,1001'], empty)).rejects.toThrow(/Row filters are/)
-    const everyone = await lookups.search(customers(), page('GmbH'), EVERY_ROW)
+    await expect(lookups.search(customers(), page(''), empty, NOT_ABORTED)).rejects.toThrow(/Row filters are/)
+    await expect(lookups.rejects(customers(), ['k1:1,1001'], empty, NOT_ABORTED)).rejects.toThrow(/Row filters are/)
+    await expect(lookups.resolve(customers(), ['k1:1,1001'], empty, NOT_ABORTED)).rejects.toThrow(/Row filters are/)
+    const everyone = await lookups.search(customers(), page('GmbH'), EVERY_ROW, NOT_ABORTED)
     expect(labels(everyone.rows)).toEqual(['Other Tenant GmbH'])
     const wrongColumn: RowFilters = { kind: 'restricted', equal: [{ column: 'region', type: { kind: 'text', maxLength: null, lengthUnit: 'utf16-code-units', fixedLength: false }, value: 'north' }] }
-    await expect(lookups.search(customers(), page(''), wrongColumn)).rejects.toMatchObject({ number: 207 })
+    await expect(lookups.search(customers(), page(''), wrongColumn, NOT_ABORTED)).rejects.toMatchObject({ number: 207 })
   })
 })
 
@@ -129,7 +132,7 @@ describe('a search', () => {
   // for '%' offers every row, '_' finds AxB and '[x]' finds 'x marks'.
   test('for %, _ or [x] matches only those characters', async () => {
     const lookups = createSqlServerLookups(owner)
-    const search = async (text: string) => labels((await lookups.search(customers(), page(text), tenant('3'))).rows)
+    const search = async (text: string) => labels((await lookups.search(customers(), page(text), tenant('3'), NOT_ABORTED)).rows)
     expect(await search('%')).toEqual(['100% Bio'])
     expect(await search('_')).toEqual(['A_B'])
     expect(await search('[x]')).toEqual(['[x] Brackets'])
@@ -142,7 +145,7 @@ describe('a search', () => {
   // here because PostgreSQL's default is the other way round.
   test("compares case by the column's collation", async () => {
     const lookups = createSqlServerLookups(owner)
-    expect(labels((await lookups.search(customers(), page('muster'), tenant('1'))).rows)).toEqual(['Muster AG'])
+    expect(labels((await lookups.search(customers(), page('muster'), tenant('1'), NOT_ABORTED)).rows)).toEqual(['Muster AG'])
   })
 
   // A displayed integer is searched as the digits its label shows, so typing
@@ -156,8 +159,8 @@ describe('a search', () => {
       ['customer_no', 'integer'],
       ['name', 'text'],
     ])
-    expect((await lookups.search(config, page('100'), tenant('1'))).rows).toEqual([{ token: 'k1:1,1001', label: '1001 · Muster AG' }])
-    expect((await lookups.search(config, page('99'), tenant('1'))).rows).toEqual([])
+    expect((await lookups.search(config, page('100'), tenant('1'), NOT_ABORTED)).rows).toEqual([{ token: 'k1:1,1001', label: '1001 · Muster AG' }])
+    expect((await lookups.search(config, page('99'), tenant('1'), NOT_ABORTED)).rows).toEqual([])
   })
 })
 
@@ -170,7 +173,7 @@ describe('the order of a page', () => {
     const lookups = createSqlServerLookups(owner)
     const byLimit = (nulls: 'first' | 'last', direction: 'asc' | 'desc' = 'asc') =>
       lookupConfig(ORDER, 'fk_order_customer', ['name'], { sort: [{ column: 'credit_limit', direction, nulls }] })
-    const order = async (config: LookupConfig) => labels((await lookups.search(config, page(''), tenant('3'))).rows)
+    const order = async (config: LookupConfig) => labels((await lookups.search(config, page(''), tenant('3'), NOT_ABORTED)).rows)
     expect(await order(byLimit('last'))).toEqual(['AxB', 'apple', 'x marks', 'Banana', '100% Bio', 'A_B', '[x] Brackets'])
     expect(await order(byLimit('first'))).toEqual(['A_B', '[x] Brackets', 'AxB', 'apple', 'x marks', 'Banana', '100% Bio'])
     expect(await order(byLimit('last', 'desc'))).toEqual(['100% Bio', 'Banana', 'x marks', 'apple', 'AxB', 'A_B', '[x] Brackets'])
@@ -182,7 +185,7 @@ describe('the order of a page', () => {
   // conformance case cannot compare this order across engines (0012).
   test("orders text by the column's collation, not by code point", async () => {
     const lookups = createSqlServerLookups(owner)
-    expect(labels((await lookups.search(customers(), page(''), tenant('3'))).rows)).toEqual([
+    expect(labels((await lookups.search(customers(), page(''), tenant('3'), NOT_ABORTED)).rows)).toEqual([
       '[x] Brackets',
       '100% Bio',
       'A_B',
@@ -197,9 +200,9 @@ describe('the order of a page', () => {
   // extra row read past each page says whether there is another.
   test('pages through every row once, and says when there is more', async () => {
     const lookups = createSqlServerLookups(owner)
-    const pages = await Promise.all([0, 3, 6].map((offset) => lookups.search(customers(), page('', offset, 3), tenant('3'))))
+    const pages = await Promise.all([0, 3, 6].map((offset) => lookups.search(customers(), page('', offset, 3), tenant('3'), NOT_ABORTED)))
     expect(pages.map((result) => result.hasMore)).toEqual([true, true, false])
-    const all = await lookups.search(customers(), page(''), tenant('3'))
+    const all = await lookups.search(customers(), page(''), tenant('3'), NOT_ABORTED)
     expect(pages.flatMap((result) => result.rows)).toEqual(all.rows)
   })
 })
@@ -212,7 +215,7 @@ describe('keys a token cannot carry', () => {
   test('a NULL key is never offered, and a key too long for a token is counted in omitted', async () => {
     const lookups = createSqlServerLookups(owner)
     const config = lookupConfig(CODE_USE, 'fk_code_use_code', ['label'])
-    expect(await lookups.search(config, page(''), EVERY_ROW)).toEqual({ rows: [{ token: 'k1:A', label: 'Alpha' }], hasMore: false, omitted: 1 })
+    expect(await lookups.search(config, page(''), EVERY_ROW, NOT_ABORTED)).toEqual({ rows: [{ token: 'k1:A', label: 'Alpha' }], hasMore: false, omitted: 1 })
   })
 
   // SQL Server's `=` ignores case under this collation and trailing spaces
@@ -222,11 +225,11 @@ describe('keys a token cannot carry', () => {
   test('a token spelled differently from the row the database matched is rejected', async () => {
     const lookups = createSqlServerLookups(owner)
     const countries = lookupConfig(CUSTOMER, 'fk_customer_country', ['name'])
-    expect(await lookups.rejects(countries, ['k1:CH', 'k1:ch'], EVERY_ROW)).toEqual(['k1:ch'])
-    expect(await lookups.resolve(countries, ['k1:ch'], EVERY_ROW)).toEqual([])
-    expect(await lookups.resolve(countries, ['k1:CH'], EVERY_ROW)).toEqual([{ token: 'k1:CH', label: 'Switzerland' }])
+    expect(await lookups.rejects(countries, ['k1:CH', 'k1:ch'], EVERY_ROW, NOT_ABORTED)).toEqual(['k1:ch'])
+    expect(await lookups.resolve(countries, ['k1:ch'], EVERY_ROW, NOT_ABORTED)).toEqual([])
+    expect(await lookups.resolve(countries, ['k1:CH'], EVERY_ROW, NOT_ABORTED)).toEqual([{ token: 'k1:CH', label: 'Switzerland' }])
     const codes = lookupConfig(CODE_USE, 'fk_code_use_code', ['label'])
-    expect(await lookups.rejects(codes, ['k1:A', 'k1:A~0020'], EVERY_ROW)).toEqual(['k1:A~0020'])
+    expect(await lookups.rejects(codes, ['k1:A', 'k1:A~0020'], EVERY_ROW, NOT_ABORTED)).toEqual(['k1:A~0020'])
   })
 })
 
@@ -255,8 +258,8 @@ describe('the parameter limit', () => {
     const lookups = createSqlServerLookups(owner)
     const invented = Array.from({ length: 2500 }, (_, index) => `k1:1,${String(index + 2000)}`)
     const tokens = [...invented.slice(0, 1250), 'k1:1,1001', ...invented.slice(1250)]
-    expect(await lookups.rejects(customers(), tokens, tenant('1'))).toEqual(invented)
-    expect(await lookups.resolve(customers(), tokens, tenant('1'))).toEqual([{ token: 'k1:1,1001', label: 'Muster AG' }])
+    expect(await lookups.rejects(customers(), tokens, tenant('1'), NOT_ABORTED)).toEqual(invented)
+    expect(await lookups.resolve(customers(), tokens, tenant('1'), NOT_ABORTED)).toEqual([{ token: 'k1:1,1001', label: 'Muster AG' }])
   })
 })
 
@@ -267,11 +270,11 @@ describe('as the restricted reader', () => {
   // instead (formancy.ai 0022), which a thrown error does.
   test('a lookup over a table the account may not read throws rather than offering nothing', async () => {
     const lookups = createSqlServerLookups(reader)
-    await expect(lookups.search(customers(), page(''), tenant('1'))).rejects.toMatchObject({ number: 229 })
-    await expect(lookups.rejects(customers(), ['k1:1,1001'], tenant('1'))).rejects.toMatchObject({ number: 229 })
+    await expect(lookups.search(customers(), page(''), tenant('1'), NOT_ABORTED)).rejects.toMatchObject({ number: 229 })
+    await expect(lookups.rejects(customers(), ['k1:1,1001'], tenant('1'), NOT_ABORTED)).rejects.toMatchObject({ number: 229 })
     // Nothing is asked when no token could be a member, so there is nothing to refuse.
-    expect(await lookups.rejects(customers(), ['not a token'], tenant('1'))).toEqual(['not a token'])
-    expect(await lookups.resolve(customers(), ['not a token', 'k1:x,1001'], tenant('1'))).toEqual([])
+    expect(await lookups.rejects(customers(), ['not a token'], tenant('1'), NOT_ABORTED)).toEqual(['not a token'])
+    expect(await lookups.resolve(customers(), ['not a token', 'k1:x,1001'], tenant('1'), NOT_ABORTED)).toEqual([])
   })
 })
 
@@ -284,10 +287,10 @@ describe('a request the configuration cannot answer', () => {
     const lookups = createSqlServerLookups(owner)
     const unsearchable = lookupConfig(ORDER, 'fk_order_customer', ['credit_limit'])
     expect(unsearchable.search).toEqual([])
-    await expect(lookups.search(unsearchable, page('Muster'), tenant('1'))).rejects.toThrow(/no searchable column/)
-    expect((await lookups.search(unsearchable, page(''), tenant('1'))).rows).toEqual([{ token: 'k1:1,1001', label: '999999999999.99' }])
+    await expect(lookups.search(unsearchable, page('Muster'), tenant('1'), NOT_ABORTED)).rejects.toThrow(/no searchable column/)
+    expect((await lookups.search(unsearchable, page(''), tenant('1'), NOT_ABORTED)).rows).toEqual([{ token: 'k1:1,1001', label: '999999999999.99' }])
     const crowded: RowFilters = { kind: 'restricted', equal: [tenantTerm('1'), ...Array.from({ length: 2096 }, () => tenantTerm('1'))] }
-    await expect(lookups.resolve(customers(), ['k1:1,1001'], crowded)).rejects.toThrow(/leave no parameter for a key/)
+    await expect(lookups.resolve(customers(), ['k1:1,1001'], crowded, NOT_ABORTED)).rejects.toThrow(/leave no parameter for a key/)
   })
 
   // A sort direction is spliced, because SQL Server takes no parameter for
@@ -299,7 +302,7 @@ describe('a request the configuration cannot answer', () => {
     const lookups = createSqlServerLookups(owner)
     const direction = "asc offset 0 rows; insert into ops.victim (note) values (N'direction'); select [name] as [k0] from sales.country order by [name]"
     const tampered: LookupConfig = { ...customers(), sort: [{ column: 'name', direction: direction as 'asc', nulls: 'last' }] }
-    await expect(lookups.search(tampered, page(''), tenant('1'))).rejects.toThrow(/sorts asc or desc/)
+    await expect(lookups.search(tampered, page(''), tenant('1'), NOT_ABORTED)).rejects.toThrow(/sorts asc or desc/)
     const victims = await owner.request().query<{ n: number }>('select count(*) as n from ops.victim')
     expect(victims.recordset[0]?.n).toBe(0)
   })

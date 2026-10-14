@@ -42,8 +42,19 @@ export interface TextResult {
   count: number
 }
 
+/** A statement on its way: the driver's handle, which can cancel it, and its rows as the server's text. */
+export interface Started {
+  readonly query: { cancel(): void }
+  readonly rows: Promise<TextResult>
+}
+
 /**
- * Runs a statement and returns its rows as the server's own text, by position.
+ * Sends a statement and returns its rows as the server's own text, by
+ * position, with the handle that can stop it (0061).
+ *
+ * postgres.js sends a query when it is first awaited, so this awaits it at
+ * once: by the time the caller holds the handle, the query is on its way to
+ * the pool. A lookup cancels through it; records only ever await `rows`.
  *
  * `raw()` hands over each column's bytes before the driver touches them. A
  * `::text` cast is not enough on its own: the composition root configures
@@ -51,15 +62,23 @@ export interface TextResult {
  * and rewrites every value after parsing, text included. Positional bytes
  * are beyond both. A row transform still runs, so the shape is checked.
  */
-export async function run(sql: Sql | TransactionSql, text: string, params: readonly Param[]): Promise<TextResult> {
-  const result = await sql.unsafe(text, [...params]).raw()
-  const rows = result.map((row: unknown): TextRow => {
-    if (!Array.isArray(row)) throw new Error("The driver's row transform changed a raw row; this adapter reads rows by position.")
-    return row.map((value: unknown) => {
-      if (value === null) return null
-      if (value instanceof Uint8Array) return Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('utf8')
-      throw new Error("The driver's row transform changed a raw value; this adapter reads the server's text.")
+export function start(sql: Sql | TransactionSql, text: string, params: readonly Param[]): Started {
+  const query = sql.unsafe(text, [...params]).raw()
+  const rows = query.then((result): TextResult => {
+    const converted = result.map((row: unknown): TextRow => {
+      if (!Array.isArray(row)) throw new Error("The driver's row transform changed a raw row; this adapter reads rows by position.")
+      return row.map((value: unknown) => {
+        if (value === null) return null
+        if (value instanceof Uint8Array) return Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('utf8')
+        throw new Error("The driver's row transform changed a raw value; this adapter reads the server's text.")
+      })
     })
+    return { rows: converted, count: result.count }
   })
-  return { rows, count: result.count }
+  return { query, rows }
+}
+
+/** Runs a statement to its end and returns its rows as the server's own text, by position: `start` without the handle. */
+export function run(sql: Sql | TransactionSql, text: string, params: readonly Param[]): Promise<TextResult> {
+  return start(sql, text, params).rows
 }

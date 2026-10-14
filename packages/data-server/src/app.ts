@@ -1,10 +1,12 @@
 import rateLimit from '@fastify/rate-limit'
+import { DEFAULT_LOOKUP_DEADLINE_MS } from '@formancy/data-core'
 import Fastify, { LogController } from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { CONFIGURATION_ID_MAX_LENGTH } from './config-store.js'
 import type { ConfigurationStore } from './config-store.js'
 import type { ConnectionRegistry } from './connections.js'
 import { crossOrigin, originsProblem } from './cors.js'
+import { lookupDeadlineProblem } from './lookup-deadline.js'
 import type { HostIdentity, IdentityVerifier } from './identity.js'
 import { PATH_NOT_PLAIN, plainPath } from './paths.js'
 import { DEFAULT_RATE_LIMIT } from './rate-limit.js'
@@ -49,8 +51,18 @@ export interface DataServerOptions {
    * is, so a wildcard, a pattern or `null` stops the server here (0060).
    * Empty or absent, nothing is offered across origins. The administrator's
    * plane has no such list: it answers no other origin.
+   *
+   * `lookupDeadlineMs`: how long one lookup statement may run, counted from
+   * when the adapter is asked for it -- so a wait for a pooled connection
+   * counts, and reading the form and opening its connection do not -- before
+   * the server stops it: a search is then answered `503 lookup-timeout`, and
+   * a resolve, or a membership check inside a write, `503 unavailable`
+   * (0061). A whole number from 1 to 2147483647, or the server is not built.
+   * Default `DEFAULT_LOOKUP_DEADLINE_MS`, derived from the published
+   * performance figures; the runnable server reads
+   * `FORMANCY_DATA_LOOKUP_DEADLINE_MS` for it (main.ts).
    */
-  runtime?: { registry: ConnectionRegistry; store: ConfigurationStore; audit?: NonNullable<RuntimeOptions['audit']>; origins?: readonly string[] }
+  runtime?: { registry: ConnectionRegistry; store: ConfigurationStore; audit?: NonNullable<RuntimeOptions['audit']>; origins?: readonly string[]; lookupDeadlineMs?: number }
 }
 
 /**
@@ -117,6 +129,13 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   const origins = Array.isArray(given) ? Object.freeze([...given]) : given
   const refused = originsProblem(origins)
   if (refused !== undefined) throw new Error(refused)
+  // The deadline by the variable's rule (lookup-deadline.ts): 0 or a value
+  // past what a timer holds refuses every lookup at once, and a fraction or
+  // NaN makes Node's timer throw on every lookup and every write with a
+  // lookup field, so either stops the server here instead.
+  const lookupDeadlineMs = options.runtime?.lookupDeadlineMs ?? DEFAULT_LOOKUP_DEADLINE_MS
+  const deadlineRefused = lookupDeadlineProblem('runtime.lookupDeadlineMs', lookupDeadlineMs)
+  if (deadlineRefused !== undefined) throw new Error(deadlineRefused)
 
   const logger = options.logger ?? false
   const app = Fastify({
@@ -203,8 +222,8 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   }
 
   if (options.runtime !== undefined) {
-    const { origins: _offered, ...runtime } = options.runtime
-    await app.register(runtimeRoutes, { ...runtime, authenticate })
+    const { origins: _offered, lookupDeadlineMs: _checked, ...runtime } = options.runtime
+    await app.register(runtimeRoutes, { ...runtime, authenticate, lookupDeadlineMs })
   }
 
   return app

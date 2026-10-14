@@ -7,6 +7,9 @@ import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { createPostgresLookups, discoverPostgres } from './index.js'
 
+/** Nobody aborts this signal: every lookup here completes, and answers exactly as it did before the port carried one (0061). */
+const NEVER = new AbortController().signal
+
 /**
  * The lookup half of the operations port against REAL PostgreSQL, loaded with
  * the shared fixture (0005), as its owner and as the restricted reader.
@@ -114,7 +117,7 @@ describe('a composite-key lookup over sales.customer, filtered by tenant', () =>
   // The leak the whole port exists to prevent: a select that offers another
   // tenant's customers, so one of them is saved into this tenant's order.
   test("offers only the tenant's own customers", async () => {
-    const page = await createPostgresLookups(owner).search(customersByKey(), FIRST_PAGE, TENANT_1)
+    const page = await createPostgresLookups(owner).search(customersByKey(), FIRST_PAGE, TENANT_1, NEVER)
     expect(page).toEqual({
       rows: [
         { token: tokenOf('1', '1001'), label: 'Muster AG' },
@@ -137,9 +140,9 @@ describe('a composite-key lookup over sales.customer, filtered by tenant', () =>
     const lookups = createPostgresLookups(owner)
     const ours = tokenOf('1', '1001')
     const theirs = tokenOf('2', '1001')
-    expect(await lookups.rejects(customers(), [ours, theirs], TENANT_1)).toEqual([theirs])
-    expect(await lookups.rejects(customers(), [ours, theirs], TENANT_2)).toEqual([ours])
-    expect(await lookups.resolve(customers(), [theirs, ours], TENANT_1)).toEqual([{ token: ours, label: 'Muster AG' }])
+    expect(await lookups.rejects(customers(), [ours, theirs], TENANT_1, NEVER)).toEqual([theirs])
+    expect(await lookups.rejects(customers(), [ours, theirs], TENANT_2, NEVER)).toEqual([ours])
+    expect(await lookups.resolve(customers(), [theirs, ours], TENANT_1, NEVER)).toEqual([{ token: ours, label: 'Muster AG' }])
   })
 
   // A filter term parsed by building a row of the table's type from NULL
@@ -151,14 +154,14 @@ describe('a composite-key lookup over sales.customer, filtered by tenant', () =>
     const lookups = createPostgresLookups(owner)
     const ours = tokenOf('1', '1')
     const theirs = tokenOf('2', '1')
-    expect(await lookups.search(config, FIRST_PAGE, TENANT_1)).toEqual({ rows: [{ token: ours, label: 'Ours' }], hasMore: false, omitted: 0 })
-    expect(await lookups.resolve(config, [ours, theirs], TENANT_1)).toEqual([{ token: ours, label: 'Ours' }])
-    expect(await lookups.rejects(config, [ours, theirs], TENANT_1)).toEqual([theirs])
+    expect(await lookups.search(config, FIRST_PAGE, TENANT_1, NEVER)).toEqual({ rows: [{ token: ours, label: 'Ours' }], hasMore: false, omitted: 0 })
+    expect(await lookups.resolve(config, [ours, theirs], TENANT_1, NEVER)).toEqual([{ token: ours, label: 'Ours' }])
+    expect(await lookups.rejects(config, [ours, theirs], TENANT_1, NEVER)).toEqual([theirs])
   })
 
   // `unrestricted` has to be written, and when it is, it means every row.
   test('an unrestricted actor is offered every tenant', async () => {
-    const page = await createPostgresLookups(owner).search(customersByKey(), { search: '100', offset: 0, limit: 50 }, EVERY_ROW)
+    const page = await createPostgresLookups(owner).search(customersByKey(), { search: '100', offset: 0, limit: 50 }, EVERY_ROW, NEVER)
     expect(page.rows.map((row) => row.token)).toEqual([tokenOf('1', '1002'), tokenOf('1', '1003'), tokenOf('2', '1002')])
   })
 
@@ -167,8 +170,8 @@ describe('a composite-key lookup over sales.customer, filtered by tenant', () =>
   test('filters that say nothing are refused before the database is asked', async () => {
     const lookups = createPostgresLookups(owner)
     const nothing = { kind: 'restricted', equal: [] } as unknown as RowFilters
-    await expect(lookups.search(customers(), FIRST_PAGE, nothing)).rejects.toThrow(/anything else would read as every row/)
-    await expect(lookups.rejects(customers(), [tokenOf('2', '1001')], undefined as unknown as RowFilters)).rejects.toThrow(/every row/)
+    await expect(lookups.search(customers(), FIRST_PAGE, nothing, NEVER)).rejects.toThrow(/anything else would read as every row/)
+    await expect(lookups.rejects(customers(), [tokenOf('2', '1001')], undefined as unknown as RowFilters, NEVER)).rejects.toThrow(/every row/)
   })
 })
 
@@ -178,7 +181,7 @@ describe('the search', () => {
   test("matches '%', '_' and '[' as the characters themselves", async () => {
     const lookups = createPostgresLookups(owner)
     const labels = async (search: string): Promise<string[]> =>
-      (await lookups.search(customers(), { search, offset: 0, limit: 50 }, TENANT_1)).rows.map((row) => row.label)
+      (await lookups.search(customers(), { search, offset: 0, limit: 50 }, TENANT_1, NEVER)).rows.map((row) => row.label)
     expect(await labels('%')).toEqual(['100% Bio'])
     expect(await labels('_')).toEqual(['snake_case AG'])
     expect(await labels('e_c')).toEqual(['snake_case AG'])
@@ -189,7 +192,7 @@ describe('the search', () => {
   // A search is a value: bound, never spliced. Spliced, this text would end
   // the string literal and run a statement of its own.
   test('a search holding a quote and SQL is only text', async () => {
-    const page = await createPostgresLookups(owner).search(customers(), { search: "'; drop table sales.customer; --", offset: 0, limit: 50 }, TENANT_1)
+    const page = await createPostgresLookups(owner).search(customers(), { search: "'; drop table sales.customer; --", offset: 0, limit: 50 }, TENANT_1, NEVER)
     expect(page.rows).toEqual([])
     const [count] = await owner<{ n: number }[]>`select count(*)::int as n from sales.customer`
     expect(count?.n).toBe(9)
@@ -203,8 +206,8 @@ describe('the search', () => {
     const byName = lookupOver(sales, ORDER, 'fk_order_customer', ['name', 'country_code'], { search: ['name'] })
     const both = lookupOver(sales, ORDER, 'fk_order_customer', ['name', 'country_code'])
     expect(both.search.map((column) => column.name)).toEqual(['name', 'country_code'])
-    expect((await lookups.search(byName, { search: 'CH', offset: 0, limit: 50 }, TENANT_1)).rows).toEqual([])
-    expect((await lookups.search(both, { search: 'CH', offset: 0, limit: 50 }, TENANT_1)).rows.map((row) => row.label)).toEqual([
+    expect((await lookups.search(byName, { search: 'CH', offset: 0, limit: 50 }, TENANT_1, NEVER)).rows).toEqual([])
+    expect((await lookups.search(both, { search: 'CH', offset: 0, limit: 50 }, TENANT_1, NEVER)).rows.map((row) => row.label)).toEqual([
       'Muster AG · CH',
       'snake_case AG · CH',
       'Über AG · CH',
@@ -217,7 +220,7 @@ describe('the search', () => {
   test('folds case, through the default collation, and not accents', async () => {
     const lookups = createPostgresLookups(owner)
     const labels = async (search: string): Promise<string[]> =>
-      (await lookups.search(customers(), { search, offset: 0, limit: 50 }, TENANT_1)).rows.map((row) => row.label)
+      (await lookups.search(customers(), { search, offset: 0, limit: 50 }, TENANT_1, NEVER)).rows.map((row) => row.label)
     expect(await labels('über')).toEqual(['Über AG'])
     expect(await labels('MUSTER')).toEqual(['Muster AG'])
     expect(await labels('uber')).toEqual([])
@@ -228,7 +231,7 @@ describe('the search', () => {
   // database's default collation is what lets such a column be searched at all.
   test('searches a column whose collation is nondeterministic', async () => {
     const config = lookupOver(lk, { schema: 'lk', name: 'ci_use' }, 'fk_ci_use_code', ['code'])
-    const page = await createPostgresLookups(owner).search(config, { search: 'cm', offset: 0, limit: 50 }, EVERY_ROW)
+    const page = await createPostgresLookups(owner).search(config, { search: 'cm', offset: 0, limit: 50 }, EVERY_ROW, NEVER)
     expect(page.rows).toEqual([{ token: tokenOf('ACME'), label: 'ACME' }])
   })
 })
@@ -240,11 +243,11 @@ describe('the order and the page', () => {
     const lookups = createPostgresLookups(owner)
     const byCountry = (nulls: 'first' | 'last'): LookupConfig =>
       lookupOver(sales, ORDER, 'fk_order_customer', ['name', 'country_code'], { sort: [{ column: 'country_code', direction: 'desc', nulls }] })
-    const first = await lookups.search(byCountry('first'), FIRST_PAGE, TENANT_1)
+    const first = await lookups.search(byCountry('first'), FIRST_PAGE, TENANT_1, NEVER)
     expect(first.rows.map((row) => row.token)).toEqual(
       ['1002', '1005', '1003', '1006', '1001', '1004', '1007'].map((number) => tokenOf('1', number)),
     )
-    const last = await lookups.search(byCountry('last'), FIRST_PAGE, TENANT_1)
+    const last = await lookups.search(byCountry('last'), FIRST_PAGE, TENANT_1, NEVER)
     expect(last.rows.map((row) => row.token)).toEqual(
       ['1003', '1006', '1001', '1004', '1007', '1002', '1005'].map((number) => tokenOf('1', number)),
     )
@@ -257,7 +260,7 @@ describe('the order and the page', () => {
   // The same database on a glibc image orders these differently. A change
   // in the image fails here, by name, before a conformance case is blamed.
   test("orders text as this image's default collation does, which on Alpine is code point order", async () => {
-    const page = await createPostgresLookups(owner).search(customers(), FIRST_PAGE, TENANT_1)
+    const page = await createPostgresLookups(owner).search(customers(), FIRST_PAGE, TENANT_1, NEVER)
     expect(page.rows.map((row) => row.label)).toEqual(['100 Prozent', '100% Bio', 'Muster AG', '[Klammer] AG', 'snakeXcase AG', 'snake_case AG', 'Über AG'])
   })
 
@@ -268,19 +271,19 @@ describe('the order and the page', () => {
     const config = customers()
     const forged = (direction: string, nulls: string) => ({ ...config, sort: [{ column: 'name', direction, nulls }] }) as unknown as LookupConfig
     const lookups = createPostgresLookups(owner)
-    await expect(lookups.search(forged('asc; drop table sales.customer; --', 'last'), FIRST_PAGE, TENANT_1)).rejects.toThrow(/no order this adapter can spell/)
+    await expect(lookups.search(forged('asc; drop table sales.customer; --', 'last'), FIRST_PAGE, TENANT_1, NEVER)).rejects.toThrow(/no order this adapter can spell/)
     // Every object has a `constructor`; a table kept in an object literal would find one.
-    await expect(lookups.search(forged('constructor', 'last'), FIRST_PAGE, TENANT_1)).rejects.toThrow(/no order this adapter can spell/)
-    await expect(lookups.search(forged('asc', 'toString'), FIRST_PAGE, TENANT_1)).rejects.toThrow(/no order this adapter can spell/)
+    await expect(lookups.search(forged('constructor', 'last'), FIRST_PAGE, TENANT_1, NEVER)).rejects.toThrow(/no order this adapter can spell/)
+    await expect(lookups.search(forged('asc', 'toString'), FIRST_PAGE, TENANT_1, NEVER)).rejects.toThrow(/no order this adapter can spell/)
   })
 
   // One extra row says there is more, without a COUNT per keystroke; a page
   // that fetched exactly `limit` could not tell a full page from the last one.
   test('says whether there is more, and pages from the offset', async () => {
     const lookups = createPostgresLookups(owner)
-    const one = await lookups.search(customers(), { search: '', offset: 0, limit: 3 }, TENANT_1)
-    const two = await lookups.search(customers(), { search: '', offset: 3, limit: 3 }, TENANT_1)
-    const three = await lookups.search(customers(), { search: '', offset: 6, limit: 3 }, TENANT_1)
+    const one = await lookups.search(customers(), { search: '', offset: 0, limit: 3 }, TENANT_1, NEVER)
+    const two = await lookups.search(customers(), { search: '', offset: 3, limit: 3 }, TENANT_1, NEVER)
+    const three = await lookups.search(customers(), { search: '', offset: 6, limit: 3 }, TENANT_1, NEVER)
     expect([one.rows.length, two.rows.length, three.rows.length]).toEqual([3, 3, 1])
     expect([one.hasMore, two.hasMore, three.hasMore]).toEqual([true, true, false])
     const all = [...one.rows, ...two.rows, ...three.rows].map((row) => row.token)
@@ -295,7 +298,7 @@ describe('the order and the page', () => {
   test('never offers a row whose key holds a NULL, and does not count it', async () => {
     const config = lookupOver(lk, { schema: 'lk', name: 'code_use' }, 'fk_code_use_item', ['label'])
     const lookups = createPostgresLookups(owner)
-    expect(await lookups.search(config, FIRST_PAGE, EVERY_ROW)).toEqual({
+    expect(await lookups.search(config, FIRST_PAGE, EVERY_ROW, NEVER)).toEqual({
       rows: [
         { token: tokenOf('A1'), label: 'Alpha' },
         { token: tokenOf('B2'), label: 'Beta' },
@@ -303,14 +306,14 @@ describe('the order and the page', () => {
       hasMore: false,
       omitted: 0,
     })
-    expect(await lookups.search(config, { search: '', offset: 0, limit: 2 }, EVERY_ROW)).toMatchObject({ hasMore: false, omitted: 0 })
+    expect(await lookups.search(config, { search: '', offset: 0, limit: 2 }, EVERY_ROW, NEVER)).toMatchObject({ hasMore: false, omitted: 0 })
   })
 
   // A row that silently is not there looks like a table that does not have
   // it. Counted, an operator can tell "not representable" from "not there".
   test('counts a row whose key cannot fit in a token, rather than dropping it silently', async () => {
     const config = lookupOver(lk, { schema: 'lk', name: 'long_use' }, 'fk_long_use_key', ['label'])
-    const page = await createPostgresLookups(owner).search(config, FIRST_PAGE, EVERY_ROW)
+    const page = await createPostgresLookups(owner).search(config, FIRST_PAGE, EVERY_ROW, NEVER)
     expect(page.rows).toEqual([{ token: tokenOf('short'), label: 'Short enough' }])
     expect(page.omitted).toBe(1)
   })
@@ -323,12 +326,12 @@ describe('membership', () => {
   test('rejects a token spelled differently from the row the database matched', async () => {
     const lookups = createPostgresLookups(owner)
     const ci = lookupOver(lk, { schema: 'lk', name: 'ci_use' }, 'fk_ci_use_code', ['name'])
-    expect(await lookups.rejects(ci, [tokenOf('acme'), tokenOf('ACME')], EVERY_ROW)).toEqual([tokenOf('acme')])
-    expect(await lookups.resolve(ci, [tokenOf('acme')], EVERY_ROW)).toEqual([])
+    expect(await lookups.rejects(ci, [tokenOf('acme'), tokenOf('ACME')], EVERY_ROW, NEVER)).toEqual([tokenOf('acme')])
+    expect(await lookups.resolve(ci, [tokenOf('acme')], EVERY_ROW, NEVER)).toEqual([])
 
     const fixed = lookupOver(lk, { schema: 'lk', name: 'fixed_use' }, 'fk_fixed_use_code', ['name'])
-    expect(await lookups.rejects(fixed, [tokenOf('AB'), tokenOf('AB ')], EVERY_ROW)).toEqual([tokenOf('AB ')])
-    expect(await lookups.resolve(fixed, [tokenOf('AB ')], EVERY_ROW)).toEqual([])
+    expect(await lookups.rejects(fixed, [tokenOf('AB'), tokenOf('AB ')], EVERY_ROW, NEVER)).toEqual([tokenOf('AB ')])
+    expect(await lookups.resolve(fixed, [tokenOf('AB ')], EVERY_ROW, NEVER)).toEqual([])
   })
 
   // The fixture's order id is 2^53 + 1. A key that went through a JavaScript
@@ -338,16 +341,16 @@ describe('membership', () => {
     const config = lookupOver(sales, { schema: 'sales', name: 'order_line' }, 'fk_order_line_order', ['order_date'])
     const lookups = createPostgresLookups(reader)
     const token = tokenOf(EDGE_VALUES.beyondSafeInteger)
-    expect(await lookups.search(config, FIRST_PAGE, TENANT_1)).toEqual({ rows: [{ token, label: EDGE_VALUES.orderDate }], hasMore: false, omitted: 0 })
-    expect(await lookups.resolve(config, [token], TENANT_1)).toEqual([{ token, label: EDGE_VALUES.orderDate }])
-    expect(await lookups.rejects(config, [token, tokenOf('9007199254740992')], TENANT_1)).toEqual([tokenOf('9007199254740992')])
+    expect(await lookups.search(config, FIRST_PAGE, TENANT_1, NEVER)).toEqual({ rows: [{ token, label: EDGE_VALUES.orderDate }], hasMore: false, omitted: 0 })
+    expect(await lookups.resolve(config, [token], TENANT_1, NEVER)).toEqual([{ token, label: EDGE_VALUES.orderDate }])
+    expect(await lookups.rejects(config, [token, tokenOf('9007199254740992')], TENANT_1, NEVER)).toEqual([tokenOf('9007199254740992')])
   })
 
   // formancy refuses a submission when its members port throws (formancy.ai
   // 0022). A reader the database refuses must reach that refusal; an empty
   // answer would accept every token.
   test('throws when the database refuses the account, rather than accepting or rejecting', async () => {
-    await expect(createPostgresLookups(reader).rejects(customers(), [tokenOf('1', '1001')], TENANT_1)).rejects.toMatchObject({ code: '42501' })
+    await expect(createPostgresLookups(reader).rejects(customers(), [tokenOf('1', '1001')], TENANT_1, NEVER)).rejects.toMatchObject({ code: '42501' })
   })
 
   // `IN ()` is a syntax error, and a token that cannot name a row needs no
@@ -357,9 +360,9 @@ describe('membership', () => {
     await ended.end()
     const lookups = createPostgresLookups(ended)
     const invented = ['k1:1,abc', 'garbage', tokenOf('1')]
-    expect(await lookups.rejects(customers(), invented, TENANT_1)).toEqual(invented)
-    expect(await lookups.resolve(customers(), invented, TENANT_1)).toEqual([])
-    expect(await lookups.rejects(customers(), [], TENANT_1)).toEqual([])
+    expect(await lookups.rejects(customers(), invented, TENANT_1, NEVER)).toEqual(invented)
+    expect(await lookups.resolve(customers(), invented, TENANT_1, NEVER)).toEqual([])
+    expect(await lookups.rejects(customers(), [], TENANT_1, NEVER)).toEqual([])
   })
 })
 
@@ -377,9 +380,9 @@ describe('what the composition root configured', () => {
     const nowhere = postgres({ host: '127.0.0.1', port: 1, connect_timeout: 1, onnotice: () => {} })
     try {
       const lookups = createPostgresLookups(nowhere)
-      await expect(lookups.search(config, FIRST_PAGE, on)).rejects.toThrow(/carries its column's type/)
-      await expect(lookups.resolve(config, [tokenOf('1')], on)).rejects.toThrow(/carries its column's type/)
-      await expect(lookups.rejects(config, [tokenOf('1')], on)).rejects.toThrow(/carries its column's type/)
+      await expect(lookups.search(config, FIRST_PAGE, on, NEVER)).rejects.toThrow(/carries its column's type/)
+      await expect(lookups.resolve(config, [tokenOf('1')], on, NEVER)).rejects.toThrow(/carries its column's type/)
+      await expect(lookups.rejects(config, [tokenOf('1')], on, NEVER)).rejects.toThrow(/carries its column's type/)
     } finally {
       await nowhere.end()
     }
@@ -399,14 +402,14 @@ describe('what the composition root configured', () => {
     try {
       const plain = createPostgresLookups(owner)
       const odd = createPostgresLookups(configured)
-      expect(await odd.search(customers(), FIRST_PAGE, TENANT_1)).toEqual(await plain.search(customers(), FIRST_PAGE, TENANT_1))
+      expect(await odd.search(customers(), FIRST_PAGE, TENANT_1, NEVER)).toEqual(await plain.search(customers(), FIRST_PAGE, TENANT_1, NEVER))
       const days = lookupOver(lk, { schema: 'lk', name: 'day_use' }, 'fk_day_use_day', ['name'])
       const tokens = [tokenOf('2026-10-08'), tokenOf('0001-01-01'), tokenOf('2026-10-09')]
-      expect(await odd.resolve(days, tokens, EVERY_ROW)).toEqual([
+      expect(await odd.resolve(days, tokens, EVERY_ROW, NEVER)).toEqual([
         { token: tokenOf('2026-10-08'), label: 'The order date' },
         { token: tokenOf('0001-01-01'), label: 'The first day' },
       ])
-      expect(await odd.rejects(days, tokens, EVERY_ROW)).toEqual([tokenOf('2026-10-09')])
+      expect(await odd.rejects(days, tokens, EVERY_ROW, NEVER)).toEqual([tokenOf('2026-10-09')])
     } finally {
       await configured.end()
     }
@@ -446,10 +449,10 @@ describe('objects planted on the search path', () => {
     const ask = async (driver: Sql) => {
       const lookups = createPostgresLookups(driver)
       return {
-        page: await lookups.search(customersByKey(), FIRST_PAGE, TENANT_1),
-        found: await lookups.search(customersByKey(), muster, TENANT_1),
-        resolved: await lookups.resolve(customers(), [ours, theirs], TENANT_1),
-        rejected: await lookups.rejects(customers(), [ours, theirs], TENANT_1),
+        page: await lookups.search(customersByKey(), FIRST_PAGE, TENANT_1, NEVER),
+        found: await lookups.search(customersByKey(), muster, TENANT_1, NEVER),
+        resolved: await lookups.resolve(customers(), [ours, theirs], TENANT_1, NEVER),
+        rejected: await lookups.rejects(customers(), [ours, theirs], TENANT_1, NEVER),
       }
     }
     const expected = await ask(owner)

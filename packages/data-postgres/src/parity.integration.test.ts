@@ -23,6 +23,9 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { createPostgresLookups, createPostgresRecords, discoverPostgres } from './index.js'
 import { searchStatement } from './lookups/sql.js'
 
+/** Nobody aborts this signal: every lookup here completes, and answers exactly as it did before the port carried one (0061). */
+const NEVER = new AbortController().signal
+
 /**
  * The parity cases of 0028 against REAL PostgreSQL: the shared fixture's
  * `parity` schema, discovered as its owner, with the answers written once in
@@ -131,7 +134,7 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
         const scoping = scopeRowFilters(objectOf('tenant_item'), [{ column: entry.column, value: entry.value }], 'parity')
         expect(scoping).toMatchObject({ ok: false, code: entry.refused })
         const forged = { kind: 'restricted', equal: [{ column: entry.column, type: col('tenant_item', entry.column).type, value: entry.value }] } as unknown as RowFilters
-        await expect(createPostgresLookups(owner).search(items(), FIRST_PAGE, forged)).rejects.toThrow(/not spelled as its column holds it/)
+        await expect(createPostgresLookups(owner).search(items(), FIRST_PAGE, forged, NEVER)).rejects.toThrow(/not spelled as its column holds it/)
         const read = defined(createPostgresRecords(owner)).read({ target: tenantItem(), key: [val('tenant_item', 'tenant_code', 'acme'), val('tenant_item', 'item_no', '1')], columns: [], filters: forged, through: [] })
         await expect(read).rejects.toThrow(/not spelled as its column holds it/)
       })
@@ -150,11 +153,11 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
       const named = NAMED.map((key) => tokenOf(...key))
       const lookups = createPostgresLookups(owner)
 
-      const page = await lookups.search(items(), FIRST_PAGE, filters)
+      const page = await lookups.search(items(), FIRST_PAGE, filters, NEVER)
       expect(new Set(page.rows.map((row) => row.token))).toEqual(expected)
       expect(page.hasMore).toBe(false)
-      expect(new Set((await lookups.resolve(items(), named, filters)).map((row) => row.token))).toEqual(expected)
-      expect(new Set(await lookups.rejects(items(), named, filters))).toEqual(new Set(named.filter((token) => !expected.has(token))))
+      expect(new Set((await lookups.resolve(items(), named, filters, NEVER)).map((row) => row.token))).toEqual(expected)
+      expect(new Set(await lookups.rejects(items(), named, filters, NEVER))).toEqual(new Set(named.filter((token) => !expected.has(token))))
 
       // A list of the table under the same filter lists exactly those rows (0044).
       const listed = await createPostgresRecords(owner).list({
@@ -235,7 +238,7 @@ describe('an exact filter with objects planted on the search path', () => {
     const ask = async (driver: Sql) => {
       const lookups = createPostgresLookups(driver)
       const answers: string[][] = []
-      for (const entry of cases) answers.push((await lookups.search(items(), FIRST_PAGE, scoped(entry.column, entry.value))).rows.map((row) => row.token).sort())
+      for (const entry of cases) answers.push((await lookups.search(items(), FIRST_PAGE, scoped(entry.column, entry.value), NEVER)).rows.map((row) => row.token).sort())
       return answers
     }
     const expected = cases.map((entry) => ('keys' in entry ? entry.keys.map((key) => tokenOf(...key)).sort() : []))
@@ -286,7 +289,7 @@ describe('an unconstrained numeric, which only PostgreSQL has', () => {
     const field = bindings.fields.find((candidate) => candidate.kind === 'lookup')
     if (field === undefined) throw new Error('the generator made no lookup for fk_amount_use_amount')
     const config = buildLookupConfig(bindings, field.field, { snapshot: measured })
-    const page = await createPostgresLookups(owner).search(config, FIRST_PAGE, scoping.filters)
+    const page = await createPostgresLookups(owner).search(config, FIRST_PAGE, scoping.filters, NEVER)
     expect(page.rows).toEqual([{ token: tokenOf('1'), label: '12.5' }])
 
     const idType = amount.columns.find((column) => column.name === 'id')?.type
@@ -320,8 +323,8 @@ describe('a label is spelled once, from the canonical value (DISPLAY_PARITY)', (
     const lookups = createPostgresLookups(sql)
     const found: Record<string, string> = {}
     for (const column of Object.keys(DISPLAY_PARITY)) {
-      const page = await lookups.search(kinds(column), FIRST_PAGE, EVERY_ROW)
-      const [resolved] = await lookups.resolve(kinds(column), [tokenOf('1')], EVERY_ROW)
+      const page = await lookups.search(kinds(column), FIRST_PAGE, EVERY_ROW, NEVER)
+      const [resolved] = await lookups.resolve(kinds(column), [tokenOf('1')], EVERY_ROW, NEVER)
       // A search and a resolve that labelled one row two ways would show a person both.
       expect(resolved?.label, column).toBe(page.rows[0]?.label)
       found[column] = page.rows[0]?.label ?? '(no row)'
@@ -361,8 +364,8 @@ describe('a label is spelled once, from the canonical value (DISPLAY_PARITY)', (
     const lookups = createPostgresLookups(owner)
     const config = kinds('i')
     expect(config.search.map((column) => column.name)).toEqual(['i'])
-    expect((await lookups.search(config, { search: '9007199254740993', offset: 0, limit: 50 }, EVERY_ROW)).rows).toEqual([{ token: tokenOf('1'), label: '9007199254740993' }])
-    expect((await lookups.search(config, { search: '9007199254740992', offset: 0, limit: 50 }, EVERY_ROW)).rows).toEqual([])
+    expect((await lookups.search(config, { search: '9007199254740993', offset: 0, limit: 50 }, EVERY_ROW, NEVER)).rows).toEqual([{ token: tokenOf('1'), label: '9007199254740993' }])
+    expect((await lookups.search(config, { search: '9007199254740992', offset: 0, limit: 50 }, EVERY_ROW, NEVER)).rows).toEqual([])
   })
 })
 

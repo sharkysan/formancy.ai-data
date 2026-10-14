@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { lookupDeadlineFrom } from './deadline.js'
 import { bytes, figure, grouped, setting } from './format.js'
 import type { CatalogueScenario, EngineKey, LatencyResult, Results, RunFacts, ScenarioResult, SizeFacts } from './results.js'
 import { ENGINE_KEYS, ENGINE_NAMES } from './results.js'
@@ -166,7 +167,20 @@ function method(results: Results): string {
     `- Before each block's warm-up and after its timed window, an idle gap of ${setting(p.calibration.gapMs)} ms with nothing in flight. Calibration: a fixed CPU-bound workload every ${setting(p.calibration.intervalMs)} ms on a worker thread, read only in the gaps, because it slows under the run's own load too; a block with a gap whose median ran past ${tolerance} times the quiet baseline is run again once, and a second miss refuses the run. Contention during a block's own load is not seen.`,
     `- Database CPU per request is the database container's CPU over the timed window less its CPU per second in the gaps times the window's seconds, over the requests; what the engine did on its own during the window alone is in it. None is printed for a request that makes no round trip.`,
     `- Disturbances, read by the database's owner between blocks: PostgreSQL's autovacuum and autoanalyze runs on any table of the database, SQL Server's recompilations and statistics updated on any user table.`,
+    ...deadline(results),
   ].join('\n')
+}
+
+/**
+ * Where the default lookup deadline comes from (0061), for a result whose
+ * catalogue names each scenario's operation; nothing for one measured
+ * before, rather than a guess from the scenarios' names.
+ */
+function deadline(results: Results): string[] {
+  if (!results.catalogue.scenarios.every((entry) => entry.operation !== undefined)) return []
+  const derived = lookupDeadlineFrom(results.scenarios, results.catalogue)
+  const scenario = results.catalogue.scenarios.find((entry) => entry.name === derived.scenario) as CatalogueScenario
+  return [`- The default lookup deadline, ${grouped(derived.ms)} ms, is the slowest lookup or resolve answer in these figures: ${ENGINE_NAMES[derived.engine]}, ${labelOf(scenario)}, ${grouped(derived.concurrency)} in flight.`]
 }
 
 /**

@@ -125,6 +125,8 @@ async function measureOn(protocol: Protocol, options: RunOptions, setup: Setup):
 
   // Every request to the server, tallied by the route it addressed and the status that answered.
   const tally = new Map<string, number>()
+  /** The same requests by audit operation alone, for the counting pass's check of what each scenario addressed (0061). */
+  const byOperation = new Map<string, number>()
   let adminRequests = 0
   const spied: typeof fetch = async (input, init) => {
     const response = await fetch(input, init)
@@ -133,6 +135,7 @@ async function measureOn(protocol: Protocol, options: RunOptions, setup: Setup):
     if (route.plane === 'runtime') {
       const key = tallyKey(route.operation, route.form, response.status)
       tally.set(key, (tally.get(key) ?? 0) + 1)
+      byOperation.set(route.operation, (byOperation.get(route.operation) ?? 0) + 1)
     } else if (route.plane === 'admin') adminRequests += 1
     return response
   }
@@ -183,6 +186,7 @@ async function measureOn(protocol: Protocol, options: RunOptions, setup: Setup):
     (engine) => refusalsFor(engine, CATALOGUE.refusals, client, drifted[engine]),
     stack.hops,
     (engine) => openFloor(engine, { ...stack.writers[engine], host: '127.0.0.1', port: stack.hops[engine].port }),
+    () => byOperation,
   )
 
   say('fixed costs')

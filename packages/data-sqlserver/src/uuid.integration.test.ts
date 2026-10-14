@@ -66,6 +66,9 @@ let snapshot: MetadataSnapshot
 let deliveries: FormBindings
 let parcels: FormBindings
 
+/** A signal nobody aborts: every lookup here completes, and answers exactly what it answered before the port carried a signal (0061). */
+const NOT_ABORTED = new AbortController().signal
+
 const TENANT = [{ column: 'tenant_id', attribute: 'tenant' }]
 const READ = { read: ['clerk'], write: [] }
 const CLERK_RW = { read: ['clerk'], write: ['clerk'] }
@@ -183,7 +186,7 @@ async function read(bindings: FormBindings, policy: FormPolicy, actor: PolicyCon
 /** Whether every selection a write carries is one of the options, asked as the server asks before it writes. */
 async function members(checks: readonly MembershipCheck[]): Promise<string[]> {
   const rejected: string[] = []
-  for (const check of checks) rejected.push(...(await lookups.rejects(check.config, check.tokens, check.filters)))
+  for (const check of checks) rejected.push(...(await lookups.rejects(check.config, check.tokens, check.filters, NOT_ABORTED)))
   return rejected
 }
 
@@ -464,13 +467,13 @@ describe("a lookup onto the delivery's uuid", covers('sqlserver', uuidCase('look
   test('offers, finds, resolves and rejects deliveries by their uuid tokens', async () => {
     const expected = UUID_PARITY.lookup
     const { config, filters } = deliveryLookup(CLARA)
-    const page = await lookups.search(config, { search: '', offset: 0, limit: 50 }, filters)
+    const page = await lookups.search(config, { search: '', offset: 0, limit: 50 }, filters, NOT_ABORTED)
     expect(page).toEqual({ rows: expected.offered, hasMore: false, omitted: 0 })
-    const found = await lookups.search(config, { search: expected.search.text, offset: 0, limit: 50 }, filters)
+    const found = await lookups.search(config, { search: expected.search.text, offset: 0, limit: 50 }, filters, NOT_ABORTED)
     expect(found.rows.map((row) => row.token)).toEqual(expected.search.tokens)
-    expect(await lookups.resolve(config, [expected.resolved.token], filters)).toEqual([expected.resolved])
+    expect(await lookups.resolve(config, [expected.resolved.token], filters, NOT_ABORTED)).toEqual([expected.resolved])
     const offered = expected.offered.map((row) => row.token)
-    expect(await lookups.rejects(config, [...offered, ...expected.rejected], filters)).toEqual(expected.rejected)
+    expect(await lookups.rejects(config, [...offered, ...expected.rejected], filters, NOT_ABORTED)).toEqual(expected.rejected)
   })
 
   // Options whose labels tie are ordered by the key that ends every lookup's
@@ -486,7 +489,7 @@ describe("a lookup onto the delivery's uuid", covers('sqlserver', uuidCase('look
     const expected = uuidOrder('sqlserver', keys)
     expect(expected).not.toEqual(uuidOrder('postgres', keys))
     const { config, filters } = deliveryLookup(OTTO)
-    const page = await lookups.search(config, { search, offset: 0, limit: 50 }, filters)
+    const page = await lookups.search(config, { search, offset: 0, limit: 50 }, filters, NOT_ABORTED)
     expect(page.rows).toEqual(expected.map((key) => ({ token: token(key), label })))
   })
 

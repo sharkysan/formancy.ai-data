@@ -40,6 +40,9 @@ import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { createPostgresLookups, createPostgresRecords, discoverPostgres } from './index.js'
 
+/** Nobody aborts this signal: every lookup here completes, and answers exactly as it did before the port carried one (0061). */
+const NEVER = new AbortController().signal
+
 /*
  * A uuid key end to end (0056), against REAL PostgreSQL loaded with the
  * shared fixture (0005) and UUID_ROWS, inserted by the owner.
@@ -176,7 +179,7 @@ async function read(bindings: FormBindings, policy: FormPolicy, actor: PolicyCon
 /** Whether every selection a write carries is one of the options, asked as the server asks before it writes. */
 async function members(checks: readonly MembershipCheck[]): Promise<string[]> {
   const rejected: string[] = []
-  for (const check of checks) rejected.push(...(await lookups.rejects(check.config, check.tokens, check.filters)))
+  for (const check of checks) rejected.push(...(await lookups.rejects(check.config, check.tokens, check.filters, NEVER)))
   return rejected
 }
 
@@ -447,13 +450,13 @@ describe("a lookup onto the delivery's uuid", covers('postgres', uuidCase('looku
   test('offers, finds, resolves and rejects deliveries by their uuid tokens', async () => {
     const expected = UUID_PARITY.lookup
     const { config, filters } = deliveryLookup(CLARA)
-    const page = await lookups.search(config, { search: '', offset: 0, limit: 50 }, filters)
+    const page = await lookups.search(config, { search: '', offset: 0, limit: 50 }, filters, NEVER)
     expect(page).toEqual({ rows: expected.offered, hasMore: false, omitted: 0 })
-    const found = await lookups.search(config, { search: expected.search.text, offset: 0, limit: 50 }, filters)
+    const found = await lookups.search(config, { search: expected.search.text, offset: 0, limit: 50 }, filters, NEVER)
     expect(found.rows.map((row) => row.token)).toEqual(expected.search.tokens)
-    expect(await lookups.resolve(config, [expected.resolved.token], filters)).toEqual([expected.resolved])
+    expect(await lookups.resolve(config, [expected.resolved.token], filters, NEVER)).toEqual([expected.resolved])
     const offered = expected.offered.map((row) => row.token)
-    expect(await lookups.rejects(config, [...offered, ...expected.rejected], filters)).toEqual(expected.rejected)
+    expect(await lookups.rejects(config, [...offered, ...expected.rejected], filters, NEVER)).toEqual(expected.rejected)
   })
 
   // Options whose labels tie are ordered by the key that ends every lookup's
@@ -469,7 +472,7 @@ describe("a lookup onto the delivery's uuid", covers('postgres', uuidCase('looku
     const expected = uuidOrder('postgres', keys)
     expect(expected).not.toEqual(uuidOrder('sqlserver', keys))
     const { config, filters } = deliveryLookup(OTTO)
-    const page = await lookups.search(config, { search, offset: 0, limit: 50 }, filters)
+    const page = await lookups.search(config, { search, offset: 0, limit: 50 }, filters, NEVER)
     expect(page.rows).toEqual(expected.map((key) => ({ token: token(key), label })))
   })
 

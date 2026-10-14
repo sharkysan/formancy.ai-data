@@ -74,6 +74,7 @@ export type { FoundRow } from './lookup/rows.js'
 export { rowFilterColumnProblem, rowFilterTerms, scopeRowFilters } from './lookup/filters.js'
 export type { FilterScoping } from './lookup/filters.js'
 export { displayText } from './lookup/display.js'
+export { DEFAULT_LOOKUP_DEADLINE_MS, MAX_LOOKUP_DEADLINE_MS } from './lookup/limits.js'
 export type {
   LookupAdapter,
   LookupConfig,
@@ -89,6 +90,7 @@ export type {
   LookupSearch,
   LookupSearchColumn,
   LookupSearchType,
+  LookupSignal,
   LookupSort,
   RowFilterTerm,
   RowFilters,

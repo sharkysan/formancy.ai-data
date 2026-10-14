@@ -78,6 +78,8 @@ const catalogueScenario = obj({
   latency: bool,
   roundTrips: engines(num),
   rowsRead: either(oneOf(null), either(obj({ exactly: num }), obj({ atMost: num }))),
+  // Absent before 0061: a result keeps the catalogue it was measured with.
+  operation: either(oneOf(undefined, null), str),
 })
 const catalogueRefusal = obj({ name: str, label: str, answer: obj({ status: num, code: str }), roundTrips: engines(num) })
 
