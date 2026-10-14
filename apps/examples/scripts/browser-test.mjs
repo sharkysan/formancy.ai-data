@@ -115,13 +115,20 @@ function widths() {
 /** How long Angular may take to arrive: the suite's own wait, doubled for a real network stack. */
 const MOUNTED_WITHIN_MS = 20_000
 
-/** Wait until every preview has its Validate button: half of them are Angular, which loads on demand. */
+/**
+ * Wait until every preview has its Validate button: half of them are Angular, which loads on demand.
+ *
+ * The forms are counted inside the wait, not once before it. Counted once, a
+ * count taken before React had drawn the page's navigation was 0, so the
+ * wait looked for no previews, never finished on "4 of 0", and the gate
+ * failed -- WebKit on CI, once at 360 px (PR #69, run 38643049102).
+ */
 async function mounted(page) {
-  const forms = await page.getByRole('navigation', { name: 'Forms on this page' }).getByRole('link').count()
-  const expected = forms * 2
   const deadline = Date.now() + MOUNTED_WITHIN_MS
+  let expected = 0
   let seen = 0
   while (Date.now() < deadline) {
+    expected = (await page.getByRole('navigation', { name: 'Forms on this page' }).getByRole('link').count()) * 2
     seen = await page.getByRole('button', { name: 'Validate' }).count()
     if (seen === expected && expected > 0) break
     await page.waitForTimeout(100)
