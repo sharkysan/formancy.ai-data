@@ -197,4 +197,4 @@ export type {
   RuntimeRefusal,
   UnknownOutcome,
 } from './runtime.js'
-export { LIST_PAGE_SIZE, WRITE_ID_HEADER } from './runtime.js'
+export { CROSS_ORIGIN_REQUEST_HEADERS, LIST_PAGE_SIZE, WRITE_ID_HEADER } from './runtime.js'

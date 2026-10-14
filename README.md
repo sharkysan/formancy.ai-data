@@ -27,8 +27,8 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > performance page, a host
 > page that draws a field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
-> a run through a real Cloudflare tunnel, and a licence a lawyer has
-> reviewed.
+> a host page on another origin run in a browser, a run through a real
+> Cloudflare tunnel, and a licence a lawyer has reviewed.
 > [`CHANGELOG.md`](./CHANGELOG.md) says what each step found.
 
 ## Try it
@@ -210,6 +210,11 @@ is not licensed for production.
   file, each key selected by the `kid` a token names and read again on
   SIGHUP; a bad file leaves the keys in force, and nothing is fetched
   ([0059](./docs/decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)).
+- **A host page on another origin is answered when its origin is listed
+  exactly**; the administrator's plane answers no other origin, and a
+  request riding a grant from before an origin was removed is refused in
+  every browser that sends `Sec-Fetch-Site`
+  ([0060](./docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md)).
 - **Every CI run ends in a report** of what it was tested on, which a release
   signs and attaches
   ([0035](./docs/decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)),
@@ -340,7 +345,8 @@ pnpm build
 FORMANCY_DATA_SERVER=http://127.0.0.1:4390 pnpm --filter @formancy/data-studio dev   # http://localhost:4392
 ```
 
-The server sends no CORS headers, so the studio is served from the server's
+The administrator's plane answers no other origin
+([0060](./docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md)), so the studio is served from the server's
 origin: in development Vite proxies `/v1` to `FORMANCY_DATA_SERVER`, and in a
 deployment one reverse proxy serves `apps/studio/dist` and `/v1` together, as
 [*Deploying*](#deploying) says. The token is held in the tab's memory only;
@@ -618,6 +624,20 @@ copy ([0014](./docs/decisions/0014-host-identity-is-verified-offline.md),
 [0059](./docs/decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md);
 [the data server's README](./packages/data-server/README.md#rotating-the-identity-key)
 says how).
+
+A host page on an origin of its own calls the runtime plane directly once
+`FORMANCY_DATA_CORS_ORIGINS` lists that origin exactly, as a browser sends
+it: each runtime route grants its own preflight, no wildcard, pattern or
+credentials can be configured, and the administrator's plane, `/v1/whoami`
+and `/health` answer no other origin. A token-bearing request a browser
+marks cross-site is refused before its token is read unless its origin is
+listed, so a grant a browser cached before its origin was removed does
+nothing in any browser that sends `Sec-Fetch-Site`; an older one can still
+send requests the server runs, for up to ten minutes, without reading the
+answers. The list is read at start, and the composed stack lists none
+([0060](./docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md);
+[the data server's README](./packages/data-server/README.md#across-origins)
+says what is granted, refused and logged).
 
 ## What it is tested on
 

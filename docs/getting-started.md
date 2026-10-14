@@ -310,8 +310,9 @@ What a real deployment changes:
   `FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE`, which
   `packages/data-server/src/main.ts` documents);
 - TLS at its own proxy, which takes the place of `deploy/web/nginx.conf` and
-  keeps the studio, the host application and `/v1` on one origin, as 0024 and
-  0029 require;
+  keeps the studio and `/v1` on one origin, as 0024 requires; a host page on
+  an origin of its own is listed in `FORMANCY_DATA_CORS_ORIGINS` instead
+  ([0060](./decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md));
 - its own database accounts, granted what each form needs, in
   `connections.json`, with TLS to the database;
 - its own secret store, mounted as files the settings name with `file:`.

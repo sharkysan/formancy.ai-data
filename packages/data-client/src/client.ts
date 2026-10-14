@@ -36,7 +36,13 @@ import type { DeleteOutcome, UnknownWrite, WriteAnswer, WriteIntent, WriteOutcom
 export interface DataClientOptions {
   /** Called once per request. The host's session owns it; it is never stored, and never in a URL or a body. */
   token: () => string | Promise<string>
-  /** Prefixed to every route. Default `''`: the page's own origin, which the server requires, having no CORS (0024). */
+  /**
+   * Prefixed to every route. Default `''`: the page's own origin. Another
+   * origin is answered only when the server's operator lists the page's
+   * origin in `FORMANCY_DATA_CORS_ORIGINS`; otherwise every call is a refused
+   * preflight, a network error to the page: a read is `unreachable`, a write
+   * unknown though nothing was sent (0060).
+   */
   base?: string
   /** Default the global `fetch`, bound. */
   fetch?: typeof fetch

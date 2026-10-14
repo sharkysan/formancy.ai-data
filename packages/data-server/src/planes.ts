@@ -13,6 +13,8 @@ export interface ServedConfiguration {
   adminRoles: readonly string[]
   /** Names records in the trail by a keyed hash; without it, no record is named (0023). */
   auditKey: string | undefined
+  /** `FORMANCY_DATA_CORS_ORIGINS`, parsed: the origins the runtime plane answers (0060); the administrator's answers none. */
+  origins: readonly string[]
   /** The server's log, looked up when an event fires: the server does not exist yet while its options are built. */
   log: () => FastifyBaseLogger
 }
@@ -28,10 +30,10 @@ export interface ServedConfiguration {
  * documents say it is.
  */
 export function servedPlanes(found: ServedConfiguration): Pick<DataServerOptions, 'admin' | 'runtime'> {
-  const { registry, store, adminRoles, auditKey } = found
+  const { registry, store, adminRoles, auditKey, origins } = found
   const sink: AuditSink = (event) => logAuditSink(found.log())(event)
   return {
-    runtime: { registry, store, audit: { sink, ...(auditKey === undefined ? {} : { key: auditKey }) } },
+    runtime: { registry, store, origins, audit: { sink, ...(auditKey === undefined ? {} : { key: auditKey }) } },
     ...(adminRoles.length === 0 ? {} : { admin: { registry, store, adminRoles, audit: { sink } } }),
   }
 }

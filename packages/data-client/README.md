@@ -88,10 +88,20 @@ a title, operations or children is `unexpected`.
   request and its answer goes in `Authorization: Bearer …` and nowhere else —
   not a URL, not a body, not storage. A host whose session renews the token is
   never answered for the old one.
-- **Same origin.** `base` defaults to `''`. The server sends no CORS headers
-  ([0024](../../docs/decisions/0024-the-studio-speaks-only-the-admin-plane.md)),
-  so the page that calls it is served from the server's origin or through a
-  proxy on the page's own.
+- **Same origin, or a listed one.** `base` defaults to `''`, the page's own
+  origin: served from the server's origin, or through a proxy on the page's
+  own ([0024](../../docs/decisions/0024-the-studio-speaks-only-the-admin-plane.md)).
+  A page on another origin sets `base` to the server's, and is answered only
+  when the server's operator lists the page's origin exactly in
+  `FORMANCY_DATA_CORS_ORIGINS`
+  ([0060](../../docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md));
+  otherwise every call is a refused preflight, a read `unreachable` and a
+  write unknown though nothing was sent, and only the server's log says why.
+  Across origins the client sends only headers the server grants --
+  `authorization`, `content-type` and `formancy-write-id`, and `accept`,
+  which a browser sends without asking -- and asks for no credentials: a
+  `fetch` the host passes must not add a header or set `credentials:
+  'include'`, which the server never allows.
 - **A name is one path segment.** A form id or a source name is
   `encodeURIComponent`'d into one segment under the form's routes. Empty, `.`
   and `..` cannot be one — `fetch` would resolve them to another route — and

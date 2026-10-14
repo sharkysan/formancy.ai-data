@@ -4,6 +4,7 @@ import type { DataServerOptions } from './app.js'
 import { createFileConfigurationStore } from './config-store.js'
 import { createConnectionRegistry, parseConnections } from './connections.js'
 import type { ConnectionRegistry } from './connections.js'
+import { corsOriginsSetting } from './cors.js'
 import { DRIVER_FACTORIES } from './drivers.js'
 import { identityKeySource, openIdentity, readAgainOnSignal } from './identity-settings.js'
 import { servedPlanes } from './planes.js'
@@ -27,6 +28,8 @@ import { resolveSecret } from './secrets.js'
  *   FORMANCY_DATA_IDENTITY_ALGORITHM               RS256, ES256, EdDSA or HS256; read again on SIGHUP (0059)
  *   FORMANCY_DATA_ATTRIBUTES                       e.g. "tenant=tid,region=reg"
  *   FORMANCY_DATA_RATE_LIMIT                       requests a minute per client address, default 600
+ *   FORMANCY_DATA_CORS_ORIGINS                     origins the runtime plane answers, comma-separated, each
+ *                                                  exactly as a browser sends Origin; empty or unset: none (0060)
  *   PORT                                           default 4390
  */
 function required(name: string): string {
@@ -56,6 +59,19 @@ function attributeMap(text: string | undefined): Record<string, string> {
 const limit = rateLimitSetting(process.env['FORMANCY_DATA_RATE_LIMIT'])
 if (!limit.ok) {
   console.error(limit.problem)
+  process.exit(1)
+}
+
+// Read before anything opens, as the limit is: an origin list nobody could
+// have meant -- a wildcard, a pattern, a spelling no browser sends -- or one
+// beside a server with no runtime plane, whose routes are all it grants,
+// stops the process here (cors.ts, 0060). Read once: changing it is a
+// restart.
+const origins = corsOriginsSetting(process.env['FORMANCY_DATA_CORS_ORIGINS'], {
+  runtime: process.env['FORMANCY_DATA_STORE_DIR'] !== undefined && process.env['FORMANCY_DATA_CONNECTIONS'] !== undefined,
+})
+if (!origins.ok) {
+  console.error(origins.problem)
   process.exit(1)
 }
 
@@ -112,7 +128,7 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
   const auditReference = process.env['FORMANCY_DATA_AUDIT_KEY']
   const auditKey = auditReference === undefined ? undefined : await resolveSecret(auditReference)
   // One trail for both planes, the server's own log (0033).
-  planes = servedPlanes({ registry, store, adminRoles, auditKey, log: () => app.log })
+  planes = servedPlanes({ registry, store, adminRoles, auditKey, origins: origins.origins, log: () => app.log })
 }
 
 const app = await createDataServer({ verifyIdentity, logger: true, rateLimit: limit.rateLimit, ...planes })

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
-import { DOORS, GUIDE, parsePrintedRoutes, RATE_LIMITED, readJson, renderDoors, routesFromServer, runtimePattern, staleBlocks } from './doors.mjs'
+import { DOORS, GUIDE, parsePrintedRoutes, RATE_LIMITED, readJson, renderDoors, routesFromServer, runtimePattern, samplePath, staleBlocks } from './doors.mjs'
 
 /**
  * The tunnel's two doors, as the built data server's router has them
@@ -17,7 +17,8 @@ import { DOORS, GUIDE, parsePrintedRoutes, RATE_LIMITED, readJson, renderDoors, 
  * reads the built verifier.
  */
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const fresh = renderDoors(await routesFromServer())
+const read = await routesFromServer()
+const fresh = renderDoors(read)
 const committed = readJson(DOORS)
 const key = (route) => `${route.method} ${route.path}`
 
@@ -70,6 +71,22 @@ describe('the runtime door’s pattern', () => {
     expect(fresh.runtimePattern).toMatch(/^\^\(\?:.*\)\$$/)
     expect(fresh.runtimePattern.slice(4, -2).split('|')).toHaveLength(new Set(samples((plane) => plane === 'runtime').map((route) => route.path)).size)
     expect(() => runtimePattern([])).toThrow(/registers no route/)
+  })
+})
+
+describe('a runtime server with an origin listed (0060)', () => {
+  // A preflight goes to the hostname and path its request goes to, so the
+  // runtime door forwards it only at a path the runtime pattern matches:
+  // every route a server with an origin adds beyond the runtime server's
+  // must be an OPTIONS route there. One elsewhere -- at /v1/whoami, or an
+  // administrator's path -- would be a preflight the tunnel never forwards
+  // to the runtime door, or one answered beside the administrator's plane.
+  // doors.json is the servers without origins, and does not change.
+  // Watched failing with a scratch OPTIONS /v1/whoami added by cors.ts.
+  test('adds only OPTIONS routes, each at a path the runtime door forwards', () => {
+    const pattern = new RegExp(fresh.runtimePattern)
+    expect(read.crossOrigin.length).toBeGreaterThan(0)
+    expect(read.crossOrigin.filter((route) => route.method !== 'OPTIONS' || !pattern.test(samplePath(route.path))).map(key)).toEqual([])
   })
 })
 

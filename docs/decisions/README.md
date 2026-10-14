@@ -78,16 +78,16 @@ only enforcement is "we remember" says so plainly.
 | [0021](0021-generated-forms-preview-in-both-frameworks.md) | Generated forms are previewed in both frameworks, generated in the browser from a captured snapshot | accepted; narrowed by 0029 |
 | [0022](0022-the-runtime-plane-asks-the-policy-every-time.md) | The runtime plane asks the policy on every request, and removes only the echo it can prove | accepted; narrowed by 0031, 0040; extended by 0041, 0044, 0045, 0050 |
 | [0023](0023-the-audit-trail-is-operational-not-evidence.md) | The audit trail is operational, never holds a value, and is not evidence | accepted; extended by 0031, 0033, 0044, 0045, 0050 |
-| [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032, 0052 |
+| [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032, 0052, 0060 |
 | [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted |
 | [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted; narrowed by 0040 |
 | [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted; extended by 0049 |
 | [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md) | Row filters, labels and refusals mean the same on both engines | accepted |
-| [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047; extended by 0032 |
+| [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047, 0060; extended by 0032 |
 | [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042 |
 | [0031](0031-an-answer-lost-after-a-write-is-unknown.md) | An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here | accepted; extended by 0040, 0041, 0047, 0050, 0053 |
 | [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md) | A clean install is the composed stack behind one proxy, and CI runs its guide | accepted; extended by 0035, 0037, 0046, 0051, 0059 |
-| [0033](0033-the-administrator-plane-is-audited.md) | The administrator's plane is audited like the runtime, one event per request | accepted |
+| [0033](0033-the-administrator-plane-is-audited.md) | The administrator's plane is audited like the runtime, one event per request | accepted; extended by 0060 |
 | [0034](0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md) | Performance is measured through the shipped server against a sized lookup table, and held without a clock by rows read and round trips | accepted |
 | [0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md) | A release report is derived from the run that gated the release, and says what it did not test | accepted; extended by 0034 |
 | [0036](0036-a-merged-branch-is-deleted-by-the-merge.md) | A merged branch is deleted by the merge, and only by the merge | accepted |
@@ -113,3 +113,4 @@ only enforcement is "we remember" says so plainly.
 | [0056](0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md) | A key the database fills is never written by a form unless the person gives another part of it, and a uuid is ordered as each engine orders it | accepted |
 | [0057](0057-a-key-of-one-column-filled-by-a-never-repeating-default-counts-as-numbered.md) | A key of one column that `gen_random_uuid()` or `newsequentialid()` fills, and no foreign key includes, counts as one the database numbers | accepted |
 | [0059](0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md) | The host identity key is a set selected by kid, read again from its file on SIGHUP, and nothing is fetched | accepted |
+| [0060](0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md) | The runtime plane answers the origins an operator lists, exactly, and the administrator's plane answers no other origin | accepted |
