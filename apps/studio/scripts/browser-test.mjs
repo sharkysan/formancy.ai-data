@@ -464,6 +464,15 @@ async function run(gate, browser) {
       // Firefox the keyboard starts from the caret the click left, past the
       // skip link, which is 0058's FACTS.clickThenTab, held here by name in
       // every browser.
+      //
+      // Once the workbench has put the keyboard where it puts it. The step's
+      // heading takes focus from a React effect, which runs after the paint
+      // that shows the step list, so a click the moment the list appears can
+      // land first; the effect then moves focus to the heading, and Tab goes
+      // on into the step. A person cannot click inside that window. WebKit on
+      // CI met it once in six widths on main (run 38629274328), and the gate
+      // read it as a browser fact that had changed.
+      await page.waitForFunction(() => document.activeElement?.id === 'step-heading', undefined, { timeout: 15_000 })
       const skip = page.getByRole('link', { name: 'Skip to the step' })
       await page.mouse.click(1, 1)
       await page.keyboard.press('Tab')
