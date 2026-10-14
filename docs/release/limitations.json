@@ -204,7 +204,7 @@
       ]
     },
     "0013": {
-      "reviewed": "sha256:8d38ab042e9d85b0a3fb20e24cf96d37cd5f47ba122456f1558df5c4747e7d19",
+      "reviewed": "sha256:5714f1bf162ea45221ece74eb44dc1dfec4149440ae4025cc3d61c2c7ad79cc2",
       "limitations": [
         {
           "area": "operations",
@@ -365,7 +365,7 @@
       ]
     },
     "0019": {
-      "reviewed": "sha256:a5a4f5871cac672c2872ba001ab950a6c2d3926d9369c9ba10d750fa910524cc",
+      "reviewed": "sha256:4ae642eeb992fe2eda4cc3f817e9d00adbb8a6100cf2be58218f36c30bea9aa9",
       "limitations": [
         {
           "area": "operations",
@@ -430,7 +430,7 @@
       ]
     },
     "0024": {
-      "reviewed": "sha256:79ff428b6f64aecb11ca153fc1aa37cad368ca220e89d074bfb99a07d0f8ff68",
+      "reviewed": "sha256:073ff23d0f0e950d703d7c0dcfdee0f9c6a130dfda02a4a739481659d4feb844",
       "limitations": [
         {
           "area": "studio",
@@ -632,7 +632,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:4c5801fded1504d9a89183dbf08d4e524623a8a5846f007588f6d826aee904b4",
+      "reviewed": "sha256:021dc69f1617207fb95ed12d3238f6522d52e57ca4cb18b3a0b5c6321d31cad6",
       "limitations": [
         {
           "area": "studio",
@@ -767,7 +767,7 @@
       ]
     },
     "0033": {
-      "reviewed": "sha256:caf7b468ba3f89abeea5ce95d87c286d0d7f2fb0545ba2d5f85febc7ce1e48f8",
+      "reviewed": "sha256:20aae732011ec8b6f89dfd04d64220ab9b119b706e9780074988d835db276f9f",
       "limitations": [
         {
           "area": "server",
@@ -953,11 +953,11 @@
       ]
     },
     "0038": {
-      "reviewed": "sha256:a242909d89ad69431d809ad46305b7d8886c2eebb99db9d0e5bd23079d80bc5f",
+      "reviewed": "sha256:cd2cb5a26473d2276e31622e3e6f93a926b33711f3250a1d5a0e2d9a52e7c810",
       "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the pictures job's time. Nobody who installs, integrates or operates the module meets them."
     },
     "0039": {
-      "reviewed": "sha256:9b2e1311db341b2f588b32fce9a94d42c3c9d51668092b065ee3029187633366",
+      "reviewed": "sha256:e246b601deb7da877cb7d2d2d05d9d52255adb115c07612afe9c5efff7cad8f3",
       "limitations": [
         {
           "area": "access",
@@ -1887,6 +1887,44 @@
         {
           "area": "testing",
           "says": "No browser gate runs against a server with origins listed: that a browser honours a grant, and is refused after reusing one it cached before its origin was removed, is shown through inject only; the one measurement in browsers, that Chromium and WebKit reuse a URL's grant for another GET, HEAD or POST there, was by hand."
+        }
+      ]
+    },
+    "0062": {
+      "reviewed": "sha256:54df372e3651eeab9d59aba883d7da383b8e294d659f324d83b84ca3d576af5b",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "An imported version keeps its connection's and its form's names, so both deployments' allowlists give the database the same name, and renaming one is an allowlist edit and a restart.",
+          "heldBy": "packages/data-server/src/routes/admin-promotion.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A version file is refused by a deployment whose release generates another base or other bindings from the same snapshot and request, so both deployments run releases that generate alike, or the form is proposed again in the target.",
+          "heldBy": "packages/data-server/src/routes/admin-promotion.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "An imported version serves, and drifts against, the snapshot the source deployment took, its account's name and its whole scope, until it is regenerated in the target, and a target account narrower than the source's is drift that refuses the import.",
+          "heldBy": "packages/data-server/src/routes/admin-promotion.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A version file holds the snapshot's metadata and the role names its policy grants, so where it is kept is the team's to secure."
+        },
+        {
+          "area": "operations",
+          "says": "Importing the same file again writes a new version, as a restore of the same version does.",
+          "heldBy": "packages/data-server/src/routes/admin-promotion.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "Nothing proves where a version file came from: the import checks what it holds, and each deployment's trail says only who read it there and who imported it here."
+        },
+        {
+          "area": "server",
+          "says": "Each import discovers the target database once, and a database that cannot be reached refuses it.",
+          "heldBy": "packages/data-server/src/routes/admin-promotion.test.ts"
         }
       ]
     }

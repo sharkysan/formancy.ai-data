@@ -205,6 +205,13 @@ export function withColumn(base: MetadataSnapshot, table: string, column: Column
   return createSnapshot(contents)
 }
 
+/** One column of sales.order in `base` renamed: to the catalog, one dropped and one added at the same place. */
+export function renamedOrderColumn(base: MetadataSnapshot, column: string, to: string): MetadataSnapshot {
+  const meta = base.objects.find((object) => object.ref.name === 'order')?.columns.find((candidate) => candidate.name === column)
+  if (meta === undefined) throw new Error(`the order has no ${column}`)
+  return withColumn(withoutColumn(base, 'order', column), 'order', { ...meta, name: to })
+}
+
 /**
  * A snapshot of `base` with a foreign key from one table of the order's
  * schema onto another, said on both sides as discovery says it -- the

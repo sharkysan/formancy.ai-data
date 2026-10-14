@@ -271,6 +271,44 @@ describe("the administrator plane's events", () => {
     expect(JSON.stringify(events)).not.toContain('column-dropped')
   })
 
+  // An imported version is a file another deployment's store wrote: on
+  // this volume nothing says it came from elsewhere, so the event is the
+  // record of who brought it in, over which base, as which version (0062).
+  // Its base is named once the body is read and its connection once the
+  // bundle validates against this allowlist; one refused by drift wrote no
+  // version and holds nothing of the drift; one whose body could not be
+  // read names neither, and none of the bundle is ever in the trail. The
+  // export is the other deployment's version-read.
+  test('an import names its base, its connection and the version it wrote, and nothing of the bundle or the drift', async () => {
+    const development = await serve()
+    expect((await publish(development)).statusCode).toBe(201)
+    events = []
+    const bundle = (await development.inject({ method: 'GET', url: '/v1/forms/employee/versions/1', headers: as('admin') })).json().bundle
+    expect(events).toEqual([event({ operation: 'version-read', form: 'employee', connection: 'erp', formVersion: 1, status: 200, outcome: 'ok' })])
+
+    const elsewhere = await mkdtemp(join(tmpdir(), 'formancy-data-admin-audit-production-'))
+    try {
+      const production = await serve({ store: createFileConfigurationStore(elsewhere) })
+      events = []
+      const imported = await production.inject({ method: 'POST', url: '/v1/forms/employee/imports', headers: as('admin'), payload: { expectedBase: null, bundle } })
+      expect(imported.statusCode, imported.body).toBe(201)
+      columns = columns.filter((entry) => entry.name !== 'name')
+      const refused = await production.inject({ method: 'POST', url: '/v1/forms/employee/imports', headers: as('admin'), payload: { expectedBase: 1, bundle } })
+      expect(refused.json()).toMatchObject({ code: 'incompatible', changes: [expect.objectContaining({ kind: 'column-dropped' })] })
+      await production.inject({ method: 'POST', url: '/v1/forms/employee/imports', headers: as('admin'), payload: { expectedBase: 'newest', bundle } })
+      await production.inject({ method: 'POST', url: '/v1/forms/employee/imports', headers: as('admin'), payload: { expectedBase: 1, bundle: { ...bundle, connection: `${HOST}:1433;password=${PASSWORD}` } } })
+      expect(events).toEqual([
+        event({ operation: 'import', form: 'employee', connection: 'erp', formVersion: 1, status: 201, outcome: 'ok' }),
+        event({ operation: 'import', form: 'employee', connection: 'erp', expectedBase: 1, status: 409, outcome: 'incompatible' }),
+        event({ operation: 'import', form: 'employee', status: 400, outcome: 'invalid-request' }),
+        event({ operation: 'import', form: 'employee', expectedBase: 1, status: 422, outcome: 'invalid-bundle' }),
+      ])
+      for (const planted of [TITLE, ROLE, HOST, PASSWORD, 'column-dropped']) expect(JSON.stringify(events)).not.toContain(planted)
+    } finally {
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
+
   // Every read on this plane hands back a policy or a schema, so each names
   // the version it served: an operator asked who looked at version 1 has an
   // answer. The list names a form and no version, since it served none.

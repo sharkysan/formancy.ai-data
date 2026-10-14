@@ -327,7 +327,7 @@
   },
   "studio-drift": {
     "file": "docs/images/readme/studio-drift.webp",
-    "captured": "2026-10-10",
+    "captured": "2026-10-14",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -337,10 +337,10 @@
     "timezone": "UTC",
     "css": {
       "width": 916,
-      "height": 1411
+      "height": 1786
     },
-    "bytes": 217724,
-    "sha256": "b787194c1f968a2f49b6a004fb0cfba9d28e4c0bab017a167e1f15629c9c0e46",
+    "bytes": 268914,
+    "sha256": "fb83749846c0648dee9bd0453b018bda1c7a9b78092ac64a5387148e6f19c042",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -352,9 +352,9 @@
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 89fb1958dc080e8f52508de020cc623c93150297f0c8434830cea54077fbcc22 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
-      "Drift": "- main \"Drift\":\n  - heading \"Drift\" [level=2]\n  - paragraph: \"Compare a published form with its database as it is now. Only what the form rests on is compared: its table and its lookups’ targets. Something this connection can no longer see is an access change, never a deletion.\"\n  - text: Form id\n  - textbox \"Form id\": pg-order\n  - button \"Check drift\"\n  - region \"Version 3 of pg-order, against the database now\":\n    - heading \"Version 3 of pg-order, against the database now\" [level=3]\n    - status: 3 changes, 1 blocking.\n    - heading \"What the published form may still do\" [level=4]\n    - list \"What the published form may still do\":\n      - listitem: \"Read: blocked by the changes below\"\n      - listitem: \"Create: blocked by the changes below\"\n      - listitem: \"Update: blocked by the changes below\"\n      - listitem: \"As a whole: not to be used as published until the blocking changes are reviewed.\"\n    - heading \"Blocking\" [level=4]\n    - paragraph: \"Blocks the form as published: a write it offers is stopped, or a field it shows can no longer be read, until it is reviewed.\"\n    - list \"Blocking\":\n      - listitem:\n        - paragraph:\n          - text: blocking\n          - code: column-dropped\n          - text: on sales.order, column notes\n        - paragraph: notes is gone, and the form binds it to notes. The form is blocked until it is reviewed.\n        - paragraph: Affects Remarks (notes).\n    - heading \"Review\" [level=4]\n    - paragraph: Blocks nothing. A person has something to decide.\n    - list \"Review\":\n      - listitem:\n        - paragraph:\n          - text: review\n          - code: column-added\n          - text: on sales.order, column memo\n        - paragraph: memo is new (text, nullable). It can be added to the form; the published form is unchanged.\n        - paragraph: Affects no field of this form.\n      - listitem:\n        - paragraph:\n          - text: review\n          - code: possible-rename\n          - text: on sales.order, column notes\n        - paragraph: \"notes is gone and memo is new with the same definition (text). If it is notes renamed, confirm it: nothing is inferred, and until then they are reported as a dropped column and a new one.\"\n        - paragraph: Affects Remarks (notes).\n  - paragraph:\n    - button \"Regenerate, keeping your presentation\"\n  - region \"Versions of pg-order\":\n    - heading \"Versions of pg-order\" [level=3]\n    - paragraph: Restoring publishes an older version again as version 4, with the policy it had, when the database can still serve it. It changes no table.\n    - text: Version to restore\n    - combobox \"Version to restore\":\n      - option \"Version 1\" [selected]\n      - option \"Version 2\"\n    - button \"Restore version 1\"\n    - paragraph: \"Version 1: “Order”, 9 fields, bound to sales.order on pg.\"\n    - alert:\n      - paragraph: \"Version 1 cannot be restored: the database has changed in a way it cannot serve.\"\n      - heading \"What blocks it\" [level=4]\n      - list \"What blocks it\":\n        - listitem:\n          - paragraph:\n            - text: blocking\n            - code: column-dropped\n            - text: on sales.order, column notes\n          - paragraph: notes is gone, and the form binds it to notes. The form is blocked until it is reviewed.\n          - paragraph: Affects Remarks (notes)."
+      "Drift": "- main \"Drift\":\n  - heading \"Drift\" [level=2]\n  - paragraph: \"Compare a published form with its database as it is now. Only what the form rests on is compared: its table and its lookups’ targets. Something this connection can no longer see is an access change, never a deletion.\"\n  - text: Form id\n  - textbox \"Form id\": pg-order\n  - button \"Check drift\"\n  - region \"Version 3 of pg-order, against the database now\":\n    - heading \"Version 3 of pg-order, against the database now\" [level=3]\n    - status: 3 changes, 1 blocking.\n    - heading \"What the published form may still do\" [level=4]\n    - list \"What the published form may still do\":\n      - listitem: \"Read: blocked by the changes below\"\n      - listitem: \"Create: blocked by the changes below\"\n      - listitem: \"Update: blocked by the changes below\"\n      - listitem: \"As a whole: not to be used as published until the blocking changes are reviewed.\"\n    - heading \"Blocking\" [level=4]\n    - paragraph: \"Blocks the form as published: a write it offers is stopped, or a field it shows can no longer be read, until it is reviewed.\"\n    - list \"Blocking\":\n      - listitem:\n        - paragraph:\n          - text: blocking\n          - code: column-dropped\n          - text: on sales.order, column notes\n        - paragraph: notes is gone, and the form binds it to notes. The form is blocked until it is reviewed.\n        - paragraph: Affects Remarks (notes).\n    - heading \"Review\" [level=4]\n    - paragraph: Blocks nothing. A person has something to decide.\n    - list \"Review\":\n      - listitem:\n        - paragraph:\n          - text: review\n          - code: column-added\n          - text: on sales.order, column memo\n        - paragraph: memo is new (text, nullable). It can be added to the form; the published form is unchanged.\n        - paragraph: Affects no field of this form.\n      - listitem:\n        - paragraph:\n          - text: review\n          - code: possible-rename\n          - text: on sales.order, column notes\n        - paragraph: \"notes is gone and memo is new with the same definition (text). If it is notes renamed, confirm it: nothing is inferred, and until then they are reported as a dropped column and a new one.\"\n        - paragraph: Affects Remarks (notes).\n  - paragraph:\n    - button \"Regenerate, keeping your presentation\"\n  - region \"Versions of pg-order\":\n    - heading \"Versions of pg-order\" [level=3]\n    - region \"Download a version\":\n      - heading \"Download a version\" [level=4]\n      - paragraph: \"The file the server stored, byte for byte: another deployment imports it, and git compares it.\"\n      - text: Version to download\n      - combobox \"Version to download\":\n        - option \"Version 1\"\n        - option \"Version 2\"\n        - option \"Version 3\" [selected]\n      - link \"Download version 3\":\n        - /url: blob:http://studio.invalid/<uuid>\n    - region \"Restore a version\":\n      - heading \"Restore a version\" [level=4]\n      - paragraph: Restoring publishes an older version again as version 4, with the policy it had, when the database can still serve it. It changes no table.\n      - text: Version to restore\n      - combobox \"Version to restore\":\n        - option \"Version 1\" [selected]\n        - option \"Version 2\"\n      - button \"Restore version 1\"\n      - paragraph: \"Version 1: “Order”, 9 fields, bound to sales.order on pg.\"\n    - alert:\n      - paragraph: \"Version 1 cannot be restored: the database has changed in a way it cannot serve.\"\n      - heading \"What blocks it\" [level=5]\n      - list \"What blocks it\":\n        - listitem:\n          - paragraph:\n            - text: blocking\n            - code: column-dropped\n            - text: on sales.order, column notes\n          - paragraph: notes is gone, and the form binds it to notes. The form is blocked until it is reviewed.\n          - paragraph: Affects Remarks (notes).\n  - region \"Import a version\":\n    - heading \"Import a version\" [level=3]\n    - paragraph: A version file is one version as a studio downloads it, from this deployment or another. It keeps its form id and its connection’s name, which this deployment’s allowlist resolves to its own database. The server checks it as it checks a publish, and against this database as it checks a restore.\n    - text: Version file\n    - button \"Version file\""
     }
   },
   "studio-regenerated": {
@@ -423,7 +423,7 @@
   },
   "studio-restored": {
     "file": "docs/images/readme/studio-restored.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-14",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -433,10 +433,10 @@
     "timezone": "UTC",
     "css": {
       "width": 874,
-      "height": 210
+      "height": 372
     },
-    "bytes": 42068,
-    "sha256": "c1307184a378b7ade71600e5de93b7fc1f1330ffbe58b96a0b6d6501a1cd4c50",
+    "bytes": 62230,
+    "sha256": "1fff5e7c663e5f4a27365f83a2e4a9105eba9ece157caa767821d14ff9aa7b3b",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -448,9 +448,9 @@
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 89fb1958dc080e8f52508de020cc623c93150297f0c8434830cea54077fbcc22 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
-      "Versions": "- region \"Versions of pg-order\":\n  - heading \"Versions of pg-order\" [level=3]\n  - paragraph: Restoring publishes an older version again as version 5, with the policy it had, when the database can still serve it. It changes no table.\n  - text: Version to restore\n  - combobox \"Version to restore\":\n    - option \"Version 1\" [selected]\n    - option \"Version 2\"\n    - option \"Version 3\"\n  - button \"Restore version 1\"\n  - paragraph: \"Version 1: “Order”, 9 fields, bound to sales.order on pg.\"\n  - status: \"Restored version 1 as version 4: the runtime serves it from now on, with the policy it had. The database was not changed.\""
+      "Versions": "- region \"Versions of pg-order\":\n  - heading \"Versions of pg-order\" [level=3]\n  - region \"Download a version\":\n    - heading \"Download a version\" [level=4]\n    - paragraph: \"The file the server stored, byte for byte: another deployment imports it, and git compares it.\"\n    - text: Version to download\n    - combobox \"Version to download\":\n      - option \"Version 1\"\n      - option \"Version 2\"\n      - option \"Version 3\"\n      - option \"Version 4\" [selected]\n    - link \"Download version 4\":\n      - /url: blob:http://studio.invalid/<uuid>\n  - region \"Restore a version\":\n    - heading \"Restore a version\" [level=4]\n    - paragraph: Restoring publishes an older version again as version 5, with the policy it had, when the database can still serve it. It changes no table.\n    - text: Version to restore\n    - combobox \"Version to restore\":\n      - option \"Version 1\" [selected]\n      - option \"Version 2\"\n      - option \"Version 3\"\n    - button \"Restore version 1\"\n    - paragraph: \"Version 1: “Order”, 9 fields, bound to sales.order on pg.\"\n  - status: \"Restored version 1 as version 4: the runtime serves it from now on, with the policy it had. The database was not changed.\""
     }
   },
   "studio-keys": {

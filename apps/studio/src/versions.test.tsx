@@ -1,3 +1,4 @@
+import { resolveObjectURL } from 'node:buffer'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -65,6 +66,100 @@ function offered(versions: HTMLElement): string[] {
 
 const file = (version: number) => readFile(join(plane.root, 'sales-order', `${String(version)}.json`))
 
+/**
+ * The link that downloads `version`, and the bytes it saves: the Blob its
+ * object URL names. jsdom has no `URL.createObjectURL`; vitest 5's jsdom
+ * environment gives one that copies the Blob's bytes into Node's own
+ * blob-URL store (its `createJSDOMCompatURL`), so Node's `resolveObjectURL`
+ * reads back what a click would save, and nothing once it is revoked. The
+ * browser's own store is the browser gate's: scripts/browser-test.mjs
+ * downloads a version in Chromium and compares the file it saved.
+ */
+async function download(versions: HTMLElement, version: number): Promise<{ name: string | null; href: string; bytes: Buffer }> {
+  const link = within(versions).getByRole('link', { name: `Download version ${String(version)}` })
+  const href = link.getAttribute('href') ?? ''
+  const blob = resolveObjectURL(href)
+  if (blob === undefined) throw new Error(`the link's address, ${href.slice(0, 60)}, names no Blob`)
+  expect(blob.type).toBe('application/json')
+  return { name: link.getAttribute('download'), href, bytes: Buffer.from(await blob.arrayBuffer()) }
+}
+
+describe('downloading a version', () => {
+  // The export (0062) is the file the store wrote, byte for byte, so the one
+  // a person downloads is the one another deployment imports and the one
+  // `git diff` compares with the volume's. The studio re-spells the bundle it
+  // read as the store does; spelled any other way -- without the store's
+  // trailing newline, as watched failing -- the download differs from the
+  // file it says it is.
+  test('downloads any version as the file the store wrote, newest by default', async () => {
+    await publishOrder(null)
+    await publishOrder(1, 'Their notes')
+    const user = await signIn(plane)
+    const versions = await versionsOf(user)
+    const select = within(versions).getByRole('combobox', { name: 'Version to download' })
+    expect(within(select).getAllByRole('option').map((option) => [option.textContent, (option as HTMLOptionElement).selected])).toEqual([
+      ['Version 1', false],
+      ['Version 2', true],
+    ])
+    const downloads = within(versions).getByRole('region', { name: 'Download a version' })
+    await within(downloads).findByRole('link', { name: 'Download version 2' })
+    const newest = await download(downloads, 2)
+    expect(newest.name).toBe('sales-order-2.json')
+    expect(newest.bytes.equals(await file(2))).toBe(true)
+    await user.selectOptions(select, '1')
+    await within(versions).findByRole('link', { name: 'Download version 1' })
+    const oldest = await download(versions, 1)
+    expect(oldest.name).toBe('sales-order-1.json')
+    expect(oldest.bytes.equals(await file(1))).toBe(true)
+    expect(await audit()).toEqual([])
+  })
+
+  // The file is held by an object URL, not spelled into the link (0062), and
+  // an object URL holds the whole file in the page until it is revoked: one
+  // left behind by each version shown, or by a panel closed, would keep
+  // every file read for as long as the studio is open. Watched failing with
+  // the revoke taken out: version 2's URL still named its file after
+  // version 1 was chosen.
+  test('holds the file shown, and lets go of it when another version is shown or the panel closes', async () => {
+    await publishOrder(null)
+    await publishOrder(1, 'Their notes')
+    const user = await signIn(plane)
+    const versions = await versionsOf(user)
+    await within(versions).findByRole('link', { name: 'Download version 2' })
+    const newest = await download(versions, 2)
+    await user.selectOptions(within(versions).getByRole('combobox', { name: 'Version to download' }), '1')
+    await within(versions).findByRole('link', { name: 'Download version 1' })
+    const oldest = await download(versions, 1)
+    expect(resolveObjectURL(newest.href)).toBeUndefined()
+    expect(resolveObjectURL(oldest.href)).toBeDefined()
+    cleanup()
+    expect(resolveObjectURL(oldest.href)).toBeUndefined()
+  })
+
+  // A version the server does not serve -- edited on disk, say -- has no
+  // file the studio can vouch for: a download built from nothing, or from
+  // the last version read, would be a file that is not that version. It
+  // says the server's sentence instead, and the versions it does serve are
+  // still offered.
+  test('a version that is not served offers no download, and says why', async () => {
+    await publishOrder(null)
+    await publishOrder(1, 'Their notes')
+    const damaged = JSON.parse((await file(2)).toString('utf8')) as { snapshot: { objects: Array<{ comment: string | null }> } }
+    for (const object of damaged.snapshot.objects) object.comment = 'edited'
+    await writeFile(join(plane.root, 'sales-order', '2.json'), JSON.stringify(damaged, null, 2))
+    const user = await signIn(plane)
+    const drift = await goTo(user, 'Drift')
+    await user.type(within(drift).getByLabelText('Form id'), 'sales-order')
+    await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
+    const downloads = await within(drift).findByRole('region', { name: 'Download a version' })
+    expect(await within(downloads).findByText('Version 2 of sales-order no longer validates and is not served.')).toBeTruthy()
+    expect(within(downloads).queryByRole('link')).toBeNull()
+    await user.selectOptions(within(downloads).getByRole('combobox', { name: 'Version to download' }), '1')
+    expect((await within(downloads).findByRole('link', { name: 'Download version 1' })).getAttribute('download')).toBe('sales-order-1.json')
+    expect(within(downloads).queryByText(/no longer validates/)).toBeNull()
+  })
+})
+
 describe('restoring a version', () => {
   // The restore is a copy, not a regeneration: the new version's file holds
   // the old one's document (the same bytes, since the store wrote both),
@@ -124,8 +219,8 @@ describe('restoring a version', () => {
     await publishOrder(2, 'Newer notes')
     await user.click(within(versions).getByRole('button', { name: 'Restore version 1' }))
     expect((await within(versions).findByRole('alert')).textContent).toBe('Somebody published version 3 since the list was read. Nothing was restored; the list now shows it.')
-    await within(versions).findByRole('option', { name: 'Version 2' })
-    expect(offered(versions)).toEqual(['Version 1', 'Version 2'])
+    // In the restore's list: the download's offers every version, and had version 2 already.
+    await waitFor(() => expect(offered(versions)).toEqual(['Version 1', 'Version 2']))
     expect(await plane.store.versions('sales-order')).toEqual([1, 2, 3])
     // The choice is the select's: the button and the line under it follow it.
     await user.selectOptions(within(versions).getByRole('combobox', { name: 'Version to restore' }), '2')
@@ -201,7 +296,7 @@ describe('restoring a version', () => {
   })
 
   // One version has nothing older to restore, and says so rather than
-  // offering itself.
+  // offering itself; it is still a version to download.
   test('says when there is nothing older to restore', async () => {
     await publishOrder(null)
     const user = await signIn(plane)
@@ -211,5 +306,8 @@ describe('restoring a version', () => {
     const versions = await within(drift).findByRole('region', { name: 'Versions of sales-order' })
     expect(await within(versions).findByText('Only version 1 is published: there is nothing older to restore.')).toBeTruthy()
     expect(within(versions).queryByRole('button')).toBeNull()
+    // Nothing to restore is not nothing to download: the one version is the one another deployment imports.
+    await within(versions).findByRole('link', { name: 'Download version 1' })
+    expect((await download(versions, 1)).bytes.equals(await file(1))).toBe(true)
   })
 })

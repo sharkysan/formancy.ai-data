@@ -20,6 +20,7 @@ export const ADMIN_OPERATIONS: Readonly<Record<string, AdminOperation>> = {
   'POST /v1/forms/:id/drift': 'drift',
   'POST /v1/forms/:id/regenerations': 'regeneration',
   'POST /v1/forms/:id/restorations': 'restore',
+  'POST /v1/forms/:id/imports': 'import',
 }
 
 /**

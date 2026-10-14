@@ -53,8 +53,36 @@
   font-size: 0.875rem;
 }
 
-.versions .problem-box h4 {
+.versions .problem-box :is(h4, h5) {
   margin: 0.5rem 0 0.25rem;
+}
+
+/* Download and restore, one version each, under the form's heading. */
+.versions section + section {
+  margin-top: 1rem;
+}
+
+.versions section > h4 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.9375rem;
+}
+
+/* A link that saves a file, drawn as the button beside it would be. */
+a.button {
+  text-decoration: none;
+}
+
+/* The file chooser's own button, in the room's colours rather than the platform's grey. */
+.import input[type='file']::file-selector-button {
+  margin-inline-end: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--edge-strong);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 4%);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
 }
 
 .reassigned h3 {

@@ -31,6 +31,7 @@ export type AdminOperation =
   | 'drift'
   | 'regeneration'
   | 'restore'
+  | 'import'
 
 /**
  * One operational audit event of the runtime plane: who asked for what,
@@ -59,8 +60,9 @@ export interface RuntimeAuditEvent extends AuditEventBase {
 
 /**
  * One operational audit event of the administrator's plane (0033): who
- * connected, discovered, proposed, published, read, compared, regenerated or
- * restored, against which connection and which version, and how it ended.
+ * connected, discovered, proposed, published, read, compared, regenerated,
+ * restored or imported, against which connection and which version, and how
+ * it ended.
  *
  * Names and numbers only. Never the bundle, the policy or a role it names,
  * a snapshot, a generation request, a drift report or any message.
@@ -74,7 +76,7 @@ export interface AdminAuditEvent extends AuditEventBase {
   form: string | null
   /** The version read, compared, regenerated from, or written. */
   formVersion: number | null
-  /** Publish and restore: the base the administrator said they edited. */
+  /** Publish, restore and import: the base the administrator said they edited, or saw newest. */
   expectedBase: number | null
   /** Restore only: the version the new one copies, which nothing on disk records. */
   restoredFrom: number | null

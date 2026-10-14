@@ -1,6 +1,6 @@
 # 0013 — Published configuration is files, and compare-and-swap is a hard link
 
-- **Status:** accepted; `versions()` on the port, and a restore is a new version holding the old one's document, extended by [0030](0030-presentation-is-a-patch-over-the-generated-base.md)
+- **Status:** accepted; `versions()` on the port, and a restore is a new version holding the old one's document, extended by [0030](0030-presentation-is-a-patch-over-the-generated-base.md); narrowed by [0062](0062-a-published-version-moves-between-deployments-as-its-version-file.md): a copy of the store's directory is no longer how a version moves between deployments; one version's file is imported through the administrator's plane, checked as a publish and gated as a restore
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/config-store.test.ts` — versions

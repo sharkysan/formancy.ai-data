@@ -238,13 +238,13 @@ describe('regeneration', () => {
   // has made every published binding meaningless; drift refuses to compare
   // across engines, and the route says so as an internal failure with the
   // reason in the log, rather than regenerating against the wrong database.
-  test('a connection now pointing at another engine is 500, for regeneration and restore alike', async () => {
+  // A restore says it as the caller's answer instead (0062), below.
+  test('a connection now pointing at another engine is 500 for a regeneration', async () => {
     await publish()
     engine = 'postgres'
     const regenerated = await regenerate()
     expect(regenerated.statusCode).toBe(500)
     expect(regenerated.json()).toMatchObject({ code: 'internal' })
-    expect((await restore({ version: 1, expectedBase: 1 })).json()).toMatchObject({ code: 'internal' })
     expect(await store.latest('employee')).toBe(1)
   })
 
@@ -305,6 +305,20 @@ describe('restoration', () => {
     expect(body.code).toBe('incompatible')
     expect(body.changes.map((change: { kind: string; severity: string }) => [change.kind, change.severity])).toEqual([['column-dropped', 'blocking']])
     expect(await store.latest('employee')).toBe(2)
+  })
+
+  // Restore and import share one gate (0062): a version bound to one engine
+  // is not served from a database of another. The restore says so as what
+  // the administrator can act on -- point the connection back -- where it
+  // was a 500 whose reason only the operator's log held (watched failing:
+  // 500 internal). Nothing is written.
+  test('a connection now pointing at another engine is 422 other-engine, and nothing is written', async () => {
+    await publish()
+    engine = 'postgres'
+    const refused = await restore({ version: 1, expectedBase: 1 })
+    expect(refused.statusCode).toBe(422)
+    expect(refused.json()).toEqual({ code: 'other-engine', message: "Version 1 cannot be restored: connection erp is a postgres database now, and the version is bound to sqlserver. A form's bindings belong to one engine." })
+    expect(await store.latest('employee')).toBe(1)
   })
 
   // Restore is compare-and-swap like publish: from a stale base it is a

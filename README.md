@@ -101,6 +101,11 @@ is not licensed for production.
   ([0013](./docs/decisions/0013-published-configuration-is-files-with-link-based-swap.md),
   [0019](./docs/decisions/0019-a-published-form-is-checked-every-time-it-is-read.md),
   [0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
+- **Moves a version between deployments** as the file its store wrote: the
+  import is checked as a publish is, against the target's allowlist by the
+  same connection name, and refused when the target database's drift blocks
+  it, as a restore is
+  ([0062](./docs/decisions/0062-a-published-version-moves-between-deployments-as-its-version-file.md)).
 - **Reviews drift** against what a published form's bindings and lookups rest
   on, and says which operations each change blocks
   ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md))
@@ -319,7 +324,7 @@ speaks only to the server's administrator plane and `/v1/whoami`
 
 **Step 7, Publish.** *Another administrator, grace, published version 2 while ada worked; the capture script sends grace's request to the same server. Nothing is overwritten: “Yours was not published, and theirs is untouched.” The step says which version is published now, and “Publishing waits until you rebase on it.” ([0013](./docs/decisions/0013-published-configuration-is-files-with-link-based-swap.md)).*
 
-<img src="./docs/images/readme/studio-drift.webp" width="916" alt="The Drift step: “3 changes, 1 blocking.”; read, create and update blocked; a blocking column-dropped change for notes, review changes for the new column memo and a possible rename; and a refused restore of version 1 with what blocks it.">
+<img src="./docs/images/readme/studio-drift.webp" width="916" alt="The Drift step: “3 changes, 1 blocking.”; read, create and update blocked; a blocking column-dropped change for notes, review changes for the new column memo and a possible rename; version 3 offered for download; a refused restore of version 1 with what blocks it; and an import with no version file chosen yet.">
 
 **Step 8, Drift.** *After the capture script renamed `notes` to `memo` in the captured snapshot, as discovery reports a real rename on both engines. The rename is a “possible-rename” for a person to confirm, not a guess, and restoring version 1, which still binds `notes`, is refused: “Version 1 cannot be restored: the database has changed in a way it cannot serve.” Against a database changed this way the server refuses what the report blocks ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md), [0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md), [0041](./docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)).*
 
@@ -334,7 +339,7 @@ speaks only to the server's administrator plane and `/v1/whoami`
 
 *Back in Presentation, the dropped label is offered to the new column as one edit, “which Undo takes back”; nothing carries it by guessing that `memo` is `notes`.*
 
-<img src="./docs/images/readme/studio-restored.webp" width="874" alt="The versions panel saying “Restored version 1 as version 4” and that the database was not changed.">
+<img src="./docs/images/readme/studio-restored.webp" width="874" alt="The versions panel offering version 4 for download, and saying “Restored version 1 as version 4” and that the database was not changed.">
 
 *After the capture script put the snapshot back without the rename, version 1 fits the database again and is restored as the next version, with the policy it had: “The database was not changed.”*
 

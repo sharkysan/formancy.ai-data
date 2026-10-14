@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { decode, occursIn, strings } from './aria-text.mjs'
+import { decode, occursIn, steadied, strings } from './aria-text.mjs'
 
 /**
  * The decoder a README picture's quotes are checked through (0038). A caption
@@ -103,5 +103,32 @@ describe('strings', () => {
   // value, and one in a name is a name, so both must be in the list.
   test('lists every decoded name and value, in order', () => {
     expect(strings('- textbox "Record token": k1:9007199254740993\n- button "Load"')).toEqual(['Record token', 'k1:9007199254740993', 'Load'])
+  })
+})
+
+describe('steadied', () => {
+  // Printed by `locator.ariaSnapshot()` (Playwright 1.63.0, Chromium
+  // 153.0.8010.12) on 2026-10-14, of a link given an object URL on an
+  // http://studio.invalid page, as the studio's download link is (0062); the
+  // UUIDs are two such prints'.
+  const printed = (uuid) => ['- region "Download a version":', '  - link "Download version 3":', `    - /url: blob:http://studio.invalid/${uuid}`].join('\n')
+
+  // The browser draws a new UUID for every object URL, so a part holding the
+  // studio's download link would be recorded with one walk's UUID and
+  // differ from it on every walk after: the check would fail with nothing
+  // changed, and a retake would change the record each time. Watched
+  // failing with the snapshot returned as it came.
+  test("says a link's object URL without the UUID drawn for it", () => {
+    expect(steadied(printed('a8b9269c-3444-4978-83af-3c0831fd1f49'))).toBe(steadied(printed('0f9940ee-531a-413c-ab0d-0fa64ffb2db4')))
+    expect(steadied(printed('a8b9269c-3444-4978-83af-3c0831fd1f49'))).toBe(['- region "Download a version":', '  - link "Download version 3":', '    - /url: blob:http://studio.invalid/<uuid>'].join('\n'))
+  })
+
+  // Made by hand: anything else is what the page says, and a record that
+  // smoothed it would hold a change nobody saw -- another address, or text
+  // that only looks like an object URL. Watched failing with every UUID in
+  // the snapshot replaced.
+  test('leaves every other address and every text as printed', () => {
+    const other = ['- link "Order pg-order":', '  - /url: "#form=pg-order&layout=stacked&view=records"', '- link "Download":', '  - /url: https://studio.invalid/a8b9269c-3444-4978-83af-3c0831fd1f49', '- paragraph: blob:http://studio.invalid/a8b9269c-3444-4978-83af-3c0831fd1f49'].join('\n')
+    expect(steadied(other)).toBe(other)
   })
 })

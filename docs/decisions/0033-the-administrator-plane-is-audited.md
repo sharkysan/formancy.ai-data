@@ -1,6 +1,6 @@
 # 0033 — The administrator's plane is audited like the runtime, one event per request
 
-- **Status:** accepted; extended by [0060](0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md): preflights are root routes outside both planes and are not audited, and a token-bearing request a browser marks cross-site is refused before its token is read and audited with no actor
+- **Status:** accepted; extended by [0060](0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md): preflights are root routes outside both planes and are not audited, and a token-bearing request a browser marks cross-site is refused before its token is read and audited with no actor; extended by [0062](0062-a-published-version-moves-between-deployments-as-its-version-file.md): an import is audited as `import`, naming its base, its connection and the version it wrote
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

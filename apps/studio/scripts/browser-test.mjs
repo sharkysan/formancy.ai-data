@@ -15,16 +15,18 @@
 //     FACTS.clickThenTab says it does, and not in Firefox, which starts from
 //     the caret the click left; and where Enter moves or removes the button
 //     it was pressed on -- a field moved down, a filter removed, a conflict
-//     rebased, a restore refused, a dropped label given -- the keyboard is
-//     somewhere deliberate afterwards, not on the page;
+//     rebased, a restore refused, an import refused, a dropped label given --
+//     the keyboard is somewhere deliberate afterwards, not on the page;
 //   - the preview's paper is the theme's: no rule of studio.css selects
 //     anything on it, so the preview shows what the published form will;
+//   - a version downloaded from the Drift step is saved as the file the
+//     store wrote, byte for byte, which in the suite is only a Blob (0062);
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules jsdom cannot measure -- on every step, including the states
 //     that add colour: gaps, a refused policy, a delete refused for what it
 //     also does and its reach accepted (0052), a failed preview, a conflict,
 //     a blocking drift, a refused restore, a regeneration and what it
-//     carried (0030);
+//     carried (0030), a version file chosen and its import refused (0062);
 //   - every web font the built studio asks for had loaded by the end of
 //     each pass, and in the pass that refuses them, none had (0058): a
 //     state measured before a late family swapped in is not caught.
@@ -94,7 +96,7 @@ async function startPlane() {
     token === TOKEN ? { ok: true, identity: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } } : { ok: false, reason: 'ERR_JWS_INVALID' }
   // The administrator's trail is the server's suites' subject; here it is required and discarded.
   const server = await createDataServer({ verifyIdentity, admin: { registry, store: createFileConfigurationStore(root), adminRoles: ['data-admin'], audit: { sink: () => {} } } })
-  return { server, databases, close: async () => { await server.close(); rmSync(root, { recursive: true, force: true }) } }
+  return { server, databases, root, close: async () => { await server.close(); rmSync(root, { recursive: true, force: true }) } }
 }
 
 /** The built studio and the plane, on one origin, on a port the system picks. */
@@ -373,6 +375,22 @@ function journey(plane, check) {
       await step(page, 'Drift').getByRole('button', { name: 'Check drift' }).click()
       await page.getByRole('region', { name: /^Version \d+ of sales-order, against the database now$/ }).waitFor()
     }],
+    // 0062's export: what the browser saves from the newest version's link
+    // is the file the store wrote, byte for byte, under the form's name. In
+    // the browser because what a click on a `download` link of an object URL
+    // saves is the browser's to say, where the suite only holds the Blob.
+    // Watched failing, in Chromium, with the studio's trailing newline dropped.
+    ['Drift, a version downloaded', async (page) => {
+      const link = step(page, 'Drift').getByRole('region', { name: 'Download a version' }).getByRole('link', { name: /^Download version \d+$/ })
+      const version = Number(/\d+$/.exec(await link.innerText())[0])
+      const [download] = await Promise.all([page.waitForEvent('download'), link.click()])
+      const failure = await download.failure()
+      const saved = failure === null ? readFileSync(await download.path()) : null
+      const stored = readFileSync(join(plane.root, 'sales-order', `${String(version)}.json`))
+      const differs = saved === null ? `the download failed: ${failure}` : `${String(saved.length)} bytes saved, ${String(stored.length)} in the store`
+      check('the version downloaded is the file the store wrote, byte for byte', saved?.equals(stored) ? null : differs)
+      check('and is named after the form and the version', download.suggestedFilename() === `sales-order-${String(version)}.json` ? null : `named ${download.suggestedFilename()}`)
+    }],
     // 0030's answers to drift. Version 1 is bound to the dropped notes, so its
     // restore is refused, with what blocks it; the button stays, and keeps
     // the keyboard.
@@ -380,6 +398,23 @@ function journey(plane, check) {
       const versions = step(page, 'Drift').getByRole('region', { name: 'Versions of sales-order' })
       const restore = versions.getByRole('button', { name: 'Restore version 1' })
       check('a refused restore leaves the keyboard on its button', await focusAfterEnter(page, restore, () => versions.getByRole('alert').waitFor(), restore))
+    }],
+    // 0062's import, of version 1's own file as another deployment would
+    // take it: the database here lost the notes it is bound to, so the
+    // import is refused with what blocks it, and the button keeps the keyboard.
+    ['Drift, a version file chosen', async (page) => {
+      const importing = step(page, 'Drift').getByRole('region', { name: 'Import a version' })
+      const buffer = readFileSync(join(plane.root, 'sales-order', '1.json'))
+      await importing.getByLabel('Version file').setInputFiles({ name: 'sales-order-1.json', mimeType: 'application/json', buffer })
+      await importing.getByRole('button', { name: /^Import as version \d+$/ }).waitFor()
+    }],
+    ['Drift, an import refused by drift', async (page) => {
+      const importing = step(page, 'Drift').getByRole('region', { name: 'Import a version' })
+      const button = importing.getByRole('button', { name: /^Import as version \d+$/ })
+      // The list of what blocks it, not any alert: every refusal is one, and
+      // a state refused for another reason would measure a state not named here.
+      const blocks = importing.getByRole('list', { name: 'What blocks it' })
+      check('a refused import leaves the keyboard on its button', await focusAfterEnter(page, button, () => blocks.waitFor(), button))
     }],
     ['Drift, regenerated', async (page) => {
       // notes renamed to memo: the label chosen for notes is dropped, and memo is a field to give it to.

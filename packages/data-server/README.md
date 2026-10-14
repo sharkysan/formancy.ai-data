@@ -116,7 +116,21 @@ existed would be documented and inert.
   replaced and no other, and by column or foreign-key name: grants removed
   in one version and given back in the next, or carried to another table by
   a publish that moves the form there, are not asked about.
-  Every request on the plane is audited, a publish and a restore included
+  Since [0062](../../docs/decisions/0062-a-published-version-moves-between-deployments-as-its-version-file.md),
+  `POST /v1/forms/:id/imports`, body `{ expectedBase, bundle,
+  keysConfirmed? }`, writes another deployment's version file -- read there
+  as `GET /v1/forms/:id/versions/:n` -- as a new version here, as it came:
+  400 for a body of another shape; 422 `invalid-bundle` for what a publish
+  refuses, a connection this allowlist does not have by the same name among
+  it; 503 when the database cannot be read; 422 `other-engine` for a
+  database of another engine; 409 `incompatible` with only the blocking
+  changes; 422 `keys-reassigned` against this deployment's base, a stale
+  base the conflict first; 409 `conflict` with `current`. 201 answers
+  `{ version, drift }` (the type `Importation`). Nothing is renamed, since a
+  lookup's source name is made from the connection's. A restore over a
+  database of another engine is 422 `other-engine` too, where it was 500.
+  Every request on the plane is audited, a publish, a restore and an
+  import included
   ([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md)):
   see the audit trail below.
 
@@ -284,9 +298,9 @@ existed would be documented and inert.
   On the administrator's plane
   ([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md))
   an event names the actor, the operation, the connection, the form and the
-  version read, compared, regenerated from or written; a publish and a
-  restore also the base the administrator named, and a restore the version
-  it copied, which nothing on disk records. Refusals are events too: a 403
+  version read, compared, regenerated from or written; a publish, a
+  restore and an import also the base the administrator named, and a
+  restore the version it copied, which nothing on disk records. Refusals are events too: a 403
   names the actor it refused. Never the bundle, the policy, a snapshot, a
   drift report or a message. On both planes a connection is recorded only
   when the allowlist knows it and a form id only when it has a form id's
