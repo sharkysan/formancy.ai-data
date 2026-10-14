@@ -645,6 +645,95 @@ jobs:
           esac
           rm -rf "$material" "$identity"
 
+      # FORMANCY_DATA_CORS_ORIGINS (0060). cors.test.ts and
+      # cross-origin.test.ts hold the setting, the grants and the refusals on
+      # the source; only the image shows that main.ts reads the setting and
+      # hands it to the runtime plane. With both planes on -- the store, the
+      # allowlist, which is opened lazily, and administrator roles -- and one
+      # origin listed: a preflight from it is granted and one from another is
+      # not, an unauthenticated runtime answer carries the listed origin back,
+      # a token-bearing request a browser marks cross-site from an unlisted
+      # origin is refused before its token is read, and the administrator's
+      # plane has no preflight route at all. A wildcard stops a server that is
+      # otherwise configured, naming the setting; an empty value is no list,
+      # and a server with no store starts with it and grants nothing. Without
+      # main.ts passing the list, the first preflight is the router's 404.
+      - name: FORMANCY_DATA_CORS_ORIGINS answers a listed origin on the runtime plane, refuses a request riding another, and a wildcard stops the server
+        run: |
+          configured=(
+            -e FORMANCY_DATA_ISSUER=https://host.example
+            -e FORMANCY_DATA_AUDIENCE=formancy-data
+            -e FORMANCY_DATA_IDENTITY_SECRET=env:HOST_SECRET
+            -e HOST_SECRET=a-shared-secret-of-at-least-thirty-two-bytes
+          )
+          planes=(
+            -v "$PWD/deploy/connections.json:/run/formancy/connections.json:ro"
+            -e FORMANCY_DATA_CONNECTIONS=/run/formancy/connections.json
+            -e FORMANCY_DATA_STORE_DIR=/var/lib/formancy-data
+            -e FORMANCY_DATA_ADMIN_ROLES=data-admin
+          )
+          healthy() {
+            for _ in $(seq 1 30); do
+              curl -sf http://127.0.0.1:4390/health > /dev/null && return 0
+              sleep 1
+            done
+            docker logs "$1"
+            exit 1
+          }
+          # One answer as "status allow-origin", or "status -" when it carries none.
+          answer() {
+            curl -s -o /dev/null -D - "$@" | tr -d '\r' | awk 'NR == 1 { status = $2 } tolower($1) == "access-control-allow-origin:" { origin = $2 } END { print status " " (origin == "" ? "-" : origin) }'
+          }
+          check() {
+            if [ "$2" != "$3" ]; then
+              echo "::error::$1 answered \"$2\", expected \"$3\""
+              exit 1
+            fi
+          }
+
+          docker run -d --name data-server-origins -p 127.0.0.1:4390:4390 \
+            "${configured[@]}" "${planes[@]}" -e FORMANCY_DATA_CORS_ORIGINS=https://app.example \
+            formancy/data-server:ci
+          healthy data-server-origins
+          granted=$(answer -X OPTIONS -H 'origin: https://app.example' -H 'access-control-request-method: GET' http://127.0.0.1:4390/v1/forms)
+          unlisted=$(answer -X OPTIONS -H 'origin: https://other.example' -H 'access-control-request-method: GET' http://127.0.0.1:4390/v1/forms)
+          refusal=$(answer -H 'origin: https://app.example' http://127.0.0.1:4390/v1/forms)
+          riding=$(answer -H 'authorization: Bearer not-read' -H 'sec-fetch-site: cross-site' -H 'origin: https://other.example' http://127.0.0.1:4390/v1/forms)
+          administrator=$(answer -X OPTIONS -H 'origin: https://app.example' -H 'access-control-request-method: GET' http://127.0.0.1:4390/v1/connections)
+          docker rm -f data-server-origins > /dev/null
+          check "A preflight for GET /v1/forms from the listed origin" "$granted" "204 https://app.example"
+          check "A preflight for GET /v1/forms from an unlisted origin" "$unlisted" "403 -"
+          check "GET /v1/forms from the listed origin with no token" "$refusal" "401 https://app.example"
+          check "GET /v1/forms with a token, cross-site, from an unlisted origin" "$riding" "403 -"
+          check "A preflight for GET /v1/connections" "$administrator" "404 -"
+
+          docker run -d --name data-server-wildcard \
+            "${configured[@]}" "${planes[@]}" -e 'FORMANCY_DATA_CORS_ORIGINS=*' formancy/data-server:ci
+          for _ in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Running}}' data-server-wildcard)" = false ] && break
+            sleep 1
+          done
+          running=$(docker inspect -f '{{.State.Running}}' data-server-wildcard)
+          code=$(docker inspect -f '{{.State.ExitCode}}' data-server-wildcard)
+          output=$(docker logs data-server-wildcard 2>&1)
+          docker rm -f data-server-wildcard > /dev/null
+          echo "$output"
+          if [ "$running" != false ] || [ "$code" = 0 ]; then
+            echo "::error::With FORMANCY_DATA_CORS_ORIGINS=* the server was still running after 30 s, or exited 0"
+            exit 1
+          fi
+          if ! echo "$output" | grep -q 'FORMANCY_DATA_CORS_ORIGINS: entry 1 '; then
+            echo "::error::With FORMANCY_DATA_CORS_ORIGINS=* the server stopped without naming the setting"
+            exit 1
+          fi
+
+          docker run -d --name data-server-no-origins -p 127.0.0.1:4390:4390 \
+            "${configured[@]}" -e FORMANCY_DATA_CORS_ORIGINS= formancy/data-server:ci
+          healthy data-server-no-origins
+          empty=$(answer -X OPTIONS -H 'origin: https://app.example' -H 'access-control-request-method: GET' http://127.0.0.1:4390/v1/forms)
+          docker rm -f data-server-no-origins > /dev/null
+          check "With FORMANCY_DATA_CORS_ORIGINS empty and no store, a preflight for GET /v1/forms" "$empty" "404 -"
+
       - name: Keep what this job found, for the report
         id: collect
         if: ${{ !cancelled() }}

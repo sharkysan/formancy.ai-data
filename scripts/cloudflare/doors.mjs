@@ -11,7 +11,9 @@
 // alone -- classified by difference, and written into doors.json, from
 // which deploy/cloudflare/ingress.mjs renders the tunnel's configuration
 // and docs/deploy/cloudflare.md shows the doors. doors.test.mjs fails when
-// either is not what this renders from the built server.
+// either is not what this renders from the built server. A fifth server,
+// the runtime plane with an origin listed (0060), is read too: what it adds
+// is not in doors.json, and doors.test.mjs holds it to the runtime door.
 //
 //   node scripts/cloudflare/doors.mjs --write   (after pnpm build)
 
@@ -106,12 +108,15 @@ export function runtimePattern(routes) {
 
 /**
  * The routes of the built server at `serverRoot`, classified: `{ routes:
- * [{ method, path, plane }], limit }`. Three servers through the package's
- * public exports -- no plane, the runtime plane, the administrator's -- and
- * a route's plane is the server it appears in beyond the first; one both
- * planes register, and a server with both that is not the union, stop it.
- * `limit` is measured: requests a server built with the defaults answers
- * before its first 429, all within the window its 429 names.
+ * [{ method, path, plane }], limit, crossOrigin }`. Three servers through
+ * the package's public exports -- no plane, the runtime plane, the
+ * administrator's -- and a route's plane is the server it appears in
+ * beyond the first; one both planes register, and a server with both that
+ * is not the union, stop it. `limit` is measured: requests a server built
+ * with the defaults answers before its first 429, all within the window
+ * its 429 names. `crossOrigin` is `[{ method, path }]`, what the runtime
+ * server adds with an origin listed (0060): never in doors.json, whose
+ * servers list none, as the composed stack lists none.
  */
 export async function routesFromServer(serverRoot = join(repo, 'packages', 'data-server')) {
   const server = await import(pathToFileURL(join(serverRoot, 'dist', 'index.mjs')).href)
@@ -126,6 +131,7 @@ export async function routesFromServer(serverRoot = join(repo, 'packages', 'data
       runtime: { runtime: { registry, store, audit } },
       administrator: { admin: { registry, store, adminRoles: ['data-admin'], audit } },
       both: { runtime: { registry, store, audit }, admin: { registry, store, adminRoles: ['data-admin'], audit } },
+      crossOrigin: { runtime: { registry, store, audit, origins: ['https://app.example'] } },
     }
     const printed = {}
     let limit
@@ -150,7 +156,8 @@ export async function routesFromServer(serverRoot = join(repo, 'packages', 'data
       ...runtime.map((route) => ({ ...route, plane: 'runtime' })),
       ...administrator.map((route) => ({ ...route, plane: 'administrator' })),
     ]
-    return { routes, limit }
+    const served = new Set(printed.runtime.map(key))
+    return { routes, limit, crossOrigin: printed.crossOrigin.filter((route) => !served.has(key(route))) }
   } finally {
     rmSync(scratch, { recursive: true, force: true })
   }

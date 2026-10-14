@@ -210,6 +210,18 @@ export interface RecordDeleted {
 export const WRITE_ID_HEADER = 'formancy-write-id'
 
 /**
+ * The request headers a page on another origin may send to the runtime plane
+ * (0060), lower case: the ones the client sends that make a browser ask
+ * first -- the token, a body's JSON type and a write's id; its `accept` is
+ * one the Fetch standard lets through unasked -- and the only ones the server
+ * reads. A preflight asking for any other header is refused, so a header
+ * added to the client and not here fails every call from another origin;
+ * the client's suite fails first. Declared here, beside the write id, for the
+ * reason that is.
+ */
+export const CROSS_ORIGIN_REQUEST_HEADERS = ['authorization', 'content-type', WRITE_ID_HEADER] as const
+
+/**
  * `POST /v1/forms/:id/lookups/:source/resolve`: the labels of the tokens asked
  * about that this person may see. A token they may not see is absent, not an
  * error, so the reply cannot be used to learn that another tenant's row exists

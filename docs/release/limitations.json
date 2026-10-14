@@ -226,7 +226,7 @@
         },
         {
           "area": "host",
-          "says": "A host with no backend of its own, a purely static single-page application, cannot hold a signing secret and so cannot use this module directly."
+          "says": "A host with no backend of its own cannot sign a token: it calls the data server with tokens its identity provider issues, carrying the claims the operator maps, from an origin the operator lists (0060)."
         },
         {
           "area": "access",
@@ -430,7 +430,7 @@
       ]
     },
     "0024": {
-      "reviewed": "sha256:25b845623ba033cad52bffee1edcee17a23a36abe20165c346ad3635efa6a495",
+      "reviewed": "sha256:f71b73c26392c159d7c30ea93007d9563555fbdb6751f5eb9d1a916fc85875d6",
       "limitations": [
         {
           "area": "studio",
@@ -599,7 +599,7 @@
       ]
     },
     "0029": {
-      "reviewed": "sha256:5b24f1af14b256867e06ffea3c2ce9b4cf77cfa2d8ff18b598601b6c0ea3deff",
+      "reviewed": "sha256:e7f2516117f68b7297a86fa40dfa765920afa846ab7f150db53fc5431cc6576d",
       "limitations": [
         {
           "area": "host",
@@ -620,10 +620,6 @@
         {
           "area": "host",
           "says": "The generator emits a plain select for a lookup, and a typeahead is each host's own choice."
-        },
-        {
-          "area": "host",
-          "says": "The client and the server require the host page and the data server on one origin."
         },
         {
           "area": "host",
@@ -771,7 +767,7 @@
       ]
     },
     "0033": {
-      "reviewed": "sha256:899ae16583ab383ed90123333f257a39cfc5e3b9a1409ebab946d1dc8fb69b7f",
+      "reviewed": "sha256:caf7b468ba3f89abeea5ce95d87c286d0d7f2fb0545ba2d5f85febc7ce1e48f8",
       "limitations": [
         {
           "area": "server",
@@ -815,7 +811,8 @@
         },
         {
           "area": "operations",
-          "says": "`/health` and `/v1/whoami` are not audited."
+          "says": "`/health`, `/v1/whoami` and CORS preflights are not audited.",
+          "heldBy": "packages/data-server/src/cross-origin.test.ts"
         },
         {
           "area": "operations",
@@ -1781,6 +1778,66 @@
         {
           "area": "operations",
           "says": "Each instance of the server reads its key set on its own signal, and only its log says which keys it holds."
+        }
+      ]
+    },
+    "0060": {
+      "reviewed": "sha256:2d75ee787154826d339661c3e90b669919940d214c4c23fbeb303c16bb07b210",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A host page on another origin is answered only when its origin is listed exactly; a refused preflight, and a request refused across origins, is a network error to the page, which data-client reads as unreachable or, for a write, unknown though nothing ran, and only the server's log says why.",
+          "heldBy": "packages/data-server/src/cross-origin.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "Across origins a request may carry only Authorization, Content-Type and the write id; a host whose fetch adds another header is refused at the preflight.",
+          "heldBy": "packages/data-server/src/cross-origin.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "No cookie crosses origins, HEAD is not offered, and `/v1/whoami`, `/health` and the administrator's plane answer no other origin.",
+          "heldBy": "packages/data-server/src/cross-origin.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The reference host page calls only the data server on its own origin."
+        },
+        {
+          "area": "host",
+          "says": "Chromium may ask the person before a page on a public address calls a server on a private one; this is not tested here."
+        },
+        {
+          "area": "operations",
+          "says": "The origin list is read at start, so adding or removing an origin is a restart."
+        },
+        {
+          "area": "operations",
+          "says": "A browser too old to send `Sec-Fetch-Site` may keep sending requests the server runs to a route for up to the preflight's Max-Age after its origin is removed, without reading the answers."
+        },
+        {
+          "area": "operations",
+          "says": "A deployment that added CORS headers at its own proxy has its cross-origin requests refused until it lists their origins.",
+          "heldBy": "packages/data-server/src/cross-origin.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Plain-HTTP origins are accepted only on loopback.",
+          "heldBy": "packages/data-server/src/cors.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "Preflights are neither rate-limited by the server nor audited.",
+          "heldBy": "packages/data-server/src/cross-origin.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "A GET, HEAD or POST route of another plane, or an embedder's, whose pattern overlaps any runtime pattern, a route of another method overlapping a runtime pattern of its own method, or any route with a regex parameter, a wildcard or a constraint, stops a server with origins from starting.",
+          "heldBy": "packages/data-server/src/cross-origin.test.ts"
+        },
+        {
+          "area": "testing",
+          "says": "No browser gate runs against a server with origins listed: that a browser honours a grant, and is refused after reusing one it cached before its origin was removed, is shown through inject only; the one measurement in browsers, that Chromium and WebKit reuse a URL's grant for another GET, HEAD or POST there, was by hand."
         }
       ]
     }

@@ -51,7 +51,9 @@ const SECRET_NAME = /PASSWORD|SECRET|KEY|TOKEN/i
  * - a port published anywhere but loopback reaches the machine's network,
  *   which this unauthenticated-at-the-edge demo must not;
  * - a published server port is a second origin beside the proxy, which 0024
- *   and 0029 rule out for the browser;
+ *   and 0029 rule out for the browser: 0060 answers another origin only
+ *   where `FORMANCY_DATA_CORS_ORIGINS` lists one, and the composed stack
+ *   lists none;
  * - a setting named like a secret holds anything but a `file:` reference or
  *   a `_FILE` setting naming an absolute path. A value is printed by `docker
  *   compose config` and `docker inspect` to anybody who runs them, and an

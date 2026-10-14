@@ -30,7 +30,7 @@ const registry = (): ConnectionRegistry => ({ ids: () => ['erp'], scope: (id) =>
 
 let root: string
 let store: ConfigurationStore
-let lines: Array<{ msg: string; req?: unknown; audit?: { plane: string; operation: string } }>
+let lines: Array<{ msg: string; req?: unknown; audit?: { plane: string; operation: string }; reason?: string; origin?: string }>
 let written: string[]
 
 beforeEach(async () => {
@@ -44,10 +44,10 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-/** The server as `main.ts` composes it -- both planes from `servedPlanes`, the audit sink its log -- writing to this suite. */
-async function runnable(adminRoles: readonly string[] = ['data-admin']): Promise<FastifyInstance> {
+/** The server as `main.ts` composes it -- both planes from `servedPlanes`, the audit sink its log, an origin listed -- writing to this suite. */
+async function runnable(adminRoles: readonly string[] = ['data-admin'], origins: readonly string[] = ['https://app.example']): Promise<FastifyInstance> {
   let app: FastifyInstance | undefined
-  const planes = servedPlanes({ registry: registry(), store, adminRoles, auditKey: undefined, log: () => (app as FastifyInstance).log })
+  const planes = servedPlanes({ registry: registry(), store, adminRoles, auditKey: undefined, origins, log: () => (app as FastifyInstance).log })
   app = await createDataServer({
     verifyIdentity,
     logger: {
@@ -140,6 +140,34 @@ describe("the runnable server's log", () => {
       { plane: 'runtime', operation: 'form' },
       { plane: 'admin', operation: 'version-list' },
     ])
-    expect(servedPlanes({ registry: registry(), store, adminRoles: [], auditKey: undefined, log: () => server.log }).admin).toBeUndefined()
+    expect(servedPlanes({ registry: registry(), store, adminRoles: [], auditKey: undefined, origins: [], log: () => server.log }).admin).toBeUndefined()
+  })
+  // A refused preflight is a plain network error to the page that sent it,
+  // so the log is the only place that says why, and names the origin to
+  // list (0060). But an Origin header is whatever the caller typed: one
+  // holding a password and a host in its user information, its path or its
+  // query is logged with no origin at all. An origin is named only as a
+  // browser sends one, which the URL parser gives back unchanged and which
+  // holds none of those, on both lines: the refused preflight and the
+  // token-bearing request refused across origins. Watched failing with the
+  // header logged as received.
+  test('names a refused origin only as a browser sends one, and never what was typed around it', async () => {
+    const server = await runnable()
+    const typed = [`https://user:${PASSWORD}@${HOST}`, `https://${HOST}/${PASSWORD}`, `https://${HOST}?password=${PASSWORD}`, `https://${HOST}:${PASSWORD}`]
+    for (const origin of [...typed, 'https://other.example']) {
+      const preflight = await server.inject({ method: 'OPTIONS', url: '/v1/forms/employee', headers: { origin, 'access-control-request-method': 'GET' } })
+      const riding = await server.inject({ method: 'GET', url: '/v1/forms/employee', headers: { origin, 'sec-fetch-site': 'cross-site', authorization: 'Bearer admin' } })
+      expect([preflight.statusCode, riding.statusCode]).toEqual([403, 403])
+    }
+    expect(written.filter((line) => line.includes(PASSWORD) || line.includes(HOST))).toEqual([])
+    const refusals = lines.filter((line) => line.msg === 'preflight refused' || line.msg === 'cross-origin request refused').map(({ msg, reason, origin }) => ({ msg, reason, origin }))
+    expect(refusals).toEqual([
+      ...typed.flatMap(() => [
+        { msg: 'preflight refused', reason: 'origin not listed', origin: undefined },
+        { msg: 'cross-origin request refused', reason: 'origin not listed', origin: undefined },
+      ]),
+      { msg: 'preflight refused', reason: 'origin not listed', origin: 'https://other.example' },
+      { msg: 'cross-origin request refused', reason: 'origin not listed', origin: 'https://other.example' },
+    ])
   })
 })

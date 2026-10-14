@@ -27,10 +27,11 @@ const SERVER = process.env['FORMANCY_DATA_SERVER'] ?? 'http://127.0.0.1:4390'
  * The host page, built the way the examples page is: Vite, React, and Angular
  * through the analog plugin.
  *
- * `/v1` is proxied rather than called across origins. The data server sends no
- * CORS headers, and a host page needs none: it is served from the server's
- * origin -- behind one reverse proxy in a deployment, through this proxy in
- * development -- so every request it makes is same-origin (0024, 0029).
+ * `/v1` is proxied rather than called across origins. The data server answers
+ * another origin only where its operator lists one (0060), and this page
+ * needs none: it is served from the server's origin -- behind one reverse
+ * proxy in a deployment, through this proxy in development -- so every
+ * request it makes is same-origin (0024, 0029).
  */
 export default defineConfig({
   plugins: [

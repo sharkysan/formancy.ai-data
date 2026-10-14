@@ -2,9 +2,10 @@ import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, test } from 'vitest'
-import { WRITE_ID_HEADER } from '@formancy/data-core'
+import { CROSS_ORIGIN_REQUEST_HEADERS, WRITE_ID_HEADER } from '@formancy/data-core'
 import { createDataClient } from './client.js'
 import { isUnknownWrite } from './writes.js'
+import type { UnknownWrite } from './writes.js'
 
 /*
  * What the client says when the data server is not the one answering: nothing
@@ -222,6 +223,75 @@ describe('when the data server is not what answers', () => {
     const outcome = await createDataClient({ token: () => 't', base: `${base}///` }).resolve('pg-order', 'order.customer', { operation: 'read', tokens: ['k1:1'] })
     expect(outcome).toEqual({ ok: true, value: [] })
     expect(asked).toEqual(['POST /v1/forms/pg-order/lookups/order.customer/resolve Bearer t'])
+  })
+})
+
+/**
+ * The Fetch standard's *CORS-safelisted request-header*, transcribed for the
+ * one name this client sends that it can hold (whatwg/fetch `fetch.bs` on
+ * main, read 2026-10-13: the rule at lines 1013-1040, the bytes at
+ * 1100-1108): `accept`, with a value of at most 128 bytes holding no
+ * CORS-unsafe request-header byte. Any other header makes a browser ask the
+ * server first, and is one the server must grant.
+ */
+const UNSAFE_BYTES = new Set([0x22, 0x28, 0x29, 0x3a, 0x3c, 0x3e, 0x3f, 0x40, 0x5b, 0x5c, 0x5d, 0x7b, 0x7d, 0x7f])
+function safelisted(name: string, value: string): boolean {
+  if (name !== 'accept') return false
+  const bytes = new TextEncoder().encode(value)
+  return bytes.length <= 128 && bytes.every((byte) => !((byte < 0x20 && byte !== 0x09) || UNSAFE_BYTES.has(byte)))
+}
+
+describe('across origins (0060)', () => {
+  // A page on another origin reaches the runtime plane only through a
+  // preflight the server grants, and the server grants exactly
+  // CROSS_ORIGIN_REQUEST_HEADERS: a header the client sent beyond them -- an
+  // `x-requested-with`, an `accept` the safelist does not cover -- would make
+  // every call from a listed origin a refused preflight, which the page sees
+  // as "could not be reached". And no call asks for credentials: the server
+  // never allows them, and a cookie sent across origins is the ambient
+  // credential the bearer header exists to avoid. Every function the client
+  // returns is called, so one added later without a case here fails.
+  test('every request carries only headers the safelist covers or the server grants, and no credentials', async () => {
+    const sent: Array<{ call: string; init: RequestInit }> = []
+    let call = ''
+    const fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+      sent.push({ call, init: init ?? {} })
+      return new Response(JSON.stringify({}), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+    const client = createDataClient({ token: () => 't', base: 'https://data.example', fetch })
+    const lost: UnknownWrite = { ok: false, status: 0, code: 'unknown-outcome', message: TRANSPORT, operation: 'update', record: 'k1:7', version: '00000000000007d1', origin: 'transport' }
+    const calls: Record<keyof typeof client, () => Promise<unknown>> = {
+      forms: () => client.forms(),
+      form: () => client.form('pg-order'),
+      read: () => client.read('pg-order', 'k1:7'),
+      list: () => client.list('pg-order', { search: 'a' }),
+      create: () => client.create('pg-order', { notes: 'a' }),
+      update: () => client.update('pg-order', CHANGE),
+      delete: () => client.delete('pg-order', { record: 'k1:7', version: '00000000000007d1' }),
+      reconcile: () => client.reconcile('pg-order', lost),
+      query: () => client.query('pg-order', 'order.customer', { operation: 'read', search: 'a' }),
+      resolve: () => client.resolve('pg-order', 'order.customer', { operation: 'read', tokens: ['k1:1'] }),
+    }
+    for (const [name, run] of Object.entries(calls)) {
+      call = name
+      await run()
+    }
+    expect([...new Set(sent.map((entry) => entry.call))].sort()).toEqual(Object.keys(client).sort())
+    // Read as fetch reads them, whatever shape the client builds them in --
+    // `Object.entries` of a Headers is empty -- and every call shown to carry
+    // its token, so a check that saw no header at all cannot pass. Watched
+    // passing vacuously, before, with the client sending a Headers holding
+    // `x-requested-with`; and failing, now, on the same client.
+    const sentHeaders = sent.map(({ call: name, init }) => ({ name, headers: [...new Headers(init.headers).entries()] }))
+    expect(sentHeaders.filter(({ headers }) => !headers.some(([header]) => header === 'authorization')).map(({ name }) => name)).toEqual([])
+    const granted = new Set<string>(CROSS_ORIGIN_REQUEST_HEADERS)
+    const ungranted = sentHeaders.flatMap(({ name, headers }) =>
+      headers
+        .filter(([header, value]) => !safelisted(header, value) && !granted.has(header))
+        .map(([header, value]) => `${name} sends ${header}: ${value}`),
+    )
+    expect(ungranted).toEqual([])
+    expect(sent.filter(({ init }) => 'credentials' in init).map(({ call: name }) => name)).toEqual([])
   })
 })
 

@@ -11,10 +11,11 @@ const SERVER = process.env['FORMANCY_DATA_SERVER'] ?? 'http://127.0.0.1:4390'
 /**
  * The studio, built the way the examples page is: Vite and React, nothing else.
  *
- * `/v1` is proxied rather than called across origins. The data server sends no
- * CORS headers, and the studio needs none: it is served from the server's
- * origin -- behind one reverse proxy in a deployment, through this proxy in
- * development -- so every request it makes is same-origin (0024).
+ * `/v1` is proxied rather than called across origins. The administrator's
+ * plane answers no other origin (0060), and the studio needs none: it is
+ * served from the server's origin -- behind one reverse proxy in a
+ * deployment, through this proxy in development -- so every request it makes
+ * is same-origin (0024).
  */
 export default defineConfig({
   // dist/THIRD-PARTY-NOTICES.txt: every package the build bundles, with the

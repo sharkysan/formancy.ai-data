@@ -30,6 +30,9 @@ existed would be documented and inert.
 - **`createDataServer(options)`** — `GET /health`, and `GET /v1/whoami`, which
   returns exactly the identity the server derived from the host's token so a
   wrong issuer, audience or claim mapping shows before any form depends on it.
+  `runtime.origins` lists the origins the runtime plane answers across
+  origins, and the administrator's plane answers none (0060, *Across
+  origins* below).
 
 - **`validateBundle(document)`** — a published version is the form, its
   bindings, its policy and the snapshot they came from, checked on publish and
@@ -296,7 +299,11 @@ existed would be documented and inert.
   past the router's limit (414) or one whose percent-encoding does not
   decode (400 `FST_ERR_BAD_URL`), the 503 Fastify sends while the server
   closes, and what Node's HTTP parser refuses before Fastify sees a request
-  (431 for headers past its limit, 400 for a request it cannot parse). The
+  (431 for headers past its limit, 400 for a request it cannot parse). A
+  preflight is answered by a route of neither plane and is not audited
+  either (0060); a token-bearing request refused across origins on a
+  plane's route is that plane's event, with no actor, and on `/v1/whoami`
+  or `/health` is none. The
   administrator's plane needs a sink
   (`admin.audit.sink`) and does not start without one; the runtime's is
   optional. A route registered on either plane without an audit name stops
@@ -343,17 +350,21 @@ one-key settings rotate by restart; a key set rotates as below.
 | Variable | Sets |
 | --- | --- |
 | `FORMANCY_DATA_RATE_LIMIT` | Requests a minute each client address may send to every route but `/health`: a whole number of at least 1, 600 when unset. Anything else stops the process with a sentence naming the setting. Behind a reverse proxy every client shares the proxy's address, so the limit is one bucket for all of them: Fastify's `trustProxy` is not offered, and the setting raises that bucket rather than splitting it. |
+| `FORMANCY_DATA_CORS_ORIGINS` | The origins a page may call the runtime plane from, comma-separated, each exactly as a browser sends `Origin`: `https://app.example`, or plain HTTP on `localhost`, `127.0.0.1` or `[::1]`. Empty or unset, none. A wildcard, a pattern, `null`, a path or a spelling no browser sends stops the process, and so does a list without the runtime plane. Read at start ([0060](../../docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md)); see *Across origins*, below. |
 | `PORT` | The port it listens on, 4390 when unset. |
 
-`src/rate-limit.test.ts` holds what the rate-limit setting accepts and refuses.
+`src/rate-limit.test.ts` holds what the rate-limit setting accepts and
+refuses, and `src/cors.test.ts` what the origin list does.
 
 The log is JSON lines on standard output: Fastify's lines for each request,
 and the audit trail. A request is logged by its method and the route it
 matched, never by the path, the query or the Host header it was sent with,
 because those are whatever a caller typed, token or none
 ([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md));
-a 404 is logged with no route. `src/server-log.test.ts` fails when a line
-holds what was sent.
+a 404 is logged with no route. A request refused across origins names its
+`Origin` only in the form a browser sends one, which holds no user
+information, path or query (0060). `src/server-log.test.ts` fails when a
+line holds what was sent.
 
 A path is routed only when it is plain
 ([0037](../../docs/decisions/0037-cloudflare-is-the-edge-not-the-runtime.md),
@@ -492,6 +503,72 @@ the line. The server fetches nothing (0014). Each instance reads its keys on
 its own signal, and where no process can be sent one, natively on Windows, a
 set is read only at start. The planes line at start names the kids in force
 and what was left out. No line holds key material or a hash of the file.
+
+### Across origins
+
+The studio, the host page and `/v1` on one origin is the default, and the
+composed stack's. A host page on an origin of its own -- a static page whose
+identity provider issues the token -- calls the runtime plane directly when
+`FORMANCY_DATA_CORS_ORIGINS` lists that origin exactly
+([0060](../../docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md));
+an embedder passes the same list as `runtime.origins`, held to the same rule.
+
+- **What is granted.** Each runtime route has an `OPTIONS` route at its
+  path. A preflight is granted when its `Origin` is a listed origin byte for
+  byte, the method it asks for is the runtime route's at that path -- GET or
+  POST, never HEAD -- and reaches that route, and it asks for no header but
+  `authorization`, `content-type` and `formancy-write-id`, the ones
+  data-client sends that a browser asks about. The grant is 204 with that
+  origin, that method, those three headers, `Access-Control-Max-Age: 600` --
+  WebKit keeps a grant no longer -- and `Vary`. A browser may send any GET,
+  HEAD or POST to that URL on the grant without asking again: Chromium and
+  WebKit did, Firefox asked (measured by hand, 0060). Every answer of a
+  runtime route then carries `Access-Control-Allow-Origin` for a listed
+  origin, refusals included, and `Vary: Origin` for any; what is written
+  before any hook, the router's 414 and the 503 while closing among it,
+  carries neither.
+- **What is refused.** Any other preflight is 403 `cross-origin-refused`
+  with no `Access-Control-*` header, which the page sees as a network
+  error: a read is `unreachable`, a write unknown though nothing was sent.
+  The administrator's plane, `/v1/whoami` and `/health` have no `OPTIONS`
+  route, so their preflight is the router's 404, and no answer of theirs
+  carries an origin. On every route, listed origins or none, a request with
+  an `Authorization` header whose `Sec-Fetch-Site` is `cross-site` or
+  `same-site` is refused 403 before its token is read unless its origin is
+  listed and its route is the runtime plane's: a browser that cached a grant
+  before its origin was removed sends without asking for up to ten minutes,
+  and those requests now do nothing. Counted by the limiter as every route
+  but `/health` is, and audited with no actor by the plane whose route it
+  reached; on `/v1/whoami` and `/health` no event. A path no route takes is
+  the router's 404, token or none. A request with no `Sec-Fetch-Site` --
+  every client that is not a
+  browser, and browsers before Chrome 76, Firefox 90 and Safari 16.4 -- and
+  a `same-origin` one are answered as before. A deployment that put CORS
+  headers on its own proxy has its cross-origin requests refused that way
+  until it lists their origins.
+- **What it logs.** "preflight refused" and "cross-origin request refused",
+  at info, with the reason -- `origin not listed`, `method not offered on
+  this route`, `method reaches another route`, `header not allowed`, `not a
+  preflight`, `route not offered across origins` -- and the origin, but only
+  when it is one a browser could send: no user information, path or query.
+- **What is never sent.** `Access-Control-Allow-Credentials`, so no cookie
+  crosses origins; `Access-Control-Expose-Headers`; and
+  `Access-Control-Allow-Private-Network`. Preflights are not rate-limited by
+  the server and not audited: they read no token and do no work.
+- **What stops the server.** With origins listed, a GET, HEAD or POST route
+  of another plane or an embedder's whose pattern could match a path a
+  runtime route of any method matches -- a request a browser would send on
+  that route's grant -- a route of another method overlapping a runtime
+  route of its own method, and any route with a regex parameter, a
+  wildcard, two parameters in one segment or a constraint, stop it at
+  ready, rather than grant a preflight for one route and have another answer
+  a request riding it. The preflight's own check that the method reaches
+  the runtime route holds only a route registered before the server's own,
+  which createDataServer registers none of.
+
+`src/cross-origin.test.ts` holds each of these over the real server, and
+`src/server-log.test.ts` what the log names. No browser gate runs against a
+server with origins listed yet; the one measurement in browsers was by hand.
 
 ## Licence
 

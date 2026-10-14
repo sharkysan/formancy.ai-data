@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { CONFIGURATION_ID_MAX_LENGTH } from './config-store.js'
 import type { ConfigurationStore } from './config-store.js'
 import type { ConnectionRegistry } from './connections.js'
+import { crossOrigin, originsProblem } from './cors.js'
 import type { HostIdentity, IdentityVerifier } from './identity.js'
 import { PATH_NOT_PLAIN, plainPath } from './paths.js'
 import { DEFAULT_RATE_LIMIT } from './rate-limit.js'
@@ -41,8 +42,15 @@ export interface DataServerOptions {
   /**
    * The runtime plane: published forms, their records and their lookups, for
    * the host application's people. Absent, none of those routes exist.
+   *
+   * `origins`: the origins a page may call these routes from, each exactly
+   * as a browser sends `Origin` -- `https://app.example`, or plain HTTP on
+   * localhost, 127.0.0.1 or [::1] -- checked as `FORMANCY_DATA_CORS_ORIGINS`
+   * is, so a wildcard, a pattern or `null` stops the server here (0060).
+   * Empty or absent, nothing is offered across origins. The administrator's
+   * plane has no such list: it answers no other origin.
    */
-  runtime?: { registry: ConnectionRegistry; store: ConfigurationStore; audit?: NonNullable<RuntimeOptions['audit']> }
+  runtime?: { registry: ConnectionRegistry; store: ConfigurationStore; audit?: NonNullable<RuntimeOptions['audit']>; origins?: readonly string[] }
 }
 
 /**
@@ -100,6 +108,16 @@ function bearer(request: FastifyRequest): string | undefined {
  * issuer, audience or claim mapping is visible before any form depends on it.
  */
 export async function createDataServer(options: DataServerOptions): Promise<FastifyInstance> {
+  // Checked before anything is built, as main.ts checks the setting: a list
+  // nobody could have meant does not start a server that grants it. A copy
+  // is checked and granted, since building awaits before the grants are
+  // made, and an embedder's array changed meanwhile would be granted
+  // unchecked.
+  const given = options.runtime?.origins ?? []
+  const origins = Array.isArray(given) ? Object.freeze([...given]) : given
+  const refused = originsProblem(origins)
+  if (refused !== undefined) throw new Error(refused)
+
   const logger = options.logger ?? false
   const app = Fastify({
     logger: logger === false ? false : { serializers: { req: requestForLog }, ...(logger === true ? {} : { stream: logger.stream }) },
@@ -149,6 +167,13 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
     return reply.code(400).send(PATH_NOT_PLAIN)
   })
 
+  // Across origins (cors.ts, 0060): before every route, so its hooks cover
+  // /health, /v1/whoami and both planes. With no origin listed it adds no
+  // route and no header, and still refuses a token-bearing request a
+  // browser marks cross-site, which only a grant cached under an earlier
+  // list, or added by some other component, would let a browser send.
+  crossOrigin(app, { origins })
+
   const authenticate = async (request: FastifyRequest): Promise<HostIdentity | undefined> => {
     const token = bearer(request)
     if (token === undefined) return undefined
@@ -178,7 +203,8 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   }
 
   if (options.runtime !== undefined) {
-    await app.register(runtimeRoutes, { ...options.runtime, authenticate })
+    const { origins: _offered, ...runtime } = options.runtime
+    await app.register(runtimeRoutes, { ...runtime, authenticate })
   }
 
   return app
