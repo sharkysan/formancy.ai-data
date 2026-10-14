@@ -7,7 +7,7 @@
 // separator is let go, and no host rule reaching into a grid.
 
 import { FORM, TOKENS } from './plane.mjs'
-import { contrast, describeFocus, focusedOn, painted, parseColor, until, WITHIN } from './measure.mjs'
+import { contrast, describeFocus, focusedOn, paintedWhere, parseColor, until, WITHIN } from './measure.mjs'
 import { rulesReaching } from './styles.mjs'
 
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
@@ -19,9 +19,16 @@ async function answered(region, pattern) {
   await until(async () => pattern.test((await status(region).textContent()) ?? ''), `the grid never said ${String(pattern)}`)
 }
 
-/** Press `button`, and Discard and continue if the page asks first. */
+/**
+ * Press `button`, and Discard and continue if the page asks first. The guard
+ * sets the notice in the click handler, and how soon a browser acknowledges
+ * a synthetic click relative to React's commit is measured in none of them:
+ * so the notice is read only after two animation frames past the click,
+ * by when the click's render has been painted, rather than at once.
+ */
 export async function carryOn(page, button) {
   await button.click()
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   const notice = page.getByRole('region', { name: 'Unsaved changes', exact: true })
   if (await notice.isVisible().catch(() => false)) await notice.getByRole('button', { name: 'Discard and continue' }).click()
 }
@@ -35,33 +42,37 @@ const row = (page, name, first) => grid(page, name).getByRole('row').filter({ ha
  * more (WCAG 1.4.11). Read from the computed border colour and the pixels.
  */
 async function focusRing(page) {
-  const at = await page.evaluate(() => {
-    const cell = document.activeElement
-    if (cell?.getAttribute('role') !== 'gridcell') return null
-    const style = getComputedStyle(cell)
-    const box = cell.getBoundingClientRect()
-    return { border: style.borderTopColor, width: style.borderTopWidth, x: box.right - 4, y: box.top + 4 }
-  })
+  const at = await paintedWhere(page, () =>
+    page.evaluate(() => {
+      const cell = document.activeElement
+      if (cell?.getAttribute('role') !== 'gridcell') return null
+      const style = getComputedStyle(cell)
+      const box = cell.getBoundingClientRect()
+      return { border: style.borderTopColor, width: style.borderTopWidth, points: [{ x: box.right - 4, y: box.top + 4 }] }
+    }),
+  )
   if (at === null) return { problem: `the focus is on ${await describeFocus(page)}, not a cell` }
   const border = parseColor(at.border)
   if (border === null || at.width === '0px') return { problem: `the focused cell has no border the gate reads: ${at.width} ${at.border}` }
-  const [inside] = await painted(page, [{ x: at.x, y: at.y }])
+  const [inside] = at.colours
   return { ratio: contrast(border.rgb, inside) }
 }
 
-/** The open row's bar -- the first cell's SVG -- against the tint around it, as painted. */
+/** The open row's bar -- the rect in the first cell's SVG, at its centre -- against the tint around it, as painted. */
 async function bar(page) {
-  const at = await page.evaluate(() => {
-    const open = [...document.querySelectorAll('[role="row"][aria-selected="true"]')].find((candidate) => candidate.closest('.grid-bench') !== null)
-    const cell = open?.querySelector('[role="gridcell"]')
-    const svg = cell?.querySelector('svg')
-    if (cell === undefined || cell === null || svg === null || svg === undefined) return null
-    const mark = svg.getBoundingClientRect()
-    const box = cell.getBoundingClientRect()
-    return { bar: { x: mark.left + 2, y: mark.top + mark.height / 2 }, tint: { x: box.left + 4, y: box.top + 4 } }
-  })
+  const at = await paintedWhere(page, () =>
+    page.evaluate(() => {
+      const open = [...document.querySelectorAll('[role="row"][aria-selected="true"]')].find((candidate) => candidate.closest('.grid-bench') !== null)
+      const cell = open?.querySelector('[role="gridcell"]')
+      const rect = cell?.querySelector('svg rect')
+      if (cell === undefined || cell === null || rect === null || rect === undefined) return null
+      const mark = rect.getBoundingClientRect()
+      const box = cell.getBoundingClientRect()
+      return { points: [{ x: mark.left + mark.width / 2, y: mark.top + mark.height / 2 }, { x: box.left + 4, y: box.top + 4 }] }
+    }),
+  )
   if (at === null) return { problem: 'no open row with its bar is drawn' }
-  const [mark, tint] = await painted(page, [at.bar, at.tint])
+  const [mark, tint] = at.colours
   return { ratio: contrast(mark, tint) }
 }
 

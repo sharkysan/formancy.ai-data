@@ -10,7 +10,7 @@
   walk narrows `sales.order.status` through the owner, so that the host page
   shows a drift refusal is held by host-drift's `--check` alone, on
   PostgreSQL. [`docs/images/README.md`](../images/README.md) says what is
-  taken now
+  taken now; extended by [0058](0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md): `--check` runs as `pnpm test:pictures`, in Chromium, in a job of its own
 - **Date:** 2026-10-10
 - **Deciders:** Daniel Bacher
 - **Verified by:**

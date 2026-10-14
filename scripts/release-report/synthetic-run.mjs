@@ -6,7 +6,12 @@
 // Pure logic over hand-made results; no database or driver is mocked, because
 // none is involved -- what the report reads are files the suites wrote.
 
+import { FACTS } from '../browsers.mjs'
+
 const T0 = Date.parse('2026-10-09T10:00:00Z')
+
+/** The checks that hold 0058's FACTS rows in `app`'s gate, which a green run's gate of it makes in every browser. */
+export const heldChecks = (app) => Object.values(FACTS).flatMap((fact) => (fact.heldBy.gate === app ? fact.heldBy.checks : []))
 export const DIST = 'sha256:aaaa111122223333444455556666777788889999aaaabbbbccccddddeeeeffff'
 
 const runner = { node: 'v22.20.0', platform: 'linux', arch: 'x64', image: 'ubuntu24', imageVersion: '20261005.1', docker: '29.8.1' }
@@ -91,9 +96,21 @@ export function greenRun() {
         startedAt: new Date(T0).toISOString(),
         finishedAt: new Date(T0 + 30_000).toISOString(),
         browser: { name: 'chromium', version: '153.0.8010.12', headless: true, options: { headless: true }, platform: 'linux', arch: 'x64' },
+        environment: {
+          userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36',
+          platform: 'Linux x86_64',
+          maxTouchPoints: 0,
+          pointerFine: true,
+          hover: true,
+          system: { fallback: { family: 'DejaVu Sans' }, packages: [] },
+        },
         axe: '4.14.0',
         widths: [320, 1440],
         passes: 2,
+        made: [
+          { label: 'reflow, 320', width: 320, checks: ['Signed out: no sideways scroll', ...heldChecks('apps/host')] },
+          { label: 'laptop, 1440', width: 1440, checks: ['Signed out: no sideways scroll', ...heldChecks('apps/host')] },
+        ],
         checks: { ok: 40, failed: [] },
         measurements: [
           { name: 'Chromium resent the create after its connection closed', value: 12.4, unit: 'ms' },
@@ -213,31 +230,58 @@ export const copy = ({ exists, ...rest }) => ({ ...structuredClone(rest), exists
 export const job = (inputs, key) => inputs.results.find((result) => result.key === key)
 
 /**
- * `inputs` (a copy of greenRun()) as a run in which the gates run in
- * Chromium and Firefox: Firefox pinned beside Chromium, and the browser
- * job's Firefox leg, on a runner of its own, with the host gate's same
- * checks and same-named measurements, which only the browser tells apart.
+ * `inputs` (a copy of greenRun()) as a run in which the gates also run in
+ * `browser`: pinned beside Chromium, and the browser job's leg of it, on a
+ * runner of its own, with the host gate's same checks and same-named
+ * measurements, which only the browser tells apart.
  */
-export function withFirefox(inputs) {
-  inputs.facts.browser.pins.push({ browser: 'firefox', name: 'firefox', revision: '1543', browserVersion: '155.0' })
+export function withBrowser(inputs, { browser, revision, version, image, offset, value, environment }) {
+  inputs.facts.browser.pins.push({ browser, name: browser, revision, browserVersion: version })
   const chromium = job(inputs, 'browser-chromium')
   const [gate] = chromium.browserGates
   inputs.results.push({
     ...structuredClone(chromium),
-    key: 'browser-firefox',
-    variant: 'firefox',
-    runner: { ...runner, image: 'ubuntu24-firefox' },
-    servers: [server({ caller: 'apps/host/scripts/browser-test.mjs', script: 'test-browser', package: 'apps/host', at: new Date(T0 + 60_500).toISOString() })],
+    key: `browser-${browser}`,
+    variant: browser,
+    runner: { ...runner, image },
+    servers: [server({ caller: 'apps/host/scripts/browser-test.mjs', script: 'test-browser', package: 'apps/host', at: new Date(T0 + offset + 500).toISOString() })],
     browserGates: [
       {
         ...structuredClone(gate),
-        asked: 'firefox',
-        startedAt: new Date(T0 + 60_000).toISOString(),
-        finishedAt: new Date(T0 + 90_000).toISOString(),
-        browser: { ...gate.browser, name: 'firefox', version: '155.0' },
-        measurements: [{ name: gate.measurements[0].name, value: 30.2, unit: 'ms' }],
+        asked: browser,
+        startedAt: new Date(T0 + offset).toISOString(),
+        finishedAt: new Date(T0 + offset + 30_000).toISOString(),
+        browser: { ...gate.browser, name: browser, version },
+        environment: { ...gate.environment, ...environment },
+        measurements: [{ name: gate.measurements[0].name, value, unit: 'ms' }],
       },
     ],
   })
   return inputs
 }
+
+/** `inputs` as a run in which the gates run in Chromium and Firefox. */
+export const withFirefox = (inputs) =>
+  withBrowser(inputs, { browser: 'firefox', revision: '1543', version: '155.0', image: 'ubuntu24-firefox', offset: 60_000, value: 30.2, environment: { userAgent: 'Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0' } })
+
+/** `inputs` as a run in which the gates run in Chromium and WebKit. */
+export const withWebKit = (inputs) =>
+  withBrowser(inputs, {
+    browser: 'webkit',
+    revision: '2359',
+    version: '26.6',
+    image: 'ubuntu24-webkit',
+    offset: 120_000,
+    value: 41.7,
+    environment: {
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15',
+      system: {
+        fallback: { family: 'DejaVu Sans' },
+        packages: [
+          { name: 'libsoup-3.0-0', gives: 'networking', version: '3.4.4-5ubuntu0.5' },
+          { name: 'glib-networking', gives: 'TLS', version: '2.80.0-1build1' },
+          { name: 'libegl-mesa0', gives: 'EGL', version: null, why: 'dpkg-query gave no version: dpkg-query: no packages found matching libegl-mesa0' },
+        ],
+      },
+    },
+  })

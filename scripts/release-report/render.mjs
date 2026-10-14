@@ -6,7 +6,7 @@
 // limitation the run shows cannot be left out by somebody forgetting it, and
 // the line per section saying where it comes from.
 
-import { browserName } from '../browsers.mjs'
+import { BROWSERS, browserName, FACTS, launchedBuild } from '../browsers.mjs'
 import { engineName } from './problems.mjs'
 
 const code = (text) => `\`${text}\``
@@ -53,7 +53,53 @@ function snapshotsOf(report, app) {
   return prose([...new Set(own.map((snapshot) => `${engineName(snapshot.kind)} ${snapshot.serverVersion}`))])
 }
 
-/** Section 8a: the limitations this run shows, each a fixed sentence with only its facts inserted. */
+/** `apps/host in Chromium`: a gate's row, as a sentence names it. */
+const gateIn = (gate) => `${gate.gate} in ${browserName(gate.asked ?? gate.browser?.name)}`
+
+/**
+ * How and where every browser gate ran, from what each recorded of its
+ * launch: headless on linux-x64 is what 0058's facts were measured in, and a
+ * run that launched otherwise says which gates did.
+ */
+function launchSentences(gates) {
+  const launched = gates.filter((gate) => gate.browser !== null)
+  if (launched.length === 0) return []
+  const groups = new Map()
+  for (const gate of launched) {
+    const way = `${launchedBuild(gate.browser).how} on ${String(gate.browser.platform)}-${String(gate.browser.arch)}`
+    groups.set(way, [...(groups.get(way) ?? []), gateIn(gate)])
+  }
+  if (groups.size === 1) return [`Every browser gate ran ${[...groups.keys()][0]}.`]
+  return [`The browser gates ran ${prose([...groups].map(([way, named]) => `${way} (${named.join(', ')})`))}.`]
+}
+
+/** A package as a run recorded it: its version, or why it has none. */
+const recorded = (entry) => (entry.version === null ? `${entry.name}, whose version ${entry.why}` : `${entry.name} ${entry.version}`)
+
+/**
+ * The system packages each browser's gates took from the runner and not
+ * from Playwright, as its gates recorded them (scripts/browser-gate.mjs's
+ * systemOf), and the facts of 0058 that rest on them: an image update can
+ * move those with no change in the repository.
+ */
+function systemSentences(gates) {
+  const sentences = []
+  for (const browser of BROWSERS) {
+    const seen = new Map()
+    for (const gate of gates.filter((entry) => entry.asked === browser)) {
+      for (const entry of gate.environment?.system?.packages ?? []) seen.set(JSON.stringify(entry), entry)
+    }
+    if (seen.size === 0) continue
+    const packages = [...seen.values()]
+    const gives = prose([...new Set(packages.map((entry) => entry.gives))])
+    const resting = Object.entries(FACTS).filter(([, fact]) => (fact.restsOn?.[browser] ?? []).length > 0)
+    const rests = resting.length === 0 ? '' : `; 0058's ${prose(resting.map(([id]) => id))} rest on ${prose([...new Set(resting.flatMap(([, fact]) => fact.restsOn[browser]))])}`
+    sentences.push(`${browserName(browser)}'s ${gives} were the runner's, not Playwright's: ${prose(packages.map(recorded))}${rests}.`)
+  }
+  return sentences
+}
+
+/** Section 9a: the limitations this run shows, each a fixed sentence with only its facts inserted. */
 export function derivedLimitations(report) {
   const { testedOn, results, browserMatrix } = report
   const all = testedOn.engines.map((engine) => engine.engine)
@@ -64,6 +110,8 @@ export function derivedLimitations(report) {
       ? 'The browser gates launched no browser in this run.'
       : `The browser gates launched ${prose(testedOn.browsers.map((browser) => `${browserName(browser.name)} ${browser.version}`))} only.`,
   )
+
+  sentences.push(...launchSentences(results.browserGates), ...systemSentences(results.browserGates))
 
   // One row per browser a gate ran in, and one sentence per app: the
   // engines are the app's, whichever browser drew the page.
@@ -138,7 +186,7 @@ function evidenceCell(item) {
 
 const GATE_STATE = { passed: 'evidence passed in this run', failed: 'evidence did not pass in this run', stated: 'stated, not exercised by this run', open: 'open' }
 
-/** Section 7: each release gate, as this run leaves it; never "met". */
+/** Section 8: each release gate, as this run leaves it; never "met". */
 function gatesSection({ gates }) {
   return [
     '## Release gates',
@@ -149,13 +197,14 @@ function gatesSection({ gates }) {
   ].join('\n')
 }
 
-/** Section 10: where each section comes from, one line each. */
+/** Section 11: where each section comes from, one line each. */
 const METHOD = [
   ['Subject', 'the GitHub run’s environment (`GITHUB_SHA`, `GITHUB_RUN_ID`), the report job’s `needs`, `packages/data-core/package.json`, and each job’s results file'],
   ['Tested on', '`scripts/release-report/tested-on.mjs` over the checkout, and every `test-results/servers/*.json` a job left: data-fixtures’ `recordServer` for each container a suite or gate started, and the getting-started journey for each composed database, each with `docker image inspect` for its digest'],
   ['Results', 'each package’s `test-results/vitest.json` and `coverage/coverage-summary.json`, turbo’s run summary (`--summarize`), each app’s `test-results/browser-<browser>.json` for each browser the gates run in, the install gate’s `test-results/install.json`, and `collect.mjs --job container`'],
   ['Shared cases', '`sharedCases()` from data-fixtures against the `covers()` each test declared, in vitest’s JSON'],
   ['The browser matrix', 'jsdom as each app loads it, each browser a gate launched, the renderers each app declares, and the engines its servers ran'],
+  ['What the browsers disagree on', '`FACTS` in `scripts/browsers.mjs`; what each browser said it was, under *Tested on*, is each gate’s recorded `environment`'],
   ['Build identity', '`scripts/release-report/dist-hash.mjs` over every published package’s `dist/` in every job, and over each tarball’s `package/dist/`'],
   ['Release gates', '`docs/release/gates.json`, the report job’s `needs`, and `git log` for a document’s last change'],
   ['Known limitations', 'the fixed sentences of `scripts/release-report/render.mjs` with this run’s facts, then `docs/release/limitations.json`, held to the decision records by hash'],
@@ -164,7 +213,7 @@ const METHOD = [
 ]
 
 /** Section 2: Tested on. */
-function testedOnSection({ testedOn }) {
+function testedOnSection({ testedOn, results }) {
   const images = testedOn.engines.flatMap((engine) =>
     engine.images.map((image) => [
       engineName(engine.engine),
@@ -191,9 +240,60 @@ function testedOnSection({ testedOn }) {
     '',
     table(['Browser', 'Launched', 'Playwright pins', 'Gates'], testedOn.browsers.map((browser) => [browserName(browser.name), browser.version, browser.pin ?? '', browser.gates.join(', ')])),
     '',
+    saidSection(results.browserGates),
+    '',
     `axe-core as run in the page: ${prose(testedOn.axe) || 'not recorded'}. Tools: ${testedOn.tooling.map((tool) => `${tool.name} ${tool.versions.map((entry) => entry.version).join('/')}`).join(', ')}.`,
     '',
     table(['Captured snapshot', 'Captured from', 'This run answered'], testedOn.snapshots.map((snapshot) => [snapshot.file, `${engineName(snapshot.kind)} ${snapshot.serverVersion}`, prose(snapshot.answered) || 'nothing'])),
+  ].join('\n')
+}
+
+const yesNo = (value) => (value === true ? 'yes' : value === false ? 'no' : '')
+
+/** What each browser said it was to the page, and the system's fallback family, as its gates recorded them: one row per browser and distinct answer. */
+function saidSection(gates) {
+  const rows = new Map()
+  for (const gate of gates.filter((entry) => entry.environment !== null)) {
+    const { userAgent, platform, maxTouchPoints, pointerFine, hover, system } = gate.environment
+    const cells = [browserName(gate.asked), userAgent, platform, maxTouchPoints, yesNo(pointerFine), yesNo(hover), system?.fallback?.family ?? `none: ${String(system?.fallback?.why ?? 'not recorded')}`]
+    const key = JSON.stringify(cells)
+    rows.set(key, { cells, gates: [...(rows.get(key)?.gates ?? []), gate.gate] })
+  }
+  return [
+    'What each browser said it was, to the page and of the machine (0058):',
+    '',
+    table(['Browser', 'Gates', 'User agent', 'Platform', 'Touch points', 'Pointer fine', 'Hover', 'Fallback family'], [...rows.values()].map(({ cells: [browser, ...rest], gates: named }) => [browser, named.join(', '), ...rest])),
+  ].join('\n')
+}
+
+/** A fact's value as the table prints it. */
+const factValue = (value) => (typeof value === 'boolean' ? yesNo(value) : String(value))
+
+/** A measurement as the table prints it: when and by what, or that the row stands on its source. */
+const factMeasured = (entry) => (entry.on === null ? `by source only (${entry.why})` : `${entry.on}: ${entry.by}`)
+
+/** Section 6: each fact the browsers disagree on, with every browser's value, source and measurement (0058). */
+function factsSection() {
+  const rows = Object.entries(FACTS).flatMap(([id, fact]) =>
+    BROWSERS.map((browser) => {
+      const byConnection = (field, show) => fact.connections.map((connection) => `${connection}: ${show(fact[field][browser][connection])}`).join('; ')
+      return [
+        id,
+        browserName(browser),
+        fact.connections === undefined ? factValue(fact.values[browser]) : byConnection('values', factValue),
+        fact.source[browser],
+        fact.connections === undefined ? factMeasured(fact.measured[browser]) : byConnection('measured', factMeasured),
+      ]
+    }),
+  )
+  return [
+    '## What the browsers disagree on',
+    '',
+    `scripts/browsers.mjs's FACTS (0058), each held by the checks it names, which its gate makes under one name in every browser and which the run fails without: ${Object.entries(FACTS)
+      .map(([id, fact]) => `${code(id)}, held by ${fact.heldBy.gate}’s ${prose(fact.heldBy.checks.map((name) => `"${name}"`))}: ${fact.says}`)
+      .join('; ')}.`,
+    '',
+    table(['Fact', 'Browser', 'Value', 'Source', 'Measured'], rows),
   ].join('\n')
 }
 
@@ -228,7 +328,7 @@ function resultsSection({ results }) {
   ].join('\n')
 }
 
-/** Sections 4 to 6: the shared cases, the browser matrix and build identity. */
+/** Sections 4 to 7: the shared cases, the browser matrix, what the browsers disagree on and build identity. */
 function matricesSection({ sharedCases, browserMatrix, results, testedOn }) {
   const engines = testedOn.engines.map((engine) => engine.engine)
   return [
@@ -239,6 +339,8 @@ function matricesSection({ sharedCases, browserMatrix, results, testedOn }) {
     '## The browser matrix',
     '',
     table(['Environment', 'App', 'Renderers', 'Engines'], browserMatrix.map((row) => [row.environment, row.app, row.renderers.map((renderer) => `${renderer.name} ${renderer.version}`).join(', '), row.engines.map(engineName).join(', ') || 'none'])),
+    '',
+    factsSection(),
     '',
     '## Build identity',
     '',
@@ -255,7 +357,7 @@ function matricesSection({ sharedCases, browserMatrix, results, testedOn }) {
   ].join('\n')
 }
 
-/** Sections 7 to 9 and the problems: limitations, observations, and what failed the run. */
+/** Sections 9 to 11 and the problems: limitations, observations, and what failed the run. */
 function closingSection(report) {
   const stated = report.limitations.stated.flatMap((group) => [
     '',

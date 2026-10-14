@@ -1,5 +1,5 @@
 {
-  "$comment": "The release gates as the delivery plan numbers them, each with the evidence a run must pass or the reason it has none. The plan is a working document kept out of the repository, so no gate's wording is here: the report prints the number and its evidence. Read by scripts/release-report/report.mjs; held by scripts/release-report/gates.test.mjs. A document is stated evidence and never counts as passed in a run. Each file below is one its decision record's Verified-by line names.",
+  "$comment": "The release gates as the delivery plan numbers them, each with the evidence a run must pass or the reason it has none. The plan is a working document kept out of the repository, so no gate's wording is here: the report prints the number and its evidence. Read by scripts/release-report/report.mjs; held by scripts/release-report/gates.test.mjs. A document is stated evidence and never counts as passed in a run. A browser gate passes only when the app's gate passed in every browser the gates run in. Each file below is one its decision record's Verified-by line names.",
   "gates": [
     {
       "gate": 1,

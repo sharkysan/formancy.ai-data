@@ -257,21 +257,26 @@ the same promises:
   answer heard (`in-flight.test.tsx`).
 - **The browser gates**, `apps/examples/scripts/browser-test.mjs`,
   `apps/studio/scripts/browser-test.mjs` and
-  `apps/host/scripts/browser-test.mjs`, run as `pnpm test:browser` in their
-  own CI job, for what jsdom cannot see: in Chromium, no sideways scroll and
+  `apps/host/scripts/browser-test.mjs`, run as `pnpm test:browser` in a CI
+  leg per browser, for what jsdom cannot see: in Chromium, Firefox and
+  WebKit, every check in every one, no sideways scroll and
   nothing past either edge down to 320 pixels, the first Tab on the skip link
   and the next into the content, and axe's colour-contrast and target-size
   rules — for the examples clean and after a failed submit, for the studio and
   the host page at every step of the journey against the real server on their
   own origin, where each also fails when any rule of its stylesheet selects an
   element on the paper. The host's gate also fails when Enter on the skip link
-  leaves the keyboard anywhere but on `<main>`.
+  leaves the keyboard anywhere but on `<main>`. Where the browsers differ, the
+  difference is a named fact in `scripts/browsers.mjs`'s `FACTS`, held by a
+  check with one name in every browser, and the report fails a run in which
+  one browser made a check another did not
+  ([0058](docs/decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
 - **The palette guard**, `scripts/palette.test.mjs` in `pnpm test:repo`:
   every stylesheet that copies `admin.css`'s variables says the same value for
   each.
 - **The README's pictures**, `scripts/pictures/readme.test.mjs` in
   `pnpm test:repo` and each app's `pictures.mjs --check` in
-  `pnpm test:browser`: every picture is whole elements of a state the page
+  `pnpm test:pictures`, in Chromium, in a CI job of its own: every picture is whole elements of a state the page
   reaches, and a caption quotes only text those elements hold
   ([0038](docs/decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 
@@ -382,7 +387,9 @@ In the packages, a file that starts containers is named
 once per run in a vitest `globalSetup` instead, so every file there needs
 Docker. `data-core`, `apps/examples` and `apps/studio` need none. `pnpm
 test:repo` needs `pnpm build` first too: `scripts/mint-token.test.mjs` runs
-the built server's code. The dev servers and the snapshot captures are in
+the built server's code. `pnpm test:browser` measures in Chromium alone
+unless `FORMANCY_BROWSERS` names more (`firefox`, `chromium,webkit`, `all`);
+CI runs every browser. The dev servers and the snapshot captures are in
 `README.md`.
 
 ## Checks before pushing
@@ -395,7 +402,7 @@ package's `test:coverage` in a job of its own, on its own runner, because nine
 suites sharing one runner timed out a test that takes two seconds alone
 (`scripts/ci-test-jobs.test.mjs` fails when that list and the workspace
 disagree); in jobs of their own `pnpm test:e2e:install`, `pnpm test:browser`
-and the server image; and `pnpm test:getting-started` in the
+once per browser, `pnpm test:pictures` and the server image; and `pnpm test:getting-started` in the
 `getting-started` job, run once with the runner's Compose and once with the
 oldest release `docs/getting-started.md` names; and `pnpm test:cloudflare` in
 the `cloudflare` job, likewise with both Compose releases, which needs Docker
@@ -438,9 +445,13 @@ Docker, and each app's `guide.test.tsx` holds the controls.
 `test:coverage` needs Docker and starts both databases. The first run pulls the
 SQL Server image, which is about a gigabyte and a half.
 
-`test:browser` builds the examples page and measures it in Chromium, which
-Playwright downloads once per machine:
-`pnpm --filter @formancy/data-examples exec playwright install chromium`.
+`test:browser` builds the apps and measures them in the browsers
+`FORMANCY_BROWSERS` names, Chromium alone when it is unset, which Playwright
+downloads once per machine, with Firefox's and WebKit's system libraries
+through sudo:
+`pnpm --filter @formancy/data-examples exec playwright install --with-deps chromium firefox webkit`.
+WebKit runs on Linux only. `test:pictures` checks the README's pictures in
+Chromium.
 
 `test:e2e:install` is the only gate that looks at the packages from outside. It
 packs them, installs the tarballs into a plain npm project, type-checks it with

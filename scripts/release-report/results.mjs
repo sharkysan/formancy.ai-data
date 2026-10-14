@@ -73,6 +73,7 @@ export function resultsInRun({ results, covered, published }) {
       passes: gate.passes ?? 0,
       made: gate.made ?? [],
       browser: gate.browser ?? null,
+      environment: gate.environment ?? null,
       axe: gate.axe ?? null,
       wallMs: Date.parse(gate.finishedAt) - Date.parse(gate.startedAt),
       engines: distinct(servers.filter((server) => server.package === gate.gate).map((server) => server.engine)).sort(),

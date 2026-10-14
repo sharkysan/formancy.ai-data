@@ -1,6 +1,6 @@
 # 0053 — A host deletes a record from its detail or its row, after a confirmation in place, and says what the server did
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0058](0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md): its delete states in the host's browser gate run in Chromium, Firefox and Linux WebKit
 - **Date:** 2026-10-13
 - **Deciders:** Daniel Bacher
 - **Verified by:**

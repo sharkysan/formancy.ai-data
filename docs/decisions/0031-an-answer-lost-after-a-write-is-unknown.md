@@ -1,6 +1,6 @@
 # 0031 — An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here
 
-- **Status:** accepted; extended by [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md): an update's read, plan and membership checks run inside its sending, so a resend asks the database nothing; extended by [0041](0041-the-runtime-refuses-what-drift-blocks.md): a write's description is read inside its sending, and a create's plan and membership checks moved into it; extended by [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md): the host page asks before anything drops a form holding a save whose outcome is unknown, and a child row's create reaches `present` and `absent` through the page; extended by [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md): a lost delete is a 502 naming its record and version, a resend with that version is not found, and the client reconciles it by a read; extended by [0053](0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md): the host page says a deletion whose answer was lost may have been deleted, asks before anything drops it, checks it by a read, and deletes it again only after asking again
+- **Status:** accepted; extended by [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md): an update's read, plan and membership checks run inside its sending, so a resend asks the database nothing; extended by [0041](0041-the-runtime-refuses-what-drift-blocks.md): a write's description is read inside its sending, and a create's plan and membership checks moved into it; extended by [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md): the host page asks before anything drops a form holding a save whose outcome is unknown, and a child row's create reaches `present` and `absent` through the page; extended by [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md): a lost delete is a 502 naming its record and version, a resend with that version is not found, and the client reconciles it by a read; extended by [0053](0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md): the host page says a deletion whose answer was lost may have been deleted, asks before anything drops it, checks it by a read, and deletes it again only after asking again; extended by [0058](0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md): whether the browser sends a lost write again is held per browser and per connection; Linux WebKit sends every POST on a new connection and never sends one twice
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**
@@ -131,16 +131,28 @@
   connection really dropped between the server and the database makes the
   adapters answer `unknown-outcome` is
   `packages/data-server/src/e2e-lost-answer.integration.test.ts`'s.
-  `apps/host/scripts/browser-test.mjs` (`pnpm test:browser`) — in Chromium,
-  at every width: an update the real server stored and whose connection
-  Playwright then reset, with the keyboard on the notice and the save sent
-  once, and the same notice after its check, with "Load the saved record";
-  a create whose answer a TCP hop between Chromium and the page dropped
-  after the server stored it, the connection then closed -- Chromium sent it
-  again on its own, the marker crossing the hop twice, one order is stored
-  and the page says what was created (watched failing with the server
-  applying every sending: two orders); a create lost on the way, checked,
-  and "Enter it again anyway" with the keyboard on "Allow saving it again";
+  `apps/host/scripts/browser-test.mjs` (`pnpm test:browser`) — in each
+  browser 0058 names, at every width: an update the real server stored and
+  whose connection Playwright then reset, with the keyboard on the notice
+  and the save sent once, and the same notice after its check, with "Load
+  the saved record"; a create whose answer a TCP hop between the browser
+  and the page dropped after the server stored it, the connection then
+  closed -- sent again on its own as often as 0058's table says for the
+  connection it took, which in Chromium and Firefox is an idle kept-alive
+  one wherever one stood idle, the marker then crossing the hop twice, and
+  in WebKit a new one, once; one order is stored, and the page says what
+  was created, or that it may have been saved (watched failing, in
+  Chromium, with the server applying every sending: two orders); and in
+  each browser's run, a pass whose create took the connection that
+  browser takes when it can choose, so that a Chromium or Firefox run
+  whose creates all went out on new connections fails as having measured
+  no resend rather than passing (watched failing, in Chromium, with the
+  hop cut just before Save in every pass: every pass's own checks held,
+  and the run failed with "Chromium sent every lost create of this run on
+  a new connection, so 0058's row for a reused one -- sent again, which
+  0031 rests on -- was measured by nothing"); a create lost on the way,
+  checked, and "Enter it again anyway" with the keyboard on "Allow saving
+  it again";
   each state with no sideways scroll, and contrast and target size measured
   (watched failing against the page built before this record).
   `packages/data-postgres` and `packages/data-sqlserver`'s

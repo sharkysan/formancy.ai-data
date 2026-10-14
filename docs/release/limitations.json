@@ -395,7 +395,7 @@
       ]
     },
     "0021": {
-      "reviewed": "sha256:92ff1f7d5a57488870708b8a40bc0d064c1a7ae764e57359d43566928d3af1c8",
+      "reviewed": "sha256:9c3435c4c0631707f967c81d2da0ded5fbe9b532c7545626c17c9758f9f2bf9e",
       "limitations": [
         {
           "area": "forms",
@@ -430,7 +430,7 @@
       ]
     },
     "0024": {
-      "reviewed": "sha256:f71b73c26392c159d7c30ea93007d9563555fbdb6751f5eb9d1a916fc85875d6",
+      "reviewed": "sha256:79ff428b6f64aecb11ca153fc1aa37cad368ca220e89d074bfb99a07d0f8ff68",
       "limitations": [
         {
           "area": "studio",
@@ -599,7 +599,7 @@
       ]
     },
     "0029": {
-      "reviewed": "sha256:e7f2516117f68b7297a86fa40dfa765920afa846ab7f150db53fc5431cc6576d",
+      "reviewed": "sha256:73d3a35205306c072b28e924d7b88184e6a8065e79eb011104a406c870b36cf5",
       "limitations": [
         {
           "area": "host",
@@ -685,7 +685,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:a8b192cf6f11616e94a7e155dde24141b944feff310afa7a77079691d06d40e4",
+      "reviewed": "sha256:2ab2b697c7ec785952035c796ad183809518b993e4b867e9a4293b0267b3f3b4",
       "limitations": [
         {
           "area": "writes",
@@ -877,7 +877,7 @@
       ]
     },
     "0035": {
-      "reviewed": "sha256:af64c92b9b69b191ef3a9ac3029df315f3820404417cb70dcc7a4b742b73af5a",
+      "reviewed": "sha256:b5c30f839492f8c939b00dcee73bbbc2e44dbd120b9c57014ca0c7b1d8410528",
       "limitations": [
         {
           "area": "databases",
@@ -953,8 +953,8 @@
       ]
     },
     "0038": {
-      "reviewed": "sha256:933b33854398f811449ff556c72cfc6a1d06e9223c5b19f9e794fa8ac87dac23",
-      "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the browser job's time. Nobody who installs, integrates or operates the module meets them."
+      "reviewed": "sha256:a242909d89ad69431d809ad46305b7d8886c2eebb99db9d0e5bd23079d80bc5f",
+      "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the pictures job's time. Nobody who installs, integrates or operates the module meets them."
     },
     "0039": {
       "reviewed": "sha256:9b2e1311db341b2f588b32fce9a94d42c3c9d51668092b065ee3029187633366",
@@ -1329,7 +1329,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:28e3bf6a1c1c40f5d9c0fa07023d527fbddd3f2bafb16bdb0dcc45d18f55716d",
+      "reviewed": "sha256:148f0698114ec6abd35784f9cf69ec186d096e47756511470b8b1ca19c225f28",
       "limitations": [
         {
           "area": "host",
@@ -1372,7 +1372,7 @@
         },
         {
           "area": "testing",
-          "says": "The host gate decides what axe cannot inside a grid on the pixels Chromium painted, and accepts columns past the window's edge inside a grid's own scroller while the grid's well stays inside the window."
+          "says": "The host gate decides what axe cannot inside a grid on the pixels each browser painted, and accepts columns past the window's edge inside a grid's own scroller while the grid's well stays inside the window."
         },
         {
           "area": "operations",
@@ -1565,7 +1565,7 @@
       ]
     },
     "0052": {
-      "reviewed": "sha256:edecaf72813ef5cce264647afe5aabf4c71392529f3fbfa54d05194874e6a706",
+      "reviewed": "sha256:6bbcfab0a9931b05c64fb46b45b3231fbe0c4c9103382e765dac919ac030c214",
       "limitations": [
         {
           "area": "studio",
@@ -1590,7 +1590,7 @@
       ]
     },
     "0053": {
-      "reviewed": "sha256:de48eb0c70a2eb612b9faa013fbb3115efbf2f1d937720ab6390c6f3641fa8af",
+      "reviewed": "sha256:59d04e7b36c0db0a6730568b7841c19bb05825ea0dd655b1fe19141c09ab1366",
       "limitations": [
         {
           "area": "host",
@@ -1711,6 +1711,55 @@
         {
           "area": "writes",
           "says": "A row filter on a key column that is the whole key writes the key from the context on every create, so a record deleted is created again under its key by the next create in that context, its version starting where the deleted one's did, as over a by-default identity; inferred from the planner, not tested."
+        }
+      ]
+    },
+    "0058": {
+      "reviewed": "sha256:6f07fbf55f0acc02f615770b48e83b1a6c74557820c5144b7e5ecf6235566eff",
+      "limitations": [
+        {
+          "area": "testing",
+          "says": "The browser gates run Playwright's builds of Chromium, Firefox and WebKit, headless on Linux: not Chrome, Edge, Firefox or Safari as people install them, and no browser on macOS, Windows, iOS or Android."
+        },
+        {
+          "area": "testing",
+          "says": "WebKit in the gates is the WPE port with the runner's libsoup networking, not Safari: it moves Tab to links, which Safari does by default only with Option-Tab, and how Safari's network stack treats a lost save is not measured."
+        },
+        {
+          "area": "host",
+          "says": "Playwright's WebKit names itself Safari on a Mac, so the host page's grids take AG Grid's Safari code paths in the WebKit gate: it proves neither Safari nor a WebKit that is not Safari."
+        },
+        {
+          "area": "writes",
+          "says": "Whether a browser sends a lost save again on its own differs by browser and connection: over HTTP/1.1, when a connection the browser reused closes after the server read the save and before any byte of an answer, Chromium and Firefox send it again and one server process answers that second sending with the first one's answer; WebKit on Linux sends every save on a new connection and never twice, so its page says the save may have been saved."
+        },
+        {
+          "area": "host",
+          "says": "In Firefox, a click on the host page's or the studio's corner and then Tab goes past the off-screen skip link, because Firefox starts the keyboard from the caret the click left."
+        },
+        {
+          "area": "testing",
+          "says": "No scrollbar took width in the gates' browsers -- Chromium's because Playwright hides them -- so the narrowest widths say nothing of a desktop browser whose scrollbar takes part of the window."
+        },
+        {
+          "area": "testing",
+          "says": "WebKit's networking, TLS and EGL and every leg's fallback fonts come from the runner's image, not from Playwright, so an image update can change what the gates measure; the release report names the versions each run had."
+        },
+        {
+          "area": "testing",
+          "says": "The README's pictures and their text check are Chromium's alone."
+        },
+        {
+          "area": "testing",
+          "says": "On macOS and Windows the gates refuse WebKit, and a machine runs Chromium alone unless FORMANCY_BROWSERS names more; only CI runs every browser, and the report requires each."
+        },
+        {
+          "area": "host",
+          "says": "In Playwright's WebKit, a pointer press on the host page's Save sent nothing in five of about 175 presses, the document scrolling by 24 px between the press and the release, and the page said nothing of it; the cause was not established, and since then no gate presses Save with a pointer in any browser, so what a person's click on Save meets in a real browser is not checked."
+        },
+        {
+          "area": "testing",
+          "says": "The host gate reads a grid cell's background only where the window shows the cell, scrolling the window to one outside it, which moves what is under the pointer, so a cell can be read under another hover than its state had; a text its grid has scrolled wholly out of view, or covers, is named in the gate's output and not decided."
         }
       ]
     },

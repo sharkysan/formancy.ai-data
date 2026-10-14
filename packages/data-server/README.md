@@ -247,10 +247,13 @@ existed would be documented and inert.
   read stores; the stale echo, the failed read and the resend run over the
   fake ports only.
 
-  A write that arrives again is answered, not applied. Chromium resends a
-  request -- a POST too -- when the connection it reused closed before any
-  answer, below the page, so a create whose answer the network lost after
-  the commit used to be stored twice behind one "Created" (measured, 0031).
+  A write that arrives again is answered, not applied. Over HTTP/1.1,
+  Chromium and Firefox send a request again -- a POST too -- when a
+  connection they reused closed after the server read it and before any
+  byte of an answer, below the page, so a create whose answer the network
+  lost after the commit used to be stored twice behind one "Created"
+  (measured in Chromium, 0031; in both, 0058). WebKit on Linux sends every
+  POST on a new connection and never twice ([0058](../../docs/decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
   `@formancy/data-client` sends a new `formancy-write-id` with every create
   and update; a request that arrives with an id this process has already
   acted on, for the same person, form and operation, gets the first
@@ -260,7 +263,10 @@ existed would be documented and inert.
   ten minutes, at most 10,000 of them and 32 MiB, oldest dropped first. A
   resend was measured arriving within 6 ms of the close, and a create's
   answer at about 236 bytes (2026-10-09, the host page's browser gate);
-  ten minutes is a margin over that, not a measurement. Held in this process only: a resend that reaches
+  ten minutes is a margin over that, not a measurement; on 2026-10-13, in
+  the seven passes of one run of the host page's gate on the shared machine
+  0058's *Measured* names, Chromium's arrived 10.1 to 13.8 ms after the
+  close and Firefox's 20.6 to 27.3 ms. Held in this process only: a resend that reaches
   another replica behind a balancer, or this one after a restart, is
   applied again, and a request without an id is a write of its own every
   time. The host page's browser gate measures the resend at the socket and

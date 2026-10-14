@@ -15,6 +15,7 @@
     "test:repo": "vitest run --config vitest.repo.config.mts",
     "test:e2e:install": "node scripts/install-test.mjs",
     "test:browser": "turbo run test:browser",
+    "test:pictures": "turbo run test:pictures",
     "test:getting-started": "node scripts/getting-started.mjs",
     "test:cloudflare": "node scripts/cloudflare.mjs",
     "pictures": "node scripts/pictures.mjs",

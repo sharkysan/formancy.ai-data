@@ -136,10 +136,13 @@ a title, operations or children is `unexpected`.
   `unexpected`.
 - **Every write carries a write id of its own**, in the `formancy-write-id`
   header: 128 random bits from `crypto.getRandomValues`, new for every
-  `create`, `update` and `delete` call. Chromium sends a request again, below the
-  page, when the connection it reused closed before any answer; the server
-  answers that copy with the first one's answer instead of applying it
-  twice (0031). The client itself still never sends anything again.
+  `create`, `update` and `delete` call. Over HTTP/1.1, when a connection the
+  browser reused closes after the server read a write and before any byte of
+  an answer, Chromium and Firefox send it again on their own, below the page;
+  one server process answers that copy with the first one's answer instead of
+  applying it twice (0031). WebKit on Linux sends every write on a new
+  connection and never sends one twice, so there the write is unknown
+  ([0058](../../docs/decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)). The client itself still never sends anything again.
 - **Field problems are sentences.** The renderers print an error entry as
   it is, beside the field and in the error summary, as observed at 0.3.0 on
   2026-10-09, at 0.4.0 on 2026-10-10 and at 0.5.0 on 2026-10-11, so

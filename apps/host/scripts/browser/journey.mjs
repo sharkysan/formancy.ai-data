@@ -2,9 +2,12 @@
 // gate's workspace states left open: a new order in both renderers, the
 // customer list, a record loaded by its token, a save, a stale save, a
 // refused selection, a save whose answer was lost and its check, a create
-// Chromium sends again on its own, and the confirmation of an unknown create
-// (0029, 0031). Each state is measured on the way by the gate.
+// the network lost after the server stored it -- which the browser sends
+// again on its own, or not, as 0058's table says of it and the connection
+// it took -- and the confirmation of an unknown create (0029, 0031). Each
+// state is measured on the way by the gate.
 
+import { fromTheTop, lostCreate } from '../../../../scripts/browser-gate.mjs'
 import { carryOn } from './workspace.mjs'
 import { describeFocus, focusedOn, until, WITHIN } from './measure.mjs'
 import { rulesReaching } from './styles.mjs'
@@ -16,6 +19,20 @@ const customer = (page, name) => paper(page, name).getByRole('combobox', { name:
 const saveIn = (page, name) => paper(page, name).getByRole('button', { name: 'Save' })
 const status = (page, name, text) => pane(page, name).getByRole('status').filter({ hasText: text })
 const unknownNotice = (page) => pane(page, 'React').getByRole('region', { name: 'React It may have been saved' })
+
+/**
+ * Save pressed from the keyboard, as every save of the journey is: focused,
+ * then Enter. A pointer press in WebKit sent nothing in five of about 175
+ * presses on 2026-10-13 (two of 120 in a probe of this sequence, three in
+ * five gate runs): the button took the press and the focus, the document
+ * scrolled by 24 px before the release, which landed on the form beside
+ * it, and settled back about 130 ms later. What moved it was not
+ * established (0058); a keyboard press has no release to miss.
+ */
+async function pressSave(page, name) {
+  await saveIn(page, name).focus()
+  await page.keyboard.press('Enter')
+}
 
 /** A new order in the React pane, every field a person types, with `notes` as its notes. Not saved. */
 async function newOrder(page, notes) {
@@ -32,14 +49,16 @@ async function newOrder(page, notes) {
  * The journey, state by state: each entry brings the page to a state and
  * names it, checking -- and measuring -- through the gate's recorder on the
  * way what only that moment can show. `run` holds what one width's pass
- * needs: its record, its customer number.
+ * needs -- its record, its customer number -- and `reached`, the run's set
+ * of connections its lost creates took, which the gate holds once the run
+ * is over (scripts/browser-gate.mjs's rowUnmeasured).
  */
-export function recordJourney(plane, hop, { check, measure }, run) {
+export function recordJourney(plane, hop, { check, measure, asked }, run) {
   return [
     ['Open', async (page) => {
       for (const name of ['React', 'Angular']) await customer(page, name).waitFor(WITHIN)
-      // From the top of the open page: the skip link, then the first control of main.
-      await page.mouse.click(1, 1)
+      // From the top of the open page, as the harness puts it there: the skip link, then the first control of main.
+      await fromTheTop(page)
       await page.keyboard.press('Tab')
       check('open: the first Tab reaches the skip link', await focusedOn(page, page.getByRole('link', { name: 'Skip to the workspace' })))
       // Enter must move the focus to main itself and change nothing else: the
@@ -135,53 +154,87 @@ export function recordJourney(plane, hop, { check, measure }, run) {
       }
     }],
     ['Unknown notice, checked (React)', async (page) => {
-      // The check's answer and "Load the saved record", drawn in Chromium:
+      // The check's answer and "Load the saved record", drawn in the browser:
       // their contrast and target size are measured nowhere else.
       await unknownNotice(page).getByRole('button', { name: 'Check whether it was saved' }).click()
       await unknownNotice(page).getByRole('button', { name: 'Load the saved record' }).waitFor(WITHIN)
     }],
-    ['Create resent by Chromium (React)', async (page) => {
+    ['A create the network lost after the server stored it (React)', async (page) => {
       // The page reaches the server through the hop. The hop drops the answer
       // carrying this order's notes, the server having stored it, and once
       // the order is in the database closes the connection that carried it:
-      // what an idle reset by a balancer, or a dropped link, does. Chromium
-      // then sends the create again on a new connection, on its own.
-      const notes = `resent by Chromium ${String(run.customer)} ${String(Date.now())}`
+      // what an idle reset by a balancer, or a dropped link, does. Whether
+      // the browser then sends the create again on its own, below the page,
+      // is its own and depends on the connection it took (0058): the hop
+      // says which, how many requests that connection carried first, and
+      // how many kept-alive connections stood idle beside it, passed over.
+      const notes = `lost after it was stored ${String(run.customer)} ${String(Date.now())}`
+      let resentAfter = null
       await newOrder(page, notes)
       const marker = Buffer.from(notes, 'utf8')
-      const sent = hop.countSent(marker)
+      const sent = hop.sentOn(marker)
       const lost = hop.swallowAnswersFrom(marker)
-      // The answer the page does get: the second sending's, which the server
-      // answers from what it kept for the first (0031).
-      const answered = page.waitForResponse((response) => response.url().endsWith('/records/create') && response.status() === 201, WITHIN)
-      await saveIn(page, 'React').click()
-      await Promise.race([lost.matched, new Promise((_, reject) => setTimeout(() => reject(new Error('the create never answered through the hop')), WITHIN.timeout))])
-      await until(async () => (await plane.ordersWithNotes(notes)) === 1, 'the create never reached the database')
-      const cutAt = performance.now()
-      lost.cut()
-      // Polled every 5 ms rather than through until(), whose 100 ms step
-      // would be the measurement: how soon a resend follows the close is
-      // what the server's kept answers have to outlast.
-      while (sent() < 2 && performance.now() - cutAt < WITHIN.timeout) await new Promise((resolve) => setTimeout(resolve, 5))
-      const resentAfter = performance.now() - cutAt
-      await status(page, 'React', 'Created record').waitFor(WITHIN)
-      const answerBytes = (await (await answered).body()).length
-      measure({ name: 'Chromium resent the create after its connection closed', value: resentAfter, unit: 'ms' })
-      measure({ name: "the create's answer", value: answerBytes, unit: 'bytes' })
-      check('Chromium sent the create again on its own: the marker crossed the hop twice', sent() === 2 ? null : `it crossed ${String(sent())} time(s): Chromium did not resend, so this measured nothing`)
-      check('and one order is stored: the second sending was answered, not applied', (await plane.ordersWithNotes(notes)) === 1 ? null : `${String(await plane.ordersWithNotes(notes))} orders are stored`)
+      // Collected, not awaited: in a browser that sends nothing again no 201 arrives.
+      const created = []
+      const collect = (response) => {
+        if (response.url().endsWith('/records/create') && response.status() === 201) created.push(response)
+      }
+      page.on('response', collect)
+      const said = status(page, 'React', 'Created record').or(unknownNotice(page))
+      try {
+        await pressSave(page, 'React')
+        await Promise.race([lost.matched, new Promise((_, reject) => setTimeout(() => reject(new Error('the create never answered through the hop')), WITHIN.timeout))])
+        await until(async () => (await plane.ordersWithNotes(notes)) === 1, 'the create never reached the database')
+        const cutAt = performance.now()
+        lost.cut()
+        // Polled every 5 ms rather than through until(), whose 100 ms step
+        // would be the measurement: how soon a resend follows the close is
+        // what the server's kept answers have to outlast. The count is final
+        // once the page says either sentence: a browser sends again below
+        // fetch, before it rejects.
+        while (performance.now() - cutAt < WITHIN.timeout) {
+          if (sent().length >= 2) {
+            resentAfter = performance.now() - cutAt
+            break
+          }
+          if (await said.first().isVisible()) break
+          await new Promise((resolve) => setTimeout(resolve, 5))
+        }
+        await said.first().waitFor(WITHIN)
+      } finally {
+        page.off('response', collect)
+      }
+      const sendings = sent()
+      const held = lostCreate(asked, sendings)
+      if (held.connection !== null) {
+        run.reached.add(held.connection)
+        measure({ name: 'requests the lost create’s connection carried before it', value: sendings[0].earlier, unit: 'requests' })
+        measure({ name: 'kept-alive connections that stood idle while the lost create took another', value: sendings[0].passedOver, unit: 'connections' })
+      }
+      check('the lost create went out on the connection 0058’s table says of this browser', held.took)
+      check('the browser sent the lost create as often as 0058’s table says for that connection', held.often)
+      check('and one order is stored: a second sending was answered, not applied', (await plane.ordersWithNotes(notes)) === 1 ? null : `${String(await plane.ordersWithNotes(notes))} orders are stored`)
+      // Where it was sent again: how soon after the close, and the answer the page got, the second sending's.
+      if (resentAfter !== null) measure({ name: 'the browser resent the create after its connection closed', value: resentAfter, unit: 'ms' })
+      if (created.length > 0) measure({ name: "the create's answer", value: (await created[0].body()).length, unit: 'bytes' })
+      const resent = sendings.length >= 2
+      const truth = resent ? await status(page, 'React', 'Created record').isVisible() : (await unknownNotice(page).isVisible()) && (await focusedOn(page, unknownNotice(page))) === null
+      check(
+        'and the page says what is true, with the keyboard where 0031 puts it',
+        truth ? null : resent ? 'the browser sent it again and the page does not say "Created record"' : `nothing was sent again and the page does not show "It may have been saved" with the keyboard on it: ${String(await focusedOn(page, unknownNotice(page)))}`,
+      )
     }],
     ['Unknown create, confirming (React)', async (page) => {
       // A create lost on the way, which nothing can find -- the database
       // numbers orders -- checked, and "Enter it again anyway" pressed: the
-      // confirmation, drawn in Chromium, with the keyboard on its answer.
+      // confirmation, drawn in the browser, with the keyboard on its answer.
       await newOrder(page, `lost and confirming ${String(run.customer)} ${String(Date.now())}`)
       await page.route('**/v1/forms/*/records/create', async (route) => {
         await route.fetch()
         await route.abort('connectionreset')
       })
       try {
-        await saveIn(page, 'React').click()
+        await pressSave(page, 'React')
         await unknownNotice(page).waitFor(WITHIN)
       } finally {
         await page.unroute('**/v1/forms/*/records/create')

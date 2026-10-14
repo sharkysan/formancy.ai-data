@@ -37,8 +37,11 @@ export function gateRecorder(gate, { browser: asked, log = console.log, now = ()
   let browser = null
   let axe = null
   let error = null
+  let environment = null
 
   return {
+    /** The browser this recorder's run was asked for, by Playwright's name: what a gate holds 0058's facts to. */
+    asked,
     /** One check: `problem` null when it holds, a sentence when it does not. Printed as the gates always printed, and kept by name under the current pass. */
     check(name, problem) {
       if (made.length === 0) made.push({ label: null, width: null, checks: [] })
@@ -71,6 +74,14 @@ export function gateRecorder(gate, { browser: asked, log = console.log, now = ()
         throw new Error(error)
       }
     },
+    /** What the browser said it was, and the system it ran on (scripts/browser-gate.mjs's environmentOf and systemOf), once per run. */
+    environment(value) {
+      environment = value
+    },
+    /** Whether the run has recorded what the browser said it was. */
+    hasEnvironment() {
+      return environment !== null
+    },
     /** The axe-core version injected into the page, as the page reports it. */
     axe(version) {
       axe = version ?? null
@@ -96,6 +107,7 @@ export function gateRecorder(gate, { browser: asked, log = console.log, now = ()
         startedAt,
         finishedAt: now().toISOString(),
         browser,
+        environment,
         axe,
         widths: [...new Set(passes.map((entry) => entry.width))],
         passes: passes.length,

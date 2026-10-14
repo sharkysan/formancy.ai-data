@@ -177,8 +177,8 @@ describe('the browser job’s results', () => {
   // uploads would overwrite one another; a browser the gates do not run in
   // is a leg no pin holds.
   test('refuse --job browser without a browser the gates run in', () => {
-    expect(() => collect({ root: workspace(), job: 'browser', ...machine })).toThrow('--job browser needs --variant <browser>, the browser its leg ran: one of chromium')
-    expect(() => collect({ root: workspace(), job: 'browser', variant: 'opera', ...machine })).toThrow('--job browser --variant opera: opera is no browser the gates run in (chromium)')
+    expect(() => collect({ root: workspace(), job: 'browser', ...machine })).toThrow('--job browser needs --variant <browser>, the browser its leg ran: one of chromium, firefox, webkit')
+    expect(() => collect({ root: workspace(), job: 'browser', variant: 'opera', ...machine })).toThrow('--job browser --variant opera: opera is no browser the gates run in (chromium, firefox, webkit)')
   })
 })
 

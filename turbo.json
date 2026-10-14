@@ -23,6 +23,10 @@
       "dependsOn": ["build"],
       "passThroughEnv": ["FORMANCY_BROWSERS"],
       "cache": false
+    },
+    "test:pictures": {
+      "dependsOn": ["build"],
+      "cache": false
     }
   }
 }

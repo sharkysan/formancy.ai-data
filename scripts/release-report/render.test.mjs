@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { derivedLimitations, renderContent, renderReport, renderSummary } from './render.mjs'
 import { buildReport } from './report.mjs'
-import { copy, greenCiRun, greenRun, job, server, withFirefox } from './synthetic-run.mjs'
+import { copy, greenCiRun, greenRun, job, server, withFirefox, withWebKit } from './synthetic-run.mjs'
 
 /**
  * The report's derived limitations and its Markdown (0035), over a run made
@@ -28,6 +28,32 @@ describe('the limitations a run shows', () => {
     const sentences = derivedLimitations(report(withFirefox))
     expect(sentences.filter((sentence) => sentence === 'The browser gate of apps/host ran against PostgreSQL only.')).toHaveLength(1)
     expect(sentences).toContain('The browser gates launched Chromium 153.0.8010.12 and Firefox 155.0 only.')
+  })
+
+  // "Headless on Linux" is what 0058 measured; a run that launched a browser
+  // headed, or on another platform, measured another browser, and says so
+  // from what each gate recorded of its launch rather than from a sentence
+  // that was always true.
+  test('say how and where every browser gate ran, from what each recorded of its launch', () => {
+    expect(derivedLimitations(report(withFirefox))).toContain('Every browser gate ran headless on linux-x64.')
+    const headed = derivedLimitations(
+      report((inputs) => {
+        withFirefox(inputs)
+        Object.assign(job(inputs, 'browser-chromium').browserGates[0].browser, { headless: false, options: { headless: false } })
+      }),
+    )
+    expect(headed).toContain('The browser gates ran headed on linux-x64 (apps/host in Chromium) and headless on linux-x64 (apps/host in Firefox).')
+    expect(headed).not.toContain('Every browser gate ran headless on linux-x64.')
+  })
+
+  // WebKit's networking, TLS and EGL are the runner's packages, so an image
+  // update can move 0058's WebKit facts with no change in the repository:
+  // the run names the versions it had, and a version it could not ask for.
+  test('name the system packages WebKit ran on, and what of 0058 rests on them', () => {
+    expect(derivedLimitations(report(withWebKit))).toContain(
+      "WebKit's networking, TLS and EGL were the runner's, not Playwright's: libsoup-3.0-0 3.4.4-5ubuntu0.5, glib-networking 2.80.0-1build1 and libegl-mesa0, whose version dpkg-query gave no version: dpkg-query: no packages found matching libegl-mesa0; 0058's postConnection and resendsLostPost rest on libsoup-3.0-0.",
+    )
+    expect(derivedLimitations(report(withFirefox)).filter((sentence) => sentence.includes('runner'))).toEqual([])
   })
 
   // An app whose suite starts no database renders from captured snapshots,
@@ -184,6 +210,29 @@ describe('the subject and the summary', () => {
     const summary = renderSummary(report(), { section: 'Unreleased', link: 'https://example.invalid/report.md' })
     expect(summary).toContain('The full report of the run that gated this: https://example.invalid/report.md')
     expect(summary).toContain('The notes above are CHANGELOG.md’s `Unreleased` section.')
+  })
+
+  // What each browser said it was decides which of AG Grid's code paths ran
+  // and which media rules applied (0058): the report prints it per browser,
+  // as the gates recorded it.
+  test('shows what each browser said it was', () => {
+    const markdown = renderContent(report(withWebKit))
+    const said = markdown.slice(markdown.indexOf('What each browser said it was'))
+    expect(said).toContain('| Browser | Gates | User agent | Platform | Touch points | Pointer fine | Hover | Fallback family |')
+    expect(said).toContain('| WebKit | apps/host | Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15 | Linux x86_64 | 0 | yes | yes | DejaVu Sans |')
+  })
+
+  // Each fact the browsers disagree on is printed with every browser's
+  // value, where it was read and how it was measured; one that stands on
+  // its source alone says so rather than leaving the cell blank.
+  test('shows each fact of 0058 with every browser’s value, source and measurement', () => {
+    const markdown = renderContent(report())
+    const facts = markdown.slice(markdown.indexOf('## What the browsers disagree on'))
+    expect(facts).toContain('| resendsLostPost | WebKit | reused: no; fresh: no |')
+    expect(facts).toContain('reused: by source only (by source; no run can reach it: WebKit sends no POST on a reused connection (postConnection))')
+    expect(facts).toContain('| claimsSafari | WebKit | yes |')
+    // And the checks that hold each row, which the report requires of its gate in every browser.
+    expect(facts).toContain('`claimsMacOs`, held by apps/host’s "the browser names its platform to AG Grid as 0058’s table says"')
   })
 
   // Every section names where it comes from, so a reader can check one.

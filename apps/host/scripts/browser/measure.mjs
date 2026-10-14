@@ -47,20 +47,25 @@ const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.mi
 /**
  * axe at WCAG 2.2 AA with nothing switched off, and a guard on the guard:
  * the two measurements must have run over something. What axe leaves
- * undecided for contrast comes back with each node's selector and reason,
- * for `decide` below.
+ * undecided for contrast comes back with each node's selector, reason and
+ * place in `window.formancyGateUndecided`, which holds the elements axe
+ * named, taken as it answered, for `decide` below: a selector axe builds
+ * can name a class AG Grid takes off again, `ag-row-hover` among them, so
+ * the element is not found by it later.
  */
 export async function audit(page, target) {
   if (!(await page.evaluate(() => 'axe' in window))) await page.addScriptTag({ content: AXE })
   const subject = target ?? (await page.evaluateHandle(() => document))
   return subject.evaluate(async (context, tags) => {
-    const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags } })
+    const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, elementRef: true })
     const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
+    const undecided = nodes(results.incomplete, 'color-contrast')
+    window.formancyGateUndecided = undecided.map((node) => node.element)
     return {
       axe: window.axe.version,
       violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
       measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
-      undecided: nodes(results.incomplete, 'color-contrast').map((node) => ({ html: node.html.slice(0, 60), selector: node.target[0], reason: node.any.map((check) => check.message).join(' ') })),
+      undecided: undecided.map((node, at) => ({ html: node.html.slice(0, 60), selector: node.target[0], at, reason: node.any.map((check) => check.message).join(' ') })),
     }
   }, [...ACCESSIBILITY_TAGS])
 }
@@ -121,37 +126,137 @@ export async function painted(page, points) {
 }
 
 /**
+ * The colours painted at the points `locate()` finds in the page -- `{
+ * points, ...what else it read }`, or null when what it looks for is not
+ * drawn -- read from a page that held still: the points are found again
+ * after the screenshot, and the reading taken again while they moved. A
+ * page that scrolled or shifted between finding a point and the screenshot
+ * would have its colours read beside what they belong to; seen in WebKit on
+ * 2026-10-13, where the document scrolled by 24 px within a press and
+ * settled back about 130 ms later, its cause not established.
+ */
+export async function paintedWhere(page, locate) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const before = await locate()
+    if (before === null) return null
+    const colours = await painted(page, before.points)
+    const after = await locate()
+    if (JSON.stringify(after) === JSON.stringify(before)) return { ...before, colours }
+  }
+  throw new Error('the page never held still between finding what to measure and the screenshot of it')
+}
+
+/**
  * Decides what axe left undecided inside a grid -- a header or a cell whose
  * background axe "could not determine due to a pseudo element" (UX-SPEC F1)
  * -- by the text's computed colour against the background the browser painted
  * in that cell's padding, at 4.5:1 or more. Anything axe left undecided
  * outside a grid, or for another reason, stays undecided: the gate fails it.
+ *
+ * The background is read only where the cell itself is drawn. A cell its
+ * grid has scrolled partly out of view is read inside the part its grid
+ * shows -- its box cut by every ancestor that clips it sideways, the grid's
+ * own scrollers among them -- and a cell outside the window is first
+ * brought into it by the window's scroll alone, never the grid's, which is
+ * part of the state measured, and the window is scrolled back after. The
+ * point must then be on the cell, by elementFromPoint, or the cell stays
+ * undecided; where a grid's header covers the cell's top padding,
+ * its bottom padding is tried. A text its grid has scrolled wholly out of
+ * view -- a column past the well's edge, a row below the grid's own
+ * scroller -- or that the grid's header covers is on no screen in this
+ * state, and is returned as `hidden`, neither decided nor left: when its
+ * box is cut away by an ancestor and the window, where it can say,
+ * shows something else at its middle, or when the window shows something
+ * else there. Before 2026-10-14 the point was the box's corner wherever it
+ * lay: with a row's Delete as the last column (0053), End scrolled the
+ * Records grid so that, at 360 pixels, the corner of its "Created by"
+ * header lay outside the grid -- on the panel's glass in Firefox and WebKit,
+ * read as 4.49:1 and 4.47:1, and left of the window in Chromium, where a
+ * screenshot has no pixel and the gate read black -- and every cell below
+ * the window was read against that black too (0058).
  */
 export async function decide(page, undecided) {
   const left = []
   const decided = []
-  for (const node of undecided) {
-    const at = await page.evaluate((selector) => {
-      const element = document.querySelector(selector)
-      const cell = element?.closest('[role="columnheader"], [role="gridcell"]')
-      if (element === null || cell === null || cell === undefined || element.closest('.grid-bench') === null) return null
-      const box = cell.getBoundingClientRect()
-      // Inside the cell's padding, clear of its 1px focus border and its text.
-      return { color: getComputedStyle(element).color, x: box.left + 4, y: box.top + 4, name: (cell.textContent ?? '').trim().slice(0, 30) }
-    }, node.selector)
-    if (at === null || !/pseudo element/.test(node.reason)) {
-      left.push(node.html)
-      continue
+  const hidden = []
+  const scrolled = await page.evaluate(() => [window.scrollX, window.scrollY])
+  try {
+    for (const node of undecided) {
+      if (!/pseudo element/.test(node.reason)) {
+        left.push(node.html)
+        continue
+      }
+      await page.evaluate((at) => {
+        const box = window.formancyGateUndecided?.[at]?.closest('[role="columnheader"], [role="gridcell"]')?.getBoundingClientRect()
+        if (box !== undefined && (box.top < 0 || box.bottom > window.innerHeight)) window.scrollBy(0, box.top - (window.innerHeight - box.height) / 2)
+      }, node.at)
+      const locate = () =>
+        page.evaluate((at) => {
+          const element = window.formancyGateUndecided?.[at]
+          const cell = element?.closest('[role="columnheader"], [role="gridcell"]')
+          if (element === undefined || !element.isConnected || cell === null || cell === undefined || element.closest('.grid-bench') === null) return null
+          // What is drawn of a box: cut by every ancestor that clips it, the grid's own scrollers among them, and, `inWindow`, by the window.
+          const drawnOf = (box, inWindow) => {
+            const edge = inWindow ? { left: 0, right: document.documentElement.clientWidth, top: 0, bottom: window.innerHeight } : { left: -Infinity, right: Infinity, top: -Infinity, bottom: Infinity }
+            const part = { left: Math.max(box.left, edge.left), right: Math.min(box.right, edge.right), top: Math.max(box.top, edge.top), bottom: Math.min(box.bottom, edge.bottom) }
+            for (let ancestor = cell.parentElement; ancestor !== null; ancestor = ancestor.parentElement) {
+              const style = getComputedStyle(ancestor)
+              const clip = ancestor.getBoundingClientRect()
+              if (style.overflowX !== 'visible') Object.assign(part, { left: Math.max(part.left, clip.left), right: Math.min(part.right, clip.right) })
+              if (style.overflowY !== 'visible') Object.assign(part, { top: Math.max(part.top, clip.top), bottom: Math.min(part.bottom, clip.bottom) })
+            }
+            return part
+          }
+          const name = (cell.textContent ?? '').trim().slice(0, 30)
+          const describe = (hit) => (hit === null ? 'nothing' : `${hit.tagName.toLowerCase()}.${String(hit.className).slice(0, 40)}`)
+          const box = cell.getBoundingClientRect()
+          const part = drawnOf(box, true)
+          // Inside the cell's top padding or, where a grid's header covers that, its bottom padding: clear of its 1px focus
+          // border and its text, where the window shows the cell.
+          const tried = []
+          for (const point of [{ x: part.left + 4, y: box.top + 4 }, { x: part.left + 4, y: box.bottom - 4 }]) {
+            const inside = point.x < part.right - 1 && point.y >= part.top && point.y < part.bottom - 1
+            const hit = inside ? document.elementFromPoint(point.x, point.y) : null
+            if (hit !== null && cell.contains(hit)) return { color: getComputedStyle(element).color, points: [point], name, drawn: true }
+            tried.push(`at ${String(Math.round(point.x))}, ${String(Math.round(point.y))} ${inside ? describe(hit) : 'the cell cut off'}`)
+          }
+          // Shown nowhere a point was tried: a text its grid has scrolled wholly out of view, or that the grid's header covers, is on
+          // no screen in this state, so there is nothing to decide. Scrolled out: its box cut away by an ancestor -- the window's own
+          // edges hide none, since it was scrolled to -- and, where its middle is in the window, the window showing something else
+          // there. Covered: the window showing something else at its middle.
+          const range = document.createRange()
+          range.selectNodeContents(element)
+          const words = range.getBoundingClientRect()
+          const shown = drawnOf(words, false)
+          const middle = { x: (words.left + words.right) / 2, y: (words.top + words.bottom) / 2 }
+          const inWindow = middle.x >= 0 && middle.x < document.documentElement.clientWidth && middle.y >= 0 && middle.y < window.innerHeight
+          const there = inWindow ? document.elementFromPoint(middle.x, middle.y) : null
+          const elsewhere = there !== null && !cell.contains(there)
+          if ((shown.right <= shown.left || shown.bottom <= shown.top) && (!inWindow || elsewhere)) return { hidden: true, name, points: [] }
+          if (elsewhere) return { hidden: true, name, points: [] }
+          return { name, points: [], drawn: false, on: tried.join('; ') }
+        }, node.at)
+      const at = await paintedWhere(page, locate)
+      if (at?.hidden === true) {
+        hidden.push(at.name)
+        continue
+      }
+      if (at === null || !at.drawn) {
+        left.push(`${node.html}${at === null ? ' (outside a grid, or gone from the page)' : ` (shown, and the gate read no pixel of the cell beside it: ${at.on})`}`)
+        continue
+      }
+      const [background] = at.colours
+      const text = parseColor(at.color)
+      if (text === null || text.alpha !== 1) {
+        left.push(`${node.html} (its colour ${at.color} is not one this gate reads)`)
+        continue
+      }
+      decided.push({ name: at.name, ratio: contrast(text.rgb, background) })
     }
-    const [background] = await painted(page, [{ x: at.x, y: at.y }])
-    const text = parseColor(at.color)
-    if (text === null || text.alpha !== 1) {
-      left.push(`${node.html} (its colour ${at.color} is not one this gate reads)`)
-      continue
-    }
-    decided.push({ name: at.name, ratio: contrast(text.rgb, background) })
+  } finally {
+    await page.evaluate(([x, y]) => window.scrollTo(x, y), scrolled)
   }
-  return { left, decided, failing: decided.filter((entry) => entry.ratio < 4.5) }
+  return { left, decided, hidden, failing: decided.filter((entry) => entry.ratio < 4.5) }
 }
 
 /** What has the keyboard's focus, said so that a failure names it. */

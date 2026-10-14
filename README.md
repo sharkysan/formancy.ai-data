@@ -17,7 +17,7 @@ renders in React or Angular with the formancy renderers.
 
 *`pg-order`, generated from `sales.order` on PostgreSQL as the order form's own account and published through the administrator plane, in the host page's workspace: the forms the person may read, the form's records in an AG Grid Community grid, and the open record drawn by `@formancy/react` and `@formancy/angular` from one definition through `@formancy/data-client` ([0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)). The order's id, “9007199254740993”, is 2^53+1, which a JavaScript number reads back as …992, and its amount, “99999999999999.9999”, is the largest `numeric(18,4)` holds. Both panes show both digit for digit, because exact values travel as strings ([0008](./docs/decisions/0008-exact-values-travel-as-strings.md)).*
 
-Every picture in this README is taken by `pnpm pictures` from the built pages and the real data server, and the browser job fails when one of them shows text the page no longer shows ([how, and what nothing checks](./docs/images/README.md)).
+Every picture in this README is taken by `pnpm pictures` from the built pages and the real data server, and the pictures job fails when one of them shows text the page no longer shows ([how, and what nothing checks](./docs/images/README.md)).
 
 <!-- end generated -->
 
@@ -121,9 +121,15 @@ is not licensed for production.
   of overwriting
   ([0015](./docs/decisions/0015-a-record-operation-is-one-guarded-statement.md));
   a save whose answer was lost says it may have been saved, and the page
-  sends nothing again; what Chromium sends again on its own is answered, not
-  applied, within one server process
+  sends nothing again
   ([0031](./docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
+  Over HTTP/1.1, when a connection the browser reused closes after the server
+  read a save and before any byte of an answer, Chromium and Firefox send it
+  again on their own, and one server process answers that second sending
+  with the first one's answer instead of applying it; WebKit on Linux sends
+  every save on a new connection and never sends one twice, so its page says
+  the save may have been saved
+  ([0058](./docs/decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
 - **An instant or a time the person may read and did not change is never
   written back**
   ([0040](./docs/decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).
@@ -360,7 +366,8 @@ connection registry over snapshots captured from the shared fixture, as every
 account `apps/studio/scripts/capture-snapshots.mjs` captures — behind a fake
 `fetch`, so a change to a response shape fails the studio's tests.
 `pnpm test:browser` walks the whole journey in Chromium against the same
-server. After a change to the fixture, with Docker running:
+server, and with `FORMANCY_BROWSERS=all` in Firefox and WebKit too, as CI's
+legs do. After a change to the fixture, with Docker running:
 
 ```bash
 pnpm build
@@ -499,10 +506,11 @@ guide's section 5 uses.
 
 Its suites run the real server against PostgreSQL and SQL Server through the
 real drivers, with literal tokens and a `fetch` that goes through
-`app.inject`. `pnpm test:browser` measures the page in Chromium against the
-real server on PostgreSQL, which needs Docker: the workspace in every layout
-down to 320 pixels, the grids' keyboard and colours, the record's journey,
-and a delete's confirmations and answers.
+`app.inject`. `pnpm test:browser` measures the page in Chromium, and with
+`FORMANCY_BROWSERS=all` in Firefox and WebKit too, as CI's legs do, against
+the real server on PostgreSQL, which needs Docker: the workspace in every
+layout down to 320 pixels, the grids' keyboard and colours, the record's
+journey, and a delete's confirmations and answers.
 
 ## Examples
 
@@ -531,14 +539,25 @@ renderers to the same fields by accessible name and the same error codes
 <!-- end generated -->
 
 What the suite cannot see, because jsdom performs no layout, a browser gate
-measures in Chromium: no sideways scroll down to 320 pixels, the keyboard path
-through the skip link into the first preview, and colour contrast and target
-size, clean and after a failed submit.
+measures, in CI in Chromium, Firefox and WebKit: no sideways scroll down to
+320 pixels, the keyboard path through the skip link into the first preview,
+and colour contrast and target size, clean and after a failed submit; and
+that every web font the page asks for had loaded by the end of each pass,
+or, in the one that refuses them, none had.
 
 ```bash
-pnpm --filter @formancy/data-examples exec playwright install chromium   # once per machine
-pnpm test:browser                                                        # builds the apps, then measures them
+pnpm --filter @formancy/data-examples exec playwright install --with-deps chromium firefox webkit   # once per machine; the system libraries need sudo
+pnpm test:browser                                       # builds the apps, then measures them in Chromium
+FORMANCY_BROWSERS=all pnpm test:browser                 # in Chromium, Firefox and WebKit, as CI does
 ```
+
+On a clean `ubuntu:24.04` container on 2026-10-13, `--with-deps webkit`
+installed 372 packages through apt in 81 s and the examples gate then passed
+in WebKit, with nothing else installed; Firefox's there was not measured.
+WebKit is refused
+off Linux: Playwright's WebKit on macOS and Windows is another port, with
+another network stack, so there `FORMANCY_BROWSERS=chromium,firefox` runs
+the other two.
 
 The snapshot is captured from a real PostgreSQL container, never written by
 hand. After a change to the fixture, with Docker running:
@@ -667,6 +686,8 @@ says what is granted, refused and logged).
 | Node, CI | 22 |  |
 | pnpm | 12.4.2, through corepack | `pnpm@12.4.2`, the root's `packageManager` |
 | Chromium | 153.0.8010.12, the chromium-headless-shell Playwright 1.63.0 pins (revision 1243) |  |
+| Firefox | 155.0, the firefox Playwright 1.63.0 pins (revision 1543) |  |
+| WebKit | 26.6, the webkit Playwright 1.63.0 pins (revision 2359) |  |
 | `jsdom` | 30.1.2 |  |
 | `react` | 19.3.0 |  |
 | `@angular/core` | 22.2.1 |  |
@@ -676,7 +697,7 @@ says what is granted, refused and logged).
 | `vitest` | 5.0.3 |  |
 | `testcontainers` | 12.2.0 |  |
 
-What a run actually answered — each server’s own version and image digest, every other image a test started, the Node and Chromium it launched — is in the report every CI run produces and every release attaches, signed.
+What a run actually answered — each server’s own version and image digest, every other image a test started, the Node and each browser it launched — is in the report every CI run produces and every release attaches, signed.
 
 <!-- end generated -->
 
@@ -713,7 +734,8 @@ which CI runs on every pull request and a release runs before it publishes:
 `pnpm build`, `pnpm typecheck`, `pnpm check:pkg`,
 `node scripts/verify-licenses.mjs` and `pnpm test:repo` in one job; each
 package's `test:coverage` in a job of its own; in jobs of their own
-`pnpm test:e2e:install`, `pnpm test:browser`, the server image, and
+`pnpm test:e2e:install`, `pnpm test:browser` once per browser,
+`pnpm test:pictures`, the server image, and
 `pnpm test:getting-started`, which runs the guide from a clean checkout with
 Node and Docker alone, with the runner's Compose and again with the oldest
 the guide names, and `pnpm test:cloudflare`, which holds the Cloudflare
@@ -728,13 +750,20 @@ from what every other job found, and fails the run on anything wrong in it
 `FORMANCY_BROWSERS` names, as a comma list or `all`, and each run leaves
 `test-results/browser-<browser>.json` for the report. Unset, a machine runs
 Chromium alone; CI runs one leg of the `browser` job per browser of
-[`scripts/browsers.mjs`](./scripts/browsers.mjs), the browsers
-[*What it is tested on*](#what-it-is-tested-on) names, and the report fails a
-run in which an app's gate left no results in one of them.
+[`scripts/browsers.mjs`](./scripts/browsers.mjs) — Chromium, Firefox and
+WebKit, the browsers [*What it is tested on*](#what-it-is-tested-on) names —
+with every check in every one, and the report fails a run in which an app's
+gate left no results in one of them, or made a check in one browser it did
+not make in another. Where the browsers differ — Firefox's Tab after a click,
+whether a lost save is sent again, what AG Grid takes WebKit for — the
+difference is a named fact in that file, held by the checks it names, and
+the report fails a run in which a gate did not make one of them in a browser
+([0058](./docs/decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
 
 The pictures in this README are taken by `pnpm pictures` from the built pages
-against the real data server, and each app's `pnpm test:browser` walks the
-same states and fails when a pictured element says something else
+against the real data server, and `pnpm test:pictures`, in Chromium, in a CI
+job of its own, walks the same states and fails when a pictured element says
+something else
 ([0038](./docs/decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 [`docs/images/README.md`](./docs/images/README.md) says what taking them
 needs, how to retake one, and what nothing checks.

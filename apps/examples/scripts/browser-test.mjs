@@ -14,7 +14,10 @@
 //     the next Tab reaches the first control of the first preview;
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules @formancy/conformance switches off in jsdom because they are
-//     measurements, run here where they can be measured.
+//     measurements, run here where they can be measured;
+//   - every web font the built page asks for had loaded by the end of each
+//     pass, and in the pass that refuses them, none had (0058): a state
+//     measured before a late family swapped in is not caught.
 //
 // Against the page `vite build` produces, served over HTTP -- not the dev
 // server, which is a different program with its own transforms. Asserted as
@@ -22,10 +25,11 @@
 // somebody updates when it goes red.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
-// scripts/browsers.mjs names through recordedPerBrowser: Chromium alone on a
-// machine unless FORMANCY_BROWSERS names more, each leg's browser in CI. A
-// browser comes from `pnpm --filter @formancy/data-examples exec playwright
-// install <browser>`, once per machine.
+// scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
+// and WebKit, each in a CI leg of its own; Chromium alone on a machine
+// unless FORMANCY_BROWSERS names more -- with every check in every browser.
+// A browser comes from installCommand() in scripts/browsers.mjs, once per
+// machine.
 
 import { createServer } from 'node:http'
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
@@ -33,6 +37,7 @@ import { createRequire } from 'node:module'
 import { dirname, extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
+import { afterEveryPass } from '../../../scripts/browser-gate.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -121,14 +126,12 @@ async function mounted(page) {
     if (seen === expected && expected > 0) break
     await page.waitForTimeout(100)
   }
-  // The page asks Google Fonts for its families. Measured either way -- a
-  // visitor whose network refuses them gets the fallback stack, and that page
-  // must fit too -- but said, so a run knows which page it measured.
-  const fonts = await page.evaluate(async () => {
-    await document.fonts.ready
-    return [...new Set([...document.fonts].filter((face) => face.status === 'loaded').map((face) => face.family.replaceAll('"', '')))].sort()
-  })
-  return { expected, seen, alerts: await page.getByRole('alert').count(), fonts }
+  // Whatever the mounted page has begun to load from Google Fonts, waited
+  // for before the first state is measured, as before 0058. It waits for no
+  // family a later state starts to use, and holds nothing: what a pass
+  // measured with is afterEveryPass's check, at its end.
+  await page.evaluate(() => document.fonts.ready)
+  return { expected, seen, alerts: await page.getByRole('alert').count() }
 }
 
 /**
@@ -280,7 +283,6 @@ async function run(gate, browser) {
       // The page is what is measured, so first that it is all there: a preview
       // whose renderer did not start would make every number below smaller.
       const previews = await mounted(page)
-      console.log(`  web fonts: ${previews.fonts.length === 0 ? 'none loaded, so the fallback stack is measured' : previews.fonts.join(', ')}`)
       check(
         'every form is previewed by both renderers',
         previews.seen === previews.expected && previews.expected > 0 && previews.alerts === 0
@@ -317,6 +319,8 @@ async function run(gate, browser) {
       sideways('after a failed submit', await measureWidth(page))
       audited('after a failed submit', await audit(page))
 
+      // Whether every web font had loaded by the end of the pass, or, where it refuses them, none had.
+      await afterEveryPass(gate, page, { dist, refused: refuseFonts })
       await page.close()
     }
 
