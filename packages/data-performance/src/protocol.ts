@@ -52,16 +52,20 @@ export const PUBLISH_PROTOCOL: Protocol = {
   // window's over ten idle minutes on the quiet machine,
   // `pnpm --filter @formancy/data-performance run calibrate`. Without it a
   // publish run refuses to start.
-  // Measured 2026-10-10, 16:30:49 to 16:40:49 UTC, on the Docker Sandbox VM
-  // (Linux x86_64, 20 vCPUs, about 15 GiB) on the user's Windows 11
-  // workstation, with no container running and nothing else at work:
-  //   { "intervalMs": 500, "probes": 1199, "medianMs": 9.6044,
+  // Measured 2026-10-15, 18:00:02 to 18:10:02 UTC, in WSL 2 (Ubuntu, kernel
+  // 5.15.167.4-microsoft-standard-WSL2, 20 vCPUs, about 15 GiB) on the user's
+  // Windows 11 workstation, with no container running and nothing else at
+  // work in the VM:
+  //   { "intervalMs": 500, "probes": 1199, "medianMs": 9.423886,
   //     "baselineMs": 10000, "baselineWindows": 59, "gapMs": 2000,
-  //     "gapWindows": 299, "worstRatio": 1.6057747103146964 }
-  // The slowest idle gap ran 1.606 times the fastest baseline window with
-  // nobody else on the machine; the tolerance is that, rounded up to the
-  // hundredth, so it clears what idle did on its own and nothing more.
-  calibration: { intervalMs: 500, gapMs: 2000, tolerance: 1.61 },
+  //     "gapWindows": 299, "worstRatio": 2.406945453318162 }
+  // The slowest idle gap ran 2.407 times the fastest baseline window with
+  // nobody else in the VM; the tolerance is that, rounded up to the
+  // hundredth, so it clears what idle did on its own and nothing more. It is
+  // wider than the Docker Sandbox VM's 1.61 (2026-10-10, worst ratio 1.606):
+  // WSL shares the Windows host's scheduler, and what the host does between
+  // probes reaches the VM, so a block is re-run only past a larger stray.
+  calibration: { intervalMs: 500, gapMs: 2000, tolerance: 2.41 },
   // One rationale, a choice: nothing else holds a whole CPU.
   quiet: { enforced: true, loadAverageBelow: 1, busyVcpusAtMost: 1, windowSeconds: 10, giveUpSeconds: 180 },
   // Longer than a round; a round that outlived it ends with a 401 naming the scenario.
