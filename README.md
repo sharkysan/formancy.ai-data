@@ -21,15 +21,16 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 
 <!-- end generated -->
 
-> **Status: in development, nothing released.** Each line under *What it does*
+> **Status: 0.1.0, the first release.** Each line under *What it does*
 > links the decision record whose **Verified by** names what fails when the
-> line stops being true. Not yet: a release, a delete figure on the
-> performance page, figures measured with the lookup limits, a host
-> page that draws a field an update may not write as read-only
+> line stops being true. Not yet: a figure on the performance page for a
+> page of records, the menu of forms or a delete, a host page that draws a
+> field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
 > a host page on another origin run in a browser, a run through a real
 > Cloudflare tunnel, and a licence a lawyer has reviewed.
-> [`CHANGELOG.md`](./CHANGELOG.md) says what each step found.
+> [`CHANGELOG.md`](./CHANGELOG.md) says what the release contains and what
+> each step before it found.
 
 ## Try it
 

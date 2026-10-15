@@ -877,7 +877,7 @@
       ]
     },
     "0035": {
-      "reviewed": "sha256:b5c30f839492f8c939b00dcee73bbbc2e44dbd120b9c57014ca0c7b1d8410528",
+      "reviewed": "sha256:ad22fbb14977f3147fdf5204d36a4fc81ac8096b3906be217bec988ff3c7ae72",
       "limitations": [
         {
           "area": "databases",
@@ -1381,7 +1381,7 @@
       ]
     },
     "0048": {
-      "reviewed": "sha256:22b4a9504504d044b62b76d9bebd0f0753d8dab0ee2ba2dfc681ddae393c8647",
+      "reviewed": "sha256:96b632417e8aa6e4452f98afa89a8510a175a570bded4cef3cd9e4a6b4a74537",
       "limitations": [
         {
           "area": "licence",
@@ -2005,6 +2005,15 @@
           "area": "operations",
           "says": "A change to the default lookup deadline alone does not mark the published performance figures stale: the file that holds it is left out of the measured product, because a measurement runs the server with the longest deadline a timer holds; the default is held instead to equal what the committed figures derive.",
           "heldBy": "packages/data-performance/src/deadline.test.ts"
+        }
+      ]
+    },
+    "0064": {
+      "reviewed": "sha256:79f3e9ef75ae138b60c09328fc8fc62ff9ffec41943c8ec2a4de821bc44cffa8",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The release notes of 0.1.0 are a summary written by hand: why each change before it was made is in CHANGELOG.md under Development before 0.1.0, not on the release page, and nothing checks that the summary says what those entries say."
         }
       ]
     }

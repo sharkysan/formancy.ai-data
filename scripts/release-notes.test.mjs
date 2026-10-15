@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
-import { BODY_LIMIT, bodySection, releaseBody, releaseNotes } from './release-notes.mjs'
+import { BODY_LIMIT, bodySection, hasSection, releaseBody, releaseNotes } from './release-notes.mjs'
+import { renderSummary } from './release-report/render.mjs'
+import { buildReport } from './release-report/report.mjs'
+import { greenCiRun } from './release-report/synthetic-run.mjs'
 
 const changelog = ['# Changelog', '', '## Unreleased', '', 'pending', '', '## 0.1.0 — 2026-11-01', '', 'first', '', '## [0.0.1] — 2026-10-08', '', 'zero'].join('\n')
 
@@ -56,5 +60,27 @@ describe('bodySection', () => {
   // A tag's notes are the tag's version's, whatever else the changelog holds.
   test('releases a tag with its version’s section', () => {
     expect(bodySection(changelog, { release: 'v0.0.1', version: '0.1.0' })).toBe('0.0.1')
+  })
+})
+
+describe('the changelog this repository keeps', () => {
+  // A section grows by a long paragraph a change. Unreleased had grown to
+  // 178,500 characters by the first release, and renamed to 0.1.0 as
+  // RELEASING.md said, it was a body GitHub refuses -- found by the release
+  // itself, the last step to look (0064). Here it fails the pull request
+  // that grows a section past the limit: data-core's version's section,
+  // when the changelog has one, and Unreleased, which the next release's
+  // section is made from. The summary is a green run's made by hand, shorter
+  // than a real run's by the limitations only a run knows, so a section
+  // within that difference of the limit is left to the rehearsal.
+  test('gives each body a release could be cut with fewer characters than GitHub accepts', () => {
+    const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8')
+    const { version } = JSON.parse(readFileSync(new URL('../packages/data-core/package.json', import.meta.url), 'utf8'))
+    const link = `https://github.com/sharkysan/formancy.ai-data/releases/download/v${version}/formancy-data-v${version}-release-report.md`
+    const sections = [...(hasSection(changelog, version) ? [version] : []), 'Unreleased']
+    for (const section of sections) {
+      const summary = renderSummary(buildReport(greenCiRun()), { section, link })
+      expect(() => releaseBody(changelog, section, summary), section).not.toThrow()
+    }
   })
 })
