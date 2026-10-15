@@ -821,7 +821,7 @@
       ]
     },
     "0034": {
-      "reviewed": "sha256:c057dfb0520244c00169f197aa4820ec9ff402177eae1568f6fbf89576b7b091",
+      "reviewed": "sha256:e3d5004ac60674b75f3e6a505798ccf3324e59ebaba4fbfe7df134775f98da02",
       "limitations": [
         {
           "area": "databases",
@@ -1891,7 +1891,7 @@
       ]
     },
     "0061": {
-      "reviewed": "sha256:f280764235edd095251f2098e0fd92b005088f5fd39844c5fd49f1e46c47ac21",
+      "reviewed": "sha256:2d3e2bbc4a139ffdf70dd7c2e087073537e3cfe006f959702c22cea62cc058f7",
       "limitations": [
         {
           "area": "server",
@@ -1995,6 +1995,16 @@
           "area": "server",
           "says": "Each import discovers the target database once, and a database that cannot be reached refuses it.",
           "heldBy": "packages/data-server/src/routes/admin-promotion.test.ts"
+        }
+      ]
+    },
+    "0063": {
+      "reviewed": "sha256:a1648dbdc8367ab38119bcb878a487987609f55630c60ee5e357c598d9924590",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "A change to the default lookup deadline alone does not mark the published performance figures stale: the file that holds it is left out of the measured product, because a measurement runs the server with the longest deadline a timer holds; the default is held instead to equal what the committed figures derive.",
+          "heldBy": "packages/data-performance/src/deadline.test.ts"
         }
       ]
     }
