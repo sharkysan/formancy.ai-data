@@ -9,6 +9,12 @@ export interface PostgresConnectOptions {
   password: string
   /** TLS, and whether the server's certificate is checked. The composition root decides. */
   tls: { enabled: boolean; rejectUnauthorized: boolean }
+  /**
+   * The client's `application_name`, so a DBA tells one client from another
+   * in pg_stat_activity: the server names its lookups' client (0061).
+   * Absent, the driver's own default stands.
+   */
+  applicationName?: string
 }
 
 /**
@@ -31,5 +37,6 @@ export function connectPostgres(options: PostgresConnectOptions): Sql {
     // The adapters read every value as text converted in SQL (0016); notices
     // are the server talking to a console nobody reads.
     onnotice: () => {},
+    ...(options.applicationName === undefined ? {} : { connection: { application_name: options.applicationName } }),
   })
 }

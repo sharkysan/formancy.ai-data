@@ -549,6 +549,35 @@ jobs:
             exit 1
           fi
 
+      # FORMANCY_DATA_LOOKUP_DEADLINE_MS is a public setting (0061).
+      # lookup-deadline.test.ts holds how it is parsed, and the server's
+      # lookup-limits suite what a deadline does; only the running image shows
+      # main.ts reads it: a value that is not a whole number of milliseconds
+      # stops a server that is otherwise configured, with the sentence naming
+      # the variable, rather than starting with the default. Detached and
+      # waited for, as the rate limit's step is, so a server that ignored the
+      # setting fails this step instead of holding it until the timeout.
+      - name: A FORMANCY_DATA_LOOKUP_DEADLINE_MS that is not a number of milliseconds stops the server
+        run: |
+          docker run -d --name data-server-deadline             -e FORMANCY_DATA_ISSUER=https://host.example             -e FORMANCY_DATA_AUDIENCE=formancy-data             -e FORMANCY_DATA_IDENTITY_SECRET=env:HOST_SECRET             -e HOST_SECRET=a-shared-secret-of-at-least-thirty-two-bytes             -e FORMANCY_DATA_LOOKUP_DEADLINE_MS=abc formancy/data-server:ci
+          for _ in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Running}}' data-server-deadline)" = false ] && break
+            sleep 1
+          done
+          running=$(docker inspect -f '{{.State.Running}}' data-server-deadline)
+          code=$(docker inspect -f '{{.State.ExitCode}}' data-server-deadline)
+          output=$(docker logs data-server-deadline 2>&1)
+          docker rm -f data-server-deadline
+          echo "$output"
+          if [ "$running" != false ] || [ "$code" = 0 ]; then
+            echo "::error::With FORMANCY_DATA_LOOKUP_DEADLINE_MS=abc the server was still running after 30 s, or exited 0"
+            exit 1
+          fi
+          if ! echo "$output" | grep -q 'FORMANCY_DATA_LOOKUP_DEADLINE_MS is a whole number of milliseconds'; then
+            echo "::error::With FORMANCY_DATA_LOOKUP_DEADLINE_MS=abc the server stopped without naming the setting"
+            exit 1
+          fi
+
       # A path a proxy could read differently from the router is refused
       # before any route's work (0037): cloudflared 2026.10.0 was measured
       # sending /v1/forms/a/versions/..%2F..%2Fb to a door meant for the

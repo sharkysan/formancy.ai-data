@@ -15,6 +15,8 @@ export interface ServedConfiguration {
   auditKey: string | undefined
   /** `FORMANCY_DATA_CORS_ORIGINS`, parsed: the origins the runtime plane answers (0060); the administrator's answers none. */
   origins: readonly string[]
+  /** `FORMANCY_DATA_LOOKUP_DEADLINE_MS`, parsed: how long a lookup statement may run (0061). */
+  lookupDeadlineMs: number
   /** The server's log, looked up when an event fires: the server does not exist yet while its options are built. */
   log: () => FastifyBaseLogger
 }
@@ -30,10 +32,10 @@ export interface ServedConfiguration {
  * documents say it is.
  */
 export function servedPlanes(found: ServedConfiguration): Pick<DataServerOptions, 'admin' | 'runtime'> {
-  const { registry, store, adminRoles, auditKey, origins } = found
+  const { registry, store, adminRoles, auditKey, origins, lookupDeadlineMs } = found
   const sink: AuditSink = (event) => logAuditSink(found.log())(event)
   return {
-    runtime: { registry, store, origins, audit: { sink, ...(auditKey === undefined ? {} : { key: auditKey }) } },
+    runtime: { registry, store, origins, lookupDeadlineMs, audit: { sink, ...(auditKey === undefined ? {} : { key: auditKey }) } },
     ...(adminRoles.length === 0 ? {} : { admin: { registry, store, adminRoles, audit: { sink } } }),
   }
 }

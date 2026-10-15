@@ -1,6 +1,6 @@
 # 0034 — Performance is measured through the shipped server against a sized lookup table, published with what it ran on, and held without a clock by what each operation reads and how often it asks the database
 
-- **Status:** accepted
+- **Status:** accepted; narrowed by [0061](0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md): "no remedy ships" no longer holds for cancellation or a deadline -- an abandoned lookup is stopped in the database and every lookup statement has a deadline -- while no trigram index, prefix mode or minimum length ships and every search still reads every admitted row; extended by [0061](0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md): the default lookup deadline is derived from the published figures, and the catalogue names the runtime operation each scenario addresses
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**

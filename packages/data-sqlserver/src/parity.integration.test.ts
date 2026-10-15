@@ -29,6 +29,9 @@ let german: mssql.ConnectionPool
 let parity: MetadataSnapshot
 let local: MetadataSnapshot
 
+/** A signal nobody aborts: every lookup here completes, and answers exactly what it answered before the port carried a signal (0061). */
+const NOT_ABORTED = new AbortController().signal
+
 const TENANT_ITEM: ObjectRef = { schema: 'parity', name: 'tenant_item' }
 const ITEM_USE: ObjectRef = { schema: 'parity', name: 'item_use' }
 const DISPLAY_KINDS: ObjectRef = { schema: 'parity', name: 'display_kinds' }
@@ -181,8 +184,8 @@ describe('FILTER_PARITY: a row filter compares the canonical value exactly', () 
         const forged = { kind: 'restricted', equal: [{ column: parityCase.column, type: columnOf(parity, TENANT_ITEM, parityCase.column).type, value: parityCase.value }] } as unknown as RowFilters
         const lookups = createSqlServerLookups(owner)
         const config = lookupConfig(parity, ITEM_USE, 'fk_item_use_item', ['label'])
-        await expect(lookups.search(config, PAGE, forged)).rejects.toThrow(/not spelled as its column holds it/)
-        await expect(lookups.resolve(config, NAMED.map(token), forged)).rejects.toThrow(/not spelled as its column holds it/)
+        await expect(lookups.search(config, PAGE, forged, NOT_ABORTED)).rejects.toThrow(/not spelled as its column holds it/)
+        await expect(lookups.resolve(config, NAMED.map(token), forged, NOT_ABORTED)).rejects.toThrow(/not spelled as its column holds it/)
         const key = [parityValue(TENANT_ITEM, 'tenant_code', 'acme'), parityValue(TENANT_ITEM, 'item_no', '1')]
         await expect(defined(createSqlServerRecords(owner)).read({ target: versioned(parity, TENANT_ITEM), key, columns: [], filters: forged, through: [] })).rejects.toThrow(/not spelled as its column holds it/)
         return
@@ -194,9 +197,9 @@ describe('FILTER_PARITY: a row filter compares the canonical value exactly', () 
 
       const lookups = createSqlServerLookups(owner)
       const config = lookupConfig(parity, ITEM_USE, 'fk_item_use_item', ['label'])
-      expect((await lookups.search(config, PAGE, filters)).rows.map((row) => row.token).sort()).toEqual(expected)
-      expect((await lookups.resolve(config, named, filters)).map((row) => row.token).sort()).toEqual(expected)
-      const rejected = await lookups.rejects(config, named, filters)
+      expect((await lookups.search(config, PAGE, filters, NOT_ABORTED)).rows.map((row) => row.token).sort()).toEqual(expected)
+      expect((await lookups.resolve(config, named, filters, NOT_ABORTED)).map((row) => row.token).sort()).toEqual(expected)
+      const rejected = await lookups.rejects(config, named, filters, NOT_ABORTED)
       expect(named.filter((candidate) => !rejected.includes(candidate)).sort()).toEqual(expected)
 
       // A list of the table under the same filter lists exactly those rows (0044).
@@ -243,7 +246,7 @@ describe('FILTER_PARITY: a row filter compares the canonical value exactly', () 
   test('a tenant filter seeks pk_tenant_item', async () => {
     await owner.request().batch('dbcc freeproccache with no_infomsgs')
     const lookups = createSqlServerLookups(owner)
-    await lookups.search(lookupConfig(parity, ITEM_USE, 'fk_item_use_item', ['label']), PAGE, tenantItemFilter('tenant_code', 'acme'))
+    await lookups.search(lookupConfig(parity, ITEM_USE, 'fk_item_use_item', ['label']), PAGE, tenantItemFilter('tenant_code', 'acme'), NOT_ABORTED)
     const plans = await owner.request().query<{ plan: string }>(`
       select [p].[query_plan] as [plan] from sys.dm_exec_query_stats as [s]
       cross apply sys.dm_exec_sql_text([s].[sql_handle]) as [t]
@@ -284,8 +287,8 @@ describe('DISPLAY_PARITY: a label is spelled from the canonical value', () => {
       const resolved: Record<string, string | undefined> = {}
       for (const name of Object.keys(DISPLAY_PARITY)) {
         const config = lookupConfig(parity, DISPLAY_USE, 'fk_display_use_kinds', [name])
-        labels[name] = (await lookups.search(config, PAGE, EVERY_ROW)).rows[0]?.label
-        resolved[name] = (await lookups.resolve(config, ['k1:1'], EVERY_ROW))[0]?.label
+        labels[name] = (await lookups.search(config, PAGE, EVERY_ROW, NOT_ABORTED)).rows[0]?.label
+        resolved[name] = (await lookups.resolve(config, ['k1:1'], EVERY_ROW, NOT_ABORTED))[0]?.label
       }
       expect(labels).toEqual(DISPLAY_PARITY)
       expect(resolved).toEqual(DISPLAY_PARITY)
@@ -333,10 +336,10 @@ describe('a fixed-length key', () => {
   test('is offered, resolved and a member under the token PostgreSQL gives it', async () => {
     const lookups = createSqlServerLookups(owner)
     const config = lookupConfig(local, CODE_USE, 'fk_code_use_code', ['label'])
-    expect(await lookups.search(config, PAGE, EVERY_ROW)).toEqual({ rows: [{ token: 'k1:AB', label: 'Short' }], hasMore: false, omitted: 0 })
-    expect(await lookups.resolve(config, ['k1:AB'], EVERY_ROW)).toEqual([{ token: 'k1:AB', label: 'Short' }])
+    expect(await lookups.search(config, PAGE, EVERY_ROW, NOT_ABORTED)).toEqual({ rows: [{ token: 'k1:AB', label: 'Short' }], hasMore: false, omitted: 0 })
+    expect(await lookups.resolve(config, ['k1:AB'], EVERY_ROW, NOT_ABORTED)).toEqual([{ token: 'k1:AB', label: 'Short' }])
     const padded = token(['AB   '])
-    expect(await lookups.rejects(config, ['k1:AB', padded], EVERY_ROW)).toEqual([padded])
+    expect(await lookups.rejects(config, ['k1:AB', padded], EVERY_ROW, NOT_ABORTED)).toEqual([padded])
   })
 
   // The write check compares what the column stored with what was sent,

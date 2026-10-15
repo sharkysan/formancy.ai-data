@@ -26,7 +26,9 @@ snapshot.objects // tables and views, with columns, keys, foreign keys, checks, 
 snapshot.gaps // what this release could not describe: a foreign table
 snapshot.fingerprint // changes when the structure, the account's privileges, or the account changes
 
-const lookups = createPostgresLookups(sql) // LookupAdapter: search, resolve, rejects
+// Lookups on a client of their own, which no record statement uses (0061, below).
+const lookupSql = connectPostgres({ host, port, database, user, password, tls: { enabled: true, rejectUnauthorized: true }, applicationName: 'formancy-data lookups' })
+const lookups = createPostgresLookups(lookupSql) // LookupAdapter: search, resolve, rejects, each with the caller's signal
 const records = createPostgresRecords(sql) // RecordAdapter: describe, read, list, insert, update, delete
 await adapter.close()
 ```
@@ -342,6 +344,78 @@ server's description of the parameters, then binds and executes. The
 measurement's counting pass counts it through a TCP hop on every run, and
 [`docs/performance.md`](../../docs/performance.md) has the figures.
 
+### When a lookup is abandoned, or its deadline passes
+
+[0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)
+has the decision; the server aborts a lookup's signal when the browser
+abandons the request or the lookup deadline passes. What this adapter does
+with it, in `lookups/cancel.ts`:
+
+- **The statement is stopped in the database.** The method rejects with the
+  signal's own reason at once, never translated, and postgres.js sends
+  PostgreSQL a cancel request for the statement, on a connection of its own.
+  An already-aborted signal sends nothing. Nothing is added to a lookup that
+  completes: no transaction, no `SET`, no `statement_timeout`, so it is still
+  two round trips and answers exactly as before.
+- **Only a statement the driver has sent is cancelled.** postgres.js 3.4.9
+  loses a pooled connection to a query cancelled before it was sent -- in the
+  microtask after the query is first awaited, or while the connection it
+  will run on is being opened: the next lookup on a pool of one never
+  answered. Nothing public tells a query waiting in the pool's queue, which
+  would be safe to cancel, from one a connection is being opened for. So the
+  adapter cancels once the driver has sent the statement, which postgres.js
+  marks only by setting the query's `state`; this reads that property and
+  watches it on a query not yet sent. A lookup abandoned while it waited for
+  a connection is therefore still sent, and then stopped.
+- **And cancelled again once its execute is sent.** postgres.js has
+  PostgreSQL parse and describe every lookup before it sends its parameters
+  and execute, and in between the backend waits for the client: PostgreSQL
+  drops a cancel request that arrives then, and the scan starts after it and
+  runs to its end. A cancel sent with the statement stops one that waits in
+  its parse, for a lock; over a network it can arrive in that wait instead
+  (10 of 10 with answers held 5 or 20 ms, 2026-10-15 review). So a statement
+  still unsettled once its execute is written is sent a second cancel
+  request, which postgres.js marks only by clearing the query's
+  `describeFirst`. The cost: when the first cancel also stopped the
+  execute, the second can arrive after it and stop the next lookup on that
+  backend, which then runs once more (below).
+- **A cancel request that fails stops nothing, and is not an error.**
+  postgres.js reports a cancel's own connection failing -- a database that
+  stopped accepting while its open sessions still answer -- on a promise
+  `query.cancel()` never returns, and Node ends the process on it. The
+  adapter calls the driver's canceller itself and handles that promise; the
+  statement then finishes as it would have.
+- **A client of the lookups' own.** PostgreSQL stops whatever a backend runs
+  when a cancel arrives, so a cancel that arrives after its own statement
+  finished stops the next statement on that backend. `createPostgresLookups`
+  must be given a client no record statement uses, which the server opens with
+  `connectPostgres({ …, applicationName })` so the two tell apart in
+  `pg_stat_activity`. There a late cancel can stop only another lookup, which
+  fails with 57014 while its own signal has not aborted and is run once more;
+  a second such failure is thrown. That is not 0015's retry: a lookup is a
+  read, the same statement under the same filters. An operator's role-level
+  `statement_timeout` ends in 57014 too, so a lookup it stops runs twice.
+- **The connection comes back when the driver settles the statement,** as for
+  every other, so a cancelled statement still on its way out holds it.
+
+Measured on 2026-10-14 by a throwaway copy of `lookups-limits.integration.test.ts`
+on a Windows 11 workstation (Intel i9-10900K, Docker 28.3.3, Node 24.21.0)
+against `postgres:17-alpine` (17.11) through the fixtures' TCP hop, with a
+search, a resolve or a rejects waiting on a table lock, n=30: the method
+rejected 0.15 / 0.20 / 0.65 ms (min / median / max) after the abort, and
+`pg_locks` stopped counting the statement 4.00 / 4.54 / 5.67 ms after it,
+read by polling from a second connection whose own round trip took a median
+of 0.60 ms. A deadline of 200 ms (`AbortSignal.timeout`, n=10) rejected after
+203.6 to 215.6 ms and the statement was gone by 208.2 to 219.2 ms. One
+machine's figures, which say how the mechanism behaves, not what a
+deployment's lookups cost.
+
+What postgres.js does when a connection goes, characterised in the same
+suite because a lookup meets it: a backend an operator ends with
+`pg_terminate_backend` fails its running statement as CONNECTION_CLOSED, and
+the driver gives the FATAL it kept to the first statement on the connection
+it opens next, unsent; the one after that answers.
+
 ### An answer lost after a write
 
 [0031](../../docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)
@@ -568,6 +642,20 @@ The suites start `postgres:17-alpine` unless a test names another image, through
 - `lookups-sized.integration.test.ts` — what a lookup reads and sends on the
   sized customers, in containers of its own: the plan of each statement the
   adapter sent, serially and under the defaults (0034).
+- `lookups-limits.integration.test.ts` — a lookup whose signal aborts (0061),
+  through the TCP hop, each statement waiting behind a lock `blockTable`
+  holds so its end is read from `pg_locks`: a search, a resolve and a rejects
+  stopped before the lock is released, the next lookup on the same backend
+  answering with no setting left behind; a deadline rejecting with its own
+  TimeoutError; an aborted signal sending nothing; an abort in the same tick,
+  while the connection is being opened and while queued, each leaving a pool
+  of one that answers; with every answer held 100 ms, an abort while queued,
+  in the same tick and during the first round trip each stopping a 30 s
+  sleep once its execute is sent; a cancel request the hop refuses, which no
+  unhandled rejection follows; an already-aborted resolve or rejects with no
+  key still rejecting; a cancel held at the hop until it lands on the next
+  lookup, which runs once more; a connection cut and a backend terminated
+  under a lookup; and `connectPostgres`'s `applicationName`.
 - `parity.integration.test.ts` — the cases 0028 holds both engines to, from
   `@formancy/data-fixtures`, over its `parity` schema: every row filter in a
   lookup's page, resolve and membership, a read and an update; the filter

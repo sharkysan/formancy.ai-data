@@ -1,9 +1,9 @@
 import { lookupKeys, lookupPage, rejectedTokens, resolvedRows, rowFilterTerms } from '@formancy/data-core'
 import type { FoundRow, LookupAdapter, LookupConfig } from '@formancy/data-core'
 import type { Sql } from 'postgres'
-import { run } from '../sql/statement.js'
 import type { TextRow } from '../sql/statement.js'
 import { decodeCanonical } from '../sql/values.js'
+import { runLookup, stopIfAborted } from './cancel.js'
 import { keysStatement, searchStatement } from './sql.js'
 
 /**
@@ -37,30 +37,42 @@ function foundRows(config: LookupConfig, rows: readonly TextRow[]): FoundRow[] {
  * A database error is thrown, not answered: formancy refuses a submission
  * whose membership check throws (formancy.ai 0022), and a search that throws
  * shows the person an error rather than an empty list.
+ *
+ * Each statement stops when the caller's signal aborts (0061, `cancel.ts`):
+ * the method rejects with the signal's reason at once, and PostgreSQL is sent
+ * a cancel request for the statement. So `sql` must be a client no record
+ * statement uses. PostgreSQL stops whatever a backend runs when a cancel
+ * arrives, and one that arrives after its own statement finished stops the
+ * next statement there: on the lookups' own client that is another lookup,
+ * which runs once more, and never a record read or write, which 0015 never
+ * runs twice. The server opens that client in its `drivers.ts`.
  */
 export function createPostgresLookups(sql: Sql): LookupAdapter {
   return {
-    async search(config, query, filters) {
+    async search(config, query, filters, signal) {
+      stopIfAborted(signal)
       const statement = searchStatement(config, query, rowFilterTerms(filters))
-      const result = await run(sql, statement.text, statement.params)
+      const result = await runLookup(sql, statement, signal)
       return lookupPage(config, foundRows(config, result.rows), query.limit)
     },
 
-    async resolve(config, tokens, filters) {
+    async resolve(config, tokens, filters, signal) {
+      stopIfAborted(signal)
       const terms = rowFilterTerms(filters)
       const keys = lookupKeys(config, tokens)
       if (keys.length === 0) return []
       const statement = keysStatement(config, keys, terms, true)
-      const result = await run(sql, statement.text, statement.params)
+      const result = await runLookup(sql, statement, signal)
       return resolvedRows(config, tokens, foundRows(config, result.rows))
     },
 
-    async rejects(config, tokens, filters) {
+    async rejects(config, tokens, filters, signal) {
+      stopIfAborted(signal)
       const terms = rowFilterTerms(filters)
       const keys = lookupKeys(config, tokens)
       if (keys.length === 0) return rejectedTokens(tokens, [])
       const statement = keysStatement(config, keys, terms, false)
-      const result = await run(sql, statement.text, statement.params)
+      const result = await runLookup(sql, statement, signal)
       return rejectedTokens(
         tokens,
         foundRows(config, result.rows).map((row) => row.key),

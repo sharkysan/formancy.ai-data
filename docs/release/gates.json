@@ -64,7 +64,14 @@
         { "file": "packages/data-sqlserver/src/delete.integration.test.ts" },
         { "file": "packages/data-server/src/routes/runtime-deletes.test.ts" },
         { "file": "packages/data-postgres/src/cascade.integration.test.ts" },
-        { "file": "packages/data-sqlserver/src/cascade.integration.test.ts" }
+        { "file": "packages/data-sqlserver/src/cascade.integration.test.ts" },
+        { "file": "packages/data-server/src/routes/runtime-lookup-limits.integration.test.ts" },
+        { "file": "packages/data-server/src/routes/runtime-lookups.test.ts" },
+        { "file": "packages/data-server/src/routes/abandoned.test.ts" },
+        { "file": "packages/data-server/src/lookup-deadline.test.ts" },
+        { "file": "packages/data-postgres/src/lookups-limits.integration.test.ts" },
+        { "file": "packages/data-sqlserver/src/lookups-limits.integration.test.ts" },
+        { "file": "packages/data-performance/src/deadline.test.ts" }
       ]
     },
     {

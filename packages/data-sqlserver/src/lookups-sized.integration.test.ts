@@ -45,6 +45,9 @@ let owner: ConnectionPool
 let writer: ConnectionPool
 let config: LookupConfig
 
+/** A signal nobody aborts: every lookup here completes, and answers exactly what it answered before the port carried a signal (0061). */
+const NOT_ABORTED = new AbortController().signal
+
 /** The Extended Events session the plans come from: the writer's statements only. */
 const SESSION = 'formancy_sized_plans'
 
@@ -209,7 +212,7 @@ describe.each([
   // tenant: a scan that a residual predicate trims to the same rows would
   // still read the table.
   test.each(SEARCHES)('%s answers the generator\'s page, returns at most 51 and reads exactly the rows the filter admits', async (name, search) => {
-    const cost = await costOf(() => createSqlServerLookups(writer).search(config, { search, offset: 0, limit: 50 }, filters))
+    const cost = await costOf(() => createSqlServerLookups(writer).search(config, { search, offset: 0, limit: 50 }, filters, NOT_ABORTED))
     console.log(`${form}, ${name}: DOP ${cost.dop}, ${cost.access.join(', ')}, read ${String(cost.read)}, returned ${String(cost.returned)}`)
     expect(cost.answer).toEqual(expectedPage(search))
     expect(cost.returned).toBeLessThanOrEqual(51)
@@ -225,7 +228,7 @@ describe('resolving and checking keys on the sized customers', () => {
   // tenant's 100,001 rows to find a hundred, or one.
   test.each([100, 1])('resolving %i keys reads at most one row per key, by seeks', async (n) => {
     const keys = sizedResolveKeys(n)
-    const cost = await costOf(() => createSqlServerLookups(writer).resolve(config, keys.map((key) => tokenOf(key.tenantId, key.customerNo)), TENANT_1))
+    const cost = await costOf(() => createSqlServerLookups(writer).resolve(config, keys.map((key) => tokenOf(key.tenantId, key.customerNo)), TENANT_1, NOT_ABORTED))
     expect(cost.answer).toHaveLength(n)
     expect(cost.read).toBeGreaterThan(0)
     expect(cost.read).toBeLessThanOrEqual(n * PER_KEY)
@@ -236,7 +239,7 @@ describe('resolving and checking keys on the sized customers', () => {
   test('checking one key reads at most one row', async () => {
     const [key] = sizedResolveKeys(1)
     if (key === undefined) throw new Error('no key')
-    const cost = await costOf(() => createSqlServerLookups(writer).rejects(config, [tokenOf(key.tenantId, key.customerNo)], TENANT_1))
+    const cost = await costOf(() => createSqlServerLookups(writer).rejects(config, [tokenOf(key.tenantId, key.customerNo)], TENANT_1, NOT_ABORTED))
     expect(cost.answer).toEqual([])
     expect(cost.read).toBe(PER_KEY)
   })

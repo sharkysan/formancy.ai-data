@@ -177,6 +177,25 @@ dropped the key from the end of its order would show on both engines.
   docker-proxy turn it off on theirs: left on, a SQL Server answer of
   several packets waited on a delayed acknowledgement through the hop that
   it never waits for directly, and the hop measured itself.
+  Since 0061 it can also hold and refuse new connections, for PostgreSQL's
+  cancel request, which postgres.js sends on a connection of its own.
+  `holdNewConnections()` holds what every connection opened after the call
+  sends until `release()`, then forwards it in order, a close behind it, so
+  a late cancel lands when a suite chooses; held bytes are counted when they
+  are released. `refuseNewConnections()` resets every connection opened
+  after the call before it reaches the database, until `release()`, as a
+  database whose listener went away while its open sessions still answer;
+  `refused()` counts them. Connections opened before either call flow as
+  before.
+
+- `blockTable(database, table)` (0061) holds a table behind its owner's
+  lock, on a connection of its own -- access exclusive mode in a
+  transaction on PostgreSQL, an exclusive table lock held to the end on SQL
+  Server -- so a statement that reads it waits in the database.
+  `waiting()` counts the statements waiting on that lock, from every client
+  of the database, and `release()` rolls back. A statement "stopped" is then
+  one that stopped waiting while the lock was still held, read from the
+  database, never from a rejected promise.
 
 - **The sized customers** (0034), opt-in: `loadSizedCustomers({ kind, admin })`
   fills `sales.customer` with a million generated customers beside the

@@ -109,12 +109,14 @@ function headersOf(init: RequestInit | undefined): Record<string, string> {
  * Starts the server and publishes `pg-order` and `ms-order` through the
  * administrator's plane -- with `lines`, `pg-order-line` and
  * `ms-order-line` too, an order's lines reached through their order (0043);
+ * with `countries`, `pg-customer` and `ms-customer`, whose lookup reads
+ * `sales.country`;
  * with `removable`, `pg-removable` and `ms-removable` over the parity
  * schema's table a clerk may delete from within their tenant (0050); and,
  * with `hops`, `pg-hop-order` and `ms-hop-order` through a TCP hop each, and
  * `pg-hop-removable` and `ms-hop-removable` over `lost.removable` (`Lossy`).
  */
-export async function startPlane(options: { hops?: boolean; lines?: boolean; removable?: boolean } = {}): Promise<Plane> {
+export async function startPlane(options: { hops?: boolean; lines?: boolean; removable?: boolean; countries?: boolean } = {}): Promise<Plane> {
   const { pg, ms } = inject('databases')
   const connections: ConnectionConfig[] = [
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
@@ -187,6 +189,19 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean; rem
     })
     // No tenant column of its own: its rows are its tenant's orders' lines, through the order lookup's filter (0043).
     const policy: FormPolicy = { ...clerkPolicy((bindings as { fields: FieldBinding[] }).fields), rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }
+    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+  }
+  // A customer form whose lookup reads `sales.country`, which no other form here
+  // reads and no write here checks: a suite may hold that table locked
+  // without waiting on, or holding up, a file that shares the database.
+  for (const { connection } of options.countries === true ? ENGINES : []) {
+    const formId = `${connection}-customer`
+    const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', { connection, root: { schema: 'sales', name: 'customer' }, formId, title: 'Customer', lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }] })
+    const fields = (bindings as { fields: FieldBinding[] }).fields
+    const lookups = Object.fromEntries(fields.filter((binding) => binding.kind === 'lookup').map((binding) => [binding.field, []]))
+    // No version column, so no update; the tenant comes from the row filter, so nobody writes it.
+    const base = clerkPolicy(fields)
+    const policy: FormPolicy = { ...base, operations: { read: ['clerk'], create: ['clerk'], update: [] }, fields: { ...base.fields, tenant_id: { read: ['clerk'], write: [] } }, lookups }
     await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
   }
   // Forms a clerk may delete with (0050): within their tenant over the parity schema, and every row of lost.removable through the hops.

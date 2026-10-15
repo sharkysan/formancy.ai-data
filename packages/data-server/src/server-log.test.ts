@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DEFAULT_LOOKUP_DEADLINE_MS } from '@formancy/data-core'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from './app.js'
@@ -47,7 +48,7 @@ afterEach(async () => {
 /** The server as `main.ts` composes it -- both planes from `servedPlanes`, the audit sink its log, an origin listed -- writing to this suite. */
 async function runnable(adminRoles: readonly string[] = ['data-admin'], origins: readonly string[] = ['https://app.example']): Promise<FastifyInstance> {
   let app: FastifyInstance | undefined
-  const planes = servedPlanes({ registry: registry(), store, adminRoles, auditKey: undefined, origins, log: () => (app as FastifyInstance).log })
+  const planes = servedPlanes({ registry: registry(), store, adminRoles, auditKey: undefined, origins, lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, log: () => (app as FastifyInstance).log })
   app = await createDataServer({
     verifyIdentity,
     logger: {
@@ -140,7 +141,7 @@ describe("the runnable server's log", () => {
       { plane: 'runtime', operation: 'form' },
       { plane: 'admin', operation: 'version-list' },
     ])
-    expect(servedPlanes({ registry: registry(), store, adminRoles: [], auditKey: undefined, origins: [], log: () => server.log }).admin).toBeUndefined()
+    expect(servedPlanes({ registry: registry(), store, adminRoles: [], auditKey: undefined, origins: [], lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, log: () => server.log }).admin).toBeUndefined()
   })
   // A refused preflight is a plain network error to the page that sent it,
   // so the log is the only place that says why, and names the origin to

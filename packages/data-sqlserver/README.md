@@ -262,6 +262,58 @@ not set by `connectSqlServer`), then sends the statement. The measurement's
 counting pass counts it through a TCP hop on every run, and
 [`docs/performance.md`](../../docs/performance.md) has the figures.
 
+### When a lookup's caller goes
+
+Every lookup method takes the caller's `AbortSignal`, last
+([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)).
+The server aborts it when the browser abandons the request or the lookup
+deadline passes, and the adapter stops the statement in the database:
+
+```ts
+await lookups.search(config, { search: 'muster', offset: 0, limit: 50 }, tenant, signal)
+```
+
+- **Already aborted:** it rejects with `signal.reason` and sends nothing, not
+  even the pool's `SELECT 1;`. A resolve checks again before each group of
+  keys, so an aborted one sends no further group.
+- **Aborted while the statement waits or runs:** `request.cancel()` sends a
+  TDS attention on the statement's own connection, and the method rejects
+  with exactly `signal.reason` at once, without waiting for the server's
+  acknowledgement. An abort before mssql holds a connection sends no
+  statement at all. An answer read before the abort is returned unchanged.
+- **Nobody else's statement is stopped.** Attention is in-band: tedious waits
+  for the server to acknowledge it before the connection takes another
+  request, so the lookups share the records' pool. PostgreSQL's cancel
+  request travels on a connection of its own and can land late, which is
+  why that adapter needs a client of its own and SQL Server does not.
+- **No `requestTimeout` is set for a lookup.** The deadline is the server's
+  signal, one timer on both engines that also counts the wait for a pooled
+  connection, which tedious's timer, started when the request is sent, does
+  not. mssql's default request timeout of 15 seconds, which it hands tedious
+  for every request (`lib/tedious/connection-pool.js` in mssql 12.7.4), still
+  bounds every statement, so on SQL Server a
+  `FORMANCY_DATA_LOOKUP_DEADLINE_MS` above 15000 is cut at 15 seconds, and
+  the server answers that as `unavailable`, not `lookup-timeout`.
+
+`lookups-limits.integration.test.ts` holds each of these against the real
+server, with `sales.customer` behind `blockTable`'s exclusive lock: the
+lookup is seen waiting in `sys.dm_exec_requests`, and after the abort seen
+gone while the lock is still held; nothing crosses the TCP hop for a signal
+already aborted; and the one pooled connection answers the next lookup in
+the same session, with no transaction open and the same `SET` options.
+How long a stop takes was measured once, on 2026-10-14, not held by a
+test: 30 searches waiting on that lock, after one warm-up, on an i9-10900K
+Windows 11 workstation under Docker 28.3.3, the 2022 image
+`sha256:5b0916c7…`, mssql 12.7.4 and tedious 20.3.3, through the built
+adapter on a pool of one connection with no hop. From the abort, the method
+rejected in 0.12 / 0.17 / 0.26 ms (min / median / max); the waiter was gone
+from `sys.dm_exec_requests`, polled query after query, in 27.2 / 40.7 /
+52.6 ms; and a request queued on the one connection at the abort was
+answered in 29.0 / 40.8 / 52.4 ms. The design's probe, the same day and
+machine, stopped a `WAITFOR` in 1.8 / 2.3 / 3.5 ms over 30 trials and a
+running scan in 88.9 ms, once: how long a stop takes depends on what the
+statement is doing, and none of these is a bound.
+
 ### Records
 
 `createSqlServerRecords(pool)` reads, inserts, updates and deletes one
@@ -466,7 +518,8 @@ checked once, by hand, on 2026-10-09, and is not a test.
 
 `pnpm test` starts SQL Server through `@formancy/data-fixtures`, once per
 test file, and runs the suite against it: discovery, the spike, lookups,
-what a lookup reads on the sized customers (0034), records, the ways a
+what a lookup reads on the sized customers (0034), a lookup stopped when
+its caller goes (0061), records, the ways a
 record operation fails, a write whose answer is lost on the way back, and a
 uuid key end to end (`uuid.integration.test.ts`, 0056: discovered, generated
 read-only, its token in lower case, created, updated, listed in this

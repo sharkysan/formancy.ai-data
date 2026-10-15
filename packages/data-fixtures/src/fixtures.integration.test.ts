@@ -5,6 +5,7 @@ import mssql from 'mssql'
 import postgres from 'postgres'
 import { getContainerRuntimeClient } from 'testcontainers'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
+import { blockTable } from './blocking.js'
 import type { PostgresFixture, SqlServerFixture } from './containers.js'
 import { POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
 import { connectDocker } from './docker.js'
@@ -401,6 +402,61 @@ describe('the parity schema', () => {
       expect(kinds.recordset[0]).toEqual(KINDS)
     } finally {
       await pool.close()
+    }
+  })
+})
+
+describe('a blocked table', () => {
+  /** Polls until `condition` holds, or fails naming what never happened. */
+  async function until(condition: () => Promise<boolean>, what: string): Promise<void> {
+    const deadline = Date.now() + 20_000
+    while (!(await condition())) {
+      if (Date.now() > deadline) throw new Error(`timed out waiting until ${what}`)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+  }
+
+  // The adapters prove a cancelled lookup is gone from the database by
+  // watching `waiting()` fall to 0 while the lock is still held (0061). A
+  // helper that never blocked would let every such assertion pass with
+  // nothing ever waiting; one whose count missed a waiting reader would
+  // never see it arrive; one whose release left the lock would hang the
+  // next suite. So: nothing waits before the reader, exactly the reader
+  // waits behind the lock, and after release it reads and nothing waits.
+  test('on PostgreSQL, holds one reader behind it, counts it, and lets it through on release', async () => {
+    const blocked = await blockTable({ kind: 'postgres', admin: pg.admin }, { schema: 'sales', name: 'customer' })
+    const reader = postgres(pg.writer)
+    try {
+      expect(await blocked.waiting()).toBe(0)
+      const read = reader<{ n: number }[]>`select count(name)::int as n from sales.customer`.then((rows) => rows[0]?.n)
+      await until(async () => (await blocked.waiting()) === 1, 'the reader waited behind the lock')
+      await blocked.release()
+      expect(await read).toBe(1)
+      const free = await blockTable({ kind: 'postgres', admin: pg.admin }, { schema: 'sales', name: 'customer' })
+      expect(await free.waiting()).toBe(0)
+      await free.release()
+    } finally {
+      await reader.end()
+    }
+  })
+
+  // As above on SQL Server, where a reader blocks behind an exclusive table
+  // lock only under locking read committed: the helper refuses a database
+  // that reads row versions instead, and this proves the fixture's does not.
+  test('on SQL Server, holds one reader behind it, counts it, and lets it through on release', async () => {
+    const blocked = await blockTable({ kind: 'sqlserver', admin: ms.admin }, { schema: 'sales', name: 'customer' })
+    const reader = await new mssql.ConnectionPool(ms.writer).connect()
+    try {
+      expect(await blocked.waiting()).toBe(0)
+      const read = reader.request().query<{ n: number }>('select count(name) as n from sales.customer').then((result) => result.recordset[0]?.n)
+      await until(async () => (await blocked.waiting()) === 1, 'the reader waited behind the lock')
+      await blocked.release()
+      expect(await read).toBe(1)
+      const free = await blockTable({ kind: 'sqlserver', admin: ms.admin }, { schema: 'sales', name: 'customer' })
+      expect(await free.waiting()).toBe(0)
+      await free.release()
+    } finally {
+      await reader.close()
     }
   })
 })

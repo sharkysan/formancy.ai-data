@@ -32,6 +32,14 @@ import type { DatabaseKind } from '@formancy/data-core'
  * is what a network's latency multiplies; the measurement's added-latency
  * block is what shows that it does. The delay is one fixed wait per answer,
  * added after loopback: no bandwidth, no loss, no congestion window.
+ *
+ * Since 0061 it can hold what new connections send, so a PostgreSQL cancel
+ * request -- which postgres.js sends on a connection of its own -- arrives
+ * when a suite releases it rather than when the scheduler delivers it: the
+ * late cancel that lands on the next statement is then made, not waited for.
+ * And it can refuse new connections, as a database whose listener went away
+ * while its open sessions still answer: the cancel request is then the one
+ * connection that fails, which the driver reports on a promise of its own.
  */
 
 /** One armed marker: what its match resolves, and the connections it has silenced. */
@@ -83,6 +91,22 @@ export interface TcpHop {
    * answer, after loopback: no bandwidth, loss or congestion window.
    */
   delayAnswers(ms: number, schedule?: Schedule): void
+  /**
+   * Holds every byte a client sends on a connection opened after this call,
+   * until `release()`, then forwards them in the order they came, a close
+   * after them. Connections opened before the call flow as before, the
+   * server's answers to a held client flow too, and one opened after
+   * `release()` is not held. Held bytes are counted -- as sent and as a turn
+   * -- when they are released, which is when the server hears them.
+   */
+  holdNewConnections(): { release(): void }
+  /**
+   * Resets every connection a client opens after this call, before it
+   * reaches the database, until `release()`: the client sees ECONNRESET.
+   * Connections opened before the call flow as before. `refused()` is how
+   * many this call has reset.
+   */
+  refuseNewConnections(): { release(): void; refused(): number }
   /** Destroys every connection, both sides, and disarms every marker; later connections are forwarded. */
   cut(): void
   close(): Promise<void>
@@ -182,6 +206,16 @@ interface Pair {
   held: Array<{ chunk: Buffer; due: boolean }>
   /** The server ended its half while chunks were held: the client's end waits for them. */
   endHeld: boolean
+  /** Client chunks a gate holds, oldest first; undefined once nothing holds this connection. */
+  sending: Buffer[] | undefined
+  /** The client ended its half while its chunks were held: the server's end waits for them. */
+  sendingEnded: boolean
+}
+
+/** One `holdNewConnections()`: the connections it holds until it is released. */
+interface Gate {
+  released: boolean
+  pairs: Set<Pair>
 }
 
 interface Arm {
@@ -234,6 +268,8 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
   /** Orders the hop's events -- an accept, a chunk heard by the client -- for passedOver; no time, so a test needs no clock. */
   let clock = 0
   const turnCounters: Array<{ total: number }> = []
+  const gates = new Set<Gate>()
+  const refusals = new Set<{ count: number }>()
   let delay: { ms: number; schedule: Schedule } = { ms: 0, schedule: setTimeout }
 
   /** A chunk the client hears: the server has spoken, as far as the client knows. */
@@ -285,6 +321,20 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
   }
 
   function fromClient(pair: Pair, chunk: Buffer): void {
+    if (pair.sending !== undefined) return void pair.sending.push(chunk)
+    sendUpstream(pair, chunk)
+  }
+
+  /** A held connection whose last gate is released: what it sent, in order, then its close. */
+  function unhold(pair: Pair): void {
+    if ([...gates].some((gate) => gate.pairs.has(pair))) return
+    const held = pair.sending ?? []
+    pair.sending = undefined
+    for (const chunk of held) sendUpstream(pair, chunk)
+    if (pair.sendingEnded) pair.upstream.end()
+  }
+
+  function sendUpstream(pair: Pair, chunk: Buffer): void {
     if (pair.lastSpoke !== 'client') {
       pair.turns += 1
       for (const counter of turnCounters) counter.total += 1
@@ -310,16 +360,41 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
   // Server answer of several packets wait about 40 ms here that it never waits
   // on the direct path. A hop that adds a stall of its own is measuring itself.
   const server = net.createServer({ allowHalfOpen: true }, (client) => {
+    if (refusals.size > 0) {
+      for (const refusal of refusals) refusal.count += 1
+      client.on('error', () => {})
+      // A reset, not a FIN: a quiet close reads to a cancel's sender as a
+      // request the server took.
+      client.resetAndDestroy()
+      return
+    }
     const upstream = net.connect({ port: target.port, host: target.host, allowHalfOpen: true })
     client.setNoDelay(true)
     upstream.setNoDelay(true)
     accepted += 1
     clock += 1
-    const pair: Pair = { client, upstream, ordinal: accepted, turns: 0, opened: clock, answeredAt: 0, open: true, swallowing: false, lastSpoke: undefined, held: [], endHeld: false }
+    const holding = [...gates]
+    const pair: Pair = {
+      client,
+      upstream,
+      ordinal: accepted,
+      turns: 0,
+      opened: clock,
+      answeredAt: 0,
+      open: true,
+      swallowing: false,
+      lastSpoke: undefined,
+      held: [],
+      endHeld: false,
+      sending: holding.length === 0 ? undefined : [],
+      sendingEnded: false,
+    }
+    for (const gate of holding) gate.pairs.add(pair)
     pairs.add(pair)
     client.on('end', () => {
       pair.open = false
-      upstream.end()
+      if (pair.sending === undefined) upstream.end()
+      else pair.sendingEnded = true
     })
     upstream.on('end', () => {
       pair.open = false
@@ -378,6 +453,23 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
     delayAnswers(ms, schedule = setTimeout) {
       if (!Number.isFinite(ms) || ms < 0) throw new Error(`a delay is a number of milliseconds, at least 0, not ${String(ms)}`)
       delay = { ms, schedule }
+    },
+    holdNewConnections() {
+      const gate: Gate = { released: false, pairs: new Set() }
+      gates.add(gate)
+      return {
+        release: () => {
+          if (gate.released) return
+          gate.released = true
+          gates.delete(gate)
+          for (const pair of gate.pairs) unhold(pair)
+        },
+      }
+    },
+    refuseNewConnections() {
+      const refusal = { count: 0 }
+      refusals.add(refusal)
+      return { release: () => void refusals.delete(refusal), refused: () => refusal.count }
     },
     cut: cutAll,
     close: () => {

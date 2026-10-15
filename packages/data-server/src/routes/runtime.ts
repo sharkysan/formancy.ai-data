@@ -1,15 +1,12 @@
 import {
   authorizeOperation,
-  buildLookupConfig,
   checkSubmittedFields,
   deleteEffects,
   driftRefusal,
-  findObject,
   grantedOperations,
   intendedRecord,
   listable,
   listColumns,
-  lookupRowFilter,
   NOTHING_LEFT,
   planCreate,
   planRead,
@@ -18,9 +15,7 @@ import {
   readableFields,
   rejectedSelection,
   runtimeOperations,
-  scopeRowFilters,
   toFormAnswers,
-  validateLookupQuery,
 } from '@formancy/data-core'
 import type {
   DescribedTable,
@@ -28,13 +23,11 @@ import type {
   FieldError,
   FormRecord,
   MembershipCheck,
-  ObjectMeta,
   PlanRefusal,
   PolicyContext,
   PolicyOperation,
   PublishedForm,
   RecordFailure,
-  ResolvedLookup,
 } from '@formancy/data-core'
 import { canonicalize } from '@formancy/spec'
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
@@ -44,10 +37,12 @@ import type { ConnectionRegistry, OpenConnection } from '../connections.js'
 import type { HostIdentity } from '../identity.js'
 import type { AuditSink, RuntimeAuditEvent, RuntimeOperation } from '../audit.js'
 import { auditedForm, auditRequests, recordReference } from '../audit.js'
+import { lookupDeadline } from '../lookup-deadline.js'
 import { loadPublished } from '../published.js'
 import { registerDeleteRoute } from './runtime-deletes.js'
 import { planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
 import { registerListRoute } from './runtime-lists.js'
+import { registerLookupRoutes } from './runtime-lookups.js'
 import { registerMenuRoute } from './runtime-menu.js'
 import { createWriteOnce, INVALID_WRITE_ID, writeId } from './write-once.js'
 import type { WriteAnswer } from './write-once.js'
@@ -61,6 +56,11 @@ export interface RuntimeOptions {
    * `key` names records by a keyed hash; without it, no record is named.
    */
   audit?: { sink: AuditSink; key?: string; now?: () => string }
+  /**
+   * How long a lookup statement may run before the server stops it, the
+   * membership checks inside a create or an update included (0061).
+   */
+  lookupDeadlineMs: number
 }
 
 declare module 'fastify' {
@@ -89,17 +89,10 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'POST /v1/forms/:id/lookups/:source/resolve': 'lookup-resolve',
 }
 
-/**
- * At most this many tokens are resolved in one request: a form holds one per
- * lookup field, not thousands. A list page's tokens for one lookup field fit
- * one resolve: `LIST_PAGE_SIZE` is at most this, which a test holds (0044).
- */
-export const MAX_RESOLVE = 100
+export { MAX_RESOLVE } from './runtime-lookups.js'
 
 /** A read that found no record inside the filters, as the port's failure, for the answers that need one. */
 const NOT_FOUND: RecordFailure = { ok: false, code: 'not-found', message: 'No such record exists inside the filters.' }
-
-const OPERATIONS = new Set<PolicyOperation>(['read', 'create', 'update'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -284,17 +277,27 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    * Runs every membership check: undefined when every selection is a member,
    * otherwise the refusal to answer. Answered rather than sent, so an
    * update's checks run inside the sending they belong to (0031).
+   *
+   * Each check has a lookup deadline of its own, counted from when the
+   * adapter is asked for it, and nothing else (0061): a write goes on after
+   * its client leaves (0031), so no abandonment stops it. A check
+   * past its deadline keeps the answer every failed check has, nothing
+   * saved, and the log says the deadline passed.
    */
   async function memberships(open: OpenConnection, checks: readonly MembershipCheck[], log: FastifyBaseLogger): Promise<WriteAnswer | undefined> {
     const errors: FieldError[] = []
     for (const check of checks) {
+      const deadline = lookupDeadline(options.lookupDeadlineMs)
       try {
-        const rejected = await open.lookups.rejects(check.config, check.tokens, check.filters)
+        const rejected = await open.lookups.rejects(check.config, check.tokens, check.filters, deadline.signal)
         if (rejected.length > 0) errors.push(rejectedSelection(check.field))
       } catch (error) {
         // Fails closed, as formancy's own membership port does (formancy.ai 0077).
-        log.warn({ field: check.field, error: (error as Error).message }, 'a lookup could not vouch for a selection')
+        if (deadline.signal.aborted && error === deadline.signal.reason) log.warn({ field: check.field, deadlineMs: options.lookupDeadlineMs }, 'a lookup could not vouch for a selection: it passed its deadline, and the database was told to stop it')
+        else log.warn({ field: check.field, error: (error as Error).message }, 'a lookup could not vouch for a selection')
         return { status: 503, body: { code: 'unavailable', message: 'A selection could not be checked. Nothing was saved.' } }
+      } finally {
+        deadline.clear()
       }
     }
     return errors.length === 0 ? undefined : { status: 422, body: { code: 'invalid-values', message: 'A selection is not one of the options.', fieldErrors: errors } }
@@ -513,68 +516,6 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   // One record, by its token and the version read (0050): the update's steps, a delete's answers.
   registerDeleteRoute(app, { published, connection, context, sendOnce, lost, refusal, answered })
 
-  /** The lookup field a source name stands for, its config and the actor's filter for it — or a reply already sent. */
-  async function lookupFor(request: FastifyRequest<{ Params: { id: string; source: string } }>, reply: FastifyReply, operation: unknown) {
-    if (typeof operation !== 'string' || !OPERATIONS.has(operation as PolicyOperation)) {
-      await reply.code(400).send({ code: 'invalid-request', message: 'Say which operation the form is open for: read, create or update.' })
-      return undefined
-    }
-    const bundle = await published(request.params.id, reply)
-    if (bundle === undefined) return undefined
-    const binding = bundle.bindings.fields.find((entry) => entry.kind === 'lookup' && entry.source === request.params.source)
-    if (binding === undefined) {
-      await reply.code(404).send({ code: 'unknown-lookup', message: `This form has no lookup called ${request.params.source}.` })
-      return undefined
-    }
-    const filter = lookupRowFilter(bundle.policy, context(request), bundle.bindings, operation as PolicyOperation, binding.field)
-    if (!filter.ok) {
-      const refusal = planRefusal(filter.code, filter.message)
-      await reply.code(refusal.status).send(refusal.body)
-      return undefined
-    }
-    // Scoped as a record request's filter is (0028), before a connection is
-    // opened: a trusted value the column does not hold in that spelling is
-    // refused here, never left to the engine to convert.
-    const config = buildLookupConfig(bundle.bindings, binding.field, { snapshot: bundle.snapshot })
-    // buildLookupConfig found the target in this snapshot, or it would have thrown.
-    const scoped = scopeRowFilters(findObject(bundle.snapshot, config.target) as ObjectMeta, filter.filter, `lookups.${binding.field}`)
-    if (!scoped.ok) {
-      const refusal = planRefusal(scoped.code, scoped.message)
-      await reply.code(refusal.status).send(refusal.body)
-      return undefined
-    }
-    const open = await connection(bundle, reply)
-    if (open === undefined) return undefined
-    return { bundle, open, config, filters: scoped.filters }
-  }
-
-  app.post<{ Params: { id: string; source: string } }>('/v1/forms/:id/lookups/:source/query', async (request, reply) => {
-    const body = isRecord(request.body) ? request.body : {}
-    const found = await lookupFor(request, reply, body['operation'])
-    if (found === undefined) return reply
-    const query = validateLookupQuery(found.config, { search: body['search'] ?? '', offset: body['offset'] ?? 0, limit: body['limit'] ?? found.config.maxPageSize })
-    if (!query.ok) return reply.code(400).send({ code: query.code, message: query.message })
-    try {
-      return await found.open.lookups.search(found.config, query.query, found.filters)
-    } catch (error) {
-      reply.log.warn({ error: (error as Error).message }, 'a lookup search failed')
-      return reply.code(503).send({ code: 'unavailable', message: 'The options could not be loaded.' })
-    }
-  })
-
-  app.post<{ Params: { id: string; source: string } }>('/v1/forms/:id/lookups/:source/resolve', async (request, reply) => {
-    const body = isRecord(request.body) ? request.body : {}
-    const tokens = body['tokens']
-    if (!Array.isArray(tokens) || tokens.length > MAX_RESOLVE || !tokens.every((token) => typeof token === 'string')) {
-      return reply.code(400).send({ code: 'invalid-request', message: `Expected { operation, tokens } with at most ${String(MAX_RESOLVE)} tokens.` })
-    }
-    const found = await lookupFor(request, reply, body['operation'])
-    if (found === undefined) return reply
-    try {
-      return { rows: await found.open.lookups.resolve(found.config, tokens as string[], found.filters) } satisfies ResolvedLookup
-    } catch (error) {
-      reply.log.warn({ error: (error as Error).message }, 'a lookup resolve failed')
-      return reply.code(503).send({ code: 'unavailable', message: 'The selected options could not be loaded.' })
-    }
-  })
+  // A lookup's options and labels, each one statement that stops when its request is abandoned or its deadline passes (0061).
+  registerLookupRoutes(app, { published, connection, context, lookupDeadlineMs: options.lookupDeadlineMs })
 }

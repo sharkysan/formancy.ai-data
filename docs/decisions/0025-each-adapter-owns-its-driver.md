@@ -1,6 +1,6 @@
 # 0025 — Each adapter package owns its driver, and one suite runs the whole product on both engines
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0061](0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md): PostgreSQL lookups run on a client of their own, named `formancy-data lookups`
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/e2e.integration.test.ts` — on

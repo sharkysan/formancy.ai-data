@@ -7,6 +7,9 @@ import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { createPostgresLookups, discoverPostgres } from './index.js'
 
+/** Nobody aborts this signal: every lookup here completes, and answers exactly as it did before the port carried one (0061). */
+const NEVER = new AbortController().signal
+
 /**
  * What a lookup costs PostgreSQL on the sized `sales.customer` (0034): a
  * million customers, a tenth of them the writer's tenant. Held without a
@@ -186,7 +189,7 @@ describe.each([
   // count below a count of the wrong statement. Row security still shows
   // the writer tenant 1 only, so the unfiltered form answers the same.
   test.each(SEARCHES)('%s answers the page the generator expects', async (_name, search) => {
-    const { answer } = await capture(() => createPostgresLookups(writer).search(config, { search, offset: 0, limit: 50 }, filters))
+    const { answer } = await capture(() => createPostgresLookups(writer).search(config, { search, offset: 0, limit: 50 }, filters, NEVER))
     expect(answer).toEqual(expectedPage(search))
   })
 
@@ -196,7 +199,7 @@ describe.each([
   // several loops could not be summed exactly, so Actual Loops 1 is asserted
   // first and the session is what makes it so.
   test.each(SEARCHES)('%s reads exactly the rows the filter admits and returns at most 51, serially', async (_name, search) => {
-    const { statement } = await capture(() => createPostgresLookups(writer).search(config, { search, offset: 0, limit: 50 }, filters))
+    const { statement } = await capture(() => createPostgresLookups(writer).search(config, { search, offset: 0, limit: 50 }, filters, NEVER))
     const plan = await explain(statement, 'serial')
     for (const scan of customerScans(plan)) expect(scan['Actual Loops'], 'a scan on customer ran more than once').toBe(1)
     expect(plan.Plan['Actual Rows']).toBeLessThanOrEqual(51)
@@ -210,7 +213,7 @@ describe.each([
   // or Parallel Seq Scan of the million rows fails here by name. JIT and
   // parallelism are printed, for 0034's record (P9).
   test.each(SEARCHES)('%s under the default plan scans the same way and reads the same rows, within its rounding', async (name, search) => {
-    const { statement } = await capture(() => createPostgresLookups(writer).search(config, { search, offset: 0, limit: 50 }, filters))
+    const { statement } = await capture(() => createPostgresLookups(writer).search(config, { search, offset: 0, limit: 50 }, filters, NEVER))
     const plan = await explain(statement, 'defaults')
     const { read, bound } = rowsRead(plan)
     console.log(`${_form}, ${name}: workers launched ${JSON.stringify(nodes(plan.Plan).map((node) => node['Workers Launched']).filter((n) => n !== undefined))}, JIT ${JSON.stringify(plan.JIT ?? null)}, read ${String(read)} ± ${String(bound)}`)
@@ -232,7 +235,7 @@ describe('resolving and checking keys on the sized customers', () => {
     [1, 'defaults'],
   ] as const)('resolving %i keys reads at most one row per key (%s)', async (n, session) => {
     const keys = sizedResolveKeys(n)
-    const { answer, statement } = await capture(() => createPostgresLookups(writer).resolve(config, keys.map((key) => tokenOf(key.tenantId, key.customerNo)), TENANT_1))
+    const { answer, statement } = await capture(() => createPostgresLookups(writer).resolve(config, keys.map((key) => tokenOf(key.tenantId, key.customerNo)), TENANT_1, NEVER))
     expect(answer).toHaveLength(n)
     const plan = await explain(statement, session)
     expect(rowsRead(plan).read).toBeGreaterThan(0)
@@ -243,7 +246,7 @@ describe('resolving and checking keys on the sized customers', () => {
   test.each(['serial', 'defaults'] as const)('checking one key reads at most one row (%s)', async (session) => {
     const [key] = sizedResolveKeys(1)
     if (key === undefined) throw new Error('no key')
-    const { answer, statement } = await capture(() => createPostgresLookups(writer).rejects(config, [tokenOf(key.tenantId, key.customerNo)], TENANT_1))
+    const { answer, statement } = await capture(() => createPostgresLookups(writer).rejects(config, [tokenOf(key.tenantId, key.customerNo)], TENANT_1, NEVER))
     expect(answer).toEqual([])
     const plan = await explain(statement, session)
     expect(rowsRead(plan).read).toBe(PER_KEY)

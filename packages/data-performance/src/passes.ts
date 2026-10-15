@@ -6,6 +6,7 @@ import type { Catalogue, ComponentResult, EngineKey, FloorResult, Protocol } fro
 import { ENGINE_KEYS, ENGINE_NAMES } from './results.js'
 import type { RefusalExecutable } from './drifted.js'
 import type { Executable } from './scenarios.js'
+import { addressedProblem } from './server-log.js'
 import type { WriterEndpoint } from './stack.js'
 import { AUDIENCE, ISSUER } from './stack.js'
 import { summarise } from './stats.js'
@@ -60,6 +61,10 @@ export type Counted = Record<EngineKey, { scenarios: Record<string, number>; ref
  * One warm-up request, then one counted: the hop counts turns, the client
  * speaking again after it heard the server, on every connection. Anything
  * other than the catalogue's pin refuses the run, naming each difference.
+ * So does a counted request that addressed another runtime operation than
+ * the catalogue names (0061): `addressed` is the run's count of runtime
+ * requests by audit operation, which the audit reconciliation holds to what
+ * the server recorded.
  */
 export async function countingPass(
   catalogue: Catalogue,
@@ -67,6 +72,7 @@ export async function countingPass(
   refused: (engine: EngineKey) => Map<string, RefusalExecutable>,
   hops: Record<EngineKey, TcpHop>,
   floorThroughHop: (engine: EngineKey) => Promise<Floor>,
+  addressed: () => ReadonlyMap<string, number>,
 ): Promise<Counted> {
   const counted = {} as Counted
   const problems: string[] = []
@@ -78,9 +84,12 @@ export async function countingPass(
       if (scenario === undefined) throw new Error(`no executable for ${entry.name}`)
       scenario.check(await scenario.send(0), 0)
       const turns = hops[engine].countRoundTrips()
+      const before = new Map(addressed())
       const answer = await scenario.send(0)
       const n = turns()
       scenario.check(answer, 0)
+      const wrong = addressedProblem(`${ENGINE_NAMES[engine]} ${entry.name}`, entry.operation, before, addressed())
+      if (wrong !== undefined) problems.push(wrong)
       counted[engine].scenarios[entry.name] = n
       if (n !== entry.roundTrips[engine]) problems.push(`${ENGINE_NAMES[engine]} ${entry.name}: counted ${String(n)} round trips, the catalogue pins ${String(entry.roundTrips[engine])}`)
     }
@@ -108,7 +117,7 @@ export async function countingPass(
     }
     if (counted[engine].floor !== catalogue.floor.roundTrips[engine]) problems.push(`${ENGINE_NAMES[engine]} floor: counted ${String(counted[engine].floor)} round trips, the catalogue pins ${String(catalogue.floor.roundTrips[engine])}`)
   }
-  if (problems.length > 0) throw new Error(`The round trips differ from catalogue.ts; explain the change and update the pins:\n  ${problems.join('\n  ')}`)
+  if (problems.length > 0) throw new Error(`The round trips or the operations differ from catalogue.ts; explain the change and update it:\n  ${problems.join('\n  ')}`)
   return counted
 }
 

@@ -34,6 +34,11 @@ import type { Catalogue } from './results.js'
  * changes this catalogue with it and, through the release check, makes the
  * figures stale. Nothing holds what a read, a create or an update reads, so
  * the page says nothing about it.
+ *
+ * Each scenario names the runtime operation its request addresses, as the
+ * audit trail names it (0061): the default lookup deadline is derived from
+ * the scenarios that address `lookup-query` and `lookup-resolve`, and the
+ * counting pass refuses a run whose requests address another.
  */
 const READ = sizedRowsRead()
 /** The keys `resolve-100` asks for: the most one request may. */
@@ -41,21 +46,21 @@ const RESOLVE_KEYS = sizedResolveKeys(100).length
 
 export const CATALOGUE: Catalogue = {
   scenarios: [
-    { name: 'health', label: 'Health check', form: null, inFlight: 'all', latency: true, roundTrips: { pg: 0, ms: 0 }, rowsRead: null },
-    { name: 'form', label: 'Open the form', form: 'order', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: null },
-    { name: 'lookup-first-page', label: 'Open the customer lookup', form: 'order', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.tenant } },
-    { name: 'lookup-common', label: 'Search many customers match', form: 'order', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.tenant } },
-    { name: 'lookup-unique', label: 'Search one customer matches', form: 'order', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.tenant } },
-    { name: 'lookup-absent', label: 'Search no customer matches', form: 'order', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.tenant } },
-    { name: 'lookup-first-page-unfiltered', label: 'Open the customer lookup', form: 'order-unfiltered', inFlight: 'one', latency: false, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.table } },
-    { name: 'lookup-common-unfiltered', label: 'Search many customers match', form: 'order-unfiltered', inFlight: 'one', latency: false, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.table } },
-    { name: 'lookup-unique-unfiltered', label: 'Search one customer matches', form: 'order-unfiltered', inFlight: 'one', latency: false, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.table } },
-    { name: 'lookup-absent-unfiltered', label: 'Search no customer matches', form: 'order-unfiltered', inFlight: 'one', latency: false, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.table } },
-    { name: 'resolve-1', label: 'Resolve one stored customer', form: 'order', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { atMost: READ.perKey } },
-    { name: 'resolve-100', label: 'Resolve the most one request may ask', form: 'order', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { atMost: READ.perKey * RESOLVE_KEYS } },
-    { name: 'read', label: 'Read an order', form: 'order', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: null },
-    { name: 'create', label: 'Create an order', form: 'order', inFlight: 'all', latency: true, roundTrips: { pg: 6, ms: 6 }, rowsRead: null },
-    { name: 'update', label: 'Update an order', form: 'order', inFlight: 'all', latency: true, roundTrips: { pg: 4, ms: 4 }, rowsRead: null },
+    { name: 'health', label: 'Health check', form: null, operation: null, inFlight: 'all', latency: true, roundTrips: { pg: 0, ms: 0 }, rowsRead: null },
+    { name: 'form', label: 'Open the form', form: 'order', operation: 'form', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: null },
+    { name: 'lookup-first-page', label: 'Open the customer lookup', form: 'order', operation: 'lookup-query', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.tenant } },
+    { name: 'lookup-common', label: 'Search many customers match', form: 'order', operation: 'lookup-query', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.tenant } },
+    { name: 'lookup-unique', label: 'Search one customer matches', form: 'order', operation: 'lookup-query', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.tenant } },
+    { name: 'lookup-absent', label: 'Search no customer matches', form: 'order', operation: 'lookup-query', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.tenant } },
+    { name: 'lookup-first-page-unfiltered', label: 'Open the customer lookup', form: 'order-unfiltered', operation: 'lookup-query', inFlight: 'one', latency: false, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.table } },
+    { name: 'lookup-common-unfiltered', label: 'Search many customers match', form: 'order-unfiltered', operation: 'lookup-query', inFlight: 'one', latency: false, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.table } },
+    { name: 'lookup-unique-unfiltered', label: 'Search one customer matches', form: 'order-unfiltered', operation: 'lookup-query', inFlight: 'one', latency: false, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.table } },
+    { name: 'lookup-absent-unfiltered', label: 'Search no customer matches', form: 'order-unfiltered', operation: 'lookup-query', inFlight: 'one', latency: false, roundTrips: { pg: 2, ms: 2 }, rowsRead: { exactly: READ.table } },
+    { name: 'resolve-1', label: 'Resolve one stored customer', form: 'order', operation: 'lookup-resolve', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { atMost: READ.perKey } },
+    { name: 'resolve-100', label: 'Resolve the most one request may ask', form: 'order', operation: 'lookup-resolve', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: { atMost: READ.perKey * RESOLVE_KEYS } },
+    { name: 'read', label: 'Read an order', form: 'order', operation: 'read', inFlight: 'all', latency: true, roundTrips: { pg: 2, ms: 2 }, rowsRead: null },
+    { name: 'create', label: 'Create an order', form: 'order', operation: 'create', inFlight: 'all', latency: true, roundTrips: { pg: 6, ms: 6 }, rowsRead: null },
+    { name: 'update', label: 'Update an order', form: 'order', operation: 'update', inFlight: 'all', latency: true, roundTrips: { pg: 4, ms: 4 }, rowsRead: null },
   ],
   refusals: [
     { name: 'create-drifted', label: 'Create, on a form whose table narrowed after it was published', answer: { status: 409, code: 'drift' }, roundTrips: { pg: 2, ms: 2 } },

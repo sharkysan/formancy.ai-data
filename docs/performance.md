@@ -8,7 +8,10 @@ results, not promises
 ([0034](./decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
 All but a page of records, which arrived after these were measured
 ([0044](./decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)
-names what measuring it needs).
+names what measuring it needs). The figures also predate the lookup limits
+([0061](./decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)):
+a lookup's signal, its deadline and PostgreSQL's second client were not in
+the server they measured, and they are stale until measured again.
 
 The requests go through `@formancy/data-client` and real HTTP to the shipped
 server, `packages/data-server/dist/main.mjs`, started as an operator starts it
@@ -36,6 +39,26 @@ differs from what the results render.
   serves a contains search or the order by name, on either engine. On a form
   with no tenant row filter it reads the whole table, a cost those tests pin.
   A resolve and the membership check read at most one row per key.
+- **What stops a lookup.** On both engines, against a table its owner holds
+  locked so a statement waits in the database
+  ([0061](./decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)):
+  each adapter's `lookups-limits.integration.test.ts` holds that an aborted
+  search, resolve or membership check stops waiting before the lock goes;
+  `packages/data-server/src/routes/runtime-lookup-limits.integration.test.ts`
+  that a browser's abandoned search does the same over HTTP, that a search
+  past the deadline is 503 `lookup-timeout` and a resolve 503 `unavailable`;
+  and
+  `packages/data-client/src/lookups.integration.test.ts` that a renderer's
+  abort does. Every existing lookup suite passes a signal that never aborts
+  and holds its answers, round trips and rows read unchanged.
+- **The default lookup deadline.**
+  `packages/data-performance/src/deadline.test.ts` fails when data-core's
+  `DEFAULT_LOOKUP_DEADLINE_MS` is not the slowest lookup or resolve answer
+  `results.json` holds, rounded up: after a re-measurement, until it
+  follows. Which scenarios are lookups is the catalogue's `operation`, which
+  the counting pass refuses a run to contradict. The harness's own server
+  runs with the deadline at the longest a timer holds, so nothing it
+  measures is cut.
 - **How often each request asks the database.** Every measurement counts the
   database round trips of each request through a TCP hop
   (`packages/data-fixtures/src/tcp-hop.ts`) and refuses to run when the count
@@ -117,13 +140,20 @@ there would be either too loose to mean anything or flaky.
   delays the next. No arrival rate is modelled, so tails under an arrival rate
   are not measured, and nothing past the drivers' pool size is.
 - **A contains search grows with the rows the filter admits.** Two sizes are
-  measured, the tenant and the whole table, not a curve. No remedy ships: no
-  trigram index (PostgreSQL's extension cannot be assumed, and SQL Server has
-  none), no prefix mode, no minimum length, no statement timeout on
-  PostgreSQL, and no cancellation: the renderers abort a superseded search's
-  request (`@formancy/react` 0.4.0, read 2026-10-10, as 0.3.0 did), but the
-  server passes no signal to the adapter, so the database finishes every
-  scan it started.
+  measured, the tenant and the whole table, not a curve. What ships bounds
+  how long a search runs, not how much it reads
+  ([0061](./decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)):
+  the renderers abort a superseded search's request while it is in flight
+  (`@formancy/react` 0.5.0, run 2026-10-14: a search 250 ms after the last
+  key, so six keys 300 ms apart send six searches and abort five), and the
+  server now stops the statement in the database; and every lookup
+  statement stops at a deadline, `FORMANCY_DATA_LOOKUP_DEADLINE_MS`, by
+  default the slowest timed lookup answer these figures hold. What does not ship:
+  no trigram index (PostgreSQL's extension cannot be assumed, and SQL Server
+  has none), no prefix mode, which would change what a search returns, and
+  no minimum length, because the empty search a plain select sends reads as
+  many rows as any other. A deployment past the measured size refuses
+  searches at the deadline rather than serving them slowly.
 - **Two driver behaviours double every statement's round trips**: mssql checks
   each pooled connection with `SELECT 1` before using it, and postgres.js has
   the server describe an unprepared statement before running it. The figures

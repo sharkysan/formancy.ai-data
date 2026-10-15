@@ -167,7 +167,7 @@
       ]
     },
     "0012": {
-      "reviewed": "sha256:b642b3ff009efefa33e718ab691230038a064dd27e1d23e83bac3ac3c836a36e",
+      "reviewed": "sha256:fef81d7f5f797af427891f9642407891828643b7db87b49ed87c142f784556be",
       "limitations": [
         {
           "area": "forms",
@@ -248,7 +248,7 @@
       ]
     },
     "0016": {
-      "reviewed": "sha256:be063d5af546f35f631ca0897d7052074528c4057a7265b187e4e281e62d5fef",
+      "reviewed": "sha256:60bf07dbb6589d84b14178d14625268be6a4dc4031384fa310a6ae861778281d",
       "limitations": [
         {
           "area": "databases",
@@ -290,7 +290,7 @@
       ]
     },
     "0017": {
-      "reviewed": "sha256:ea380a18d6516b0a331bea5d1a51194109e068c12d4edab87e8d305c763b9c6d",
+      "reviewed": "sha256:d15495b716e8dcb921ba780175403bbd7a2bc88a400387b9a6435d657f568548",
       "limitations": [
         {
           "area": "writes",
@@ -451,7 +451,7 @@
       ]
     },
     "0025": {
-      "reviewed": "sha256:95d4cb5e31e239e983febf5dd6bebee8948f69c9414ab562c8f03a134906d9e7",
+      "reviewed": "sha256:e4306a46a1128d57cd5081419fe5b3d473018334b4996e1e78e5f06ce1b3f899",
       "limitations": [
         {
           "area": "operations",
@@ -821,7 +821,7 @@
       ]
     },
     "0034": {
-      "reviewed": "sha256:7e9fc3d1426a7c8fbed75e6e00ba13de7a4569a9bc97c8377c3cefb931b07961",
+      "reviewed": "sha256:c057dfb0520244c00169f197aa4820ec9ff402177eae1568f6fbf89576b7b091",
       "limitations": [
         {
           "area": "databases",
@@ -835,7 +835,7 @@
         },
         {
           "area": "databases",
-          "says": "Nothing bounds a slow lookup search: no trigram index, prefix mode or minimum length ships, PostgreSQL has no statement timeout, and a search the browser abandoned is not cancelled, so the database finishes every scan it started."
+          "says": "No trigram index, prefix mode or minimum search length ships, so every lookup search reads every row its filter admits; the lookup deadline caps how long it runs, not how much it reads (0061)."
         },
         {
           "area": "databases",
@@ -1887,6 +1887,76 @@
         {
           "area": "testing",
           "says": "No browser gate runs against a server with origins listed: that a browser honours a grant, and is refused after reusing one it cached before its origin was removed, is shown through inject only; the one measurement in browsers, that Chromium and WebKit reuse a URL's grant for another GET, HEAD or POST there, was by hand."
+        }
+      ]
+    },
+    "0061": {
+      "reviewed": "sha256:f280764235edd095251f2098e0fd92b005088f5fd39844c5fd49f1e46c47ac21",
+      "limitations": [
+        {
+          "area": "server",
+          "says": "A lookup search still reads every row its filter admits: the lookup deadline caps how long, not how much, so a deployment past the measured size refuses searches with 503 `lookup-timeout` instead of serving them slowly.",
+          "heldBy": "packages/data-server/src/routes/runtime-lookup-limits.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "The default lookup deadline is the slowest timed lookup answer of one measurement on one machine: SQL Server's tenant search, reading 100,001 rows, eight at a time; a search of a whole table was measured only one at a time, and opening connections and membership checks were not timed, so a slower or larger deployment raises `FORMANCY_DATA_LOOKUP_DEADLINE_MS`.",
+          "heldBy": "packages/data-performance/src/deadline.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "The lookup deadline starts when the adapter is asked for the statement: reading the form and opening its connection are not bounded by it, and a deadline passed while waiting for a pooled connection is answered `lookup-timeout` though the same search may then answer.",
+          "heldBy": "packages/data-server/src/routes/runtime-lookups.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "The lookup deadline is a timer in the server process: if the process dies, its statement runs on, and PostgreSQL notices the gone client only when it sends, unless `client_connection_check_interval` is set."
+        },
+        {
+          "area": "operations",
+          "says": "PostgreSQL lookups run on a client of their own, so each allowlisted PostgreSQL database may use up to twice the connections it did.",
+          "heldBy": "packages/data-server/src/routes/runtime-lookup-limits.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "The PostgreSQL adapter cancels a lookup through three private properties of postgres.js 3.4.9 (`state`, `describeFirst`, `canceller`), so a driver upgrade that changes them fails its suite and changes 0061.",
+          "heldBy": "packages/data-postgres/src/lookups-limits.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A PostgreSQL lookup abandoned before it was sent is still sent and then stopped, and one aborted before PostgreSQL described it may be sent a second cancel request, which can stop the next lookup on that backend.",
+          "heldBy": "packages/data-postgres/src/lookups-limits.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A PostgreSQL lookup stopped by another lookup's late cancel, or by a role-level `statement_timeout`, runs a second time; one stopped twice is answered `unavailable`.",
+          "heldBy": "packages/data-postgres/src/lookups-limits.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "postgres.js keeps the FATAL of a PostgreSQL backend an operator terminates and gives it, unsent, to the first statement on the next connection it opens, a record's statement included.",
+          "heldBy": "packages/data-postgres/src/lookups-limits.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Behind a proxy, an abandoned search stops in the database only if the proxy closes its upstream connection when its client goes; nothing tests the composed stack's nginx or the Cloudflare edge for it."
+        },
+        {
+          "area": "host",
+          "says": "A lookup refused for its deadline reaches the person as the renderer's \"The options could not be loaded. Type to try again.\", and typing more does not make a contains search cheaper."
+        },
+        {
+          "area": "server",
+          "says": "A page of records searches as a lookup does and has neither cancellation nor a deadline."
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server, mssql's default request timeout of 15 s still cuts any lookup deadline set above it, answered `unavailable`."
+        },
+        {
+          "area": "server",
+          "says": "An abandoned lookup is answered 499 `abandoned`, a status no standard names, which appears only in the audit trail.",
+          "heldBy": "packages/data-server/src/routes/runtime-lookup-limits.integration.test.ts"
         }
       ]
     },

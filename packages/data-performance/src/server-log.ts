@@ -77,3 +77,20 @@ export function readServerLog(text: string): ServerLog {
   const lines = [...runtimeRequests].reduce((sum, id) => sum + (linesByRequest.get(id) ?? 0), runtimeAuditLines)
   return { runtimeEvents: tallyRows(events), adminEvents, errorLines, runtimeLines: { requests: runtimeRequests.size, lines } }
 }
+
+/**
+ * Whether one counted request addressed what the catalogue says (0061):
+ * exactly one runtime request of `operation`, or none when the catalogue
+ * names none. `before` and `after` are the run's counts of runtime requests
+ * by audit operation, around that one request; undefined when it did.
+ */
+export function addressedProblem(scenario: string, operation: string | null | undefined, before: ReadonlyMap<string, number>, after: ReadonlyMap<string, number>): string | undefined {
+  if (operation === undefined) return `${scenario} names no operation in the catalogue`
+  const sent = [...after].flatMap(([name, count]) => {
+    const more = count - (before.get(name) ?? 0)
+    return more > 0 ? [`${name} ${more === 1 ? 'once' : more === 2 ? 'twice' : `${String(more)} times`}`] : []
+  })
+  const expected = operation === null ? [] : [`${operation} once`]
+  if (sent.join() === expected.join()) return undefined
+  return `${scenario} addressed ${sent.length === 0 ? 'no runtime operation' : sent.join(' and ')}; the catalogue says ${operation ?? 'no runtime operation'}`
+}

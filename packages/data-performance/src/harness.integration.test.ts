@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { CATALOGUE } from './catalogue.js'
+import { lookupDeadlineFrom } from './deadline.js'
 import { SMOKE_PROTOCOL } from './protocol.js'
 import type { Results } from './results.js'
 import { ENGINE_KEYS } from './results.js'
@@ -120,6 +121,18 @@ describe('the harness, run with the smoke protocol', () => {
       expect(entry.run.calibrationRatio, name).toBeGreaterThan(0)
       expect(entry.databaseIdleCpuMsPerSecond, name).toBeGreaterThanOrEqual(0)
     }
+  })
+
+  // The default lookup deadline is derived from what the harness measures
+  // (0061), so the harness's own server must never cut a lookup: it runs
+  // with the deadline set to the longest a timer holds, and the slowest
+  // search still answered -- the run would have ended naming it otherwise.
+  // The derivation reads each scenario's operation, which the counting pass
+  // held to what each request addressed.
+  test('runs its server with the lookup deadline out of the way, and derives the default from its own figures', () => {
+    const run = measured()
+    expect(run.server.settings).toContain('FORMANCY_DATA_LOOKUP_DEADLINE_MS')
+    expect(lookupDeadlineFrom(run.scenarios, run.catalogue).ms).toBeGreaterThan(0)
   })
 
   // A smoke result proves the harness runs; published, it would be noise.
