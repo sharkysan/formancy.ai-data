@@ -2,82 +2,143 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
-import { agGridRowProblem, declaredFamilies, focusScrollProblem, fontProblem, lostCreate, rowUnmeasured, systemOf, unlikeTheTable } from './browser-gate.mjs'
+import { agGridRowProblem, declaredFamilies, focusScrollProblem, fontProblem, foreignProblem, isFontFile, isForeign, lostCreate, rowUnmeasured, systemOf, unlikeTheTable } from './browser-gate.mjs'
 
 /**
  * What every browser gate does to a page in every browser (0058), in the
- * parts that need no browser: the web fonts a built page asks for, what a
- * pass that loaded them or refused them is failed with, the system a run
- * records, the sentence a fact's check fails with, and what 0058's rows say
- * of what a browser did or said. What the page does with them is the
- * gates' own, in each browser.
+ * parts that need no browser: the web fonts a built page declares, what a
+ * pass that loaded them or refused them is failed with, which requests a
+ * pass refuses and how it names them (0072), the system a run records, the
+ * sentence a fact's check fails with, and what 0058's rows say of what a
+ * browser did or said. What the page does with them is the gates' own, in
+ * each browser.
  */
 let dirs = []
 afterEach(() => {
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true })
   dirs = []
 })
-const built = (html) => {
+/** A built page in a temporary directory: its index.html, and `files` by their path in it. */
+const built = (html, files = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'formancy-data-browser-gate-'))
   dirs.push(dir)
-  mkdirSync(dir, { recursive: true })
+  mkdirSync(join(dir, 'assets'), { recursive: true })
   writeFileSync(join(dir, 'index.html'), html, 'utf8')
+  for (const [path, text] of Object.entries(files)) writeFileSync(join(dir, path), text, 'utf8')
   return dir
 }
 
-const LINK = 'https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,500..800&amp;family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap'
+/** Fontsource's rules as Vite's build writes them: quoted by the package, bare where lightningcss minified them, several faces to a family. */
+const FACES =
+  "@font-face{font-family:'IBM Plex Sans';font-weight:400;src:url(./ibm-plex-sans-latin-400-normal-CcBhy9p4.woff2) format('woff2')}" +
+  "@font-face{font-family:'IBM Plex Sans';font-weight:600;src:url(./ibm-plex-sans-latin-600-normal-B4bNJ8eX.woff2) format('woff2')}" +
+  '@font-face{font-family:Archivo Variable;font-weight:100 900;src:url(./archivo-latin-wght-normal-D9H2jx1E.woff2) format("woff2-variations")}' +
+  '@font-face{font-family:"IBM Plex Mono";src:url(data:font/woff2;base64,d09GMgABAAAAA) format("woff2")}'
 
 describe('declaredFamilies', () => {
-  // The families are what the built page asks Google Fonts for, read from
-  // the page itself: typed here, a family added to index.html would be
-  // checked by nobody, and one removed would fail every pass for a font the
-  // page no longer wants.
-  test('reads every family of the built page’s Google Fonts stylesheet, its axes left off and `+` read as a space', () => {
-    const dir = built(`<!doctype html><link rel="preconnect" href="https://fonts.googleapis.com" /><link href="${LINK}" rel="stylesheet" />`)
-    expect(declaredFamilies(dir)).toEqual(['Archivo', 'IBM Plex Mono', 'IBM Plex Sans'])
+  // The families are what the built page's own stylesheets declare a face
+  // of, read from the build itself: typed here, a face an app added would be
+  // checked by nobody, and one it dropped would fail every pass for a font
+  // the page no longer carries. Vite links them absolute in the studio and
+  // the host page, relative in the examples page.
+  test('reads every family the stylesheets the built page links declare a face of, quoted or bare, once each', () => {
+    for (const href of ['./assets/index-jUG2n6pz.css', '/assets/index-jUG2n6pz.css']) {
+      const dir = built(`<!doctype html><link rel="stylesheet" crossorigin href="${href}">`, { 'assets/index-jUG2n6pz.css': `body{color:red}${FACES}` })
+      expect(declaredFamilies(dir), href).toEqual(['Archivo Variable', 'IBM Plex Mono', 'IBM Plex Sans'])
+    }
   })
 
-  test('is empty for a page that asks Google Fonts for nothing', () => {
-    expect(declaredFamilies(built('<!doctype html><link rel="preconnect" href="https://fonts.googleapis.com" />'))).toEqual([])
+  // turbo replays a cached build over a dist it never cleans (0069), so an
+  // earlier build's stylesheet can lie beside the page's; and a stylesheet on
+  // another host is the static guard's to refuse, not a face of this build.
+  test('reads no stylesheet the page does not link, nor one on another host', () => {
+    const dir = built('<!doctype html><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo"><link rel="stylesheet" href="./assets/index-a.css">', {
+      'assets/index-a.css': 'body{}',
+      'assets/index-old.css': FACES,
+    })
+    expect(declaredFamilies(dir)).toEqual([])
+  })
+
+  // A link that climbs out of dist would have the gate read a file the
+  // browser is never sent.
+  test('refuses a stylesheet whose path leaves dist', () => {
+    expect(() => declaredFamilies(built('<link rel="stylesheet" href="/assets/..%2F..%2Foutside.css">'))).toThrow('dist/index.html links /assets/..%2F..%2Foutside.css, which is outside dist')
   })
 })
 
 describe('fontProblem', () => {
-  const families = ['Archivo', 'IBM Plex Mono', 'IBM Plex Sans']
+  const families = ['Archivo Variable', 'IBM Plex Mono', 'IBM Plex Sans']
 
   // 0021 chose to measure whichever fonts arrive and print which. A browser
-  // with no TLS, or a network that refuses Google Fonts, then reports a
-  // web-font pass that measured the fallback stack, and nothing fails:
+  // with no TLS, or a network that refused the font host, then reported a
+  // web-font pass that measured the fallback stack, and nothing failed:
   // in the probe of 2026-10-12, WebKit loaded none in every pass and all
   // 119 checks passed.
-  test('fails a pass that does not refuse the web fonts unless every family the page asks for loaded', () => {
+  test('fails a pass that does not refuse the web fonts unless every family the build declares loaded', () => {
     expect(fontProblem({ families, loaded: [...families], refused: false })).toBeNull()
-    expect(fontProblem({ families, loaded: ['Archivo'], refused: false })).toBe('IBM Plex Mono and IBM Plex Sans did not load, so this pass measured the fallback stack in their place')
+    expect(fontProblem({ families, loaded: ['Archivo Variable'], refused: false })).toBe('IBM Plex Mono and IBM Plex Sans did not load, so this pass measured the fallback stack in their place')
   })
 
-  // A pass whose Google Fonts stylesheet never arrived -- seen once on
-  // 2026-10-13, the first Chromium pass of a run through a proxy, and not
-  // again in two runs after -- is the network's, not the page's: the
-  // failure says how many files the page fetched from Google Fonts, so a
-  // red leg can be told from a page that stopped asking.
-  test('says how many files the page fetched from Google Fonts when it fails', () => {
-    expect(fontProblem({ families, loaded: [], fetched: 0, refused: false })).toBe('Archivo, IBM Plex Mono and IBM Plex Sans did not load, so this pass measured the fallback stack in their place (the page fetched 0 files from Google Fonts)')
-    expect(fontProblem({ families, loaded: ['Archivo'], fetched: 1, refused: true })).toBe('Archivo loaded anyway, so this pass measured the web fonts, not the fallback stack (the page fetched 1 file from Google Fonts)')
+  // A pass whose faces never arrived is told from a page that stopped
+  // declaring them by how many font files the page fetched.
+  test('says how many font files the page fetched when it fails', () => {
+    expect(fontProblem({ families, loaded: [], fetched: 0, refused: false })).toBe('Archivo Variable, IBM Plex Mono and IBM Plex Sans did not load, so this pass measured the fallback stack in their place (the page fetched 0 font files)')
+    expect(fontProblem({ families, loaded: ['Archivo Variable'], fetched: 1, refused: true })).toBe('Archivo Variable loaded anyway, so this pass measured the web fonts, not the fallback stack (the page fetched 1 font file)')
   })
 
   // Nothing checked that the refusing pass refused: a route that stopped
-  // matching Google's hosts would measure the web fonts twice, and the
+  // matching the font files would measure the web fonts twice, and the
   // fallback stack never.
   test('fails the refusing pass unless none loaded', () => {
     expect(fontProblem({ families, loaded: [], refused: true })).toBeNull()
     expect(fontProblem({ families, loaded: ['IBM Plex Sans'], refused: true })).toBe('IBM Plex Sans loaded anyway, so this pass measured the web fonts, not the fallback stack')
   })
 
-  // A page whose link the gate cannot read would pass both checks with
-  // nothing to compare: neither "all of none loaded" nor "none loaded" says
-  // anything about the page.
-  test('fails both kinds of pass for a page that asks for no family', () => {
-    for (const refused of [false, true]) expect(fontProblem({ families: [], loaded: [], refused })).toBe('the built page asks Google Fonts for nothing; the gate reads its families from dist/index.html')
+  // A build whose stylesheets the gate cannot read would pass both checks
+  // with nothing to compare: neither "all of none loaded" nor "none loaded"
+  // says anything about the page.
+  test('fails both kinds of pass for a build that declares no face', () => {
+    for (const refused of [false, true]) {
+      expect(fontProblem({ families: [], loaded: [], refused })).toBe("the built page's stylesheets declare no font face; the gate reads its families from the stylesheets dist/index.html links")
+    }
+  })
+})
+
+describe('the requests a pass refuses (0072)', () => {
+  const origins = new Set(['http://127.0.0.1:4391'])
+
+  // A page that asks another host for anything tells it about every
+  // visitor, and makes a gate's answer depend on that host: refused and
+  // named. Another port of the gate's own address is another server, so
+  // another origin; the page's own bytes, as data: or blob:, are no request.
+  test('is every request to an origin the gate does not serve', () => {
+    expect(isForeign('http://127.0.0.1:4391/data/examples/assets/index-a.js', origins)).toBe(false)
+    expect(isForeign('https://fonts.googleapis.com/css2?family=Archivo', origins)).toBe(true)
+    expect(isForeign('https://fonts.gstatic.com/s/archivo/v25/x.woff2', origins)).toBe(true)
+    expect(isForeign('http://127.0.0.1:4390/v1/forms', origins)).toBe(true)
+    expect(isForeign('http://localhost:4391/', origins)).toBe(true)
+    expect(isForeign('data:image/svg+xml,%3Csvg%3E', origins)).toBe(false)
+    expect(isForeign('blob:http://127.0.0.1:4391/0b8f6d5e-1f3a-4c1e-9c4e-4c1d2e3f4a5b', origins)).toBe(false)
+  })
+
+  // Once the faces are the page's own, a network that blocks a font host is
+  // no longer why a pass refuses them; a browser or an extension that refuses
+  // web fonts still is, and it refuses them wherever they come from.
+  test('and, in the pass that refuses the web fonts, every font file from any origin', () => {
+    expect(isFontFile('http://127.0.0.1:4391/assets/ibm-plex-sans-latin-400-normal-CcBhy9p4.woff2')).toBe(true)
+    expect(isFontFile('http://127.0.0.1:4391/assets/ibm-plex-sans-latin-400-normal-CcBhy9p4.woff')).toBe(true)
+    expect(isFontFile('https://cdn.example/f.WOFF2?v=1')).toBe(true)
+    expect(isFontFile('http://127.0.0.1:4391/assets/index-jUG2n6pz.css')).toBe(false)
+    expect(isFontFile('http://127.0.0.1:4391/assets/woff2.js')).toBe(false)
+  })
+
+  // The check names what was asked, each once, so a red leg says which host.
+  test('are named, each once, in what the check fails with', () => {
+    expect(foreignProblem([])).toBeNull()
+    expect(foreignProblem(['https://fonts.googleapis.com/css2?family=A', 'https://fonts.googleapis.com/css2?family=A'])).toBe('1 address on another origin, each refused: https://fonts.googleapis.com/css2?family=A')
+    expect(foreignProblem(['https://a.example/1', 'https://a.example/2', 'https://a.example/3', 'https://a.example/4', 'https://a.example/5'])).toBe(
+      '5 addresses on another origin, each refused: https://a.example/1, https://a.example/2, https://a.example/3, https://a.example/4, …',
+    )
   })
 })
 

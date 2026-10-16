@@ -43,7 +43,8 @@ import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } 
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { HASHED, headerRules, headersFile, POLICY, policyProblems, references, resolved } from './demo-headers.mjs'
+import { references, resolved } from './addresses.mjs'
+import { HASHED, headerRules, headersFile, POLICY, policyProblems } from './demo-headers.mjs'
 import { NOTICES_FILE } from './third-party-notices.mjs'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..')

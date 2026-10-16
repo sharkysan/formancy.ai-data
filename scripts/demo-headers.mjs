@@ -29,6 +29,7 @@
 // Nothing here reads what formancy.ai answers again: the gate holds the page
 // to these headers as this module reads the file.
 
+import { elements, rel, resolved, stylesheetLinks } from './addresses.mjs'
 import { NOTICES_FILE } from './third-party-notices.mjs'
 
 /**
@@ -192,39 +193,6 @@ export function headersFor(rules, pathname) {
 }
 
 /**
- * An attribute as HTML writes it: a name, and a value double-quoted,
- * single-quoted or unquoted, or none.
- */
-const ATTRIBUTE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g
-
-/**
- * Each `tag` element of `html` (a pattern), as its attributes: lowercased
- * names, `true` for one with no value. A `>` inside a quoted value does not
- * end the tag.
- */
-function elements(html, tag) {
-  return [...html.matchAll(new RegExp(`<${tag}\\b((?:[^>"']|"[^"]*"|'[^']*')*)>`, 'gi'))].map((match) =>
-    Object.fromEntries([...match[1].matchAll(ATTRIBUTE)].map(([, name, double, single, bare]) => [name.toLowerCase(), double ?? single ?? bare ?? true])),
-  )
-}
-
-/** Every `src` and `href` of every element of `html`, as `{ name, value }`, in order. */
-export function references(html) {
-  return elements(html, '[a-z][\\w-]*').flatMap((attributes) =>
-    ['src', 'href'].filter((name) => typeof attributes[name] === 'string').map((name) => ({ name, value: attributes[name] })),
-  )
-}
-
-/** `value` resolved as the page at `address` resolves it, or null for one that is no URL. */
-export function resolved(value, address) {
-  try {
-    return new URL(value, address)
-  } catch {
-    return null
-  }
-}
-
-/**
  * The origins of the http(s) addresses in `list` other than the page's own,
  * resolved as the page at `address` resolves them -- a protocol-relative
  * `//host/…` included -- once each, sorted.
@@ -277,10 +245,9 @@ export function policyProblems(policy, { html, stylesheets, address }) {
   if (scripts.some((attributes) => attributes.src === undefined)) problems.push('index.html has an inline script, which script-src refuses')
   if (/<style\b/i.test(html) || elements(html, '[a-z][\\w-]*').some((attributes) => attributes.style !== undefined)) problems.push('index.html has an inline style, which style-src refuses')
 
-  const rel = (attributes) => String(attributes.rel ?? '').toLowerCase().split(/\s+/)
   const loads = {
     'script-src': foreign(scripts.map((attributes) => attributes.src), address),
-    'style-src': foreign(links.filter((attributes) => rel(attributes).includes('stylesheet')).map((attributes) => attributes.href), address),
+    'style-src': foreign(stylesheetLinks(html), address),
     'font-src': foreign(links.filter((attributes) => rel(attributes).includes('preconnect') && attributes.crossorigin !== undefined).map((attributes) => attributes.href), address),
   }
   for (const [name, sources] of Object.entries(policy)) {

@@ -7,6 +7,7 @@ import { describe, expect, test } from 'vitest'
 import { configProblems, demoBase, demoUrl, indexProblems, namingProblems, readDemoConfig, unhashedAssets, unloadedAssets, viteBuild, WORKER, WRANGLER } from './demo.mjs'
 import { contentSecurityPolicy, headerRules, headersFile, headersFor, parseHeadersFile, policyProblems, POLICY } from './demo-headers.mjs'
 import { serveDemo } from './demo-serve.mjs'
+import { fontPackages } from './fonts.mjs'
 import { NOTICES_FILE } from './third-party-notices.mjs'
 
 /**
@@ -31,11 +32,13 @@ const address = 'https://formancy.ai/data/examples/'
 
 /**
  * The stylesheets the page draws with, as they are before the build: the
- * Blueprint theme it imports, as installed, and its own. What the built
+ * faces it imports from Fontsource's packages, read from src/main.tsx, and
+ * the Blueprint theme, each as installed, and its own. What the built
  * stylesheets hold is what scripts/demo.mjs checks at deploy time, against
  * the same policy.
  */
-const stylesheets = [readFileSync(createRequire(join(app, 'package.json')).resolve('@formancy/themes/blueprint.css'), 'utf8'), read('apps', 'examples', 'src', 'app.css')]
+const installed = (specifier) => readFileSync(createRequire(join(app, 'package.json')).resolve(specifier), 'utf8')
+const stylesheets = [...fontPackages(app).flatMap((entry) => entry.stylesheets).map(installed), installed('@formancy/themes/blueprint.css'), read('apps', 'examples', 'src', 'app.css')]
 
 /** The text under `## <title>`, up to the next heading of that level. */
 function section(title) {
@@ -110,7 +113,7 @@ describe('the demo on formancy.ai (0069)', () => {
   // page's directory.
   test('refuses a built page that asks formancy.ai for a file other than by a path relative to the page, and only that', () => {
     expect(indexProblems('<script type="module" crossorigin src="./assets/index-a.js"></script><link rel="stylesheet" crossorigin href="./assets/index-b.css">', address)).toEqual([])
-    expect(indexProblems('<link rel="icon" href="data:," /><link href="https://fonts.googleapis.com/css2?family=Archivo" rel="stylesheet" />', address)).toEqual([])
+    expect(indexProblems('<link rel="icon" href="data:," /><link href="https://cdn.example/x.css" rel="stylesheet" />', address)).toEqual([])
     expect(indexProblems('<script type="module" crossorigin src="/assets/index-a.js"></script>', address)).toEqual(['src="/assets/index-a.js"'])
     expect(indexProblems('<link rel="modulepreload" crossorigin href="/data/examples/assets/c.js">', address)).toEqual(['href="/data/examples/assets/c.js"'])
     expect(indexProblems("<script src='/assets/x.js'></script>", address)).toEqual(['src="/assets/x.js"'])
@@ -305,16 +308,16 @@ describe("the demo's headers (0069)", () => {
   const rules = headerRules(demoBase(wrangler))
 
   // The policy as decided, directive by directive: nothing a directive
-  // does not name, nothing inline and nothing evaluated, scripts, styles
-  // and fetches from formancy.ai's own origin and Google's fonts, no
-  // plugin, no <base>, no form sent anywhere and no page framing it. A
-  // directive loosened here is a change to the record.
+  // does not name, nothing inline and nothing evaluated, scripts, styles,
+  // faces and fetches from formancy.ai's own origin and no other host
+  // (0072), no plugin, no <base>, no form sent anywhere and no page framing
+  // it. A directive loosened here is a change to the record.
   test('the Content-Security-Policy is the strict one the record names', () => {
     expect(POLICY).toEqual({
       'default-src': ["'none'"],
       'script-src': ["'self'"],
-      'style-src': ["'self'", 'https://fonts.googleapis.com'],
-      'font-src': ['https://fonts.gstatic.com'],
+      'style-src': ["'self'"],
+      'font-src': ["'self'"],
       'img-src': ['data:'],
       'connect-src': ["'self'"],
       'object-src': ["'none'"],
@@ -325,26 +328,31 @@ describe("the demo's headers (0069)", () => {
     expect(contentSecurityPolicy()).not.toMatch(/unsafe|\*|https?:(?:\s|;|$)/)
   })
 
-  // A font host the page stopped using, or one it began to, is a policy
-  // that names a host for nothing or a page whose fonts the browser
-  // refuses. Derived from index.html and the stylesheets, never typed: each
-  // host the policy names is one the page loads, in the directive it loads
-  // it under, and the data: images the theme draws are the only reason
-  // img-src names anything.
-  test('names exactly the hosts index.html loads, and data: only for the images the stylesheets draw', () => {
+  // A host the page stopped using, or one it began to, is a policy that
+  // names a host for nothing or a page whose files the browser refuses.
+  // Derived from index.html and the stylesheets, never typed: each host the
+  // policy names is one the page loads, in the directive it loads it under
+  // -- a face by its stylesheet's url() -- and the data: images the theme
+  // draws are the only reason img-src names anything.
+  test('names exactly the hosts the page loads from, and data: only for the images the stylesheets draw', () => {
     expect(policyProblems(POLICY, { html: index, stylesheets, address })).toEqual([])
   })
 
   test.each([
     ['an inline script in the page', { html: index.replace('</body>', '<script>window.x = 1</script></body>') }, 'inline'],
     ['a style attribute in the page', { html: index.replace('<div id="root">', '<div id="root" style="color: red">') }, 'style'],
-    ['the fonts link removed from the page', { html: index.replace(/<link\s+href="https:\/\/fonts\.googleapis\.com[^>]*>/, '') }, 'https://fonts.googleapis.com'],
     ['a script from another host', { html: index.replace('</head>', '<script src="https://cdn.example/x.js"></script></head>') }, 'https://cdn.example'],
     ['a script from another host, by a protocol-relative address', { html: index.replace('</head>', '<script src="//cdn.example/x.js"></script></head>') }, 'https://cdn.example'],
     ['a script from another host, single-quoted', { html: index.replace('</head>', "<script src='https://cdn.example/x.js'></script></head>") }, 'https://cdn.example'],
     ['a stylesheet from another host, unquoted', { html: index.replace('</head>', '<link rel=stylesheet href=https://cdn.example/x.css></head>') }, 'https://cdn.example'],
     ['a script from another host, after a > in a quoted attribute', { html: index.replace('</head>', '<script data-x="a>b" src="https://cdn.example/x.js"></script></head>') }, 'https://cdn.example'],
-    ['the font host the page preconnects to missing', { policy: { ...POLICY, 'font-src': ["'self'"] } }, 'https://fonts.gstatic.com'],
+    // A face is fetched under font-src, from wherever its stylesheet's
+    // url() says, which index.html never shows (0072).
+    ['a face on another host in a stylesheet', { stylesheets: [...stylesheets, "@font-face{font-family:X;src:url(https://cdn.example/f.woff2) format('woff2')}"] }, 'https://cdn.example'],
+    ['a face on another host, by a protocol-relative address', { stylesheets: [...stylesheets, '@font-face{font-family:X;src:url("//cdn.example/f.woff2")}'] }, 'https://cdn.example'],
+    ['a stylesheet another host serves, imported by one of the page', { stylesheets: [...stylesheets, "@import url('https://cdn.example/x.css');"] }, 'https://cdn.example'],
+    ["the page's own faces with font-src not allowing 'self'", { policy: { ...POLICY, 'font-src': ["'none'"] } }, "font-src does not allow 'self'"],
+    ['a face inlined as a data: URL, which font-src refuses', { stylesheets: [...stylesheets, "@font-face{font-family:X;src:url(data:font/woff2;base64,d09GMgAB) format('woff2')}"] }, 'inlines a face as a data: URL'],
     ['a host the page never loads', { policy: { ...POLICY, 'connect-src': ["'self'", 'https://api.example'] } }, 'https://api.example'],
     ['inline scripts allowed', { policy: { ...POLICY, 'script-src': ["'self'", "'unsafe-inline'"] } }, 'unsafe-inline'],
     ['eval allowed', { policy: { ...POLICY, 'script-src': ["'self'", "'unsafe-eval'"] } }, 'unsafe-eval'],

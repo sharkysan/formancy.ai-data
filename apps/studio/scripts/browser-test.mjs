@@ -32,10 +32,13 @@
 //     carried (0030), a version file chosen and its import refused (0062),
 //     and under review a draft submitted, a draft open for review and a
 //     draft approved (0065);
-//   - every web font the built studio asks for had loaded by the end of
+//   - every web font the built studio declares had loaded by the end of
 //     each pass, on each origin the pass signed in to, and in the pass that
-//     refuses them, none had (0058): a state measured before a late family
-//     swapped in is not caught.
+//     refuses every font file, none had (0058): a state measured before a
+//     late family swapped in is not caught;
+//   - on each origin, the page asked no other origin for anything: every
+//     such request is refused, so the answer is the same with no network,
+//     and named (0072).
 //
 // Against the page `vite build` produces, served over HTTP from the same
 // origin as the real data server -- createDataServer, in this process, with
@@ -59,7 +62,7 @@
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEveryPass, declaredFamilies, fontProblem, fromTheTop, unlikeTheTable, webFonts } from '../../../scripts/browser-gate.mjs'
+import { afterEveryPass, declaredFamilies, fontProblem, foreignProblem, fromTheTop, guardRequests, unlikeTheTable, webFonts } from '../../../scripts/browser-gate.mjs'
 import { FACTS } from '../../../scripts/browsers.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { journey } from './browser/journey.mjs'
@@ -144,19 +147,23 @@ async function wayIn(gate, page) {
 
 /**
  * The states of review, on a plane under review served from an origin of
- * its own, in the same page: signed in there as the author, each state
- * measured as the journey's are, then the web fonts of that document.
+ * its own, in the same page, which `guard` is told: signed in there as the
+ * author, each state measured as the journey's are, then what that document
+ * asked of other origins and its web fonts.
  */
-async function underReview(gate, page, refuseFonts) {
+async function underReview(gate, page, { refuseFonts, guard }) {
   const plane = await startPlane({ review: true })
   const { http, port } = await serve(plane)
   try {
-    await page.goto(`http://127.0.0.1:${String(port)}/`, { waitUntil: 'load' })
+    const origin = `http://127.0.0.1:${String(port)}`
+    guard.allow(origin)
+    await page.goto(`${origin}/`, { waitUntil: 'load' })
     await signIn(page, TOKENS.admin)
     for (const [state, act] of review(gate.check)) {
       await act(page)
       await measured(gate, page, state)
     }
+    gate.check('under review, the page asked no other origin for anything', foreignProblem(guard.foreign()))
     const problem = fontProblem({ families: declaredFamilies(DIST), ...(await webFonts(page)), refused: refuseFonts })
     gate.check(refuseFonts ? 'under review, with the web fonts refused, none loaded' : 'under review, every web font the page asks for loaded', problem)
   } finally {
@@ -175,9 +182,12 @@ async function run(gate, browser) {
     const plane = await startPlane()
     const { http, port } = await serve(plane)
     const page = await browser.newPage({ viewport: { width, height: 900 } })
-    if (refuseFonts) await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort())
+    const origin = `http://127.0.0.1:${String(port)}`
+    // Every request to another origin refused and named at the end of the
+    // pass, and in the refusing pass every font file (0072).
+    const guard = await guardRequests(page, { origins: [origin], refuseFonts })
     try {
-      await page.goto(`http://127.0.0.1:${String(port)}/`, { waitUntil: 'load' })
+      await page.goto(`${origin}/`, { waitUntil: 'load' })
       console.log(`\n${label} -- ${String(width)}x900`)
       await wayIn(gate, page)
       await measured(gate, page, 'Connect')
@@ -185,9 +195,11 @@ async function run(gate, browser) {
         await act(page)
         await measured(gate, page, state)
       }
-      // Whether every web font had loaded by the end of the journey, or, where the pass refuses them, none had.
-      await afterEveryPass(gate, page, { dist: DIST, refused: refuseFonts })
-      await underReview(gate, page, refuseFonts)
+      // Whether the page asked another origin for anything, and whether every
+      // web font had loaded by the end of the journey, or, where the pass
+      // refuses them, none had.
+      await afterEveryPass(gate, page, { dist: DIST, refused: refuseFonts, guard })
+      await underReview(gate, page, { refuseFonts, guard })
     } finally {
       await page.close()
       http.close()
