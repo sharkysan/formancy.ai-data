@@ -157,6 +157,59 @@ The publish job has never run. A test holds its shape
 (`scripts/release-report/workflows.test.mjs`); the first tag is the first
 time it runs.
 
+## The demo on formancy.ai
+
+The Worker `formancy-data-examples` is created once, in Cloudflare's
+dashboard or by a first `pnpm demo:deploy`, by the steps in
+[REPO-METADATA.md](.github/REPO-METADATA.md#creating-the-worker); until
+then https://formancy.ai/data/examples/ is formancy.ai's 404. From then
+on Cloudflare deploys the examples page there on every push to `main`,
+through Workers Builds
+([0069](docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
+The Worker builds with `pnpm build` and deploys with
+`node scripts/demo.mjs`, the two halves of `pnpm demo:deploy`, with the
+settings in
+[REPO-METADATA.md](.github/REPO-METADATA.md#the-demos-worker-on-cloudflare).
+So the demo is main's page, not the latest release's, and a release needs
+nothing more for it. GitHub's workflows hold no Cloudflare token and never
+deploy.
+
+`node scripts/demo.mjs` refuses:
+- a checkout with changes;
+- a Worker config in `apps/examples/wrangler.json` that is not the demo's,
+  another Worker's name included;
+- an examples Vite config that names what it bundles without a hash;
+- a built page that asks formancy.ai for a file other than by a path
+  relative to it, holds a file in `assets/` copied from the public
+  directory or whose name has not a hash's shape, does not fit the
+  Content-Security-Policy of `scripts/demo-headers.mjs`, or carries no
+  `THIRD-PARTY-NOTICES.txt`.
+
+Then it stages the build under `data/examples/` with the `_headers` file
+beside it, and deploys with the pinned Wrangler, with the commit in the
+deployment's message. A failed build leaves the last deployment serving.
+Its log is on the Worker's page in Cloudflare's dashboard, and nothing in
+this repository reads it. After a deploy, open the address, press Validate
+in a preview, and see both renderers refuse the empty required fields; and
+`curl -sI https://formancy.ai/data/examples/THIRD-PARTY-NOTICES.txt`
+should say `Content-Type: text/plain; charset=utf-8`, which nothing here
+has yet read from Cloudflare.
+
+By hand, from a clean checkout of `main`, with a Cloudflare login that can
+edit Workers on formancy.ai's zone:
+
+```bash
+npx --yes wrangler@4.146.0 login     # once per machine
+pnpm demo:deploy
+```
+
+The deploy refuses changes, not another branch: run from a branch, it would
+serve that branch's page until the next push to `main`.
+
+`node scripts/demo.mjs --dry-run`, after `pnpm build`, does everything but
+the upload and the refusal of uncommitted changes, with no login: it
+checks a working tree as it stands.
+
 ## Provenance
 
 `npm publish --provenance` under `id-token: write` makes npm record a

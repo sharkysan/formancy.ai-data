@@ -395,7 +395,7 @@
       ]
     },
     "0021": {
-      "reviewed": "sha256:9c3435c4c0631707f967c81d2da0ded5fbe9b532c7545626c17c9758f9f2bf9e",
+      "reviewed": "sha256:9fdc2f63f59d1c4f72112a780a7698b659bf2a675e0f6f66b6ad98950a364079",
       "limitations": [
         {
           "area": "forms",
@@ -902,7 +902,7 @@
       "none": "A rule for this repository's branches; nobody who installs, integrates or operates the module meets it."
     },
     "0037": {
-      "reviewed": "sha256:99df0bb1149caa5d63f192261dcc2318b0823cf9af7388afb9094ca087a66390",
+      "reviewed": "sha256:1a5e8bb33ee516ba04703283597e7859f6fe212c206419d86a53413e8f361d72",
       "limitations": [
         {
           "area": "operations",
@@ -1296,7 +1296,7 @@
       ]
     },
     "0046": {
-      "reviewed": "sha256:bc6e4fd4ff2cfae13de07b795e999fd8dc16a8d721e79271aeac6e7a991d0e3e",
+      "reviewed": "sha256:3171bf9e2f198de27e13c3696175eebc994b781185bad50513f838047a8e6afb",
       "limitations": [
         {
           "area": "licence",
@@ -2146,6 +2146,63 @@
         {
           "area": "studio",
           "says": "The regeneration report does not say that a republish changes a lookup's control."
+        }
+      ]
+    },
+    "0069": {
+      "reviewed": "sha256:e82632a42c697845e1fcdb8153e6933b2f94cf8167ecac0a5d005bea74d093bb",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The demo at formancy.ai/data/examples/ is the examples page as main holds it, deployed by Cloudflare on every push without waiting for that commit's CI, so it can show what no release has published."
+        },
+        {
+          "area": "operations",
+          "says": "Nothing in this repository reads what formancy.ai/data/examples/ serves: a failed deploy leaves the last one serving with its log in Cloudflare's dashboard, and the headers -- the notices' UTF-8 type among them -- are applied as Cloudflare documents its _headers file, which was not measured against Cloudflare, nor whether a redirect or a 404 carries them."
+        },
+        {
+          "area": "operations",
+          "says": "The demo's Content-Security-Policy allows scripts, styles and fetches from all of formancy.ai's origin, the report's Studio and whatever is routed there later included, not only the demo's path, because a policy held to the path could not be measured in a gate that serves the page from 127.0.0.1."
+        },
+        {
+          "area": "operations",
+          "says": "The demo is a page on formancy.ai's hostname without the site's shell: no site bar, no site footer and no link back to formancy.ai."
+        },
+        {
+          "area": "operations",
+          "says": "The demo Worker's build settings are in Cloudflare's dashboard, where nothing here reads them; a test holds only what .github/REPO-METADATA.md records of them."
+        },
+        {
+          "area": "operations",
+          "says": "Workers Builds reads this repository through the Cloudflare Workers and Pages GitHub app, whose access is a setting of the rightsholder's GitHub account that nothing here reads."
+        },
+        {
+          "area": "operations",
+          "says": "The demo Worker's compatibility date stays until someone reads what moving it changes, and which of Cloudflare's changes tied to that date reach a Worker with no code was not read."
+        },
+        {
+          "area": "operations",
+          "says": "A visitor's browser asks Google for the demo's fonts, and its Content-Security-Policy names Google's two hosts, so fonts Google moves to another host are refused, and the page drawn in its fallback stack, until the policy is edited."
+        },
+        {
+          "area": "licence",
+          "says": "The demo's THIRD-PARTY-NOTICES.txt names the exact version of every package the examples page bundles, to anyone, and the repository's own LICENSE.md and NOTICE are reached through the page's link to the repository, not served beside it."
+        },
+        {
+          "area": "testing",
+          "says": "The data: images the demo's policy allows are drawn only by Safari on a touch device, which no browser gate runs, so that allowance is held by deriving it from the stylesheets, not by a browser."
+        },
+        {
+          "area": "testing",
+          "says": "The examples gate audits with axe's preload off, which was measured to change no rule's outcome on the page on 2026-10-16, and would audit less a page that gained media or a cross-origin stylesheet a rule reads."
+        },
+        {
+          "area": "testing",
+          "says": "The examples gate fails on any console error in any browser, so a browser release that logs a new one fails it until someone reads why."
+        },
+        {
+          "area": "testing",
+          "says": "The examples gate's check of what the browser refused holds the page's code and not axe's: what Playwright evaluates, axe included, was measured to run outside the page's Content-Security-Policy in Chromium and Firefox."
         }
       ]
     }

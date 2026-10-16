@@ -1,6 +1,6 @@
 # 0046 — A built app carries the licence and notice texts of everything it bundles
 
-- **Status:** accepted; extends [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)
+- **Status:** accepted; extends [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md); extended by [0069](0069-the-examples-page-is-served-at-formancy-ai-data-examples.md): the examples page, served at formancy.ai/data/examples/, carries its notices too
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:** `scripts/third-party-notices.test.mjs` (`pnpm test:repo`)

@@ -11,6 +11,9 @@ import { GenerationNotes } from './notes.js'
 import { AngularPane, ReactPane } from './panes.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
 
+/** Where the source is, which the page says because formancy.ai/data/examples/ is reached without the README (0069). */
+const REPOSITORY = 'https://github.com/sharkysan/formancy.ai-data'
+
 /** How a database kind is written for a person. */
 const ENGINE_NAMES: Readonly<Record<DatabaseKind, string>> = { postgres: 'PostgreSQL', sqlserver: 'SQL Server' }
 
@@ -126,6 +129,10 @@ export function App({ captured = CAPTURED }: { captured?: readonly CapturedTable
           fixture captured from {ENGINE_NAMES[FIXTURE_SNAPSHOT.kind]} {FIXTURE_SNAPSHOT.serverVersion}. Each renders
           twice, over the same document: with <code>@formancy/react</code> and with <code>@formancy/angular</code>.
         </p>
+        <p className="standing">
+          A static page, with no server and no database behind it. Formancy Data is source-available:{' '}
+          <a href={REPOSITORY}>sharkysan/formancy.ai-data</a> on GitHub.
+        </p>
         <nav aria-label="Forms on this page">
           <ul>
             {examples.map((example) => (
@@ -145,12 +152,9 @@ export function App({ captured = CAPTURED }: { captured?: readonly CapturedTable
 
       <footer className="colophon">
         <p>
-          Nothing on this page saves. <strong>Validate</strong> runs the formancy engine in your browser, and there is no
-          server behind it yet.
+          Nothing on this page saves. <strong>Validate</strong> runs the formancy engine in your browser.
         </p>
-        <p>
-          Formancy Data is source-available, not open source. The formancy packages it renders with are Apache-2.0.
-        </p>
+        <p>The formancy packages it renders with are Apache-2.0.</p>
       </footer>
     </div>
   )

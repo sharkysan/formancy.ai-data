@@ -24,19 +24,24 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > **Status: 0.1.0, the first release.** On `main` since it, and not yet
 > released: publication under review
 > ([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)),
-> which a 0.1.0 server does not have and whose setting it ignores; and a
+> which a 0.1.0 server does not have and whose setting it ignores; a
 > lookup a person can search generated as a typeahead
 > ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)),
 > which a form published at 0.1.0 does not carry until it is regenerated
-> and published again, as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased*
-> says. Each line under
+> and published again; and the examples page served at
+> https://formancy.ai/data/examples/ once its Worker is created, under a
+> strict Content-Security-Policy, which Cloudflare deploys from `main` and
+> not from a release
+> ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)),
+> as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
 > page of records, the menu of forms or a delete, a host page that draws a
 > field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
 > a host page on another origin run in a browser, a run through a real
-> Cloudflare tunnel, and a licence a lawyer has reviewed.
+> Cloudflare tunnel, a reading of what Cloudflare sends at the demo's
+> address, and a licence a lawyer has reviewed.
 > [`CHANGELOG.md`](./CHANGELOG.md) says what the release contains and what
 > each step before it found.
 
@@ -51,6 +56,15 @@ a clean checkout
 ([0032](./docs/decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
 Starting the stack accepts the EULA of SQL Server's Developer edition, which
 is not licensed for production.
+
+With nothing installed, the [examples page](#examples) is served at
+https://formancy.ai/data/examples/ once its Worker is created
+([the steps](./.github/REPO-METADATA.md#creating-the-worker)): forms
+generated in your browser from a captured snapshot and drawn by both
+renderers, with no server and no database behind them. Cloudflare then
+deploys it from `main` on every push, and `pnpm demo` runs the same build
+from a clone
+([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
 
 ## What it does
 
@@ -291,14 +305,18 @@ Version 1.1, under which a redistribution agreement is requested at the same
 address as a production licence, is
 [0054](./docs/decisions/0054-version-1-1-names-the-address-for-a-redistribution-agreement-too.md).
 
-The studio and the host page bundle other people's packages, React, Angular
-and upstream formancy among them: each build writes `THIRD-PARTY-NOTICES.txt`
-beside its page with their licence and notice texts, but for what
+The studio, the host page and the examples page bundle other people's
+packages, React, Angular and upstream formancy among them: each build writes
+`THIRD-PARTY-NOTICES.txt` beside its page with their licence and notice
+texts, but for what
 [0046](./docs/decisions/0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md)
 names, and stops when a bundled package ships no licence text. The composed
 stack serves them at `/studio/THIRD-PARTY-NOTICES.txt` and
 `/host/THIRD-PARTY-NOTICES.txt`, and this repository's own `LICENSE.md` and
-`NOTICE` are in the image.
+`NOTICE` are in the image. The examples page's are at
+https://formancy.ai/data/examples/THIRD-PARTY-NOTICES.txt, and the page
+links this repository for the rest
+([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
 
 ## Studio
 
@@ -550,12 +568,15 @@ journey, and a delete's confirmations and answers.
 
 ## Examples
 
-`apps/examples` is a private page, never published, that shows a generated form
-the way the people filling it in will see it — under both renderers at once.
+`apps/examples` is a page, never published to npm, that shows a generated
+form the way the people filling it in will see it — under both renderers at
+once. It is served at https://formancy.ai/data/examples/ once its Worker
+is created ([the steps](./.github/REPO-METADATA.md#creating-the-worker)),
+and runs from a clone:
 
 ```bash
-pnpm build
-pnpm --filter @formancy/data-examples dev        # http://localhost:4391
+pnpm demo                                        # builds, then serves the built page at http://localhost:4391
+pnpm --filter @formancy/data-examples dev        # after pnpm build: the dev server, at http://localhost:4391
 ```
 
 It reads a snapshot of the shared fixture, checks it against its fingerprint,
@@ -574,12 +595,37 @@ renderers to the same fields by accessible name and the same error codes
 
 <!-- end generated -->
 
+The demo is a Cloudflare Worker of its own with static assets and no code,
+routed at `/data/examples/` of formancy.ai and nowhere else, which
+Cloudflare's Workers Builds deploys from `main` on every push; `/data`
+itself is kept for the product's page on formancy.ai. Every file under the
+path is sent with a Content-Security-Policy that allows nothing a directive
+does not name, nothing inline and nothing evaluated, scripts, styles and
+fetches from formancy.ai's own origin -- its whole site, not only this path
+-- and Google's fonts and no other host, and no form sent anywhere, with
+`nosniff`, `no-referrer` and a Permissions-Policy that denies what the page
+does not use; the hashed chunks are cached for a year, and the third-party
+notices are sent as UTF-8 text
+([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
+The Worker runs none of the product: no server, no database and neither
+plane, which stay where the composed stack puts them, with Cloudflare at
+most their edge
+([0037](./docs/decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)).
+GitHub's workflows hold no Cloudflare token and never deploy. By hand,
+`pnpm demo:deploy` deploys from a clean checkout of `main` after the
+Wrangler login [RELEASING.md](./RELEASING.md#the-demo-on-formancyai)
+names, and `node scripts/demo.mjs --dry-run`, after `pnpm build`, checks
+the config and the build and uploads nothing.
+
 What the suite cannot see, because jsdom performs no layout, a browser gate
-measures, in CI in Chromium, Firefox and WebKit: no sideways scroll down to
+measures, in CI in Chromium, Firefox and WebKit, with the built page served
+under `/data/examples/` with the demo's headers: no sideways scroll down to
 320 pixels, the keyboard path through the skip link into the first preview,
-and colour contrast and target size, clean and after a failed submit; and
-that every web font the page asks for had loaded by the end of each pass,
-or, in the one that refuses them, none had.
+and colour contrast and target size, clean and after a failed submit; that
+every web font the page asks for had loaded by the end of each pass, or, in
+the one that refuses them, none had; that the browser refused nothing
+under the policy, the console said no error, and an inline script put in
+the page was refused; and that the notices were sent as UTF-8 text.
 
 ```bash
 pnpm --filter @formancy/data-examples exec playwright install --with-deps chromium firefox webkit   # once per machine; the system libraries need sudo

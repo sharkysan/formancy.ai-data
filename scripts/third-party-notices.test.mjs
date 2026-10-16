@@ -476,7 +476,8 @@ describe('the packages and apps this repository builds', () => {
   // the notices the old plugin wrote. Each app whose build runs the plugin
   // names it among its build's inputs (its turbo.json), read here as turbo
   // resolves them. The apps are found by the plugins their configs load, and
-  // are the two the web image serves.
+  // are the two the web image serves and the examples page, which the demo
+  // on formancy.ai serves (0069).
   test('each app that writes the notices builds again when the plugin changes', async () => {
     const apps = []
     for (const name of readdirSync(join(repo, 'apps')).sort()) {
@@ -485,12 +486,13 @@ describe('the packages and apps this repository builds', () => {
       const { default: config } = await import(pathToFileURL(file).href)
       if ((config.plugins ?? []).flat(Infinity).some((plugin) => plugin?.name === thirdPartyNotices().name)) apps.push(name)
     }
-    expect(apps).toEqual(['host', 'studio'])
+    expect(apps).toEqual(['examples', 'host', 'studio'])
     const dry = spawnSync('pnpm', ['exec', 'turbo', 'run', 'build', '--dry=json', ...apps.map((name) => `--filter=./apps/${name}`)], { cwd: repo, encoding: 'utf8', shell: process.platform === 'win32' })
     expect(dry.status).toBe(0)
     const tasks = JSON.parse(dry.stdout).tasks
     for (const name of apps) {
-      const task = tasks.find((each) => each.directory === `apps/${name}` && each.task === 'build')
+      // Turbo names a task's directory with the platform's separator: `apps\host` on Windows.
+      const task = tasks.find((each) => each.directory.replaceAll('\\', '/') === `apps/${name}` && each.task === 'build')
       expect({ name, plugin: Object.keys(task?.inputs ?? {}).includes('../../scripts/third-party-notices.mjs') }).toEqual({ name, plugin: true })
     }
   })
