@@ -24,6 +24,13 @@ export interface ServerRecord extends ServerAnswer {
   engine: DatabaseKind
   /** The image the container was started from, as the starter named it. */
   image: string
+  /**
+   * SQL Server: the `compatibility_level` of the database the fixture was
+   * loaded into, which data-core's compatibility floor is held to (0068).
+   * Null for a bare container, which loads none, and for PostgreSQL, which
+   * has no such level.
+   */
+  compatibility: number | null
   /** The absolute path of the file that asked for the server, or null when no frame named one. */
   caller: string | null
   /** The package script that was running (`test-coverage`, `test-browser`), or `direct`. */

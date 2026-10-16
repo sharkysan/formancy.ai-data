@@ -16,7 +16,7 @@ import { connectSqlServer, createSqlServerAdapter } from '@formancy/data-sqlserv
 
 const pool = await connectSqlServer({ host, port, database, user, password, encrypt: true, trustServerCertificate: false })
 const adapter = createSqlServerAdapter(pool)
-await adapter.ping() // { kind: 'sqlserver', version: '16.0.4205.1' }
+await adapter.ping() // { kind: 'sqlserver', version: '16.0.4205.1', product: 'sqlserver', major: 16, compatibility: 160 }
 await adapter.close()
 ```
 

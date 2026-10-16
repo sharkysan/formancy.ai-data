@@ -7,7 +7,7 @@ import { getContainerRuntimeClient } from 'testcontainers'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { blockTable } from './blocking.js'
 import type { PostgresFixture, SqlServerFixture } from './containers.js'
-import { startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
+import { SQLSERVER_DATABASE, startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
 import { connectDocker } from './docker.js'
 import { selectedImage } from './images.js'
 import { FILTER_PARITY } from './parity.js'
@@ -479,7 +479,7 @@ describe('what each start records for the release report', () => {
     const sql = postgres(pg.admin)
     try {
       const [row] = await sql<{ version: string }[]>`select current_setting('server_version') as version`
-      expect(pg.server).toMatchObject({ engine: 'postgres', image: selectedImage('postgres'), version: row?.version, updateLevel: null, edition: null, caller: here })
+      expect(pg.server).toMatchObject({ engine: 'postgres', image: selectedImage('postgres'), version: row?.version, updateLevel: null, edition: null, compatibility: null, caller: here })
     } finally {
       await sql.end()
     }
@@ -494,6 +494,23 @@ describe('what each start records for the release report', () => {
       await pool.close()
     }
     expect(written()).toEqual(expect.arrayContaining([pg.server, ms.server]))
+  })
+
+  // data-core's compatibility floor is the lowest level a matrix leg's
+  // fixture database answered (0068), so the record carries the level of
+  // the database the fixture was loaded into. Read from `master` it would
+  // be the server's default whatever the fixture's database said, and on
+  // an image whose `model` differs the floor would be held to a database no
+  // test ran on. Asked here by name, from `master`, the other way round.
+  test('names the compatibility level of the database the SQL Server fixture was loaded into', async () => {
+    const pool = await new mssql.ConnectionPool({ ...ms.admin, database: 'master' }).connect()
+    try {
+      const result = await pool.request().input('name', mssql.NVarChar, SQLSERVER_DATABASE).query<{ level: number }>('select compatibility_level as level from sys.databases where name = @name')
+      expect(result.recordset).toEqual([{ level: ms.server.compatibility }])
+      expect(ms.server.compatibility).toEqual(expect.any(Number))
+    } finally {
+      await pool.close()
+    }
   })
 })
 

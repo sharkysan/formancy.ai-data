@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
-import { MATRIX_IMAGES } from './images.js'
+import { imageMajor, MATRIX_IMAGES } from './images.js'
 import type { ServerRecord } from './servers.js'
 import { serverMajor, VERSION_FACTS, versionFact } from './versions.js'
 
@@ -17,6 +17,7 @@ const record = (engine: ServerRecord['engine'], version: string): ServerRecord =
   engine,
   version,
   image: 'an image',
+  compatibility: null,
   updateLevel: null,
   edition: null,
   description: null,
@@ -55,14 +56,13 @@ describe('VERSION_FACTS', () => {
     expect(() => versionFact('transactionTimeout', record('sqlserver', '16.0.4295.3'))).toThrow('VERSION_FACTS.transactionTimeout is a postgres fact, and this server is sqlserver')
   })
 
-  // PostgreSQL's tags carry the major. A row without a value for an image of
-  // the matrix is a leg that fails on the lookup above; held here too, so
-  // the matrix and the table move together without a run.
-  test('gives each PostgreSQL fact a value, a source and a measurement for the major of every PostgreSQL image of the matrix', () => {
-    const majors = MATRIX_IMAGES.postgres.map((image) => Number(/^postgres:(\d+)/.exec(image)?.[1]))
-    expect(majors.every(Number.isInteger)).toBe(true)
-    for (const [name, fact] of Object.entries(VERSION_FACTS).filter(([, entry]) => entry.engine === 'postgres')) {
-      for (const major of majors) {
+  // A row without a value for an image of the matrix is a leg that fails on
+  // the lookup above; held here too, so the matrix and the table move
+  // together without a run. SQL Server's tags name a year, which
+  // SQLSERVER_RELEASES turns into the major its server answers (imageMajor).
+  test('gives each fact a value, a source and a measurement for the major of every image of its engine’s matrix', () => {
+    for (const [name, fact] of Object.entries(VERSION_FACTS)) {
+      for (const major of MATRIX_IMAGES[fact.engine].map((image) => imageMajor(fact.engine, image))) {
         expect(typeof fact.values[major], `${name} on ${String(major)}`).toBe('boolean')
         expect(fact.measured[major], `${name} on ${String(major)}`).toEqual(expect.any(String))
       }

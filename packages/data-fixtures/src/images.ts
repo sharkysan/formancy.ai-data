@@ -1,5 +1,5 @@
 import type { DatabaseKind } from '@formancy/data-core'
-import { DATABASE_KINDS } from '@formancy/data-core'
+import { DATABASE_KINDS, SQLSERVER_RELEASES } from '@formancy/data-core'
 
 /*
  * The images the suites start, and how a run is told which (0067).
@@ -76,4 +76,30 @@ export function selectedImages(env: NodeJS.ProcessEnv = process.env): Record<Dat
 /** The image of `kind` a start without an image of its own runs: the one FORMANCY_IMAGES chooses, or the default. */
 export function selectedImage(kind: DatabaseKind, env: NodeJS.ProcessEnv = process.env): string {
   return selectedImages(env)[kind]
+}
+
+/**
+ * The major the server of `image` answers, read from its tag: PostgreSQL's
+ * names it (`16-alpine`), SQL Server's the year it is sold as
+ * (`2019-latest`), which data-core's SQLSERVER_RELEASES turns into the major
+ * it answers (15). Throws for a tag that names neither. What a tag says is
+ * a moving tag's promise (0035); each adapter's server.integration.test.ts
+ * holds the server a leg started to it, so a tag that moved to another major
+ * fails there, and images.test.ts holds data-core's TESTED_SERVERS to it.
+ */
+export function imageMajor(kind: DatabaseKind, image: string): number {
+  switch (kind) {
+    case 'postgres': {
+      const major = /^postgres:(\d+)(?:[.-]|$)/.exec(image)?.[1]
+      if (major !== undefined) return Number(major)
+      break
+    }
+    case 'sqlserver': {
+      const year = /^mcr\.microsoft\.com\/mssql\/server:(\d{4})-/.exec(image)?.[1]
+      const major = Object.entries(SQLSERVER_RELEASES).find(([, release]) => String(release) === year)?.[0]
+      if (major !== undefined) return Number(major)
+      break
+    }
+  }
+  throw new Error(`${image} names no ${kind} major in its tag`)
 }

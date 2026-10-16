@@ -17,7 +17,7 @@ import { connectPostgres, createPostgresAdapter, createPostgresLookups, createPo
 
 const sql = connectPostgres({ host, port, database, user, password, tls: { enabled: true, rejectUnauthorized: true } })
 const adapter = createPostgresAdapter(sql)
-await adapter.ping() // { kind: 'postgres', version: '17.6' }
+await adapter.ping() // { kind: 'postgres', version: '17.6', product: 'postgresql', major: 17 }
 
 const snapshot = await adapter.discover({ schemas: ['sales'] })
 snapshot.account // { user, login }: current_user and session_user

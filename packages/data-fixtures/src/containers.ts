@@ -95,7 +95,7 @@ export async function startPostgresContainer(image: string = selectedImage('post
   const container = await new PostgreSqlContainer(image).start()
   try {
     const answer = await askPostgres(container.getConnectionUri())
-    return { container, server: recordServer({ engine: 'postgres', image, caller, ...answer }) }
+    return { container, server: recordServer({ engine: 'postgres', image, caller, compatibility: null, ...answer }) }
   } catch (error) {
     await container.stop()
     throw error
@@ -213,18 +213,15 @@ async function askSqlServer(config: mssql.config): Promise<ServerAnswer> {
 }
 
 /**
- * A SQL Server container, empty, accepting logins, and a record of the
- * server that answered in it (0035), as `startPostgresContainer`. Accepting
+ * A SQL Server container, accepting logins, and what its server said about
+ * itself: recorded by whoever started it, who knows what it loaded. Accepting
  * the EULA is the operator's act; in a test it is this call, the decision
  * compose.yaml makes a developer spell out.
  */
-export async function startSqlServerContainer(image: string = selectedImage('sqlserver')): Promise<StartedServer<StartedMSSQLServerContainer>> {
-  // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
-  const caller = captureCaller()
+async function launchSqlServer(image: string): Promise<{ container: StartedMSSQLServerContainer; answer: ServerAnswer }> {
   const container = await new MSSQLServerContainer(image).acceptLicense().start()
   try {
-    const answer = await askSqlServer(ownerOf(container, 'master'))
-    return { container, server: recordServer({ engine: 'sqlserver', image, caller, ...answer }) }
+    return { container, answer: await askSqlServer(ownerOf(container, 'master')) }
   } catch (error) {
     await container.stop()
     throw error
@@ -232,15 +229,24 @@ export async function startSqlServerContainer(image: string = selectedImage('sql
 }
 
 /**
- * A SQL Server container with the fixture loaded into its own database, the
- * restricted principals created, and the parity schema (0028) beside it, on
- * `image`, as `startPostgresFixture`.
+ * A SQL Server container, empty, accepting logins, and a record of the
+ * server that answered in it (0035), as `startPostgresContainer`. It loads
+ * no database, so its record names no compatibility level.
  */
-export async function startSqlServerFixture(image: string = selectedImage('sqlserver')): Promise<SqlServerFixture> {
-  const { container, server } = await startSqlServerContainer(image)
-  const owner = ownerOf(container, 'master')
-  const base = { server: owner.server, port: owner.port, options: owner.options }
+export async function startSqlServerContainer(image: string = selectedImage('sqlserver')): Promise<StartedServer<StartedMSSQLServerContainer>> {
+  // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
+  const caller = captureCaller()
+  const { container, answer } = await launchSqlServer(image)
+  return { container, server: recordServer({ engine: 'sqlserver', image, caller, compatibility: null, ...answer }) }
+}
 
+/**
+ * Creates the fixture's database and principals, loads the fixture into it,
+ * and answers that database's compatibility level: the one it took from the
+ * server's `model` when it was created, which data-core's floor is held to
+ * (0068), asked of the database itself rather than of `master`.
+ */
+async function loadSqlServerFixture(owner: mssql.config): Promise<number> {
   // Server-level work happens in master: the database and the login. Both are
   // constants of this module, not input, which is why they can be spliced in.
   const master = await connectWhenAcceptingLogins(owner)
@@ -253,18 +259,46 @@ export async function startSqlServerFixture(image: string = selectedImage('sqlse
     await master.close()
   }
 
-  const admin: mssql.config = { ...owner, database: SQLSERVER_DATABASE }
-  const pool = await new mssql.ConnectionPool(admin).connect()
+  const pool = await new mssql.ConnectionPool({ ...owner, database: SQLSERVER_DATABASE }).connect()
   try {
     for (const batch of splitBatches(readFixture('sqlserver.sql'))) await pool.request().batch(batch)
     for (const batch of splitBatches(readFixture('sqlserver.restricted.sql'))) await pool.request().batch(batch)
     for (const batch of splitBatches(readFixture('sqlserver.parity.sql'))) await pool.request().batch(batch)
+    const result = await pool.request().query<{ level: number }>('select compatibility_level as level from sys.databases where database_id = db_id()')
+    const level = result.recordset[0]?.level
+    if (level === undefined) throw new Error('SQL Server answered the compatibility query with no row')
+    return level
   } finally {
     await pool.close()
   }
+}
+
+/**
+ * A SQL Server container with the fixture loaded into its own database, the
+ * restricted principals created, and the parity schema (0028) beside it, on
+ * `image`, as `startPostgresFixture`. Its record names the compatibility
+ * level of the database the fixture was loaded into.
+ */
+export async function startSqlServerFixture(image: string = selectedImage('sqlserver')): Promise<SqlServerFixture> {
+  // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
+  const caller = captureCaller()
+  const { container, answer } = await launchSqlServer(image)
+  const owner = ownerOf(container, 'master')
+  const base = { server: owner.server, port: owner.port, options: owner.options }
+
+  let compatibility: number
+  try {
+    compatibility = await loadSqlServerFixture(owner)
+  } catch (error) {
+    // The server answered, and a file asked for it: recorded as it was
+    // before the fixture's database had a level to record.
+    recordServer({ engine: 'sqlserver', image, caller, compatibility: null, ...answer })
+    throw error
+  }
+  const server = recordServer({ engine: 'sqlserver', image, caller, compatibility, ...answer })
 
   return {
-    admin,
+    admin: { ...owner, database: SQLSERVER_DATABASE },
     reader: { ...base, user: READER.user, password: READER.sqlServerPassword, database: SQLSERVER_DATABASE },
     writer: { ...base, user: WRITER.user, password: WRITER.sqlServerPassword, database: SQLSERVER_DATABASE },
     owner: { user: 'dbo', login: String(owner.user) },

@@ -58,7 +58,7 @@ const audit = { sink: () => {} }
 function registry(): ConnectionRegistry {
   const adapter = {
     kind: 'sqlserver',
-    ping: async () => ({ kind: 'sqlserver', version: '16.0' }),
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
     discover: async () => snapshot(),
     close: async () => {},
   } as DatabaseAdapter
@@ -124,7 +124,7 @@ describe('the administrator plane', () => {
   // database that is down is 503 without the driver's message, which names
   // hosts and ports.
   test('tests and discovers allowlisted connections, and says nothing about an unreachable one', async () => {
-    expect((await app.inject({ method: 'POST', url: '/v1/connections/erp/test', headers: as('admin') })).json()).toEqual({ kind: 'sqlserver', version: '16.0' })
+    expect((await app.inject({ method: 'POST', url: '/v1/connections/erp/test', headers: as('admin') })).json()).toEqual({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 })
     expect((await app.inject({ method: 'GET', url: '/v1/connections/erp/metadata', headers: as('admin') })).json()).toMatchObject({ kind: 'sqlserver', objects: [{ ref: { name: 'employee' } }] })
     expect((await app.inject({ method: 'GET', url: '/v1/connections/elsewhere/metadata', headers: as('admin') })).statusCode).toBe(404)
     reachable = false

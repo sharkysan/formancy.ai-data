@@ -7,6 +7,7 @@ import type { MetadataSnapshot } from '@formancy/data-core'
 import {
   accessDisagreements,
   FIXTURE_MODEL,
+  imageMajor,
   POSTGRES_IMAGE,
   READER_ACCESS,
   restrictedDisagreements,
@@ -93,14 +94,13 @@ describe('the captured snapshots', () => {
 
   // The version is printed by the studio and is outside the fingerprint, so
   // an edit to it would pass the cases above. It must be the major of the
-  // image the fixture runs -- for SQL Server, the product version its year
-  // names, which is what the server reports.
+  // image the fixture runs -- for SQL Server, the major its year names,
+  // through data-core's one table of years (imageMajor), which is what the
+  // server reports.
   test('each names a server version from the image the fixture runs', () => {
-    const major = /^postgres:(\d+)/.exec(POSTGRES_IMAGE)?.[1]
-    expect(major).toBeDefined()
+    const major = String(imageMajor('postgres', POSTGRES_IMAGE))
     for (const snapshot of [OWNER_SNAPSHOT, READER_SNAPSHOT, WRITER_SNAPSHOT]) expect(snapshot.serverVersion.split('.')[0]).toBe(major)
-    const year = /server:(\d{4})/.exec(SQLSERVER_IMAGE)?.[1]
-    const PRODUCT_VERSIONS: Record<string, string> = { '2019': '15', '2022': '16', '2025': '17' }
-    for (const snapshot of [SQLSERVER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT]) expect(snapshot.serverVersion.split('.')[0]).toBe(PRODUCT_VERSIONS[year ?? ''])
+    const release = String(imageMajor('sqlserver', SQLSERVER_IMAGE))
+    for (const snapshot of [SQLSERVER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT]) expect(snapshot.serverVersion.split('.')[0]).toBe(release)
   })
 })

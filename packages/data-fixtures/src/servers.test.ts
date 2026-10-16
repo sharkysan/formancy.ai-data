@@ -40,7 +40,7 @@ describe('recordServer', () => {
     const before = process.env['npm_lifecycle_event']
     process.env['npm_lifecycle_event'] = 'test:coverage'
     try {
-      const record = recordServer({ engine: 'postgres', image: 'postgres:17-alpine', caller: HERE, ...ANSWER }, dir)
+      const record = recordServer({ engine: 'postgres', image: 'postgres:17-alpine', caller: HERE, compatibility: null, ...ANSWER }, dir)
       const [name, ...others] = readdirSync(join(dir, 'test-results', 'servers'))
       expect(others).toEqual([])
       expect(name).toMatch(new RegExp(`^test-coverage-postgres-${String(process.pid)}-\\d+\\.json$`))
@@ -59,8 +59,8 @@ describe('recordServer', () => {
   // other is a server the report never hears of.
   test('writes two records for two servers, never one over the other', () => {
     const dir = scratch()
-    recordServer({ engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', caller: HERE, ...ANSWER }, dir)
-    recordServer({ engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', caller: HERE, ...ANSWER }, dir)
+    recordServer({ engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', caller: HERE, compatibility: null, ...ANSWER }, dir)
+    recordServer({ engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', caller: HERE, compatibility: null, ...ANSWER }, dir)
     expect(readdirSync(join(dir, 'test-results', 'servers'))).toHaveLength(2)
   })
 

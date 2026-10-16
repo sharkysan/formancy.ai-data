@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
 import { discoverSqlServer } from './discovery/discover.js'
-import { readServerVersion } from './version.js'
+import { readServer } from './server.js'
 
 /**
  * SQL Server, through a pool the composition root connected.
@@ -21,8 +21,10 @@ export function createSqlServerAdapter(pool: ConnectionPool): DatabaseAdapter {
   return {
     kind: 'sqlserver',
 
+    // What the server is (0068), from the query discovery runs too. A ping
+    // refuses nothing: a server discovery cannot read still answers it.
     async ping() {
-      return { kind: 'sqlserver', version: await readServerVersion(pool) }
+      return (await readServer(pool)).identity
     },
 
     discover: (scope) => discoverSqlServer(pool, scope),

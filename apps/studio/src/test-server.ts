@@ -127,7 +127,10 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
       if (unreachable.has(id)) throw new Error('connect ECONNREFUSED 10.0.0.5:5432')
       const adapter: DatabaseAdapter = {
         kind: now.kind,
-        ping: async () => ({ kind: now.kind, version: now.serverVersion }),
+        // The server the snapshot records (0068). One captured before
+        // snapshots recorded it was read from the fixture's container, a
+        // boxed product, whose major it did not record.
+        ping: async () => ({ kind: now.kind, version: now.serverVersion, ...(now.server ?? { product: now.kind === 'postgres' ? 'postgresql' : 'sqlserver', major: null }) }),
         discover: async () => databases.get(id) ?? now,
         close: async () => {},
       }

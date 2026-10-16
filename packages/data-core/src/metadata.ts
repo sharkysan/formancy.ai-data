@@ -1,4 +1,5 @@
 import type { DatabaseKind } from './adapter.js'
+import type { ServerFacts } from './server.js'
 
 /**
  * A table or view, as two strings and never one dotted string.
@@ -379,6 +380,14 @@ export interface MetadataSnapshot {
   kind: DatabaseKind
   /** As `DatabaseAdapter.ping` reports it. Not part of the fingerprint: a patch upgrade is not drift. */
   serverVersion: string
+  /**
+   * What the server is (0068), as `DatabaseAdapter.ping` reports it; whether
+   * this release was tested on it is `serverStanding`'s to say. Not part of
+   * the fingerprint either: a major upgrade or a compatibility change is not
+   * a change to anything a form binds to, and two servers holding one
+   * catalog are one catalog. Absent from a snapshot taken before 0068.
+   */
+  server?: ServerFacts
   account: DiscoveryAccount
   scope: DiscoveryScope
   objects: ObjectMeta[]

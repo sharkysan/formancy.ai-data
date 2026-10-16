@@ -1,6 +1,7 @@
 import type { DatabaseAdapter, ServerIdentity } from '@formancy/data-core'
 import type { Sql } from 'postgres'
 import { discoverPostgres } from './discovery/discover.js'
+import { readServer } from './server.js'
 
 /**
  * Seconds close() gives a statement still running before it destroys the
@@ -30,20 +31,10 @@ export function createPostgresAdapter(sql: Sql): DatabaseAdapter {
   return {
     kind: 'postgres',
 
-    async ping(): Promise<ServerIdentity> {
-      // `server_version` is the setting the server reports about itself
-      // ("17.6"). `version()` adds the platform and the compiler, which is not
-      // a version, and `server_version_num` is an integer a human cannot read.
-      const rows = await sql<{ version: string }[]>`select current_setting('server_version') as version`
-      const row = rows[0]
-      // Never reached against a real server -- a SELECT of one expression
-      // returns one row -- and kept because `rows[0]` is `T | undefined` under
-      // noUncheckedIndexedAccess. A non-null assertion would be the same claim
-      // without the check, so the coverage report shows this line uncovered
-      // and that is the honest reading of it.
-      if (row === undefined) throw new Error('PostgreSQL answered the ping with no row')
-      return { kind: 'postgres', version: row.version }
-    },
+    // `server_version` for a person ("17.6"), `server_version_num` for the
+    // major and `version()` for the product (0068): the query discovery runs
+    // too, so a snapshot and a ping cannot disagree about the server.
+    ping: (): Promise<ServerIdentity> => readServer(sql),
 
     discover: (scope) => discoverPostgres(sql, scope),
 

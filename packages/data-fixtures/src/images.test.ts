@@ -1,6 +1,6 @@
-import { DATABASE_KINDS } from '@formancy/data-core'
+import { DATABASE_KINDS, TESTED_SERVERS } from '@formancy/data-core'
 import { describe, expect, test } from 'vitest'
-import { DEFAULT_IMAGES, IMAGES_VARIABLE, MATRIX_IMAGES, selectedImage, selectedImages } from './images.js'
+import { DEFAULT_IMAGES, imageMajor, IMAGES_VARIABLE, MATRIX_IMAGES, selectedImage, selectedImages } from './images.js'
 
 /**
  * The images the adapter suites run on (0067), and how a run is told which:
@@ -28,6 +28,42 @@ describe('the matrix', () => {
   test('gives no image to two engines', () => {
     const all = DATABASE_KINDS.flatMap((kind) => MATRIX_IMAGES[kind])
     expect(new Set(all).size).toBe(all.length)
+  })
+
+  // data-core says which servers the release was tested on (0068) and
+  // cannot read this package, which is test support. The two lists are held
+  // to each other here, both ways, so a matrix image added without its
+  // major -- every leg green, and the release calling its server untested
+  // -- or a major kept after its image left -- a server called tested that
+  // no leg ran -- fails `pnpm test`, without waiting for a CI run.
+  test('names, image by image, exactly the majors TESTED_SERVERS calls tested', () => {
+    for (const kind of DATABASE_KINDS) {
+      const majors = [...new Set(MATRIX_IMAGES[kind].map((image) => imageMajor(kind, image)))].sort((a, b) => a - b)
+      expect([...TESTED_SERVERS[kind].majors], kind).toEqual(majors)
+    }
+  })
+})
+
+describe('the major an image names', () => {
+  // The major a leg's server is held to (each adapter's
+  // server.integration.test.ts): PostgreSQL's tag names it, SQL Server's
+  // the year it is sold as, which is not the major it answers -- 2019 is 15.
+  // Read as the year, the 2019 leg would expect a major 2019 and fail.
+  test('reads PostgreSQL’s from its tag, and SQL Server’s from its year', () => {
+    expect(imageMajor('postgres', 'postgres:16-alpine')).toBe(16)
+    expect(imageMajor('postgres', 'postgres:14-alpine')).toBe(14)
+    expect(imageMajor('sqlserver', 'mcr.microsoft.com/mssql/server:2019-latest')).toBe(15)
+    expect(imageMajor('sqlserver', 'mcr.microsoft.com/mssql/server:2025-latest')).toBe(17)
+    expect(imageMajor('sqlserver', 'mcr.microsoft.com/mssql/server:2017-latest')).toBe(14)
+  })
+
+  // A tag without a major -- `latest`, a digest -- or a year no release
+  // has would otherwise hold a leg to NaN, which no server answers, and
+  // fail far from the cause; an image of the other engine names neither.
+  test('refuses a tag that names no major of its engine', () => {
+    expect(() => imageMajor('postgres', 'postgres:latest')).toThrow('postgres:latest names no postgres major in its tag')
+    expect(() => imageMajor('sqlserver', 'mcr.microsoft.com/mssql/server:2030-latest')).toThrow('mcr.microsoft.com/mssql/server:2030-latest names no sqlserver major in its tag')
+    expect(() => imageMajor('sqlserver', 'postgres:17-alpine')).toThrow(/names no sqlserver major/)
   })
 })
 

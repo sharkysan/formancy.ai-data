@@ -16,7 +16,7 @@ const ERP: ConnectionConfig = {
 
 /** A connection whose ports are inert: the registry is what is under test, not a database. */
 function fakeConnection(onClose: () => void = () => {}): OpenConnection {
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: 'x' }), discover: async () => { throw new Error('unused') }, close: async () => onClose() } as DatabaseAdapter
+  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: 'x', product: 'sqlserver', major: null }), discover: async () => { throw new Error('unused') }, close: async () => onClose() } as DatabaseAdapter
   return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter }
 }
 

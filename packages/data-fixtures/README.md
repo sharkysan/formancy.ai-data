@@ -246,6 +246,14 @@ turbo hashes the variable for `test` and `test:coverage`, so a run on one
 image is never replayed from another's cache. `selectedImage(engine)` is
 what a start without an image of its own runs.
 
+`imageMajor(engine, image)` is the major an image's tag names: PostgreSQL's
+names it, SQL Server's names a year, which data-core's `SQLSERVER_RELEASES`
+turns into the major the server answers (`2019-latest` is 15). data-core's
+`TESTED_SERVERS`, the servers the release calls tested (0068), cannot read
+this package, so `images.test.ts` holds its majors to the matrix's, both
+ways, and each adapter's `server.integration.test.ts` holds every leg's
+server to the major its image names and to a standing of tested.
+
 `VERSION_FACTS` names what the versions of one engine disagree on, as 0026
 names what the engines disagree on: each row's value per major, its source,
 how each value was measured, and the test that asserts it.
@@ -260,12 +268,14 @@ Every container a suite or a gate starts goes through here:
 `startPostgresContainer(image?)` and `startSqlServerContainer(image?)` start
 an empty server -- the image `FORMANCY_IMAGES` chooses for its engine, which
 unset is the default, unless a test names another -- and the two fixtures,
-`startPostgresFixture(image?)` and `startSqlServerFixture(image?)`, are built
-on them. Each asks the
+`startPostgresFixture(image?)` and `startSqlServerFixture(image?)`, start
+theirs the same way. Each asks the
 server what it is (`server_version`, or `ProductVersion` -- what the adapters'
 pings read, and both adapters' ping tests hold them to it -- with
 `ProductUpdateLevel` and `Edition`) and writes that, the image and the file
-that asked to
+that asked -- and for the SQL Server fixture the `compatibility_level` of the
+database it loaded, which data-core's compatibility floor is held to on
+every leg (0068); a bare container and PostgreSQL record none -- to
 `test-results/servers/<script>-<engine>-<pid>-<n>.json` in the working
 directory, and returns it as `server`. The release report reads those files
 from every job and lists every image a run started, with what each server
