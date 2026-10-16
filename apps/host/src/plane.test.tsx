@@ -1,7 +1,10 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { PREFIX } from '@formancy/data-live-demo/worker'
 import { ROUTE_OPERATIONS } from '@formancy/data-server'
-import { answer, answeredOnce, chooseCustomer, chooseForm, chooseRenderer, gridSection, load, loaded, mount, newRecord, rendered, said, save, searchRecords, shows, signIn, stamp } from './test-host.js'
+import { demoSession } from './demo.js'
+import { demoDoor } from './test-demo.js'
+import { answer, answeredOnce, chooseCustomer, chooseForm, chooseRenderer, gridSection, load, loaded, mount, newRecord, rendered, said, save, searchRecords, shows, signIn, signInAs, stamp } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane, Sent } from './test-plane.js'
 
@@ -17,12 +20,17 @@ import type { Plane, Sent } from './test-plane.js'
  * may send, and one the page sends that the table does not have fails --
  * the delete route included, which the page sends since 0053, from its
  * confirmation in place.
+ *
+ * And through both doors the page has: its own origin, as a host serves
+ * it, and the live demo's path, behind the demo's Worker (0070), where the
+ * page asks the Worker for its people and a sign-in and then speaks the
+ * same routes under its base -- the token still in the header alone.
  */
 
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true, deletes: true })
+  plane = await startPlane({ children: true, deletes: true, demo: true })
 })
 
 afterAll(async () => {
@@ -58,15 +66,26 @@ function recordRows(): HTMLElement[] {
     .filter((row) => within(row).queryAllByRole('gridcell').length > 0)
 }
 
-describe.each(ENGINES)('what the page sends on $engine', ({ formId, lines }) => {
-  test('only runtime routes, each carrying the token in the header and nowhere else, never a tenant, and only for forms the menu named', async () => {
+/** The page's doors: its own origin on each engine, and the live demo's path, behind its Worker, signed in as tenant 1's clerk. */
+const JOURNEYS = [
+  ...ENGINES.map((engine) => ({ ...engine, door: 'its own origin', demo: false })),
+  // The demo serves PostgreSQL alone (deploy/demo), and the base is the
+  // client's, which knows no engine.
+  { ...ENGINES[0], door: "the demo's path", demo: true },
+]
+
+describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ formId, lines, demo }) => {
+  test('only runtime routes under its base, each carrying the token in the header and nowhere else, never a tenant, and only for forms the menu named', async () => {
     plane.sent.length = 0
     const words = stamp('plane')
-    const user = mount(plane.fetch)
+    const door = demo ? demoDoor(plane) : undefined
+    const base = door === undefined ? '' : PREFIX
+    const user = door === undefined ? mount(plane.fetch) : mount(door.fetch, { base, session: demoSession(door.fetch, base) })
     // The whole journey: the menu, a form and its list, a create through a
     // lookup's search, an update, a search for what the create typed, and
     // its row opened -- its lines listed, a label resolved -- and deleted.
-    await signIn(user, TOKENS.clerk)
+    if (door === undefined) await signIn(user, TOKENS.clerk)
+    else await signInAs(user, 'Clara')
     await chooseForm(user, formId)
     await chooseRenderer(user)
     await newRecord(user)
@@ -94,8 +113,23 @@ describe.each(ENGINES)('what the page sends on $engine', ({ formId, lines }) => 
     await user.click(within(screen.getByRole('region', { name: `Delete Order ${record}?` })).getByRole('button', { name: 'Delete it' }))
     await waitFor(() => expect(screen.getByRole('heading', { level: 3, name: 'No record open' })).toBeTruthy(), { timeout: 15_000 })
 
-    const sent: Sent[] = [...plane.sent]
+    const page: Sent[] = door === undefined ? [...plane.sent] : [...door.sent]
+    const token = door === undefined ? TOKENS.clerk : String(door.tokens[0])
     const line = (request: Sent): string => `${request.method} ${request.path}`
+
+    // On the demo's path, the page first asks the Worker for its people and
+    // signs in, and nothing else of the Worker's; on its own origin it has
+    // no Worker to ask.
+    const session = page.filter((request) => request.path === `${PREFIX}/session`)
+    expect(session.map(line)).toEqual(door === undefined ? [] : [`GET ${PREFIX}/session`, `POST ${PREFIX}/session`])
+    expect(page.slice(0, session.length)).toEqual(session)
+    // Every other request is under the base -- `/v1/` on its own origin,
+    // `/data/demo/v1/` on the demo's path, where the Worker forwards
+    // nothing else -- and is a route of the runtime plane once the base is
+    // taken off.
+    const api = page.slice(session.length)
+    expect(api.filter((request) => !request.path.startsWith(`${base}/v1/`)).map(line)).toEqual([])
+    const sent: Sent[] = api.map((request) => ({ ...request, path: request.path.slice(base.length) }))
 
     // Nothing but the runtime plane's routes: no whoami, no administrator
     // route. A page that asked anything else would need a role, or know
@@ -118,14 +152,16 @@ describe.each(ENGINES)('what the page sends on $engine', ({ formId, lines }) => 
     // The token in the Authorization header of every request, and in no URL
     // and no body: a URL is in every proxy's log, a body in every dump.
     for (const request of sent) {
-      expect({ request: line(request), authorization: request.headers['authorization'] }).toEqual({ request: line(request), authorization: `Bearer ${TOKENS.clerk}` })
-      expect(request.url).not.toContain(TOKENS.clerk)
-      expect(request.body ?? '').not.toContain(TOKENS.clerk)
+      expect({ request: line(request), authorization: request.headers['authorization'] }).toEqual({ request: line(request), authorization: `Bearer ${token}` })
+    }
+    for (const request of page) {
+      expect(request.url).not.toContain(token)
+      expect(request.body ?? '').not.toContain(token)
     }
 
     // The tenant is the token's, never the form's or the page's: no body
     // names one, at any depth (0011, 0029).
-    const tenants = sent.flatMap((request) => keys(JSON.parse(request.body ?? '{}')).filter((key) => /tenant/i.test(key)).map((key) => `${line(request)}: ${key}`))
+    const tenants = page.flatMap((request) => keys(JSON.parse(request.body ?? '{}')).filter((key) => /tenant/i.test(key)).map((key) => `${line(request)}: ${key}`))
     expect(tenants).toEqual([])
   })
 })
