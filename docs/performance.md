@@ -6,12 +6,16 @@ reading, creating and updating an order; and what a write the runtime
 refuses because the form's table changed still asks the database. Measured
 results, not promises
 ([0034](./decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
-All but a page of records, which arrived after these were measured
+All but a page of records, the menu of forms and a delete, which the
+harness does not measure yet
 ([0044](./decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)
-names what measuring it needs). The figures also predate the lookup limits
+names what measuring a page needs). The server measured has the lookup
+limits
 ([0061](./decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)):
-a lookup's signal, its deadline and PostgreSQL's second client were not in
-the server they measured, and they are stale until measured again.
+a lookup's signal and PostgreSQL's second client for lookups are in it,
+and its deadline is set to the longest a timer holds, so no timed answer
+was cut by one, and the default deadline is derived from these figures
+([0063](./decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)).
 
 The requests go through `@formancy/data-client` and real HTTP to the shipped
 server, `packages/data-server/dist/main.mjs`, started as an operator starts it

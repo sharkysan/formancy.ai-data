@@ -18,4 +18,4 @@
  * number it derived. `scripts/performance-stale.test.mjs` fails if anything
  * but the number is added here.
  */
-export const DEFAULT_LOOKUP_DEADLINE_MS = 536
+export const DEFAULT_LOOKUP_DEADLINE_MS = 892

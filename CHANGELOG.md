@@ -10,7 +10,7 @@ later.
 
 ## Unreleased
 
-## 0.1.0 — 2026-10-15
+## 0.1.0 — 2026-10-16
 
 **The first release of Formancy Data.** It turns an existing PostgreSQL or
 SQL Server database into formancy forms, and serves their records under a
@@ -94,9 +94,11 @@ name, one sentence each.
 
 ### Changed to make this release
 
-- **The default lookup deadline is DEADLINE_MS ms** (it was 536 ms). It is
-  derived from the performance figures measured for this release, and
-  `FORMANCY_DATA_LOOKUP_DEADLINE_MS` still overrides it.
+- **The default lookup deadline is 892 ms** (it was 536 ms). It is
+  derived from the performance figures measured for this release -- the
+  slowest timed lookup, SQL Server's "Search many customers match" with 8
+  in flight --
+  and `FORMANCY_DATA_LOOKUP_DEADLINE_MS` still overrides it.
 - **Re-measuring the performance figures now settles in one run.** The
   default deadline is derived from the figures, but its file was part of
   what the figures describe, so each new value made them stale. That file
@@ -104,7 +106,8 @@ name, one sentence each.
   with the longest deadline a timer holds, so the default never affects a
   measured answer
   ([0063](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/docs/decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)).
-- **The figures were measured in WSL 2** on the same workstation as before.
+- **The figures were measured in WSL 2** on 15 October, on the same
+  workstation as before, and no block had to be measured again.
   The harness's calibration tolerance there is 2.41, from a worst idle-gap
   ratio of 2.407 measured on 2026-10-15. The Docker Sandbox VM used before
   measured 1.61.
