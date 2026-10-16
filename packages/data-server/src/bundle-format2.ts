@@ -14,9 +14,10 @@ import { servedSchema } from './served-schema.js'
  * check that runs this release's generator, through `storable`
  * (`publishing.ts`): a publish (`routes/admin.ts`), and through `gate`
  * (`routes/admin-gate.ts`) an import and, under review, a draft's submit
- * and its approval (`routes/admin-drafts.ts`). A restore asks neither: it
- * writes again, as it was read and validated, a version this deployment
- * stored.
+ * and its approval (`routes/admin-drafts.ts`). A restore asks only
+ * `format2Problems`, through the read that loads it (`published.ts`), and
+ * never `generatedProblems`: it writes again, as it was read and validated,
+ * a version this deployment stored.
  */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -115,9 +116,10 @@ function hasRowversion(snapshot: MetadataSnapshot | null, root: ObjectRef): bool
 
 /**
  * Whether this server's generator writes the bundle's base and bindings from
- * its snapshot and generation request (0030). Asked at publish, so a base
- * somebody edited — a relaxed maxLength, a dropped `required` — is never
- * stored as if the database had said so. Not asked on read: a later release
+ * its snapshot and generation request (0030). Asked at every write but a
+ * restore (this file's header names them), so a base somebody edited — a
+ * relaxed maxLength, a dropped `required` — is never stored as if the
+ * database had said so. Not asked on read: a later release
  * whose generator writes something else must not make every version stored
  * before it "corrupt".
  */
