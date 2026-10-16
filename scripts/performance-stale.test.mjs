@@ -1,10 +1,10 @@
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { compareProduct, describeProduct, productFiles, runtimeClosure } from './performance-product.mjs'
+import { compareProduct, describeProduct, OUTSIDE_THE_PRODUCT, productFiles, runtimeClosure } from './performance-product.mjs'
 import { readWorkflow } from './release-report/workflows.mjs'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -208,6 +208,31 @@ describe('the product on this repository', () => {
     expect(files).not.toContain('packages/data-fixtures/src/model.ts')
     expect(files).not.toContain('packages/data-performance/src/render.ts')
     expect(files.filter((path) => /\.test\./.test(path))).toEqual([])
+  })
+
+  // The default lookup deadline is derived from the figures (0061), and the
+  // figures were counted with it inside the product: setting it to what a
+  // measurement derived made that measurement stale, and the next one derived
+  // another number, so a release could never pass the stale check. A run
+  // gives the server the longest deadline a timer holds, so the default's
+  // value reaches no timed answer, and the file that holds it is left out
+  // (0063) -- while the deadline's logic, in limits.ts, stays in.
+  test('leaves out the default lookup deadline, and only its value', () => {
+    const files = productFiles(repo)
+    expect(files).not.toContain('packages/data-core/src/lookup/default-deadline.ts')
+    expect(files).toContain('packages/data-core/src/lookup/limits.ts')
+    expect(Object.keys(OUTSIDE_THE_PRODUCT)).toEqual(['packages/data-core/src/lookup/default-deadline.ts'])
+  })
+
+  // What is left out can hold nothing but the number: a function, an import
+  // or a second constant added beside it would run unmeasured. Read without
+  // its comments, the file is one exported integer and nothing else.
+  test('leaves out a file that holds the one number and nothing else', () => {
+    for (const path of Object.keys(OUTSIDE_THE_PRODUCT)) {
+      const text = readFileSync(join(repo, path), 'utf8')
+      const code = text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/^\s*\/\/.*$/gm, '').trim()
+      expect(code, path).toMatch(/^export const DEFAULT_LOOKUP_DEADLINE_MS = \d+$/)
+    }
   })
 
   // The drivers and the server's libraries, found by walking node_modules

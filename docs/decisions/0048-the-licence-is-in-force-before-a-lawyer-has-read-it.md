@@ -1,6 +1,6 @@
 # 0048 — The licence is in force before a lawyer has read it
 
-- **Status:** accepted; extended by [0054](0054-version-1-1-names-the-address-for-a-redistribution-agreement-too.md): Version 1.1 names section 9's address for the agreement Redistribution requires too, and the script reads a version numbered N or N.N
+- **Status:** accepted; extended by [0054](0054-version-1-1-names-the-address-for-a-redistribution-agreement-too.md): Version 1.1 names section 9's address for the agreement Redistribution requires too, and the script reads a version numbered N or N.N; amended by [0064](0064-the-first-releases-notes-summarise-the-development-before-it.md): the first release's notes carry Version 0 and Version 1 as a summary, and their entries stay in `CHANGELOG.md` under *Development before 0.1.0*
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:** `scripts/licence-status.test.mjs`, in `pnpm test:repo` —

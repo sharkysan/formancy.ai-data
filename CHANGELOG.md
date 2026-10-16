@@ -10,6 +10,123 @@ later.
 
 ## Unreleased
 
+## 0.1.0 — 2026-10-16
+
+**The first release of Formancy Data.** It turns an existing PostgreSQL or
+SQL Server database into formancy forms, and serves their records under a
+policy the server checks on every request. Self-hosted and source-available.
+
+### Get it
+
+- **Server image:** `ghcr.io/sharkysan/formancy-data-server:v0.1.0`,
+  signed, with its SBOM attached. There is no `latest` tag.
+- **npm packages, with provenance:** `@formancy/data-core`,
+  `@formancy/data-postgres`, `@formancy/data-sqlserver`,
+  `@formancy/data-server` and `@formancy/data-client`.
+- **Try it on your machine:** the
+  [getting-started guide](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/docs/getting-started.md) starts both
+  databases, the server, the studio and a host page with one command, and
+  walks you to a published form. CI runs it as written.
+- Built on formancy's `@formancy/*` packages at 0.5.0.
+
+### What it does
+
+- **Discovers** a database as the account you connect with, and says what
+  that account cannot see.
+- **Generates** a form from what the account may do. The result is
+  deterministic, and the generator says what it inferred, made read-only or
+  left out.
+- **Enforces a policy on every request:** who may read, create, update and
+  delete which fields and rows. Row filters come from your application's
+  verified identity, never from the form.
+- **Publishes without overwriting.** Versions are kept and checked on every
+  read. An old version can be restored, or moved to another deployment,
+  only while the database still fits it.
+- **Serves records and lookups.** Records can be read, listed a page at a
+  time, created, updated and deleted one at a time, each write in one
+  guarded statement. A lookup offers only the rows the person may choose.
+- **Reviews drift** between the database and what a published form relies
+  on. The server refuses what drift blocks in a form's own table.
+- **Renders in React and Angular** from one definition, through
+  `@formancy/data-client`.
+
+The studio (the administrator's application) and the host page come with
+the repository and are not published as packages. The
+[README](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/README.md#what-it-does) links the decision record behind each
+point, and each record names the test that fails when it stops being true.
+
+### Licence
+
+The Formancy Data Source-Available Licence, Version 1.1, in force from
+11 October 2026. **No lawyer has reviewed it yet.**
+
+| Use | Terms |
+| --- | --- |
+| Read the source and fork the repository | Free |
+| Evaluate, develop and test, in companies too | Free |
+| Run in production, internally or customer-facing | Paid licence |
+| Redistribute inside another software product | Separate commercial agreement |
+| Customer data and generated form definitions | Remain the customer's |
+
+Ask for a production licence or a redistribution agreement at the address
+in section 9 of [LICENSE.md](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/LICENSE.md). No price is published yet.
+Version 1.1 replaced Version 1 of the same day and the draft Version 0 of
+8 October, and adds only where to ask for a redistribution agreement
+([0048](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/docs/decisions/0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md),
+[0054](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/docs/decisions/0054-version-1-1-names-the-address-for-a-redistribution-agreement-too.md)).
+
+### Known gaps
+
+- The licence has not been reviewed by a lawyer.
+- No performance figures yet for listing records, the menu of forms or a
+  delete. [The performance page](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/docs/performance.md) covers every
+  other runtime request.
+- A host page on another origin is tested in the server's suites, not yet
+  in a browser.
+- The [Cloudflare guide](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/docs/deploy/cloudflare.md) is checked offline.
+  Nothing has run through a real tunnel yet.
+- The host page does not yet show a field that an update may not write as
+  read-only ([filed](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/docs/images/README.md#what-the-pictures-show-that-is-wrong)).
+
+The release report attached below says what this release was tested on.
+Its *Known limitations* section lists every limitation the decision records
+name, one sentence each.
+
+### Changed to make this release
+
+- **The default lookup deadline is 892 ms** (it was 536 ms). It is
+  derived from the performance figures measured for this release -- the
+  slowest timed lookup, SQL Server's "Search many customers match" with 8
+  in flight --
+  and `FORMANCY_DATA_LOOKUP_DEADLINE_MS` still overrides it.
+- **Re-measuring the performance figures now settles in one run.** The
+  default deadline is derived from the figures, but its file was part of
+  what the figures describe, so each new value made them stale. That file
+  is now left out of the measured product, and measurements run the server
+  with the longest deadline a timer holds, so the default never affects a
+  measured answer
+  ([0063](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/docs/decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)).
+- **The figures were measured in WSL 2** on 15 October, on the same
+  workstation as before, and no block had to be measured again.
+  The harness's calibration tolerance there is 2.41, from a worst idle-gap
+  ratio of 2.407 measured on 2026-10-15. The Docker Sandbox VM used before
+  measured 1.61.
+- **These notes are a summary.** The full history did not fit in a GitHub
+  release, which takes 125,000 characters. A test now fails any pull
+  request that makes the next release's notes too long
+  ([0064](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/docs/decisions/0064-the-first-releases-notes-summarise-the-development-before-it.md)).
+
+### Full history
+
+Every change before this release, each with its reason, is in
+[CHANGELOG.md](https://github.com/sharkysan/formancy.ai-data/blob/v0.1.0/CHANGELOG.md#development-before-010) under
+*Development before 0.1.0*.
+
+## Development before 0.1.0
+
+Every entry from the repository's first commit to the first release, newest
+first. All of it is in 0.1.0.
+
 **A lookup statement stops when the page abandons its request or the server's lookup deadline passes** ([0061](docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)). The renderers abort a superseded search's request, but the server passed no signal to the adapter, so the database finished every scan it started, and nothing bounded how long one ran; `docs/performance.md` measured that every search reads every row its row filter admits. Now the server notices a lookup request whose client left -- the response or its socket closing before the answer -- and stops the statement with the driver's own cancel, postgres.js's cancel request or mssql's TDS attention; and every lookup statement, a search, a resolve and each membership check inside a create or an update, stops at a deadline counted from when the adapter is asked for it, so a wait for a pooled connection counts and reading the form and opening its connection do not. `FORMANCY_DATA_LOOKUP_DEADLINE_MS` sets it, a whole number of milliseconds from 1 to 2147483647, anything else stopping the server with a sentence naming it; an embedder passes `runtime.lookupDeadlineMs`, which `createDataServer` holds to the same rule. Its default, data-core's new `DEFAULT_LOOKUP_DEADLINE_MS`, is the slowest timed lookup or resolve answer in the published figures, rounded up -- 536 ms, SQL Server's tenant search reading 100,001 rows eight at a time, measured 2026-10-10 -- and a test fails when the two differ: a slower or larger deployment than the one measured raises it. A search past it is 503 `lookup-timeout`, a new code, because `unavailable` invites another try and a contains search that timed out reads the same rows again; a resolve past it is 503 `unavailable`, since it reads by key and one that timed out waited, so trying again helps; an abandoned lookup is answered 499 `abandoned`, which nobody reads and the audit trail records; a membership check past it is 503 `unavailable`, nothing saved, as before. No minimum search length and no prefix mode: the rows a search reads do not depend on its text, the plain select asks only the empty search, and a prefix would change what a search returns. A lookup that completes is answered exactly as before. Noticed by integrators: `LookupAdapter`'s `search`, `resolve` and `rejects` take a required last `signal` (data-core's `LookupSignal`, which the platform's `AbortSignal` satisfies), and an adapter given an aborted one rejects with its reason; on PostgreSQL the server opens a second client per allowlisted database for lookups, `application_name` `formancy-data lookups`, so each may use up to twice the connections -- because a PostgreSQL cancel that arrives after its statement finished stops whatever runs next on that backend, and on their own client that is only another lookup, which then runs once more. The PostgreSQL adapter cancels a lookup once postgres.js has sent it and again once it has sent its execute, since PostgreSQL drops a cancel that arrives while the backend waits for the execute, and handles a cancel request's own failure, which `query.cancel()` would leave to end the process; it reads three of postgres.js 3.4.9's private properties to do so, which its suite pins. On SQL Server mssql's default request timeout of 15 s still cuts any deadline set above it, answered `unavailable`. Behind a proxy the abort reaches the server only if the proxy closes its upstream connection when its client goes, which nothing tests. The performance figures were measured before this change and are stale until measured again; the harness runs its server with the deadline at its longest, and its catalogue names the runtime operation each scenario addresses, which the counting pass checks. `@formancy/data-fixtures` gains `blockTable`, an owner's lock that makes a statement wait in the database, and `TcpHop.holdNewConnections()` and `refuseNewConnections()`. No upstream `@formancy/*` version changes.
 
 **A published version moves to another deployment as its version file** ([0062](docs/decisions/0062-a-published-version-moves-between-deployments-as-its-version-file.md)). The studio downloads any version as the file the store wrote, and imports one from its Drift step; `POST /v1/forms/:id/imports`, body `{ expectedBase, bundle, keysConfirmed? }`, checks it as a publish does -- it validates, in format 2, for the form the path names, bound to a connection this deployment's allowlist has by the same name, and this server's generator writes its base and bindings -- then refuses what the target database's drift blocks, as a restore does: 422 `other-engine` for a database of another engine, 409 `incompatible` with only the blocking changes, then 0039's keys against this deployment's base and the compare-and-swap. 201 answers `{ version, drift }`, the changes to review or note, and the file is written as it came, so what was reviewed is what runs. The connection and the form keep their names, because a lookup's source name is made from the connection's. Each import is audited as `import`, with its base, its connection and the version it wrote; the export is the source's `version-read`. Why: nothing moved a version between environments, and copying the store moved every version of every form, unchecked and with no event.

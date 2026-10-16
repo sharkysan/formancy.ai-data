@@ -28,6 +28,18 @@ import { dirname, join, relative, resolve } from 'node:path'
 /** Where the measurement starts: the server the harness runs as a child, and the harness. */
 export const ENTRIES = ['packages/data-server/src/main.ts', 'packages/data-performance/src/measure.ts']
 
+/**
+ * Files the server or the harness reach that the figures do not depend on,
+ * each with why. The default lookup deadline is derived from the figures
+ * (0061), and a run gives the server the longest deadline a timer holds, so
+ * the default's value reaches no timed answer; counted in, setting it to the
+ * number a measurement derived made that measurement stale (0063).
+ * `performance-stale.test.mjs` holds each file to the one number it holds.
+ */
+export const OUTSIDE_THE_PRODUCT = Object.freeze({
+  'packages/data-core/src/lookup/default-deadline.ts': 'the default lookup deadline: derived from the figures, and met by no run (0061, 0063)',
+})
+
 /** Files the measurement reads by name rather than by import: the fixture the databases load. */
 const BY_NAME = [{ directory: 'packages/data-fixtures/fixtures', pattern: /\.sql$/ }]
 
@@ -152,7 +164,7 @@ export function productFiles(root) {
     if (!existsSync(join(root, directory))) continue
     for (const name of readdirSync(join(root, directory))) if (pattern.test(name)) found.add(`${directory}/${name}`)
   }
-  return [...found].filter((file) => !/\.test\.[cm]?[jt]sx?$/.test(file)).sort()
+  return [...found].filter((file) => !/\.test\.[cm]?[jt]sx?$/.test(file) && !(file in OUTSIDE_THE_PRODUCT)).sort()
 }
 
 /** The directory of `name` as `from` would load it: the first `node_modules/<name>` walking up from `from`'s real path. */

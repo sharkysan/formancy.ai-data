@@ -1,6 +1,6 @@
 # 0061 — A lookup statement stops when its request is abandoned or its deadline passes, and a search is not bounded before it scans
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0063](0063-the-default-lookup-deadline-is-outside-the-measured-product.md): the default lives alone in `lookup/default-deadline.ts`, which the measured product leaves out, so setting it to what a measurement derived no longer makes that measurement stale
 - **Date:** 2026-10-14
 - **Deciders:** Daniel Bacher
 - **Verified by:**
