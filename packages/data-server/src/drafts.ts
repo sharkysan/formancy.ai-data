@@ -16,9 +16,11 @@ import { readKeysConfirmed } from './reassigned.js'
  *   { entry: 'rejection', draft, by }
  *
  * A draft's number is its entry's. Its state is derived whenever it is
- * read, never written: rejected when a rejection names it, published when
- * the version after its base is its bundle, stale when another version
- * replaced its base, pending otherwise. The version an approval writes is
+ * read, never written: published when the version after its base is its
+ * bundle, rejected when a rejection names it, stale when another version
+ * replaced its base, pending otherwise. Published is asked first, since it
+ * is what is served: a rejection that landed while the approval wrote the
+ * version is kept, and decides nothing. The version an approval writes is
  * the bundle alone; who approved it is the audit trail's (0033).
  */
 
@@ -48,7 +50,7 @@ export interface Draft extends Omit<DraftEntry, 'entry'> {
   form: string
   draft: number
   state: DraftState
-  /** When rejected: who rejected it, and whether that was its submitter taking it back. */
+  /** When a rejection names it: who rejected it, and whether that was its submitter taking it back. A published draft can carry one, written while its approval wrote the version. */
   rejection?: { by: string; withdrawn: boolean }
   /** The form's newest version now, or `null` before its first. */
   current: number | null
@@ -200,11 +202,12 @@ export function createDrafts(versions: ConfigurationStore): Drafts {
         const rejected = rejections.get(number)
         const draft: Draft = { form, draft: number, ...held, current, state: 'pending' }
         const next = (entry.expectedBase ?? 0) + 1
-        if (rejected !== undefined) {
-          draft.state = 'rejected'
-          draft.rejection = { by: rejected.by, withdrawn: rejected.by === entry.submittedBy }
-        } else if (current !== null && current >= next && (await isPublished(form, next, entry.bundle))) {
+        if (rejected !== undefined) draft.rejection = { by: rejected.by, withdrawn: rejected.by === entry.submittedBy }
+        // A version served is a fact, asked first: a rejection written while its approval wrote the version decides nothing.
+        if (current !== null && current >= next && (await isPublished(form, next, entry.bundle))) {
           draft.state = 'published'
+        } else if (rejected !== undefined) {
+          draft.state = 'rejected'
         } else if (current !== entry.expectedBase) {
           draft.state = 'stale'
         }

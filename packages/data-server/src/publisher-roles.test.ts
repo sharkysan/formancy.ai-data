@@ -1,4 +1,9 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
+import { createDataServer } from './app.js'
+import { createFileConfigurationStore } from './config-store.js'
+import type { ConnectionRegistry } from './connections.js'
 import { publisherRolesProblem, publisherRolesSetting } from './publisher-roles.js'
 
 /*
@@ -66,5 +71,31 @@ describe('publisherRolesProblem', () => {
     expect(publisherRolesProblem([], ['data-admin'])).toMatch(/^admin\.publisherRoles is set and names no role/)
     expect(publisherRolesProblem(['data-approver'], ['data-admin'])).toBe('admin.publisherRoles names "data-approver", which is not in admin.adminRoles: a publisher is an administrator who may also approve.')
     expect(publisherRolesProblem('data-publisher' as never, ['data-publisher'])).toBe('admin.publisherRoles is not a list of roles.')
+  })
+})
+
+describe('createDataServer', () => {
+  /** The administrator's plane with `publisherRoles`, built or refused: nothing is connected, and the store is never written. */
+  const built = (publisherRoles: readonly string[]) => {
+    const registry: ConnectionRegistry = { ids: () => [], scope: () => undefined, open: async () => undefined, close: async () => {} }
+    const store = createFileConfigurationStore(join(tmpdir(), 'formancy-data-publisher-roles-never-written'))
+    return createDataServer({ verifyIdentity: async () => ({ ok: false, reason: 'bad' }), admin: { registry, store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles, audit: { sink: () => {} } } }).then(async (app) => {
+      await app.close()
+      return 'built'
+    })
+  }
+
+  // The rule above is a function until the plane asks it. An embedder's
+  // empty list would put the plane under review with nobody to approve; a
+  // role the plane does not admit, review whose publisher is refused at
+  // the door; a string from a .mjs caller, a Set of its characters, every
+  // one a "role". Each stops the server being built, in the sentence the
+  // function says. Watched failing with the plane's throw taken out: the
+  // empty list was built.
+  test("refuses an embedder's admin.publisherRoles the rule refuses, and builds with one it accepts", async () => {
+    await expect(built([])).rejects.toThrow(/^admin\.publisherRoles is set and names no role/)
+    await expect(built(['data-approver'])).rejects.toThrow('admin.publisherRoles names "data-approver", which is not in admin.adminRoles')
+    await expect(built('data-publisher' as never)).rejects.toThrow('admin.publisherRoles is not a list of roles.')
+    await expect(built(['data-publisher'])).resolves.toBe('built')
   })
 })

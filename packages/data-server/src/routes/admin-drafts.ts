@@ -51,7 +51,7 @@ export interface DraftRead {
   state: DraftState
   expectedBase: number | null
   submittedBy: string
-  /** When rejected: who rejected it, and whether that was its submitter withdrawing it. */
+  /** When a rejection names it: who rejected it, and whether that was its submitter withdrawing it. A published draft can carry one, written while its approval wrote the version (0065). */
   rejectedBy?: string
   withdrawn?: boolean
   keysConfirmed: ReassignedKey[]
@@ -129,10 +129,10 @@ export function reviewRoutes(app: FastifyInstance, options: ReviewOptions): void
   const drafts = createDrafts(store)
   const steps = { store, allowlisted: options.allowlisted, discover: options.discover, refuse }
 
-  /** Why `form`'s drafts could not be read or written, for the operator: the form and entry of one that does not validate, and never for the caller. */
+  /** Why `form`'s drafts, or the versions a draft is checked against and written to, could not be read or written, for the operator: the form and entry of one that does not validate, and never for the caller. */
   function unread(log: FastifyBaseLogger, form: string | undefined, error: unknown): void {
     if (error instanceof UnreadableDraftError) log.error({ form: error.form, entry: error.entry, problems: error.problems }, 'a draft entry does not validate, and is not served')
-    else log.error({ form, error: (error as Error).message }, 'the drafts could not be read or written')
+    else log.error({ form, error: (error as Error).message }, 'the drafts or the versions could not be read or written')
   }
 
   /** Something no caller can put right -- a draft edited on disk, a store that cannot be read: logged for the operator, 500 for the caller. */
@@ -195,9 +195,10 @@ export function reviewRoutes(app: FastifyInstance, options: ReviewOptions): void
     if (confirmed === undefined) {
       return refuse(reply, 400, 'invalid-request', 'Expected keysConfirmed, when sent, to list { field, was, now } as a refusal 422 keys-reassigned lists them in keys.')
     }
-    const gated = await gate(steps, reply, id, expectedBase, body['bundle'], confirmed, SUBMIT)
-    if (!gated.ok) return reply
     try {
+      // Inside the try: the gate reads the versions store, which can fail as the drafts store can.
+      const gated = await gate(steps, reply, id, expectedBase, body['bundle'], confirmed, SUBMIT)
+      if (!gated.ok) return reply
       // Over a version that is not the newest, it could never be approved: the conflict a publish answers.
       const current = await store.latest(id)
       if (current !== expectedBase) return send(reply, conflictOver(current))
@@ -255,9 +256,9 @@ export function reviewRoutes(app: FastifyInstance, options: ReviewOptions): void
     const state = decided(reply, draft)
     if (state !== undefined) return state
     const name = `Draft ${String(draft.draft)} cannot be approved`
-    const gated = await gate(steps, reply, draft.form, draft.expectedBase, draft.bundle, draft.keysConfirmed, sentences(name, 'an approval failed where it cannot'))
-    if (!gated.ok) return reply
     try {
+      const gated = await gate(steps, reply, draft.form, draft.expectedBase, draft.bundle, draft.keysConfirmed, sentences(name, 'an approval failed where it cannot'))
+      if (!gated.ok) return reply
       // Asked again just before the write: a rejection made while the database was asked decides first.
       const now = (await drafts.of(draft.form)).find((each) => each.draft === draft.draft)
       if (now?.state === 'rejected') return decided(reply, now)
