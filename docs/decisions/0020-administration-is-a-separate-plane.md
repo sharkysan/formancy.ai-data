@@ -1,6 +1,6 @@
 # 0020 — Administration is a separate plane, held by a role in the host's token
 
-- **Status:** accepted; extended by [0033](0033-the-administrator-plane-is-audited.md): every request that reaches an administrator route is audited, and the identity is set before the role check so a 403 names its actor
+- **Status:** accepted; extended by [0033](0033-the-administrator-plane-is-audited.md): every request that reaches an administrator route is audited, and the identity is set before the role check so a 403 names its actor; extended by [0065](0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md): with `FORMANCY_DATA_PUBLISHER_ROLES` set, the second role this record named as a later change: nobody publishes or imports directly, an administrator submits a draft, a publisher who did not submit it approves it, and restoring is a publisher's
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/routes/admin.test.ts` — no token

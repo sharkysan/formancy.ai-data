@@ -1,6 +1,6 @@
 # 0013 — Published configuration is files, and compare-and-swap is a hard link
 
-- **Status:** accepted; `versions()` on the port, and a restore is a new version holding the old one's document, extended by [0030](0030-presentation-is-a-patch-over-the-generated-base.md); narrowed by [0062](0062-a-published-version-moves-between-deployments-as-its-version-file.md): a copy of the store's directory is no longer how a version moves between deployments; one version's file is imported through the administrator's plane, checked as a publish and gated as a restore
+- **Status:** accepted; `versions()` on the port, and a restore is a new version holding the old one's document, extended by [0030](0030-presentation-is-a-patch-over-the-generated-base.md); narrowed by [0062](0062-a-published-version-moves-between-deployments-as-its-version-file.md): a copy of the store's directory is no longer how a version moves between deployments; one version's file is imported through the administrator's plane, checked as a publish and gated as a restore; extended by [0065](0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md): a deployment under review keeps its drafts beside the versions, in `<store>/.drafts`, a store the versions store makes (`drafts()`), its numbered entries written by the same compare-and-swap and its directory never listed as a form
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/config-store.test.ts` — versions

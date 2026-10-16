@@ -1,6 +1,6 @@
 # 0062 — A published version moves between deployments as its version file, and is imported as a publish the target's database must be able to serve
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0065](0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md): under review an import is a draft, submitted as the file and approved by a publisher, and its checks are `gate` in `routes/admin-gate.ts`, which a submit and an approval pass too
 - **Date:** 2026-10-14
 - **Deciders:** Daniel Bacher
 - **Verified by:**

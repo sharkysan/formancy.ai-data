@@ -10,6 +10,62 @@ later.
 
 ## Unreleased
 
+### Added
+
+- **A second person can review publication.** Until now one administrator
+  could put a form in front of every user alone -- its policy, which says
+  who reads and writes which column, included -- because one list of roles
+  could propose, publish, import and restore. Comparable administration
+  tools ask for a second person here; Forest Admin's approvals are one. Set
+  `FORMANCY_DATA_PUBLISHER_ROLES` to roles that are also administrator
+  roles, and:
+  - nobody publishes or imports a version directly: 403 `review-required`,
+    publishers included;
+  - an administrator submits a draft, `POST /v1/forms/:id/drafts`, which
+    the server keeps beside the versions, in `<store>/.drafts`, and checks
+    as an import is checked, against the database as it is then;
+  - a publisher who did not submit it approves it, which checks it again
+    against the database and writes exactly the bundle that was submitted.
+    Whoever submitted a draft never approves it, whatever roles they hold
+    (403 `own-draft`);
+  - a publisher rejects a draft, its author withdraws their own, and
+    `GET /v1/drafts` lists the ones that wait;
+  - restoring a version stays one publisher's action, alone.
+
+  ([0065](docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md);
+  the data server's README says what an author and a publisher may each
+  do.)
+- **`GET /v1/administration`** says whether the deployment reviews
+  publication and what the caller may not do, each with the server's
+  sentence, so a client offers only what the server will allow. It is
+  there review or not.
+- **The studio follows the server**: under review it submits a draft where
+  it would publish or import, offers Restore only to a publisher, and a
+  Review step lists the drafts, draws one on white paper, says in words
+  the policy approving it grants, and approves, rejects or withdraws it as
+  the server allows.
+
+### Changed
+
+- **Unset, nothing changes.** Every administrator publishes alone, as
+  before, and upgrading puts no deployment under review. The composed stack
+  and the getting-started guide stay that way.
+- **The audit trail names drafts**: the administration and draft
+  operations, and a `draft` field on every administrator event. Who
+  approved a version is recorded only there, as the `draft-approve`
+  event's actor; the version file is still the bundle alone.
+- **For embedders**: `ConfigurationStore` has a new method, `drafts()`,
+  which a store of your own must provide, and `AdminAuditEvent` has
+  `draft` and the administration and draft operations. `createDataServer`
+  takes `admin.publisherRoles`.
+
+What review costs, in 0065: every submit and approval asks the database, so
+one that cannot be reached refuses both; nothing deletes a draft; nobody is
+told a draft waits; a publisher sees a draft's review-level drift only once
+the approval has written it; the studio shows a draft, not what it changes
+from the version it replaces; a deployment under review needs two people;
+and roles are still read only from the token's `roles` claim.
+
 ## 0.1.0 — 2026-10-16
 
 **The first release of Formancy Data.** It turns an existing PostgreSQL or

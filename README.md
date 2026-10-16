@@ -21,9 +21,13 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 
 <!-- end generated -->
 
-> **Status: 0.1.0, the first release.** Each line under *What it does*
-> links the decision record whose **Verified by** names what fails when the
-> line stops being true. Not yet: a figure on the performance page for a
+> **Status: 0.1.0, the first release.** On `main` since it, and not yet
+> released: publication under review
+> ([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)),
+> which a 0.1.0 server does not have and whose setting it ignores, as
+> [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
+> *What it does* links the decision record whose **Verified by** names
+> what fails when the line stops being true. Not yet: a figure on the performance page for a
 > page of records, the menu of forms or a delete, a host page that draws a
 > field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
@@ -107,6 +111,14 @@ is not licensed for production.
   same connection name, and refused when the target database's drift blocks
   it, as a restore is
   ([0062](./docs/decisions/0062-a-published-version-moves-between-deployments-as-its-version-file.md)).
+- **Can have a second person approve publication**, unreleased: not in
+  0.1.0. With `FORMANCY_DATA_PUBLISHER_ROLES` set, nobody publishes or imports a
+  version alone: an administrator submits a draft, which the server keeps,
+  and a publisher who did not submit it approves it, which checks it again
+  against the database and writes exactly what was submitted. Restoring a
+  version is one publisher's, alone. Unset, as in the composed stack,
+  every administrator publishes alone, as before
+  ([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)).
 - **Reviews drift** against what a published form's bindings and lookups rest
   on, and says which operations each change blocks
   ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md))
@@ -369,7 +381,10 @@ deployment one reverse proxy serves `apps/studio/dist` and `/v1` together, as
 reloading the page signs out. The server needs its administrator plane turned
 on — a store, an allowlist and `FORMANCY_DATA_ADMIN_ROLES`, as
 [its README](./packages/data-server/README.md) says; against a server without
-one, the studio says so at sign-in.
+one, the studio says so at sign-in. Against a server that reviews
+publication, it submits a draft where it would publish or import, and a
+Review step lists the drafts for a publisher to approve or reject
+([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)).
 
 Its suite runs the real server in the test — `createDataServer` with a fake
 connection registry over snapshots captured from the shared fixture, as every
@@ -667,6 +682,17 @@ answers. The list is read at start, and the composed stack lists none
 ([0060](./docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md);
 [the data server's README](./packages/data-server/README.md#across-origins)
 says what is granted, refused and logged).
+
+Publication can need a second person, from the release after 0.1.0: a
+0.1.0 server ignores the setting, and every administrator there still
+publishes alone. With `FORMANCY_DATA_PUBLISHER_ROLES` set, each role also
+an administrator role, nobody publishes or imports a version alone, a
+publisher who did not submit a draft approves it, and a restore is a
+publisher's. The setting is read at start, and the composed stack sets
+none, so its guide publishes as one administrator
+([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md);
+[the data server's README](./packages/data-server/README.md#publication-under-review)
+says what an author and a publisher may each do, and what it costs).
 
 ## What it is tested on
 

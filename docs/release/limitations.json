@@ -204,7 +204,7 @@
       ]
     },
     "0013": {
-      "reviewed": "sha256:5714f1bf162ea45221ece74eb44dc1dfec4149440ae4025cc3d61c2c7ad79cc2",
+      "reviewed": "sha256:c028a8d532bea17de48435d36c4fb6942ec020a8646ad789ada5d4c9717290d7",
       "limitations": [
         {
           "area": "operations",
@@ -378,11 +378,11 @@
       ]
     },
     "0020": {
-      "reviewed": "sha256:f9f07ed05c78c74a5b46e2cb73bd6fb648c800876d49dee64c693ae33c4e885e",
+      "reviewed": "sha256:c6d1ee4e73bf4667f4a5128c32cce9766c63f59ed44dbb5bd51d748763792db1",
       "limitations": [
         {
           "area": "access",
-          "says": "Administration is only as granular as one list of roles: everyone who may propose may also publish and see every connection's metadata."
+          "says": "Administration is as granular as one list of roles and, under review, a second for publishers: everyone who may propose may also see every connection's metadata and, without review, publish."
         },
         {
           "area": "operations",
@@ -430,7 +430,7 @@
       ]
     },
     "0024": {
-      "reviewed": "sha256:073ff23d0f0e950d703d7c0dcfdee0f9c6a130dfda02a4a739481659d4feb844",
+      "reviewed": "sha256:f1720aacea6471a08d7897983dd0029588cc9faf8d1fba1bdb51994c109a1fe1",
       "limitations": [
         {
           "area": "studio",
@@ -767,7 +767,7 @@
       ]
     },
     "0033": {
-      "reviewed": "sha256:20aae732011ec8b6f89dfd04d64220ab9b119b706e9780074988d835db276f9f",
+      "reviewed": "sha256:ade1ab5d95e8bbf28efd749d95b6d6bc4b85916a62a94e661c0e66666695ef37",
       "limitations": [
         {
           "area": "server",
@@ -957,7 +957,7 @@
       "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the pictures job's time. Nobody who installs, integrates or operates the module meets them."
     },
     "0039": {
-      "reviewed": "sha256:e246b601deb7da877cb7d2d2d05d9d52255adb115c07612afe9c5efff7cad8f3",
+      "reviewed": "sha256:4bd4b725233263fa56e8d2661449845208618dfcb2fe44962b81b7c81bcf3666",
       "limitations": [
         {
           "area": "access",
@@ -976,7 +976,7 @@
         },
         {
           "area": "operations",
-          "says": "Which reassigned keys an administrator confirmed is kept in neither the version file nor the audit trail."
+          "says": "Which reassigned keys an administrator confirmed is kept in neither the version file nor the audit trail, and under review only in the draft it was submitted with."
         },
         {
           "area": "operations",
@@ -1961,7 +1961,7 @@
       ]
     },
     "0062": {
-      "reviewed": "sha256:54df372e3651eeab9d59aba883d7da383b8e294d659f324d83b84ca3d576af5b",
+      "reviewed": "sha256:42b9620182bc4d9bfef2bfe2c940dddebde9a8d2197dfa12bef3aac4d446541a",
       "limitations": [
         {
           "area": "operations",
@@ -1995,6 +1995,11 @@
           "area": "server",
           "says": "Each import discovers the target database once, and a database that cannot be reached refuses it.",
           "heldBy": "packages/data-server/src/routes/admin-promotion.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "Under review an import is a draft, which discovers the target database at its submit and again at its approval, and a database that cannot be reached refuses either.",
+          "heldBy": "packages/data-server/src/routes/admin-drafts.test.ts"
         }
       ]
     },
@@ -2014,6 +2019,94 @@
         {
           "area": "operations",
           "says": "The release notes of 0.1.0 are a summary written by hand: why each change before it was made is in CHANGELOG.md under Development before 0.1.0, not on the release page, and nothing checks that the summary says what those entries say."
+        }
+      ]
+    },
+    "0065": {
+      "reviewed": "sha256:4fad718a3e3ad33bd4115a7cbc5445d39c5b951c2fd869d4f5a4328f6126820c",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "Publication is reviewed only when FORMANCY_DATA_PUBLISHER_ROLES is set, so a deployment that upgrades without setting it lets every administrator publish, import and restore alone, as before.",
+          "heldBy": "packages/data-server/src/routes/admin-drafts.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "Nobody approves a draft they submitted, whatever roles they hold, so a deployment under review needs a publisher besides each draft's author.",
+          "heldBy": "packages/data-server/src/routes/admin-drafts.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A publisher restores any version alone, one published by a single administrator before review was turned on included.",
+          "heldBy": "packages/data-server/src/routes/admin-drafts.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "No route shows a publisher a draft's drift before approval: what blocks refuses the approval, and what drift only asks to review is in the approval's answer, after the version is written."
+        },
+        {
+          "area": "access",
+          "says": "A publisher approves a draft with the reassigned keys its author confirmed, not with a confirmation of their own.",
+          "heldBy": "packages/data-server/src/routes/admin-drafts.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "Publisher roles, like administrator roles, are read only from the token's roles claim, so an identity provider that puts roles elsewhere maps them into it."
+        },
+        {
+          "area": "server",
+          "says": "Under review every submit and every approval discovers the database, so one that cannot be reached refuses both, and a version is written only while drift against the database blocks nothing, which a direct publish without review does not ask.",
+          "heldBy": "packages/data-server/src/routes/admin-drafts.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "A draft reads published when the version after its base holds the same bundle, so two drafts of one bundle on one base both read published once either is approved, and so does a rejected draft of that bundle.",
+          "heldBy": "packages/data-server/src/routes/admin-drafts.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "A draft whose base another version replaced, by another approval or a restore, is stale and can be neither approved nor rejected; it is submitted again over the newest version.",
+          "heldBy": "packages/data-server/src/routes/admin-drafts.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "An approval and a rejection of the same draft at the same moment can both succeed, because the two writes go to two stores that share no compare-and-swap: the version is written, the rejection answers 201, and the draft then reads published.",
+          "heldBy": "packages/data-server/src/routes/admin-drafts.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Who approved a version is recorded only as the actor of the audit trail's draft-approve event; the version file is the bundle alone.",
+          "heldBy": "packages/data-server/src/routes/admin-audit.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A pending draft notifies nobody: it waits until a publisher opens the queue."
+        },
+        {
+          "area": "operations",
+          "says": "Nothing deletes a draft: rejected, published and stale drafts stay on the volume, and the queue and every draft route read all of a form's entries, the queue every form's, on every request, a cost not measured."
+        },
+        {
+          "area": "operations",
+          "says": "A form one of whose draft entries no longer parses or validates on the volume serves none of its drafts and takes no new one until the file is put right, and the queue names it as unreadable.",
+          "heldBy": "packages/data-server/src/routes/admin-drafts-store.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Turning review off leaves the drafts on the volume, where no route reads or publishes them until it is turned on again."
+        },
+        {
+          "area": "operations",
+          "says": "The composed stack and the getting-started guide run without review, which the data server's README describes and its suites hold, and no gate runs it in the composed stack."
+        },
+        {
+          "area": "server",
+          "says": "A ConfigurationStore an embedder implements must now provide drafts(), and code that builds an AdminAuditEvent or narrows its operation exhaustively meets the event's draft field and the administration and draft operations, review or not."
+        },
+        {
+          "area": "studio",
+          "says": "The studio's Review step shows a draft's form on paper, its submitter, base, confirmed keys and policy, and not what it changes from the version it replaces.",
+          "heldBy": "apps/studio/src/review.test.tsx"
         }
       ]
     }
