@@ -1,0 +1,29 @@
+{
+  "name": "formancy-data-demo",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-18",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "formancy.ai/data/demo/*", "zone_name": "formancy.ai" },
+    { "pattern": "formancy.ai/data/demo", "zone_name": "formancy.ai" }
+  ],
+  "assets": {
+    "directory": "./.cloudflare",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none",
+    "run_worker_first": ["/data/demo/session", "/data/demo/v1/*"]
+  },
+  "containers": [
+    {
+      "class_name": "DemoServer",
+      "image": "../../deploy/demo/Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "basic",
+      "max_instances": 10
+    }
+  ],
+  "durable_objects": { "bindings": [{ "name": "DEMO", "class_name": "DemoServer" }] },
+  "exports": { "DemoServer": { "type": "durable-object", "storage": "sqlite" } },
+  "observability": { "enabled": false }
+}

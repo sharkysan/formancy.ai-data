@@ -21,6 +21,12 @@ test-results/
 # the demo's path beside its headers, removed after each deploy, and
 # Wrangler's own state.
 /apps/examples/.cloudflare/
+# The live demo's deploy (scripts/live-demo.mjs, 0070): the host page's demo
+# build, and that build staged under the demo's path beside its headers,
+# removed after each deploy. Ignored, so a deploy run twice from one
+# checkout does not refuse its own outputs as uncommitted changes.
+/apps/host/dist-demo/
+/apps/live-demo/.cloudflare/
 .wrangler/
 .idea/
 .pnpm-store/

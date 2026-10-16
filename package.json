@@ -23,6 +23,7 @@
     "check:pkg": "turbo run check:pkg",
     "demo": "pnpm build && pnpm --filter @formancy/data-examples preview",
     "demo:deploy": "pnpm build && node scripts/demo.mjs",
+    "live-demo:deploy": "pnpm build && node scripts/live-demo.mjs",
     "performance": "pnpm build && pnpm --filter @formancy/data-performance run measure && pnpm --filter @formancy/data-performance run render"
   },
   "devDependencies": {
