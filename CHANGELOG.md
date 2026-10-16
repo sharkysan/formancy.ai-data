@@ -55,7 +55,9 @@ later.
   deployed at `/report/`; GitHub holds no Cloudflare token. `pnpm demo`
   serves the same build from a clone, and `pnpm demo:deploy` deploys it by
   hand. The deploy refuses a config that names another Worker, so it
-  cannot replace formancy.ai's site or the report's Studio
+  cannot replace formancy.ai's site or the report's Studio, and a build
+  holding files the page never loads, which turbo leaves from an earlier
+  build in a checkout that built before
   ([0069](docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
 - **The demo is sent with a strict Content-Security-Policy**, so a script
   injected into it would not run: nothing a directive does not name,

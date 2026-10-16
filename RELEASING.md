@@ -181,7 +181,9 @@ deploy.
 - an examples Vite config that names what it bundles without a hash;
 - a built page that asks formancy.ai for a file other than by a path
   relative to it, holds a file in `assets/` copied from the public
-  directory or whose name has not a hash's shape, does not fit the
+  directory, whose name has not a hash's shape or that the page never
+  loads -- an earlier build's, which turbo leaves when it replays a cached
+  build over `dist/` -- does not fit the
   Content-Security-Policy of `scripts/demo-headers.mjs`, or carries no
   `THIRD-PARTY-NOTICES.txt`.
 
