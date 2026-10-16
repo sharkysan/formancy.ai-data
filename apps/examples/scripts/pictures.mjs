@@ -58,8 +58,18 @@ const acts = {
       await untilSnapshot(part, /\[invalid\]/, { within: WITHIN, what: `the ${name} preview's refusal` })
       // The customer list is filled after the form is drawn, Angular's later
       // than React's (measured: --check, with the fonts refused, read
-      // Angular's empty); the picture is of the form with its list.
-      await untilSnapshot(part, /option "Muster AG"/, { within: WITHIN, what: `the ${name} preview's customer list` })
+      // Angular's empty). The customer is a typeahead (0066), and in both
+      // renderers its `typeahead-listbox` part is `hidden` while the list is
+      // not expanded, so the part's text no longer holds the options: the
+      // act opens the list from the keyboard to hold that the source answered,
+      // then closes it and leaves the box, and the picture is the form after
+      // Validate with no list over it.
+      const customer = part.getByRole('combobox', { name: field('Customer') })
+      await customer.focus()
+      await customer.press('ArrowDown')
+      await untilSnapshot(part, /listbox "Customer suggestions":\s+- option "Muster AG"/, { within: WITHIN, what: `the ${name} preview's customer list` })
+      await customer.press('Escape')
+      await customer.blur()
       // A renderer that rounded or cut the amount would refuse something else than the caption says.
       const amount = await part.getByRole('textbox', { name: field('Amount') }).inputValue()
       if (amount !== AMOUNT) throw new Error(`the ${name} preview holds the amount ${amount}, not ${AMOUNT}`)
