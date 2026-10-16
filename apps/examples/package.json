@@ -2,7 +2,7 @@
   "name": "@formancy/data-examples",
   "version": "0.1.0",
   "private": true,
-  "description": "Generated forms from the shared fixture, rendered by @formancy/react and @formancy/angular side by side. An example, never published.",
+  "description": "Generated forms from the shared fixture, rendered by @formancy/react and @formancy/angular side by side. An example, never published to npm; served at formancy.ai/data/examples/ (0069).",
   "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",
   "scripts": {

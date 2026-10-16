@@ -1,13 +1,14 @@
 // The licence and notice texts of every package a built app bundles (0046).
 //
-// A Vite plugin, in the configs of the two apps the web image serves,
-// apps/studio and apps/host, that writes THIRD-PARTY-NOTICES.txt beside each
-// app's index.html. The bundles keep no licence comment, so without it the
-// code of React, Angular and upstream formancy reaches every browser with
-// none of the texts their licences ask to travel with it: MIT's notice, and
-// for an Apache-2.0 package its NOTICE (section 4(d)). Vite's own
-// `build.license` (read in 8.3.3, what both apps resolve) reads one licence
-// file per package and never a NOTICE.
+// A Vite plugin, in the configs of the apps that are served -- apps/studio
+// and apps/host, which the web image serves, and apps/examples, which the
+// demo at formancy.ai/data/examples/ serves (0069) -- that writes
+// THIRD-PARTY-NOTICES.txt beside each app's index.html. The bundles keep no
+// licence comment, so without it the code of React, Angular and upstream
+// formancy reaches every browser with none of the texts their licences ask
+// to travel with it: MIT's notice, and for an Apache-2.0 package its NOTICE
+// (section 4(d)). Vite's own `build.license` (read in 8.3.3, what all three
+// apps resolve) reads one licence file per package and never a NOTICE.
 //
 // Every module of every chunk, and every file the build writes beside them,
 // is placed, or the build stops:

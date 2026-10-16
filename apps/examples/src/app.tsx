@@ -152,12 +152,9 @@ export function App({ captured = CAPTURED }: { captured?: readonly CapturedTable
 
       <footer className="colophon">
         <p>
-          Nothing on this page saves. <strong>Validate</strong> runs the formancy engine in your browser, and there is no
-          server behind it yet.
+          Nothing on this page saves. <strong>Validate</strong> runs the formancy engine in your browser.
         </p>
-        <p>
-          Formancy Data is source-available, not open source. The formancy packages it renders with are Apache-2.0.
-        </p>
+        <p>The formancy packages it renders with are Apache-2.0.</p>
       </footer>
     </div>
   )
