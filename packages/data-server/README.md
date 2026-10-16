@@ -15,6 +15,9 @@ existed would be documented and inert.
   `read`, so a publish over it can tell a damaged file from a read that
   failed
   ([0039](../../docs/decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md)).
+  Its `drafts()` is the store a deployment under review keeps its drafts
+  in, `<root>/.drafts`, which `list()` never reports as a form
+  ([0065](../../docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)).
 - **`createIdentityVerifier(options)`** — the host application's JWT, verified
   offline with a pinned algorithm, becomes an actor, roles and attributes such
   as the tenant ([0014](../../docs/decisions/0014-host-identity-is-verified-offline.md)).
@@ -129,6 +132,12 @@ existed would be documented and inert.
   `{ version, drift }` (the type `Importation`). Nothing is renamed, since a
   lookup's source name is made from the connection's. A restore over a
   database of another engine is 422 `other-engine` too, where it was 500.
+  Since [0065](../../docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md),
+  `GET /v1/administration` says whether the deployment reviews publication
+  and what the caller may not do; with `publisherRoles` set, nobody
+  publishes or imports directly, an administrator submits a draft and a
+  publisher who did not submit it approves it, and restoring is a
+  publisher's: *Publication under review*, below.
   Every request on the plane is audited, a publish, a restore and an
   import included
   ([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md)):
@@ -323,8 +332,11 @@ existed would be documented and inert.
   an event names the actor, the operation, the connection, the form and the
   version read, compared, regenerated from or written; a publish, a
   restore and an import also the base the administrator named, and a
-  restore the version it copied, which nothing on disk records. Refusals are events too: a 403
-  names the actor it refused. Never the bundle, the policy, a snapshot, a
+  restore the version it copied, which nothing on disk records. Under
+  review a draft's event names the draft, the number a submit wrote or the
+  one its path names, and an approval the version it wrote: who approved a
+  version is that event's actor, and nothing else records it (0065).
+  Refusals are events too: a 403 names the actor it refused. Never the bundle, the policy, a snapshot, a
   drift report or a message. On both planes a connection is recorded only
   when the allowlist knows it and a form id only when it has a form id's
   shape, so a connection string typed into a path or a body never reaches
@@ -370,6 +382,7 @@ are turned on by configuration:
 | --- | --- |
 | `FORMANCY_DATA_STORE_DIR` and `FORMANCY_DATA_CONNECTIONS` | The runtime plane: published forms, records, lookups. The connections file is the allowlist (JSON); passwords in it are `env:` or `file:` references. |
 | `FORMANCY_DATA_ADMIN_ROLES` | The administrator's plane, for tokens holding one of these comma-separated roles. Needs the two above. Its requests are audited to the same log as the runtime's, one `audit` line per event, told apart by `audit.plane`. |
+| `FORMANCY_DATA_PUBLISHER_ROLES` | Review of publication, for tokens holding one of these comma-separated roles, each also one of the administrator roles: nobody publishes alone, and a publisher approves another administrator's draft. Needs the administrator's plane. Unset, no review. See *Publication under review*, below ([0065](../../docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)). |
 | `FORMANCY_DATA_AUDIT_KEY` | Records named in the audit trail by a keyed hash. A secret reference. Without it, no record is named. |
 
 Without the store and the allowlist the server verifies tokens and nothing
@@ -398,8 +411,9 @@ one-key settings rotate by restart; a key set rotates as below.
 | `PORT` | The port it listens on, 4390 when unset. |
 
 `src/rate-limit.test.ts` holds what the rate-limit setting accepts and
-refuses, `src/cors.test.ts` what the origin list does, and
-`src/lookup-deadline.test.ts` what the lookup deadline accepts.
+refuses, `src/cors.test.ts` what the origin list does,
+`src/lookup-deadline.test.ts` what the lookup deadline accepts, and
+`src/publisher-roles.test.ts` what the publisher roles do.
 
 The log is JSON lines on standard output: Fastify's lines for each request,
 and the audit trail. A request is logged by its method and the route it
@@ -614,6 +628,144 @@ an embedder passes the same list as `runtime.origins`, held to the same rule.
 `src/cross-origin.test.ts` holds each of these over the real server, and
 `src/server-log.test.ts` what the log names. No browser gate runs against a
 server with origins listed yet; the one measurement in browsers was by hand.
+
+### Publication under review
+
+Without it, every administrator publishes, imports and restores alone. A
+deployment that wants a second person before a form reaches its users sets
+`FORMANCY_DATA_PUBLISHER_ROLES` ([0065](../../docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)):
+
+```bash
+FORMANCY_DATA_ADMIN_ROLES=data-admin,data-publisher \
+FORMANCY_DATA_PUBLISHER_ROLES=data-publisher \
+node dist/main.mjs
+```
+
+Comma-separated, space around each role ignored, each counted once, and
+each also one of `FORMANCY_DATA_ADMIN_ROLES`: a publisher is an
+administrator who may also approve. Set and naming no role, naming a role
+the administrator roles do not have, or set on a server without the
+administrator's plane, it stops the process with a sentence naming what is
+wrong. It is read once, at start, and the startup `planes` line says
+`review`. An embedder passes `admin.publisherRoles` to `createDataServer`,
+held to the same rule. Unset, nothing changes, so upgrading puts no
+deployment under review.
+
+Under review an administrator whose token holds a publisher role is a
+publisher, and one whose token does not is an author. Who they are is the
+token's `sub`, and what they hold its `roles` claim, never anything a body
+says.
+
+| | An author | A publisher |
+| --- | --- | --- |
+| Connect, discover, propose, read versions, drift, regenerate | yes | yes |
+| Publish or import directly | no: 403 `review-required` | no: 403 `review-required` |
+| Submit a draft, read the queue and a draft | yes | yes |
+| Approve a draft | no: 403 `publisher-required` | someone else's; their own is 403 `own-draft` |
+| Reject a draft | their own, which is a withdrawal; someone else's is 403 `publisher-required` | any pending draft |
+| Restore a version | no: 403 `publisher-required` | yes, alone and without a draft |
+
+A token that holds both roles is a publisher, and still never approves a
+draft it submitted. Each refusal is 403, decided by `refusalFor` in
+`governance.ts` before the route reads its body -- for an approval or a
+rejection, once the draft is read -- with one sentence each:
+
+- `review-required`: "This deployment reviews publication: submit this
+  version as a draft, and a publisher other than you approves it."
+- `publisher-required`: "This needs a publisher role: restoring a version,
+  and approving or rejecting someone else's draft, are a publisher's."
+- `own-draft`: "You submitted this draft: a publisher other than you
+  approves it."
+
+The routes:
+
+- **`GET /v1/administration`**, review or not: `{ review, publisher,
+  refuses }` (the type `Administration`): whether the deployment reviews,
+  whether the caller publishes, and every operation the caller's grant
+  refuses them, each with its `code` and `message`. Without review it is
+  `{ review: false, publisher: true, refuses: {} }`. A client draws what it
+  offers from this rather than guessing; a clerk is 403 `forbidden`.
+- **The draft routes exist only under review**; without it the router
+  answers 404 for each.
+  - **`POST /v1/forms/:id/drafts`**, the publish's body `{ expectedBase,
+    bundle, keysConfirmed? }`, a `submittedBy` in it unread. It checks
+    what an import checks, in its order: 400 for a body of another shape;
+    422 `invalid-bundle` for what a publish refuses, among them a
+    connection this allowlist has no entry by that name for, with the
+    sentence that a version keeps its connection's name; 503 `unavailable`
+    when the database cannot be discovered, with no address; 422
+    `other-engine`; 409 `incompatible` with only the blocking changes; 422
+    `keys-reassigned` with `keys` and `problems`; 409 `conflict` with
+    `current` when `expectedBase` is not the newest version. 201 answers
+    `{ draft, state: 'pending', drift }` (`DraftSubmission`). Nothing is
+    written to the versions.
+  - **`GET /v1/drafts`**, the queue (`DraftQueue`): `{ drafts, unreadable
+    }`, each pending draft's `form`, `draft`, `expectedBase`,
+    `submittedBy`, `title` and `refuses: { approve?, reject? }`, by form id
+    in codepoint order and by number within a form; and the forms whose
+    drafts cannot be read, which hide no other form's.
+  - **`GET /v1/forms/:id/drafts/:draft`** (`DraftRead`): the draft, its
+    `bundle` and `keysConfirmed`, its `state` -- `pending`, `rejected`,
+    `published` or `stale` -- `rejectedBy` and `withdrawn` when a rejection
+    names it, a published draft's included, the form's `current` version,
+    and `refuses`. 404
+    `unknown-draft` for a number no draft has.
+  - **`POST /v1/forms/:id/drafts/:draft/approval`**, no body: 403
+    `publisher-required` or `own-draft`; 409 `rejected`, `published`, or
+    `stale` with `current`; then every check of the submit again, against
+    the database as it is now -- so a bound column dropped since is 409
+    `incompatible` and the draft waits -- and 409 `conflict` with `current`
+    if another version landed first. 201 answers `{ version, drift }`
+    (`Approval`), and the version file is the draft's bundle exactly as the
+    store writes every version.
+  - **`POST /v1/forms/:id/drafts/:draft/rejection`**, no body: 201 `{ draft,
+    state: 'rejected', withdrawn }` (`DraftRejection`), `withdrawn` when the
+    submitter took it back; 403 `publisher-required` for an author
+    rejecting someone else's; 409 for a draft rejected, published or stale
+    already.
+  - A draft's number in a path is a whole number from 1; anything else is
+    400 `invalid-request`.
+
+Drafts are kept in `<FORMANCY_DATA_STORE_DIR>/.drafts`, a numbered entry per
+draft and per rejection, each form's written by the same compare-and-swap
+as its versions and never edited, so draft numbers have gaps where a
+rejection took one. A draft's state is derived whenever it is read:
+published when the version after its base holds its bundle, rejected when a
+rejection names it, stale when another version replaced its base, pending
+otherwise. Published is asked first because it is what is served: a
+rejection that landed while the approval wrote the version decides
+nothing. An entry edited or damaged on the volume makes that form's
+drafts 500 `internal`, and the log says `a draft entry does not validate,
+and is not served`, naming the form and the entry. Who approved a version
+is the audit trail's `draft-approve` event, and nothing else.
+
+What it costs and does not do, as 0065 says: every submit and approval
+discovers the database, so one that cannot be reached refuses both;
+nothing deletes a draft, and the queue reads every form's on every
+request; nobody is told a draft waits; no route shows a publisher a
+draft's drift before the approval answers with it; nobody approves their
+own draft, so a deployment under review needs two people; a publisher
+restores any version alone, one published before review was turned on
+included; turning review off leaves the drafts on the volume, unread;
+roles are read from the token's `roles` claim only; and an approval and a
+rejection of one draft at the same moment can both succeed, the draft then
+reading published. The composed
+stack and [the getting-started guide](../../docs/getting-started.md) run
+without review.
+
+`src/routes/admin-drafts.test.ts` holds every route and refusal, and that
+an author writes no version on any route;
+`src/routes/admin-drafts-store.test.ts` what a drafts or versions store
+that cannot be read, an entry edited on disk and concurrent submits
+answer, and the queue;
+`src/routes/admin-drafts.integration.test.ts`, on both engines, two drafts
+of the order form: refused for drift and approved as version 1, then a
+second over it from a submitter holding the publisher role, refused
+`own-draft` for them, refused for drift and approved by the other
+publisher as version 2, which the runtime serves, with who approved read
+from the trail; `src/publisher-roles.test.ts` the setting, and an
+embedder's `admin.publisherRoles` refused by `createDataServer`;
+`src/routes/admin-audit.test.ts` the draft routes' events.
 
 ## Licence
 

@@ -48,13 +48,22 @@ export const WRITER_SNAPSHOT = readSnapshot(writer)
 export const SQLSERVER_SNAPSHOT = readSnapshot(sqlserver)
 export const SQLSERVER_READER_SNAPSHOT = readSnapshot(sqlserverReader)
 
-/** The tokens the fake verifier accepts, and who each one is. */
-export const TOKENS = { admin: 'studio-test-administrator', clerk: 'studio-test-clerk' } as const
+/**
+ * The tokens the fake verifier accepts, and who each one is. Under review
+ * (0065), `admin` is an author -- an administrator without a publisher
+ * role; `publisher` holds the publisher role alone, which a reviewed plane
+ * also lets in; `both` holds both, and still never approves what it
+ * submitted.
+ */
+export const TOKENS = { admin: 'studio-test-administrator', clerk: 'studio-test-clerk', publisher: 'studio-test-publisher', both: 'studio-test-both' } as const
 export const ADMIN_ROLE = 'data-admin'
+export const PUBLISHER_ROLE = 'data-publisher'
 
 const verifyIdentity: IdentityVerifier = async (token) => {
   if (token === TOKENS.admin) return { ok: true, identity: { actor: { id: 'ada', roles: [ADMIN_ROLE] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-7', roles: ['clerk'] }, attributes: { tenant: '1' } } }
+  if (token === TOKENS.publisher) return { ok: true, identity: { actor: { id: 'grace', roles: [PUBLISHER_ROLE] }, attributes: { tenant: '1' } } }
+  if (token === TOKENS.both) return { ok: true, identity: { actor: { id: 'lin', roles: [ADMIN_ROLE, PUBLISHER_ROLE] }, attributes: { tenant: '1' } } }
   return { ok: false, reason: 'ERR_JWS_INVALID' }
 }
 
@@ -75,7 +84,7 @@ export interface TestPlane {
    */
   hold(path: RegExp): { release: () => void }
   store: ConfigurationStore
-  /** The store's directory: one file per published version, which a test can damage by hand. */
+  /** The store's directory: one file per published version, which a test can damage by hand, and under review the drafts beside them in `.drafts` (0065). */
   root: string
   close(): Promise<void>
 }
@@ -86,9 +95,12 @@ export const CONNECTIONS = ['fixture', 'fixture-reader', 'fixture-sqlserver', 'f
 /**
  * `administrator: false` starts the server as one started without a store, an
  * allowlist or administrator roles would be: `/v1/whoami` answers and the
- * administrator plane does not exist.
+ * administrator plane does not exist. `review: true` starts it as
+ * `FORMANCY_DATA_PUBLISHER_ROLES=data-publisher` would (0065): nobody
+ * publishes directly, an administrator submits a draft, and a publisher
+ * who did not submit it approves it.
  */
-export async function startPlane(options: { administrator?: boolean } = {}): Promise<TestPlane> {
+export async function startPlane(options: { administrator?: boolean; review?: boolean } = {}): Promise<TestPlane> {
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-studio-'))
   const store = createFileConfigurationStore(root)
   const databases = new Map<string, MetadataSnapshot>([
@@ -125,10 +137,13 @@ export async function startPlane(options: { administrator?: boolean } = {}): Pro
     close: async () => {},
   }
 
-  const app = await createDataServer(
-    // The administrator's trail is the server's suites' subject; here it is required and discarded.
-    options.administrator === false ? { verifyIdentity } : { verifyIdentity, admin: { registry, store, adminRoles: [ADMIN_ROLE], audit: { sink: () => {} } } },
-  )
+  // The administrator's trail is the server's suites' subject; here it is required and discarded.
+  const audit = { sink: () => {} }
+  const admin =
+    options.review === true
+      ? { registry, store, adminRoles: [ADMIN_ROLE, PUBLISHER_ROLE], publisherRoles: [PUBLISHER_ROLE], audit }
+      : { registry, store, adminRoles: [ADMIN_ROLE], audit }
+  const app = await createDataServer(options.administrator === false ? { verifyIdentity } : { verifyIdentity, admin })
 
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input), 'http://studio.test')

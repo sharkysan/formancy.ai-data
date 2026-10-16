@@ -3,10 +3,13 @@ import type { ChangeEvent, ReactElement } from 'react'
 import { describeReassigned } from '@formancy/data-core'
 import type { DriftChange, DriftReport, ReassignedKey } from '@formancy/data-core'
 import type { PublishedBundle } from '@formancy/data-server'
-import type { AdminClient, Published } from './api.js'
+import type { AdminClient, Failure, Published } from './api.js'
 import { describeRef, isFormId } from './choice.js'
-import { Change } from './drift-change.js'
+import { Change, Changes } from './drift-change.js'
 import { useFocusAfterRender } from './focus.js'
+
+/** What sending a file came to: a version imported, or under review a draft submitted (0065), with the drift that let it through. */
+type Sent = Failure | { ok: true; drift: DriftReport; version: number } | { ok: true; drift: DriftReport; draft: number }
 
 /** The import button's id, for the keyboard to return to when the keys' confirmation closes. */
 const IMPORT = 'import-version'
@@ -29,6 +32,8 @@ type Chosen =
 
 type Imported =
   | { kind: 'imported'; formId: string; version: number; drift: DriftReport; published: Published }
+  /** Under review (0065): the file submitted as a draft, and the drift the server let it through with. */
+  | { kind: 'submitted'; formId: string; draft: number; drift: DriftReport; published: Published }
   | { kind: 'incompatible'; message: string; changes: DriftChange[]; published: Published }
   | { kind: 'keys'; message: string; keys: ReassignedKey[] }
   | { kind: 'conflict'; formId: string; current: number | null }
@@ -96,15 +101,24 @@ export function readVersionFile(name: string, text: string): { ok: true; file: V
  * the server's words and confirmed exactly as the server listed them
  * (0039). Pressing a button that stays keeps the keyboard on it; the
  * confirmation, which closes, sends it back to the import button.
+ *
+ * Under review (0065) -- `review`, the server's sentence for it -- the file
+ * is submitted as a draft instead, sent as it was read, over the same base
+ * and checked the same way, for a publisher other than its submitter to
+ * approve. Nothing is written to the versions, so the step is not told of
+ * a version and the base stays the one read.
  */
 export function ImportPanel({
   client,
   written = 0,
+  review = null,
   onImported,
 }: {
   client: AdminClient
   /** Changes when the step wrote a version itself -- a restore -- so the newest version the import names is read again. */
   written?: number
+  /** Under review, the server's sentence for why the file is submitted as a draft (`reviewedBy`); `null` where it is imported. */
+  review?: string | null
   onImported: (formId: string) => void
 }): ReactElement {
   const [chosen, setChosen] = useState<Chosen | null>(null)
@@ -150,6 +164,16 @@ export function ImportPanel({
     await readNewest(read.file, asked)
   }
 
+  /** The file sent: imported as a version, or under review submitted as a draft. */
+  async function send(file: VersionFile, newest: number | null, keysConfirmed: readonly ReassignedKey[] | undefined): Promise<Sent> {
+    if (review === null) {
+      const outcome = await client.importVersion(file.formId, newest, file.bundle, keysConfirmed)
+      return outcome.ok ? { ok: true, drift: outcome.value.drift, version: outcome.value.version } : outcome
+    }
+    const outcome = await client.submitDraft(file.formId, newest, file.bundle, keysConfirmed)
+    return outcome.ok ? { ok: true, drift: outcome.value.drift, draft: outcome.value.draft } : outcome
+  }
+
   async function importFile(keysConfirmed?: readonly ReassignedKey[]): Promise<void> {
     // A second press while the first is on its way does nothing; the button stays enabled, so it keeps the keyboard.
     if (pending || chosen?.state !== 'read') return
@@ -157,21 +181,24 @@ export function ImportPanel({
     const asked = choice.current
     setPending(true)
     setImported(null)
-    const outcome = await client.importVersion(file.formId, newest, file.bundle, keysConfirmed)
+    const outcome = await send(file, newest, keysConfirmed)
     if (asked !== choice.current) {
       // Another file was chosen meanwhile: this answer is about one nobody has
       // chosen any more, and its keys are not that file's to confirm. A
       // version it wrote is still news to the step.
       setPending(false)
-      if (outcome.ok) onImported(file.formId)
+      if (outcome.ok && 'version' in outcome) onImported(file.formId)
       return
     }
     // Validated by the server before it answered anything but a refusal of the file itself.
     const published: Published = { version: newest ?? 0, bundle: file.bundle as PublishedBundle }
-    if (outcome.ok) {
-      setImported({ kind: 'imported', formId: file.formId, version: outcome.value.version, drift: outcome.value.drift, published: { ...published, version: outcome.value.version } })
+    if (outcome.ok && 'version' in outcome) {
+      setImported({ kind: 'imported', formId: file.formId, version: outcome.version, drift: outcome.drift, published: { ...published, version: outcome.version } })
       await readNewest(file, asked)
       onImported(file.formId)
+    } else if (outcome.ok) {
+      // A draft: no version was written, so nothing is read again and the step is told nothing.
+      setImported({ kind: 'submitted', formId: file.formId, draft: outcome.draft, drift: outcome.drift, published })
     } else if (outcome.code === 'incompatible') {
       setImported({ kind: 'incompatible', message: outcome.message, changes: outcome.changes ?? [], published })
     } else if (outcome.code === 'keys-reassigned') {
@@ -194,6 +221,7 @@ export function ImportPanel({
         connection&rsquo;s name, which this deployment&rsquo;s allowlist resolves to its own database. The server checks it as it
         checks a publish, and against this database as it checks a restore.
       </p>
+      {review === null ? null : <p className="reviewed">{review}</p>}
       <div className="field">
         <label htmlFor="import-file">Version file</label>
         <input id="import-file" type="file" accept=".json,application/json" onChange={(event) => void choose(event)} />
@@ -209,37 +237,49 @@ export function ImportPanel({
       {chosen?.state === 'read' ? (
         <p className="next">
           <button type="button" id={IMPORT} className="button" onClick={() => void importFile()}>
-            Import as version {(chosen.newest ?? 0) + 1}
+            {review === null ? `Import as version ${String((chosen.newest ?? 0) + 1)}` : 'Submit as a draft'}
           </button>
         </p>
       ) : null}
-      {imported === null ? null : <ImportOutcome imported={imported} onConfirm={(keys) => void importFile(keys)} />}
+      {imported === null ? null : <ImportOutcome imported={imported} reviewed={review !== null} onConfirm={(keys) => void importFile(keys)} />}
     </section>
   )
 }
 
+/** What the drift a file was let through with says, as an import and a draft of one both show it. */
+function Differs({ imported }: { imported: Extract<Imported, { drift: DriftReport }> }): ReactElement | null {
+  return (
+    <Changes
+      changes={imported.drift.changes}
+      published={imported.published}
+      id="import-differs"
+      heading="What differs here, and blocks nothing"
+      level="h4"
+      none="Nothing it rests on differs between this database and the one it was published from."
+    />
+  )
+}
+
 /** What the server answered an import, each answer as the step shows its kind elsewhere. */
-function ImportOutcome({ imported, onConfirm }: { imported: Imported; onConfirm: (keys: readonly ReassignedKey[]) => void }): ReactElement {
+function ImportOutcome({ imported, reviewed, onConfirm }: { imported: Imported; reviewed: boolean; onConfirm: (keys: readonly ReassignedKey[]) => void }): ReactElement {
   if (imported.kind === 'imported') {
-    const { changes } = imported.drift
     return (
       <>
         <p role="status" className="done">
           Imported as version {imported.version} of {imported.formId}: the runtime here serves it from now on, with the policy and the
           snapshot it was published with. The database was not changed.
         </p>
-        {changes.length === 0 ? (
-          <p>Nothing it rests on differs between this database and the one it was published from.</p>
-        ) : (
-          <>
-            <h4 id="import-differs">What differs here, and blocks nothing</h4>
-            <ul aria-labelledby="import-differs">
-              {changes.map((change, index) => (
-                <Change key={index} change={change} published={imported.published} />
-              ))}
-            </ul>
-          </>
-        )}
+        <Differs imported={imported} />
+      </>
+    )
+  }
+  if (imported.kind === 'submitted') {
+    return (
+      <>
+        <p role="status" className="done">
+          Draft {imported.draft} of {imported.formId} submitted: a publisher other than you approves it.
+        </p>
+        <Differs imported={imported} />
       </>
     )
   }
@@ -267,17 +307,19 @@ function ImportOutcome({ imported, onConfirm }: { imported: Imported; onConfirm:
           ))}
         </ul>
         <button type="button" className="button" onClick={() => onConfirm(imported.keys)}>
-          Confirm these keys and import
+          {reviewed ? 'Confirm these keys and submit' : 'Confirm these keys and import'}
         </button>
       </div>
     )
   }
   if (imported.kind === 'conflict') {
     const current = imported.current
+    const next = (current ?? 0) + 1
     return (
       <p role="alert" className="problem-box">
         Somebody published {current === null ? 'a version' : `version ${String(current)}`} of {imported.formId} here since its versions
-        were read. Nothing was imported; importing now makes version {(current ?? 0) + 1}.
+        were read.{' '}
+        {reviewed ? `Nothing was submitted; a draft submitted now, once approved, makes version ${String(next)}.` : `Nothing was imported; importing now makes version ${String(next)}.`}
       </p>
     )
   }

@@ -1,6 +1,6 @@
 # 0033 — The administrator's plane is audited like the runtime, one event per request
 
-- **Status:** accepted; extended by [0060](0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md): preflights are root routes outside both planes and are not audited, and a token-bearing request a browser marks cross-site is refused before its token is read and audited with no actor; extended by [0062](0062-a-published-version-moves-between-deployments-as-its-version-file.md): an import is audited as `import`, naming its base, its connection and the version it wrote
+- **Status:** accepted; extended by [0060](0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md): preflights are root routes outside both planes and are not audited, and a token-bearing request a browser marks cross-site is refused before its token is read and audited with no actor; extended by [0062](0062-a-published-version-moves-between-deployments-as-its-version-file.md): an import is audited as `import`, naming its base, its connection and the version it wrote; extended by [0065](0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md): the administration and draft operations, and the event's `draft`, the number a submit wrote or a path names; who approved a version is the `draft-approve` event's actor, and nothing else records it
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

@@ -116,6 +116,26 @@ describe('the file configuration store', () => {
     await expect(misconfigured.publish('sales-order', null, {})).rejects.toThrow(/is not a directory/)
   })
 
+  // A deployment under review keeps its drafts beside the versions, in
+  // `<root>/.drafts` (0065), with entries numbered the way versions are.
+  // Listed as a form, `.drafts` would be served to the menu and offered
+  // to the studio as a form nobody published; and a draft written into a
+  // form's own directory would be a version the runtime serves. Neither
+  // is: the store lists the same forms with drafts beside it, and the
+  // drafts store has its own forms and numbers.
+  test('keeps drafts beside the versions, where no form id reaches and the listing does not look', async () => {
+    await store.publish('sales-order', null, { title: 'one' })
+    const drafts = store.drafts()
+    expect(await drafts.publish('sales-order', null, { entry: 'draft' })).toEqual({ ok: true, version: 1 })
+    expect(await drafts.publish('purchase', null, { entry: 'draft' })).toEqual({ ok: true, version: 1 })
+    expect(await store.list()).toEqual(['sales-order'])
+    expect(await store.versions('sales-order')).toEqual([1])
+    expect(await store.latest('purchase')).toBeNull()
+    expect(await drafts.list()).toEqual(['purchase', 'sales-order'])
+    expect((await readdir(root)).sort()).toEqual(['.drafts', 'sales-order'])
+    expect(await store.read('sales-order', 1)).toEqual({ title: 'one' })
+  })
+
   // An empty store, or one whose directory does not exist yet, lists nothing
   // rather than failing — a fresh volume is the first state every deployment has.
   test('lists ids in codepoint order, and nothing for a store that does not exist yet', async () => {

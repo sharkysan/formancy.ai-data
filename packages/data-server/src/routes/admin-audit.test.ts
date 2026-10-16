@@ -51,11 +51,12 @@ function snapshot(): MetadataSnapshot {
   })
 }
 
-/** Accepts three literal tokens: an administrator, a clerk, and nothing else. */
+/** Accepts four literal tokens: an administrator, a publisher -- who administers too, under review (0065) -- a clerk, and nothing else. */
 const verifyIdentity: IdentityVerifier = async (token) =>
   token === 'admin' ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } }
-    : token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: {} } }
-      : { ok: false, reason: 'bad' }
+    : token === 'publisher' ? { ok: true, identity: { actor: { id: 'p', roles: ['data-publisher'] }, attributes: {} } }
+      : token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: {} } }
+        : { ok: false, reason: 'bad' }
 
 /** The same, for a plane registered on a Fastify instance this suite builds itself. */
 async function authenticate(request: FastifyRequest): Promise<HostIdentity | undefined> {
@@ -92,6 +93,11 @@ const sink: AuditSink = (event) => {
 
 function serve(overrides: { store?: ConfigurationStore } = {}): Promise<FastifyInstance> {
   return createDataServer({ verifyIdentity, admin: { registry: registry(), store: overrides.store ?? store, adminRoles: ['data-admin'], audit: { sink, now: () => NOW } } })
+}
+
+/** The same plane under review (0065): `publisher` approves what `admin` submits. */
+function serveReviewed(): Promise<FastifyInstance> {
+  return createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles: ['data-publisher'], audit: { sink, now: () => NOW } } })
 }
 
 beforeEach(async () => {
@@ -134,7 +140,7 @@ const of = (operation: AdminAuditEvent['operation']) => events.filter((entry) =>
 
 /** An expected event, every field present: what a case does not give is null, as the plane writes it. */
 const event = (fields: Partial<AdminAuditEvent> & Pick<AdminAuditEvent, 'operation' | 'status' | 'outcome'>): AdminAuditEvent => ({
-  at: NOW, plane: 'admin', actor: 'a', connection: null, form: null, formVersion: null, expectedBase: null, restoredFrom: null, ...fields,
+  at: NOW, plane: 'admin', actor: 'a', connection: null, form: null, formVersion: null, expectedBase: null, restoredFrom: null, draft: null, ...fields,
 })
 
 describe('what holds the trail in place', () => {
@@ -163,9 +169,10 @@ describe('what holds the trail in place', () => {
   // name, fails here whichever route it is. HEAD is sent too, as the GET it
   // answers for. The table has no name for a route that no longer exists,
   // and the router no route the table does not name -- one registered above
-  // the plane's hooks, where `onRoute` never sees it, included.
+  // the plane's hooks, where `onRoute` never sees it, included. The plane is
+  // under review (0065), so its draft routes are in the router too.
   test.each([
-    { plane: 'admin', names: ADMIN_OPERATIONS, register: (instance: FastifyInstance, to: AuditSink) => adminRoutes(instance, { registry: registry(), store, adminRoles: ['data-admin'], authenticate, audit: { sink: to } }) },
+    { plane: 'admin', names: ADMIN_OPERATIONS, register: (instance: FastifyInstance, to: AuditSink) => adminRoutes(instance, { registry: registry(), store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles: ['data-publisher'], authenticate, audit: { sink: to } }) },
     { plane: 'runtime', names: ROUTE_OPERATIONS, register: (instance: FastifyInstance, to: AuditSink) => runtimeRoutes(instance, { registry: registry(), store, authenticate, lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, audit: { sink: to } }) },
   ] as const)('every route the $plane plane registers emits exactly one event, named from its table', async ({ plane, names, register }) => {
     const routes: Array<{ method: string; url: string }> = []
@@ -180,7 +187,7 @@ describe('what holds the trail in place', () => {
     const key = ({ method, url }: { method: string; url: string }) => `${method === 'HEAD' ? 'GET' : method} ${url}`
     expect(new Set(routes.map(key))).toEqual(new Set(Object.keys(names)))
     for (const route of routes) {
-      const path = route.url.replace(':id', route.url.startsWith('/v1/connections/') ? 'erp' : 'employee').replace(':version', '1').replace(':source', 'customer')
+      const path = route.url.replace(':id', route.url.startsWith('/v1/connections/') ? 'erp' : 'employee').replace(':version', '1').replace(':source', 'customer').replace(':draft', '1')
       heard = []
       const response = await bare.inject({ method: route.method as 'GET', url: path })
       expect({ route, status: response.statusCode }).toEqual({ route, status: 401 })
@@ -307,6 +314,48 @@ describe("the administrator plane's events", () => {
     } finally {
       await rm(elsewhere, { recursive: true, force: true })
     }
+  })
+
+  // Under review (0065) the trail is the one place that says who approved
+  // version 1: the version file is the bundle alone. Each draft route names
+  // the draft it addressed -- a submit, the one it wrote -- and its form,
+  // base and connection once the draft is read; an approval, the version it
+  // wrote. A refusal is audited by its code, a direct publish under review
+  // by `review-required`, and a draft named in a path is recorded once it
+  // has a draft number's shape, as a form id is. Nothing of the bundle.
+  test('under review, the draft routes name the draft, its base and connection, and an approval the version it wrote', async () => {
+    const server = await serveReviewed()
+    const bundle = bundleOf(await propose(server))
+    events = []
+    const send = (method: 'GET' | 'POST', url: string, token?: string, payload?: Record<string, unknown>) =>
+      server.inject({ method, url, headers: token === undefined ? {} : as(token), ...(payload === undefined ? {} : { payload }) })
+    await send('GET', '/v1/administration', 'admin')
+    expect((await send('POST', '/v1/forms/employee/versions', 'admin', { expectedBase: null, bundle })).statusCode).toBe(403)
+    expect((await send('POST', '/v1/forms/employee/drafts', 'admin', { expectedBase: null, bundle })).json()).toMatchObject({ draft: 1 })
+    await send('GET', '/v1/drafts', 'publisher')
+    await send('GET', '/v1/forms/employee/drafts/1', 'publisher')
+    await send('POST', '/v1/forms/employee/drafts/1/approval', 'admin')
+    expect((await send('POST', '/v1/forms/employee/drafts/1/approval', 'publisher')).json()).toMatchObject({ version: 1 })
+    expect((await send('POST', '/v1/forms/employee/drafts', 'admin', { expectedBase: 1, bundle })).json()).toMatchObject({ draft: 2 })
+    await send('POST', '/v1/forms/employee/drafts/2/rejection', 'admin')
+    await send('GET', '/v1/forms/employee/drafts/9', 'publisher')
+    await send('POST', '/v1/forms/employee/drafts/3/approval')
+    await send('POST', '/v1/forms/employee/drafts/x/approval')
+    expect(events).toEqual([
+      event({ operation: 'administration', status: 200, outcome: 'ok' }),
+      event({ operation: 'publish', form: 'employee', status: 403, outcome: 'review-required' }),
+      event({ operation: 'draft-submit', form: 'employee', connection: 'erp', draft: 1, status: 201, outcome: 'ok' }),
+      event({ operation: 'draft-queue', actor: 'p', status: 200, outcome: 'ok' }),
+      event({ operation: 'draft-read', actor: 'p', form: 'employee', connection: 'erp', draft: 1, status: 200, outcome: 'ok' }),
+      event({ operation: 'draft-approve', form: 'employee', connection: 'erp', draft: 1, status: 403, outcome: 'publisher-required' }),
+      event({ operation: 'draft-approve', actor: 'p', form: 'employee', connection: 'erp', draft: 1, formVersion: 1, status: 201, outcome: 'ok' }),
+      event({ operation: 'draft-submit', form: 'employee', connection: 'erp', expectedBase: 1, draft: 2, status: 201, outcome: 'ok' }),
+      event({ operation: 'draft-reject', form: 'employee', connection: 'erp', expectedBase: 1, draft: 2, status: 201, outcome: 'ok' }),
+      event({ operation: 'draft-read', actor: 'p', form: 'employee', draft: 9, status: 404, outcome: 'unknown-draft' }),
+      event({ operation: 'draft-approve', actor: null, form: 'employee', draft: 3, status: 401, outcome: 'unauthenticated' }),
+      event({ operation: 'draft-approve', actor: null, form: 'employee', status: 401, outcome: 'unauthenticated' }),
+    ])
+    for (const planted of [TITLE, ROLE]) expect(JSON.stringify(events)).not.toContain(planted)
   })
 
   // Every read on this plane hands back a policy or a schema, so each names

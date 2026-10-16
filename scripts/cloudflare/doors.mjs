@@ -8,7 +8,9 @@
 // administrator's plane. So the routes are read from what the server
 // registers -- three servers built through the package's public exports,
 // with no plane, with the runtime plane alone and with the administrator's
-// alone -- classified by difference, and written into doors.json, from
+// alone, under review (0065) so that its draft routes, which a server
+// without review does not register, are decided too -- classified by
+// difference, and written into doors.json, from
 // which deploy/cloudflare/ingress.mjs renders the tunnel's configuration
 // and docs/deploy/cloudflare.md shows the doors. doors.test.mjs fails when
 // either is not what this renders from the built server. A fifth server,
@@ -46,7 +48,7 @@ export const EXAMPLE = {
  * stops the generator, so a new kind of name is a decision rather than a
  * guess.
  */
-const SAMPLES = { forms: 'order', connections: 'erp', lookups: 'customer', versions: '1' }
+const SAMPLES = { forms: 'order', connections: 'erp', lookups: 'customer', versions: '1', drafts: '1' }
 
 const LINE = /^((?:│ {3}| {4})*)(?:├── |└── )(\/\S*) \(([A-Z]+(?:, [A-Z]+)*)\)$/
 
@@ -110,7 +112,7 @@ export function runtimePattern(routes) {
  * The routes of the built server at `serverRoot`, classified: `{ routes:
  * [{ method, path, plane }], limit, crossOrigin }`. Three servers through
  * the package's public exports -- no plane, the runtime plane, the
- * administrator's -- and a route's plane is the server it appears in
+ * administrator's under review -- and a route's plane is the server it appears in
  * beyond the first; one both planes register, and a server with both that
  * is not the union, stop it. `limit` is measured: requests a server built
  * with the defaults answers before its first 429, all within the window
@@ -126,11 +128,13 @@ export async function routesFromServer(serverRoot = join(repo, 'packages', 'data
     const registry = server.createConnectionRegistry([], {})
     const audit = { sink: () => {} }
     const verifyIdentity = async () => ({ ok: false, reason: 'no token is valid here' })
+    // Under review, the administrator's plane registers every route it has.
+    const admin = { registry, store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles: ['data-publisher'], audit }
     const planes = {
       none: {},
       runtime: { runtime: { registry, store, audit } },
-      administrator: { admin: { registry, store, adminRoles: ['data-admin'], audit } },
-      both: { runtime: { registry, store, audit }, admin: { registry, store, adminRoles: ['data-admin'], audit } },
+      administrator: { admin },
+      both: { runtime: { registry, store, audit }, admin },
       crossOrigin: { runtime: { registry, store, audit, origins: ['https://app.example'] } },
     }
     const printed = {}

@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import { DOORS, GUIDE, parsePrintedRoutes, RATE_LIMITED, readJson, renderDoors, routesFromServer, runtimePattern, samplePath, staleBlocks } from './doors.mjs'
 
@@ -32,6 +33,31 @@ describe('deploy/cloudflare/doors.json', () => {
     const gone = committed.routes.filter((route) => !fresh.routes.some((entry) => key(entry) === key(route)))
     expect([...missing.map((route) => `${key(route)} is not in ${DOORS}`), ...gone.map((route) => `${key(route)} is in ${DOORS} and the server has no such route`)], 'run node scripts/cloudflare/doors.mjs --write').toEqual([])
     expect(committed, `${DOORS} is not what the server gives: run node scripts/cloudflare/doors.mjs --write`).toEqual(fresh)
+  })
+
+  // The draft routes exist only on a server under review (0065), so the
+  // generator reads the administrator's plane under review. Read without
+  // it, they would be in neither doors.json nor the routes it is compared
+  // with, and the check above would pass by agreeing with itself, the
+  // runtime door's no-overlap check never seeing a draft path. So this
+  // builds a plane under review of its own, apart from the generator's, and
+  // every route it registers must be in doors.json, and none as the
+  // runtime's. Watched failing with the generator's publisherRoles taken
+  // out and doors.json written again: the draft routes were named.
+  test('decides every route of an administrator’s plane under review', async () => {
+    const server = await import(pathToFileURL(join(repo, 'packages', 'data-server', 'dist', 'index.mjs')).href)
+    const scratch = mkdtempSync(join(tmpdir(), 'formancy-data-doors-review-'))
+    try {
+      const admin = { registry: server.createConnectionRegistry([], {}), store: server.createFileConfigurationStore(scratch), adminRoles: ['data-admin', 'data-publisher'], publisherRoles: ['data-publisher'], audit: { sink: () => {} } }
+      const app = await server.createDataServer({ verifyIdentity: async () => ({ ok: false, reason: 'no token is valid here' }), admin })
+      await app.ready()
+      const registered = parsePrintedRoutes(app.printRoutes({ commonPrefix: false }))
+      await app.close()
+      expect(registered.some((route) => route.path.includes(':draft'))).toBe(true)
+      expect(registered.filter((route) => !committed.routes.some((entry) => key(entry) === key(route) && entry.plane !== 'runtime')).map(key), `run node scripts/cloudflare/doors.mjs --write`).toEqual([])
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
   })
 
   // A timestamp would change the file on every run and make the check

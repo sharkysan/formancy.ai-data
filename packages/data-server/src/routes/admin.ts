@@ -7,12 +7,15 @@ import type { PublishedBundle } from '../bundle.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry, OpenConnection } from '../connections.js'
 import { readGeneration } from '../generation.js'
+import { callerOf, DECIDED_ON_THE_DRAFT, refusalFor } from '../governance.js'
 import type { HostIdentity } from '../identity.js'
+import { publisherRolesProblem } from '../publisher-roles.js'
 import { FORM_ID, loadPublished } from '../published.js'
 import { conflictOver, keysRefusal, storable } from '../publishing.js'
 import type { Refusal } from '../publishing.js'
 import { readKeysConfirmed } from '../reassigned.js'
-import { ADMIN_OPERATIONS, adminTrail, describeAdmin } from './admin-audit.js'
+import { ADMIN_OPERATIONS, adminOperationOf, adminTrail, describeAdmin } from './admin-audit.js'
+import { reviewRoutes } from './admin-drafts.js'
 import { evolutionRoutes } from './admin-evolution.js'
 import { promotionRoutes } from './admin-promotion.js'
 
@@ -21,6 +24,14 @@ export interface AdminOptions {
   store: ConfigurationStore
   /** Roles in the host's token that may connect, discover, propose and publish. */
   adminRoles: readonly string[]
+  /**
+   * Publication under review (0065): the roles whose holders approve a
+   * draft another administrator submitted, each one also in `adminRoles`.
+   * Absent, there is no review, and every administrator publishes alone.
+   * Present, nobody publishes or imports directly, and a publisher
+   * restores. An empty list, or a role `adminRoles` lacks, stops the plane.
+   */
+  publisherRoles?: readonly string[]
   authenticate: (request: FastifyRequest) => Promise<HostIdentity | undefined>
   /**
    * The operational trail (0023, 0033): one event per request, refusals
@@ -54,7 +65,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * drift, and since 0030 versions, regeneration and restore (plan section 13).
  * Every route requires a host identity holding one of `adminRoles` —
  * publishing a form and writing a business record are
- * different permissions, and nothing here touches a record.
+ * different permissions, and nothing here touches a record. With
+ * `publisherRoles`, publication is reviewed (0065, governance.ts): the
+ * same preHandler refuses what the caller's grant alone does not allow.
  *
  * A database that cannot be reached is 503 with no detail: a driver's message
  * names hosts and ports, which is the operator's business and not the caller's.
@@ -70,6 +83,14 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
   if (typeof (options.audit as Partial<AdminOptions['audit']> | undefined)?.sink !== 'function') {
     throw new Error("The administrator's plane needs an audit sink: audit: { sink } (0033).")
   }
+  // The setting's rule, for an embedder no environment variable reads: a
+  // review nobody can approve, or approved by a role the plane refuses at
+  // its door, is not started. Copied, as the administrator roles are.
+  const given = options.publisherRoles
+  const refused = given === undefined ? undefined : publisherRolesProblem(given, options.adminRoles)
+  if (refused !== undefined) throw new Error(refused)
+  const publishers = given === undefined ? undefined : new Set(given)
+  const review = publishers !== undefined
   auditRequests(app, { names: ADMIN_OPERATIONS, sink: options.audit.sink, now: options.audit.now, describe: describeAdmin((id) => registry.scope(id) !== undefined) })
 
   app.addHook('preHandler', async (request, reply) => {
@@ -81,6 +102,14 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     request.identity = identity
     if (!identity.actor.roles.some((role) => admins.has(role))) {
       return refuse(reply, 403, 'forbidden', 'This action needs an administrator role.')
+    }
+    // Governance (0065), before the route reads its body: what the grant
+    // alone refuses this caller. A draft's approval and rejection depend on
+    // the draft, and their routes ask once it is read.
+    const operation = adminOperationOf(request)
+    if (operation !== undefined && !DECIDED_ON_THE_DRAFT.has(operation)) {
+      const refusal = refusalFor(operation, callerOf(identity, publishers), review)
+      if (refusal !== undefined) return refuse(reply, refusal.status, refusal.code, refusal.message)
     }
     return undefined
   })
@@ -204,7 +233,9 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     return { version: published.version, ...diffSnapshots(published.bundle.snapshot, current, published.bundle.bindings, published.bundle.policy) }
   })
 
-  // After the role check above, which covers every route registered on this instance.
+  // After the role check and the governance gate above, which cover every route registered on this instance.
+  const allowlisted = (name: string) => registry.scope(name) !== undefined
   evolutionRoutes(app, { store, discover, refuse })
-  promotionRoutes(app, { store, allowlisted: (name) => registry.scope(name) !== undefined, discover, refuse })
+  promotionRoutes(app, { store, allowlisted, discover, refuse })
+  reviewRoutes(app, { store, publisherRoles: publishers, allowlisted, discover, refuse })
 }

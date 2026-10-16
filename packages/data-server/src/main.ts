@@ -9,6 +9,7 @@ import { DRIVER_FACTORIES } from './drivers.js'
 import { identityKeySource, openIdentity, readAgainOnSignal } from './identity-settings.js'
 import { servedPlanes } from './planes.js'
 import { lookupDeadlineSetting } from './lookup-deadline.js'
+import { publisherRolesSetting } from './publisher-roles.js'
 import { rateLimitSetting } from './rate-limit.js'
 import { resolveSecret } from './secrets.js'
 
@@ -87,6 +88,26 @@ if (!origins.ok) {
   process.exit(1)
 }
 
+// The planes' settings, read here so that review can be checked against
+// them before anything opens. The administrator's plane is on with a store,
+// an allowlist and at least one administrator role.
+const storeDirectory = process.env['FORMANCY_DATA_STORE_DIR']
+const connectionsFile = process.env['FORMANCY_DATA_CONNECTIONS']
+const adminRoles = (process.env['FORMANCY_DATA_ADMIN_ROLES'] ?? '').split(',').map((role) => role.trim()).filter((role) => role !== '')
+
+// Read before anything opens, as the limit is: review that names no
+// publisher, names a role the administrator's plane does not admit, or
+// is set beside a server with no administrator's plane stops the process
+// here (publisher-roles.ts, 0065). Read once: changing it is a restart.
+const review = publisherRolesSetting(process.env['FORMANCY_DATA_PUBLISHER_ROLES'], {
+  adminRoles,
+  admin: storeDirectory !== undefined && connectionsFile !== undefined && adminRoles.length > 0,
+})
+if (!review.ok) {
+  console.error(review.problem)
+  process.exit(1)
+}
+
 // Which key, decided before any file is opened, and then opened
 // (identity-settings.ts): every refusal of it -- a secret or a file that
 // cannot be read, a short secret, a public key that does not import, a key
@@ -110,19 +131,18 @@ const { verifyIdentity, file: keyFile } = opened
 /**
  * The two planes, each on only when its configuration is present:
  *
- *   FORMANCY_DATA_STORE_DIR     the configuration store's volume (0013)
- *   FORMANCY_DATA_CONNECTIONS   the allowlist file, JSON (0019)
- *   FORMANCY_DATA_ADMIN_ROLES   comma-separated roles that administer (0020)
- *   FORMANCY_DATA_AUDIT_KEY     a secret reference naming records in the audit trail (0023)
+ *   FORMANCY_DATA_STORE_DIR         the configuration store's volume (0013)
+ *   FORMANCY_DATA_CONNECTIONS       the allowlist file, JSON (0019)
+ *   FORMANCY_DATA_ADMIN_ROLES       comma-separated roles that administer (0020)
+ *   FORMANCY_DATA_PUBLISHER_ROLES   comma-separated roles, each also an admin role, that approve
+ *                                   another administrator's draft; set, publication is reviewed (0065)
+ *   FORMANCY_DATA_AUDIT_KEY         a secret reference naming records in the audit trail (0023)
  *
  * The store and the allowlist turn on the runtime plane; admin roles as well
- * turn on the administrator's plane. Without them the server verifies tokens
- * and nothing else, which is how a host is wired in before any form exists.
+ * turn on the administrator's plane, and publisher roles put it under
+ * review. Without them the server verifies tokens and nothing else, which is
+ * how a host is wired in before any form exists.
  */
-const storeDirectory = process.env['FORMANCY_DATA_STORE_DIR']
-const connectionsFile = process.env['FORMANCY_DATA_CONNECTIONS']
-const adminRoles = (process.env['FORMANCY_DATA_ADMIN_ROLES'] ?? '').split(',').map((role) => role.trim()).filter((role) => role !== '')
-
 let registry: ConnectionRegistry | undefined
 let planes: Pick<DataServerOptions, 'admin' | 'runtime'> = {}
 if ((storeDirectory === undefined) !== (connectionsFile === undefined)) {
@@ -140,12 +160,12 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
   const auditReference = process.env['FORMANCY_DATA_AUDIT_KEY']
   const auditKey = auditReference === undefined ? undefined : await resolveSecret(auditReference)
   // One trail for both planes, the server's own log (0033).
-  planes = servedPlanes({ registry, store, adminRoles, auditKey, origins: origins.origins, lookupDeadlineMs: deadline.ms, log: () => app.log })
+  planes = servedPlanes({ registry, store, adminRoles, publisherRoles: review.publisherRoles, auditKey, origins: origins.origins, lookupDeadlineMs: deadline.ms, log: () => app.log })
 }
 
 const app = await createDataServer({ verifyIdentity, logger: true, rateLimit: limit.rateLimit, ...planes })
 const identityKeys = keyFile === undefined ? {} : { identityKeys: { kids: keyFile.current().kids, leftOut: keyFile.current().leftOut } }
-app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, connections: registry?.ids() ?? [], ...identityKeys }, 'planes')
+app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, review: planes.admin?.publisherRoles !== undefined, connections: registry?.ids() ?? [], ...identityKeys }, 'planes')
 
 // SIGHUP reads the key set file again, and with a one-key setting says it
 // read nothing; either way it no longer stops the server, which is Node's

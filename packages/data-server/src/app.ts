@@ -39,8 +39,15 @@ export interface DataServerOptions {
    * and drift. Absent, none of those routes exist — a server without a store
    * answers 404 for them rather than pretending. Its audit sink is required:
    * every request that reaches one of its routes is an event (0033).
+   *
+   * `publisherRoles` puts publication under review (0065): nobody publishes
+   * or imports directly, an administrator submits a draft and a holder of
+   * one of these roles who did not submit it approves it, and restoring is
+   * a publisher's. Each must be one of `adminRoles`. Absent, there is no
+   * review; the runnable server reads `FORMANCY_DATA_PUBLISHER_ROLES` for it
+   * (main.ts).
    */
-  admin?: { registry: ConnectionRegistry; store: ConfigurationStore; adminRoles: readonly string[]; audit: AdminOptions['audit'] }
+  admin?: { registry: ConnectionRegistry; store: ConfigurationStore; adminRoles: readonly string[]; publisherRoles?: readonly string[]; audit: AdminOptions['audit'] }
   /**
    * The runtime plane: published forms, their records and their lookups, for
    * the host application's people. Absent, none of those routes exist.

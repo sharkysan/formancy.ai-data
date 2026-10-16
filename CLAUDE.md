@@ -47,7 +47,11 @@ One path runs through the packages, and most changes touch one step of it.
 4. **Publish.** The administrator plane stores a bundle — snapshot, request,
    base, presentation, bindings, policy — in the file configuration store,
    where compare-and-swap is a hard link (0013). `validateBundle` checks it on
-   publish and on every read (0019).
+   publish and on every read (0019). With publisher roles set, publication is
+   reviewed (0065): `governance.ts` decides who may do what, `drafts.ts` keeps
+   each form's drafts beside the versions, and `routes/admin-drafts.ts`
+   submits, lists, reads, approves and rejects them, through the gate an
+   import passes (`routes/admin-gate.ts`).
 5. **Run.** The runtime plane serves a published form's records and lookups.
    `data-core/src/records/plan.ts` -- and `records/list.ts` for a page of
    records (0044) -- is where a browser's request meets the policy, the

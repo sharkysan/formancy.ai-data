@@ -197,6 +197,92 @@ describe('the administrator plane, through the studio client', () => {
   })
 })
 
+/** The server's governance sentences (0065), as the client carries them. */
+const REVIEW_REQUIRED = { code: 'review-required', message: 'This deployment reviews publication: submit this version as a draft, and a publisher other than you approves it.' }
+const PUBLISHER_REQUIRED = { code: 'publisher-required', message: "This needs a publisher role: restoring a version, and approving or rejecting someone else's draft, are a publisher's." }
+const OWN_DRAFT = { code: 'own-draft', message: 'You submitted this draft: a publisher other than you approves it.' }
+const NOTHING_DRIFTED = { changes: [], blocking: false, readable: true, writable: { create: true, update: true, delete: true }, runtime: { readable: true, writable: { create: true, update: true, delete: true } } }
+
+describe('publication under review, through the studio client', () => {
+  let reviewed: TestPlane
+  let author: AdminClient
+  let publisher: AdminClient
+
+  beforeEach(async () => {
+    reviewed = await startPlane({ review: true })
+    author = createAdminClient({ token: TOKENS.admin, fetch: reviewed.fetch })
+    publisher = createAdminClient({ token: TOKENS.publisher, fetch: reviewed.fetch })
+  })
+
+  afterEach(async () => {
+    await reviewed.close()
+  })
+
+  // What the studio is told it may not do is what it hides and what it
+  // explains, in the server's sentences: an answer read in another shape
+  // would show an author an Approve button the server refuses, or hide a
+  // publisher's restore.
+  test('says, for each caller, whether the deployment reviews and what it refuses them', async () => {
+    expect(await admin.administration()).toEqual({ ok: true, value: { review: false, publisher: true, refuses: {} } })
+    expect(await author.administration()).toEqual({
+      ok: true,
+      value: { review: true, publisher: false, refuses: { publish: REVIEW_REQUIRED, import: REVIEW_REQUIRED, restore: PUBLISHER_REQUIRED, 'draft-approve': PUBLISHER_REQUIRED, 'draft-reject': PUBLISHER_REQUIRED } },
+    })
+    expect(await publisher.administration()).toEqual({ ok: true, value: { review: true, publisher: true, refuses: { publish: REVIEW_REQUIRED, import: REVIEW_REQUIRED } } })
+  })
+
+  // A draft submitted, queued, read, approved, rejected and withdrawn, each
+  // answer in the shape the review step reads. A renamed field would leave
+  // the queue empty or the decision unsaid; here it names the route.
+  test('submits, queues, reads, approves, rejects and withdraws drafts in the shapes the server sends', async () => {
+    const sent = await bundle()
+    expect(await author.submitDraft('sales-order', null, sent)).toEqual({ ok: true, value: { draft: 1, state: 'pending', drift: NOTHING_DRIFTED } })
+    expect(reviewed.requests.at(-1)).toEqual({ method: 'POST', path: '/v1/forms/sales-order/drafts', body: { expectedBase: null, bundle: sent } })
+    const queued = { form: 'sales-order', draft: 1, expectedBase: null, submittedBy: 'ada', title: 'Order' }
+    expect(await publisher.drafts()).toEqual({ ok: true, value: { drafts: [{ ...queued, refuses: {} }], unreadable: [] } })
+    // The submitter may take it back, and only take it back.
+    expect(await author.drafts()).toEqual({ ok: true, value: { drafts: [{ ...queued, refuses: { approve: PUBLISHER_REQUIRED } }], unreadable: [] } })
+    const read = await publisher.draft('sales-order', 1)
+    if (!read.ok) throw new Error(read.message)
+    const { bundle: drafted, ...rest } = read.value
+    expect(rest).toEqual({ form: 'sales-order', draft: 1, state: 'pending', expectedBase: null, submittedBy: 'ada', keysConfirmed: [], current: null, refuses: {} })
+    expect(drafted).toEqual(sent)
+
+    expect(await publisher.approveDraft('sales-order', 1)).toEqual({ ok: true, value: { version: 1, drift: NOTHING_DRIFTED } })
+    expect(reviewed.requests.at(-1)).toEqual({ method: 'POST', path: '/v1/forms/sales-order/drafts/1/approval' })
+    const approved = await publisher.draft('sales-order', 1)
+    expect(approved.ok && approved.value.state).toBe('published')
+
+    expect(await author.submitDraft('sales-order', 1, sent)).toMatchObject({ ok: true, value: { draft: 2 } })
+    expect(await publisher.rejectDraft('sales-order', 2)).toEqual({ ok: true, value: { draft: 2, state: 'rejected', withdrawn: false } })
+    expect(reviewed.requests.at(-1)).toEqual({ method: 'POST', path: '/v1/forms/sales-order/drafts/2/rejection' })
+    const rejected = await author.draft('sales-order', 2)
+    expect(rejected.ok && [rejected.value.state, rejected.value.rejectedBy, rejected.value.withdrawn]).toEqual(['rejected', 'grace', false])
+
+    // A rejection takes the next entry's number: the next draft is 4.
+    expect(await author.submitDraft('sales-order', 1, sent)).toMatchObject({ ok: true, value: { draft: 4 } })
+    expect(await author.rejectDraft('sales-order', 4)).toEqual({ ok: true, value: { draft: 4, state: 'rejected', withdrawn: true } })
+    expect(await publisher.drafts()).toEqual({ ok: true, value: { drafts: [], unreadable: [] } })
+  })
+
+  // Each refusal of a draft is the server's code and sentence, with what it
+  // carries: four eyes, a publisher's role, the newest version a stale draft
+  // was overtaken by. A client that kept only the status would leave the
+  // review step saying "no" without the reason.
+  test('carries the refusals of a draft as the server words them', async () => {
+    const both = createAdminClient({ token: TOKENS.both, fetch: reviewed.fetch })
+    await both.submitDraft('sales-order', null, await bundle())
+    expect(await both.approveDraft('sales-order', 1)).toMatchObject({ ok: false, status: 403, ...OWN_DRAFT })
+    expect(await author.approveDraft('sales-order', 1)).toMatchObject({ ok: false, status: 403, ...PUBLISHER_REQUIRED })
+    expect(await author.publish('sales-order', null, await bundle())).toMatchObject({ ok: false, status: 403, ...REVIEW_REQUIRED })
+    // Another draft over the same base, which differs: equal bytes would read as published too.
+    await author.submitDraft('sales-order', null, await bundle({ ...READ_ONLY, operations: { ...READ_ONLY.operations, read: ['auditor'] } }))
+    expect(await publisher.approveDraft('sales-order', 2)).toMatchObject({ ok: true, value: { version: 1 } })
+    expect(await publisher.approveDraft('sales-order', 1)).toMatchObject({ ok: false, status: 409, code: 'stale', current: 1 })
+    expect(await publisher.draft('sales-order', 9)).toMatchObject({ ok: false, status: 404, code: 'unknown-draft' })
+  })
+})
+
 describe('when the server is not the one answering', () => {
   // A page that cannot reach the server must say so, not throw into React
   // and leave a blank screen.

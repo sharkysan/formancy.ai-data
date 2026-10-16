@@ -2,7 +2,8 @@ import { useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { grantsDelete, offers } from '@formancy/data-core'
 import type { DriftSeverity } from '@formancy/data-core'
-import type { Regeneration } from '@formancy/data-server'
+import type { Administration, Regeneration } from '@formancy/data-server'
+import { reviewedBy } from './api.js'
 import type { AdminClient, Drift, Published } from './api.js'
 import { isFormId } from './choice.js'
 import { Change } from './drift-change.js'
@@ -86,14 +87,21 @@ const VERSIONS_STILL_OFFERED = new Set(['corrupt-bundle', 'unavailable'])
  * And a version from another deployment, imported from its file (0062):
  * the form it names is checked again here when it is the one shown, since
  * the import made a newer version than the report describes.
+ *
+ * Under review (0065), `refuses` -- the administration answer's -- decides
+ * what the two writes here do: an import submits its file as a draft, and
+ * a restore refused this caller is not offered, with the server's sentence
+ * in its place.
  */
 export function DriftStep({
   client,
   formId: initial,
+  refuses = {},
   onRegenerated,
 }: {
   client: AdminClient
   formId: string
+  refuses?: Administration['refuses']
   /** Continue with a regeneration as the draft: the Workbench takes it from here. */
   onRegenerated: (regeneration: Regeneration, fresh: string[]) => void
 }): ReactElement {
@@ -178,6 +186,7 @@ export function DriftStep({
           client={client}
           formId={versionsOf}
           published={imported}
+          refused={refuses.restore?.message ?? null}
           onRestored={() => {
             setRestored((count) => count + 1)
             void run(versionsOf)
@@ -187,6 +196,7 @@ export function DriftStep({
       <ImportPanel
         client={client}
         written={restored}
+        review={reviewedBy(refuses, 'import')}
         onImported={(id) => {
           if (id !== versionsOf) return
           setImported((count) => count + 1)

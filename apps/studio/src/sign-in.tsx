@@ -1,15 +1,20 @@
 import { useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
-import type { HostIdentity } from '@formancy/data-server'
+import type { Administration, HostIdentity } from '@formancy/data-server'
 import { createAdminClient } from './api.js'
 import type { AdminClient } from './api.js'
 import { IdentityList, TOKEN_KEPT } from './identity.js'
 
-/** Who signed in, the client that speaks for them, and the connections the deployment allows. */
+/**
+ * Who signed in, the client that speaks for them, the connections the
+ * deployment allows, and what the server said they may do: whether
+ * publication is reviewed, and every operation refused them (0065).
+ */
 export interface SignedIn {
   client: AdminClient
   identity: HostIdentity
   connections: string[]
+  administration: Administration
 }
 
 type Refusal = { message: string; identity?: HostIdentity }
@@ -17,12 +22,15 @@ type Refusal = { message: string; identity?: HostIdentity }
 /**
  * Signing in: a host token pasted by the operator, checked by the server.
  *
- * Two questions, asked in order, because their answers mean different
+ * Three questions, asked in order, because their answers mean different
  * things. `/v1/whoami` says whether the server accepts the token at all and
  * whom it names; the connection list says whether the administrator plane
  * lets that person in. A token that passes the first and fails the second is
  * the common mistake -- a role claim mapped wrongly -- and the identity is
- * shown beside the refusal so it can be seen.
+ * shown beside the refusal so it can be seen. `/v1/administration` then
+ * says what the plane lets them do (0065), which decides the steps: without
+ * that answer the studio does not sign in, since any steps it showed would
+ * be a guess about what the server refuses.
  */
 export function SignIn({ fetch, onSignedIn }: { fetch: typeof globalThis.fetch; onSignedIn: (signedIn: SignedIn) => void }): ReactElement {
   const [token, setToken] = useState('')
@@ -43,8 +51,8 @@ export function SignIn({ fetch, onSignedIn }: { fetch: typeof globalThis.fetch; 
       return
     }
     const listed = await client.connections()
-    setChecking(false)
     if (!listed.ok) {
+      setChecking(false)
       const message =
         listed.status === 403
           ? `The administrator plane refused this token: ${listed.message}`
@@ -54,8 +62,14 @@ export function SignIn({ fetch, onSignedIn }: { fetch: typeof globalThis.fetch; 
       setRefusal({ message, identity: who.value })
       return
     }
+    const administration = await client.administration()
+    setChecking(false)
+    if (!administration.ok) {
+      setRefusal({ message: `The server did not say what this token may do here, so the studio cannot tell which steps are yours: ${administration.message}`, identity: who.value })
+      return
+    }
     setToken('')
-    onSignedIn({ client, identity: who.value, connections: listed.value })
+    onSignedIn({ client, identity: who.value, connections: listed.value, administration: administration.value })
   }
 
   return (

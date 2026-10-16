@@ -1,5 +1,5 @@
 import type { DriftChange, DriftReport, GeneratedForm, GenerationRequest, LookupChoice, MetadataSnapshot, ObjectRef, ReassignedKey, ServerIdentity } from '@formancy/data-core'
-import type { BundleV2, HostIdentity, Importation, PublishedBundle, Regeneration, Restoration } from '@formancy/data-server'
+import type { Administration, Approval, BundleV2, DraftQueue, DraftRead, DraftRejection, DraftSubmission, HostIdentity, Importation, PublishedBundle, Regeneration, Restoration } from '@formancy/data-server'
 
 /**
  * The studio's whole vocabulary: the data server's administrator plane, and
@@ -94,6 +94,37 @@ export interface AdminClient {
    * does neither for it. `keysConfirmed`: exactly the keys a refusal listed.
    */
   importVersion(formId: string, expectedBase: number | null, bundle: unknown, keysConfirmed?: readonly ReassignedKey[]): Promise<Outcome<Importation>>
+  /**
+   * Whether this deployment reviews publication (0065), whether this
+   * caller publishes, and every operation the server refuses them, each
+   * with its code and sentence: what the studio hides, and says why.
+   */
+  administration(): Promise<Outcome<Administration>>
+  /**
+   * Under review, a version submitted as a draft over `expectedBase`, for a
+   * publisher other than its submitter to approve: the body a publish or an
+   * import sends, checked as they are, and nothing written to the versions.
+   */
+  submitDraft(formId: string, expectedBase: number | null, bundle: unknown, keysConfirmed?: readonly ReassignedKey[]): Promise<Outcome<DraftSubmission>>
+  /** The drafts waiting for review, each with what this caller may not do with it. */
+  drafts(): Promise<Outcome<DraftQueue>>
+  draft(formId: string, draft: number): Promise<Outcome<DraftRead>>
+  /** The draft published as the next version, after the server has checked it again against the database now. */
+  approveDraft(formId: string, draft: number): Promise<Outcome<Approval>>
+  /** The draft rejected -- or, by its submitter, withdrawn. Nothing is published. */
+  rejectDraft(formId: string, draft: number): Promise<Outcome<DraftRejection>>
+}
+
+/**
+ * Whether the server sends `operation` through review for this caller
+ * (0065): its sentence saying so, from the administration answer, or
+ * `null` where the operation writes a version itself. Read from the
+ * refusal's code, not from `review` alone, so a step submits a draft
+ * exactly where the server would refuse it the direct way.
+ */
+export function reviewedBy(refuses: Administration['refuses'], operation: 'publish' | 'import'): string | null {
+  const refused = refuses[operation]
+  return refused?.code === 'review-required' ? refused.message : null
 }
 
 /**
@@ -191,5 +222,12 @@ export function createAdminClient({ token, fetch, base = '' }: { token: string; 
     restore: (formId, version, expectedBase) => call('POST', `/v1/forms/${segment(formId)}/restorations`, { version, expectedBase }),
     importVersion: (formId, expectedBase, bundle, keysConfirmed = []) =>
       call('POST', `/v1/forms/${segment(formId)}/imports`, { expectedBase, bundle, ...(keysConfirmed.length === 0 ? {} : { keysConfirmed }) }),
+    administration: () => call('GET', '/v1/administration'),
+    submitDraft: (formId, expectedBase, bundle, keysConfirmed = []) =>
+      call('POST', `/v1/forms/${segment(formId)}/drafts`, { expectedBase, bundle, ...(keysConfirmed.length === 0 ? {} : { keysConfirmed }) }),
+    drafts: () => call('GET', '/v1/drafts'),
+    draft: (formId, draft) => call('GET', `/v1/forms/${segment(formId)}/drafts/${String(draft)}`),
+    approveDraft: (formId, draft) => call('POST', `/v1/forms/${segment(formId)}/drafts/${String(draft)}/approval`),
+    rejectDraft: (formId, draft) => call('POST', `/v1/forms/${segment(formId)}/drafts/${String(draft)}/rejection`),
   }
 }

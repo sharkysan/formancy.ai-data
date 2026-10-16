@@ -1,6 +1,6 @@
 # 0039 — The server refuses a publish whose keys now name other columns, unless it says what happens to their grants
 
-- **Status:** accepted; extended by [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md): a key a policy's `through` names is a grant on it, with or without a role on its field, and `grantsOnKey` counts it; extended by [0062](0062-a-published-version-moves-between-deployments-as-its-version-file.md): an import is compared with the target deployment's base, as a publish is
+- **Status:** accepted; extended by [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md): a key a policy's `through` names is a grant on it, with or without a role on its field, and `grantsOnKey` counts it; extended by [0062](0062-a-published-version-moves-between-deployments-as-its-version-file.md): an import is compared with the target deployment's base, as a publish is; extended by [0065](0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md): under review a draft keeps the keys its author confirmed, its submit and its approval compare them over the same base, and the version file still keeps none
 - **Date:** 2026-10-10
 - **Deciders:** Daniel Bacher
 - **Verified by:**

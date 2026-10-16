@@ -8,6 +8,7 @@ import { createAdminClient } from './api.js'
 import type { Bundle } from './api.js'
 import { audit, focusedName, goTo, paragraphs, pressEnter, signIn } from './test-studio.js'
 import type { User } from './test-studio.js'
+import { client, orderBundle, publishReviewed, REVIEW_REQUIRED } from './test-review.js'
 import { OWNER_SNAPSHOT, renamedOrderColumn, SQLSERVER_SNAPSHOT, startPlane, TOKENS, withoutColumn } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
@@ -283,6 +284,94 @@ describe('importing a version', () => {
     expect(within(region).getAllByRole('alert').map((alert) => alert.textContent)).toEqual([
       'hello.json is not a version file: it names no form, connection or bound table. Nothing was sent.',
     ])
+  })
+
+  // Under review (0065) nobody imports directly either: the file is
+  // submitted as a draft, sent as it was read, for a publisher other than
+  // its submitter to approve, and nothing is written to the versions. The
+  // step says so in the server's sentence before the file is chosen, and
+  // the drift the server let the draft through with is shown as an
+  // import's is. A studio that went on calling the imports route would be
+  // refused every time.
+  test('under review, submits the version file as a draft, as it was read, and writes no version', async () => {
+    const reviewed = await startPlane({ review: true })
+    try {
+      await publishOn(source, null)
+      const user = await signIn(reviewed)
+      const region = await importRegion(user)
+      expect(paragraphs(region)).toContain(REVIEW_REQUIRED)
+      await user.upload(within(region).getByLabelText('Version file'), await exported())
+      const button = await within(region).findByRole('button', { name: 'Submit as a draft' })
+      expect(await audit()).toEqual([])
+      await pressEnter(user, button)
+      expect((await within(region).findByRole('status')).textContent).toBe('Draft 1 of sales-order submitted: a publisher other than you approves it.')
+      expect(paragraphs(region)).toContain('Nothing it rests on differs between this database and the one it was published from.')
+      expect(await reviewed.store.latest('sales-order')).toBeNull()
+      const file = JSON.parse((await stored(source, 1)).toString('utf8')) as unknown
+      expect(imports(reviewed)).toEqual([])
+      expect(reviewed.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/drafts')).map((request) => request.body)).toEqual([{ expectedBase: null, bundle: file }])
+      const read = await client(reviewed, TOKENS.publisher).draft('sales-order', 1)
+      expect(read.ok && read.value.bundle).toEqual(file)
+      expect(focusedName()).toBe('Submit as a draft')
+      expect(await audit()).toEqual([])
+    } finally {
+      await reviewed.close()
+    }
+  })
+
+  // Under review the keys are confirmed as an import confirms them, and
+  // the confirmation submits the draft with exactly the keys the server
+  // listed: its publisher approves the grants moving with it.
+  test('under review, confirms the keys the server lists and submits the draft with them', async () => {
+    const reviewed = await startPlane({ review: true })
+    try {
+      await publishReviewed(reviewed, null, await orderBundle(reviewed, POLICY))
+      const renamed = renamedOrderColumn(OWNER_SNAPSHOT, 'order_date', 'order date')
+      reviewed.databases.set('fixture', renamed)
+      source.databases.set('fixture', renamed)
+      await publishOn(source, null)
+      const user = await signIn(reviewed)
+      const region = await importRegion(user)
+      await user.upload(within(region).getByLabelText('Version file'), await exported())
+      await pressEnter(user, await within(region).findByRole('button', { name: 'Submit as a draft' }))
+      const alert = await within(region).findByRole('alert')
+      expect(items(alert, 'Keys that stand for something else here')).toEqual(['Grants for order_date were written for column order_date; it now stands for column order date.'])
+      expect(await audit()).toEqual([])
+      await pressEnter(user, within(alert).getByRole('button', { name: 'Confirm these keys and submit' }))
+      expect((await within(region).findByRole('status')).textContent).toBe('Draft 2 of sales-order submitted: a publisher other than you approves it.')
+      const read = await client(reviewed, TOKENS.publisher).draft('sales-order', 2)
+      expect(read.ok && read.value.keysConfirmed).toEqual([{ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } }])
+      expect(await reviewed.store.versions('sales-order')).toEqual([1])
+      await waitFor(() => expect(focusedName()).toBe('Submit as a draft'))
+      expect(await audit()).toEqual([])
+    } finally {
+      await reviewed.close()
+    }
+  })
+
+  // A version approved here after the versions were read: the draft names
+  // a base that is not the newest, which could never be approved, so the
+  // server refuses it as a conflict and the studio says what a draft
+  // submitted now would make.
+  test('under review, says when somebody published here since the versions were read', async () => {
+    const reviewed = await startPlane({ review: true })
+    try {
+      await publishOn(source, null)
+      const user = await signIn(reviewed)
+      const region = await importRegion(user)
+      await user.upload(within(region).getByLabelText('Version file'), await exported())
+      const button = await within(region).findByRole('button', { name: 'Submit as a draft' })
+      await publishReviewed(reviewed, null, await orderBundle(reviewed))
+      await pressEnter(user, button)
+      expect((await within(region).findByRole('alert')).textContent).toBe(
+        'Somebody published version 1 of sales-order here since its versions were read. Nothing was submitted; a draft submitted now, once approved, makes version 2.',
+      )
+      const read = await client(reviewed, TOKENS.publisher).drafts()
+      expect(read.ok && read.value.drafts).toEqual([])
+      expect(await audit()).toEqual([])
+    } finally {
+      await reviewed.close()
+    }
   })
 
   // A restore on the same step writes a version too. The import names the
