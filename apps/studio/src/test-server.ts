@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot } from '@formancy/data-core'
-import type { ColumnMeta, CoverageGap, DatabaseAdapter, LookupAdapter, MetadataSnapshot, RecordAdapter, ReferentialAction } from '@formancy/data-core'
+import type { ColumnMeta, CoverageGap, DatabaseAdapter, LookupAdapter, MetadataSnapshot, RecordAdapter, ReferentialAction, ServerFacts } from '@formancy/data-core'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
 import type { ConfigurationStore, ConnectionRegistry, IdentityVerifier } from '@formancy/data-server'
 import owner from './fixtures/postgres-owner.json'
@@ -127,10 +127,13 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
       if (unreachable.has(id)) throw new Error('connect ECONNREFUSED 10.0.0.5:5432')
       const adapter: DatabaseAdapter = {
         kind: now.kind,
-        // The server the snapshot records (0068). One captured before
-        // snapshots recorded it was read from the fixture's container, a
-        // boxed product, whose major it did not record.
-        ping: async () => ({ kind: now.kind, version: now.serverVersion, ...(now.server ?? { product: now.kind === 'postgres' ? 'postgresql' : 'sqlserver', major: null }) }),
+        // The server the snapshot records (0068), as the adapters' ping and
+        // discovery read it with one query. Every capture records one; a
+        // ping cannot answer for a server nobody recorded.
+        ping: async () => {
+          if (now.server === undefined) throw new Error(`the snapshot of ${id} records no server, so nothing can answer its ping`)
+          return { kind: now.kind, version: now.serverVersion, ...now.server }
+        },
         discover: async () => databases.get(id) ?? now,
         close: async () => {},
       }
@@ -285,4 +288,17 @@ export function withDelete(base: MetadataSnapshot, table: string): MetadataSnaps
 export function withGap(base: MetadataSnapshot, gap: CoverageGap): MetadataSnapshot {
   const { fingerprint: _, ...contents } = structuredClone(base)
   return createSnapshot({ ...contents, gaps: [...contents.gaps, gap] })
+}
+
+/**
+ * The same database read from another server (0068): `base`'s catalog as
+ * discovery would read it there, with the version and the facts that
+ * server would answer, made the one way a snapshot is made. The server is
+ * outside the fingerprint, so this is the database after an in-place
+ * upgrade, or a restore elsewhere, that changed nothing a form binds.
+ * `server` undefined is a snapshot an adapter before 0068 took.
+ */
+export function onServer(base: MetadataSnapshot, serverVersion: string, server: ServerFacts | undefined): MetadataSnapshot {
+  const { fingerprint: _, server: _server, ...contents } = structuredClone(base)
+  return createSnapshot({ ...contents, serverVersion, ...(server === undefined ? {} : { server }) })
 }

@@ -1,5 +1,6 @@
 // The studio's journey in the browser, state by state, on a plane where every
-// administrator publishes: from a restricted connection discovered to a
+// administrator publishes: from a restricted connection discovered, and a
+// server this release was not tested on (0068), to a
 // version restored, through the policy, the presentation, the preview's
 // paper, a publish and its conflict, drift, a download, a refused restore and
 // import, and a regeneration and what it carried (0030, 0052, 0062). Each
@@ -55,6 +56,21 @@ export function journey(plane, check) {
         .getByRole('list', { name: 'Tables and views' })
         .getByText('sales.order', { exact: true })
         .click()
+    }],
+    // 0068: a server this release was not tested on, said in the warm
+    // colour twice -- the rest of the connection test's answer, and a
+    // sentence under the metadata's server line. The writer's capture as a
+    // PostgreSQL 14 would answer it, made as src/test-server.ts's onServer
+    // makes it: the server is outside the fingerprint, so the catalog is
+    // the one captured. No database answers this here, only the gate's plane.
+    ['Connect, a server this release was not tested on', async (page) => {
+      const { fingerprint: _, ...contents } = snapshot('postgres-writer.json')
+      plane.databases.set('fixture-writer', createSnapshot({ ...contents, serverVersion: '14.24', server: { product: 'postgresql', major: 14 } }))
+      const untested = /This release of Formancy Data was not tested on PostgreSQL 14: /
+      await page.getByRole('button', { name: 'Test fixture-writer', exact: true }).click()
+      await page.getByRole('status').filter({ hasText: untested }).waitFor()
+      await page.getByRole('button', { name: 'Discover fixture-writer', exact: true }).click()
+      await page.getByRole('region', { name: 'What fixture-writer can see', exact: true }).getByText(untested).waitFor()
     }],
     ['Choose, the order with a lookup, a pin and a version column', async (page) => {
       await page.getByRole('button', { name: 'Discover fixture', exact: true }).click()

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
-import { startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
+import { POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { PostgresFixture, SqlServerFixture } from '@formancy/data-fixtures'
 import { connectPostgres } from '@formancy/data-postgres'
 import { connectSqlServer } from '@formancy/data-sqlserver'
@@ -111,7 +111,7 @@ let admin: string
 let clerk: string
 
 beforeAll(async () => {
-  ;[pg, ms] = await Promise.all([startPostgresFixture(), startSqlServerFixture()])
+  ;[pg, ms] = await Promise.all([startPostgresFixture(POSTGRES_IMAGE), startSqlServerFixture(SQLSERVER_IMAGE)])
   const pgUrl = new URL(pg.admin)
   const connections: ConnectionConfig[] = [
     {

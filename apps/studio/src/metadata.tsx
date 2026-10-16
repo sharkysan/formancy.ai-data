@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { findObject } from '@formancy/data-core'
+import { findObject, serverStanding } from '@formancy/data-core'
 import type { ColumnMeta, CoverageGap, DatabaseKind, ForeignKeyMeta, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
 import { describeRef, gapsAbout, gapsHiding } from './choice.js'
 
@@ -151,11 +151,17 @@ function ObjectDetails({ snapshot, object }: { snapshot: MetadataSnapshot; objec
   )
 }
 
-/** Step 2's result: what a connection can see, with what it cannot see first. */
+/**
+ * Step 2's result: what a connection can see, with what it cannot see
+ * first -- after the server it was read from, and whether this release was
+ * tested on it when it was not.
+ */
 export function MetadataView({ connection, snapshot }: { connection: string; snapshot: MetadataSnapshot }): ReactElement {
   const tables = snapshot.objects.filter((object) => object.kind === 'table').length
   const views = snapshot.objects.length - tables
   const { user, login } = snapshot.account
+  // Whether this release was tested on the server it was read from (0068), said under the server line only when it was not.
+  const standing = serverStanding(snapshot.kind, snapshot.server)
   return (
     <section className="metadata" aria-labelledby="seen-heading">
       <h3 id="seen-heading">What {connection} can see</h3>
@@ -169,6 +175,7 @@ export function MetadataView({ connection, snapshot }: { connection: string; sna
         )}
         . Fingerprint <code>{snapshot.fingerprint.slice(0, 12)}</code>.
       </p>
+      {standing.tested ? null : <p className="untested">{standing.says}</p>}
       <Gaps snapshot={snapshot} />
       <h4 id="objects-heading">Tables and views</h4>
       <ul className="objects" aria-labelledby="objects-heading">

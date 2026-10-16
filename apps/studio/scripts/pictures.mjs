@@ -87,7 +87,7 @@ async function startPlane() {
     open: async (id) => {
       const now = databases.get(id)
       if (now === undefined) return undefined
-      return { adapter: { kind: now.kind, ping: async () => ({ kind: now.kind, version: now.serverVersion }), discover: async () => databases.get(id), close: async () => {} }, lookups: {}, records: {} }
+      return { adapter: { kind: now.kind, ping: async () => ({ kind: now.kind, version: now.serverVersion, ...now.server }), discover: async () => databases.get(id), close: async () => {} }, lookups: {}, records: {} }
     },
     close: async () => {},
   }

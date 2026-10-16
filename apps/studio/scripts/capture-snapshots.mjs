@@ -39,9 +39,11 @@ import { fileURLToPath } from 'node:url'
 import {
   accessDisagreements,
   FIXTURE_SCOPE,
+  POSTGRES_IMAGE,
   READER_ACCESS,
   restrictedDisagreements,
   snapshotDisagreements,
+  SQLSERVER_IMAGE,
   startPostgresFixture,
   startSqlServerFixture,
   WRITER_ACCESS,
@@ -59,7 +61,7 @@ const mssql = createRequire(fileURLToPath(import.meta.resolve('@formancy/data-sq
 const target = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'fixtures')
 
 async function capturePostgres() {
-  const fixture = await startPostgresFixture()
+  const fixture = await startPostgresFixture(POSTGRES_IMAGE)
   const owner = postgres(fixture.admin, { onnotice: () => {} })
   const reader = postgres(fixture.reader, { onnotice: () => {} })
   const writer = postgres(fixture.writer, { onnotice: () => {} })
@@ -78,7 +80,7 @@ async function capturePostgres() {
 }
 
 async function captureSqlServer() {
-  const fixture = await startSqlServerFixture()
+  const fixture = await startSqlServerFixture(SQLSERVER_IMAGE)
   const owner = await new mssql.ConnectionPool(fixture.admin).connect()
   const reader = await new mssql.ConnectionPool(fixture.reader).connect()
   try {

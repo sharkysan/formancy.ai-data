@@ -1,5 +1,5 @@
-import { diffSnapshots, generateForm } from '@formancy/data-core'
-import type { MetadataSnapshot } from '@formancy/data-core'
+import { diffSnapshots, generateForm, serverStanding } from '@formancy/data-core'
+import type { MetadataSnapshot, ServerIdentity, ServerStanding } from '@formancy/data-core'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { auditRequests } from '../audit.js'
 import type { AuditSink } from '../audit.js'
@@ -39,6 +39,15 @@ export interface AdminOptions {
    * restores forms does not run without saying who did.
    */
   audit: { sink: AuditSink; now?: () => string }
+}
+
+/**
+ * What `POST /v1/connections/:id/test` answers: the server as its adapter's
+ * ping reports it, and whether this release was tested on it, as data-core
+ * decides (0068). Said, never a refusal.
+ */
+export interface ConnectionTest extends ServerIdentity {
+  standing: ServerStanding
 }
 
 /** Sends a refusal: a stable code, a sentence, and whatever else the caller can act on. */
@@ -146,11 +155,15 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
   app.post<{ Params: { id: string } }>('/v1/connections/:id/test', async (request, reply) => {
     const open = await connection(request.params.id, reply)
     if (open === undefined) return reply
+    let identity: ServerIdentity
     try {
-      return await open.adapter.ping()
+      identity = await open.adapter.ping()
     } catch {
       return refuse(reply, 503, 'unavailable', `Connection ${request.params.id} did not answer.`)
     }
+    // A server this release was not tested on is answered as any other (0068): the standing says it.
+    const tested: ConnectionTest = { ...identity, standing: serverStanding(identity.kind, identity) }
+    return tested
   })
 
   app.get<{ Params: { id: string } }>('/v1/connections/:id/metadata', async (request, reply) => {

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { FieldBinding, FormBindings, FormPolicy, MetadataSnapshot } from '@formancy/data-core'
-import { EDGE_VALUES, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
+import { EDGE_VALUES, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { PostgresFixture, SqlServerFixture } from '@formancy/data-fixtures'
 import { connectPostgres } from '@formancy/data-postgres'
 import { connectSqlServer } from '@formancy/data-sqlserver'
@@ -87,7 +87,7 @@ const registries: ConnectionRegistry[] = []
 const roots: string[] = []
 
 beforeAll(async () => {
-  ;[pg, ms] = await Promise.all([startPostgresFixture(), startSqlServerFixture()])
+  ;[pg, ms] = await Promise.all([startPostgresFixture(POSTGRES_IMAGE), startSqlServerFixture(SQLSERVER_IMAGE)])
   verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: SECRET }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: 'tid' } })
   author = await token('author-1', { roles: ['data-admin'] })
   publisher = await token('publisher-1', { roles: ['data-publisher'] })

@@ -4,7 +4,7 @@ import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { createSnapshot } from '@formancy/data-core'
 import { audit, discover, generateOrder, goTo, paragraphs, signIn, step, writeOrderPolicy } from './test-studio.js'
 import type { CoverageGap } from '@formancy/data-core'
-import { CONNECTIONS, OWNER_SNAPSHOT, READER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT, startPlane } from './test-server.js'
+import { CONNECTIONS, onServer, OWNER_SNAPSHOT, READER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT, SQLSERVER_SNAPSHOT, startPlane } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
 /**
@@ -51,6 +51,27 @@ describe('connecting', () => {
     const fixture = within(connect).getByRole('group', { name: 'fixture' })
     await user.click(within(fixture).getByRole('button', { name: 'Test fixture' }))
     expect((await within(fixture).findByRole('status')).textContent).toBe(`PostgreSQL ${OWNER_SNAPSHOT.serverVersion} answered.`)
+    expect(await audit()).toEqual([])
+  })
+
+  // A server this release was not tested on answers like any other, and
+  // the answer says so (0068), in data-core's words, naming the server:
+  // "answered" alone would read as a server of the matrix. Said only then,
+  // so a tested server's answer stays the one line the test above holds.
+  test('says when this release was not tested on the server that answered', async () => {
+    plane.databases.set('fixture', onServer(OWNER_SNAPSHOT, '14.24', { product: 'postgresql', major: 14 }))
+    plane.databases.set('fixture-sqlserver', onServer(SQLSERVER_SNAPSHOT, SQLSERVER_SNAPSHOT.serverVersion, { product: 'sqlserver', major: 16, compatibility: 140 }))
+    const user = await signIn(plane)
+    const fixture = within(step('Connect')).getByRole('group', { name: 'fixture' })
+    await user.click(within(fixture).getByRole('button', { name: 'Test fixture' }))
+    expect((await within(fixture).findByRole('status')).textContent).toBe(
+      'PostgreSQL 14.24 answered. This release of Formancy Data was not tested on PostgreSQL 14: it was tested on PostgreSQL 15, 16, 17 and 18.',
+    )
+    const sqlserver = within(step('Connect')).getByRole('group', { name: 'fixture-sqlserver' })
+    await user.click(within(sqlserver).getByRole('button', { name: 'Test fixture-sqlserver' }))
+    expect((await within(sqlserver).findByRole('status')).textContent).toBe(
+      `SQL Server ${SQLSERVER_SNAPSHOT.serverVersion} answered. This release of Formancy Data was tested on SQL Server 2022 (16), and the database’s compatibility level, 140, is below the lowest it was tested at, 150.`,
+    )
     expect(await audit()).toEqual([])
   })
 

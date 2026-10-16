@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { diffSnapshots, EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { DriftReport, FieldBinding, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, RecordAdapter } from '@formancy/data-core'
-import { driftingOn, runtimeOf, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
+import { driftingOn, POSTGRES_IMAGE, runtimeOf, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { DriftingCase, DriftVerdict, PostgresFixture, SqlServerFixture } from '@formancy/data-fixtures'
 import { connectPostgres } from '@formancy/data-postgres'
 import { connectSqlServer } from '@formancy/data-sqlserver'
@@ -106,7 +106,7 @@ let admin: string
 let clerk: string
 
 beforeAll(async () => {
-  ;[pg, ms] = await Promise.all([startPostgresFixture(), startSqlServerFixture()])
+  ;[pg, ms] = await Promise.all([startPostgresFixture(POSTGRES_IMAGE), startSqlServerFixture(SQLSERVER_IMAGE)])
   const pgUrl = new URL(pg.admin)
   const connections: ConnectionConfig[] = [
     {

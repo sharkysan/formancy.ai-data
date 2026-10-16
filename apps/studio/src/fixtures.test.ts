@@ -2,7 +2,7 @@
 //
 // Node rather than jsdom: the fixture package's comparators live beside its
 // container harness, and nothing here renders.
-import { createSnapshot } from '@formancy/data-core'
+import { createSnapshot, serverStanding } from '@formancy/data-core'
 import type { MetadataSnapshot } from '@formancy/data-core'
 import {
   accessDisagreements,
@@ -102,5 +102,24 @@ describe('the captured snapshots', () => {
     for (const snapshot of [OWNER_SNAPSHOT, READER_SNAPSHOT, WRITER_SNAPSHOT]) expect(snapshot.serverVersion.split('.')[0]).toBe(major)
     const release = String(imageMajor('sqlserver', SQLSERVER_IMAGE))
     for (const snapshot of [SQLSERVER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT]) expect(snapshot.serverVersion.split('.')[0]).toBe(release)
+  })
+
+  // The server is outside the fingerprint as well (0068), and the studio
+  // says a standing from it: a capture taken before servers were recorded
+  // would say "not tested" on every page the README pictures, and one
+  // edited to another major a sentence no server gave. Each must name the
+  // product and major of the image the fixture runs, which this release
+  // was tested on -- for SQL Server, at the fixture database's own level.
+  test('each records the server of the image the fixture runs, one this release was tested on', () => {
+    const engines = [
+      { kind: 'postgres', product: 'postgresql', major: imageMajor('postgres', POSTGRES_IMAGE), snapshots: [OWNER_SNAPSHOT, READER_SNAPSHOT, WRITER_SNAPSHOT] },
+      { kind: 'sqlserver', product: 'sqlserver', major: imageMajor('sqlserver', SQLSERVER_IMAGE), snapshots: [SQLSERVER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT] },
+    ] as const
+    for (const { kind, product, major, snapshots } of engines) {
+      for (const snapshot of snapshots) {
+        expect(snapshot.server).toMatchObject({ product, major })
+        expect(serverStanding(kind, snapshot.server)).toMatchObject({ tested: true })
+      }
+    }
   })
 })

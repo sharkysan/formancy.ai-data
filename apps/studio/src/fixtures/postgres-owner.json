@@ -1,6 +1,10 @@
 {
   "kind": "postgres",
   "serverVersion": "17.11",
+  "server": {
+    "product": "postgresql",
+    "major": 17
+  },
   "account": {
     "user": "test",
     "login": "test"
