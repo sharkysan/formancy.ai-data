@@ -2,17 +2,22 @@
   "name": "@formancy/data-live-demo",
   "version": "0.1.0",
   "private": true,
-  "description": "The live master-detail demo's own code: the sample sales data its database is loaded with, generated from a fixed seed. Never published.",
+  "description": "The live master-detail demo's own code: the sample sales data its database is loaded with, generated from a fixed seed; the personas a visitor signs in as and the tokens signed for them; and the forms its image publishes at build time. Never published.",
   "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsdown",
     "test:coverage": "vitest run --coverage",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@formancy/data-core": "workspace:*"
+  },
   "devDependencies": {
-    "@formancy/data-core": "workspace:*",
     "@formancy/data-fixtures": "workspace:*",
     "@formancy/data-server": "workspace:*",
     "@types/node": "catalog:",

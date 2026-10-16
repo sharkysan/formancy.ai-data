@@ -1,0 +1,13 @@
+[
+  {
+    "id": "demo",
+    "kind": "postgres",
+    "host": "127.0.0.1",
+    "port": 5432,
+    "database": "formancy_demo",
+    "user": "formancy_demo",
+    "password": "env:FORMANCY_DEMO_DB_PASSWORD",
+    "schemas": ["sales"],
+    "tls": { "enabled": false }
+  }
+]
