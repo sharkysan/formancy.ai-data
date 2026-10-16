@@ -11,30 +11,45 @@
 // `#` starts a comment; a `*` matches greedily, once per path; a request
 // takes the headers of every rule whose path matches it, and one header
 // named by two rules is joined with a comma; at most 100 rules, 2,000
-// characters a line. The file itself is not served. The page for Pages,
-// whose format it says is the same, adds that a header the file names
-// overrides what Cloudflare sends by default, `Cache-Control` among them.
-// None of this was measured against Cloudflare: the gate holds the page to
-// these headers as this module reads the file, and nothing here reads what
-// formancy.ai answers.
+// characters a line. The file itself is not served. "Headers defined in the
+// `_headers` file override what Cloudflare ordinarily sends", and what it
+// ordinarily sends includes a `Content-Type` Wrangler picks by the file's
+// extension. The page does not say whether the rules reach a redirect the
+// assets make of a path without its slash, or a 404.
+//
+// Measured on 2026-10-16, with no `_headers` in play: Workers static assets
+// sent formancy.ai/report/THIRD-PARTY-NOTICES.txt as `Content-Type:
+// text/plain`, with no charset. Nothing else of this was measured against
+// Cloudflare: the gate holds the page to these headers as this module reads
+// the file, and nothing here reads what formancy.ai answers.
+
+import { NOTICES_FILE } from './third-party-notices.mjs'
 
 /**
  * The Content-Security-Policy, directive by directive. Each source is one
  * the built page uses, and policyProblems holds the hosts to what
  * index.html loads.
+ *
+ * `'self'` is formancy.ai's whole origin -- its site, its playground, the
+ * report's Studio at /report/ and whatever is routed there later -- and not
+ * this page's path: a source with a path would hold it to /data/examples/,
+ * but the gate serves the page from 127.0.0.1, where such a policy would
+ * refuse every file and could not be measured.
  */
 export const POLICY = Object.freeze({
-  // Anything a directive below does not name: the page's own files only.
-  'default-src': ["'self'"],
-  // The built chunks, and nothing inline and nothing evaluated. React needs
-  // neither, and Angular is compiled ahead of time by the analog plugin, so
-  // no JIT compiler is bundled and nothing builds a function from a string;
-  // the browser gate fails on every violation the page reports.
+  // Anything a directive below does not name -- a frame, a worker, media, a
+  // manifest -- the page has none of, so nothing.
+  'default-src': ["'none'"],
+  // The built chunks, from formancy.ai's origin, and nothing inline and
+  // nothing evaluated. React needs neither, and Angular is compiled ahead of
+  // time by the analog plugin, so no JIT compiler is bundled and nothing
+  // builds a function from a string; the browser gate fails on every
+  // violation the page reports.
   'script-src': ["'self'"],
-  // The built stylesheet, and Google Fonts' stylesheet, which index.html
-  // links. No inline style: React and Angular set a style through the CSSOM,
-  // which this directive does not govern, and the page carries no style
-  // attribute or element.
+  // The built stylesheet, from formancy.ai's origin, and Google Fonts'
+  // stylesheet, which index.html links. No inline style: React and Angular
+  // set a style through the CSSOM, which this directive does not govern, and
+  // the page carries no style attribute or element.
   'style-src': ["'self'", 'https://fonts.googleapis.com'],
   // The font files Google's stylesheet names, from the host index.html
   // preconnects to for them.
@@ -44,8 +59,8 @@ export const POLICY = Object.freeze({
   // picker icon of its own, and index.html's icon is `data:,`.
   'img-src': ['data:'],
   // The page fetches nothing: the snapshot is in the build. Vite's preload
-  // fetches the Angular chunk from the page's own origin in a browser
-  // without modulepreload.
+  // fetches the Angular chunk from formancy.ai's origin in a browser without
+  // modulepreload.
   'connect-src': ["'self'"],
   'object-src': ["'none'"],
   'base-uri': ["'none'"],
@@ -97,10 +112,19 @@ export const HASHED = 'assets/'
 export const LONG_CACHE = 'public, max-age=31536000, immutable'
 
 /**
+ * What the notices are sent as: text that says it is UTF-8, as 0046 serves
+ * them from the web image. Cloudflare sends a `.txt` as bare `text/plain`,
+ * whose encoding a browser guesses, and the examples page's notices are not
+ * ASCII -- a bundled MIT text quotes the “Software” in curly quotes.
+ */
+export const NOTICES_TYPE = 'text/plain; charset=utf-8'
+
+/**
  * The rules, for the page served under `base` (`/data/examples/`): every
- * response under it gets the policy and its companions, and the hashed
- * chunks a year's cache. The page itself keeps Cloudflare's default,
- * revalidated on every load, so a deploy is seen at once.
+ * file under it gets the policy and its companions, the hashed chunks a
+ * year's cache, and the notices their encoding. The page itself keeps
+ * Cloudflare's default cache, revalidated on every load, so a deploy is
+ * seen at once.
  */
 export function headerRules(base) {
   return [
@@ -114,6 +138,7 @@ export function headerRules(base) {
       },
     },
     { path: `${base}${HASHED}*`, headers: { 'Cache-Control': LONG_CACHE } },
+    { path: `${base}${NOTICES_FILE}`, headers: { 'Content-Type': NOTICES_TYPE } },
   ]
 }
 
@@ -159,23 +184,61 @@ export function headersFor(rules, pathname) {
   return headers
 }
 
-/** Each `tag` element of `html` (a pattern), as its attributes: lowercased names, `true` for one with no value. */
+/**
+ * An attribute as HTML writes it: a name, and a value double-quoted,
+ * single-quoted or unquoted, or none.
+ */
+const ATTRIBUTE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g
+
+/**
+ * Each `tag` element of `html` (a pattern), as its attributes: lowercased
+ * names, `true` for one with no value. A `>` inside a quoted value does not
+ * end the tag.
+ */
 function elements(html, tag) {
-  return [...html.matchAll(new RegExp(`<${tag}\\b([^>]*)>`, 'gi'))].map((match) =>
-    Object.fromEntries([...match[1].matchAll(/([\w-]+)(?:\s*=\s*"([^"]*)")?/g)].map(([, name, value]) => [name.toLowerCase(), value ?? true])),
+  return [...html.matchAll(new RegExp(`<${tag}\\b((?:[^>"']|"[^"]*"|'[^']*')*)>`, 'gi'))].map((match) =>
+    Object.fromEntries([...match[1].matchAll(ATTRIBUTE)].map(([, name, double, single, bare]) => [name.toLowerCase(), double ?? single ?? bare ?? true])),
   )
 }
 
-/** The origins of the absolute http(s) addresses in `list`, once each, sorted. */
-const origins = (list) => [...new Set(list.filter((address) => typeof address === 'string' && /^https?:\/\//.test(address)).map((address) => new URL(address).origin))].sort()
+/** Every `src` and `href` of every element of `html`, as `{ name, value }`, in order. */
+export function references(html) {
+  return elements(html, '[a-z][\\w-]*').flatMap((attributes) =>
+    ['src', 'href'].filter((name) => typeof attributes[name] === 'string').map((name) => ({ name, value: attributes[name] })),
+  )
+}
+
+/** `value` resolved as the page at `address` resolves it, or null for one that is no URL. */
+export function resolved(value, address) {
+  try {
+    return new URL(value, address)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The origins of the http(s) addresses in `list` other than the page's own,
+ * resolved as the page at `address` resolves them -- a protocol-relative
+ * `//host/…` included -- once each, sorted.
+ */
+const foreign = (list, address) => {
+  const own = new URL(address).origin
+  const urls = list.filter((value) => typeof value === 'string').map((value) => resolved(value, address))
+  return [...new Set(urls.filter((url) => url !== null && /^https?:$/.test(url.protocol) && url.origin !== own).map((url) => url.origin))].sort()
+}
+
+/** The origins of the http(s) sources a directive names, once each, sorted. */
+const origins = (list) => [...new Set(list.filter((source) => /^https?:\/\//.test(source)).map((source) => new URL(source).origin))].sort()
 
 /** The directives the record decides, all of which the policy must have and no other. */
 const DECIDED = Object.keys(POLICY)
 
 /**
- * What is wrong with `policy` for the page `html` and the stylesheets it
- * draws with: one sentence each, none when the policy lets the page load
- * everything it loads and names nothing it does not. Derived from the page:
+ * What is wrong with `policy` for the page `html`, served at `address`, and
+ * the stylesheets it draws with: one sentence each, none when the policy
+ * lets the page load everything it loads and names nothing it does not.
+ * Derived from the page:
  *
  * - the policy has every directive the record decides and no other, and
  *   allows nothing inline, nothing evaluated and no host by wildcard;
@@ -183,12 +246,14 @@ const DECIDED = Object.keys(POLICY)
  *   the policy refuses;
  * - script-src names the hosts of the page's scripts, style-src those of
  *   its stylesheet links, and font-src those it preconnects to for a
- *   CORS-mode fetch (`crossorigin`), which is how a browser fetches a font;
- *   no directive names a host the page does not load from;
+ *   CORS-mode fetch (`crossorigin`), which is how a browser fetches a font
+ *   -- each address resolved against `address`, however it is quoted, and
+ *   every host but the page's own one the directive must name; no directive
+ *   names a host the page does not load from;
  * - img-src allows `data:` exactly when the page or a stylesheet uses a
  *   data: URL.
  */
-export function policyProblems(policy, { html, stylesheets }) {
+export function policyProblems(policy, { html, stylesheets, address }) {
   const problems = []
   for (const name of DECIDED) if (policy[name] === undefined) problems.push(`the policy has no ${name}, which the record decides`)
   for (const name of Object.keys(policy)) if (!DECIDED.includes(name)) problems.push(`the policy has ${name}, which the record does not decide`)
@@ -207,9 +272,9 @@ export function policyProblems(policy, { html, stylesheets }) {
 
   const rel = (attributes) => String(attributes.rel ?? '').toLowerCase().split(/\s+/)
   const loads = {
-    'script-src': origins(scripts.map((attributes) => attributes.src)),
-    'style-src': origins(links.filter((attributes) => rel(attributes).includes('stylesheet')).map((attributes) => attributes.href)),
-    'font-src': origins(links.filter((attributes) => rel(attributes).includes('preconnect') && attributes.crossorigin !== undefined).map((attributes) => attributes.href)),
+    'script-src': foreign(scripts.map((attributes) => attributes.src), address),
+    'style-src': foreign(links.filter((attributes) => rel(attributes).includes('stylesheet')).map((attributes) => attributes.href), address),
+    'font-src': foreign(links.filter((attributes) => rel(attributes).includes('preconnect') && attributes.crossorigin !== undefined).map((attributes) => attributes.href), address),
   }
   for (const [name, sources] of Object.entries(policy)) {
     const named = origins(sources)

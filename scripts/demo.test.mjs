@@ -1,10 +1,13 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
-import { configProblems, demoBase, demoUrl, indexProblems, readDemoConfig, unhashedAssets, WRANGLER } from './demo.mjs'
+import { configProblems, demoBase, demoUrl, indexProblems, namingProblems, readDemoConfig, unhashedAssets, viteBuild, WORKER, WRANGLER } from './demo.mjs'
 import { contentSecurityPolicy, headerRules, headersFile, headersFor, parseHeadersFile, policyProblems, POLICY } from './demo-headers.mjs'
+import { serveDemo } from './demo-serve.mjs'
+import { NOTICES_FILE } from './third-party-notices.mjs'
 
 /**
  * The examples page as a demo on formancy.ai (0069): the Worker's config,
@@ -20,9 +23,11 @@ const readme = read('README.md')
 const root = JSON.parse(read('package.json'))
 const examples = JSON.parse(read('apps', 'examples', 'package.json'))
 const vite = read('apps', 'examples', 'vite.config.ts')
-const gate = read('apps', 'examples', 'scripts', 'browser-test.mjs')
 const index = read('apps', 'examples', 'index.html')
 const wrangler = readDemoConfig()
+
+/** The page's address, against which every address in it is resolved. */
+const address = 'https://formancy.ai/data/examples/'
 
 /**
  * The stylesheets the page draws with, as they are before the build: the
@@ -65,6 +70,12 @@ describe('the demo on formancy.ai (0069)', () => {
   // answered by formancy.ai's 404, or the staging directory another than the
   // one the deploy fills.
   test.each([
+    // Wrangler deploys to whichever Worker the name says: formancy.ai's own
+    // would then serve only /data/examples/ and answer 404 for the rest of
+    // the site, and the report's would lose its Studio.
+    ["formancy.ai's own Worker", { ...base, name: 'formancy-ai' }, 'formancy-data-examples'],
+    ["the report's Worker", { ...base, name: 'formancy-report-studio' }, 'formancy-data-examples'],
+    ['no name', Object.fromEntries(Object.entries(base).filter(([key]) => key !== 'name')), 'formancy-data-examples'],
     ['a workers.dev address', { ...base, workers_dev: true }, 'workers_dev'],
     ['a preview address per version', { ...base, preview_urls: true }, 'preview_urls'],
     ['code that runs at the edge', { ...base, main: 'worker.js' }, 'main'],
@@ -94,11 +105,19 @@ describe('the demo on formancy.ai (0069)', () => {
   // site's own directory: the demo is a blank page while every log says it
   // deployed. The gate would see it; the deploy refuses it before anything
   // is uploaded.
-  test('refuses a built page that asks for a file by an absolute path, and only that', () => {
-    expect(indexProblems('<script type="module" crossorigin src="./assets/index-a.js"></script><link rel="stylesheet" crossorigin href="./assets/index-b.css">')).toEqual([])
-    expect(indexProblems('<link rel="icon" href="data:," /><link href="https://fonts.googleapis.com/css2?family=Archivo" rel="stylesheet" />')).toEqual([])
-    expect(indexProblems('<script type="module" crossorigin src="/assets/index-a.js"></script>')).toEqual(['src="/assets/index-a.js"'])
-    expect(indexProblems('<link rel="modulepreload" crossorigin href="/data/examples/assets/c.js">')).toEqual(['href="/data/examples/assets/c.js"'])
+  // However the attribute is quoted, and whether the address names the
+  // path, the host or the whole of formancy.ai, or climbs out of the
+  // page's directory.
+  test('refuses a built page that asks formancy.ai for a file other than by a path relative to the page, and only that', () => {
+    expect(indexProblems('<script type="module" crossorigin src="./assets/index-a.js"></script><link rel="stylesheet" crossorigin href="./assets/index-b.css">', address)).toEqual([])
+    expect(indexProblems('<link rel="icon" href="data:," /><link href="https://fonts.googleapis.com/css2?family=Archivo" rel="stylesheet" />', address)).toEqual([])
+    expect(indexProblems('<script type="module" crossorigin src="/assets/index-a.js"></script>', address)).toEqual(['src="/assets/index-a.js"'])
+    expect(indexProblems('<link rel="modulepreload" crossorigin href="/data/examples/assets/c.js">', address)).toEqual(['href="/data/examples/assets/c.js"'])
+    expect(indexProblems("<script src='/assets/x.js'></script>", address)).toEqual(['src="/assets/x.js"'])
+    expect(indexProblems('<script src=/assets/x.js></script>', address)).toEqual(['src="/assets/x.js"'])
+    expect(indexProblems('<script src="//formancy.ai/assets/x.js"></script>', address)).toEqual(['src="//formancy.ai/assets/x.js"'])
+    expect(indexProblems('<link rel="stylesheet" href="https://formancy.ai/data/examples/assets/b.css">', address)).toEqual(['href="https://formancy.ai/data/examples/assets/b.css"'])
+    expect(indexProblems('<script src="../assets/x.js"></script>', address)).toEqual(['src="../assets/x.js"'])
   })
 
   // The examples page is built with a relative base, so the one build is
@@ -112,10 +131,36 @@ describe('the demo on formancy.ai (0069)', () => {
   // content: a stale page asking for a chunk the deploy removed would
   // otherwise be served the old one. Vite names every chunk it writes with
   // a hash; the deploy refuses an assets directory holding anything else.
-  test('refuses a file in assets/ whose name carries no hash', () => {
-    expect(unhashedAssets(['index-BxKwE78K.js', 'angular-bootstrap-b1VPoZ-e.js', 'index-BgSCHOjx.css'])).toEqual([])
-    expect(unhashedAssets(['index-BxKwE78K.js', 'index.js', 'logo.svg'])).toEqual(['index.js', 'logo.svg'])
+  //
+  // A name's shape is not its hash: `fixture-snapshot.json` has the shape.
+  // So a file Vite copied from the public directory, under the name it has
+  // there, is refused whatever its name, and so is a config that names
+  // what it writes by a pattern without [hash].
+  test('refuses a file in assets/ that the public directory put there, or whose name has not the shape of a hashed one', () => {
+    expect(unhashedAssets(['index-BxKwE78K.js', 'angular-bootstrap-b1VPoZ-e.js', 'index-BgSCHOjx.css'], [])).toEqual([])
+    expect(unhashedAssets(['index-BxKwE78K.js', 'index.js', 'logo.svg'], [])).toEqual(['index.js', 'logo.svg'])
+    expect(unhashedAssets(['index-BxKwE78K.js', 'fixture-snapshot.json', 'brand-template.svg'], ['fixture-snapshot.json', 'brand-template.svg'])).toEqual(['fixture-snapshot.json', 'brand-template.svg'])
   })
+
+  test.each([
+    ['chunks named without a hash', { assetsDir: 'assets', output: { chunkFileNames: 'assets/[name].js' } }, 'chunkFileNames'],
+    ['entries named without a hash', { assetsDir: 'assets', output: [{ entryFileNames: 'assets/[name].js' }] }, 'entryFileNames'],
+    ['assets named by a function', { assetsDir: 'assets', output: { assetFileNames: () => 'assets/x.css' } }, 'assetFileNames'],
+    ['another assets directory than the one the headers cache', { assetsDir: 'static', output: undefined }, 'static'],
+  ])('refuses a build whose Vite config gives %s', (_name, facts, says) => {
+    const problems = namingProblems(facts)
+    expect(problems.length).toBeGreaterThan(0)
+    expect(problems.join('\n')).toContain(says)
+  })
+
+  // The examples page's own Vite config, resolved as `vite build` resolves
+  // it: every file it writes into assets/ is named with a hash, and its
+  // public directory is the one beside its config.
+  test("the examples page's Vite config names everything it writes into assets/ with a hash", async () => {
+    const facts = await viteBuild()
+    expect(namingProblems(facts)).toEqual([])
+    expect(facts.publicDir.replaceAll('\\', '/')).toBe(join(app, 'public').replaceAll('\\', '/'))
+  }, 30_000)
 
   // The deploy is the root's script, after the same build `pnpm demo`
   // makes, and with the Wrangler the record names, never whatever npx finds
@@ -129,11 +174,26 @@ describe('the demo on formancy.ai (0069)', () => {
   // nothing here can read; REPO-METADATA.md records them. Recorded apart
   // from `pnpm demo:deploy`, the two would drift, and the demo deployed on a
   // push to main would be built or checked otherwise than one deployed by
-  // hand.
-  test("REPO-METADATA.md's Workers Builds settings are pnpm demo:deploy's halves, for the demo's Worker", () => {
+  // hand. The repository it is connected to, and the one the steps that
+  // create it tell the dashboard to import, is this one as data-core's
+  // manifest names it for npm's provenance, and every Worker the section
+  // names is the demo's: a slug or a name copied from the report's file
+  // would connect formancy.ai-report, or create its Worker a second time.
+  test("REPO-METADATA.md's Workers Builds settings are pnpm demo:deploy's halves, for the demo's Worker and this repository", () => {
     const metadata = read('.github', 'REPO-METADATA.md')
     const setting = (name) => new RegExp(`^\\| ${name} \\| \`([^\`]+)\` \\|`, 'm').exec(metadata)?.[1]
-    expect(setting('Worker')).toBe(wrangler.name)
+    const repository = JSON.parse(read('packages', 'data-core', 'package.json')).repository.url.replace(/^git\+https:\/\/github\.com\//, '').replace(/\.git$/, '')
+    const start = metadata.indexOf("\n## The demo's Worker on Cloudflare\n")
+    const worker = metadata.slice(start, metadata.indexOf('\n## ', start + 1))
+    expect(start).toBeGreaterThan(-1)
+    expect(setting('Git repository')).toBe(repository)
+    const named = [...worker.matchAll(/\bsharkysan\/[\w.-]*[\w-]/g)].map((match) => match[0])
+    expect(named.length).toBeGreaterThan(1)
+    for (const each of named) expect(each).toBe(repository)
+    const workers = [...worker.matchAll(/\bformancy-(?!ai\b)[a-z][a-z-]*[a-z]/g)].map((match) => match[0])
+    expect(workers.length).toBeGreaterThan(1)
+    for (const each of workers) expect(each).toBe(WORKER)
+    expect(setting('Worker')).toBe(WORKER)
     expect(setting('Root directory')).toBe('/')
     expect(setting('Production branch')).toBe('main')
     expect(`${String(setting('Build command'))} && ${String(setting('Deploy command'))}`).toBe(root.scripts['demo:deploy'])
@@ -169,29 +229,56 @@ describe('the demo on formancy.ai (0069)', () => {
     for (const each of named) expect(each).toBe(WRANGLER)
   })
 
-  // The gate measuring the page at the root of its origin, or without the
-  // headers, would pass a build that is a blank page under /data/examples/
-  // or one its own policy stops; served under the demo's path with the
-  // headers the deploy writes, every check of it is a check of the demo as
-  // formancy.ai serves it.
-  test('the browser gate serves the built page under the demo’s path, with the headers the deploy writes', () => {
-    expect(gate).toMatch(/import \{[^}]*\bdemoBase\b[^}]*\breadDemoConfig\b[^}]*\} from '\.\.\/\.\.\/\.\.\/scripts\/demo\.mjs'/)
-    expect(gate).toMatch(/import \{[^}]*\bheadersFile\b[^}]*\} from '\.\.\/\.\.\/\.\.\/scripts\/demo-headers\.mjs'/)
-    expect(gate).toContain('const BASE = demoBase(readDemoConfig())')
-    expect(gate).toContain('parseHeadersFile(headersFile(headerRules(BASE)))')
+  // The browser gate measures the page through serveDemo. Served at the
+  // root of its origin, or without the headers, it would pass a build that
+  // is a blank page under /data/examples/ or one its own policy stops; and
+  // with a type of its own for a file Cloudflare sends otherwise, it would
+  // pass a page whose notices a browser reads in the wrong encoding.
+  // Measured on 2026-10-16: formancy.ai/report/THIRD-PARTY-NOTICES.txt,
+  // which Workers static assets serve with no `_headers`, answered
+  // `Content-Type: text/plain`, with no charset.
+  test("the page is served as formancy.ai serves it: under the demo's path alone, each file with the deploy's headers over Cloudflare's type", async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'demo-serve-'))
+    mkdirSync(join(directory, 'assets'))
+    writeFileSync(join(directory, 'index.html'), '<!doctype html><title>page</title>')
+    writeFileSync(join(directory, 'assets', 'index-BxKwE78K.js'), 'export {}')
+    writeFileSync(join(directory, NOTICES_FILE), 'the “Software”')
+    writeFileSync(join(directory, 'other.txt'), 'text')
+    const { server, port, base: served } = await serveDemo(directory)
+    try {
+      const get = (path) => fetch(`http://127.0.0.1:${String(port)}${path}`, { redirect: 'manual' })
+      const rules = headerRules(demoBase(wrangler))
+      expect(served).toBe('/data/examples/')
+      expect((await get('/')).status).toBe(404)
+      expect((await get('/index.html')).status).toBe(404)
+      expect((await get('/data/')).status).toBe(404)
+      const bare = await get('/data/examples')
+      expect([bare.status, bare.headers.get('location')]).toEqual([307, '/data/examples/'])
+      for (const path of ['/data/examples/', '/data/examples/assets/index-BxKwE78K.js', `/data/examples/${NOTICES_FILE}`]) {
+        const answer = await get(path)
+        expect(answer.status, path).toBe(200)
+        for (const [name, value] of Object.entries(headersFor(rules, path))) expect(answer.headers.get(name), `${path} ${name}`).toBe(value)
+      }
+      expect((await get(`/data/examples/${NOTICES_FILE}`)).headers.get('content-type')).toBe('text/plain; charset=utf-8')
+      expect((await get('/data/examples/other.txt')).headers.get('content-type')).toBe('text/plain')
+    } finally {
+      server.close()
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 })
 
 describe("the demo's headers (0069)", () => {
   const rules = headerRules(demoBase(wrangler))
 
-  // The policy as decided, directive by directive: nothing inline and
-  // nothing evaluated, the page's own files and Google's fonts, no plugin,
-  // no <base>, no form sent anywhere and no page framing it. A directive
-  // loosened here is a change to the record.
+  // The policy as decided, directive by directive: nothing a directive
+  // does not name, nothing inline and nothing evaluated, scripts, styles
+  // and fetches from formancy.ai's own origin and Google's fonts, no
+  // plugin, no <base>, no form sent anywhere and no page framing it. A
+  // directive loosened here is a change to the record.
   test('the Content-Security-Policy is the strict one the record names', () => {
     expect(POLICY).toEqual({
-      'default-src': ["'self'"],
+      'default-src': ["'none'"],
       'script-src': ["'self'"],
       'style-src': ["'self'", 'https://fonts.googleapis.com'],
       'font-src': ['https://fonts.gstatic.com'],
@@ -212,7 +299,7 @@ describe("the demo's headers (0069)", () => {
   // it under, and the data: images the theme draws are the only reason
   // img-src names anything.
   test('names exactly the hosts index.html loads, and data: only for the images the stylesheets draw', () => {
-    expect(policyProblems(POLICY, { html: index, stylesheets })).toEqual([])
+    expect(policyProblems(POLICY, { html: index, stylesheets, address })).toEqual([])
   })
 
   test.each([
@@ -220,6 +307,10 @@ describe("the demo's headers (0069)", () => {
     ['a style attribute in the page', { html: index.replace('<div id="root">', '<div id="root" style="color: red">') }, 'style'],
     ['the fonts link removed from the page', { html: index.replace(/<link\s+href="https:\/\/fonts\.googleapis\.com[^>]*>/, '') }, 'https://fonts.googleapis.com'],
     ['a script from another host', { html: index.replace('</head>', '<script src="https://cdn.example/x.js"></script></head>') }, 'https://cdn.example'],
+    ['a script from another host, by a protocol-relative address', { html: index.replace('</head>', '<script src="//cdn.example/x.js"></script></head>') }, 'https://cdn.example'],
+    ['a script from another host, single-quoted', { html: index.replace('</head>', "<script src='https://cdn.example/x.js'></script></head>") }, 'https://cdn.example'],
+    ['a stylesheet from another host, unquoted', { html: index.replace('</head>', '<link rel=stylesheet href=https://cdn.example/x.css></head>') }, 'https://cdn.example'],
+    ['a script from another host, after a > in a quoted attribute', { html: index.replace('</head>', '<script data-x="a>b" src="https://cdn.example/x.js"></script></head>') }, 'https://cdn.example'],
     ['the font host the page preconnects to missing', { policy: { ...POLICY, 'font-src': ["'self'"] } }, 'https://fonts.gstatic.com'],
     ['a host the page never loads', { policy: { ...POLICY, 'connect-src': ["'self'", 'https://api.example'] } }, 'https://api.example'],
     ['inline scripts allowed', { policy: { ...POLICY, 'script-src': ["'self'", "'unsafe-inline'"] } }, 'unsafe-inline'],
@@ -228,7 +319,7 @@ describe("the demo's headers (0069)", () => {
     ['data: images refused while the theme draws them', { policy: { ...POLICY, 'img-src': ["'self'"] } }, 'data:'],
     ['a directive the record names missing', { policy: Object.fromEntries(Object.entries(POLICY).filter(([name]) => name !== 'frame-ancestors')) }, 'frame-ancestors'],
   ])('refuses %s', (_name, change, says) => {
-    const problems = policyProblems(change.policy ?? POLICY, { html: change.html ?? index, stylesheets: change.stylesheets ?? stylesheets })
+    const problems = policyProblems(change.policy ?? POLICY, { html: change.html ?? index, stylesheets: change.stylesheets ?? stylesheets, address })
     expect(problems.length).toBeGreaterThan(0)
     expect(problems.join('\n')).toContain(says)
   })
@@ -249,6 +340,14 @@ describe("the demo's headers (0069)", () => {
     const chunk = headersFor(parseHeadersFile(text), '/data/examples/assets/index-BxKwE78K.js')
     expect(chunk['Cache-Control']).toBe('public, max-age=31536000, immutable')
     expect(chunk['Content-Security-Policy']).toBe(contentSecurityPolicy())
+    expect(page['Content-Type']).toBeUndefined()
+    expect(chunk['Content-Type']).toBeUndefined()
+    // Cloudflare sends a .txt as bare text/plain, whose encoding a browser
+    // guesses, and the notices are not ASCII: a bundled MIT text's curly
+    // quotes among them. 0046 serves them as UTF-8, and so does the demo.
+    const notices = headersFor(parseHeadersFile(text), `/data/examples/${NOTICES_FILE}`)
+    expect(notices['Content-Type']).toBe('text/plain; charset=utf-8')
+    expect(notices['Content-Security-Policy']).toBe(contentSecurityPolicy())
     expect(headersFor(rules, '/report/')).toEqual({})
     expect(headersFor(rules, '/data/')).toEqual({})
     expect(headersFor(rules, '/data/examples-old/')).toEqual({})
