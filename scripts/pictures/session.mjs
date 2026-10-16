@@ -6,10 +6,10 @@
 //
 // The three apps' apps/<app>/scripts/pictures.mjs hold their plane, their
 // routing and one act per scene. This holds what they would otherwise each
-// decide again: which scene is shot, that --check aborts the fonts and shoots
-// nothing, that nothing is written until every scene of the walk has passed,
-// and what each record entry says. Node built-ins only; the app passes in its
-// own Playwright.
+// decide again: which scene is shot, that --check shoots nothing, that
+// nothing is written until every scene of the walk has passed, and what each
+// record entry says. Node built-ins only; the app passes in its own
+// Playwright.
 //
 //   node scripts/pictures.mjs                walk every scene; retake those whose text changed, or that have no record or no picture
 //   node scripts/pictures.mjs --all          retake every scene of the app
@@ -19,6 +19,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { declaredFamilies, fontPackages } from '../fonts.mjs'
 import { parse } from '../pictures.mjs'
 import * as camera from './camera.mjs'
 import { announce, checkProblems, entry, IMAGES, lineDiff, pairingProblems, pictureOf, readRecord, readScenes, REPO, stylesheetNotices, withEntry, writeRecord } from './record.mjs'
@@ -134,9 +135,6 @@ async function quiet(page, parts, within) {
 /** Today, as captured.json dates a picture: the UTC date, which the record's dates are compared in. */
 const today = () => new Date().toISOString().slice(0, 10)
 
-/** Every request to Google Fonts, refused: --check compares text, which does not depend on fonts, and must not depend on Google. */
-const FONTS = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//
-
 /**
  * Walks `config.app`'s scenes and does what `argv` asks (see the header).
  *
@@ -172,14 +170,20 @@ export async function pictures(config, argv = process.argv.slice(2)) {
   const sheet = camera.stylesheet(css.directory, css.entry)
   const breakpoint = camera.widestBreakpoint(sheet, css.entry)
   const stylesheet = `sha256 ${camera.digest(sheet)} of src/${css.entry} with its imports, and @formancy/themes ${themes}`
-  const families = camera.families(readFileSync(join(dist, 'index.html'), 'utf8'))
+  // The faces the build declares, each named by the package it comes from,
+  // before the browser opens: a face no package accounts for refuses the
+  // capture. --check reads the faces from dist too, through the camera's
+  // own route, so it measures the clip with the faces the pictures were
+  // taken in (0072).
+  const families = declaredFamilies(dist)
+  if (families.length === 0) throw new Error(`apps/${app}/dist declares no font face, so there is nothing to wait for and a fallback face would be pictured unnoticed`)
+  const faces = camera.lookFonts(families, fontPackages(join(REPO, 'apps', app)))
 
   const browser = await chromium.launch()
   let context
   let page
   try {
     context = await camera.context(browser, { width, breakpoint })
-    if (options.check) await context.route(FONTS, (route) => route.abort())
     await camera.serve(context, { origin, dist, inject })
     page = await context.newPage()
     page.setDefaultTimeout(within)
@@ -244,7 +248,7 @@ export async function pictures(config, argv = process.argv.slice(2)) {
         mkdirSync(options.review, { recursive: true })
         writeFileSync(join(options.review, `${id}.png`), await camera.decodedPng(browser, picture))
       }
-      const look = camera.look(browser, { playwright, fonts: shot.fonts })
+      const look = camera.look(browser, { playwright, fonts: faces })
       // withEntry refuses a misquoting caption and another look before anything is written.
       next = withEntry(next, scenes, id, entry(id, { captured, settings, clip: shot.clip, picture, look, database, stylesheet, text: shot.text }))
       written[id] = picture

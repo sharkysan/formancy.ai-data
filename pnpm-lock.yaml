@@ -167,6 +167,15 @@ catalogs:
     '@arethetypeswrong/cli':
       specifier: ^0.18.5
       version: 0.18.5
+    '@fontsource-variable/archivo':
+      specifier: 5.3.0
+      version: 5.3.0
+    '@fontsource/ibm-plex-mono':
+      specifier: 5.3.0
+      version: 5.3.0
+    '@fontsource/ibm-plex-sans':
+      specifier: 5.3.0
+      version: 5.3.0
     '@testcontainers/mssqlserver':
       specifier: ^12.1.0
       version: 12.2.0
@@ -232,6 +241,15 @@ importers:
       '@angular/platform-browser':
         specifier: ^22.1.7
         version: 22.2.1(@angular/common@22.2.1(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))
+      '@fontsource-variable/archivo':
+        specifier: 'catalog:'
+        version: 5.3.0
+      '@fontsource/ibm-plex-mono':
+        specifier: 'catalog:'
+        version: 5.3.0
+      '@fontsource/ibm-plex-sans':
+        specifier: 'catalog:'
+        version: 5.3.0
       '@formancy/angular':
         specifier: 0.5.0
         version: 0.5.0(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))
@@ -338,6 +356,15 @@ importers:
       '@angular/platform-browser':
         specifier: ^22.1.7
         version: 22.2.1(@angular/common@22.2.1(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))
+      '@fontsource-variable/archivo':
+        specifier: 'catalog:'
+        version: 5.3.0
+      '@fontsource/ibm-plex-mono':
+        specifier: 'catalog:'
+        version: 5.3.0
+      '@fontsource/ibm-plex-sans':
+        specifier: 'catalog:'
+        version: 5.3.0
       '@formancy/angular':
         specifier: 0.5.0
         version: 0.5.0(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))
@@ -450,6 +477,15 @@ importers:
 
   apps/studio:
     dependencies:
+      '@fontsource-variable/archivo':
+        specifier: 'catalog:'
+        version: 5.3.0
+      '@fontsource/ibm-plex-mono':
+        specifier: 'catalog:'
+        version: 5.3.0
+      '@fontsource/ibm-plex-sans':
+        specifier: 'catalog:'
+        version: 5.3.0
       '@formancy/builder-core':
         specifier: 0.5.0
         version: 0.5.0
@@ -1407,6 +1443,15 @@ packages:
 
   '@fastify/rate-limit@11.2.0':
     resolution: {integrity: sha512-X7osJd4XSvMoejYrnJkSZYYjY1eNYoBqhjlzf1RakC2204qExFqZFTKj5+T7VuzA/iUI9Z3UoSqQRkB2HpG0oQ==}
+
+  '@fontsource-variable/archivo@5.3.0':
+    resolution: {integrity: sha512-HogK8FJelrD1o7TlZlkIVtHgc20bO5PZRWE7mUeUTdMN055alznQV6/00J00IBeu8FQAH4s3zW9UJNvKExXf+g==}
+
+  '@fontsource/ibm-plex-mono@5.3.0':
+    resolution: {integrity: sha512-eTgnZjZEGk1QtD3ZstF+Vclo2HLAni8YMy34/DxllwZvyz1lR/1RF/xTiAquOBO7MvqBx8D2Ig2WCPMVfdZu7Q==}
+
+  '@fontsource/ibm-plex-sans@5.3.0':
+    resolution: {integrity: sha512-CbE4CbbEEZJX860XyUiRpsksXIQR8Rp2XDva2VO53NJox9tVNtusrysd2x5YkUEY3ErQ66W1IiiQL8/wihhw5w==}
 
   '@formancy/angular@0.5.0':
     resolution: {integrity: sha512-9u3SeETyPXVCIijsAtC+zteD7FNnFUbf6qh2bisr8XaVXmsLD8u2yJhlytTJ9vgqclJi5dwBQ32RrbMKCV1+1Q==}
@@ -5328,6 +5373,12 @@ snapshots:
       fastify-plugin: 6.0.0
       ip-address: 10.7.3
       toad-cache: 3.7.4
+
+  '@fontsource-variable/archivo@5.3.0': {}
+
+  '@fontsource/ibm-plex-mono@5.3.0': {}
+
+  '@fontsource/ibm-plex-sans@5.3.0': {}
 
   '@formancy/angular@0.5.0(@angular/core@22.2.1(@angular/compiler@22.2.1)(rxjs@7.8.2))':
     dependencies:

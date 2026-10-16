@@ -16,9 +16,10 @@ import { builtStylesheets, declaredFamilies, fontFaces, fontPackages, withoutFon
  * the built page and every stylesheet it links, and the Fontsource packages
  * each app imports its faces from. It does not read JavaScript: the host
  * page's bundle holds AG Grid's own loader of Google's fonts, which asks
- * nothing unless a grid is given `loadThemeGoogleFonts`, and a scan of the
- * bundle would fail on a request nobody makes. The gates see the one that
- * is made.
+ * Google only for a theme parameter given as `{ googleFont }`, and only for
+ * a grid given `loadThemeGoogleFonts` -- the page does neither -- so a scan
+ * of the bundle would fail on a request nobody makes. The gates see the one
+ * that is made.
  *
  * Named after formancy.ai's apps/admin/src/no-other-host.test.tsx. The apps
  * are derived, never listed: every apps/<name>/index.html. The built pages

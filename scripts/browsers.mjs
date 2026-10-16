@@ -158,9 +158,10 @@ export const installCommand = (browser) => `pnpm --filter @formancy/data-example
  * The system packages, by Debian name, that a browser's gates take from the
  * runner rather than from Playwright's download, each with what it gives the
  * browser: every package a fact below rests on, and WebKit's TLS and EGL,
- * which decide whether it reaches the web fonts and draws at all. The gate
- * records each one's version through dpkg-query (scripts/browser-gate.mjs's
- * systemOf), and the report names them.
+ * which decide whether it speaks HTTPS and draws at all. The gates serve
+ * their pages, faces included, over plain HTTP from 127.0.0.1 (0072). The
+ * gate records each one's version through dpkg-query
+ * (scripts/browser-gate.mjs's systemOf), and the report names them.
  */
 export const SYSTEM_PACKAGES = Object.freeze({
   webkit: Object.freeze([

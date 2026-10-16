@@ -1,16 +1,18 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { families, fontVersions, MARGIN, padded, SETTINGS, stylesheet, widestBreakpoint } from './camera.mjs'
+import { fontPackages } from '../fonts.mjs'
+import { foreignFaces, lookFonts, MARGIN, padded, SETTINGS, stylesheet, widestBreakpoint } from './camera.mjs'
 import { REPO } from './record.mjs'
 
 /**
  * The camera's decisions that need no browser (0038): the settings every
- * picture is taken in, the width it is taken past, the fonts it waits for
- * and the versions it records. Its browser half -- the font wait, the
- * intrusion check, the settle loop, the encoder -- runs at every capture
- * and was watched refusing in Chromium (0038 lists how).
+ * picture is taken in, the width it is taken past, and what the look says
+ * of the faces the pictures were drawn in, and where they came from (0072).
+ * Its browser half -- the font wait, the intrusion check, the settle loop,
+ * the encoder -- runs at every capture and was watched refusing in Chromium
+ * (0038 lists how).
  */
 
 describe('the settings', () => {
@@ -78,36 +80,39 @@ describe('the stylesheet', () => {
   })
 })
 
-describe('the font families', () => {
-  // The camera waits for every family the page asks Google Fonts for; one
-  // missed here is one a fallback face could stand in for unnoticed.
-  test("are every family= of each app's Google Fonts link", () => {
-    for (const app of ['examples', 'studio', 'host']) {
-      expect(families(readFileSync(join(REPO, 'apps', app, 'index.html'), 'utf8')), app).toEqual(['Archivo', 'IBM Plex Mono', 'IBM Plex Sans'])
-    }
+describe("the look's faces (0072)", () => {
+  // The record's look names the face each picture was drawn in, so a font
+  // package that moved is a new look and not an unexplained change of
+  // pixels: each family by the package an app imports it from, its version
+  // as installed, and Google's version of the face that release carries --
+  // read from the packages, never typed, and the same for every app.
+  test("are each family's package, its version and Google's version of the face, the same in every app", () => {
+    const looks = ['examples', 'studio', 'host'].map((app) => {
+      const packages = fontPackages(join(REPO, 'apps', app))
+      return lookFonts(
+        packages.map((entry) => entry.family),
+        packages,
+      )
+    })
+    expect(Object.keys(looks[0]).sort()).toEqual(['Archivo Variable', 'IBM Plex Mono', 'IBM Plex Sans'])
+    for (const value of Object.values(looks[0])) expect(value).toMatch(/^@fontsource(?:-variable)?\/[a-z-]+ \d+\.\d+\.\d+ \(v\d+\)$/)
+    expect(looks[1]).toEqual(looks[0])
+    expect(looks[2]).toEqual(looks[0])
   })
 
-  // A page that asked Google for nothing would give the wait nothing to wait for.
-  test('are refused when the page names none', () => {
-    expect(() => families('<link rel="preconnect" href="https://fonts.googleapis.com" />')).toThrow(/names no Google Fonts family/)
-  })
-})
-
-describe('the font versions', () => {
-  const names = ['Archivo', 'IBM Plex Mono', 'IBM Plex Sans']
-  // In the shape of the URLs Chromium fetched for the studio on 2026-10-09: the versions are those, the file names made up.
-  const urls = ['https://fonts.gstatic.com/s/archivo/v25/k3k6o8.woff2', 'https://fonts.gstatic.com/s/ibmplexmono/v20/-F63fjp.woff2', 'https://fonts.gstatic.com/s/ibmplexsans/v23/zYXz.woff2', 'https://fonts.gstatic.com/s/ibmplexsans/v23/zYX9.woff2']
-
-  // The record's look names the font each picture was drawn in, so a font
-  // Google ships is a new look and not an unexplained change of pixels.
-  test('are read from the files each family loaded', () => {
-    expect(fontVersions(urls, names)).toEqual({ Archivo: 'v25', 'IBM Plex Mono': 'v20', 'IBM Plex Sans': 'v23' })
+  // A face the build declares and no imported package does -- one written
+  // by hand over a committed file -- is a face the record cannot name.
+  test('refuse a family no imported package declares', () => {
+    const packages = [{ name: '@fontsource/ibm-plex-sans', version: '5.3.0', google: 'v23', family: 'IBM Plex Sans' }]
+    expect(lookFonts(['IBM Plex Sans'], packages)).toEqual({ 'IBM Plex Sans': '@fontsource/ibm-plex-sans 5.3.0 (v23)' })
+    expect(() => lookFonts(['IBM Plex Sans', 'Roboto'], packages)).toThrow('the build declares Roboto, which no font package the app imports declares')
   })
 
-  // Each would let the record say a version nobody can stand behind.
-  test('are refused for a file without one, two of one family, and a family no file was seen for', () => {
-    expect(() => fontVersions([...urls, 'https://fonts.gstatic.com/s/archivo/latest/x.woff2'], names)).toThrow('the font file /s/archivo/latest/x.woff2 names no version')
-    expect(() => fontVersions([...urls, 'https://fonts.gstatic.com/s/archivo/v26/x.woff2'], names)).toThrow('two versions of Archivo were loaded, v25 and v26')
-    expect(() => fontVersions(urls.slice(1), names)).toThrow('no fonts.gstatic.com file was seen for Archivo')
+  // The pictures are drawn in the build's own files; a face another origin
+  // answered is one the look does not name, from a host the page must not ask.
+  test('refuse a font file from any origin but the app’s', () => {
+    const origin = 'http://examples.invalid'
+    expect(foreignFaces(new Set([`${origin}/assets/archivo-latin-wght-normal-D9H2jx1E.woff2`]), origin)).toEqual([])
+    expect(foreignFaces(new Set([`${origin}/assets/a.woff2`, 'https://fonts.gstatic.com/s/archivo/v25/k3k6o8.woff2']), origin)).toEqual(['https://fonts.gstatic.com/s/archivo/v25/k3k6o8.woff2'])
   })
 })

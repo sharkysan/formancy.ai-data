@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 export const APP = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 export const DIST = join(APP, 'dist')
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8' }
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain; charset=utf-8' }
 
 export function serve(plane) {
   const http = createServer((request, response) => {

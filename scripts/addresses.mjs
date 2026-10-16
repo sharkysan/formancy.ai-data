@@ -52,6 +52,11 @@ export function resolved(value, address) {
   }
 }
 
+/** The address of every `@import` of a stylesheet, quoted or as a `url()`, as written. */
+export function styleImports(css) {
+  return [...css.matchAll(/@import\s+(?:url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)|"([^"]*)"|'([^']*)')/gi)].map((match) => match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5])
+}
+
 /** Every `url(...)` and quoted `@import` of a stylesheet, as written. */
 export function styleReferences(css) {
   const found = []
