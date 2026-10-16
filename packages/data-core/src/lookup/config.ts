@@ -2,6 +2,7 @@ import type { FieldBinding, FormBindings } from '../generate/types.js'
 import { bindingsVersionProblem } from '../generate/version.js'
 import type { ColumnMeta, MetadataSnapshot, NormalizedTypeKind, ObjectMeta, ObjectRef } from '../metadata.js'
 import { findObject } from '../snapshot.js'
+import { SEARCHABLE_KINDS, searchableDisplay } from './searchable.js'
 import type { LookupConfig, LookupDisplayColumn, LookupDisplayType, LookupKeyColumn, LookupSearchColumn, LookupSearchType, LookupSort } from './types.js'
 import { isLookupKeyType } from './values.js'
 
@@ -17,8 +18,6 @@ export const DEFAULT_MAX_PAGE_SIZE = 50
 
 /** No canonical text: nothing a token, a label or a portable order can rely on. */
 const NO_TEXT: ReadonlySet<NormalizedTypeKind> = new Set(['binary', 'rowversion', 'unsupported'])
-/** Kinds both engines spell alike as text, so a search over them matches what the label shows. */
-const SEARCHABLE: ReadonlySet<NormalizedTypeKind> = new Set(['text', 'integer'])
 
 /** One column of an order an administrator chose. */
 export interface LookupSortChoice {
@@ -147,11 +146,9 @@ function checkDisplay(target: ObjectMeta, where: string, display: readonly strin
  * text, never through an implicit conversion (0028).
  */
 function searchFor(display: readonly LookupDisplayColumn[], where: string, requested: readonly string[] | undefined, target: ObjectMeta): LookupSearchColumn[] {
-  const searchable = (column: LookupDisplayColumn): column is { name: string; type: LookupSearchType } => SEARCHABLE.has(column.type.kind)
-  if (requested === undefined) {
-    const seen = new Set<string>()
-    return display.filter((column) => searchable(column) && !seen.has(column.name) && seen.add(column.name) !== undefined).map((column) => ({ name: column.name, type: column.type as LookupSearchType }))
-  }
+  // The generator draws a typeahead exactly when this default finds a column (0066).
+  if (requested === undefined) return searchableDisplay(display)
+  const searchable = (column: LookupDisplayColumn): column is { name: string; type: LookupSearchType } => SEARCHABLE_KINDS.has(column.type.kind)
   const seen = new Set<string>()
   return requested.map((name) => {
     once(seen, where, name)

@@ -1,4 +1,5 @@
 import type { FieldBinding, FormBindings } from '../generate/types.js'
+import { SEARCHABLE_KINDS } from '../lookup/searchable.js'
 import type { LookupSearchColumn, RowFilters } from '../lookup/types.js'
 import type { ColumnMeta, MetadataSnapshot, NormalizedTypeKind } from '../metadata.js'
 import { readableFields } from '../policy/evaluate.js'
@@ -24,8 +25,6 @@ import type { ListRequest, RecordRead, RecordSort, RecordValue, Through } from '
 
 /** No canonical text: nothing a portable order can rely on (`lookup/config.ts`'s rule for a lookup's order). */
 const UNORDERED: ReadonlySet<NormalizedTypeKind> = new Set(['binary', 'rowversion', 'unsupported'])
-/** Kinds both engines spell alike as text, so a search over them matches what the cell shows: a lookup's search's rule. */
-const SEARCHABLE: ReadonlySet<NormalizedTypeKind> = new Set(['text', 'integer'])
 
 type ColumnBinding = Extract<FieldBinding, { kind: 'column' }>
 
@@ -105,13 +104,13 @@ function readableColumns(bindings: FormBindings, fields: readonly string[]): Col
  * What a list of this form may be sorted and searched by, for an actor who
  * may read `fields`: one decision, so what `GET /v1/forms/:id` offers is what
  * `planList` accepts. Sortable: every readable column field whose kind has
- * canonical text. Searchable: those of kind text or integer, matched as a
- * lookup's search matches (0028).
+ * canonical text. Searchable: those whose kind is in `lookup/searchable.ts`'s
+ * set, the kinds a lookup's search matches, matched as it matches (0028).
  */
 export function listColumns(bindings: FormBindings, fields: readonly string[]): ListColumns {
   const columns = readableColumns(bindings, fields)
   return {
-    searchable: columns.filter((binding) => SEARCHABLE.has(binding.type.kind)).map((binding) => binding.field),
+    searchable: columns.filter((binding) => SEARCHABLE_KINDS.has(binding.type.kind)).map((binding) => binding.field),
     sortable: columns.filter((binding) => !UNORDERED.has(binding.type.kind)).map((binding) => binding.field),
   }
 }

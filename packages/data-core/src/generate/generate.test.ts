@@ -4,8 +4,9 @@ import { canonicalize } from '@formancy/spec'
 import { validateSchema } from '@formancy/spec/validate'
 import { describe, expect, test } from 'vitest'
 import type { DatabaseKind } from '../adapter.js'
+import { buildLookupConfig } from '../lookup/config.js'
 import type { ColumnMeta, MetadataSnapshot, NormalizedType, ObjectMeta } from '../metadata.js'
-import { createSnapshot } from '../snapshot.js'
+import { createSnapshot, findObject } from '../snapshot.js'
 import { generateForm } from './generate.js'
 import type { GenerationRequest } from './types.js'
 
@@ -205,7 +206,7 @@ describe('generateForm', () => {
     expect(keys).not.toContain('tenant_id')
     expect(keys).not.toContain('customer_no')
     expect(keys.indexOf('customer')).toBe(1)
-    expect(form.model.fields[1]).toMatchObject({ key: 'customer', type: 'select', optionsSource: 'erp-sales-order-fk-order-customer', required: true })
+    expect(form.model.fields[1]).toMatchObject({ key: 'customer', type: 'select', optionsSource: 'erp-sales-order-fk-order-customer', widget: 'typeahead', required: true })
     expect(bindings.fields.find((binding) => binding.field === 'customer')).toMatchObject({
       kind: 'lookup',
       columns: ['tenant_id', 'customer_no'],
@@ -890,6 +891,105 @@ describe('delete (0050)', () => {
     const view = generateForm(facts, { ...ORDER, root: { schema: 'sales', name: 'customer_summary' }, lookups: [] })
     expect(view.bindings.operations).toEqual({ create: false, update: false, delete: false })
     expect(deleteNotes(view.notes)).toEqual([])
+  })
+})
+
+describe('lookup controls (0066)', () => {
+  /** The one lookup a generated form holds: its field, its binding and the note that says what it is. */
+  function lookupOf(generated: ReturnType<typeof generateForm>) {
+    const binding = generated.bindings.fields.find((candidate) => candidate.kind === 'lookup')
+    if (binding === undefined) throw new Error('the form holds no lookup')
+    const field = generated.form.model.fields.find((candidate) => candidate.key === binding.field)
+    const notes = generated.notes.filter((note) => note.subject === binding.field && note.kind === 'inferred').map((note) => note.message)
+    return { binding, field, notes }
+  }
+
+  // A plain select with a source asks once, with "", and lists one page: a
+  // customer past it could never be chosen, though the server would search
+  // its name. So a lookup showing a text or whole-number column is written
+  // as a typeahead, and the note the reviewer reads before publishing says
+  // which control and what a person's typing searches (watched failing on
+  // main, which wrote no widget and named no control).
+  test("a lookup a person can search is a typeahead, and its note says what typing searches", () => {
+    for (const kind of ['postgres', 'sqlserver'] as const) {
+      const { field, notes } = lookupOf(generateForm(fixtureLike(kind), ORDER))
+      expect(field, kind).toEqual({ key: 'customer', type: 'select', label: 'Customer', optionsSource: 'erp-sales-order-fk-order-customer', widget: 'typeahead', required: true })
+      expect(notes, kind).toEqual(['A lookup over fk_order_customer (tenant_id, customer_no), showing name of customer, drawn as a typeahead searching name; label from the table name.'])
+      const both = lookupOf(generateForm(fixtureLike(kind), { ...ORDER, lookups: [{ foreignKey: 'fk_order_customer', display: ['customer_no', 'name'] }] }))
+      expect(both.notes, kind).toEqual(['A lookup over fk_order_customer (tenant_id, customer_no), showing customer_no, name of customer, drawn as a typeahead searching customer_no, name; label from the table name.'])
+    }
+  })
+
+  // A lookup showing only a date has nothing a search matches, and the
+  // server refuses every typed search over it, 400 not-searchable
+  // (`lookup/query.ts`). A typeahead there is a box whose every search
+  // fails; a plain select at least lists the first page, and the note says
+  // that a row past it cannot be chosen and what the administrator changes
+  // to make it searchable (watched failing with the widget written for
+  // every lookup).
+  test('a lookup showing nothing a search matches is a plain select, and its note says what to show instead', () => {
+    for (const kind of ['postgres', 'sqlserver'] as const) {
+      const { field, notes } = lookupOf(generateForm(withDeleteFacts(kind), LINE))
+      expect(field, kind).not.toHaveProperty('widget')
+      expect(field, kind).toMatchObject({ key: 'order', type: 'select', optionsSource: 'erp-sales-order-line-fk-order-line-order' })
+      expect(notes, kind).toEqual([
+        'A lookup over fk_order_line_order (order_id), showing order_date of order, as a plain list of its first page: a search matches only text and whole-number columns and it shows neither, so a row past that page cannot be chosen; show a text or whole-number column to make it searchable; label from the table name.',
+      ])
+    }
+  })
+
+  // The generator decides the control and `buildLookupConfig` the search, and
+  // a host draws the one and the server answers with the other: a typeahead
+  // over a lookup the config does not search is a box whose every search is
+  // refused, and a select over one it does is a list that stops at a page.
+  // So for every foreign key of the restated objects and every column of its
+  // target shown alone, where the config accepts the lookup -- it throws for
+  // a column with no text form for a label: flag, shape and SQL Server's
+  // row_version -- the field is a typeahead exactly when the config's
+  // default search is not empty. Both outcomes are counted on each engine,
+  // and the refusals named, so a loop in which every lookup threw, or none
+  // was generated, fails rather than passing over nothing (watched failing
+  // with the generator drawing a typeahead for text alone: customer_no is an
+  // integer, which the config searches).
+  //
+  // It cannot catch a rule both share and get wrong: searchable.test.ts
+  // decides that. And it needs no version against a real database on each
+  // engine: both sides read the same normalized kinds, which the discovery
+  // conformance suites hold (0005).
+  test('a lookup is a typeahead exactly when the config built from its bindings searches something', () => {
+    for (const kind of ['postgres', 'sqlserver'] as const) {
+      const snapshot = withDeleteFacts(kind)
+      const typeahead: string[] = []
+      const plain: string[] = []
+      const refused: string[] = []
+      for (const root of snapshot.objects) {
+        for (const foreignKey of root.foreignKeys) {
+          const target = foreignKey.references === null ? undefined : findObject(snapshot, foreignKey.references.table)
+          if (target === undefined) throw new Error(`${foreignKey.name} reaches no restated table`)
+          for (const column of target.columns) {
+            const shown = `${foreignKey.name}: ${column.name}`
+            const generated = generateForm(snapshot, { connection: 'erp', root: root.ref, formId: `f-${root.ref.name}`, title: root.ref.name, lookups: [{ foreignKey: foreignKey.name, display: [column.name] }] })
+            const { binding, field } = lookupOf(generated)
+            let searched: number
+            try {
+              searched = buildLookupConfig(generated.bindings, binding.field, { snapshot }).search.length
+            } catch {
+              refused.push(shown)
+              continue
+            }
+            expect(field?.widget === 'typeahead', `${kind} ${shown}`).toBe(searched > 0)
+            ;(searched > 0 ? typeahead : plain).push(column.name)
+          }
+        }
+      }
+      expect(refused, kind).toEqual([
+        'fk_customer_country: flag',
+        'fk_customer_country: shape',
+        ...(kind === 'sqlserver' ? ['fk_order_line_order: row_version'] : []),
+      ])
+      expect(typeahead, kind).toEqual(expect.arrayContaining(['name', 'customer_no', 'iso_code']))
+      expect(plain, kind).toEqual(expect.arrayContaining(['order_date', 'amount', 'credit_limit', 'active', 'created_at']))
+    }
   })
 })
 
