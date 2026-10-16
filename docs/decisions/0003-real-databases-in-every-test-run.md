@@ -1,14 +1,19 @@
 # 0003 — Database behaviour is proved against real servers, on both engines, in every run
 
-- **Status:** accepted
+- **Status:** accepted; narrowed by [0067](0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md): the supported matrix is `MATRIX_IMAGES`, each engine's default first, and an image outside it that one file names is what that file showed, not a version a release was tested on
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-postgres/src/adapter.integration.test.ts`
-  and `packages/data-sqlserver/src/adapter.integration.test.ts` start
-  `postgres:17-alpine` and `mcr.microsoft.com/mssql/server:2022-latest` through
-  testcontainers and run against them; `ci.yml` runs `pnpm test:coverage` on
-  every pull request, on a runner with Docker, with no step that skips a suite
-  when a database is absent. That no mocked driver exists is **not
+  and `packages/data-sqlserver/src/adapter.integration.test.ts` start, through
+  testcontainers, the image of each engine's matrix (`MATRIX_IMAGES`, in
+  `packages/data-fixtures/src/images.ts`) that `FORMANCY_IMAGES` chooses --
+  the defaults, `postgres:17-alpine` and
+  `mcr.microsoft.com/mssql/server:2022-latest`, in the `test` job, and every
+  other image of the matrix in a leg of the `test-images` job -- run against
+  it, and fail when the server they started is another image's; `ci.yml`
+  runs `pnpm test:coverage` on every pull request, through `gates.yml`, on a
+  runner with Docker, with no step that skips a suite when a database is
+  absent. That no mocked driver exists is **not
   mechanically enforced** — nothing fails if somebody adds one — and is held
   by review and by `CLAUDE.md` saying so in as many words.
 

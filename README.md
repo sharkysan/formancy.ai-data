@@ -28,10 +28,15 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > lookup a person can search generated as a typeahead
 > ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)),
 > which a form published at 0.1.0 does not carry until it is regenerated
-> and published again; the examples page served at
-> https://formancy.ai/data/examples/, under a strict
-> Content-Security-Policy, which Cloudflare deploys from `main` and not
-> from a release
+> and published again; the adapter suites on every image of each engine's
+> matrix, which [*What it is tested on*](#what-it-is-tested-on) names
+> ([0067](./docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md));
+> a snapshot that records the server it was read from, with a SQL Server
+> older than 2019 refused at discovery and its release named
+> ([0068](./docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md));
+> the examples page served at https://formancy.ai/data/examples/, under a
+> strict Content-Security-Policy, which Cloudflare deploys from `main` and
+> not from a release
 > ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md));
 > and the rate limit and the log counting each client by the address a
 > proxy the operator names forwarded, which the composed stack sets for its
@@ -84,6 +89,14 @@ and `pnpm demo` runs the same build from a clone
   [0007](./docs/decisions/0007-sqlserver-discovery-and-what-it-hides.md),
   [0027](./docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md),
   [0049](./docs/decisions/0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md)).
+  Unreleased, not in 0.1.0: a snapshot records which server it was read
+  from -- the product, the major version and, on SQL Server, the database's
+  compatibility level -- from which `@formancy/data-core` says whether this
+  release was tested on that server, never taking Azure SQL Database for
+  the SQL Server 2014 its major would be. Nothing refuses a server for
+  being untested; a SQL Server older than 2019, whose catalog lacks a view
+  discovery reads, is refused with its release named
+  ([0068](./docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
 - **Generates a form deterministically**, and says what it inferred, made
   read-only, excluded and blocked, and why
   ([0009](./docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)).
@@ -148,6 +161,11 @@ and `pnpm demo` runs the same build from a clone
   and which of those the server still allows, where what blocks them is a
   change it does not compare when a request arrives
   ([0041](./docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)).
+  When the database was read from a server this release was not tested
+  on, every review says so, for review, and stops nothing, as the
+  connection test and the studio's metadata pane say it before a form is
+  generated
+  ([0068](./docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
 
 **For the person filling in the form, through any host:**
 
@@ -276,7 +294,11 @@ and `pnpm demo` runs the same build from a clone
 - **Every CI run ends in a report** of what it was tested on, which a release
   signs and attaches
   ([0035](./docs/decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)),
-  and the built studio and host page carry the licence and notice texts of
+  and on `main` since 0.1.0 it holds every shared case on every image of
+  each engine's matrix, failing a run in which one is missing or failed on
+  any of them
+  ([0067](./docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md));
+  the built studio and host page carry the licence and notice texts of
   what they bundle, but what Vite folds in as text
   ([0046](./docs/decisions/0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md)):
   [*Development*](#development).
@@ -779,8 +801,8 @@ says what an author and a publisher may each do, and what it costs).
 
 | | Tested with | Declared as |
 | --- | --- | --- |
-| **PostgreSQL** | `postgres:17-alpine`, unless a test names another image; `@formancy/data-fixtures` and `@formancy/data-postgres` also on `postgres:15-alpine`, `postgres:16-alpine` and `postgres:18-alpine` |  |
-| **SQL Server** | `mcr.microsoft.com/mssql/server:2022-latest`, unless a test names another image; `@formancy/data-fixtures` and `@formancy/data-sqlserver` also on `mcr.microsoft.com/mssql/server:2019-latest` and `mcr.microsoft.com/mssql/server:2025-latest` |  |
+| **PostgreSQL** | `postgres:17-alpine`; `@formancy/data-fixtures` and `@formancy/data-postgres` also on `postgres:15-alpine`, `postgres:16-alpine` and `postgres:18-alpine`; an image outside the matrix that one file names shows only what that file shows |  |
+| **SQL Server** | `mcr.microsoft.com/mssql/server:2022-latest`; `@formancy/data-fixtures` and `@formancy/data-sqlserver` also on `mcr.microsoft.com/mssql/server:2019-latest` and `mcr.microsoft.com/mssql/server:2025-latest`; an image outside the matrix that one file names shows only what that file shows |  |
 | `postgres`, by `@formancy/data-postgres` | 3.4.9 | `^3.4.9` |
 | `@fastify/rate-limit`, by `@formancy/data-server` | 11.2.0 | `^11.2.0` |
 | `fastify`, by `@formancy/data-server` | 5.12.5 | `^5.12.5` |
@@ -826,7 +848,7 @@ for the tests, whose version each run's report names for every job.
 corepack enable pnpm
 pnpm install
 pnpm build
-pnpm test        # starts the databases *What it is tested on* names, through testcontainers
+pnpm test        # starts each engine's default image, through testcontainers
 ```
 
 There is no mocked driver and no `--skip-db` flag. Database behaviour is proved
@@ -848,7 +870,9 @@ The gates are [`.github/workflows/gates.yml`](./.github/workflows/gates.yml),
 which CI runs on every pull request and a release runs before it publishes:
 `pnpm build`, `pnpm typecheck`, `pnpm check:pkg`,
 `node scripts/verify-licenses.mjs` and `pnpm test:repo` in one job; each
-package's `test:coverage` in a job of its own; in jobs of their own
+package's `test:coverage` in a job of its own, and data-fixtures' and each
+engine's adapter's again in the `test-images` job, once on every other image
+of the engine's matrix; in jobs of their own
 `pnpm test:e2e:install`, `pnpm test:browser` once per browser,
 `pnpm test:pictures`, the server image, and
 `pnpm test:getting-started`, which runs the guide from a clean checkout with
@@ -860,6 +884,31 @@ releases; it needs `pnpm build` first. The last job builds [the release report](
 from what every other job found, and fails the run on anything wrong in it
 ([0035](./docs/decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)).
 [`CLAUDE.md`](./CLAUDE.md) says what each is for and what the bar is.
+
+`pnpm test` runs every suite on each engine's default image, but for a file
+that names an image of its own. `FORMANCY_IMAGES` names other images of the
+matrix for the adapter suites and data-fixtures', at most one per engine,
+as `MATRIX_IMAGES` in
+[`packages/data-fixtures`](./packages/data-fixtures/README.md#which-images)
+lists them, and an engine it does not name keeps its default; an image
+outside the matrix, two for one engine, or the variable set to nothing is
+refused. Every other suite names the default at each start, so the
+variable leaves it where it is:
+
+```bash
+FORMANCY_IMAGES=postgres:16-alpine,mcr.microsoft.com/mssql/server:2019-latest pnpm exec turbo run test --filter=@formancy/data-fixtures
+```
+
+CI runs data-fixtures and each engine's adapter suite in a leg of the
+`test-images` job per image of the matrix but the default, and the report
+fails a run in which an image of the matrix answered no test in a leg of
+its own, or a shared case is missing or failed on one of them. Where the versions differ --
+`transaction_timeout`, which PostgreSQL has from 17, what 17's planner drops
+from a lookup's plan, a membership granted `WITH INHERIT`, which PostgreSQL
+has from 16, SQL Server 2022's `VIEW SECURITY DEFINITION` -- the
+difference is a named fact in data-fixtures' `VERSION_FACTS`, asserted on each
+version as it answers, and no test is skipped on one
+([0067](./docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)).
 
 `pnpm test:browser` runs each app's browser gate once for each browser
 `FORMANCY_BROWSERS` names, as a comma list or `all`, and each run leaves

@@ -1,6 +1,6 @@
 # 0028 — Row filters, labels and refusals mean the same on both engines
 
-- **Status:** accepted
+- **Status:** accepted; narrowed by [0067](0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md): its `transaction_timeout` case holds on PostgreSQL 17 and later, and on 15 and 16, which have no such setting and refuse the connection that sends it with 42704, the case asserts that refusal (`VERSION_FACTS.transactionTimeout`)
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

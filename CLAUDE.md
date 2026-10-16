@@ -388,6 +388,7 @@ again, so either run `pnpm build` or let turbo build the dependencies first:
 
 ```bash
 pnpm exec turbo run test --filter=@formancy/data-postgres                  # dependencies built, then that suite
+FORMANCY_IMAGES=postgres:16-alpine pnpm exec turbo run test --filter=@formancy/data-postgres # the same on another image of the matrix (0067)
 pnpm --filter @formancy/data-postgres test                                 # that suite, against dist/ as it stands
 pnpm --filter @formancy/data-core exec vitest run src/lookup/token.test.ts # one file
 pnpm --filter @formancy/data-core exec vitest run -t "a test's name"       # one case
