@@ -4,7 +4,8 @@
 // can be checked without one, on the real binary and the real server:
 //
 //  1. what Compose resolves both files to: 0032's checks of the composed
-//     stack, plus the overlay's own (scripts/cloudflare/gate.mjs) -- it
+//     stack, 0071's of whom its server trusts as a proxy -- cloudflared at
+//     the address it names -- plus the overlay's own (scripts/cloudflare/gate.mjs) -- it
 //     changes no service of compose.yaml, pins cloudflared by tag and
 //     digest, the one the tools copy their binary from, and gives it no
 //     token and the flags the guide names -- and no image's VOLUME left
@@ -50,6 +51,7 @@ import { DOORS, EXAMPLE, GUIDE } from './cloudflare/doors.mjs'
 import { cloudflareProblems, DOCKERFILE, FILES, guideCommandProblems, imageVolumeProblems, NGINX_CONF, staticLocations, TUNNEL_VOLUME, WEB_DOCKERFILE, webFrontImage, webPort } from './cloudflare/gate.mjs'
 import { STAND_IN, startWebFront } from './cloudflare/web-front.mjs'
 import { bindMountProblems, configProblems } from './getting-started/stack.mjs'
+import { trustProblems } from './getting-started/trust.mjs'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(repo, path), 'utf8')
@@ -187,7 +189,7 @@ async function main() {
     const config = JSON.parse(compose(env, ['config', '--format', 'json']).stdout)
     const base = JSON.parse(compose(env, ['config', '--format', 'json'], { base: true }).stdout)
     await timed('1. Resolved configuration', async () => {
-      fail('the overlay is not what 0037 says', [...configProblems(config), ...bindMountProblems(config), ...cloudflareProblems(config, base, read(DOCKERFILE))])
+      fail('the overlay is not what 0037 and 0071 say', [...configProblems(config), ...bindMountProblems(config), ...cloudflareProblems(config, base, read(DOCKERFILE)), ...trustProblems(config)])
     })
     await timed("2. The guide's commands", async () => fail(`${GUIDE}'s commands do not fit the overlay`, guideCommandProblems(read(GUIDE), config, GUIDE)))
 

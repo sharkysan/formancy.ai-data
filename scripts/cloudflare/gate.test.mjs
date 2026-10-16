@@ -113,12 +113,13 @@ describe('the overlay', () => {
   // databases; on `edge` alone it is the web front. So it joins `edge` and
   // nothing else, and nothing but the web front joins `edge` beside it.
   test('fails with cloudflared on compose’s network, or another service beside it', () => {
-    expect(problems(edited('    networks: [edge]\n', '')).join('\n')).toMatch(/cloudflared is on default, not on edge alone/)
-    expect(problems(edited('    networks: [edge]\n', '    networks: [default, edge]\n')).join('\n')).toMatch(/cloudflared is on default, edge, not on edge alone/)
-    const serverOnEdge = BASE.replace('    image: formancy/data-server:compose\n    environment:', '    image: formancy/data-server:compose\n    networks: [default, edge]\n    environment:')
+    const onEdge = '    networks:\n      edge:\n        ipv4_address: 172.16.239.250\n'
+    expect(problems(edited(onEdge, '')).join('\n')).toMatch(/cloudflared is on default, not on edge alone/)
+    expect(problems(edited(onEdge, '    networks: [default, edge]\n')).join('\n')).toMatch(/cloudflared is on default, edge, not on edge alone/)
+    const serverOnEdge = BASE.replace('    networks: [default, proxy]\n', '    networks: [default, proxy, edge]\n')
     expect(serverOnEdge).not.toBe(BASE)
     expect(cloudflareProblems(resolved(OVERLAY, serverOnEdge), resolved(undefined, serverOnEdge), DOCKERFILE).join('\n')).toMatch(/server joins edge, beside cloudflared/)
-    const webOffEdge = BASE.replace('    networks: [default, edge]\n', '')
+    const webOffEdge = BASE.replace('        ipv4_address: 172.16.238.250\n      edge:\n', '        ipv4_address: 172.16.238.250\n')
     expect(webOffEdge).not.toBe(BASE)
     expect(cloudflareProblems(resolved(OVERLAY, webOffEdge), resolved(undefined, webOffEdge), DOCKERFILE).join('\n')).toMatch(/web is not on edge, so cloudflared cannot reach it/)
   })

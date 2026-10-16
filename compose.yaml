@@ -20,7 +20,9 @@
 #
 # scripts/getting-started.mjs runs that guide against this file, in CI on
 # every pull request, and fails if anything here is published off loopback,
-# publishes the server, holds a secret as a value or restarts on its own.
+# publishes the server, holds a secret as a value, restarts on its own, or
+# has the server trust as a proxy anything but the web front's and
+# cloudflared's fixed addresses.
 # Both uses need the Compose release the guide's section 0 names, or a later
 # one: an older one can refuse the file outright, as 2.19.1 does the web
 # front's `start_interval` (measured 2026-10-09 in a Docker Sandbox VM on
@@ -168,6 +170,17 @@ services:
   # so the studio, the host page and /v1 share one origin. A local process on
   # a Linux host can still reach it at its container address, which the
   # guide's section 8 says.
+  #
+  # On compose's network, for the databases, and on `proxy`, where the web
+  # front reaches it from the one address the server trusts as a proxy
+  # (0071): each request is counted and logged by the address nginx saw, not
+  # by nginx's. The second address is cloudflared's on `edge`, which the
+  # Cloudflare overlay gives it and nothing in this file holds, so behind the
+  # tunnel the address is the visitor's as Cloudflare reported it. Neither
+  # range, only the two addresses: each network's gateway is how a local
+  # process reaches a container, and trusting it would let that process
+  # choose its own address. scripts/getting-started/trust.mjs holds these
+  # to the addresses below, and the gate to the server's log.
   server:
     profiles: [stack]
     build:
@@ -180,6 +193,8 @@ services:
       FORMANCY_DATA_CONNECTIONS: /etc/formancy-data/connections.json
       FORMANCY_DATA_ADMIN_ROLES: data-admin
       FORMANCY_DATA_AUDIT_KEY: file:/run/formancy-secrets/audit-key
+      FORMANCY_DATA_TRUSTED_PROXIES: 172.16.238.250,172.16.239.250
+    networks: [default, proxy]
     volumes:
       - formancy-data-store:/var/lib/formancy-data
       - ./deploy/connections.json:/etc/formancy-data/connections.json:ro
@@ -199,11 +214,16 @@ services:
     image: formancy/data-web:compose
     ports:
       - "127.0.0.1:${FORMANCY_DATA_WEB_PORT:-4394}:8080"
-    # compose's network, to reach the server, and `edge`, which nothing else
-    # of this file joins: the Cloudflare overlay's cloudflared joins it alone
-    # (0037), so a tunnel whose ingress is changed reaches the web front and
-    # not the server or the databases.
-    networks: [default, edge]
+    # `proxy`, to reach the server, at the address the server trusts (0071),
+    # and `edge`, which nothing else of this file joins: the Cloudflare
+    # overlay's cloudflared joins it alone (0037), so a tunnel whose ingress
+    # is changed reaches the web front and not the server or the databases.
+    # Not compose's network: on two networks with the server, which address
+    # `server` resolves to would be Docker's choice.
+    networks:
+      proxy:
+        ipv4_address: 172.16.238.250
+      edge:
     depends_on:
       server:
         # The server image's own HEALTHCHECK. Restarted when the server is
@@ -251,7 +271,28 @@ volumes:
   formancy-data-secrets-token:
   formancy-data-store:
 
+# Both with a range fixed here, so that the server can name the web front's
+# address and cloudflared's (0071), and each address outside the part Docker
+# hands out (ip_range), so that no other container is given it. Docker's own
+# default pools are 172.17.0.0/16 to 172.31.0.0/16 and 192.168.0.0/16
+# (moby's ipamutils, read 2026-10-16), so unless its daemon is given other
+# pools it never makes a network of its own in 172.16.0.0/16. Docker refuses
+# a network whose range another one already holds -- "Pool overlaps with
+# other one on this address space", measured 2026-10-16 on Engine 28.3.3 --
+# so two stacks from this file do not run at once on one machine, and a
+# range of your own there is a collision the guide's section 0 says what to
+# do about.
 networks:
   # The web front's alone in this file; see `web`. Docker makes it, empty of
   # anything but the web front, whenever the stack starts.
   edge:
+    ipam:
+      config:
+        - subnet: 172.16.239.0/24
+          ip_range: 172.16.239.0/25
+  # The web front and the server, alone; see `server`.
+  proxy:
+    ipam:
+      config:
+        - subnet: 172.16.238.0/24
+          ip_range: 172.16.238.0/25

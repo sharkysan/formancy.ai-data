@@ -8,8 +8,10 @@
 //
 //  1. compose's resolved configuration, before anything starts: loopback
 //     only, no server port, no secret held as a value, nothing that restarts
-//     on its own, and every file of the checkout a service that is not root
-//     reads readable by it;
+//     on its own, every file of the checkout a service that is not root
+//     reads readable by it, and the server trusting the web front's fixed
+//     address as a proxy and no address Docker could give another container
+//     (trust.mjs, 0071);
 //  2. the commands, each through the platform's shell -- sh on CI, where it
 //     runs. steps.mjs refuses any character sh, PowerShell and cmd read
 //     differently, which is what makes a command that passes under sh mean
@@ -39,7 +41,8 @@
 //     stack, and on Linux the server answering at its container address, as
 //     section 8 says;
 //  8. that no secret and no token reached a log, the configuration or a
-//     container's inspect;
+//     container's inspect, and that the server's log names no request by
+//     the web front's own address: it believed nginx (0071);
 //  9. the guide's `down`, then its start again, every container recreated:
 //     every token still accepted, which is the secrets kept; both forms and
 //     both orders still there, which is the store and the databases kept; and
@@ -86,6 +89,7 @@ import {
   servicesWithContainers,
 } from './getting-started/stack.mjs'
 import { extractSteps, GUIDE, inlineCommands, plan, readJourney } from './getting-started/steps.mjs'
+import { believedProblems, trustProblems } from './getting-started/trust.mjs'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -255,7 +259,7 @@ async function main() {
     on = machine()
     config = JSON.parse(compose(env, ['config', '--format', 'json']).stdout)
     await timed('Gate: compose configuration', async () => {
-      fail('the composed configuration is not what 0032 and the guide say', [...configProblems(config), ...bindMountProblems(config)])
+      fail('the composed configuration is not what 0032, 0071 and the guide say', [...configProblems(config), ...bindMountProblems(config), ...trustProblems(config)])
     })
 
     for (const entry of before) await step(entry, entry === start ? 'Start' : 'Step')
@@ -326,6 +330,9 @@ async function main() {
     await leakCheck('Gate: leak check')
     await timed('Gate: the audit trail in the server log', async () => {
       fail("the server's log holds no audit event for the journey's create, which the guide's section 8 says is where the trail is", journey.forms.filter((form) => createdIn(form) === 0).map((form) => form.formId))
+    })
+    await timed('Gate: the server believes the web front', async () => {
+      fail("the server did not believe the web front's X-Forwarded-For, so every client shares one bucket, which compose.yaml's FORMANCY_DATA_TRUSTED_PROXIES is there to prevent (0071)", believedProblems(compose(env, ['logs', '--no-color', '--no-log-prefix', 'server']).stdout, config))
     })
 
     for (const entry of keep) {

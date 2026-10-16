@@ -214,10 +214,11 @@ export function doorsBlock(doors) {
   ].join('\n')
 }
 
-/** The guide's `rate-limit` block: the edge rule's settings, and how its threshold relates to the server's one bucket. */
+/** The guide's `rate-limit` block: the edge rule's settings, and how its threshold relates to the server's bucket for each address (0071). */
 export function rateLimitBlock(doors) {
   const limit = doors.serverLimitPerMinute
   const perPeriod = limit / 6
+  const per = Number.isInteger(perPeriod) ? String(perPeriod) : perPeriod.toFixed(1)
   return [
     '| Setting | Value |',
     '| --- | --- |',
@@ -230,7 +231,7 @@ export function rateLimitBlock(doors) {
     '| Response body | the JSON below, on Pro and above |',
     '| For duration | 10 seconds |',
     '',
-    `The data server refuses everybody, with 429, once all requests together pass its one bucket: ${String(limit)} a minute unless \`FORMANCY_DATA_RATE_LIMIT\` says otherwise, which is ${Number.isInteger(perPeriod) ? String(perPeriod) : perPeriod.toFixed(1)} per 10 seconds. The edge counts each address on its own, per Cloudflare location, so a threshold above ${Number.isInteger(perPeriod) ? String(perPeriod) : perPeriod.toFixed(1)} lets one address spend the whole bucket, and everybody else is then refused by the server. Below it, many addresses together still can.`,
+    `The data server counts each visitor's address on its own, as Cloudflare's edge reported it, and refuses that address, with 429, once it passes ${String(limit)} a minute unless \`FORMANCY_DATA_RATE_LIMIT\` says otherwise, which is ${per} per 10 seconds. The edge counts each address too, per Cloudflare location, so with a threshold at or below ${per} it blocks an address sending steadily before the server would refuse it, and those requests never reach your machine; above ${per}, the server's own 429 comes first.`,
   ].join('\n')
 }
 
