@@ -40,9 +40,11 @@
       `text/plain; charset=utf-8` -- and is within Cloudflare's limits.
     - `scripts/demo-serve.mjs`, through which the browser gate serves the
       page, answers 404 at `/`, at `/index.html` and at `/data/`, sends
-      `/data/examples` on to `/data/examples/`, and sends each file under
-      it with the headers the deploy writes, over the type Cloudflare
-      gives it: a `.txt` the rules do not name is bare `text/plain`.
+      `/data/examples` on to `/data/examples/`, both with none of the
+      deploy's headers, and sends each file under it with the headers the
+      deploy writes, over the type Cloudflare gives it -- a `.txt` the
+      rules do not name is bare `text/plain` -- and a file under it that
+      is not there as a 404 with them, as the address answered when read.
     - The Workers Builds settings `.github/REPO-METADATA.md` records are the
       demo's Worker and this repository, as data-core's manifest names it,
       and so is every Worker and repository its steps for creating the
@@ -68,7 +70,14 @@
     'src="/assets/x.js"' ]", "expected [] to deeply equal [
     'fixture-snapshot.json', …(1) ]", "expected
     'text/plain; charset=utf-8' to be 'text/plain'" and "expected
-    undefined to be 'text/plain; charset=utf-8'".
+    undefined to be 'text/plain; charset=utf-8'". The server's 404 under
+    the path and its redirect, held once the address had been read,
+    failed against the server that sent that 404 bare: "the 404 under the
+    path: Content-Security-Policy: expected null to be 'default-src
+    'none'; script-src 'se…'"; and with the headers put on the redirect,
+    then on the 404 outside the path: "the redirect's
+    Content-Security-Policy: expected 'default-src 'none'; script-src
+    'se…' to be null", and the same of "the 404 outside the path".
   - **`scripts/third-party-notices.test.mjs`, in `pnpm test:repo`.** The
     examples build runs the notices plugin, and names it among its turbo
     build inputs, so an edit to the plugin alone builds the page again.
@@ -120,7 +129,9 @@
     refused the build: "assets/ holds files the page never loads, an
     earlier build's, which the deploy would serve too" (the case in
     `scripts/demo.test.mjs` watched failing first against a check that
-    found nothing).
+    found nothing). Once the demo was live, the same day, what the address
+    sends was read with curl and in Chromium, as *What it costs* says;
+    nothing reads it again.
   - **Review alone** holds what is in Cloudflare's dashboard and GitHub's
     settings: that the Worker is connected with the settings
     REPO-METADATA.md records, that no other branch is built and no
@@ -252,16 +263,21 @@ writes them as the `_headers` file at the staging directory's root, from
 - **`Content-Type: text/plain; charset=utf-8`** for
   `THIRD-PARTY-NOTICES.txt`, as 0046 serves it from the web image.
   Cloudflare documents that a header the file names overrides what it
-  sends by default.
+  sends by default, and the address sent the notices so when read.
 
 What Cloudflare sends with its redirect of the path without its slash,
-and with a 404, its documentation does not say, and nothing here claims.
+and with a 404, its documentation does not say. Read at the address on
+2026-10-16, the redirect carried none of these headers, and a 404 for a
+file under the path the policy, `nosniff`, `no-referrer` and the
+Permissions-Policy.
 
 **The browser gate serves it where the demo is,** through
 `scripts/demo-serve.mjs`: under the path read from the Worker's config,
 each file with the headers read back from that file's text over the type
-Cloudflare gives it. It fails on anything the policy refuses, and on
-notices not sent as UTF-8 text. Its axe audits run without axe's preload.
+Cloudflare gives it, a file that is not there a 404 with them, and the
+path without its slash a redirect with none. It fails on anything the
+policy refuses, and on notices not sent as UTF-8 text. Its axe audits run
+without axe's preload.
 
 **The page says what it is.** Its header says that no server and no
 database are behind it, and links the repository.
@@ -326,19 +342,51 @@ formancy.ai-report 0018 records.
   must be given access to it. That installation is a setting of the
   rightsholder's GitHub account; REPO-METADATA.md records the step, and
   nothing here reads it.
-- **Nothing measured of Cloudflare's serving.** No answer from the address
-  was read when this was decided, and nothing here reads one. That the
-  routes take precedence over formancy.ai's Worker, that `/data/examples`
-  is sent on to `/data/examples/`, how `_headers` is matched, and that its
-  `Content-Type` overrides the one Cloudflare picks are from Cloudflare's
-  documentation, which the gate's parser and server follow; only the
-  report's notices were read, as bare `text/plain`. Whether the redirect
-  and a 404 carry the headers is not documented and was not read. After
-  the first deploy, `curl -sI
-  https://formancy.ai/data/examples/THIRD-PARTY-NOTICES.txt` shows whether
-  the notices' type is honoured; nothing here runs it. A setting of the
-  zone could add or change a header. A failed build leaves the last
-  deployment serving, and its log is in Cloudflare's dashboard.
+- **Cloudflare's serving read once, by hand.** When this was decided, no
+  answer from the address had been read: that the routes take precedence
+  over formancy.ai's Worker, that `/data/examples` is sent on to
+  `/data/examples/`, how `_headers` is matched, and that its
+  `Content-Type` overrides the one Cloudflare picks were from Cloudflare's
+  documentation, which the gate's parser and server follow, and only the
+  report's notices had been read, as bare `text/plain`. Once the demo was
+  live, on 2026-10-16, the address was read with curl and in Chromium:
+  - `/data/examples/` answered 200 `text/html`, with the policy, the
+    Permissions-Policy, `no-referrer` and `nosniff`;
+  - `THIRD-PARTY-NOTICES.txt` answered 200 `text/plain; charset=utf-8`,
+    with those headers and Cloudflare's `public, max-age=0,
+    must-revalidate`;
+  - a hashed chunk under `assets/` was sent as `text/javascript`, with
+    `public, max-age=31536000, immutable`;
+  - a file under the path that is not there, `nope.js`, answered 404 with
+    the policy, the Permissions-Policy, `no-referrer` and `nosniff`;
+  - `/data/examples` answered 307 to `/data/examples/`, with none of the
+    headers;
+  - `/data` answered formancy.ai's own 404;
+  - in Chromium the page drew `sales.order` in both previews, React's and
+    Angular's.
+
+  The gate's server answers the redirect and a 404 as they were read; a
+  missing file under `assets/`, which the rules give a year's cache too,
+  was not. Nothing here reads the address again: a later deploy, a change
+  of Cloudflare's or a setting of the zone could add or change a header
+  and nothing would fail. After a deploy, `curl -sI
+  https://formancy.ai/data/examples/THIRD-PARTY-NOTICES.txt` shows the
+  notices' type again; nothing here runs it. A failed build leaves the
+  last deployment serving, and its log is in Cloudflare's dashboard.
+- **Cloudflare's own script is refused.** Cloudflare's bot detection,
+  JavaScript Detections, puts an inline `<script>` into the page as it
+  serves it, just before `</body>`, which loads
+  `/cdn-cgi/challenge-platform/scripts/jsd/main.js`; the built
+  `index.html` has none. The policy refuses it as it refuses any inline
+  script, and Chromium's console says so once on every load: "Executing
+  inline script violates the following Content Security Policy directive
+  'script-src 'self''". Nothing on the page depends on it, and Cloudflare
+  gets no bot signal from this path. The notices, sent as text, get no
+  script. formancy.ai's site and the report's Studio send no policy, so it
+  runs there. The gate cannot see it, because its server is not
+  Cloudflare: the gate's "no console error" holds the build, and at the
+  address that one error is expected on every load. Read on 2026-10-16,
+  in Chromium; nothing reads it again.
 - **`'self'` is all of formancy.ai.** The policy allows scripts, styles
   and fetches from any path of the origin -- formancy.ai's site, the
   report's Studio at `/report/`, and whatever is routed there later -- so
@@ -436,6 +484,18 @@ the config already says.
 **The headers from Worker code.** Rejected. It would be code at the edge,
 which 0037 keeps out, and Cloudflare applies `_headers` only to what the
 assets answer.
+
+**Turn JavaScript Detections off.** Not chosen. It is a setting of
+formancy.ai's whole zone, so it would change what formancy.ai's site and
+the report's Studio are served with too, to quiet one console line on a
+page that needs nothing from the script.
+
+**Let Cloudflare's script run.** Rejected. The script differs on every
+response -- it carries a token of the request -- so no hash in the policy
+could match it, and only `'unsafe-inline'` would allow it, which lets any
+script injected into the page run too. A nonce would have to be new on
+every response and written into both the header and the script, which
+takes code on each request, and the Worker has none (0037).
 
 **The policy in a `<meta>` element.** Rejected. A meta policy cannot carry
 `frame-ancestors`, and it would also bind `pnpm dev`, where the React

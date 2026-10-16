@@ -25,7 +25,10 @@
 //     the web fonts, and an inline script put in the page was refused and
 //     heard -- so a pass under a policy nobody enforced fails; and its
 //     THIRD-PARTY-NOTICES.txt was sent as UTF-8 text, over the bare
-//     text/plain Cloudflare gives a .txt.
+//     text/plain Cloudflare gives a .txt. At the address itself the
+//     console says one thing more on every load, which this gate cannot
+//     see: the policy refusing the inline script Cloudflare's bot detection
+//     puts into the page as it serves it, read on 2026-10-16 (0069).
 //
 // Against the page `vite build` produces, served over HTTP as formancy.ai
 // serves it -- not the dev server, which is a different program with its

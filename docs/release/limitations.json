@@ -2150,7 +2150,7 @@
       ]
     },
     "0069": {
-      "reviewed": "sha256:57d5bed32723811be44f551714783e3d7cfbcd77c8abf3ec5471deb5a5ed9875",
+      "reviewed": "sha256:f867a9d9854a8c8675a2059c28c78cada2f08dfe10bddaecb5e2c8b41aecb284",
       "limitations": [
         {
           "area": "operations",
@@ -2158,11 +2158,15 @@
         },
         {
           "area": "operations",
-          "says": "Nothing in this repository reads what formancy.ai/data/examples/ serves: a failed deploy leaves the last one serving with its log in Cloudflare's dashboard, and the headers -- the notices' UTF-8 type among them -- are applied as Cloudflare documents its _headers file, which was not measured against Cloudflare, nor whether a redirect or a 404 carries them."
+          "says": "What formancy.ai/data/examples/ serves was read by hand once, on 2026-10-16 -- the notices as UTF-8 text, a 404 under the path with the demo's headers, the redirect of the path without its slash with none -- and nothing in this repository reads it since: a header a later deploy, Cloudflare or a setting of the zone changes fails nothing, and a failed deploy leaves the last one serving with its log in Cloudflare's dashboard."
         },
         {
           "area": "operations",
           "says": "The demo's Content-Security-Policy allows scripts, styles and fetches from all of formancy.ai's origin, the report's Studio and whatever is routed there later included, not only the demo's path, because a policy held to the path could not be measured in a gate that serves the page from 127.0.0.1."
+        },
+        {
+          "area": "operations",
+          "says": "Cloudflare's bot detection puts an inline script into the demo's page as it is served, and the page's Content-Security-Policy refuses it, as read on 2026-10-16: the browser's console shows that refusal on every load, Cloudflare gets no bot signal from the demo, and the browser gate, which serves the page itself, never sees it; letting it run would take 'unsafe-inline' or a nonce made per request by code the Worker does not have, and turning detection off would change formancy.ai's whole zone."
         },
         {
           "area": "operations",

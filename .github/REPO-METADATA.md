@@ -105,9 +105,9 @@ Or with Wrangler first, then connected:
 Either way, open the address afterwards and press Validate in a preview:
 both renderers refuse the empty required fields. And
 `curl -sI https://formancy.ai/data/examples/THIRD-PARTY-NOTICES.txt`
-should say `Content-Type: text/plain; charset=utf-8`: the first reading of
-whether Cloudflare honours the `_headers` file's type (0069), which
-nothing here makes.
+should say `Content-Type: text/plain; charset=utf-8`, which shows that
+Cloudflare honours the `_headers` file's type (0069). It did when the
+demo was live and read by hand on 2026-10-16; nothing here reads it.
 
 ## Secrets the workflows expect
 

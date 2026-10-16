@@ -19,9 +19,15 @@
 //
 // Measured on 2026-10-16, with no `_headers` in play: Workers static assets
 // sent formancy.ai/report/THIRD-PARTY-NOTICES.txt as `Content-Type:
-// text/plain`, with no charset. Nothing else of this was measured against
-// Cloudflare: the gate holds the page to these headers as this module reads
-// the file, and nothing here reads what formancy.ai answers.
+// text/plain`, with no charset. And read by hand at formancy.ai/data/examples/
+// once the demo was live, the same day, with curl: the page came with the
+// policy and its companions, the notices `text/plain; charset=utf-8` with
+// them and Cloudflare's revalidating cache, a hashed chunk with the year's
+// cache, a missing file's 404 with the policy and its companions, and the
+// redirect of the path without its slash with none of them;
+// scripts/demo-serve.mjs answers the redirect and a 404 as they were read.
+// Nothing here reads what formancy.ai answers again: the gate holds the page
+// to these headers as this module reads the file.
 
 import { NOTICES_FILE } from './third-party-notices.mjs'
 

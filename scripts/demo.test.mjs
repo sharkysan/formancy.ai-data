@@ -257,8 +257,12 @@ describe('the demo on formancy.ai (0069)', () => {
   // pass a page whose notices a browser reads in the wrong encoding.
   // Measured on 2026-10-16: formancy.ai/report/THIRD-PARTY-NOTICES.txt,
   // which Workers static assets serve with no `_headers`, answered
-  // `Content-Type: text/plain`, with no charset.
-  test("the page is served as formancy.ai serves it: under the demo's path alone, each file with the deploy's headers over Cloudflare's type", async () => {
+  // `Content-Type: text/plain`, with no charset. And at the demo's address,
+  // once deployed, the same day: a missing file under the path answered 404
+  // with the policy and its companions, and the path without its slash 307
+  // with none of them. A server that answered those two otherwise would have
+  // the gate, and this file, describe a demo nobody is sent.
+  test("the page is served as formancy.ai serves it: under the demo's path alone, each file with the deploy's headers over Cloudflare's type, a missing one's 404 with them too, and the redirect with none", async () => {
     const directory = mkdtempSync(join(tmpdir(), 'demo-serve-'))
     mkdirSync(join(directory, 'assets'))
     writeFileSync(join(directory, 'index.html'), '<!doctype html><title>page</title>')
@@ -275,6 +279,14 @@ describe('the demo on formancy.ai (0069)', () => {
       expect((await get('/data/')).status).toBe(404)
       const bare = await get('/data/examples')
       expect([bare.status, bare.headers.get('location')]).toEqual([307, '/data/examples/'])
+      const outside = await get('/data/')
+      for (const name of Object.keys(headersFor(rules, '/data/examples/'))) {
+        expect(bare.headers.get(name), `the redirect's ${name}`).toBeNull()
+        expect(outside.headers.get(name), `the 404 outside the path: ${name}`).toBeNull()
+      }
+      const missing = await get('/data/examples/nope.js')
+      expect(missing.status).toBe(404)
+      for (const [name, value] of Object.entries(headersFor(rules, '/data/examples/nope.js'))) expect(missing.headers.get(name), `the 404 under the path: ${name}`).toBe(value)
       for (const path of ['/data/examples/', '/data/examples/assets/index-BxKwE78K.js', `/data/examples/${NOTICES_FILE}`]) {
         const answer = await get(path)
         expect(answer.status, path).toBe(200)
