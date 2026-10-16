@@ -73,7 +73,7 @@ export { lookupKeys, lookupPage, rejectedTokens, resolvedRows } from './lookup/r
 export type { FoundRow } from './lookup/rows.js'
 export { rowFilterColumnProblem, rowFilterTerms, scopeRowFilters } from './lookup/filters.js'
 export type { FilterScoping } from './lookup/filters.js'
-export { displayText } from './lookup/display.js'
+export { displayText, isDisplayType } from './lookup/display.js'
 export { DEFAULT_LOOKUP_DEADLINE_MS } from './lookup/default-deadline.js'
 export { MAX_LOOKUP_DEADLINE_MS } from './lookup/limits.js'
 export type {

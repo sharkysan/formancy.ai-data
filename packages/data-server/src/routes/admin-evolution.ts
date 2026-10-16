@@ -99,9 +99,11 @@ type Regenerated = { ok: true; generated: GeneratedForm; generation: GenerationR
  * First without lookups: a failure there is not a lookup's — the root, a
  * pinned or version column — and nothing can be generated. Then each lookup
  * alone, put through `buildLookupConfig` exactly as the runtime builds it
- * (0028), which refuses more than the generator does: a display column with
- * no text form, a float key. A lookup either refuses is left out with the
- * sentence that refused it, which names only approved metadata.
+ * (0028), which refuses more than the generator does: a key no token can
+ * hold exactly, a float one for one. (A display column with no text form,
+ * which it refuses too, the generator has refused since 0066.) A lookup
+ * either refuses is left out with the sentence that refused it, which names
+ * only approved metadata.
  */
 function regenerate(bundle: BundleV2, current: MetadataSnapshot): Regenerated {
   const attempt = (lookups: LookupChoice[]) => generateForm(current, { ...bundle.generation, lookups })

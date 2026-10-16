@@ -96,7 +96,7 @@
       ]
     },
     "0009": {
-      "reviewed": "sha256:39dbd372b2d654f57a6223b0cf92d74fb3de8cbd80376f4146a6756122fdb408",
+      "reviewed": "sha256:db9ffe17065d989267aebdb2b3bd0b220a2ea5e1c5f57e5d4d2514578d8d4bd4",
       "limitations": [
         {
           "area": "forms",
@@ -599,7 +599,7 @@
       ]
     },
     "0029": {
-      "reviewed": "sha256:73d3a35205306c072b28e924d7b88184e6a8065e79eb011104a406c870b36cf5",
+      "reviewed": "sha256:9efe033f428279545443558c18cc617affd23c988e0c792da00f942e46b9dd81",
       "limitations": [
         {
           "area": "host",
@@ -619,10 +619,6 @@
         },
         {
           "area": "host",
-          "says": "The generator emits a plain select for a lookup, and a typeahead is each host's own choice."
-        },
-        {
-          "area": "host",
           "says": "On the host page, \"Load the saved record\" discards the draft, and nothing merges."
         },
         {
@@ -632,7 +628,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:021dc69f1617207fb95ed12d3238f6522d52e57ca4cb18b3a0b5c6321d31cad6",
+      "reviewed": "sha256:4989828770c624318ebbd22291964bd6373241899c0901384040318ddeba6159",
       "limitations": [
         {
           "area": "studio",
@@ -1151,7 +1147,7 @@
         },
         {
           "area": "testing",
-          "says": "That a host whose reader is at `@formancy/*` 0.3.0 reads every generated form was measured once, on 2026-10-10, and nothing here runs a 0.3.0 renderer."
+          "says": "That a host whose reader is at `@formancy/*` 0.3.0 reads the generated forms was measured by hand, in scratch checks over the forms each generated from the committed snapshots, on 2026-10-10 and again on 2026-10-16 once generated lookups carried a typeahead (0066); other forms were not generated, and nothing here runs a 0.3.0 renderer."
         }
       ]
     },
@@ -2107,6 +2103,49 @@
           "area": "studio",
           "says": "The studio's Review step shows a draft's form on paper, its submitter, base, confirmed keys and policy, and not what it changes from the version it replaces.",
           "heldBy": "apps/studio/src/review.test.tsx"
+        }
+      ]
+    },
+    "0066": {
+      "reviewed": "sha256:460de376ea6e489449b80944fd1792d25a3d0b66ac1db15991222d8e7a46a351",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "Every lookup that can be searched is a typeahead, a short list included; an administrator cannot choose a plain list for one.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A lookup that shows no text or whole-number column is a plain select of its first page, and a row past it cannot be chosen.",
+          "heldBy": "apps/host/src/lookup-controls.test.tsx"
+        },
+        {
+          "area": "forms",
+          "says": "A lookup cannot show a binary, rowversion or unsupported column, which no label can spell: the generator refuses it, and the studio offers such a column disabled.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "When a plain select's one search fails, the database out of reach for one, it says the renderer's \"Type to try again.\" under a control nobody can type into, and asks again when the form is drawn again.",
+          "heldBy": "apps/host/src/lookup-controls.test.tsx"
+        },
+        {
+          "area": "operations",
+          "says": "A form published at 0.1.0 names no typeahead, so every host, the reference host page now included, draws its lookups as plain selects of their first page until it is regenerated and published again; restoring such a version brings them back.",
+          "heldBy": "apps/host/src/lookup-controls.test.tsx"
+        },
+        {
+          "area": "operations",
+          "says": "A version file exported from 0.1.0 is refused by this release's import, so the source deployment upgrades and regenerates first, or the form is proposed again in the target.",
+          "heldBy": "packages/data-server/src/routes/admin-promotion.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A version published before this release whose lookup shows a binary, rowversion or unsupported column is still served, and its list still cannot be built; regenerating it leaves that lookup out, and this release's import refuses its version file."
+        },
+        {
+          "area": "studio",
+          "says": "The regeneration report does not say that a republish changes a lookup's control."
         }
       ]
     }

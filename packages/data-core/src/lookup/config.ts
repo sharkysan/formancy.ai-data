@@ -1,8 +1,10 @@
 import type { FieldBinding, FormBindings } from '../generate/types.js'
 import { bindingsVersionProblem } from '../generate/version.js'
-import type { ColumnMeta, MetadataSnapshot, NormalizedTypeKind, ObjectMeta, ObjectRef } from '../metadata.js'
+import type { ColumnMeta, MetadataSnapshot, ObjectMeta, ObjectRef } from '../metadata.js'
 import { findObject } from '../snapshot.js'
-import type { LookupConfig, LookupDisplayColumn, LookupDisplayType, LookupKeyColumn, LookupSearchColumn, LookupSearchType, LookupSort } from './types.js'
+import { isDisplayType, NO_TEXT_KINDS } from './display.js'
+import { SEARCHABLE_KINDS, searchableDisplay } from './searchable.js'
+import type { LookupConfig, LookupDisplayColumn, LookupKeyColumn, LookupSearchColumn, LookupSearchType, LookupSort } from './types.js'
 import { isLookupKeyType } from './values.js'
 
 /**
@@ -14,11 +16,6 @@ import { isLookupKeyType } from './values.js'
  * until a measurement says it is cheap.
  */
 export const DEFAULT_MAX_PAGE_SIZE = 50
-
-/** No canonical text: nothing a token, a label or a portable order can rely on. */
-const NO_TEXT: ReadonlySet<NormalizedTypeKind> = new Set(['binary', 'rowversion', 'unsupported'])
-/** Kinds both engines spell alike as text, so a search over them matches what the label shows. */
-const SEARCHABLE: ReadonlySet<NormalizedTypeKind> = new Set(['text', 'integer'])
 
 /** One column of an order an administrator chose. */
 export interface LookupSortChoice {
@@ -122,7 +119,7 @@ function checkKey(target: ObjectMeta, where: string, columns: readonly string[])
     if (type.kind === 'float') {
       throw new Error(`${where}: key column ${name} is ${column.databaseType}; a floating-point value cannot be referenced exactly`)
     }
-    if (NO_TEXT.has(type.kind)) throw new Error(`${where}: key column ${name} is ${column.databaseType}, which has no text form for a token`)
+    if (NO_TEXT_KINDS.has(type.kind)) throw new Error(`${where}: key column ${name} is ${column.databaseType}, which has no text form for a token`)
     if (!isLookupKeyType(type)) throw new Error(`${where}: key column ${name} is ${column.databaseType}; a lookup has no settled spelling for its values`)
     return { name, type }
   })
@@ -133,8 +130,9 @@ function checkDisplay(target: ObjectMeta, where: string, display: readonly strin
   if (display.length === 0) throw new Error(`${where} needs at least one display column`)
   return display.map((name) => {
     const column = readableOf(target, where, name, 'display column ')
-    if (NO_TEXT.has(column.type.kind)) throw new Error(`${where}: display column ${name} is ${column.databaseType}, which has no text form for a label`)
-    return { name, type: column.type as LookupDisplayType }
+    // The generator refuses it in the same words, before anything is published (0066).
+    if (!isDisplayType(column.type)) throw new Error(`${where}: display column ${name} is ${column.databaseType}, which has no text form for a label`)
+    return { name, type: column.type }
   })
 }
 
@@ -147,11 +145,9 @@ function checkDisplay(target: ObjectMeta, where: string, display: readonly strin
  * text, never through an implicit conversion (0028).
  */
 function searchFor(display: readonly LookupDisplayColumn[], where: string, requested: readonly string[] | undefined, target: ObjectMeta): LookupSearchColumn[] {
-  const searchable = (column: LookupDisplayColumn): column is { name: string; type: LookupSearchType } => SEARCHABLE.has(column.type.kind)
-  if (requested === undefined) {
-    const seen = new Set<string>()
-    return display.filter((column) => searchable(column) && !seen.has(column.name) && seen.add(column.name) !== undefined).map((column) => ({ name: column.name, type: column.type as LookupSearchType }))
-  }
+  // The generator draws a typeahead exactly when this default finds a column (0066).
+  if (requested === undefined) return searchableDisplay(display)
+  const searchable = (column: LookupDisplayColumn): column is { name: string; type: LookupSearchType } => SEARCHABLE_KINDS.has(column.type.kind)
   const seen = new Set<string>()
   return requested.map((name) => {
     once(seen, where, name)
@@ -186,7 +182,7 @@ function sortFor(target: ObjectMeta, where: string, binding: LookupBinding, requ
     once(seen, where, entry.column)
     const column = columnOf(target, where, entry.column)
     if (!column.access.select) throw new Error(`${where}: ${entry.column} is a column this connection's account may not read, so a lookup cannot sort by it`)
-    if (NO_TEXT.has(column.type.kind)) throw new Error(`${where}: ${entry.column} is ${column.databaseType}, which has no order a lookup can rely on`)
+    if (NO_TEXT_KINDS.has(column.type.kind)) throw new Error(`${where}: ${entry.column} is ${column.databaseType}, which has no order a lookup can rely on`)
     sort.push({ column: entry.column, direction: entry.direction, nulls })
   }
   for (const name of binding.target.columns) if (!seen.has(name)) sort.push({ column: name, direction: 'asc', nulls: 'last' })

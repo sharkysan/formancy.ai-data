@@ -1,18 +1,21 @@
 // The workspace's states in the browser (0047): signed in, a form's records in
 // each layout, a row open with its lines, a line open, the unsaved-changes
-// notice and a refused list -- each measured by the gate's `measured` on the
+// notice, a refused list and an order line opened alone, whose Order is a
+// plain select (0066) -- each measured by the gate's `measured` on the
 // way -- and what only a real browser shows about the grids: one Tab stop
 // each, End reaching the last column, the focused cell's teal border and the
 // open row's bar against the row, the columns fitted again when the
 // separator is let go, and no host rule reaching into a grid.
 
-import { FORM, TOKENS } from './plane.mjs'
+import { FORM, LINES, TOKENS } from './plane.mjs'
 import { contrast, describeFocus, focusedOn, paintedWhere, parseColor, until, WITHIN } from './measure.mjs'
 import { rulesReaching } from './styles.mjs'
 
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
 const grid = (page, name) => page.getByRole('grid', { name, exact: true })
 const status = (region) => region.getByRole('status').first()
+/** The order line form's paper in a renderer's pane. */
+const linePaper = (page, name) => page.getByRole('region', { name, exact: true }).getByRole('form', { name: `Order line, ${name}` })
 
 /** Wait until the grid in `region` has answered with rows. */
 async function answered(region, pattern) {
@@ -259,6 +262,53 @@ export function workspaceJourney(plane, { check }, run) {
     }],
     ['Asked again', async (page) => {
       await records(page).getByRole('button', { name: 'Ask again' }).click()
+      await answered(records(page), /^Rows 1–/)
+      await carryOn(page, records(page).getByRole('button', { name: 'New record' }))
+      await page.getByRole('heading', { level: 3, name: 'New record' }).waitFor(WITHIN)
+    }],
+    ['An order line alone (React)', async (page) => {
+      // The order line's lookup shows its order's date alone, which no search
+      // matches, so the generator draws it as a plain select of its first
+      // page (0066): the one enabled sourced select the gate measures on
+      // paper, since 'A line open' draws the child line's Order disabled.
+      // Opened alone from Forms, a new line, and the keyboard into the React
+      // paper: its first control is Order, a native select, which ArrowDown
+      // moves from nothing to the first order, a token. Only React's is
+      // pressed: Angular's is the same native element, and axe measures both
+      // here.
+      await carryOn(page, page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Order line ${LINES}` }))
+      await answered(records(page), /^Rows 1–/)
+      await carryOn(page, records(page).getByRole('button', { name: 'New record' }))
+      await page.getByRole('heading', { level: 3, name: 'New record' }).waitFor(WITHIN)
+      const sheet = linePaper(page, 'React')
+      const order = sheet.getByRole('combobox', { name: /^Order\*?$/ })
+      for (const name of ['React', 'Angular']) await linePaper(page, name).getByRole('combobox', { name: /^Order\*?$/ }).waitFor(WITHIN)
+      for (let step = 0; step < 12 && !(await sheet.evaluate((form) => form.contains(document.activeElement))); step += 1) await page.keyboard.press('Tab')
+      check('an order line alone: Tab into the React paper lands on its Order', await focusedOn(page, order))
+      const element = await order.evaluate((control) => control.tagName.toLowerCase())
+      check('an order line alone: its Order is a native select', element === 'select' ? null : `it is ${element}`)
+      // Its one search answered: the empty option and at least one order.
+      if (element === 'select') await until(async () => (await order.getByRole('option').count()) > 1, 'the order line’s Order never listed an order')
+      const before = await order.inputValue()
+      await page.keyboard.press('ArrowDown')
+      await until(async () => /^k1:/.test(await order.inputValue()), 'ArrowDown chose no order').catch(() => null)
+      const after = await order.inputValue()
+      check('an order line alone: ArrowDown on the closed select chooses its first order', before === '' && /^k1:/.test(after) ? null : `its value went from "${before}" to "${after}"`)
+    }],
+    ['An order line alone, created (React)', async (page) => {
+      // The line saved under the order ArrowDown chose, numbered by the pass
+      // (9000 and up; the lines `plane.order` writes are 1 and 2), and then
+      // the order form's new record again, as 'Asked again' left the page:
+      // where the record's journey starts (journey.mjs, 'Open').
+      const sheet = linePaper(page, 'React')
+      await sheet.getByLabel(/^Line no/).fill(String(run.customer))
+      await sheet.getByLabel(/^Quantity/).fill('1')
+      await sheet.getByLabel(/^Unit price/).fill('1.00')
+      // From the keyboard, as the journey's saves are, for its reason (journey.mjs, pressSave).
+      await sheet.getByRole('button', { name: 'Save' }).focus()
+      await page.keyboard.press('Enter')
+      await page.getByRole('region', { name: 'React', exact: true }).getByRole('status').filter({ hasText: /^Created record / }).waitFor(WITHIN)
+      await carryOn(page, page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Order ${FORM}` }))
       await answered(records(page), /^Rows 1–/)
       await carryOn(page, records(page).getByRole('button', { name: 'New record' }))
       await page.getByRole('heading', { level: 3, name: 'New record' }).waitFor(WITHIN)

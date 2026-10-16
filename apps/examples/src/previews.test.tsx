@@ -4,7 +4,6 @@ import { userEvent } from '@testing-library/user-event'
 import axe from 'axe-core'
 import { computeAccessibleDescription, computeAccessibleName } from 'dom-accessibility-api'
 import { ACCESSIBILITY_EXCLUSIONS, ACCESSIBILITY_TAGS, ACCESSIBILITY_UNMEASURABLE_IN_JSDOM } from '@formancy/conformance'
-import { decodeKeyToken } from '@formancy/data-core'
 import { App } from './app.js'
 import { generateExamples } from './examples.js'
 import type { Example } from './examples.js'
@@ -238,29 +237,36 @@ describe('sales.order, at the edges the fixture inserts', () => {
     }
   })
 
-  // The lookup is a select over the host's source, and what it stores is the
-  // token of the referenced key, never the label (0012). Both renderers get the
-  // same source; each must offer both customers and store the same token.
-  test('both renderers offer the two captured customers and store the token of the chosen key', async () => {
+  // The lookup shows the customer's name, which a search can match, so the
+  // generator draws it as a typeahead (0066), and the preview must draw what
+  // every host draws: a box whose list is the host's source, opened from the
+  // keyboard. A preview that drew the lookup as a plain select would show a
+  // control no host draws for this form any more. Both renderers get the same
+  // source, and each must offer both customers.
+  //
+  // One ArrowDown, then a wait for the list. The source is asked 250 ms after
+  // the box is drawn (the renderers' debounce), and an ArrowDown before the
+  // answer opens a list that stays hidden until the answer gives it options;
+  // which option is active when it appears depends on that timing, so this
+  // case asserts nothing about it. What a choice stores is panes.test.tsx's:
+  // a typeahead's box shows the label, and only the engine holds the token.
+  test('both renderers draw the customer as a typeahead whose list offers the two captured customers', async () => {
     await mounted()
     const user = userEvent.setup()
     const order = example('order')
 
     for (const renderer of RENDERERS) {
       const customer = within(pane(order, renderer)).getByRole('combobox', { name: 'Customer' })
+      customer.focus()
+      await user.keyboard('{ArrowDown}')
+      const list = await within(pane(order, renderer)).findByRole('listbox', { name: 'Customer suggestions' })
       await waitFor(() => {
-        const offered = within(customer)
+        const offered = within(list)
           .getAllByRole('option')
           .map((option) => computeAccessibleName(option))
-        expect({ renderer, offered }).toEqual({ renderer, offered: ['', 'Muster AG', 'Other Tenant GmbH'] })
+        expect({ renderer, offered }).toEqual({ renderer, offered: ['Muster AG', 'Other Tenant GmbH'] })
       })
-      await user.selectOptions(customer, within(customer).getByRole('option', { name: 'Other Tenant GmbH' }))
-      await waitFor(() => {
-        expect({ renderer, stored: decodeKeyToken((customer as HTMLSelectElement).value) }).toEqual({
-          renderer,
-          stored: { ok: true, values: ['2', '1001'] },
-        })
-      })
+      await user.keyboard('{Escape}')
     }
   })
 })

@@ -29,8 +29,10 @@ export interface BundleV1 extends BundleParts {
 
 /**
  * Since 0030. `form` is `applyPresentation(base, presentation, bindings)`;
- * `base` and `bindings` are `generateForm(snapshot, generation)`'s, which is
- * checked at publish (`generatedProblems`) and not on read.
+ * `base` and `bindings` are what the release that wrote the version
+ * generated from `snapshot` and `generation`, checked by `generatedProblems`
+ * at every write but a restore (`bundle-format2.ts`) and never on read, so a
+ * later generator, 0066's for one, does not make a stored version corrupt.
  */
 export interface BundleV2 extends BundleParts {
   format: 2

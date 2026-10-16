@@ -63,7 +63,7 @@ only enforcement is "we remember" says so plainly.
 | [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057 |
 | [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted; narrowed by 0026, 0027; extended by 0049 |
 | [0008](0008-exact-values-travel-as-strings.md) | Exact values travel as strings, are canonical, and are never rounded | accepted; narrowed by 0026, 0028 |
-| [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042, 0056 |
+| [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042, 0056; extended by 0066 |
 | [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050; extended by 0030, 0051 |
 | [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted; extended by 0043, 0050 |
 | [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted; narrowed by 0028, 0056; extended by 0044, 0061 |
@@ -83,8 +83,8 @@ only enforcement is "we remember" says so plainly.
 | [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted; narrowed by 0040 |
 | [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted; extended by 0049 |
 | [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md) | Row filters, labels and refusals mean the same on both engines | accepted |
-| [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047, 0060; extended by 0032, 0058 |
-| [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042; extended by 0062 |
+| [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047, 0060, 0066; extended by 0032, 0058 |
+| [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042, 0066; extended by 0062 |
 | [0031](0031-an-answer-lost-after-a-write-is-unknown.md) | An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here | accepted; extended by 0040, 0041, 0047, 0050, 0053, 0058 |
 | [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md) | A clean install is the composed stack behind one proxy, and CI runs its guide | accepted; extended by 0035, 0037, 0046, 0051, 0059 |
 | [0033](0033-the-administrator-plane-is-audited.md) | The administrator's plane is audited like the runtime, one event per request | accepted; extended by 0060, 0062, 0065 |
@@ -120,3 +120,4 @@ only enforcement is "we remember" says so plainly.
 | [0063](0063-the-default-lookup-deadline-is-outside-the-measured-product.md) | The default lookup deadline is outside the measured product | accepted |
 | [0064](0064-the-first-releases-notes-summarise-the-development-before-it.md) | The first release's notes summarise the development before it | accepted |
 | [0065](0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md) | With publisher roles set, a draft is published only when a publisher who did not submit it approves it, and a restore is one publisher's alone | accepted |
+| [0066](0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md) | A lookup a person can search is generated as a typeahead, and a host draws the control it is given | accepted |

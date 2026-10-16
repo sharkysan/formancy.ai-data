@@ -24,8 +24,12 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > **Status: 0.1.0, the first release.** On `main` since it, and not yet
 > released: publication under review
 > ([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)),
-> which a 0.1.0 server does not have and whose setting it ignores, as
-> [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
+> which a 0.1.0 server does not have and whose setting it ignores; and a
+> lookup a person can search generated as a typeahead
+> ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)),
+> which a form published at 0.1.0 does not carry until it is regenerated
+> and published again, as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased*
+> says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
 > page of records, the menu of forms or a delete, a host page that draws a
@@ -139,6 +143,13 @@ is not licensed for production.
   deadline, is stopped in the database rather than left to finish for
   nobody; a search still reads every row the filter admits
   ([0061](./docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)).
+- **A lookup a person can search is a box to type into.** The generator
+  draws it as a typeahead when the columns it shows include text or a whole
+  number, which is what a search matches; a lookup that shows neither is a
+  plain list of its first page, and the generator's note says so. One that
+  would show a binary or unsupported column, which no label can spell, is
+  refused before it is published
+  ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
 - **Every write is one guarded statement.** A stale save is refused instead
   of overwriting
   ([0015](./docs/decisions/0015-a-record-operation-is-one-guarded-statement.md));
@@ -492,7 +503,7 @@ guide's section 5 uses.
 
 <img src="./docs/images/readme/host-typeahead.webp" width="561" alt="The React pane of a new order with er typed into Customer and a list offering Muster AG alone.">
 
-*The customer field is a typeahead the host page draws over the published lookup. As clara, a clerk of tenant 1, types, the server answers as her with the rows she may choose: “Muster AG”, and not tenant 2's Other Tenant GmbH, which matches too and has the same customer number. Each option travels under a token that is a reference, not a permission ([0012](./docs/decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md)).*
+*The customer field is the published lookup, which the generator draws as a typeahead because its label can be searched ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)). As clara, a clerk of tenant 1, types, the server answers as her with the rows she may choose: “Muster AG”, and not tenant 2's Other Tenant GmbH, which matches too and has the same customer number. Each option travels under a token that is a reference, not a permission ([0012](./docs/decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md)).*
 
 <img src="./docs/images/readme/host-stale.webp" width="1165" alt="The order form twice: the React pane says “Saved.”; the Angular pane shows a notice “Not saved”, that the record changed since it was read, that the changes are still in the form, and a button “Load the saved record”.">
 
@@ -595,9 +606,10 @@ pnpm --filter @formancy/data-examples snapshot
 and commit `apps/examples/src/fixture-snapshot.json` and
 `fixture-customers.json`. The suite compares the committed snapshot with the
 fixture model and fails where they disagree, and refuses a snapshot edited by
-hand. The customer lookup is an in-memory source over the captured customers,
-because this page has no server, and the page says so; a host gets the
-customer options from the runtime plane, as the host page above shows.
+hand. The customer lookup, drawn as the typeahead the generator writes, is an
+in-memory source over the captured customers, because this page has no
+server, and the page says so; a host gets the customer options from the
+runtime plane, as the host page above shows.
 
 ## Packages
 

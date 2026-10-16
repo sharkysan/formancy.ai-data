@@ -108,9 +108,9 @@ describe.each(ENGINES)('lookups on $engine', ({ connection }) => {
     expect(plane.sent[0]?.headers['authorization']).toBe(`Bearer ${plane.tokens.clerk}`)
   })
 
-  // (j) The plain select's path: the generator emits a select with no widget,
-  // which asks once with an empty query and lists the first page. A source
-  // that refused an empty search would leave every generated lookup empty.
+  // (j) The empty search: a plain select, now an unsearchable lookup's
+  // control (0066), asks only "", and a typeahead asks it on mount. A source
+  // that refused it would leave every such lookup empty.
   test('an empty search lists the tenant’s customers', async () => {
     const { form, source } = await published()
     const options = await lookupSources(plane.client(), formId, form, 'create')[source]?.resolve(request('search'))

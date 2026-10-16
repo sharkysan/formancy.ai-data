@@ -7,7 +7,7 @@ import { applyPresentation, EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { FieldBinding, FormBindings, FormPolicy, PresentationOverrides } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, DRIVER_FACTORIES } from '@formancy/data-server'
-import type { ConnectionConfig, ConnectionRegistry, IdentityVerifier } from '@formancy/data-server'
+import type { ConfigurationStore, ConnectionConfig, ConnectionRegistry, IdentityVerifier } from '@formancy/data-server'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import { inject } from 'vitest'
@@ -95,6 +95,8 @@ export interface Plane {
    * line, all numbers, does not have.
    */
   lose: Map<string, 'after' | 'before'>
+  /** The server's store, written straight to as an older release's server wrote it, which this release's routes refuse. */
+  store: ConfigurationStore
   db: {
     /** A customer of tenant 1, written through the database's owner, as another application would. */
     insertCustomer(connection: Engine['connection'], no: number, name: string): Promise<void>
@@ -481,6 +483,7 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
     clerk: createDataClient({ token: () => TOKENS.clerk, fetch: injectingFetch(app, pending) }),
     unreachable,
     lose,
+    store,
     db: {
       insertCustomer: async (connection, no, name) => {
         if (connection === 'pg') await pgAdmin`insert into sales.customer (tenant_id, customer_no, name) values (1, ${no}, ${name})`

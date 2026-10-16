@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { computeAccessibleName } from 'dom-accessibility-api'
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient } from '@formancy/data-client'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
@@ -120,6 +121,14 @@ describe.each(ENGINES)("an order's lines on $engine", (engine) => {
   // A new line is preset with the open order, whose field the page draws
   // disabled; saved, it is created under that order and the grid shows it;
   // opened from the grid, it is edited and saved in the line's own form.
+  // The order field is a native select (0066: its date is nothing a search
+  // matches), whose value is the preset token at once; only the selected
+  // option's name, the order's date, proves its label arrived, from the
+  // labels request or from the empty search's first page -- until one
+  // answers, the option is named by the token itself (watched failing with
+  // every request for the line form's lookup held: the option stayed named
+  // by its token; with the labels request alone held it passed, the empty
+  // search's first page naming the order).
   test.each(RENDERERS)('a line is created under the order and edited, in %s', async (renderer) => {
     const words = stamp('line')
     const mine = await orderWithLines(engine, TOKENS.clerk, words, [1])
@@ -132,8 +141,8 @@ describe.each(ENGINES)("an order's lines on $engine", (engine) => {
     await waitFor(() => expect(focusedName()).toBe('New Order line'), ARRIVES)
     const pane = childPane('New Order line', renderer)
     const order = await within(pane).findByRole('combobox', { name: /^Order\*?$/ }, ARRIVES)
-    expect((order as HTMLInputElement).disabled).toBe(true)
-    await waitFor(() => expect((order as HTMLInputElement).value).not.toBe(''), ARRIVES)
+    expect((order as HTMLSelectElement).disabled).toBe(true)
+    await waitFor(() => expect(computeAccessibleName(within(order).getByRole('option', { selected: true }))).toBe(EDGES.orderDate), ARRIVES)
     const field = (name: RegExp): HTMLInputElement => within(pane).getByLabelText(name) as HTMLInputElement
     await user.clear(field(/^Line no\b/))
     await user.type(field(/^Line no\b/), '7')

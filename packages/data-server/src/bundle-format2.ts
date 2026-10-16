@@ -9,9 +9,15 @@ import { servedSchema } from './served-schema.js'
 /*
  * What a format-2 bundle carries beyond format 1 (0030), and what holds it:
  * the generation request, the generated base and the presentation chosen
- * over it. `validateBundle` asks `format2Problems` on publish and on every
- * read; the publish route alone asks `generatedProblems`, the one check that
- * runs this release's generator.
+ * over it. `validateBundle` asks `format2Problems` on every read. Every
+ * write that is not a restore asks both it and `generatedProblems`, the one
+ * check that runs this release's generator, through `storable`
+ * (`publishing.ts`): a publish (`routes/admin.ts`), and through `gate`
+ * (`routes/admin-gate.ts`) an import and, under review, a draft's submit
+ * and its approval (`routes/admin-drafts.ts`). A restore asks only
+ * `format2Problems`, through the read that loads it (`published.ts`), and
+ * never `generatedProblems`: it writes again, as it was read and validated,
+ * a version this deployment stored.
  */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -24,7 +30,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * accepts, in the generator's spec version (`servedSchema`); and a
  * presentation that applies to that base and gives exactly the stored form.
  * Not whether the generator would write that base — that is
- * `generatedProblems`, at publish only.
+ * `generatedProblems`, at every write but a restore, and never on read.
  */
 export function format2Problems(document: Record<string, unknown>, form: FormSchema, bindings: FormBindings, snapshot: MetadataSnapshot | null): string[] {
   const problems: string[] = []
@@ -110,9 +116,10 @@ function hasRowversion(snapshot: MetadataSnapshot | null, root: ObjectRef): bool
 
 /**
  * Whether this server's generator writes the bundle's base and bindings from
- * its snapshot and generation request (0030). Asked at publish, so a base
- * somebody edited — a relaxed maxLength, a dropped `required` — is never
- * stored as if the database had said so. Not asked on read: a later release
+ * its snapshot and generation request (0030). Asked at every write but a
+ * restore (this file's header names them), so a base somebody edited — a
+ * relaxed maxLength, a dropped `required` — is never stored as if the
+ * database had said so. Not asked on read: a later release
  * whose generator writes something else must not make every version stored
  * before it "corrupt".
  */

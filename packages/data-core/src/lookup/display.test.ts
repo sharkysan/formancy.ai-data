@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest'
-import { displayText } from './display.js'
+import type { ApiValue } from '../codecs/codec.js'
+import type { NormalizedType, NormalizedTypeKind } from '../metadata.js'
+import { displayText, isDisplayType, NO_TEXT_KINDS } from './display.js'
 import type { LookupDisplayType } from './types.js'
 
 const TEXT: LookupDisplayType = { kind: 'text', maxLength: 5, lengthUnit: 'code-points', fixedLength: true }
@@ -72,5 +74,50 @@ describe('displayText', () => {
     expect(() => displayText({ kind: 'float', bits: 64 }, '0.1')).toThrow(/float/)
     expect(() => displayText({ kind: 'float', bits: 64 }, true)).toThrow(/float/)
     expect(() => displayText(INSTANT, 0)).toThrow(/timestamp/)
+  })
+})
+
+/*
+ * Which kinds a label can show, decided here apart from the code that
+ * decides it, one row per kind of `NormalizedType`: a kind added to the
+ * metadata fails this file's type check until somebody says whether a label
+ * can show it. A kind a label can show comes with a value `displayText`
+ * spells, so a kind let through that nothing spells fails too.
+ */
+type Shown = { [K in NormalizedTypeKind]: { type: Extract<NormalizedType, { kind: K }>; value: ApiValue | undefined } }
+
+const SHOWN: Shown = {
+  text: { type: { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }, value: 'Muster AG' },
+  integer: { type: { kind: 'integer', min: '-2147483648', max: '2147483647' }, value: '1001' },
+  boolean: { type: { kind: 'boolean' }, value: true },
+  decimal: { type: { kind: 'decimal', precision: 14, scale: 2 }, value: '12.50' },
+  float: { type: { kind: 'float', bits: 64 }, value: 0.5 },
+  date: { type: { kind: 'date' }, value: '2026-10-08' },
+  time: { type: { kind: 'time', precision: 0 }, value: '10:34' },
+  timestamp: { type: { kind: 'timestamp', withTimeZone: true, precision: 6 }, value: '2026-10-08T08:34:56Z' },
+  uuid: { type: { kind: 'uuid' }, value: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
+  // No canonical text: bytes, a counter the database writes, a type with no codec.
+  binary: { type: { kind: 'binary', maxLength: null, fixedLength: false }, value: undefined },
+  rowversion: { type: { kind: 'rowversion' }, value: undefined },
+  unsupported: { type: { kind: 'unsupported' }, value: undefined },
+}
+
+describe('isDisplayType', () => {
+  // The generator, `buildLookupConfig` and the studio's display choice all
+  // ask this (0066). A kind let through that has no text is a lookup the
+  // generator writes and the config refuses: a form published over a list
+  // that never comes. A kind kept out that a label can spell is a column
+  // nobody may show though the server would. The set and the function each
+  // answer for every kind (watched failing with `unsupported` left out of
+  // the set).
+  test('lets a label show every kind with a canonical text, and no bytes, rowversion or type without a codec', () => {
+    const kinds = Object.keys(SHOWN) as NormalizedTypeKind[]
+    expect(kinds.filter((kind) => !isDisplayType(SHOWN[kind].type))).toEqual(['binary', 'rowversion', 'unsupported'])
+    expect(kinds.filter((kind) => NO_TEXT_KINDS.has(kind))).toEqual(['binary', 'rowversion', 'unsupported'])
+    for (const kind of kinds) {
+      const { type, value } = SHOWN[kind]
+      expect(isDisplayType(type), kind).toBe(value !== undefined)
+      if (isDisplayType(type) && value !== undefined) expect(typeof displayText(type, value), kind).toBe('string')
+    }
   })
 })

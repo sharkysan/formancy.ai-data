@@ -1,4 +1,7 @@
 import type { FieldDef, FormSchema, LayoutNode, LogicRule } from '@formancy/spec'
+import { isDisplayType } from '../lookup/display.js'
+import { searchableDisplay } from '../lookup/searchable.js'
+import type { LookupSearchColumn } from '../lookup/types.js'
 import type { ColumnMeta, ForeignKeyMeta, Generation, MetadataSnapshot, ObjectMeta } from '../metadata.js'
 import { findObject } from '../snapshot.js'
 import { assertReadableLookup, assertReadableRoot, identityFor, rowSecurityNotes, UNREADABLE, uninsertablePins, versionAccessProblem, writesFor } from './access.js'
@@ -126,9 +129,11 @@ function resolveLookups(snapshot: MetadataSnapshot, root: ObjectMeta, choices: r
     }
     if (choice.display.length === 0) throw new Error(`${choice.foreignKey} needs at least one display column`)
     for (const name of choice.display) {
-      if (!target.columns.some((column) => column.name === name)) {
-        throw new Error(`${choice.foreignKey}: ${target.ref.name} has no column ${name} to display`)
-      }
+      const column = target.columns.find((candidate) => candidate.name === name)
+      if (column === undefined) throw new Error(`${choice.foreignKey}: ${target.ref.name} has no column ${name} to display`)
+      // `buildLookupConfig` refuses it in these words, so a form published
+      // with it would list nothing, under a control its note named (0066).
+      if (!isDisplayType(column.type)) throw new Error(`${choice.foreignKey}: display column ${name} is ${column.databaseType}, which has no text form for a label`)
     }
     assertReadableLookup(root, foreignKey, target, choice.display)
     // One column bound through two lookups would take two values from two
@@ -159,11 +164,15 @@ function planLookup(
   const nullable = columns.some((column) => column.nullable)
   const key = allocate(fieldKeyFor(target.table.name))
   const source = sourceNameFor(request.connection, root.ref, foreignKey.name)
+  // What a typed search matches, as `buildLookupConfig`'s default decides it:
+  // a typeahead over anything else would be refused every search (0066).
+  // `resolveLookups` refused a display column the target does not have.
+  const searched = searchableDisplay(choice.display.map((name) => lookup.target.columns.find((column) => column.name === name) as ColumnMeta))
 
   notes.push({
     subject: key,
     kind: 'inferred',
-    message: `A lookup over ${foreignKey.name} (${foreignKey.columns.join(', ')}), showing ${choice.display.join(', ')} of ${target.table.name}; label from the table name.`,
+    message: `A lookup over ${foreignKey.name} (${foreignKey.columns.join(', ')}), showing ${choice.display.join(', ')} of ${target.table.name}, ${controlNote(searched)}; label from the table name.`,
   })
   const possible = !isView && columns.every((column) => column.generated === 'none')
   const writes = writesFor(columns, possible, key, notes)
@@ -171,7 +180,14 @@ function planLookup(
 
   return {
     ordinal: columns[0]?.ordinal ?? 0,
-    field: { key, type: 'select', label: labelFor(target.table.name), optionsSource: source, ...(required ? { required: true } : {}) },
+    field: {
+      key,
+      type: 'select',
+      label: labelFor(target.table.name),
+      optionsSource: source,
+      ...(searched.length > 0 ? { widget: 'typeahead' as const } : {}),
+      ...(required ? { required: true } : {}),
+    },
     binding: {
       kind: 'lookup',
       field: key,
@@ -187,6 +203,16 @@ function planLookup(
     multiline: false,
     privilegeOnly: possible,
   }
+}
+
+/**
+ * The control a lookup's note names (0066): a typeahead, with what typing
+ * searches; or a plain select of one page, which says what it cannot reach
+ * and what the administrator would show to make it searchable.
+ */
+function controlNote(searched: readonly LookupSearchColumn[]): string {
+  if (searched.length > 0) return `drawn as a typeahead searching ${searched.map((column) => column.name).join(', ')}`
+  return 'as a plain list of its first page: a search matches only text and whole-number columns and it shows neither, so a row past that page cannot be chosen; show a text or whole-number column to make it searchable'
 }
 
 /**

@@ -1,5 +1,6 @@
 import type { ApiValue } from '../codecs/codec.js'
 import { canonicalFloat32 } from '../codecs/numbers.js'
+import type { NormalizedType, NormalizedTypeKind } from '../metadata.js'
 import type { LookupDisplayType } from './types.js'
 
 /*
@@ -17,6 +18,20 @@ import type { LookupDisplayType } from './types.js'
  * because rounding moves a value into a minute or second the row does not
  * hold. Labels are not localised.
  */
+
+/** No canonical text: nothing a token, a label or a portable order can rely on. */
+export const NO_TEXT_KINDS: ReadonlySet<NormalizedTypeKind> = new Set<Exclude<NormalizedTypeKind, LookupDisplayType['kind']>>(['binary', 'rowversion', 'unsupported'])
+
+/**
+ * Whether a label can show a column of `type`: every kind with a canonical
+ * text, which `displayText` spells. `buildLookupConfig` refuses a display
+ * column of any other kind, and so does the generator, so no lookup is
+ * published over a display the server will not build; the studio offers
+ * such a column disabled (0066).
+ */
+export function isDisplayType(type: NormalizedType): type is LookupDisplayType {
+  return !NO_TEXT_KINDS.has(type.kind)
+}
 
 /** An instant as both readers spell one inside years 1–9999, its fraction apart. */
 const INSTANT = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?Z$/

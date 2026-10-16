@@ -22,7 +22,9 @@
 //     selection in the error summary, after a save whose answer was lost on
 //     the "It may have been saved" notice (0031), after "Enter it again
 //     anyway" on "Allow saving it again", and after a save that worked still
-//     on Save;
+//     on Save; and in an order line opened alone, Tab into the React paper
+//     lands on its Order, a native select, which ArrowDown moves from
+//     nothing to its first order (0066);
 //   - the grids' colours, which axe cannot decide behind AG Grid's painted
 //     layers: a header's and a cell's text against what the browser painted
 //     there, the focused cell's teal border at 3:1 on the open row and on

@@ -121,7 +121,8 @@ record, and `pnpm test:repo` fails when they are not what the render gives.
 against the database: that both panes hold the id digit for digit, that the
 stale save overwrote nothing, that the lost save was stored, that the
 typeahead offers clara her tenant's customer alone though tenant 2's matches
-too; that `status` is `varchar(20)` before the narrowing and `varchar(8)`
+too; that each examples preview's customer typeahead, opened from the
+keyboard, offers Muster AG (0066); that `status` is `varchar(20)` before the narrowing and `varchar(8)`
 after it, as host-drift's caption says, read from the catalog because neither
 width is in the picture (watched failing with 9 for 8); that after it drift
 review, asked as ada, says reads go on and create and update stop, for the

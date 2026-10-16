@@ -12,7 +12,7 @@ import type { LightMyRequestResponse } from 'fastify'
 import { SignJWT } from 'jose'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
-import type { PublishedBundle } from '../bundle.js'
+import type { BundleV2, PublishedBundle } from '../bundle.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionConfig, ConnectionRegistry } from '../connections.js'
 import { createConnectionRegistry } from '../connections.js'
@@ -28,14 +28,17 @@ import { createIdentityVerifier } from '../identity.js'
  * development one.
  *
  * Development publishes the order form, and its version is read through
- * the route the studio downloads it from: the export. Production has lost
- * approved_by, a column the form binds, with plan section 14 step 8's DDL:
- * the import is refused, and nothing is written. The column put back, the
- * import is version 1 there, and a clerk creates an order through
- * production's runtime and reads it back exactly. Pointed at the other
- * engine, production's `erp` refuses the import as the caller's problem;
- * as the order form's own account, formancy_writer (0027), the import does
- * exactly what drift between the two snapshots says, which is to refuse.
+ * the route the studio downloads it from: the export. The same file as
+ * 0.1.0 wrote it, its customer a plain select, is refused by a deployment
+ * of its own as a base this server does not generate (0066). Production
+ * has lost approved_by, a column the form binds, with plan section 14 step
+ * 8's DDL: the import is refused, and nothing is written. The column put
+ * back, the import is version 1 there, and a clerk creates an order
+ * through production's runtime and reads it back exactly. Pointed at the
+ * other engine, production's `erp` refuses the import as the caller's
+ * problem; as the order form's own account, formancy_writer (0027), the
+ * import does exactly what drift between the two snapshots says, which is
+ * to refuse.
  */
 
 const SECRET = 'a-promotion-host-secret-of-32-bytes!!'
@@ -192,6 +195,25 @@ describe.each([
     expect(read.statusCode, read.body).toBe(200)
     bundle = read.json().bundle as PublishedBundle
     expect(`${JSON.stringify(bundle, null, 2)}\n`).toBe(await readFile(join(development.root, 'order', '1.json'), 'utf8'))
+  })
+
+  // The export as 0.1.0 wrote it: its customer lookup is the plain select
+  // that release generated, with no widget in the base or the form, so its
+  // presentation still gives its form and it validates. Only this server's
+  // generator, which draws a lookup a person can search as a typeahead,
+  // says the base is not its own: 422, 0062's cost first met at 0066, and
+  // nothing written. Into a deployment of its own, not production: watched
+  // answering 201 on main, where the stripped file is what the generator
+  // writes, which in production would also have written the version the
+  // next case expects not to be there.
+  test('the export as 0.1.0 wrote it, its customer a plain select, is refused as not what this server generates, and writes nothing', async () => {
+    const older = structuredClone(bundle) as BundleV2
+    for (const form of [older.base, older.form]) delete (form.model.fields.find((field) => field.key === 'customer') as { widget?: unknown }).widget
+    const target = await deployment(connection)
+    const refused = await target.call('POST', '/v1/forms/order/imports', admin, { expectedBase: null, bundle: older })
+    expect(refused.statusCode, refused.body).toBe(422)
+    expect(refused.json()).toEqual({ code: 'invalid-bundle', message: expect.any(String), problems: ['base: is not what this server generates from the stored snapshot and generation request'] })
+    expect((await target.call('GET', '/v1/forms/order/versions', admin)).statusCode).toBe(404)
   })
 
   // Production's table has lost approved_by, which the form binds: served

@@ -199,7 +199,7 @@
     "app": "host",
     "placement": "inline",
     "title": "The customer typeahead",
-    "caption": "The customer field is a typeahead the host page draws over the published lookup. As clara, a clerk of tenant 1, types, the server answers as her with the rows she may choose: “Muster AG”, and not tenant 2's Other Tenant GmbH, which matches too and has the same customer number. Each option travels under a token that is a reference, not a permission ([0012](./docs/decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md)).",
+    "caption": "The customer field is the published lookup, which the generator draws as a typeahead because its label can be searched ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)). As clara, a clerk of tenant 1, types, the server answers as her with the rows she may choose: “Muster AG”, and not tenant 2's Other Tenant GmbH, which matches too and has the same customer number. Each option travels under a token that is a reference, not a permission ([0012](./docs/decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md)).",
     "alt": "The React pane of a new order with er typed into Customer and a list offering Muster AG alone.",
     "quotes": {
       "Muster AG": ["List"]
