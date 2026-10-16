@@ -128,9 +128,38 @@ describe('choosing', () => {
     expect(await audit()).toEqual([])
   })
 
+  // A label is its columns' text, and a bytea or a point has none: the
+  // server's lookup config refuses a lookup that shows one, and so does the
+  // generator (0066). Offered anyway, the column would end in a refusal
+  // after everything else was chosen; the studio offers it disabled, with
+  // the reason in its description, in the column's own type, and the lookup
+  // generates over the suggested name (watched failing with every readable
+  // column offered: flag and shape enabled).
+  test("a lookup's target columns with no text form are offered disabled, with the reason", async () => {
+    const user = await signIn(plane)
+    const choose = await toChoose(user)
+    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.customer')
+    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_customer_country as a lookup' }))
+    const group = within(choose).getByRole('group', { name: 'Columns to show for fk_customer_country' })
+    const state = within(group)
+      .getAllByRole('checkbox')
+      .map((box) => `${computeAccessibleName(box)}:${(box as HTMLInputElement).disabled ? 'disabled' : 'enabled'}${(box as HTMLInputElement).checked ? ',checked' : ''}`)
+    expect(state).toEqual(['id:enabled', 'iso_code:enabled', 'name:enabled,checked', 'flag:disabled', 'shape:disabled'])
+    expect(computeAccessibleDescription(within(group).getByRole('checkbox', { name: 'flag' }))).toBe('It is bytea, which has no text form for a label, so it cannot be shown.')
+    expect(computeAccessibleDescription(within(group).getByRole('checkbox', { name: 'shape' }))).toBe('It is point, which has no text form for a label, so it cannot be shown.')
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    const generated = await screen.findByRole('main', { name: 'Generate' })
+    expect(list(generated, 'Inferred')).toContain('country A lookup over fk_customer_country (country_code), showing name of country, drawn as a typeahead searching name; label from the table name.')
+    expect(await audit()).toEqual([])
+  })
+
   // The display column is suggested, and the suggestion is the
   // administrator's to change: what is sent is what is checked, in the
-  // target's column order.
+  // target's column order. The note says which control those columns make:
+  // a typeahead searching both, because a whole number is searched as its
+  // text, as a name is (0066). This step is where the administrator learns
+  // the control before anything is published, so a note naming a plain
+  // list, or a search over a column the lookup does not show, fails here.
   test('suggests a display column, and sends the one confirmed', async () => {
     const user = await signIn(plane)
     const choose = await chooseOrder(user)
@@ -140,7 +169,7 @@ describe('choosing', () => {
     await user.click(within(shown).getByRole('checkbox', { name: 'customer_no' }))
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     const generated = await screen.findByRole('main', { name: 'Generate' })
-    expect(list(generated, 'Inferred')).toContain('customer A lookup over fk_order_customer (tenant_id, customer_no), showing customer_no, name of customer; label from the table name.')
+    expect(list(generated, 'Inferred')).toContain('customer A lookup over fk_order_customer (tenant_id, customer_no), showing customer_no, name of customer, drawn as a typeahead searching customer_no, name; label from the table name.')
     expect(await audit()).toEqual([])
   })
 

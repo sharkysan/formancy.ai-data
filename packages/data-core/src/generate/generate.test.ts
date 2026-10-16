@@ -938,43 +938,80 @@ describe('lookup controls (0066)', () => {
     }
   })
 
+  // A label is its display columns' text, and a column with no text form --
+  // bytes, a type with no codec, SQL Server's rowversion -- has none. The
+  // config refuses a lookup that shows one, so a form published with it
+  // answered every request for that list with an error, while its note
+  // named a control: "a plain list of its first page" for flag alone, "a
+  // typeahead searching name" beside name. The generator refuses it before
+  // anything is published, in the words the config refuses it with, read
+  // here from the config itself (watched failing with the generator
+  // accepting such a display: both forms were generated).
+  test('refuses a lookup that shows a column with no text form, in the words the config refuses it with', () => {
+    for (const kind of ['postgres', 'sqlserver'] as const) {
+      const snapshot = fixtureLike(kind)
+      const customer: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'customer' }, formId: 'sales-customer', title: 'Customer', lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }] }
+      const shown = generateForm(snapshot, customer)
+      const { binding } = lookupOf(shown)
+      const country = findObject(snapshot, { schema: 'sales', name: 'country' }) as ObjectMeta
+      for (const column of country.columns.filter((candidate) => candidate.name === 'flag' || candidate.name === 'shape')) {
+        const words = `display column ${column.name} is ${column.databaseType}, which has no text form for a label`
+        for (const display of [[column.name], ['name', column.name]]) {
+          const edited = { ...shown.bindings, fields: shown.bindings.fields.map((entry) => (entry === binding ? { ...binding, display } : entry)) }
+          expect(() => buildLookupConfig(edited, binding.field, { snapshot }), `${kind} ${display.join(', ')}`).toThrow(`fk_customer_country (sales.country): ${words}`)
+          expect(() => generateForm(snapshot, { ...customer, lookups: [{ foreignKey: 'fk_customer_country', display }] }), `${kind} ${display.join(', ')}`).toThrow(`fk_customer_country: ${words}`)
+        }
+      }
+    }
+  })
+
   // The generator decides the control and `buildLookupConfig` the search, and
   // a host draws the one and the server answers with the other: a typeahead
   // over a lookup the config does not search is a box whose every search is
-  // refused, and a select over one it does is a list that stops at a page.
-  // So for every foreign key of the restated objects and every column of its
-  // target shown alone, where the config accepts the lookup -- it throws for
-  // a column with no text form for a label: flag, shape and SQL Server's
-  // row_version -- the field is a typeahead exactly when the config's
-  // default search is not empty. Both outcomes are counted on each engine,
-  // and the refusals named, so a loop in which every lookup threw, or none
-  // was generated, fails rather than passing over nothing (watched failing
-  // with the generator drawing a typeahead for text alone: customer_no is an
-  // integer, which the config searches).
+  // refused, a select over one it does is a list that stops at a page, and a
+  // lookup the config refuses is a control over a list that never comes. So
+  // for every foreign key of the restated objects and every column of its
+  // target shown alone, the config refuses no lookup the generator writes --
+  // the generator refuses a column with no text form for a label: flag,
+  // shape and SQL Server's row_version -- and the field is a typeahead
+  // exactly when the config's default search is not empty. Both outcomes
+  // are counted on each engine, and the refusals named, so a loop in which
+  // every lookup threw, or none was generated, fails rather than passing
+  // over nothing (watched failing with the generator drawing a typeahead for
+  // text alone: customer_no is an integer, which the config searches; and
+  // with the generator accepting a display with no text form: the config
+  // refused flag, shape and row_version).
   //
-  // It cannot catch a rule both share and get wrong: searchable.test.ts
-  // decides that. And it needs no version against a real database on each
-  // engine: both sides read the same normalized kinds, which the discovery
-  // conformance suites hold (0005).
-  test('a lookup is a typeahead exactly when the config built from its bindings searches something', () => {
+  // It cannot catch a rule both share and get wrong: searchable.test.ts and
+  // display.test.ts decide those. And it needs no version against a real
+  // database on each engine: both sides read the same normalized kinds,
+  // which the discovery conformance suites hold (0005).
+  test('a lookup the generator writes is one the config builds, and a typeahead exactly when that config searches something', () => {
     for (const kind of ['postgres', 'sqlserver'] as const) {
       const snapshot = withDeleteFacts(kind)
       const typeahead: string[] = []
       const plain: string[] = []
-      const refused: string[] = []
+      const notGenerated: string[] = []
+      const notBuilt: string[] = []
       for (const root of snapshot.objects) {
         for (const foreignKey of root.foreignKeys) {
           const target = foreignKey.references === null ? undefined : findObject(snapshot, foreignKey.references.table)
           if (target === undefined) throw new Error(`${foreignKey.name} reaches no restated table`)
           for (const column of target.columns) {
             const shown = `${foreignKey.name}: ${column.name}`
-            const generated = generateForm(snapshot, { connection: 'erp', root: root.ref, formId: `f-${root.ref.name}`, title: root.ref.name, lookups: [{ foreignKey: foreignKey.name, display: [column.name] }] })
+            let generated: ReturnType<typeof generateForm>
+            try {
+              generated = generateForm(snapshot, { connection: 'erp', root: root.ref, formId: `f-${root.ref.name}`, title: root.ref.name, lookups: [{ foreignKey: foreignKey.name, display: [column.name] }] })
+            } catch {
+              notGenerated.push(shown)
+              continue
+            }
             const { binding, field } = lookupOf(generated)
             let searched: number
             try {
               searched = buildLookupConfig(generated.bindings, binding.field, { snapshot }).search.length
             } catch {
-              refused.push(shown)
+              notBuilt.push(shown)
               continue
             }
             expect(field?.widget === 'typeahead', `${kind} ${shown}`).toBe(searched > 0)
@@ -982,7 +1019,8 @@ describe('lookup controls (0066)', () => {
           }
         }
       }
-      expect(refused, kind).toEqual([
+      expect(notBuilt, kind).toEqual([])
+      expect(notGenerated, kind).toEqual([
         'fk_customer_country: flag',
         'fk_customer_country: shape',
         ...(kind === 'sqlserver' ? ['fk_order_line_order: row_version'] : []),

@@ -1,4 +1,4 @@
-import { findObject, gapCovers, rowFilterColumnProblem, throughProblems } from '@formancy/data-core'
+import { findObject, gapCovers, isDisplayType, rowFilterColumnProblem, throughProblems } from '@formancy/data-core'
 import type { ColumnMeta, CoverageGap, ForeignKeyMeta, FormBindings, LookupChoice, MetadataSnapshot, ObjectMeta, ObjectRef, RowFilterRule } from '@formancy/data-core'
 import type { ProposalRequest } from './api.js'
 
@@ -110,9 +110,15 @@ export function lookupBlocker(snapshot: MetadataSnapshot, root: ObjectMeta, fore
   return `${describeRef(target)} is outside the schemas this connection discovers, so its rows cannot be offered.`
 }
 
-/** Why a target column cannot be shown by a lookup, or `null`: the generator refuses a display column the account may not read (0027). */
+/**
+ * Why a target column cannot be shown by a lookup, or `null`: the generator
+ * refuses a display column the account may not read (0027), and one with no
+ * text form for a label, as the server's lookup config does (0066). Asked of
+ * `isDisplayType`, the rule both of those read.
+ */
 export function displayBlocker(column: ColumnMeta): string | null {
-  return readable(column) ? null : 'This connection may not read it, so it cannot be shown.'
+  if (!readable(column)) return 'This connection may not read it, so it cannot be shown.'
+  return isDisplayType(column.type) ? null : `It is ${column.databaseType}, which has no text form for a label, so it cannot be shown.`
 }
 
 /**
@@ -121,8 +127,8 @@ export function displayBlocker(column: ColumnMeta): string | null {
  * shown checked for the administrator to confirm or change (plan section 3).
  */
 export function suggestedDisplay(target: ObjectMeta, keyColumns: readonly string[]): string[] {
-  // Only a column the account may read: a label of one it may not fails every search (0027).
-  const shown = target.columns.filter(readable)
+  // Only a column a lookup may show: a label of one the account may not read fails every search (0027), and one with no text form is refused (0066).
+  const shown = target.columns.filter((column) => displayBlocker(column) === null)
   const text = shown.find((column) => column.type.kind === 'text' && !keyColumns.includes(column.name))
   const first = text ?? shown[0]
   return first === undefined ? [] : [first.name]

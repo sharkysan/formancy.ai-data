@@ -388,14 +388,32 @@ describe('planCreate', () => {
 
   // A lookup that cannot be configured — here, labelled by a binary column —
   // offers no options, so no selection of it can be rechecked, and a request
-  // that carries one is refused rather than written unchecked.
+  // that carries one is refused rather than written unchecked. The generator
+  // refuses that label since 0066, so these are bindings a release before it
+  // stored: generated over the employee's id, then labelled by its binary
+  // name.
   test('refuses a selection whose lookup cannot be rechecked', () => {
     const binary = snapshot('postgres', (objects) => {
       const name = objects.find((object) => object.ref.name === 'employee')?.columns.find((candidate) => candidate.name === 'name')
       if (name !== undefined) name.type = { kind: 'binary', maxLength: null, fixedLength: false }
     })
-    const bindings = orderForm(binary).bindings
-    expect(planCreate(binary, bindings, ORDER_POLICY, CLERK, { ...ANSWERS, employee: 'k1:1' }, described(binary, bindings))).toMatchObject({ ok: false, code: 'invalid-bindings' })
+    const generated = generateForm(binary, {
+      connection: 'erp',
+      root: sales('order'),
+      formId: 'sales-order',
+      title: 'Order',
+      lookups: [
+        { foreignKey: 'fk_order_customer', display: ['name'] },
+        { foreignKey: 'fk_order_created_by', display: ['id'] },
+      ],
+      versionColumn: 'row_version',
+    }).bindings
+    const bindings = { ...generated, fields: generated.fields.map((field) => (field.kind === 'lookup' && field.foreignKey === 'fk_order_created_by' ? { ...field, display: ['name'] } : field)) }
+    expect(planCreate(binary, bindings, ORDER_POLICY, CLERK, { ...ANSWERS, employee: 'k1:1' }, described(binary, bindings))).toMatchObject({
+      ok: false,
+      code: 'invalid-bindings',
+      message: expect.stringMatching(/^employee cannot be rechecked: .*display column name is .*, which has no text form for a label$/) as unknown,
+    })
   })
 
   // A lookup's filter is the actor's as much as the root's is: scoped by an

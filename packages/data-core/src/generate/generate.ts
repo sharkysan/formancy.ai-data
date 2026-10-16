@@ -1,4 +1,5 @@
 import type { FieldDef, FormSchema, LayoutNode, LogicRule } from '@formancy/spec'
+import { isDisplayType } from '../lookup/display.js'
 import { searchableDisplay } from '../lookup/searchable.js'
 import type { LookupSearchColumn } from '../lookup/types.js'
 import type { ColumnMeta, ForeignKeyMeta, Generation, MetadataSnapshot, ObjectMeta } from '../metadata.js'
@@ -128,9 +129,11 @@ function resolveLookups(snapshot: MetadataSnapshot, root: ObjectMeta, choices: r
     }
     if (choice.display.length === 0) throw new Error(`${choice.foreignKey} needs at least one display column`)
     for (const name of choice.display) {
-      if (!target.columns.some((column) => column.name === name)) {
-        throw new Error(`${choice.foreignKey}: ${target.ref.name} has no column ${name} to display`)
-      }
+      const column = target.columns.find((candidate) => candidate.name === name)
+      if (column === undefined) throw new Error(`${choice.foreignKey}: ${target.ref.name} has no column ${name} to display`)
+      // `buildLookupConfig` refuses it in these words, so a form published
+      // with it would list nothing, under a control its note named (0066).
+      if (!isDisplayType(column.type)) throw new Error(`${choice.foreignKey}: display column ${name} is ${column.databaseType}, which has no text form for a label`)
     }
     assertReadableLookup(root, foreignKey, target, choice.display)
     // One column bound through two lookups would take two values from two
