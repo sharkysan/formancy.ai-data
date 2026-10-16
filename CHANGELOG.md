@@ -146,38 +146,6 @@ later.
 
 ### Changed
 
-- **The studio, the host page and the examples page serve their own
-  fonts, and no page asks another host for anything**
-  ([0072](docs/decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
-  Archivo, IBM Plex Sans and IBM Plex Mono come from Fontsource's packages
-  at 5.3.0, the release formancy.ai's site and admin install, pinned once
-  in the workspace catalog and bundled into each build, where every page
-  asked Google Fonts for them. Why:
-  - a browser gate failed when Google did not answer: on 2026-10-16 the
-    Chromium leg's first attempt failed its fonts check three times, in
-    runs 38915951921, 38919378187 and 38937995522, and passed on a rerun;
-  - every visitor's browser told Google their address, the demo's
-    included. A German court has held a website liable for that (LG
-    München I, 3 O 17493/20, 2022-01-20), cited as context, not as legal
-    advice;
-  - the demo's Content-Security-Policy named Google's two hosts, so fonts
-    Google moved would have been refused until it was edited. It is now
-    `style-src 'self'` and `font-src 'self'`, derived from the faces the
-    built stylesheets name.
-
-  Each browser gate now refuses and names any request to an origin it
-  does not serve, and its pass with the web fonts refused refuses every
-  font file, wherever it comes from. `scripts/no-other-host.test.mjs`
-  holds each app's page and build to the same, and the getting-started
-  gate exempts no host. What you notice: a visitor's browser fetched 6 font
-  files, 135,548 bytes, on the examples page, where Google sent 4 of
-  165,412 bytes and a stylesheet; each app's build is 59 font files,
-  757,316 bytes, larger, so the web image, which holds two, and the demo's
-  upload grow; `THIRD-PARTY-NOTICES.txt` lists the three packages with the
-  SIL Open Font License's text; and IBM Plex Sans at 500 and 600 is drawn
-  from static instances, so its edges are anti-aliased differently from
-  Google's variable file and the README's pictures are retaken. Nothing
-  moves: the advances and line heights are the same.
 - **Unset, nothing changes.** Every administrator publishes alone, as
   before, and upgrading puts no deployment under review. The composed stack
   and the getting-started guide stay that way.
@@ -214,8 +182,9 @@ later.
   policy, on any console error, on a fetch from anywhere but the page's
   path, when an inline script put in the page runs or
   goes unheard, and on notices not sent as UTF-8 text. Its axe audits run
-  without axe's preload, which fetched Google's stylesheet against the
-  policy and, as measured, changed no rule's outcome on the page.
+  without axe's preload, which was measured to change no rule's outcome on
+  the page; a stylesheet from another origin is the policy check's failure,
+  not axe's.
 - **A lookup a person can search is generated as a typeahead, and the host
   page draws the control the published form names**
   ([0066](docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
@@ -305,6 +274,40 @@ later.
   built on one machine passes
   `--allow-missing container,getting-started,test-images`, since a machine
   runs the defaults ([`docs/release/`](docs/release/README.md)).
+- **The studio, the host page and the examples page serve their own
+  fonts, and no page asks another host for anything**
+  ([0072](docs/decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
+  Archivo, IBM Plex Sans and IBM Plex Mono come from Fontsource's packages
+  at 5.3.0, the release formancy.ai's site and admin install, pinned once
+  in the workspace catalog and bundled into each build, where every page
+  asked Google Fonts for them. Why:
+  - a browser gate failed when Google did not answer: on 2026-10-16 the
+    Chromium leg's first attempt failed its fonts check three times, in
+    runs 38915951921, 38919378187 and 38937995522; the first and the third
+    passed on a second attempt;
+  - every visitor's browser told Google their address, the demo's
+    included. A German court has held a website liable for that (LG
+    München I, 3 O 17493/20, 2022-01-20), cited as context, not as legal
+    advice;
+  - the demo's Content-Security-Policy named Google's two hosts, so fonts
+    Google moved would have been refused until it was edited. It is now
+    `style-src 'self'` and `font-src 'self'`, derived from the faces the
+    built stylesheets name.
+
+  Each browser gate now refuses and names any request to an origin it
+  does not serve, and its pass with the web fonts refused refuses every
+  font file, wherever it comes from. `scripts/no-other-host.test.mjs`
+  holds each app's page and build to the same, and the getting-started
+  gate exempts no host. What you notice: on the examples page a visitor's
+  browser fetched 6 font files, 135,548 bytes, Latin only (Chromium 153 on
+  Windows 11, 2026-10-16), where Google sent 4 of 165,412 bytes and a
+  stylesheet (the same Chromium on Linux, the same day); each app's build
+  is 59 font files, 757,316 bytes, larger (Vite 8.3.3, 2026-10-16), so the
+  web image, which holds two, and the demo's upload grow; `THIRD-PARTY-NOTICES.txt` lists the three packages with the
+  SIL Open Font License's text; and IBM Plex Sans at 500 and 600 is drawn
+  from static instances, so its edges are anti-aliased differently from
+  Google's variable file and the README's pictures are retaken. Nothing
+  moves: the advances and line heights are the same.
 
 What review costs, in 0065: every submit and approval asks the database, so
 one that cannot be reached refuses both; nothing deletes a draft; nobody is
@@ -379,7 +382,8 @@ fix reaches the pages only when this repository moves the pins, and
 nothing says one is due; a rule asking Archivo for a width would draw the
 normal width, which the static guard refuses first; a machine with a font
 installed under the name Archivo draws the headings in it; and the gates
-see only the requests the states they reach make.
+see only the requests the states they reach make, and the static guard
+reads no JavaScript.
 
 ## 0.1.0 — 2026-10-16
 

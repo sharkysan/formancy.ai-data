@@ -38,7 +38,7 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > strict Content-Security-Policy, which Cloudflare deploys from `main` and
 > not from a release
 > ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md));
-> and the rate limit and the log counting each client by the address a
+> the rate limit and the log counting each client by the address a
 > proxy the operator names forwarded, which the composed stack sets for its
 > nginx and the Cloudflare overlay's cloudflared, where a 0.1.0 server
 > counts everybody behind a proxy as one
