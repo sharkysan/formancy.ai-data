@@ -194,8 +194,9 @@ Its log is on the Worker's page in Cloudflare's dashboard, and nothing in
 this repository reads it. After a deploy, open the address, press Validate
 in a preview, and see both renderers refuse the empty required fields; and
 `curl -sI https://formancy.ai/data/examples/THIRD-PARTY-NOTICES.txt`
-should say `Content-Type: text/plain; charset=utf-8`, which nothing here
-has yet read from Cloudflare.
+should say `Content-Type: text/plain; charset=utf-8`, as it did when read
+by hand on 2026-10-16. Nothing here reads it, so this is the check after
+every deploy.
 
 By hand, from a clean checkout of `main`, with a Cloudflare login that can
 edit Workers on formancy.ai's zone:

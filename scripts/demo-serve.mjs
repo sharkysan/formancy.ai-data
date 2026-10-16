@@ -35,10 +35,16 @@ const TYPES = {
  * The built page in `directory` over HTTP, on a port the operating system
  * picks: under the demo's path, each file with the headers the deploy's
  * `_headers` gives its path, which override its type, as Cloudflare's
- * documentation says they do; the path without its slash sent to it, as the
- * Worker's `auto-trailing-slash` sends it; and nothing outside it, which
- * formancy.ai answers from its own site. The redirect and the 404s carry no
- * header of the file's: whether Cloudflare gives them any was not read.
+ * documentation says they do, and a file that is not there a 404 with the
+ * same headers; the path without its slash sent to it, as the Worker's
+ * `auto-trailing-slash` sends it, with none of them; and nothing outside it,
+ * which formancy.ai answers from its own site, with none of them either.
+ * What the redirect and a 404 carry is what formancy.ai answered on
+ * 2026-10-16, read with curl: `/data/examples/nope.js` a 404 with the
+ * policy, Permissions-Policy, Referrer-Policy and nosniff, `/data/examples`
+ * a 307 to `/data/examples/` with no header of the file's, and `/data` the
+ * site's 404. A missing file under `assets/`, which the rules give a year's
+ * cache too, was not read, and nothing reads any of it again.
  * Resolves to the server, its port and the path, `/data/examples/`.
  */
 export function serveDemo(directory) {
@@ -62,12 +68,13 @@ export function serveDemo(directory) {
       return
     }
     if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html')
-    if (!existsSync(file)) {
-      response.writeHead(404, { 'content-type': 'text/plain' }).end(`no ${url.pathname}`)
+    const found = existsSync(file)
+    const headers = { 'content-type': found ? (TYPES[extname(file)] ?? 'application/octet-stream') : 'text/plain' }
+    for (const [name, value] of Object.entries(headersFor(rules, url.pathname))) headers[name.toLowerCase()] = value
+    if (!found) {
+      response.writeHead(404, headers).end(`no ${url.pathname}`)
       return
     }
-    const headers = { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' }
-    for (const [name, value] of Object.entries(headersFor(rules, url.pathname))) headers[name.toLowerCase()] = value
     response.writeHead(200, headers)
     createReadStream(file).pipe(response)
   })

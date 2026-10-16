@@ -29,9 +29,9 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)),
 > which a form published at 0.1.0 does not carry until it is regenerated
 > and published again; and the examples page served at
-> https://formancy.ai/data/examples/ once its Worker is created, under a
-> strict Content-Security-Policy, which Cloudflare deploys from `main` and
-> not from a release
+> https://formancy.ai/data/examples/, under a strict
+> Content-Security-Policy, which Cloudflare deploys from `main` and not
+> from a release
 > ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
@@ -40,8 +40,9 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
 > a host page on another origin run in a browser, a run through a real
-> Cloudflare tunnel, a reading of what Cloudflare sends at the demo's
-> address, and a licence a lawyer has reviewed.
+> Cloudflare tunnel, anything that reads what Cloudflare sends at the
+> demo's address, which was read by hand once, on 2026-10-16, and a
+> licence a lawyer has reviewed.
 > [`CHANGELOG.md`](./CHANGELOG.md) says what the release contains and what
 > each step before it found.
 
@@ -58,12 +59,11 @@ Starting the stack accepts the EULA of SQL Server's Developer edition, which
 is not licensed for production.
 
 With nothing installed, the [examples page](#examples) is served at
-https://formancy.ai/data/examples/ once its Worker is created
-([the steps](./.github/REPO-METADATA.md#creating-the-worker)): forms
-generated in your browser from a captured snapshot and drawn by both
-renderers, with no server and no database behind them. Cloudflare then
-deploys it from `main` on every push, and `pnpm demo` runs the same build
-from a clone
+https://formancy.ai/data/examples/: forms generated in your browser from a
+captured snapshot and drawn by both renderers, with no server and no
+database behind them. Cloudflare deploys it from `main` on every push
+([the Worker's settings](./.github/REPO-METADATA.md#the-demos-worker-on-cloudflare)),
+and `pnpm demo` runs the same build from a clone
 ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
 
 ## What it does
@@ -570,9 +570,8 @@ journey, and a delete's confirmations and answers.
 
 `apps/examples` is a page, never published to npm, that shows a generated
 form the way the people filling it in will see it — under both renderers at
-once. It is served at https://formancy.ai/data/examples/ once its Worker
-is created ([the steps](./.github/REPO-METADATA.md#creating-the-worker)),
-and runs from a clone:
+once. It is served at https://formancy.ai/data/examples/, and runs from a
+clone:
 
 ```bash
 pnpm demo                                        # builds, then serves the built page at http://localhost:4391
