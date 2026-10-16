@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -6,8 +7,9 @@ import type { DataClient } from '@formancy/data-client'
 import { applyPresentation, EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { FieldBinding, FormBindings, FormPolicy, PresentationOverrides } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
-import { createConnectionRegistry, createDataServer, createFileConfigurationStore, DRIVER_FACTORIES } from '@formancy/data-server'
+import { createConnectionRegistry, createDataServer, createFileConfigurationStore, createIdentityVerifier, DRIVER_FACTORIES } from '@formancy/data-server'
 import type { ConfigurationStore, ConnectionConfig, ConnectionRegistry, IdentityVerifier } from '@formancy/data-server'
+import { AUDIENCE, ISSUER, TENANT_CLAIM } from '@formancy/data-live-demo/worker'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import { inject } from 'vitest'
@@ -22,8 +24,9 @@ import { inject } from 'vitest'
  *
  * What is fake is what the studio's plane fakes: the identity verifier, which
  * takes literal tokens (verification is identity.test's, and the client
- * suite signs real ones), and `fetch`, which goes through `app.inject`
- * instead of a socket.
+ * suite signs real ones) -- and, for the live demo's page, the server's own
+ * verifier beside it -- and `fetch`, which goes through `app.inject` instead
+ * of a socket.
  */
 
 /** The tokens the fake verifier accepts. Literal, and meaningless anywhere but this suite. */
@@ -34,6 +37,21 @@ const verifyIdentity: IdentityVerifier = async (token) => {
   if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-1', roles: ['clerk'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.otherClerk) return { ok: true, identity: { actor: { id: 'clerk-2', roles: ['clerk'] }, attributes: { tenant: '2' } } }
   return { ok: false, reason: 'ERR_JWS_INVALID' }
+}
+
+/**
+ * With `demoKey`, the literal tokens and the live demo's (0070): a token
+ * the fake does not know is judged by data-server's own verifier, given the
+ * key and configured as deploy/demo's image configures the server -- the
+ * issuer, the audience and `tenant=tid` that its Dockerfile test holds to
+ * the demo's token module. So a persona signed in through the demo's
+ * Worker is whoever that verifier says, as on Cloudflare.
+ */
+async function verifierFor(demoKey: string | undefined): Promise<IdentityVerifier> {
+  if (demoKey === undefined) return verifyIdentity
+  const demo = await createIdentityVerifier({ key: { kind: 'secret', secret: demoKey }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: TENANT_CLAIM } })
+  const literal = new Set<string>(Object.values(TOKENS))
+  return async (token) => (literal.has(token) ? verifyIdentity(token) : demo(token))
 }
 
 /** The fixture's values, from the run's setup: see `Edges`. */
@@ -97,6 +115,12 @@ export interface Plane {
   lose: Map<string, 'after' | 'before'>
   /** The server's store, written straight to as an older release's server wrote it, which this release's routes refuse. */
   store: ConfigurationStore
+  /**
+   * With `startPlane({ demo: true })`, the key the server verifies the live
+   * demo's tokens with: random for each plane, as a Durable Object makes one
+   * for each start (0070). Undefined otherwise, and no demo token is accepted.
+   */
+  demoKey: string | undefined
   db: {
     /** A customer of tenant 1, written through the database's owner, as another application would. */
     insertCustomer(connection: Engine['connection'], no: number, name: string): Promise<void>
@@ -366,10 +390,13 @@ function childForms(engine: Engine, deletes: boolean): Array<{
  * form's policy naming every key a delete of an order acts through; and
  * each engine's `parity.removable`, which other rows refer to with NO ACTION
  * and RESTRICT, is published as `removable` of `ENGINES`, on a connection
- * scoped to `parity`.
+ * scoped to `parity`. With `demo`, the server also accepts the live demo's
+ * tokens, signed with `demoKey` (0070).
  */
-export async function startPlane(options: { children?: boolean; deletes?: boolean } = {}): Promise<Plane> {
+export async function startPlane(options: { children?: boolean; deletes?: boolean; demo?: boolean } = {}): Promise<Plane> {
   const { pg, ms } = inject('databases')
+  // 32 random bytes as base64url: the shape of the key a Durable Object starts its container with.
+  const demoKey = options.demo === true ? randomBytes(32).toString('base64url') : undefined
   const deletes = options.deletes === true
   const connections: ConnectionConfig[] = [
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
@@ -407,7 +434,7 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-host-'))
   const store = createFileConfigurationStore(root)
   // The administrator's trail is the server's suites' subject; here it is required and discarded.
-  const app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  const app = await createDataServer({ verifyIdentity: await verifierFor(demoKey), admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
 
   const admin = async (url: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> => {
     const reply = await app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${TOKENS.admin}` }, payload })
@@ -484,6 +511,7 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
     unreachable,
     lose,
     store,
+    demoKey,
     db: {
       insertCustomer: async (connection, no, name) => {
         if (connection === 'pg') await pgAdmin`insert into sales.customer (tenant_id, customer_no, name) values (1, ${no}, ${name})`

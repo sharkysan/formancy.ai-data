@@ -420,6 +420,9 @@ importers:
       '@formancy/data-fixtures':
         specifier: workspace:*
         version: link:../../packages/data-fixtures
+      '@formancy/data-live-demo':
+        specifier: workspace:*
+        version: link:../live-demo
       '@formancy/data-server':
         specifier: workspace:*
         version: link:../../packages/data-server
