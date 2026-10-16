@@ -221,7 +221,15 @@ origin.
 **The look names packages.** A README picture's look records each face as
 its package, version and Google's version of it, read from the packages
 the app imports. `pnpm pictures --check` no longer refuses the fonts: it
-reads them from `dist`, as the pictures were taken.
+reads them from `dist`, as the pictures were taken. With the faces loaded,
+the host page's `--check` failed host-typeahead in 2 of 3 runs, where
+`main`'s passed 3 of 3 (Chromium 153.0.8010.12 on Linux, 2026-10-16): the
+act counted the lookup queries routed after it began, and the typeahead,
+which searches from no characters, had already put Muster AG on the screen
+from an empty search, so the list was seen before clara's search was asked.
+The act now waits for the answer to her search itself; watched failing with
+that query refused, and passing with its answer 1.5 s late, where the
+counting act failed once in two runs.
 
 ## Consequences
 
