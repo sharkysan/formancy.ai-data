@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
 import type { MouseEvent, ReactElement } from 'react'
+import type { DemoSession } from './demo.js'
 import { SignIn } from './sign-in.js'
 import type { SignedIn } from './sign-in.js'
 
@@ -18,14 +19,16 @@ const Workspace = lazy(() => import('./workspace.js').then((module) => ({ defaul
  * under `@formancy/react` and `@formancy/angular`, with its child rows below.
  *
  * Every request goes through the one client the sign-in made, to this page's
- * own origin. The token lives in that client's closure and nowhere else, so
+ * own origin, under `base` -- `''` unless the live demo's build gives its
+ * path (0070), where `session` also replaces the token with the demo's
+ * people. The token lives in that client's closure and nowhere else, so
  * signing out -- or reloading -- forgets it.
  *
  * The skip link puts the keyboard on main and does nothing else: it does not
  * navigate, so the address, which holds the workspace's state, and the
  * history stay as they were.
  */
-export function Host({ fetch }: { fetch: typeof globalThis.fetch }): ReactElement {
+export function Host({ fetch, base = '', session }: { fetch: typeof globalThis.fetch; base?: string; session?: DemoSession | undefined }): ReactElement {
   const [signedIn, setSignedIn] = useState<SignedIn | null>(null)
   // Signed out from the workspace, rather than arrived: the question takes
   // the keyboard then, and only then -- on arrival the skip link is first.
@@ -55,7 +58,7 @@ export function Host({ fetch }: { fetch: typeof globalThis.fetch }): ReactElemen
 
       {signedIn === null ? (
         <main id="host-main" tabIndex={-1}>
-          <SignIn fetch={fetch} onSignedIn={setSignedIn} focus={signedOut} />
+          <SignIn fetch={fetch} base={base} session={session} onSignedIn={setSignedIn} focus={signedOut} />
         </main>
       ) : (
         <Suspense

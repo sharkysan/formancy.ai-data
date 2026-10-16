@@ -125,6 +125,46 @@ h1:where(:not(.sheet *, .grid-bench *)) {
   font-size: 0.8125rem;
 }
 
+/* The live demo's people (0070): each button with what that person may do
+   under it, at its own width rather than the card's. */
+.personas {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.personas li {
+  display: grid;
+  justify-items: start;
+  gap: 0.25rem;
+}
+
+.personas .hint {
+  margin: 0;
+}
+
+/* What the page is, for a visitor who reached the demo without the README:
+   the examples page's line, and its link -- violet underline, text as
+   bright as the page's own. */
+.standing {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.standing a {
+  color: var(--text);
+  text-decoration-color: color-mix(in srgb, var(--client) 55%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.2em;
+}
+
+.standing a:hover {
+  text-decoration-color: var(--client);
+}
+
 /* A refusal: the warm colour of something to look at, as every refusal on
    the page is -- a refused list, a refused save, the stale notice. */
 .problem-box {

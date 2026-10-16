@@ -10,6 +10,7 @@ import '@fontsource/ibm-plex-mono/400.css'
 import '@fontsource/ibm-plex-mono/500.css'
 import '@formancy/themes/blueprint.css'
 import './host.css'
+import { demoBase, demoSession } from './demo.js'
 import { Host } from './host.js'
 
 const root = document.getElementById('root')
@@ -17,8 +18,18 @@ if (root === null) throw new Error('index.html has no #root to render into')
 
 // The browser's own fetch, bound: the page is served from the data server's
 // origin, so every request the client makes is same-origin (0024, 0029).
+const fetch = window.fetch.bind(window)
+
+// Built with `--mode demo` (`build:demo`), the page is the live demo's
+// (0070): its routes are beside its files, wherever it is served, and a
+// visitor signs in as one of the demo's people. Vite writes the mode into
+// the build as a constant, so the ordinary build drops this branch and
+// demo.ts with it.
+const demo = import.meta.env.MODE === 'demo'
+const base = demo ? demoBase(window.location.pathname) : ''
+
 createRoot(root).render(
   <StrictMode>
-    <Host fetch={window.fetch.bind(window)} />
+    <Host fetch={fetch} base={base} session={demo ? demoSession(fetch, base) : undefined} />
   </StrictMode>,
 )
