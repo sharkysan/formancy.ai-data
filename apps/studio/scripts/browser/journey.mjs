@@ -120,6 +120,23 @@ export function journey(plane, check) {
       const down = presentation.getByRole('button', { name: 'Move down Customer' })
       check('Move down keeps the keyboard on the button pressed', await focusAfterEnter(page, down, () => presentation.getByText('Moved Customer down.').waitFor(), down))
     }],
+    // 0075: a field moved to another section is a row made again in the
+    // other section's list, so the button pressed is gone and the keyboard
+    // is given to the moved field's button for the way back. Measured with
+    // Customer in Record, and then back in Order, last, where the way back
+    // puts it.
+    ['Presentation, a field moved to another section by keyboard', async (page) => {
+      const presentation = step(page, 'Presentation')
+      const there = presentation.getByRole('button', { name: 'Move to Record Customer' })
+      const back = presentation.getByRole('button', { name: 'Move to Order Customer' })
+      check('Move to keeps the keyboard on the field moved', await focusAfterEnter(page, there, () => presentation.getByText('Moved Customer to Record.').waitFor(), back))
+    }],
+    ['Presentation, a field moved back by keyboard', async (page) => {
+      const presentation = step(page, 'Presentation')
+      const there = presentation.getByRole('button', { name: 'Move to Record Customer' })
+      const back = presentation.getByRole('button', { name: 'Move to Order Customer' })
+      check('Move to keeps the keyboard on the field moved back', await focusAfterEnter(page, back, () => presentation.getByText('Moved Customer to Order.').waitFor(), there))
+    }],
     ['Presentation, a label refused', async (page) => {
       await step(page, 'Presentation').getByLabel('Label of notes').fill('')
     }],

@@ -62,17 +62,23 @@ function LabelInput({ id, label, value, commit }: { id: string; label: ReactElem
  * `@formancy/builder-react`'s panes (0024).
  *
  * The controls offer exactly what cannot break a binding: a field's label, a
- * section's label, a field's place among its neighbours, and whether it spans
- * the row. Nothing here adds, removes, renames or retypes a field, because a
- * field is a column the bindings name, and the generator is what decides those.
- * A draft carried from another (0030) lists what could not be carried above
- * the controls, and what it offers is a label too.
+ * section's label, a field's place among its neighbours, whether it spans
+ * the row, and which generated section it is in (0075). Nothing here adds,
+ * removes, renames or retypes a field, because a field is a column the
+ * bindings name, and the generator is what decides those. A draft carried
+ * from another (0030) lists what could not be carried above the controls,
+ * and what it offers is a label too.
  */
 export function PresentationStep({ session, carried = null }: { session: BuilderSession; carried?: Carried | null }): ReactElement {
   const document = useDocument(session)
   const [said, setSaid] = useState<Said | null>(null)
   const focusAfter = useFocusAfterRender()
   const layout = document.layouts?.[0]
+  /** The sections a field may move between: each top-level one holding one grid, by its index and current label (0075). */
+  const sections = (layout?.nodes ?? []).flatMap((node, index) => {
+    const grid = node.kind === 'section' && node.children.length === 1 ? node.children[0] : undefined
+    return node.kind === 'section' && typeof node.label === 'string' && grid?.kind === 'table' ? [{ index, name: node.label, length: grid.children.length }] : []
+  })
 
   function report(outcome: CommandOutcome, done: string): CommandOutcome {
     setSaid(outcome.ok ? { ok: true, message: done } : { ok: false, message: outcome.message })
@@ -92,6 +98,17 @@ export function PresentationStep({ session, carried = null }: { session: Builder
       // goes to its partner rather than falling to the page.
       const end = by < 0 ? at + by === 0 : at + by === siblings - 1
       if (outcome.ok && end) focusAfter(`${id}-${by < 0 ? 'down' : 'up'}`)
+    }
+    // A field in a section's grid may go to the end of another section's
+    // grid. A button, not a select: arrow keys on a closed select change it,
+    // and would move the field on every keypress. The row is made again in
+    // the other section's list, so the keyboard is given to the button that
+    // takes the field back. A section keeps one field at least.
+    const home = path.length === 3 && path[1] === 0 && sections.some((section) => section.index === path[0]) ? path[0] : undefined
+    const elsewhere = home === undefined ? [] : sections.filter((section) => section.index !== home)
+    const moveTo = (target: { index: number; name: string; length: number }) => {
+      const outcome = report(session.moveLayoutNode(address, { layout: address.layout, parent: [target.index, 0], index: target.length }), `Moved ${label} to ${target.name}.`)
+      if (outcome.ok) focusAfter(`${id}-to-${String(home)}`)
     }
     return (
       <li key={key} className="placed">
@@ -115,6 +132,11 @@ export function PresentationStep({ session, carried = null }: { session: Builder
           <button type="button" id={`${id}-down`} className="button" disabled={at === siblings - 1} onClick={() => move(1)}>
             Move down{' '}<span className="visually-hidden">{label}</span>
           </button>
+          {elsewhere.map((target) => (
+            <button key={target.index} type="button" id={`${id}-to-${String(target.index)}`} className="button" disabled={siblings === 1} onClick={() => moveTo(target)}>
+              Move to {target.name}{' '}<span className="visually-hidden">{label}</span>
+            </button>
+          ))}
           {inTable ? (
             <span className="check">
               <input
@@ -182,8 +204,8 @@ export function PresentationStep({ session, carried = null }: { session: Builder
   return (
     <>
       <p className="lede">
-        What a person filling the form reads, and in what order. Each field is a column the bindings name, so nothing here
-        adds, removes or renames one: that is the generator&rsquo;s, from the table.
+        What a person filling the form reads, in what order and in which section. Each field is a column the bindings name, so
+        nothing here adds, removes or renames one: that is the generator&rsquo;s, from the table.
       </p>
       {carried === null ? null : <CarriedPanel session={session} carried={carried} report={report} />}
       <div className="toolbar">

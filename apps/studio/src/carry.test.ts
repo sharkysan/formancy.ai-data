@@ -4,10 +4,10 @@
 // proposal to the next, with proposals the real server generated.
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createBuilderSession } from '@formancy/builder-core'
-import type { FormPolicy } from '@formancy/data-core'
+import type { FormBindings, FormPolicy, PresentationConflict } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { AdminClient, Proposal, ProposalRequest } from './api.js'
-import { asked, carryDraft, freshFields } from './carry.js'
+import { asked, carriedAgain, carryDraft, freshFields } from './carry.js'
 import type { Carried } from './carry.js'
 import { OWNER_SNAPSHOT, startPlane, TOKENS, withColumn, withoutColumn } from './test-server.js'
 import type { TestPlane } from './test-server.js'
@@ -94,5 +94,38 @@ describe('the keys a draft still asks about', () => {
   test('asks again about a removed key that a through names again, with no role on its field', () => {
     expect(asked(removed, policy([]))).toEqual([])
     expect(asked(removed, policy(['order']))).toEqual([ORDER_KEY])
+  })
+})
+
+describe('what "Generate again" keeps', () => {
+  const NO_FIELDS = { fields: [] } as unknown as FormBindings
+  const moveDropped: PresentationConflict = {
+    kind: 'move-dropped',
+    field: 'customer',
+    anchor: { kind: 'lookup', foreignKey: 'fk_order_customer' },
+    section: { label: 'Record', occurrence: 0 },
+    to: { label: 'Order', occurrence: 0 },
+    resolution: 'dropped',
+    message: 'The move of customer to section "Record" was dropped.',
+  }
+  const sectionGone: PresentationConflict = {
+    kind: 'field-gone',
+    field: 'notes',
+    anchor: { kind: 'column', column: 'notes' },
+    property: 'section',
+    yours: { label: 'Record', occurrence: 0 },
+    resolution: 'dropped',
+    message: 'The section "Record" you chose for notes was dropped.',
+  }
+  const followed: PresentationConflict = { kind: 'field-rekeyed', field: 'client', from: 'customer', anchor: { kind: 'lookup', foreignKey: 'fk_order_customer' }, resolution: 'followed', message: 'customer is now client.' }
+
+  // What a regeneration dropped is no longer in the draft for the next
+  // rebase to report, so "Generate again" keeps every conflict that dropped
+  // something -- a move whose section went (0075) as much as a label -- and
+  // the rebase reports again what it still follows. Watched failing with the
+  // list of kinds kept before 0075, which forgot the dropped move.
+  test('keeps every conflict that dropped something, a dropped move and a moved field gone included', () => {
+    const earlier: Carried = { from: 'version 1', version: 1, conflicts: [moveDropped, sectionGone, followed], fresh: [], undecided: [], kept: [], removed: [] }
+    expect(carriedAgain(earlier, NO_FIELDS, { conflicts: [], fresh: [] }, NO_FIELDS).conflicts).toEqual([moveDropped, sectionGone])
   })
 })
