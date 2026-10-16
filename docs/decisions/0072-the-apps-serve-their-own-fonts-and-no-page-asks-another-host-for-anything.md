@@ -206,7 +206,12 @@ reads them from `dist`, as the pictures were taken.
 - **The look moves once.** IBM Plex Sans at 500 and 600 is anti-aliased
   differently, so every README picture is retaken with `pnpm pictures
   --all` on the look's Linux Chromium: 0038 refuses two looks in one
-  record.
+  record. Retaken on 2026-10-16 in `mcr.microsoft.com/playwright:v1.63.0-noble`,
+  Chromium 153.0.8010.12: every picture's bytes changed and no picture's
+  text. `studio-policy` and `studio-through` came out one CSS pixel
+  shorter, as a retake of `main` in Google's faces made them the same day,
+  because the studio's stylesheet changed after they were taken; no other
+  picture changed size.
 - **A font fix reaches the pages only by a version bump here,** and nothing
   says one is due; keeping to upstream's release is review's.
 - **No width axis.** A rule asking Archivo for a width would draw the
