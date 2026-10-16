@@ -66,6 +66,44 @@ the approval has written it; the studio shows a draft, not what it changes
 from the version it replaces; a deployment under review needs two people;
 and roles are still read only from the token's `roles` claim.
 
+- **A lookup a person can search is generated as a typeahead, and the host
+  page draws the control the published form names**
+  ([0066](docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
+  The generator writes `widget: "typeahead"` on a lookup that shows a text
+  or whole-number column, which is what a search matches; one that shows
+  neither stays a plain select of its first page, and its note in the
+  studio's Generate step says how to make it searchable. Why: a plain
+  select lists one page and never reaches the rest, so on every host but
+  the reference page a row past the first page could not be chosen; and
+  the host page, which drew every lookup as a typeahead itself, drew the
+  order line's date-only lookup as one whose every typed search the server
+  refused, 400 `not-searchable`. Generated forms now carry `widget`
+  (`@formancy/data-core`), and the host page no longer chooses a lookup's
+  control. The generator also refuses a lookup that shows a binary,
+  rowversion or unsupported column, whose list the server never could
+  build, where it used to write one whose note named a control; the
+  studio offers such a column disabled, and `isDisplayType`, which
+  `@formancy/data-core` now exports, is the one rule the generator, the
+  server and the studio read. No `@formancy/*` version changes.
+
+  **Upgrading from 0.1.0:** a form published at 0.1.0 names no widget, so
+  every host, the host page now included, draws its lookups as plain
+  selects of their first page until the form is regenerated in the
+  studio's Drift step and published again -- under review, submitted and
+  approved. Restoring such a version brings the plain selects back. A
+  version file exported from 0.1.0 is refused by this release's import as
+  not what this server generates: upgrade the source deployment and
+  regenerate there first, or propose the form again in the target.
+
+What the typeahead costs, in 0066: a short list is a typeahead too, and
+nobody can choose a plain list for it; a lookup that shows no text or whole
+number still lists only its first page; when that list's one search fails,
+the renderer says "Type to try again." under a control nobody can type
+into, and asks again only when the form is drawn again; a version
+published before it with a lookup no label can spell still cannot list
+it until regenerated; and the regeneration report does not say that a
+control changed.
+
 ## 0.1.0 — 2026-10-16
 
 **The first release of Formancy Data.** It turns an existing PostgreSQL or

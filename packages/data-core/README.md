@@ -37,6 +37,14 @@ browser.
   `GENERATED_SPEC_VERSION` is that `"3"`, which the data server also holds
   every stored version to
   ([0042](../../docs/decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)).
+  A lookup is a select over its option source, with `widget: "typeahead"`
+  when its display includes a text or whole-number column, which is what a
+  search matches, and a plain select of its first page otherwise; its note
+  says which, and for a plain select what to show to make it searchable.
+  A display column with no text form -- binary, rowversion, unsupported
+  -- is refused, as `buildLookupConfig` refuses it; `isDisplayType` is
+  that rule
+  ([0066](../../docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
 - **Codecs**: `codecFor(column)` checks and canonicalises one API value for a
   column — decimals as strings, never rounded; integers past 2^53 as strings;
   formancy's date and time shapes on real days
