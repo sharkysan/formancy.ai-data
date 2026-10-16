@@ -1,4 +1,4 @@
-import rateLimit from '@fastify/rate-limit'
+import rateLimit, { normalizeIP } from '@fastify/rate-limit'
 import { DEFAULT_LOOKUP_DEADLINE_MS } from '@formancy/data-core'
 import Fastify, { LogController } from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
@@ -14,6 +14,7 @@ import { adminRoutes } from './routes/admin.js'
 import type { AdminOptions } from './routes/admin.js'
 import { runtimeRoutes } from './routes/runtime.js'
 import type { RuntimeOptions } from './routes/runtime.js'
+import { clientAddress, trustedProxiesProblem } from './trusted-proxies.js'
 
 export interface DataServerOptions {
   verifyIdentity: IdentityVerifier
@@ -29,11 +30,25 @@ export interface DataServerOptions {
    * is a request per pause in typing. What it is for is the other case:
    * somebody replaying tokens at the verifier as fast as the network allows.
    * The runnable server reads `FORMANCY_DATA_RATE_LIMIT` for it (main.ts).
-   * Fastify's `trustProxy` is not offered, so behind a reverse proxy every
-   * client shares the proxy's address and one bucket: the setting raises that
-   * bucket, it does not split it.
+   * The client address is the peer's, unless `trustedProxies` names it:
+   * behind a reverse proxy it does not name, every client shares the
+   * proxy's address and one bucket, which the setting raises and does not
+   * split. An IPv6 client is counted by its /64.
    */
   rateLimit?: { max: number; timeWindowMs: number }
+  /**
+   * The proxies whose X-Forwarded-For is believed (0071): IP addresses and
+   * CIDR ranges, checked as `FORMANCY_DATA_TRUSTED_PROXIES` is, so `*`, a
+   * hop count, an empty entry or a range written with an interface's
+   * address stops the server here. A request whose peer is in the list is
+   * counted by the rate limiter and named in the log by the address Fastify
+   * reads from X-Forwarded-For: from the right, the first address not in
+   * the list. One that is not an IP address is not believed. Empty or
+   * absent, nothing is trusted and every request is its peer's. Fastify's
+   * request.host and request.protocol then follow X-Forwarded-Host and
+   * X-Forwarded-Proto from a listed peer too; nothing here reads either.
+   */
+  trustedProxies?: readonly string[]
   /**
    * The administrator's plane: connections, discovery, proposals, publication
    * and drift. Absent, none of those routes exist — a server without a store
@@ -94,8 +109,11 @@ declare module 'fastify' {
  * (0033). Fastify's default writes the URL and the Host as sent.
  */
 function requestForLog(request: FastifyRequest) {
-  const port = request.socket.remotePort
-  return { method: request.method, route: request.routeOptions.url ?? null, remoteAddress: request.ip, ...(port === undefined ? {} : { remotePort: port }) }
+  const address = clientAddress(request)
+  // The socket's port is the peer's: beside an address a trusted proxy
+  // forwarded it would be the proxy's connection, so it is left out (0071).
+  const port = address === request.socket.remoteAddress ? request.socket.remotePort : undefined
+  return { method: request.method, route: request.routeOptions.url ?? null, remoteAddress: address, ...(port === undefined ? {} : { remotePort: port }) }
 }
 
 /** Fastify's request lines, but for its 404 line, which names the path it was sent: here, a 404 is named by its method. */
@@ -143,6 +161,13 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   const lookupDeadlineMs = options.runtime?.lookupDeadlineMs ?? DEFAULT_LOOKUP_DEADLINE_MS
   const deadlineRefused = lookupDeadlineProblem('runtime.lookupDeadlineMs', lookupDeadlineMs)
   if (deadlineRefused !== undefined) throw new Error(deadlineRefused)
+  // The proxies by the setting's rule (trusted-proxies.ts, 0071): a list
+  // that would believe every client about itself stops the server here. A
+  // copy is checked and handed to Fastify, as the origins are.
+  const offered = options.trustedProxies ?? []
+  const trustedProxies = Array.isArray(offered) ? Object.freeze([...offered]) : offered
+  const proxiesRefused = trustedProxiesProblem(trustedProxies)
+  if (proxiesRefused !== undefined) throw new Error(proxiesRefused)
 
   const logger = options.logger ?? false
   const app = Fastify({
@@ -154,6 +179,9 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
     // form could be proposed and never published. Lookup sources and
     // connection ids are shorter.
     routerOptions: { maxParamLength: CONFIGURATION_ID_MAX_LENGTH },
+    // Absent unless proxies are named: Fastify then reads no X-Forwarded-*
+    // header at all, as before 0071.
+    ...(trustedProxies.length === 0 ? {} : { trustProxy: [...trustedProxies] }),
   })
 
   // Nothing this server answers may be kept by a cache (0037). A form id may
@@ -173,8 +201,10 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   // Global, unlike formancy's server, where the management plane is
   // authenticated by its own sessions: every route here except /health is
   // reachable by anybody holding a browser and does work before refusing.
+  // Counted by the address the log names (trusted-proxies.ts), masked as the
+  // limiter's own default key is: an IPv6 client by its /64.
   const limit = options.rateLimit ?? DEFAULT_RATE_LIMIT
-  await app.register(rateLimit, { global: true, max: limit.max, timeWindow: limit.timeWindowMs })
+  await app.register(rateLimit, { global: true, max: limit.max, timeWindow: limit.timeWindowMs, keyGenerator: (request) => normalizeIP(clientAddress(request)) })
 
   // A path a proxy could read differently from the router is answered here,
   // before any route's work (paths.ts, 0037): before a plane's hooks, before

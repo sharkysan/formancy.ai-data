@@ -850,6 +850,62 @@ jobs:
           docker rm -f data-server-no-origins > /dev/null
           check "With FORMANCY_DATA_CORS_ORIGINS empty and no store, a preflight for GET /v1/forms" "$empty" "404 -"
 
+      # FORMANCY_DATA_TRUSTED_PROXIES (0071). trusted-proxies.test.ts and
+      # forwarded.test.ts hold the setting and whom the server believes on
+      # the source; only the image shows that main.ts reads it and hands it
+      # to the server. The requests are sent from inside the container, so
+      # the peer is 127.0.0.1 on every runner, whatever Docker's port
+      # forwarding makes of a request from the host. With 127.0.0.1 named and
+      # a limit of two, each forwarded address is a bucket of its own: the
+      # fourth request, from a second address, is answered 401, where a
+      # server that ignored the setting answers 429. `true` stops a server
+      # that is otherwise configured, naming the setting.
+      - name: FORMANCY_DATA_TRUSTED_PROXIES splits the limit by the address a named proxy forwards, and true stops the server
+        run: |
+          configured=(
+            -e FORMANCY_DATA_ISSUER=https://host.example
+            -e FORMANCY_DATA_AUDIENCE=formancy-data
+            -e FORMANCY_DATA_IDENTITY_SECRET=env:HOST_SECRET
+            -e HOST_SECRET=a-shared-secret-of-at-least-thirty-two-bytes
+          )
+          docker run -d --name data-server-proxied             "${configured[@]}" -e FORMANCY_DATA_RATE_LIMIT=2 -e FORMANCY_DATA_TRUSTED_PROXIES=127.0.0.1 formancy/data-server:ci
+          up=false
+          for _ in $(seq 1 30); do
+            docker exec data-server-proxied node -e "fetch('http://127.0.0.1:4390/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))" && up=true && break
+            sleep 1
+          done
+          if [ "$up" != true ]; then docker logs data-server-proxied; exit 1; fi
+          statuses=$(docker exec data-server-proxied node --input-type=module -e "
+            const from = ['198.51.100.7', '198.51.100.7', '198.51.100.7', '198.51.100.8']
+            const answers = []
+            for (const address of from) answers.push((await fetch('http://127.0.0.1:4390/v1/whoami', { headers: { 'x-forwarded-for': address } })).status)
+            console.log(answers.join(' '))
+          ")
+          docker rm -f data-server-proxied > /dev/null
+          if [ "$statuses" != "401 401 429 401" ]; then
+            echo "::error::With FORMANCY_DATA_TRUSTED_PROXIES=127.0.0.1, three requests forwarded for one address and one for another answered ${statuses}; expected 401 401 429 401"
+            exit 1
+          fi
+
+          docker run -d --name data-server-trust-all             "${configured[@]}" -e FORMANCY_DATA_TRUSTED_PROXIES=true formancy/data-server:ci
+          for _ in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Running}}' data-server-trust-all)" = false ] && break
+            sleep 1
+          done
+          running=$(docker inspect -f '{{.State.Running}}' data-server-trust-all)
+          code=$(docker inspect -f '{{.State.ExitCode}}' data-server-trust-all)
+          output=$(docker logs data-server-trust-all 2>&1)
+          docker rm -f data-server-trust-all > /dev/null
+          echo "$output"
+          if [ "$running" != false ] || [ "$code" = 0 ]; then
+            echo "::error::With FORMANCY_DATA_TRUSTED_PROXIES=true the server was still running after 30 s, or exited 0"
+            exit 1
+          fi
+          if ! echo "$output" | grep -q 'FORMANCY_DATA_TRUSTED_PROXIES: entry 1 trusts every peer'; then
+            echo "::error::With FORMANCY_DATA_TRUSTED_PROXIES=true the server stopped without naming the setting"
+            exit 1
+          fi
+
       - name: Keep what this job found, for the report
         id: collect
         if: ${{ !cancelled() }}

@@ -12,6 +12,7 @@ import { lookupDeadlineSetting } from './lookup-deadline.js'
 import { publisherRolesSetting } from './publisher-roles.js'
 import { rateLimitSetting } from './rate-limit.js'
 import { resolveSecret } from './secrets.js'
+import { trustedProxiesSetting } from './trusted-proxies.js'
 
 /**
  * The runnable server: `node dist/main.mjs`.
@@ -30,6 +31,8 @@ import { resolveSecret } from './secrets.js'
  *   FORMANCY_DATA_IDENTITY_ALGORITHM               RS256, ES256, EdDSA or HS256; read again on SIGHUP (0059)
  *   FORMANCY_DATA_ATTRIBUTES                       e.g. "tenant=tid,region=reg"
  *   FORMANCY_DATA_RATE_LIMIT                       requests a minute per client address, default 600
+ *   FORMANCY_DATA_TRUSTED_PROXIES                  the proxies whose X-Forwarded-For names the client address,
+ *                                                  IP addresses and CIDR ranges, comma-separated; unset: none (0071)
  *   FORMANCY_DATA_CORS_ORIGINS                     origins the runtime plane answers, comma-separated, each
  *                                                  exactly as a browser sends Origin; empty or unset: none (0060)
  *   FORMANCY_DATA_LOOKUP_DEADLINE_MS               how long a lookup statement may run before it is stopped,
@@ -64,6 +67,17 @@ function attributeMap(text: string | undefined): Record<string, string> {
 const limit = rateLimitSetting(process.env['FORMANCY_DATA_RATE_LIMIT'])
 if (!limit.ok) {
   console.error(limit.problem)
+  process.exit(1)
+}
+
+// Read before anything opens, as the limit is: a list that would believe
+// every client about itself -- `true`, `*`, a prefix of 0, a hop count --
+// an empty entry, or anything that is not an address or a range stops the
+// process here (trusted-proxies.ts, 0071). Read once: changing it is a
+// restart.
+const proxies = trustedProxiesSetting(process.env['FORMANCY_DATA_TRUSTED_PROXIES'])
+if (!proxies.ok) {
+  console.error(proxies.problem)
   process.exit(1)
 }
 
@@ -163,9 +177,9 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
   planes = servedPlanes({ registry, store, adminRoles, publisherRoles: review.publisherRoles, auditKey, origins: origins.origins, lookupDeadlineMs: deadline.ms, log: () => app.log })
 }
 
-const app = await createDataServer({ verifyIdentity, logger: true, rateLimit: limit.rateLimit, ...planes })
+const app = await createDataServer({ verifyIdentity, logger: true, rateLimit: limit.rateLimit, trustedProxies: proxies.trustedProxies, ...planes })
 const identityKeys = keyFile === undefined ? {} : { identityKeys: { kids: keyFile.current().kids, leftOut: keyFile.current().leftOut } }
-app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, review: planes.admin?.publisherRoles !== undefined, connections: registry?.ids() ?? [], ...identityKeys }, 'planes')
+app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, review: planes.admin?.publisherRoles !== undefined, connections: registry?.ids() ?? [], trustedProxies: proxies.trustedProxies, ...identityKeys }, 'planes')
 
 // SIGHUP reads the key set file again, and with a one-key setting says it
 // read nothing; either way it no longer stops the server, which is Node's
