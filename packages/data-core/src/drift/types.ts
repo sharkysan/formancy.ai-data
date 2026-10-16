@@ -82,13 +82,19 @@ export type DriftKind =
   | 'row-security-changed'
   /** The snapshot was taken as another principal: privileges and policies are evaluated for someone else now. */
   | 'account-changed'
+  /**
+   * The current snapshot was read from a server this release was not tested
+   * on (0068), as `serverStanding` decides: on every review against it, and
+   * always for review. Nothing is stopped for it.
+   */
+  | 'server-untested'
 
 /**
  * What a change is about. An object is two strings and never one dotted
  * string, for the reason `ObjectRef` gives.
  */
 export type DriftSubject =
-  /** A gap about the discovery scope as a whole, or the account the snapshot was taken as. */
+  /** A gap about the discovery scope as a whole, the account the snapshot was taken as, or the server it was read from. */
   | { kind: 'scope' }
   /** A gap about one schema: SQL Server's catalog shows the account nothing in it (0027). */
   | { kind: 'schema'; schema: string }
