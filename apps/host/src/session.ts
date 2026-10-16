@@ -3,7 +3,7 @@ import type { FormEngine } from '@formancy/core'
 import { fieldProblems, isUnknownWrite, lookupSources } from '@formancy/data-client'
 import type { DataClient, FormRecord, LookupOperation, PublishedForm, Reconciliation, UnknownWrite, WriteOutcome } from '@formancy/data-client'
 import type { Work } from './leave.js'
-import { disableFields, drawLookupsAsTypeaheads } from './widgets.js'
+import { disableFields } from './widgets.js'
 
 /*
  * One pane's session: the engine that holds a person's answers, the record
@@ -155,9 +155,9 @@ function said(outcome: WriteOutcome, created: boolean): string {
 }
 
 export function createSession({ client, formId, definition, renderer, namespace, fixed = [] }: SessionOptions) {
-  // The host's copy of the form: the published one, with its lookups drawn
-  // as typeaheads and the fields the page fills in disabled.
-  const form = disableFields(drawLookupsAsTypeaheads(definition.form), fixed)
+  // The host's copy of the form: the published one, with the fields the page
+  // fills in disabled.
+  const form = disableFields(definition.form, fixed)
   // A saved record this person may not update is drawn with every field
   // disabled, as the generator draws a field nothing may write: presentation
   // only, the server refuses the update (UX-SPEC D19).

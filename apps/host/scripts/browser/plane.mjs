@@ -77,8 +77,8 @@ export async function startPlane() {
   const publish = async ({ formId, title, table, lookups, policy }) => {
     const proposal = await call(TOKENS.admin, '/v1/form-proposals', { connection: 'pg', root: { schema: 'sales', name: table }, formId, title, lookups, versionColumn: 'row_version' })
     // Published as the generator made it (0030 refuses anything but
-    // presentation over the generated base); the page draws its lookups as
-    // typeaheads itself.
+    // presentation over the generated base), which draws a lookup as a
+    // typeahead where it can be searched (0066).
     const form = proposal.form
     await call(TOKENS.admin, `/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection: 'pg', generation: proposal.generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings: proposal.bindings, policy: policy(proposal.bindings), snapshot: proposal.snapshot } })
     return form
