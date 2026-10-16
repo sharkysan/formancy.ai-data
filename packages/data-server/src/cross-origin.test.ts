@@ -97,14 +97,14 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-/** Both planes as main.ts serves them, one sink each into `events`, the log into `lines`, the runtime answering `origins`. */
-async function serve(origins: readonly string[] = [LISTED], rateLimit = { max: 100_000, timeWindowMs: 60_000 }): Promise<FastifyInstance> {
+/** Both planes as main.ts serves them, one sink each into `events`, the log into `lines`, the runtime answering `origins`; under review (0065) when `review`, so the draft routes are there too. */
+async function serve(origins: readonly string[] = [LISTED], rateLimit = { max: 100_000, timeWindowMs: 60_000 }, review = false): Promise<FastifyInstance> {
   const sink = (event: AuditEvent) => void events.push(event)
   const app = await createDataServer({
     verifyIdentity,
     rateLimit,
     logger: { stream: { write: (line: string) => void lines.push(JSON.parse(line) as (typeof lines)[number]) } },
-    admin: { registry: registry(), store, adminRoles: ['data-admin'], audit: { sink } },
+    admin: { registry: registry(), store, adminRoles: review ? ['data-admin', 'data-publisher'] : ['data-admin'], ...(review ? { publisherRoles: ['data-publisher'] } : {}), audit: { sink } },
     runtime: { registry: registry(), store, audit: { sink }, origins },
   })
   servers.push(app)
@@ -206,9 +206,10 @@ describe('the differential: a preflight is granted exactly where the request is 
   // OPTIONS route granting every path under /v1/forms/; a scratch
   // administrator route GET /v1/forms/menu with the check that the method
   // reaches the same parameters removed (and the check at ready off); and
-  // the key built the audit's way, HEAD as GET.
+  // the key built the audit's way, HEAD as GET. The administrator's plane
+  // is under review (0065), so every route its table names is in the router.
   test('for every route the router holds, sampled with the other plane’s names', async () => {
-    const app = await serve()
+    const app = await serve([LISTED], undefined, true)
     await app.ready()
     const routes = routesOf(app)
 

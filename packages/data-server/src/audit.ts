@@ -32,6 +32,12 @@ export type AdminOperation =
   | 'regeneration'
   | 'restore'
   | 'import'
+  | 'administration'
+  | 'draft-queue'
+  | 'draft-submit'
+  | 'draft-read'
+  | 'draft-approve'
+  | 'draft-reject'
 
 /**
  * One operational audit event of the runtime plane: who asked for what,
@@ -61,8 +67,10 @@ export interface RuntimeAuditEvent extends AuditEventBase {
 /**
  * One operational audit event of the administrator's plane (0033): who
  * connected, discovered, proposed, published, read, compared, regenerated,
- * restored or imported, against which connection and which version, and how
- * it ended.
+ * restored or imported, and under review (0065) who submitted, read,
+ * approved, rejected or withdrew which draft, against which connection and
+ * which version, and how it ended. Who approved a version is said here and
+ * nowhere else: the version file is the bundle alone.
  *
  * Names and numbers only. Never the bundle, the policy or a role it names,
  * a snapshot, a generation request, a drift report or any message.
@@ -76,10 +84,12 @@ export interface AdminAuditEvent extends AuditEventBase {
   form: string | null
   /** The version read, compared, regenerated from, or written. */
   formVersion: number | null
-  /** Publish, restore and import: the base the administrator said they edited, or saw newest. */
+  /** Publish, restore, import and a draft's routes: the base the administrator said they edited, or saw newest. */
   expectedBase: number | null
   /** Restore only: the version the new one copies, which nothing on disk records. */
   restoredFrom: number | null
+  /** Under review (0065): the draft addressed, or the one a submit wrote; an approval's `formVersion` is the version it wrote. */
+  draft: number | null
 }
 
 /** Both planes, told apart by `plane`. A typed sink narrows on it before reading a plane's own fields. */

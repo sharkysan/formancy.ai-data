@@ -353,12 +353,18 @@ Every route the server registers, and what each door does with it:
 | Method | Path | Plane | Administrator’s door | Runtime door |
 | --- | --- | --- | --- | --- |
 | `GET` | `/health` | shared | behind Access | not forwarded |
+| `GET` | `/v1/administration` | administrator | behind Access | not forwarded |
 | `GET` | `/v1/connections` | administrator | behind Access | not forwarded |
 | `GET` | `/v1/connections/:id/metadata` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/connections/:id/test` | administrator | behind Access | not forwarded |
+| `GET` | `/v1/drafts` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/form-proposals` | administrator | behind Access | not forwarded |
 | `GET` | `/v1/forms` | runtime | behind Access | forwarded |
 | `GET` | `/v1/forms/:id` | runtime | behind Access | forwarded |
+| `POST` | `/v1/forms/:id/drafts` | administrator | behind Access | not forwarded |
+| `GET` | `/v1/forms/:id/drafts/:draft` | administrator | behind Access | not forwarded |
+| `POST` | `/v1/forms/:id/drafts/:draft/approval` | administrator | behind Access | not forwarded |
+| `POST` | `/v1/forms/:id/drafts/:draft/rejection` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/forms/:id/drift` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/forms/:id/imports` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/forms/:id/lookups/:source/query` | runtime | behind Access | forwarded |
@@ -599,12 +605,18 @@ doors-check: formancy.example.com (administrator), team example-team
 pass  GET https://formancy.example.com/studio/  Access answered first
 pass  GET https://formancy.example.com/host/  Access answered first
 pass  GET https://formancy.example.com/health  Access answered first
+pass  GET https://formancy.example.com/v1/administration  Access answered first
 pass  GET https://formancy.example.com/v1/connections  Access answered first
 pass  GET https://formancy.example.com/v1/connections/erp/metadata  Access answered first
 pass  POST https://formancy.example.com/v1/connections/erp/test  Access answered first
+pass  GET https://formancy.example.com/v1/drafts  Access answered first
 pass  POST https://formancy.example.com/v1/form-proposals  Access answered first
 pass  GET https://formancy.example.com/v1/forms  Access answered first
 pass  GET https://formancy.example.com/v1/forms/order  Access answered first
+pass  POST https://formancy.example.com/v1/forms/order/drafts  Access answered first
+pass  GET https://formancy.example.com/v1/forms/order/drafts/1  Access answered first
+pass  POST https://formancy.example.com/v1/forms/order/drafts/1/approval  Access answered first
+pass  POST https://formancy.example.com/v1/forms/order/drafts/1/rejection  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/drift  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/imports  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/lookups/customer/query  Access answered first
@@ -622,7 +634,7 @@ pass  GET https://formancy.example.com/v1/forms/order/versions/1  Access answere
 pass  GET https://formancy.example.com/v1/forms/order/versions/latest  Access answered first
 pass  GET https://formancy.example.com/v1/whoami  Access answered first
 pass  GET http://formancy.example.com/studio/  redirected to HTTPS
-26 requests, 26 as expected, 0 not.
+32 requests, 32 as expected, 0 not.
 ```
 
 <!-- end generated -->

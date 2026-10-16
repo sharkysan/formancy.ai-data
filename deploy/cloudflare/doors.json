@@ -13,6 +13,14 @@
     },
     {
       "method": "GET",
+      "path": "/v1/administration",
+      "plane": "administrator",
+      "sample": "/v1/administration",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "GET",
       "path": "/v1/connections",
       "plane": "administrator",
       "sample": "/v1/connections",
@@ -32,6 +40,14 @@
       "path": "/v1/connections/:id/test",
       "plane": "administrator",
       "sample": "/v1/connections/erp/test",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/drafts",
+      "plane": "administrator",
+      "sample": "/v1/drafts",
       "administratorDoor": "behind Access",
       "runtimeDoor": "not forwarded"
     },
@@ -58,6 +74,38 @@
       "sample": "/v1/forms/order",
       "administratorDoor": "behind Access",
       "runtimeDoor": "forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/drafts",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/drafts",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/forms/:id/drafts/:draft",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/drafts/1",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/drafts/:draft/approval",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/drafts/1/approval",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/forms/:id/drafts/:draft/rejection",
+      "plane": "administrator",
+      "sample": "/v1/forms/order/drafts/1/rejection",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
     },
     {
       "method": "POST",

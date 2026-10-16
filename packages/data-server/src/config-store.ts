@@ -38,6 +38,15 @@ export interface ConfigurationStore {
   publish(id: string, expectedBase: number | null, value: unknown): Promise<PublishOutcome>
   /** Every id with at least one version, in codepoint order. */
   list(): Promise<string[]>
+  /**
+   * The store a deployment under review keeps its drafts in (0065), beside
+   * this one and never inside a form's versions: its ids are form ids, and
+   * its versions each form's numbered entries -- a draft or a rejection --
+   * written by the same compare-and-swap. Made from this store rather than
+   * configured, so drafts cannot be kept beside another deployment's
+   * versions, whose numbers their bases name.
+   */
+  drafts(): ConfigurationStore
 }
 
 /** What `read` throws for a version that exists and does not parse. Its message names the file. */
@@ -58,6 +67,8 @@ export class UnparsableVersionError extends Error {
 export const CONFIGURATION_ID_MAX_LENGTH = 128
 export const CONFIGURATION_ID = new RegExp(`^[a-z0-9][a-z0-9._-]{0,${String(CONFIGURATION_ID_MAX_LENGTH - 1)}}$`)
 const VERSION_FILE = /^([1-9][0-9]*)\.json$/
+/** Where a store keeps its drafts (0065): a name `CONFIGURATION_ID` refuses, so no form can be called it. */
+const DRAFTS = '.drafts'
 
 function assertId(id: string): void {
   if (!CONFIGURATION_ID.test(id)) throw new Error(`${JSON.stringify(id)} is not a configuration id`)
@@ -71,7 +82,8 @@ function isCode(error: unknown, code: string): boolean {
  * A configuration store on a directory — a persistent volume in a container.
  *
  * Layout: `<root>/<id>/<version>.json`, pretty-printed, one file per version,
- * so an export is a copy of the directory and a review is a diff.
+ * so an export is a copy of the directory and a review is a diff. Drafts,
+ * under review, are `<root>/.drafts/<id>/<entry>.json` (0065).
  *
  * **Compare-and-swap without a lock.** A version is written to a temporary file,
  * flushed, and then hard-linked to its final name. `link` fails if the name
@@ -188,6 +200,12 @@ export function createFileConfigurationStore(root: string): ConfigurationStore {
         if (CONFIGURATION_ID.test(name) && (await latest(name)) !== null) ids.push(name)
       }
       return ids.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    },
+
+    // `.drafts` starts with a dot, which no id may, so it is never a form's
+    // directory and `list` never reports it (0065).
+    drafts() {
+      return createFileConfigurationStore(join(root, DRAFTS))
     },
   }
 }

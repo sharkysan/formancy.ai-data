@@ -45,10 +45,10 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-/** The server as `main.ts` composes it -- both planes from `servedPlanes`, the audit sink its log, an origin listed -- writing to this suite. */
-async function runnable(adminRoles: readonly string[] = ['data-admin'], origins: readonly string[] = ['https://app.example']): Promise<FastifyInstance> {
+/** The server as `main.ts` composes it -- both planes from `servedPlanes`, the audit sink its log, an origin listed, review when publisher roles are given -- writing to this suite. */
+async function runnable(adminRoles: readonly string[] = ['data-admin'], origins: readonly string[] = ['https://app.example'], publisherRoles?: readonly string[]): Promise<FastifyInstance> {
   let app: FastifyInstance | undefined
-  const planes = servedPlanes({ registry: registry(), store, adminRoles, auditKey: undefined, origins, lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, log: () => (app as FastifyInstance).log })
+  const planes = servedPlanes({ registry: registry(), store, adminRoles, publisherRoles, auditKey: undefined, origins, lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, log: () => (app as FastifyInstance).log })
   app = await createDataServer({
     verifyIdentity,
     logger: {
@@ -143,6 +143,27 @@ describe("the runnable server's log", () => {
     ])
     expect(servedPlanes({ registry: registry(), store, adminRoles: [], auditKey: undefined, origins: [], lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, log: () => server.log }).admin).toBeUndefined()
   })
+  // Review is the operator's choice, read once by main.ts and handed to the
+  // administrator's plane by servedPlanes (0065). Dropped on the way, the
+  // deployment would let one administrator publish alone while its
+  // operator set FORMANCY_DATA_PUBLISHER_ROLES to stop exactly that; the
+  // refusal is in the same log as every other event, by its code. Unset,
+  // the plane says review is off. Watched failing with servedPlanes
+  // leaving publisherRoles out.
+  test('puts the administrator plane under review when publisher roles are set, and not otherwise', async () => {
+    const reviewed = await runnable(['data-admin', 'data-publisher'], [], ['data-publisher'])
+    expect((await reviewed.inject({ method: 'GET', url: '/v1/administration', headers: { authorization: 'Bearer admin' } })).json()).toMatchObject({ review: true, publisher: false })
+    const refused = await reviewed.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: { authorization: 'Bearer admin' }, payload: { expectedBase: null } })
+    expect([refused.statusCode, (refused.json() as { code: string }).code]).toEqual([403, 'review-required'])
+    expect(lines.filter((line) => line.msg === 'audit').map((line) => ({ operation: line.audit?.operation, outcome: (line.audit as { outcome?: string } | undefined)?.outcome }))).toEqual([
+      { operation: 'administration', outcome: 'ok' },
+      { operation: 'publish', outcome: 'review-required' },
+    ])
+    const plain = await runnable()
+    expect((await plain.inject({ method: 'GET', url: '/v1/administration', headers: { authorization: 'Bearer admin' } })).json()).toEqual({ review: false, publisher: true, refuses: {} })
+    expect(servedPlanes({ registry: registry(), store, adminRoles: [], publisherRoles: ['data-publisher'], auditKey: undefined, origins: [], lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, log: () => plain.log }).admin).toBeUndefined()
+  })
+
   // A refused preflight is a plain network error to the page that sent it,
   // so the log is the only place that says why, and names the origin to
   // list (0060). But an Origin header is whatever the caller typed: one
