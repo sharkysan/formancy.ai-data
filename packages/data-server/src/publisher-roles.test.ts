@@ -1,6 +1,7 @@
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from './app.js'
 import { createFileConfigurationStore } from './config-store.js'
 import type { ConnectionRegistry } from './connections.js'
@@ -75,10 +76,18 @@ describe('publisherRolesProblem', () => {
 })
 
 describe('createDataServer', () => {
+  let root: string
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), 'formancy-data-publisher-roles-'))
+  })
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true })
+  })
+
   /** The administrator's plane with `publisherRoles`, built or refused: nothing is connected, and the store is never written. */
   const built = (publisherRoles: readonly string[]) => {
     const registry: ConnectionRegistry = { ids: () => [], scope: () => undefined, open: async () => undefined, close: async () => {} }
-    const store = createFileConfigurationStore(join(tmpdir(), 'formancy-data-publisher-roles-never-written'))
+    const store = createFileConfigurationStore(root)
     return createDataServer({ verifyIdentity: async () => ({ ok: false, reason: 'bad' }), admin: { registry, store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles, audit: { sink: () => {} } } }).then(async (app) => {
       await app.close()
       return 'built'
