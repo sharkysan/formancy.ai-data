@@ -88,11 +88,15 @@ later.
 - **The adapter suites run on every image of a matrix per engine**:
   PostgreSQL 15, 16, 17 and 18, and SQL Server 2019, 2022 and 2025, where
   they ran on 17 and 2022 alone. Why: passing on 17 said nothing of 16. The
-  first runs on the older images met differences the defaults could not
+  first runs on the other images met differences the defaults could not
   show -- PostgreSQL 15 and 16 have no `transaction_timeout`, and keep in a
   lookup's plan the `IS NOT NULL` tests 17 plans away; PostgreSQL 15 has no
-  membership granted `WITH INHERIT`; SQL Server 2019 has no `VIEW SECURITY
-  DEFINITION` -- and each is now a named fact,
+  membership granted `WITH INHERIT`; PostgreSQL 18 runs a cascaded table's
+  AFTER DELETE trigger as the table's owner, where 15 to 17 run it as the
+  deleting account, refuses a delete an ON DELETE RESTRICT key forbids with
+  23001 where they send 23503, and files each NOT NULL in `pg_constraint`;
+  SQL Server 2019 has no `VIEW SECURITY DEFINITION` -- and each is now a
+  named fact,
   `VERSION_FACTS`, which the suites assert as each version answers, with no
   test skipped. A CI job of its own, `test-images`, runs data-fixtures and
   each engine's adapter suite on every image but the default, and the
@@ -312,7 +316,14 @@ starts both engines; more moving tags; runs that go red for a difference no
 user of the defaults meets; what the routes, the client, the host page and
 the studio do on another version is still not tested; PostgreSQL 14 is not
 tested; and what the image legs show on CI's runners is first shown by
-their first runs there. What
+their first runs there. What it names and does not change: on PostgreSQL
+18 a delete whose cascaded table's AFTER DELETE trigger writes where only
+the table's owner may is done, where 15 to 17 refuse it,
+`permission-denied`; a delete an ON DELETE RESTRICT key forbids is answered
+`referenced` on every version, though 18 sends another SQLSTATE; and
+discovery describes a table the same on 18 as on 17, though 18 files its
+NOT NULLs in `pg_constraint` -- but a NOT NULL added NOT VALID, which only
+18 has, is read as NOT NULL though rows older than it may hold NULL. What
 0068 does not do: refuse a server this release was not tested on, which is
 generated, published and served on as before; tell a managed PostgreSQL
 from PostgreSQL; or call a SQL Server database untested at a level between

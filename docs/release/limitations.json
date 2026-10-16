@@ -37,7 +37,7 @@
       "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
     },
     "0006": {
-      "reviewed": "sha256:2b6479615023b9e4194d82ff15d5e8c30d934decbbb18e4afbbadc1422655b9a",
+      "reviewed": "sha256:cede534c64dc36ab5acd95680303d104be0404bc97d0560601ecd2b21a5e6a4d",
       "limitations": [
         {
           "area": "databases",
@@ -45,7 +45,7 @@
         },
         {
           "area": "databases",
-          "says": "PostgreSQL 18 runs the whole adapter suite, but no test is about its `NOT NULL` constraints in `pg_constraint` or its virtual generated columns."
+          "says": "PostgreSQL 18 runs the whole adapter suite, but no test is about a `NOT NULL` made `NO INHERIT` or its virtual generated columns."
         },
         {
           "area": "databases",
@@ -1427,7 +1427,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:369088fbc185aef02d34f8e4c811a0e5abe6e99199a49c1529a78c8842a33e3e",
+      "reviewed": "sha256:1deb888de814a88866c564b19102ef7e23113b83ff904c83e5798046400556a6",
       "limitations": [
         {
           "area": "writes",
@@ -1500,7 +1500,7 @@
       ]
     },
     "0051": {
-      "reviewed": "sha256:226be55f50c769f6167443bff69ab8395110356404083b635b00422013958ba2",
+      "reviewed": "sha256:127b5aaefe73555492fb203b2017a42dcad98d0cb8846a53e6f76dc283c468c1",
       "limitations": [
         {
           "area": "forms",
@@ -1543,7 +1543,7 @@
         },
         {
           "area": "databases",
-          "says": "On PostgreSQL a cascaded table's BEFORE DELETE triggers and its rules run as that table's owner, with the owner's grants, and may do what the deleting account could not; its AFTER DELETE triggers run as the deleting account. Neither is seen nor refused here.",
+          "says": "On PostgreSQL a cascaded table's BEFORE DELETE triggers and its rules run as that table's owner, with the owner's grants, and may do what the deleting account could not; its AFTER DELETE triggers run as the deleting account on 15 to 17 and as the owner on 18. Neither is seen nor refused here.",
           "heldBy": "packages/data-postgres/src/cascade.integration.test.ts"
         },
         {
@@ -2154,7 +2154,7 @@
       ]
     },
     "0067": {
-      "reviewed": "sha256:01a77c4d08e52c7f87ee36bd5acb912b862a5fb69155ea638f4608c2a364eb46",
+      "reviewed": "sha256:58071cd9e5be80d40a18da1fe9f003ea7dc6bc68b3f5d05d43c25750b2dfdeea",
       "limitations": [
         {
           "area": "testing",
@@ -2167,6 +2167,16 @@
         {
           "area": "testing",
           "says": "What the versions of one engine disagree on is named only where a test has met it: a difference no suite reaches is in no table, and the release report prints none of them."
+        },
+        {
+          "area": "access",
+          "says": "On PostgreSQL 18 a cascaded table's AFTER DELETE trigger runs with its owner's grants, so a delete that 15 to 17 refuse, `permission-denied`, because the trigger writes where the deleting account may not, is done.",
+          "heldBy": "packages/data-postgres/src/cascade.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL 18 a `NOT NULL` added `NOT VALID` is read as NOT NULL, though rows older than it may hold NULL.",
+          "heldBy": "packages/data-postgres/src/discovery-pg18.integration.test.ts"
         }
       ]
     },

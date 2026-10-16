@@ -164,7 +164,7 @@ in short:
   policy — and is `refused`, not `stale`; so is an insert the server
   completed as `INSERT 0 0`.
 - **Errors are values.** By SQLSTATE: 23505 and 23P01 `unique-violation`,
-  23503 `foreign-key-violation`, 23502 `not-null-violation`, other class 23
+  23503 and 23001 `foreign-key-violation`, 23502 `not-null-violation`, other class 23
   `check-violation`, 22001 and 54000 `too-long`, other class 22
   `out-of-range`, 42501 `permission-denied`, a missing table or column, one
   whose type changed, or a generated column named in a write (428C9)
@@ -270,8 +270,10 @@ After no row, one statement tells a moved definition or reach
 (`schema-changed`), a rule (`refused`), another isolation (`unavailable`),
 not found, stale, and a row found at the version sent -- a BEFORE DELETE
 trigger that returned NULL, a row security policy for DELETE stricter than
-the one for SELECT -- `refused`. A foreign key's refusal is 23503 on
-PostgreSQL 17 under NO ACTION and RESTRICT alike. A table a rule acts on
+the one for SELECT -- `refused`. A foreign key's refusal is 23503 under
+NO ACTION, and under RESTRICT on 15 to 17; 18 refuses RESTRICT with 23001,
+`restrict_violation`, and both are `foreign-key-violation` with the key
+named (`VERSION_FACTS.restrictViolation`). A table a rule acts on
 refuses every delete: PostgreSQL itself refuses the CTE (0A000) under a DO
 ALSO rule, a DO INSTEAD NOTHING rule, and a DO INSTEAD rule without
 RETURNING or with several actions, and the statement's own guard refuses
@@ -296,7 +298,11 @@ nothing where one is refused, which the follow-up answers
 by the table each is on, its name, the table it refers to and its action,
 and refuses a key that follows a cleared column by an ON UPDATE that acts.
 A cascaded table's BEFORE DELETE triggers and its rules run as that table's
-owner, its AFTER DELETE triggers as the deleting account.
+owner; its AFTER DELETE triggers run as the deleting account on 15 to 17,
+and as the owner on 18, which runs an AFTER trigger as the role that queued
+it. So a delete whose cascaded table's AFTER trigger writes where only the
+owner may is `permission-denied` on 15 to 17 and done on 18
+(`VERSION_FACTS.afterTriggerAsQueuer`); this module governs neither.
 `cascade.integration.test.ts` holds every case `CASCADE_PARITY` names but
 `lost-answer`, which `records-lost-answer.integration.test.ts` holds.
 
@@ -553,7 +559,12 @@ default; one that computes with `nextval()` is an ordinary default. An
 A check's `enforced` is `pg_constraint.conenforced` where the server has it
 (PostgreSQL 18's `NOT ENFORCED`) and true where it does not (17, which checks
 every new row against each one); `validated` is `convalidated`: NOT VALID
-skips only the rows already there. A stored generated column is `computed`
+skips only the rows already there. NOT NULL is read from `attnotnull` on
+every version: 18 files each NOT NULL in `pg_constraint` too, as type `n`
+(`VERSION_FACTS.notNullConstraints`), and none is read as a check. A NOT
+NULL added NOT VALID, which only 18 has, sets `attnotnull`, so its column
+is reported not nullable though rows older than it may hold NULL. A stored
+generated column is `computed`
 and has no default, though PostgreSQL files its expression where defaults
 live.
 Unique keys include unique indexes that are not constraints, when they are
@@ -630,8 +641,10 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   contract, the two identities and a sequence default, the shapes only
   PostgreSQL has, declared in schemas of their own, and what a text length
   counts in a SQL_ASCII and a LATIN1 database, each made for the test.
-- `discovery-pg18.integration.test.ts` — the one catalog fact 18 adds: a
-  `NOT ENFORCED` check, on `postgres:18-alpine`, reported as not enforced.
+- `discovery-pg18.integration.test.ts` — the two catalog states only 18
+  can hold, on `postgres:18-alpine` in every leg: a `NOT ENFORCED` check,
+  reported as not enforced, and a NOT NULL added NOT VALID, read as NOT
+  NULL though a row older than it holds NULL (characterised, not decided).
 - `discovery/columns.test.ts` — the generation codes, including one no server
   can produce yet, called directly.
 - `spike.integration.test.ts` — the driver's numbers, untyped parameters, and

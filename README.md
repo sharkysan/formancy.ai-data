@@ -905,7 +905,9 @@ fails a run in which an image of the matrix answered no test in a leg of
 its own, or a shared case is missing or failed on one of them. Where the versions differ --
 `transaction_timeout`, which PostgreSQL has from 17, what 17's planner drops
 from a lookup's plan, a membership granted `WITH INHERIT`, which PostgreSQL
-has from 16, SQL Server 2022's `VIEW SECURITY DEFINITION` -- the
+has from 16, the role 18 runs a cascaded table's AFTER trigger as, the
+SQLSTATE 18 refuses an ON DELETE RESTRICT key with, the NOT NULLs 18 files
+in `pg_constraint`, SQL Server 2022's `VIEW SECURITY DEFINITION` -- the
 difference is a named fact in data-fixtures' `VERSION_FACTS`, asserted on each
 version as it answers, and no test is skipped on one
 ([0067](./docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)).

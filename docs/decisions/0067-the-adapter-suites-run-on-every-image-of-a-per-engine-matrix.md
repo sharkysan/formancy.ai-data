@@ -77,11 +77,29 @@
   (`transactionTimeout`), `packages/data-postgres/src/lookups-sized.integration.test.ts`
   (`notNullTestsRemoved`),
   `packages/data-postgres/src/discovery-access.integration.test.ts`
-  (`membershipInherit`) and
+  (`membershipInherit`),
+  `packages/data-postgres/src/cascade.integration.test.ts`
+  (`afterTriggerAsQueuer`, in two cases: who a cascaded table's AFTER
+  trigger runs as, and the delete its grants refuse or let through),
+  `packages/data-postgres/src/delete.integration.test.ts`
+  (`restrictViolation`),
+  `packages/data-postgres/src/discovery.integration.test.ts`
+  (`notNullConstraints`) and
   `packages/data-sqlserver/src/discovery-access.integration.test.ts`
   (`viewSecurityDefinition`); before their rows existed, the second failed on
-  `postgres:16-alpine`, the third on `postgres:15-alpine` and the fourth on
-  `mcr.microsoft.com/mssql/server:2019-latest`, as *Measured* says.
+  `postgres:16-alpine`, the third on `postgres:15-alpine`, the fourth's
+  first case, the fifth and the sixth on `postgres:18-alpine` -- in CI's
+  first run of that leg, run 38938708885, and again here -- and the last on
+  `mcr.microsoft.com/mssql/server:2019-latest`, as *Measured* says; and
+  each case of the three rows 18 added failed on 18 and on 17 with the two
+  versions' values swapped. The `restrict` case also failed on 18 with
+  23001 taken out of the adapter's map: `check-violation`, class 23's
+  default, which the server answers `refused` where it answers
+  `referenced`.
+  `packages/data-postgres/src/discovery-pg18.integration.test.ts`
+  characterises, on 18 in every leg, a NOT NULL added NOT VALID: read as
+  NOT NULL while a row older than it holds NULL (watched failing with the
+  column expected nullable).
   `packages/data-sqlserver/src/discovery.integration.test.ts` holds a
   snapshot's `serverVersion` to the version the fixture recorded, where it
   held it to 2022's `/^16\./` and failed on 2019. **Held by the report**
@@ -133,9 +151,40 @@ the older images showed where:
   refuses the grant as a syntax error. And two discovery tests had 2022's
   major written into them.
 
+CI's first run of the 18 leg, run 38938708885, failed three cases that pass
+on 15, 16 and 17, each a difference of its own:
+
+- PostgreSQL 18 runs an AFTER trigger as the role that was active when its
+  event was queued, where 15 to 17 run it as the role active when it fires.
+  A cascaded table's AFTER DELETE trigger is queued by the referential
+  action, which runs as that table's owner, so on 18 it runs as the owner
+  and on 15 to 17 as the deleting account
+  ([0051](0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)'s
+  P5). A person meets it: a trigger that writes where only the owner may
+  refuses the delete on 15 to 17, `permission-denied`, and lets it through
+  on 18.
+- PostgreSQL 18 refuses a delete that an ON DELETE RESTRICT key forbids with
+  23001, `restrict_violation`, where 15 to 17 send 23503, as for NO ACTION
+  ([0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)'s
+  P3). 18's release notes do not list it; the commit is 086c84b23d. The
+  adapter already answered 23001 `foreign-key-violation`, kept for the
+  code's own meaning, so the answer and the server's `referenced` are the
+  same; the case held the SQLSTATE in the adapter's message.
+- PostgreSQL 18 files each NOT NULL in `pg_constraint`, as a row of type
+  `n`, which the restricted reader counts with the rest; 15 to 17 have no
+  such row. Discovery reads NOT NULL from `attnotnull` and checks of type
+  `c` alone ([0006](0006-postgres-discovery-reads-pg-catalog.md)), and the
+  shared model's cases passed on 18, so a table's snapshot is the same; the
+  case counted the catalog's rows.
+
 Each was a test holding the default's behaviour, not a defect of an adapter.
 That none of them was one is what these runs show, not a property of the
-next difference.
+next difference. One thing 18 adds that no older version can hold is not a
+difference between versions and has no row: a NOT NULL added NOT VALID,
+which sets `attnotnull` though rows older than it may hold NULL, and which
+discovery reads as NOT NULL. `discovery-pg18.integration.test.ts`
+characterises it; what such a column should be reported as is not decided
+here.
 
 The person decided the matrix on 2026-10-16: PostgreSQL 15, 16, 17 and 18,
 and SQL Server 2019, 2022 and 2025, each with the whole adapter suite; only
@@ -233,8 +282,9 @@ showed, not as tested.
   server answered, never by the image's tag, and asserts that value; a major
   the row has no value for throws, so a leg on a version nobody measured
   fails rather than asserting nothing. Nothing is skipped on a version. The
-  rows are `transactionTimeout`, `notNullTestsRemoved`, `membershipInherit`
-  and `viewSecurityDefinition`, as the context describes them, and a row is
+  rows are `transactionTimeout`, `notNullTestsRemoved`, `membershipInherit`,
+  `afterTriggerAsQueuer`, `restrictViolation`, `notNullConstraints` and
+  `viewSecurityDefinition`, as the context describes them, and a row is
   added when a leg shows a difference.
 - **An assertion that a leg reaches names what its server answered.** The
   two SQL Server discovery tests that held `serverVersion` to 2022's
@@ -244,9 +294,11 @@ showed, not as tested.
 
 On 2026-10-16, on Windows 11 Pro with Docker Desktop (WSL 2), one database
 suite at a time, with another workflow's containers running on the same
-machine. None of it is a CI figure: no leg of `test-images` had run on CI
-when this was written, and the Linux kernel Docker Desktop runs is not the
-runner's, so a local pass of an image does not show that it starts there.
+machine. None of it is a CI figure: when the rest was written no leg of
+`test-images` had run on CI, and of CI's first run, 38938708885, only its
+18 leg's three failures are cited here. The Linux kernel Docker Desktop
+runs is not the runner's, so a local pass of an image does not show that
+it starts there.
 
 | Suite | Images, as they answered | Tests passed |
 |---|---|---|
@@ -255,6 +307,7 @@ runner's, so a local pass of an image does not show that it starts there.
 | data-postgres | `postgres:17-alpine` | 367 of 367 |
 | data-postgres | `postgres:16-alpine` (16.15) | eight sized lookup cases failed before `notNullTestsRemoved`; 367 of 367 after |
 | data-postgres | `postgres:15-alpine` (15.19) | the access discovery file's role setup failed before `membershipInherit`, so its case did not run, 374 of 375; 375 of 375 after |
+| data-postgres | `postgres:18-alpine` (18.6) | the three cases CI's 18 leg failed, as there, before `afterTriggerAsQueuer`, `restrictViolation` and `notNullConstraints`; after them, with the case each added, 377 of 377, and 377 of 377 on `postgres:17-alpine` the same hour |
 | data-sqlserver | `2022-latest` | 289 of 289 |
 | data-sqlserver | `2019-latest` (15.0.4500.2, CU32) | 286 of 289 before the fixes; then every test that ran passed, the sized lookup file's eleven skipped by its failed `beforeAll`, which passed alone, 11 of 11 |
 | data-sqlserver | `2025-latest` (17.0.5015.4, CU9) | 301 of 301 |
@@ -288,6 +341,24 @@ member's privilege functions answered false and its read 42501; 16.15 and
 on 15 and 16, and on 18 only the parity, sized lookup and access discovery
 files; the whole SQL Server adapter suite ran on 2019 and 2025.
 data-fixtures did not run on 15, 18 or 2025.
+
+The 18 rows were measured after CI's first run, the same day, each by
+psql against a bare container of each image and then through the adapter
+in the three files, on 15.19, 16.15, 17.11 and 18.6. A cascaded table's
+AFTER DELETE trigger recorded the deleting account as `current_user` on 15,
+16 and 17 and the owner on 18; with the trigger inserting into a table only
+the owner may write, the delete was refused on 15, 16 and 17, 42501, the
+record and its rows kept, and done on 18. A delete an ON DELETE RESTRICT key
+forbids was 23503, "violates foreign key constraint", on 15, 16 and 17, and
+23001, "violates RESTRICT setting of foreign key constraint", on 18, the
+constraint named on each; a NO ACTION key's was 23503 on all four. The
+restricted reader counted five `pg_constraint` rows on `sales.order` on 15,
+16 and 17, and twelve on 18: the same five and seven of type `n`, one for
+each column `attnotnull` holds; `information_schema` showed it none on
+all four. A NOT NULL added NOT VALID was refused as a syntax error, 42601,
+on 15 and 17, and on 18 set `attnotnull` over a row holding NULL, which
+discovery read as NOT NULL. Then the three files passed on each of the four
+images, 63 of 63 each, and the whole adapter suite on 18 and on 17.
 
 The suites' wall times on that machine are not a cost of the job: data-postgres
 on the defaults took 197.7 s in one run and 409 s in another the same day,
@@ -335,8 +406,17 @@ YAML lost it fails `workflows.test.mjs`.
   One file, `admin-untested.integration.test.ts`, runs on it, to show that
   a server of it is said to be untested and is served (0068); nothing in
   the adapters runs there.
-- On 18 three files had run here when this was written, and data-fixtures
-  had not run on 15, 18 or 2025; what those legs show is first shown on CI.
+- data-fixtures had not run here on 15, 18 or 2025 when this was written;
+  what those legs show is first shown on CI.
+- A difference a person meets stays one: on PostgreSQL 18 a cascaded
+  table's AFTER DELETE trigger runs as the table's owner, with the owner's
+  grants, so a delete that 15 to 17 refuse, `permission-denied`, because
+  the trigger writes where the deleting account may not, is done on 18. The
+  matrix names it and holds it on each version; the adapter governs it on
+  none (0051).
+- On PostgreSQL 18 a NOT NULL added NOT VALID is read as NOT NULL, though
+  rows older than it may hold NULL: a snapshot then says more of those rows
+  than the database keeps. Characterised, not decided.
 - `VERSION_FACTS` is not in the release report: each row is held only by its
   test passing on every leg, and a difference no test meets is named nowhere.
 - A starter called under another name, outside the legs, would follow the
@@ -387,9 +467,18 @@ its Verified-by now names the matrix);
 is no longer the one 2022 image its cost paragraph names);
 [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)
 (its `transaction_timeout` case holds on PostgreSQL 17 and later; 15 and 16
-refuse the setting). Extended: [0006](0006-postgres-discovery-reads-pg-catalog.md)
-(the suites run 15 to 18, not 17 only; no test is about 18's NOT NULL
-constraints or virtual generated columns) and
+refuse the setting);
+[0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)
+(its P3, a RESTRICT key's refusal as 23503, holds on 15 to 17; 18 sends
+23001, answered the same);
+[0051](0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)
+(its P5, a cascaded table's AFTER trigger as the deleting account, holds on
+15 to 17; 18 runs it as the owner). Extended:
+[0006](0006-postgres-discovery-reads-pg-catalog.md) (the suites run 15 to
+18, not 17 only; 18's NOT NULL constraints in `pg_constraint` are counted,
+and discovery reads NOT NULL there as 17 does; a NOT NULL added NOT VALID is
+read as NOT NULL, characterised and not decided; no test is about a NOT NULL
+made NO INHERIT or 18's virtual generated columns) and
 [0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md)
 (shared cases per image, a row per leg, an image outside the matrix named as
 such). 0035's rejected alternative, "a 'supported' list narrower than what
