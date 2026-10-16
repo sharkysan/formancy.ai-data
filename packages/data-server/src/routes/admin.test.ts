@@ -234,6 +234,34 @@ describe('the administrator plane', () => {
     expect(await store.latest('employee')).toBeNull()
   })
 
+  // A field moved to another generated section publishes with its move in
+  // the presentation, and is served there (0075). The same form without its
+  // entry is a layout the presentation does not describe, which the next
+  // regeneration would undo without a word; refused before anything is
+  // written, so a client other than the studio cannot publish one.
+  test('publishes a field moved to another section, and refuses the move without its presentation', async () => {
+    columns.push(col('stamp', 4, INT32, { generated: 'computed' }))
+    const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
+    const bundle = bundleOf(proposal)
+    type Grid = { children: Array<{ children: Array<{ path: string }> }> }
+    const grids = (form: { layouts: Array<{ nodes: Grid[] }> }) => form.layouts[0]?.nodes.map((node) => node.children[0]?.children ?? []) ?? []
+    const moved = JSON.parse(JSON.stringify(bundle.form)) as { layouts: Array<{ nodes: Grid[] }> }
+    const [main, record] = grids(moved)
+    record?.push(...(main?.splice(main.findIndex((node) => node.path === 'name'), 1) ?? []))
+
+    const bare = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, form: moved } } })
+    expect(bare.statusCode).toBe(422)
+    expect(bare.json()).toMatchObject({ code: 'invalid-bundle', problems: ['form: is not the base with its presentation applied; the form, the base or the presentation was edited'] })
+    expect(await store.latest('employee')).toBeNull()
+
+    const presentation = { version: 1, fields: [{ field: 'name', anchor: { kind: 'column', column: 'name' }, section: { label: 'Record', occurrence: 0 } }], sections: [] }
+    const published = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, presentation, form: moved } } })
+    expect(published.statusCode, published.body).toBe(201)
+    const served = (await app.inject({ method: 'GET', url: '/v1/forms/employee/versions/latest', headers: as('admin') })).json()
+    expect(served.bundle.presentation).toEqual(presentation)
+    expect(grids(served.bundle.form).map((grid) => grid.map((node) => node.path))).toEqual([['id'], ['stamp', 'name']])
+  })
+
   // A base the generator would not write is a database fact somebody typed:
   // a name of 4000 characters into a column of 200 would be offered and then
   // refused by the database on every save. Checked at publish against this

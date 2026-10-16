@@ -152,6 +152,29 @@ describe('regeneration', () => {
     expect(await store.latest('employee')).toBe(1)
   })
 
+  // A field moved to another generated section comes back as it went in
+  // (0075): the route hands the published presentation to the rebase whole,
+  // so a route that rebuilt it from labels, widths and orders would drop the
+  // move without a word, and the next publish would put the field back.
+  test('an unchanged database carries a field moved to another section, with no conflict', async () => {
+    columns.push(col('stamp', 5, INT32, { generated: 'computed' }))
+    const proposal = await propose()
+    const edited = JSON.parse(JSON.stringify(proposal.form)) as FormSchema
+    const [main, record] = (edited.layouts?.[0]?.nodes ?? []).map((node) => ((node as { children: LayoutNode[] }).children[0] as { children: Array<{ path: string }> }).children)
+    record?.push(...(main?.splice(main.findIndex((node) => node.path === 'title'), 1) ?? []))
+    const derived = presentationOf(proposal.form, edited, proposal.bindings)
+    if (!derived.ok) throw new Error(derived.problems.join('; '))
+    expect(derived.presentation.fields).toEqual([{ field: 'title', anchor: { kind: 'column', column: 'title' }, section: { label: 'Record', occurrence: 0 } }])
+    const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: derived.presentation, form: edited, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
+    const published = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase: null, bundle } })
+    expect(published.statusCode, published.body).toBe(201)
+
+    const regeneration = (await regenerate()).json()
+    expect(regeneration.conflicts).toEqual([])
+    expect(canonicalize(regeneration.presentation)).toBe(canonicalize(derived.presentation))
+    expect(canonicalize(regeneration.form)).toBe(canonicalize(edited))
+  })
+
   // A compatible change: the new column is placed after its generated
   // predecessor and the person's label and order are kept.
   test('a column added is placed, and the overrides are kept', async () => {
