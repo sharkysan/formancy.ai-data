@@ -606,6 +606,10 @@ fetches from formancy.ai's own origin -- its whole site, not only this path
 does not use; the hashed chunks are cached for a year, and the third-party
 notices are sent as UTF-8 text
 ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
+Cloudflare's bot detection puts an inline script into the page as it
+serves it, which the policy refuses like any other: the browser's console
+reports that refusal on every load, and nothing on the page needs the
+script.
 The Worker runs none of the product: no server, no database and neither
 plane, which stay where the composed stack puts them, with Cloudflare at
 most their edge

@@ -373,6 +373,20 @@ formancy.ai-report 0018 records.
   https://formancy.ai/data/examples/THIRD-PARTY-NOTICES.txt` shows the
   notices' type again; nothing here runs it. A failed build leaves the
   last deployment serving, and its log is in Cloudflare's dashboard.
+- **Cloudflare's own script is refused.** Cloudflare's bot detection,
+  JavaScript Detections, puts an inline `<script>` into the page as it
+  serves it, just before `</body>`, which loads
+  `/cdn-cgi/challenge-platform/scripts/jsd/main.js`; the built
+  `index.html` has none. The policy refuses it as it refuses any inline
+  script, and Chromium's console says so once on every load: "Executing
+  inline script violates the following Content Security Policy directive
+  'script-src 'self''". Nothing on the page depends on it, and Cloudflare
+  gets no bot signal from this path. The notices, sent as text, get no
+  script. formancy.ai's site and the report's Studio send no policy, so it
+  runs there. The gate cannot see it, because its server is not
+  Cloudflare: the gate's "no console error" holds the build, and at the
+  address that one error is expected on every load. Read on 2026-10-16,
+  in Chromium; nothing reads it again.
 - **`'self'` is all of formancy.ai.** The policy allows scripts, styles
   and fetches from any path of the origin -- formancy.ai's site, the
   report's Studio at `/report/`, and whatever is routed there later -- so
@@ -470,6 +484,18 @@ the config already says.
 **The headers from Worker code.** Rejected. It would be code at the edge,
 which 0037 keeps out, and Cloudflare applies `_headers` only to what the
 assets answer.
+
+**Turn JavaScript Detections off.** Not chosen. It is a setting of
+formancy.ai's whole zone, so it would change what formancy.ai's site and
+the report's Studio are served with too, to quiet one console line on a
+page that needs nothing from the script.
+
+**Let Cloudflare's script run.** Rejected. The script differs on every
+response -- it carries a token of the request -- so no hash in the policy
+could match it, and only `'unsafe-inline'` would allow it, which lets any
+script injected into the page run too. A nonce would have to be new on
+every response and written into both the header and the script, which
+takes code on each request, and the Worker has none (0037).
 
 **The policy in a `<meta>` element.** Rejected. A meta policy cannot carry
 `frame-ancestors`, and it would also bind `pnpm dev`, where the React

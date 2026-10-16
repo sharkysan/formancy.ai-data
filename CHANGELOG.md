@@ -150,11 +150,15 @@ sends at the address -- the notices as UTF-8 text, a 404 under the path
 with the policy, the redirect of the path without its slash with none of
 the headers -- was read by hand once, on 2026-10-16, and nothing reads
 it since, so a header a later deploy, Cloudflare or the zone changes
-fails nothing; the Worker's compatibility date is one
-more date to move; `'self'` is all of formancy.ai, the report's Studio
-included; the page is on the site's hostname without the site's bar or
-footer; a visitor's browser asks Google for the fonts; and the policy
-names Google's hosts, so fonts that move are refused until it is edited.
+fails nothing; Cloudflare's bot detection puts an inline script into the
+page as it serves it, which the policy refuses, so the browser's console
+shows that one error on every load and Cloudflare gets no bot signal
+from the demo, and turning it off would change formancy.ai's whole zone;
+the Worker's compatibility date is one more date to move; `'self'` is
+all of formancy.ai, the report's Studio included; the page is on the
+site's hostname without the site's bar or footer; a visitor's browser
+asks Google for the fonts; and the policy names Google's hosts, so fonts
+that move are refused until it is edited.
 The Worker runs no code and none of the product -- no server, no
 database, neither plane -- which stays where 0037 puts it.
 

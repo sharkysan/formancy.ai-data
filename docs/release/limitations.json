@@ -2150,7 +2150,7 @@
       ]
     },
     "0069": {
-      "reviewed": "sha256:4e040e7a028dae4308bb5de703254b867799520f43d67f2926a1156ebe4bf75c",
+      "reviewed": "sha256:f867a9d9854a8c8675a2059c28c78cada2f08dfe10bddaecb5e2c8b41aecb284",
       "limitations": [
         {
           "area": "operations",
@@ -2163,6 +2163,10 @@
         {
           "area": "operations",
           "says": "The demo's Content-Security-Policy allows scripts, styles and fetches from all of formancy.ai's origin, the report's Studio and whatever is routed there later included, not only the demo's path, because a policy held to the path could not be measured in a gate that serves the page from 127.0.0.1."
+        },
+        {
+          "area": "operations",
+          "says": "Cloudflare's bot detection puts an inline script into the demo's page as it is served, and the page's Content-Security-Policy refuses it, as read on 2026-10-16: the browser's console shows that refusal on every load, Cloudflare gets no bot signal from the demo, and the browser gate, which serves the page itself, never sees it; letting it run would take 'unsafe-inline' or a nonce made per request by code the Worker does not have, and turning detection off would change formancy.ai's whole zone."
         },
         {
           "area": "operations",
