@@ -1,7 +1,7 @@
 {
   "host-loaded": {
     "file": "docs/images/readme/host-loaded.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -13,16 +13,16 @@
       "width": 1425,
       "height": 1407
     },
-    "bytes": 167778,
-    "sha256": "69736750668a8151b2e44923236429bc2b6ad666d14dcd27c49da564ca5b15fb",
+    "bytes": 167646,
+    "sha256": "5bba96ef4ff4c970b8eab96f208bf0ed81e2e907b1e17e5c75f6f4f38fd552eb",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
@@ -46,20 +46,20 @@
       "width": 922,
       "height": 851
     },
-    "bytes": 63476,
-    "sha256": "82c2d05f923f12df711b95f169bff4c033c4e9e538e224a6f2a630c3006373e5",
+    "bytes": 63588,
+    "sha256": "0892db2b2e8bbb6e8cba078f3afe0837f2851bb2012765c907fb7250ebf40e4b",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshot apps/examples/src/fixture-snapshot.json (PostgreSQL 17.11)",
-    "stylesheet": "sha256 dbc83f3ee357d14edfbc12586a34908c39085360e53ecbf1fbfe7685974a0213 of src/app.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 412b9a07721582d148e206047886452b53a959a608a416f1cd8cd6df6b9a19e7 of src/app.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "React": "- region \"sales.order React\":\n  - heading \"React\" [level=3]\n  - form \"sales.order, React preview\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [invalid]\n      - status\n      - paragraph: required\n      - text: Order date*\n      - textbox \"Order date*\" [invalid]\n      - paragraph: required\n      - text: Status\n      - textbox \"Status\": placed\n      - text: Amount*\n      - textbox \"Amount*\" [invalid]: \"12.34567\"\n      - paragraph: pattern\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\"\n      - text: Created by\n      - spinbutton \"Created by\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]\n    - button \"Validate\"",
       "Angular": "- region \"sales.order Angular\":\n  - heading \"Angular\" [level=3]\n  - form \"sales.order, Angular preview\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [invalid]\n      - status\n      - paragraph: required\n      - text: Order date*\n      - textbox \"Order date*\" [invalid]\n      - paragraph: required\n      - text: Status\n      - textbox \"Status\": placed\n      - text: Amount*\n      - textbox \"Amount*\" [invalid]: \"12.34567\"\n      - paragraph: pattern\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\"\n      - text: Created by\n      - spinbutton \"Created by\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]\n    - button \"Validate\""
@@ -67,7 +67,7 @@
   },
   "studio-connect": {
     "file": "docs/images/readme/studio-connect.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -79,27 +79,27 @@
       "width": 874,
       "height": 688
     },
-    "bytes": 165580,
-    "sha256": "3305692b31f79e8182d0f5d3bf5e3ce001dd75d1b8e1a65ad174159d80365a6d",
+    "bytes": 165822,
+    "sha256": "a40095ed4822d2e1cee036824a0f2add73e69d84fa51bad54bb0b839008c6743",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Seen": "- region \"What ms-reader can see\":\n  - heading \"What ms-reader can see\" [level=3]\n  - paragraph:\n    - text: \"SQL Server 16.0.4295.3, schemas sales: 1 table and 0 views. Discovered as\"\n    - code: formancy_reader\n    - text: . Fingerprint\n    - code: 94b2d94ccf2a\n    - text: .\n  - region \"What this connection could not see\":\n    - heading \"What this connection could not see\" [level=4]\n    - paragraph:\n      - text: Each of these is\n      - strong: cannot tell\n      - text: \", not\"\n      - strong: does not exist\n      - text: \": a table, key or relationship missing below may be there, out of this account’s sight.\"\n    - list \"What this connection could not see\":\n      - listitem:\n        - code: The whole scope\n        - text: referenced-by this account lacks VIEW DEFINITION on the database, which is what lists every foreign key on a table in any schema, so a key on a table it cannot see may refer to any table in scope\n      - listitem:\n        - code: The whole scope\n        - text: row-security this account lacks VIEW DEFINITION on the database, which is what lists every security policy, so a security policy it cannot see may filter any table or view in scope\n      - listitem:\n        - code: Schema sales\n        - text: objects without VIEW DEFINITION on schema sales, the catalog lists only the tables and views this account holds a permission on, so one it cannot see is absent without trace\n      - listitem:\n        - code: sales.order\n        - text: \"checks ck_order_status: the expression is hidden without VIEW DEFINITION\"\n      - listitem:\n        - code: sales.order\n        - text: \"defaults status: the definition of its default df_order_status is hidden without VIEW DEFINITION\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_approved_by references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_created_by references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n      - listitem:\n        - code: sales.order\n        - text: \"foreign-keys fk_order_customer references a table this account cannot see: the key and its own columns are visible, the name of its target and of the target's columns are not\"\n  - heading \"Tables and views\" [level=4]\n  - list \"Tables and views\":\n    - listitem:\n      - group:\n        - code: sales.order\n        - text: table"
     }
   },
   "studio-choose": {
     "file": "docs/images/readme/studio-choose.webp",
-    "captured": "2026-10-10",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -111,20 +111,20 @@
       "width": 874,
       "height": 634
     },
-    "bytes": 96180,
-    "sha256": "59b200732cc8e54d45f55b932ce236c3fee0f904f32b672191afeae86addbb26",
+    "bytes": 94824,
+    "sha256": "b120f691558b0b293c18d22e7af19630acf722e8b7b247201ff8546db828caac",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Lookups": "- group \"Foreign keys to offer as lookups\":\n  - text: Foreign keys to offer as lookups\n  - checkbox \"Offer fk_order_approved_by as a lookup\" [disabled]\n  - text: Offer fk_order_approved_by as a lookup\n  - paragraph: approved_by → sales.employee. id of sales.employee cannot be read by this connection, so its rows cannot be offered.\n  - checkbox \"Offer fk_order_created_by as a lookup\" [disabled]\n  - text: Offer fk_order_created_by as a lookup\n  - paragraph: created_by → sales.employee. id of sales.employee cannot be read by this connection, so its rows cannot be offered.\n  - checkbox \"Offer fk_order_customer as a lookup\" [checked]\n  - text: Offer fk_order_customer as a lookup\n  - paragraph: tenant_id, customer_no → sales.customer.\n  - group \"Columns to show for fk_order_customer\":\n    - text: Columns to show for fk_order_customer\n    - paragraph: What a person recognises a customer by. The first text column is suggested; confirm or change it.\n    - checkbox \"tenant_id\"\n    - text: tenant_id\n    - checkbox \"customer_no\"\n    - text: customer_no\n    - checkbox \"name\" [checked]\n    - text: name\n    - checkbox \"country_code\" [disabled]\n    - text: country_code This connection may not read it, so it cannot be shown.\n    - checkbox \"credit_limit\" [disabled]\n    - text: credit_limit This connection may not read it, so it cannot be shown.\n    - checkbox \"active\" [disabled]\n    - text: active This connection may not read it, so it cannot be shown.\n    - checkbox \"created_at\" [disabled]\n    - text: created_at This connection may not read it, so it cannot be shown."
     }
@@ -143,16 +143,16 @@
       "width": 874,
       "height": 1099
     },
-    "bytes": 216802,
-    "sha256": "4628c8795aed0ee86c6c5851e98f3959b107471cbd743364b64c0a65c64e0e7d",
+    "bytes": 216788,
+    "sha256": "2e4e0f8d23d38f809a27fb7fc09513e3d28d8e0100ad601e1f34ac81415e8aaf",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
@@ -163,7 +163,7 @@
   },
   "studio-policy": {
     "file": "docs/images/readme/studio-policy.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -173,22 +173,22 @@
     "timezone": "UTC",
     "css": {
       "width": 874,
-      "height": 613
+      "height": 612
     },
-    "bytes": 83042,
-    "sha256": "91cf63b5874a7f8d4b67475285f8444af8fdfbde35ed86bf84705772f3e2eeac",
+    "bytes": 86266,
+    "sha256": "23cd96ba9decae2bde3b217759c8a034e60c147755a5a866453cdd12fab5d7a7",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Rows": "- group \"Row filters on sales.order\":\n  - text: Row filters on sales.order\n  - paragraph: \"Which rows of sales.order this form reaches: on read and update the filter, on create the values the pinned columns are written with, from the signed-in person’s attributes and never from the form.\"\n  - list:\n    - listitem:\n      - text: Column of row filter 1\n      - combobox \"Column of row filter 1\":\n        - option \"id\"\n        - option \"row_version\"\n        - option \"tenant_id\" [selected]\n        - option \"customer_no\"\n        - option \"order_date\"\n        - option \"status\"\n        - option \"amount\"\n        - option \"notes\"\n        - option \"group\"\n        - option \"created_by\"\n        - option \"approved_by\"\n      - text: Trusted attribute of row filter 1\n      - textbox \"Trusted attribute of row filter 1\": tenant\n      - button \"Remove row filter 1\"\n  - paragraph:\n    - button \"Add a row filter\"",
       "Lookup": "- group \"Rows the Customer list may offer\":\n  - text: Rows the Customer list may offer\n  - paragraph: The Customer field chooses a row of sales.customer. A choice is checked again on save against these filters, so a row they exclude cannot be submitted even by somebody who knows its key.\n  - list:\n    - listitem:\n      - text: Column of Customer filter 1\n      - combobox \"Column of Customer filter 1\":\n        - option \"tenant_id\" [selected]\n        - option \"customer_no\"\n        - option \"name\"\n      - text: Trusted attribute of Customer filter 1\n      - textbox \"Trusted attribute of Customer filter 1\": tenant\n      - button \"Remove Customer filter 1\"\n  - paragraph:\n    - button \"Add a filter to the Customer list\"\n  - checkbox \"Only rows of sales.order whose Customer is one of these\"\n  - text: Only rows of sales.order whose Customer is one of these\n  - paragraph: \"For a table with no tenant of its own: a row of sales.order is read and updated only while the row its Customer names is one this list may offer, and created only under one. A row that names none is reached by nobody.\""
@@ -196,7 +196,7 @@
   },
   "studio-through": {
     "file": "docs/images/readme/studio-through.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -206,29 +206,29 @@
     "timezone": "UTC",
     "css": {
       "width": 874,
-      "height": 344
+      "height": 343
     },
-    "bytes": 53586,
-    "sha256": "0010bbe2ab75886fa34d7a4013e4189017bebf748d268aa6f18ca028819020b3",
+    "bytes": 53144,
+    "sha256": "85269a39ece33acfbe44caa42a91233a11383415a2de7aa0ddee0e000289e903",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Lookup": "- group \"Rows the Order list may offer\":\n  - text: Rows the Order list may offer\n  - paragraph: The Order field chooses a row of sales.order. A choice is checked again on save against these filters, so a row they exclude cannot be submitted even by somebody who knows its key.\n  - list:\n    - listitem:\n      - text: Column of Order filter 1\n      - combobox \"Column of Order filter 1\":\n        - option \"id\"\n        - option \"tenant_id\" [selected]\n        - option \"customer_no\"\n        - option \"order_date\"\n        - option \"status\"\n        - option \"amount\"\n        - option \"notes\"\n        - option \"group\"\n        - option \"created_by\"\n        - option \"approved_by\"\n        - option \"row_version\"\n      - text: Trusted attribute of Order filter 1\n      - textbox \"Trusted attribute of Order filter 1\": tenant\n      - button \"Remove Order filter 1\"\n  - paragraph:\n    - button \"Add a filter to the Order list\"\n  - checkbox \"Only rows of sales.order_line whose Order is one of these\" [checked]\n  - text: Only rows of sales.order_line whose Order is one of these\n  - paragraph: \"For a table with no tenant of its own: a row of sales.order_line is read and updated only while the row its Order names is one this list may offer, and created only under one. A row that names none is reached by nobody.\""
     }
   },
   "studio-presentation": {
     "file": "docs/images/readme/studio-presentation.webp",
-    "captured": "2026-10-10",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -240,20 +240,20 @@
       "width": 874,
       "height": 1100
     },
-    "bytes": 87742,
-    "sha256": "bf10074f692ba650e131cbbd0265f44bb8b4f2e11a5044fee129b4e99fa30058",
+    "bytes": 87744,
+    "sha256": "dc4f12f5b24c2ee04148ef19e27d20b60527db362a657d3040f8ac104a7cdd67",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Undo": "- button \"Undo\"",
       "Redo": "- button \"Redo\"",
@@ -263,7 +263,7 @@
   },
   "studio-preview": {
     "file": "docs/images/readme/studio-preview.webp",
-    "captured": "2026-10-10",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -275,27 +275,27 @@
       "width": 916,
       "height": 1088
     },
-    "bytes": 92756,
-    "sha256": "3eaa6f926f022cb156d4220dc5ff1e41a8948dca2157f3024f3719ae4dfd8eff",
+    "bytes": 92624,
+    "sha256": "d41ca2469d6542d9fa06acf71a13b22ff85bbf4a8cab94e6d27cb56bbc2c05a1",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Preview": "- main \"Preview\":\n  - heading \"Preview\" [level=2]\n  - paragraph:\n    - strong: Validate\n    - text: \"runs the formancy engine in this browser against the document you are about to publish. Nothing is saved: the studio writes forms, never records.\"\n  - note:\n    - text: The\n    - strong: Customer\n    - text: list is filled by the runtime plane once the form is published, from sales.customer under its lookup filters. The studio speaks only the administrator plane, so here the renderer says where the list would be.\n  - form \"Order preview\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Order date*\n      - textbox \"Order date*\" [invalid]\n      - paragraph: required\n      - text: Customer\n      - paragraph: This field's answers come from \"pg-sales-order-fk-order-customer\", which this application has not provided.\n      - paragraph: required\n      - text: Status\n      - textbox \"Status\"\n      - text: Amount*\n      - textbox \"Amount*\" [invalid]\n      - paragraph: required\n      - text: Remarks\n      - textbox \"Remarks\"\n      - text: Group\n      - textbox \"Group\"\n      - text: Created by\n      - spinbutton \"Created by\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]\n    - button \"Validate\""
     }
   },
   "studio-publish-conflict": {
     "file": "docs/images/readme/studio-publish-conflict.webp",
-    "captured": "2026-10-10",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -308,26 +308,26 @@
       "height": 422
     },
     "bytes": 70004,
-    "sha256": "57bcc862c824c6822c8574f0a8073b7ce531864a89f6a2472da50708eb461777",
+    "sha256": "d7d2ea20083871e2d2f3a50a8db8db89d7e125733b58dd4ffabe47ff54ea1f56",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Publish": "- main \"Publish\":\n  - heading \"Publish\" [level=2]\n  - paragraph:\n    - text: \"One bundle: the form as the presentation step left it, its bindings to sales.order on\"\n    - code: pg\n    - text: \", the policy, and the snapshot they were generated from. The server checks all of it again before it writes anything, and keeps every version it has published.\"\n  - paragraph: Version 2 of pg-order is published now, and it is somebody else's. Publishing waits until you rebase on it.\n  - paragraph:\n    - button \"Publish\" [disabled]\n  - alert:\n    - paragraph: Somebody published version 2 while you worked. Yours was not published, and theirs is untouched.\n    - paragraph: \"Version 2: “Order”, 9 fields, bound to sales.order on pg.\"\n    - button \"Rebase on version 2\""
     }
   },
   "studio-drift": {
     "file": "docs/images/readme/studio-drift.webp",
-    "captured": "2026-10-14",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -339,27 +339,27 @@
       "width": 916,
       "height": 1786
     },
-    "bytes": 268914,
-    "sha256": "fb83749846c0648dee9bd0453b018bda1c7a9b78092ac64a5387148e6f19c042",
+    "bytes": 268906,
+    "sha256": "a9cadf0f6be8fa188666a77cfe415a309697364374fcc4ca9181d9d4a642ba78",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 89fb1958dc080e8f52508de020cc623c93150297f0c8434830cea54077fbcc22 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Drift": "- main \"Drift\":\n  - heading \"Drift\" [level=2]\n  - paragraph: \"Compare a published form with its database as it is now. Only what the form rests on is compared: its table and its lookups’ targets. Something this connection can no longer see is an access change, never a deletion.\"\n  - text: Form id\n  - textbox \"Form id\": pg-order\n  - button \"Check drift\"\n  - region \"Version 3 of pg-order, against the database now\":\n    - heading \"Version 3 of pg-order, against the database now\" [level=3]\n    - status: 3 changes, 1 blocking.\n    - heading \"What the published form may still do\" [level=4]\n    - list \"What the published form may still do\":\n      - listitem: \"Read: blocked by the changes below\"\n      - listitem: \"Create: blocked by the changes below\"\n      - listitem: \"Update: blocked by the changes below\"\n      - listitem: \"As a whole: not to be used as published until the blocking changes are reviewed.\"\n    - heading \"Blocking\" [level=4]\n    - paragraph: \"Blocks the form as published: a write it offers is stopped, or a field it shows can no longer be read, until it is reviewed.\"\n    - list \"Blocking\":\n      - listitem:\n        - paragraph:\n          - text: blocking\n          - code: column-dropped\n          - text: on sales.order, column notes\n        - paragraph: notes is gone, and the form binds it to notes. The form is blocked until it is reviewed.\n        - paragraph: Affects Remarks (notes).\n    - heading \"Review\" [level=4]\n    - paragraph: Blocks nothing. A person has something to decide.\n    - list \"Review\":\n      - listitem:\n        - paragraph:\n          - text: review\n          - code: column-added\n          - text: on sales.order, column memo\n        - paragraph: memo is new (text, nullable). It can be added to the form; the published form is unchanged.\n        - paragraph: Affects no field of this form.\n      - listitem:\n        - paragraph:\n          - text: review\n          - code: possible-rename\n          - text: on sales.order, column notes\n        - paragraph: \"notes is gone and memo is new with the same definition (text). If it is notes renamed, confirm it: nothing is inferred, and until then they are reported as a dropped column and a new one.\"\n        - paragraph: Affects Remarks (notes).\n  - paragraph:\n    - button \"Regenerate, keeping your presentation\"\n  - region \"Versions of pg-order\":\n    - heading \"Versions of pg-order\" [level=3]\n    - region \"Download a version\":\n      - heading \"Download a version\" [level=4]\n      - paragraph: \"The file the server stored, byte for byte: another deployment imports it, and git compares it.\"\n      - text: Version to download\n      - combobox \"Version to download\":\n        - option \"Version 1\"\n        - option \"Version 2\"\n        - option \"Version 3\" [selected]\n      - link \"Download version 3\":\n        - /url: blob:http://studio.invalid/<uuid>\n    - region \"Restore a version\":\n      - heading \"Restore a version\" [level=4]\n      - paragraph: Restoring publishes an older version again as version 4, with the policy it had, when the database can still serve it. It changes no table.\n      - text: Version to restore\n      - combobox \"Version to restore\":\n        - option \"Version 1\" [selected]\n        - option \"Version 2\"\n      - button \"Restore version 1\"\n      - paragraph: \"Version 1: “Order”, 9 fields, bound to sales.order on pg.\"\n    - alert:\n      - paragraph: \"Version 1 cannot be restored: the database has changed in a way it cannot serve.\"\n      - heading \"What blocks it\" [level=5]\n      - list \"What blocks it\":\n        - listitem:\n          - paragraph:\n            - text: blocking\n            - code: column-dropped\n            - text: on sales.order, column notes\n          - paragraph: notes is gone, and the form binds it to notes. The form is blocked until it is reviewed.\n          - paragraph: Affects Remarks (notes).\n  - region \"Import a version\":\n    - heading \"Import a version\" [level=3]\n    - paragraph: A version file is one version as a studio downloads it, from this deployment or another. It keeps its form id and its connection’s name, which this deployment’s allowlist resolves to its own database. The server checks it as it checks a publish, and against this database as it checks a restore.\n    - text: Version file\n    - button \"Version file\""
     }
   },
   "studio-regenerated": {
     "file": "docs/images/readme/studio-regenerated.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -371,27 +371,27 @@
       "width": 874,
       "height": 427
     },
-    "bytes": 66472,
-    "sha256": "a4d1b3e3b11dbddb0779724b6969166faf2945862cc828210244f2c1a79d2d22",
+    "bytes": 66470,
+    "sha256": "87ea73d228584d160498a75cf577bd01a9e7c416a9331ec8b163259adb4e6d5f",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Regenerated": "- region \"Regenerated from version 3\":\n  - heading \"Regenerated from version 3\" [level=3]\n  - status: Generated again from the database now, with your presentation carried by the column or lookup each choice was made for. Nothing is published until you publish it.\n  - heading \"Presentation not carried as it was\" [level=4]\n  - list \"Presentation not carried as it was\":\n    - listitem: \"The label \\\"Remarks\\\" you chose for notes was dropped: column notes is not in the regenerated form.\"\n  - heading \"Lookups left out\" [level=4]\n  - paragraph: Every lookup is still offered.\n  - heading \"Keys that now stand for something else\" [level=4]\n  - paragraph: Every key stands for what it did.\n  - heading \"What the published policy no longer fits\" [level=4]\n  - list \"What the published policy no longer fits\":\n    - listitem: \"policy: fields.notes: the form has no field notes\"\n  - paragraph:\n    - button \"Continue to presentation\""
     }
   },
   "studio-carried": {
     "file": "docs/images/readme/studio-carried.webp",
-    "captured": "2026-10-10",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -403,27 +403,27 @@
       "width": 874,
       "height": 225
     },
-    "bytes": 30224,
-    "sha256": "f4de2c6172fab6f16ab81278937d6bfac69446377d1a2497ac5241de8db35de0",
+    "bytes": 30216,
+    "sha256": "5a26e6e5029132eafd0bf5f5e09bd8e8ca80508c6f039b4654743e824950fb7c",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Carried": "- region \"Carried from version 3\":\n  - heading \"Carried from version 3\" [level=3]\n  - paragraph: What could not be carried as it was, and what was done instead. A choice here is one edit, which Undo takes back.\n  - list \"Carried from version 3\":\n    - listitem:\n      - paragraph: \"The label \\\"Remarks\\\" you chose for notes was dropped: column notes is not in the regenerated form.\"\n      - text: Give “Remarks” to\n      - combobox \"Give “Remarks” to\":\n        - option \"Memo (memo)\" [selected]\n      - button \"Give “Remarks”\""
     }
   },
   "studio-restored": {
     "file": "docs/images/readme/studio-restored.webp",
-    "captured": "2026-10-14",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -435,27 +435,27 @@
       "width": 874,
       "height": 372
     },
-    "bytes": 62230,
-    "sha256": "1fff5e7c663e5f4a27365f83a2e4a9105eba9ece157caa767821d14ff9aa7b3b",
+    "bytes": 62222,
+    "sha256": "2a0e0b8d947fae26080c4aed37859836f1df5e9627892310bcfba53879146736",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 89fb1958dc080e8f52508de020cc623c93150297f0c8434830cea54077fbcc22 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Versions": "- region \"Versions of pg-order\":\n  - heading \"Versions of pg-order\" [level=3]\n  - region \"Download a version\":\n    - heading \"Download a version\" [level=4]\n    - paragraph: \"The file the server stored, byte for byte: another deployment imports it, and git compares it.\"\n    - text: Version to download\n    - combobox \"Version to download\":\n      - option \"Version 1\"\n      - option \"Version 2\"\n      - option \"Version 3\"\n      - option \"Version 4\" [selected]\n    - link \"Download version 4\":\n      - /url: blob:http://studio.invalid/<uuid>\n  - region \"Restore a version\":\n    - heading \"Restore a version\" [level=4]\n    - paragraph: Restoring publishes an older version again as version 5, with the policy it had, when the database can still serve it. It changes no table.\n    - text: Version to restore\n    - combobox \"Version to restore\":\n      - option \"Version 1\" [selected]\n      - option \"Version 2\"\n      - option \"Version 3\"\n    - button \"Restore version 1\"\n    - paragraph: \"Version 1: “Order”, 9 fields, bound to sales.order on pg.\"\n  - status: \"Restored version 1 as version 4: the runtime serves it from now on, with the policy it had. The database was not changed.\""
     }
   },
   "studio-keys": {
     "file": "docs/images/readme/studio-keys.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -467,27 +467,27 @@
       "width": 874,
       "height": 227
     },
-    "bytes": 43194,
-    "sha256": "9467df914482b9e2726aa8bda5d0605e0d09156755d10c17a4e23663e771e5e8",
+    "bytes": 43268,
+    "sha256": "28e4023255770a0300801e0ed6c66ee036f9ad3564a29cdd5698a7812d254170",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 7e638e06627223fe22d0fbcf3b72c9b3409a74a75684a604517598be3b6ed215 of src/studio.css with its imports, and @formancy/themes 0.5.0",
+    "stylesheet": "sha256 35affd85d2cbfb8476062f42bc5590178b219648c3c8395ee954b912ca977ed2 of src/studio.css with its imports, and @formancy/themes 0.5.0",
     "text": {
       "Keys": "- region \"Keys that now stand for something else\":\n  - heading \"Keys that now stand for something else\" [level=3]\n  - paragraph: Each grant below was written for what its key stood for when the policy was. Keep it for what the key stands for now, or remove it.\n  - paragraph: Publishing waits until each is decided, and the server refuses grants nobody decided.\n  - list \"Keys that now stand for something else\":\n    - listitem:\n      - paragraph: Grants for order_date were written for column order_date; it now stands for column order date.\n      - paragraph:\n        - button \"Keep grants for order_date\"\n        - button \"Remove grants for order_date\""
     }
   },
   "host-typeahead": {
     "file": "docs/images/readme/host-typeahead.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -499,16 +499,16 @@
       "width": 561,
       "height": 807
     },
-    "bytes": 27580,
-    "sha256": "c401f970bbb05134a074a91b14fb7903a23800185556f9e68068104c8c512e9f",
+    "bytes": 27552,
+    "sha256": "1291c4768a1fc529561893c58a6bc3a36fa9a0071d626a8e4a2410469d4f526b",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
@@ -520,7 +520,7 @@
   },
   "host-stale": {
     "file": "docs/images/readme/host-stale.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -532,16 +532,16 @@
       "width": 1165,
       "height": 965
     },
-    "bytes": 97494,
-    "sha256": "4efa1b1f4a2b59412845c267dfbc2cf0a97a509315b10243ecbde39811f72b66",
+    "bytes": 97432,
+    "sha256": "d6e139d0f0e5dd256e199d5d9cf9b52508dd3ffce44753c81b41760ec870c4c4",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
@@ -553,7 +553,7 @@
   },
   "host-refused": {
     "file": "docs/images/readme/host-refused.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -565,16 +565,16 @@
       "width": 561,
       "height": 955
     },
-    "bytes": 53546,
-    "sha256": "dd4ca58067e34370ec8f914707073d2471a4b05368fe014007dfa1385b2a0d2f",
+    "bytes": 53666,
+    "sha256": "df6fd1e52110b9ba7fe3d012a37aaf43f4e9518051886b36dd235a22ea8c091f",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
@@ -585,7 +585,7 @@
   },
   "host-unknown": {
     "file": "docs/images/readme/host-unknown.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -597,16 +597,16 @@
       "width": 561,
       "height": 957
     },
-    "bytes": 57630,
-    "sha256": "64c6d315b07cab888040643f31e1b8e9457c8d546af888f97d2d561e92fd7711",
+    "bytes": 57526,
+    "sha256": "b9bb7885ab79a3d351d517e68553f70805ca7e050b1d4ae2cd0cdc703b79f8a5",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
@@ -617,7 +617,7 @@
   },
   "host-unsaved": {
     "file": "docs/images/readme/host-unsaved.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -629,16 +629,16 @@
       "width": 1165,
       "height": 90
     },
-    "bytes": 25364,
-    "sha256": "67d738b3d1f79ae10da2b91f95a8a5617e8d2005951cdec8a6b34d26686e05f5",
+    "bytes": 25346,
+    "sha256": "9daf4e70cd18f195426595af287d1cfb237ac031df282344800557db6017a74c",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
@@ -649,7 +649,7 @@
   },
   "host-delete": {
     "file": "docs/images/readme/host-delete.webp",
-    "captured": "2026-10-13",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -661,16 +661,16 @@
       "width": 1165,
       "height": 474
     },
-    "bytes": 74392,
-    "sha256": "dd5a3f7d875e12884b60358e3ba0ac1cdae8bf14c4763ef780b54faedb17dd6a",
+    "bytes": 74398,
+    "sha256": "6075df6a24fa4c792cff2a63cf6443b91bb4d41f3e2deb8a583da09e83cc7087",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
@@ -681,7 +681,7 @@
   },
   "host-drift": {
     "file": "docs/images/readme/host-drift.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -693,16 +693,16 @@
       "width": 561,
       "height": 913
     },
-    "bytes": 57132,
-    "sha256": "b415fb69e020ca4612b18b3e2c2b5086cb650bc7f673313b23f62b6b5bec80ce",
+    "bytes": 57086,
+    "sha256": "4ab07b6acf107104d541e588b2ff08175fc87fe348cbb3717cc8580d8e323b66",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
@@ -713,7 +713,7 @@
   },
   "host-other-tenant": {
     "file": "docs/images/readme/host-other-tenant.webp",
-    "captured": "2026-10-11",
+    "captured": "2026-10-16",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -725,16 +725,16 @@
       "width": 1165,
       "height": 810
     },
-    "bytes": 74804,
-    "sha256": "3dee118fe59c686cd647cc3ff55b6328d1633155bb1e43b15ee5d404a0e526ca",
+    "bytes": 74882,
+    "sha256": "6ea3a1f04ad07a9316d85e7834944355ce7b348ed40e283c9df9e6149b9b7f24",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
       "chromium": "153.0.8010.12",
       "fonts": {
-        "Archivo": "v25",
-        "IBM Plex Mono": "v20",
-        "IBM Plex Sans": "v23"
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
