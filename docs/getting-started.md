@@ -304,9 +304,6 @@ This is an evaluation stack on your own machine, not a production deployment:
   if it ever names nginx's.
 - **SQL Server's Developer edition**, which is not licensed for production.
 - **Fixture data**, loaded with the databases' administrator accounts.
-- **Fonts from Google.** The studio and the host page load their fonts from
-  Google, so every load asks Google for them; nothing here is set up to work
-  offline.
 - **Secrets as plain files.** Each service reads its own from a volume that
   holds only those, so the server and the minter cannot read a database
   administrator's password, and the gate fails if they can. Anybody who can

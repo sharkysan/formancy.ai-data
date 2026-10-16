@@ -734,7 +734,7 @@
       ]
     },
     "0032": {
-      "reviewed": "sha256:67d09a79073932814a278919aff201f49a16fd8b26f3c0981475c19056cc8b3d",
+      "reviewed": "sha256:95be055f7eaa0bd546ca41675eb8b01f1623a9757a034860ebe7bf4d3cf6a2c2",
       "limitations": [
         {
           "area": "operations",
@@ -949,7 +949,7 @@
       ]
     },
     "0038": {
-      "reviewed": "sha256:cd2cb5a26473d2276e31622e3e6f93a926b33711f3250a1d5a0e2d9a52e7c810",
+      "reviewed": "sha256:ed1bef4c59da111c4b925e9f698a6235709ce76394631f354fa895464b4a5816",
       "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the pictures job's time. Nobody who installs, integrates or operates the module meets them."
     },
     "0039": {
@@ -1296,7 +1296,7 @@
       ]
     },
     "0046": {
-      "reviewed": "sha256:3171bf9e2f198de27e13c3696175eebc994b781185bad50513f838047a8e6afb",
+      "reviewed": "sha256:d6fdc44fb77ac3e9c33ce8b24fe16e2abfdb62b2fb6e0e6d1d3b901b736d7a39",
       "limitations": [
         {
           "area": "licence",
@@ -2229,7 +2229,7 @@
       ]
     },
     "0069": {
-      "reviewed": "sha256:f867a9d9854a8c8675a2059c28c78cada2f08dfe10bddaecb5e2c8b41aecb284",
+      "reviewed": "sha256:cfb97ddf45582e33a88bba10f3ef14b2d76aeea0cfe10adf8a0dc2c0ae2184c9",
       "limitations": [
         {
           "area": "operations",
@@ -2262,10 +2262,6 @@
         {
           "area": "operations",
           "says": "The demo Worker's compatibility date stays until someone reads what moving it changes, and which of Cloudflare's changes tied to that date reach a Worker with no code was not read."
-        },
-        {
-          "area": "operations",
-          "says": "A visitor's browser asks Google for the demo's fonts, and its Content-Security-Policy names Google's two hosts, so fonts Google moves to another host are refused, and the page drawn in its fallback stack, until the policy is edited."
         },
         {
           "area": "licence",
@@ -2331,6 +2327,27 @@
           "area": "server",
           "says": "From a trusted proxy, Fastify's `request.host` and `request.protocol` follow `X-Forwarded-Host` and `X-Forwarded-Proto`, which nginx passes on from any client; nothing in the server reads either.",
           "heldBy": "packages/data-server/src/forwarded.test.ts"
+        }
+      ]
+    },
+    "0072": {
+      "reviewed": "sha256:bcfe710e3621f89325f5f14507bfe0bef0ae3d33a01db8452f0d514fe93514fc",
+      "limitations": [
+        {
+          "area": "licence",
+          "says": "The studio, the host page and the examples page bundle the Archivo, IBM Plex Sans and IBM Plex Mono fonts under the SIL Open Font License 1.1, not this repository's licence, and the notices beside each page carry that licence's text."
+        },
+        {
+          "area": "operations",
+          "says": "The pages' fonts are the Fontsource release the workspace catalog pins, so a fix Google ships to a face reaches them only when this repository moves the pins, and nothing says one is due."
+        },
+        {
+          "area": "operations",
+          "says": "Each app's build carries 59 font files, 757,316 bytes, and the web image two such sets, most of them subsets and WOFF fallbacks no visitor's browser fetches (measured with Vite 8.3.3 on 2026-10-16)."
+        },
+        {
+          "area": "host",
+          "says": "On a machine with a font installed under the name Archivo, the studio, the host page and the examples page draw their headings in that font rather than the face they carry."
         }
       ]
     }

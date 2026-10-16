@@ -63,8 +63,8 @@ later.
   injected into it would not run: nothing a directive does not name,
   nothing inline, nothing evaluated, scripts, styles and fetches from
   formancy.ai's own origin -- its whole site, not only the demo's path --
-  and Google's fonts and no other host, no form sent anywhere and no page
-  framing it; with `nosniff`, `no-referrer`, a Permissions-Policy that
+  and from no other host, no form sent anywhere and no page framing it;
+  with `nosniff`, `no-referrer`, a Permissions-Policy that
   denies what the page does not use, a year's cache for the hashed chunks
   alone, and the third-party notices sent as UTF-8 text, which Cloudflare
   would otherwise send as bare `text/plain` and a browser read in a
@@ -146,7 +146,38 @@ later.
 
 ### Changed
 
+- **The studio, the host page and the examples page serve their own
+  fonts, and no page asks another host for anything**
+  ([0072](docs/decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
+  Archivo, IBM Plex Sans and IBM Plex Mono come from Fontsource's packages
+  at 5.3.0, the release formancy.ai's site and admin install, pinned once
+  in the workspace catalog and bundled into each build, where every page
+  asked Google Fonts for them. Why:
+  - a browser gate failed when Google did not answer: on 2026-10-16 the
+    Chromium leg's first attempt failed its fonts check three times, in
+    runs 38915951921, 38919378187 and 38937995522, and passed on a rerun;
+  - every visitor's browser told Google their address, the demo's
+    included. A German court has held a website liable for that (LG
+    München I, 3 O 17493/20, 2022-01-20), cited as context, not as legal
+    advice;
+  - the demo's Content-Security-Policy named Google's two hosts, so fonts
+    Google moved would have been refused until it was edited. It is now
+    `style-src 'self'` and `font-src 'self'`, derived from the faces the
+    built stylesheets name.
 
+  Each browser gate now refuses and names any request to an origin it
+  does not serve, and its pass with the web fonts refused refuses every
+  font file, wherever it comes from. `scripts/no-other-host.test.mjs`
+  holds each app's page and build to the same, and the getting-started
+  gate exempts no host. What you notice: a visitor's browser fetched 6 font
+  files, 135,548 bytes, on the examples page, where Google sent 4 of
+  165,412 bytes and a stylesheet; each app's build is 59 font files,
+  757,316 bytes, larger, so the web image, which holds two, and the demo's
+  upload grow; `THIRD-PARTY-NOTICES.txt` lists the three packages with the
+  SIL Open Font License's text; and IBM Plex Sans at 500 and 600 is drawn
+  from static instances, so its edges are anti-aliased differently from
+  Google's variable file and the README's pictures are retaken. Nothing
+  moves: the advances and line heights are the same.
 - **Unset, nothing changes.** Every administrator publishes alone, as
   before, and upgrading puts no deployment under review. The composed stack
   and the getting-started guide stay that way.
@@ -181,7 +212,7 @@ later.
   `/data/examples/` with the demo's headers over the types Cloudflare
   gives each file, and fails on anything the browser refuses under the
   policy, on any console error, on a fetch from anywhere but the page's
-  path and Google Fonts, when an inline script put in the page runs or
+  path, when an inline script put in the page runs or
   goes unheard, and on notices not sent as UTF-8 text. Its axe audits run
   without axe's preload, which fetched Google's stylesheet against the
   policy and, as measured, changed no rule's outcome on the page.
@@ -304,10 +335,8 @@ page as it serves it, which the policy refuses, so the browser's console
 shows that one error on every load and Cloudflare gets no bot signal
 from the demo, and turning it off would change formancy.ai's whole zone;
 the Worker's compatibility date is one more date to move; `'self'` is
-all of formancy.ai, the report's Studio included; the page is on the
-site's hostname without the site's bar or footer; a visitor's browser
-asks Google for the fonts; and the policy names Google's hosts, so fonts
-that move are refused until it is edited.
+all of formancy.ai, the report's Studio included; and the page is on the
+site's hostname without the site's bar or footer.
 The Worker runs no code and none of the product -- no server, no
 database, neither plane -- which stays where 0037 puts it.
 What the matrix costs, in 0067: more CI jobs a run, and the wait for
@@ -343,6 +372,14 @@ people's addresses where it held a proxy's; behind the tunnel the server
 believes Cloudflare's edge about the visitor, which was read in
 Cloudflare's documentation and not measured; and a private network route
 to the tunnel would let an enrolled device name its own address.
+
+What serving the fonts costs, in 0072: each build carries every subset of
+every weight and WOFF fallbacks no browser the gates run fetches; a font
+fix reaches the pages only when this repository moves the pins, and
+nothing says one is due; a rule asking Archivo for a width would draw the
+normal width, which the static guard refuses first; a machine with a font
+installed under the name Archivo draws the headings in it; and the gates
+see only the requests the states they reach make.
 
 ## 0.1.0 — 2026-10-16
 

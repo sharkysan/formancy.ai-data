@@ -1,6 +1,6 @@
 # 0058 — The browser gates run in Chromium, Firefox and WebKit, and each fact the browsers disagree on is named and held
 
-- **Status:** accepted; its table extended on 2026-10-16 by `reportsFocusScroll`: after a focus scrolls the window or a scroller, WebKit says the new scroll only at its next rendering update, and the host gate waits for one between the keys that scroll its grid
+- **Status:** accepted; its table extended on 2026-10-16 by `reportsFocusScroll`: after a focus scrolls the window or a scroller, WebKit says the new scroll only at its next rendering update, and the host gate waits for one between the keys that scroll its grid; extended by [0072](0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md): the families a pass must load are those the built page's stylesheets declare, the pass that refuses the web fonts refuses every font file, whatever its origin, and every gate refuses and names a request to an origin it does not serve; its *Google Fonts* cost is history
 - **Date:** 2026-10-13
 - **Deciders:** Daniel Bacher
 - **Verified by:**

@@ -42,7 +42,11 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > proxy the operator names forwarded, which the composed stack sets for its
 > nginx and the Cloudflare overlay's cloudflared, where a 0.1.0 server
 > counts everybody behind a proxy as one
-> ([0071](./docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)),
+> ([0071](./docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md));
+> and the studio, the host page and the examples page serving their fonts
+> from their own build, so that no page asks Google or any other host for
+> anything, where 0.1.0's pages ask Google for theirs
+> ([0072](./docs/decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
@@ -628,7 +632,10 @@ itself is kept for the product's page on formancy.ai. Every file under the
 path is sent with a Content-Security-Policy that allows nothing a directive
 does not name, nothing inline and nothing evaluated, scripts, styles and
 fetches from formancy.ai's own origin -- its whole site, not only this path
--- and Google's fonts and no other host, and no form sent anywhere, with
+-- and from no other host, the page's fonts included, which are files of
+its build
+([0072](./docs/decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)),
+and no form sent anywhere, with
 `nosniff`, `no-referrer` and a Permissions-Policy that denies what the page
 does not use; the hashed chunks are cached for a year, and the third-party
 notices are sent as UTF-8 text
@@ -653,9 +660,10 @@ under `/data/examples/` with the demo's headers: no sideways scroll down to
 320 pixels, the keyboard path through the skip link into the first preview,
 and colour contrast and target size, clean and after a failed submit; that
 every web font the page asks for had loaded by the end of each pass, or, in
-the one that refuses them, none had; that the browser refused nothing
-under the policy, the console said no error, and an inline script put in
-the page was refused; and that the notices were sent as UTF-8 text.
+the one that refuses them, none had; that the page asked no other origin
+for anything; that the browser refused nothing under the policy, the
+console said no error, and an inline script put in the page was refused;
+and that the notices were sent as UTF-8 text.
 
 ```bash
 pnpm --filter @formancy/data-examples exec playwright install --with-deps chromium firefox webkit   # once per machine; the system libraries need sudo

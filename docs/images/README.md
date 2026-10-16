@@ -77,10 +77,14 @@ listens on a port.
   host page, whose workspace draws its Forms sidebar only past 80rem
   (0047), and 1300 px for the examples page; each app refuses a width at or
   below its stylesheet's widest `max-width` breakpoint.
-- **Fonts.** It waits until every family the page asks Google Fonts for has a
-  face loaded and none is loading, and records each family's version from the
-  font file's URL. `document.fonts.ready` alone once resolved with a family
-  missing.
+- **Fonts.** It waits until every family the built page's stylesheets
+  declare has a face loaded and none is loading, and the look records each
+  family's Fontsource package, its version and Google's version of the face,
+  read from the packages the app imports
+  ([0072](../decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
+  A family no imported package declares, and a font file from any origin but
+  the app's, refuse the capture. `document.fonts.ready` alone once resolved
+  with a family missing.
 - **Parts.** A picture is the union of named whole elements, found by role and
   accessible name, with a bench of the page around them: up to 16 CSS px,
   less where something else is drawn nearer -- a neighbouring panel, a
@@ -139,15 +143,15 @@ step). They run at every capture and every `--check`.
 
 All of them need `pnpm build` first, Chromium
 (`pnpm --filter @formancy/data-examples exec playwright install chromium`),
-the network for Google Fonts at capture, and Docker for the host page.
+and Docker for the host page. The fonts are files of the build.
 
 | Command | What it does |
 | --- | --- |
 | `pnpm pictures` | Walks every scene and retakes those whose text changed, or that have no record, no picture or a picture other than the one recorded. |
 | `pnpm pictures --scene <id>` | Retakes those scenes; repeatable. |
 | `pnpm pictures --app <app> --all` | Retakes every picture of one app, on this machine's look. |
-| `pnpm pictures --all` | Retakes every picture on an empty record: the one way to a new look (another Chromium, Playwright or font version). |
-| `pnpm pictures --check` | Walks every scene with Google Fonts refused and compares each part's text with the record; writes nothing. Each app's `pnpm test:pictures` runs it, in the pictures job, in Chromium alone, where the browser gates run in every browser ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)). |
+| `pnpm pictures --all` | Retakes every picture on an empty record: the one way to a new look (another Chromium, Playwright or font package). |
+| `pnpm pictures --check` | Walks every scene, with the faces the pictures were taken in, and compares each part's text with the record; writes nothing. Each app's `pnpm test:pictures` runs it, in the pictures job, in Chromium alone, where the browser gates run in every browser ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)). |
 | `--review <dir>` | Also writes each new picture, decoded to PNG, into a directory outside the repository. |
 
 ## Before a picture is committed
@@ -219,7 +223,7 @@ Filed, not hidden, because a picture is the product as it is:
 ## What nothing checks
 
 - **What a picture looks like.** A change to a stylesheet or a theme alone, a
-  font Google ships, or a Chromium rendering change leaves the text the same;
+  font package that moved, or a Chromium rendering change leaves the text the same;
   `--check` prints a notice when the app's stylesheet changed, and fails on
   nothing. Review holds the looks.
 - **Unquoted sentences.** Whether a caption's unquoted words are true, beyond
