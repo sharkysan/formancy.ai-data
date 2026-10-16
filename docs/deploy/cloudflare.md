@@ -79,16 +79,17 @@ replace with your own.
                                               v
                                 tunnel: outbound from your machine, port 7844, no inbound port
 +------------------------------------ your machine: Docker ---------------------------------------+
-| cloudflared, on the network `edge` with the web front alone                                     |
+| cloudflared, on the network `edge` with the web front alone, at a fixed address                 |
 |   (configuration generated from the server's routes, checked before it runs)                    |
 |   formancy.<zone>              -> web:8080, everything; refused without a valid Access token    |
 |   <app host> + runtime pattern -> web:8081; any other path: 404, or the host application's own  |
-| web (nginx), on `edge` and compose's network:                                                   |
+| web (nginx), on `edge`, and on `proxy` at a fixed address:                                      |
 |   8080: /studio/ and /host/ files; /v1/ and /health --plain HTTP--> server:4390                 |
 |   8081: no file; /v1/forms and /v1/forms/ --plain HTTP--> server:4390; anything else 404        |
-| server, on compose's network: refuses a path a proxy could read differently; verifies the host  |
-|   token; roles pick the plane; no-store on its answers; one rate-limit bucket; store on a       |
-|   volume; its log is the audit                                                                  |
+| server, on compose's network and `proxy`: refuses a path a proxy could read differently;        |
+|   verifies the host token; roles pick the plane; no-store on its answers; a rate-limit bucket   |
+|   per visitor's address, believed from cloudflared and nginx alone; store on a volume; its log  |
+|   is the audit                                                                                  |
 |   --TLS to your databases (plain only for the composed stack's own)--> PostgreSQL, SQL Server   |
 +-------------------------------------------------------------------------------------------------+
 ```
@@ -182,8 +183,27 @@ be decrypted at Cloudflare, Cloudflare is not this deployment's edge.
   cloudflared turns that off (cloudflared's `CHANGES.md`, 2023.9.0: for a
   locally-managed tunnel, "guarantee that tunnel has no Private Routes").
   Such a route would reach what cloudflared reaches, above, without
-  Access. Setup looks for one once, while its login lasts, and stops if it
-  finds one; nothing looks again.
+  Access, and since the server believes the visitor's address cloudflared
+  passes on (below), such a device could name an address of its own choice
+  in `X-Forwarded-For` and so choose its own rate-limit bucket and the
+  address the log gives it. Setup looks for one once, while its login
+  lasts, and stops if it finds one; nothing looks again.
+
+**Whose address the server counts.** cloudflared passes on the
+`X-Forwarded-For` Cloudflare's edge sends, which ends with the address that
+connected to Cloudflare: Cloudflare appends it to whatever the visitor sent
+(Cloudflare's `fundamentals/reference/http-headers`, read 2026-10-16), and
+cloudflared 2026.10.0 adds only `X-Forwarded-Host`, and that only with
+`httpHostHeader`, which this configuration does not use
+(`ingress/origin_proxy.go` at that tag; a search of its repository for
+"Forwarded" found no other place that sets one, the same day). nginx appends
+cloudflared's own address, and the server believes both proxies, because
+compose.yaml's `FORMANCY_DATA_TRUSTED_PROXIES` names the web front's address
+on `proxy` and the one the overlay gives cloudflared on `edge`
+([0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)). So
+the rate limit counts each visitor's address on its own, and the server's
+log names it. That Cloudflare's edge sends the header as documented was not
+measured: nothing here has an account.
 
 Formancy Data is source-available: its
 [licence](../../LICENSE.md) makes evaluation free and production use paid.
@@ -503,10 +523,11 @@ rename or move it.
   Routes**, by CIDR or by hostname: either would let enrolled devices reach
   what cloudflared reaches, the web front's 8080 without Access among it
   (section 0). Setup looked once; nothing looks again.
-- **The rate-limiting rule, optional on the administrator's door, advised
-  once the runtime door is open**, because that door has no Access in front
-  of it, and one anonymous script could otherwise spend the server's whole
-  bucket so that every host-application user is refused. On the Free plan
+- **The rate-limiting rule, optional on either door.** The server counts
+  each visitor's address on its own (section 0), so one anonymous script on
+  the runtime door, which has no Access in front of it, spends its own
+  bucket and not everybody's; what the rule adds is that the script's
+  requests stop at the edge and never reach your machine. On the Free plan
   there is one such rule, matched on the path alone, counted per IP address
   over 10 seconds, so it also counts the administrator's door; Pro adds the
   hostname to what it can match
@@ -518,11 +539,11 @@ rename or move it.
   `message`, and data-client reads a blocked write as one that may have
   been saved, though nothing reached your machine
   (`scripts/cloudflare/answers.test.mjs` holds that); without the rule, the
-  same script spends the bucket and the server refuses everybody with its
-  own 429, which data-client reads as a refusal. On Free the rule still
-  keeps one address from refusing everybody else, at the price of that
-  address's writes reading as unknown: turn it on when that is the better
-  trade, and say so to the host application's people. Its settings:
+  server refuses that address with its own 429, which data-client reads as
+  a refusal. On Free the rule keeps that address's requests off your
+  machine at the price of its writes reading as unknown: turn it on when
+  that is the better trade, and say so to the host application's people.
+  Its settings:
 
 <!-- generated by scripts/cloudflare/doors.mjs from deploy/cloudflare/doors.json: rate-limit; do not edit -->
 
@@ -537,7 +558,7 @@ rename or move it.
 | Response body | the JSON below, on Pro and above |
 | For duration | 10 seconds |
 
-The data server refuses everybody, with 429, once all requests together pass its one bucket: 600 a minute unless `FORMANCY_DATA_RATE_LIMIT` says otherwise, which is 100 per 10 seconds. The edge counts each address on its own, per Cloudflare location, so a threshold above 100 lets one address spend the whole bucket, and everybody else is then refused by the server. Below it, many addresses together still can.
+The data server counts each visitor's address on its own, as Cloudflare's edge reported it, and refuses that address, with 429, once it passes 600 a minute unless `FORMANCY_DATA_RATE_LIMIT` says otherwise, which is 100 per 10 seconds. The edge counts each address too, per Cloudflare location, so with a threshold at or below 100 it blocks an address sending steadily before the server would refuse it, and those requests never reach your machine; above 100, the server's own 429 comes first.
 
 <!-- end generated -->
 
@@ -557,10 +578,10 @@ The data server refuses everybody, with 429, once all requests together pass its
   machine. Without it -- and on Free, where there is no body to set -- a
   blocked write reads as one that may have been saved. The threshold is
   yours; Cloudflare says the count is not designed to
-  be precise. The server's bucket is one for everybody because it trusts no
-  forwarded address
-  ([the data server's README](../../packages/data-server/README.md));
-  `FORMANCY_DATA_RATE_LIMIT` raises it and does not split it.
+  be precise. The server's bucket is one per address because it believes
+  nginx and cloudflared about the visitor's
+  ([the data server's README](../../packages/data-server/README.md#behind-a-reverse-proxy));
+  `FORMANCY_DATA_RATE_LIMIT` sets how many requests each address may send.
 
 ## 6. Use it
 
@@ -706,9 +727,10 @@ and every other path on that hostname is 404. Access Service Auth can stand
 in front of that hostname for the backend alone; on Zero Trust
 organisations created on or after 2026-10-05 Cloudflare always checks a
 service token strictly *[survey, not re-read]*. The edge's rate-limiting
-rule counts the backend as one visitor, and on Free a path-only rule cannot
+rule counts the backend as one visitor, and so does the server: every person
+behind the backend shares its one bucket. On Free a path-only rule cannot
 leave it out: with shape (b), leave the rule off or set its threshold at the
-server's whole bucket.
+server's limit.
 
 Setup logs in again for the new hostname's DNS record, and leaves the
 tunnel and the administrator's hostname as they are. Revoke the login's
@@ -769,7 +791,7 @@ door, which fails closed; nothing reminds you.
   [data server's README](../../packages/data-server/README.md#rotating-the-identity-key)
   says how a key is rotated.
 - **The rate limit:** `FORMANCY_DATA_RATE_LIMIT`, in the server's
-  environment in your own override, for the one bucket everybody shares.
+  environment in your own override, for what each address may send.
 - **Your own databases**, with TLS, reached from this machine and not
   through Cloudflare, in `connections.json`: cloudflared, on `edge`, does
   not reach compose's network, but it reaches what your machine routes to,
@@ -779,7 +801,13 @@ door, which fails closed; nothing reminds you.
   configuration names your own web front's addresses instead of `web:8080`
   and `web:8081` -- and your web front needs a server for the runtime door
   that serves no file, as `deploy/web/nginx.conf`'s does -- and cloudflared
-  can run as a host package; the tools' checks are then yours to run.
+  can run as a host package; the tools' checks are then yours to run. The
+  server's `FORMANCY_DATA_TRUSTED_PROXIES` then names the address your web
+  front connects to it from and the one cloudflared connects to the web
+  front from, each alone and never the network around it: a network's
+  gateway is how a local process reaches a container, and trusting it lets
+  that process choose its own address. Name one too few and everybody
+  behind it shares one bucket again.
 - **Back up** the volumes `<project>_formancy-data-store` and
   `<project>_formancy-data-tunnel`, where `<project>` is Compose's project
   name, the checkout's directory name unless you set one. Cloudflare holds
@@ -795,7 +823,10 @@ door, which fails closed; nothing reminds you.
   log. That is personal data on your machine; "Remove visitor IP
   headers" removes the address only from a request another CDN proxied
   first. This deployment adds the runtime door's server to nginx's
-  configuration and leaves its log format as it is.
+  configuration and leaves its log format as it is. **So does the server's
+  log**, the audit trail's: each request line names the visitor's address
+  where it named cloudflared's
+  ([0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)).
 - **One server process** (0013, 0031): a write's id is remembered by one
   process, so a second replica would apply a resent write again. One
   cloudflared is enough; more would change nothing for the server.
@@ -824,10 +855,12 @@ door, which fails closed; nothing reminds you.
   machine routes to; not the server past nginx or the composed stack's
   databases, which are on compose's network, where cloudflared is not.
   Setup looks for private network routes once; nothing looks again.
-- **Rate limiting is coarse.** The server's one bucket has a fixed window,
-  so up to twice its size can pass across a window's boundary; the edge's
-  count is per Cloudflare location and imprecise; and shape (b) is one
-  visitor to the edge. On Free the edge rule's block carries no sentence,
+- **Rate limiting is coarse.** The server's buckets have a fixed window,
+  so up to twice a bucket can pass across a window's boundary; a bucket is
+  the address Cloudflare reported, so visitors behind one NAT or one proxy
+  of their own share one, and an IPv6 visitor is counted by its /64; the
+  edge's count is per Cloudflare location and imprecise; and shape (b) is
+  one visitor to the edge and to the server. On Free the edge rule's block carries no sentence,
   so a write it blocked reads as one that may have been saved; only Pro and
   above can answer with the body that reads as a refusal (section 5).
 - **What a lapse looks like.** A lapsed Access session reads as "could not

@@ -44,7 +44,14 @@ services:
     # route anybody adds to the tunnel, it reaches neither the server past
     # nginx nor the databases. It still reaches Docker's host and what that
     # routes to, which the guide says.
-    networks: [edge]
+    #
+    # At the address on `edge` that compose.yaml's server trusts as a proxy
+    # (0071), outside the part of `edge` Docker hands out, so the server
+    # believes the visitor's address Cloudflare's edge put in X-Forwarded-For
+    # and nginx passed on behind it.
+    networks:
+      edge:
+        ipv4_address: 172.16.239.250
     volumes:
       - formancy-data-tunnel:/etc/formancy-cloudflare:ro
     depends_on:

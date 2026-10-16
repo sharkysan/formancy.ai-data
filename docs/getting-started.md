@@ -59,6 +59,20 @@ makes ([0024](./decisions/0024-the-studio-speaks-only-the-admin-plane.md)).
   `FORMANCY_DATA_WEB_PORT`, `FORMANCY_DATA_PG_PORT` or `FORMANCY_DATA_MS_PORT`
   in a `.env` file beside `compose.yaml`; `.env.example` lists them. Nothing is
   published on any other interface.
+- **Two address ranges no other Docker network holds**: 172.16.238.0/24 and
+  172.16.239.0/24. `compose.yaml` fixes them for the network the web front
+  shares with the server and the one it shares with cloudflared, so that the
+  server can name the web front's address as the proxy it believes
+  ([0071](./decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)).
+  Docker never takes either for a network of its own unless its daemon was
+  given other default pools. If starting the stack says "Pool overlaps with
+  other one on this address space", a network already holds one -- another
+  stack from this file among them, which is why two do not run at once on
+  one machine -- and `docker network inspect` on each of `docker network
+  ls`'s networks says which. Remove that network, or change both ranges in
+  `compose.yaml` together with the web front's address there, cloudflared's
+  in `deploy/cloudflare/compose.yaml` and the server's
+  `FORMANCY_DATA_TRUSTED_PROXIES`.
 - **Microsoft's SQL Server EULA.** Starting the stack runs SQL Server's
   Developer edition, which is not licensed for production, and accepting its
   EULA is your act; `compose.yaml` says so where it sets `ACCEPT_EULA`.
@@ -273,13 +287,21 @@ This is an evaluation stack on your own machine, not a production deployment:
 - **One replica, a file store on a local volume.** A write's id is remembered
   in the server's process only, so a resend that reached another replica would
   be applied again ([0031](./decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
-- **One rate-limit bucket.** Every request reaches the server from nginx, and
-  the server has no setting to trust a proxy's forwarded address, so everybody
-  shares one limit. The server reads how many requests a minute that limit
-  allows from `FORMANCY_DATA_RATE_LIMIT` in its own environment, which in
-  this stack is the `server` service's `environment` in `compose.yaml`;
+- **One rate-limit bucket per address nginx saw.** Every request reaches the
+  server from nginx, and the server believes the address nginx says it saw
+  because `FORMANCY_DATA_TRUSTED_PROXIES` names nginx's address, and nothing
+  wider ([0071](./decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)).
+  On this machine that is one address for every browser you open, the one
+  Docker forwards the published port from: a network's gateway on Docker
+  Desktop, where 0071 measured it. A client that sends its
+  own `X-Forwarded-For` changes nothing: nginx adds the address it saw, and
+  only that one is believed. The server reads how many requests a minute
+  each address may send from `FORMANCY_DATA_RATE_LIMIT` in its own
+  environment, which in this stack is the `server` service's
+  `environment` in `compose.yaml`;
   [the data server's README](../packages/data-server/README.md) has its
-  default. It raises the one bucket and does not split it.
+  default. The log names that address for each request, so the gate fails
+  if it ever names nginx's.
 - **SQL Server's Developer edition**, which is not licensed for production.
 - **Fixture data**, loaded with the databases' administrator accounts.
 - **Fonts from Google.** The studio and the host page load their fonts from
@@ -291,7 +313,9 @@ This is an evaluation stack on your own machine, not a production deployment:
   run `docker` on this machine can read every one, as section 7 shows.
 - **Reachable past nginx, on Linux.** Nothing is published off loopback, but
   on a Linux host a local process can reach each service at its address on
-  compose's network: the server directly, without nginx and its headers, and
+  compose's network: the server directly, without nginx and its headers --
+  from Docker's gateway, which the server does not believe about anybody --
+  and
   both databases. The gate reaches the server that way on every run.
 - **The audit trail is the server's log.** The server writes an audit event
   for each runtime request to its standard output, which `docker compose

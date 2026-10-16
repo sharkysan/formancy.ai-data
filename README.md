@@ -28,11 +28,16 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > lookup a person can search generated as a typeahead
 > ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)),
 > which a form published at 0.1.0 does not carry until it is regenerated
-> and published again; and the examples page served at
+> and published again; the examples page served at
 > https://formancy.ai/data/examples/, under a strict
 > Content-Security-Policy, which Cloudflare deploys from `main` and not
 > from a release
-> ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)),
+> ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md));
+> and the rate limit and the log counting each client by the address a
+> proxy the operator names forwarded, which the composed stack sets for its
+> nginx and the Cloudflare overlay's cloudflared, where a 0.1.0 server
+> counts everybody behind a proxy as one
+> ([0071](./docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
@@ -743,6 +748,19 @@ answers. The list is read at start, and the composed stack lists none
 ([0060](./docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md);
 [the data server's README](./packages/data-server/README.md#across-origins)
 says what is granted, refused and logged).
+
+Behind a proxy, the server counts and logs each client by the address the
+proxy forwarded only when `FORMANCY_DATA_TRUSTED_PROXIES` names that proxy,
+by its address or its range; unset, as in 0.1.0, everybody behind it is one
+client to the rate limit and the log names the proxy. `true`, `*`, a hop
+count and a range written with an interface's address stop the server, and
+a forwarded value that is not an address is not believed. The composed
+stack names its nginx's fixed address and the one the Cloudflare overlay
+gives cloudflared, never their networks, whose gateways are how a local
+process reaches a container
+([0071](./docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md);
+[the data server's README](./packages/data-server/README.md#behind-a-reverse-proxy)
+says what a list too wide or too narrow does).
 
 Publication can need a second person, from the release after 0.1.0: a
 0.1.0 server ignores the setting, and every administrator there still

@@ -405,19 +405,23 @@ one-key settings rotate by restart; a key set rotates as below.
 
 | Variable | Sets |
 | --- | --- |
-| `FORMANCY_DATA_RATE_LIMIT` | Requests a minute each client address may send to every route but `/health`: a whole number of at least 1, 600 when unset. Anything else stops the process with a sentence naming the setting. Behind a reverse proxy every client shares the proxy's address, so the limit is one bucket for all of them: Fastify's `trustProxy` is not offered, and the setting raises that bucket rather than splitting it. |
+| `FORMANCY_DATA_RATE_LIMIT` | Requests a minute each client address may send to every route but `/health`: a whole number of at least 1, 600 when unset. Anything else stops the process with a sentence naming the setting. An IPv6 client is counted by its /64. Behind a reverse proxy that `FORMANCY_DATA_TRUSTED_PROXIES` does not name, every client shares the proxy's address, so the limit is one bucket for all of them, which this setting raises and does not split. |
+| `FORMANCY_DATA_TRUSTED_PROXIES` | The proxies whose `X-Forwarded-For` the server believes, comma-separated, each an IP address or a CIDR range of either family: `10.0.0.2`, `10.0.0.0/24`, `2001:db8::/64`. Empty or unset, none: every request is its peer's, as before 0071. A request from a listed peer is counted by the rate limit and named in the log by the address it forwarded -- from the right, the first address not in the list. `true`, `*`, a prefix of 0, a hop count, an empty entry, a range with bits set past its prefix (`172.16.238.250/24`, as `ip addr` prints an interface), a netmask, a zone, a port or a name stops the process with a sentence naming the entry by its place. Read at start ([0071](../../docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)); see *Behind a reverse proxy*, below. |
 | `FORMANCY_DATA_CORS_ORIGINS` | The origins a page may call the runtime plane from, comma-separated, each exactly as a browser sends `Origin`: `https://app.example`, or plain HTTP on `localhost`, `127.0.0.1` or `[::1]`. Empty or unset, none. A wildcard, a pattern, `null`, a path or a spelling no browser sends stops the process, and so does a list without the runtime plane. Read at start ([0060](../../docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md)); see *Across origins*, below. |
 | `FORMANCY_DATA_LOOKUP_DEADLINE_MS` | How long a lookup statement may run, in milliseconds counted from when the adapter is asked for it, before the server stops it ([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)): a whole number from 1 to 2147483647, the longest a Node timer holds. Unset, `DEFAULT_LOOKUP_DEADLINE_MS` from `@formancy/data-core`, the slowest lookup answer `docs/performance.md` measured, which describes that machine and data: a slower or larger deployment raises it. Anything else stops the process with a sentence naming the setting, and `createDataServer` refuses the same as `runtime.lookupDeadlineMs`. On SQL Server mssql's default request timeout of 15 s still cuts any deadline set above it, answered `unavailable`. |
 | `PORT` | The port it listens on, 4390 when unset. |
 
 `src/rate-limit.test.ts` holds what the rate-limit setting accepts and
-refuses, `src/cors.test.ts` what the origin list does,
+refuses, `src/trusted-proxies.test.ts` what the proxy list does,
+`src/cors.test.ts` what the origin list does,
 `src/lookup-deadline.test.ts` what the lookup deadline accepts, and
 `src/publisher-roles.test.ts` what the publisher roles do.
 
 The log is JSON lines on standard output: Fastify's lines for each request,
-and the audit trail. A request is logged by its method and the route it
-matched, never by the path, the query or the Host header it was sent with,
+and the audit trail. A request is logged by its method, the route it
+matched and the client's address -- the peer's with its port, or, from a
+trusted proxy, the address it forwarded without one (0071) -- never by the
+path, the query or the Host header it was sent with,
 because those are whatever a caller typed, token or none
 ([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md));
 a 404 is logged with no route. A request refused across origins names its
@@ -476,8 +480,8 @@ CI container job fails if `node` cannot write it. The image declares no
 `compose.yaml`'s `stack` profile runs the image that way -- both planes, the
 allowlist in `deploy/connections.json`, an audit key, and every secret a
 `file:` reference into a volume -- behind one nginx that serves the studio
-and the host page on the same origin as `/v1`, with a token minter beside it
-for the demo. [`docs/getting-started.md`](../../docs/getting-started.md) walks
+and the host page on the same origin as `/v1`, at a fixed address the server
+trusts as a proxy, with a token minter beside it for the demo. [`docs/getting-started.md`](../../docs/getting-started.md) walks
 through it, and CI runs that guide as written
 ([0032](../../docs/decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
 It is an evaluation stack, not a deployment: the guide's section 8 says what
@@ -628,6 +632,53 @@ an embedder passes the same list as `runtime.origins`, held to the same rule.
 `src/cross-origin.test.ts` holds each of these over the real server, and
 `src/server-log.test.ts` what the log names. No browser gate runs against a
 server with origins listed yet; the one measurement in browsers was by hand.
+
+### Behind a reverse proxy
+
+Behind a proxy every request arrives from the proxy, so without a setting
+the rate limit counts everybody behind it as one client, and the log names
+the proxy. `FORMANCY_DATA_TRUSTED_PROXIES` names the proxies whose
+`X-Forwarded-For` the server believes
+([0071](../../docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md));
+an embedder passes the same list as `trustedProxies`, held to the same rule.
+The list goes to Fastify's `trustProxy`, which walks `X-Forwarded-For` from
+the right, past the peer while it and each address after it are listed, and
+stops at the first that is not.
+
+- **Name every proxy in front of the server, and only those.** nginx with
+  `$proxy_add_x_forwarded_for` appends the address it saw to what the client
+  sent, so the rightmost address it wrote is believed and whatever the
+  client wrote to the left of it is not. Behind two proxies -- nginx behind
+  cloudflared, say -- both are named. A list too wide believes a client
+  that can connect from inside it about itself, so it chooses its own
+  bucket and the address the log gives it; a range includes its network's
+  gateway, from where a local process reaches a container. A list too
+  narrow is one bucket again, as without it.
+- **A forwarded value that is not an IP address is not believed** -- an
+  address with its port, a word -- and the request is counted and logged
+  as its peer's. A proxy that passes a client's header on without adding
+  the address it saw is never safe to name: an address the client wrote
+  would then be believed.
+- **IPv4 and IPv6.** A peer reported as `::ffff:10.0.0.2`, as a dual-stack
+  listener reports an IPv4 one, matches `10.0.0.2` in the list. An IPv6
+  client is counted by its /64, as @fastify/rate-limit does by default,
+  since one host commonly holds a whole /64; the log names its address.
+- **Only `X-Forwarded-For`.** RFC 7239's `Forwarded` is not read. From a
+  listed peer, Fastify's `request.host` and `request.protocol` also follow
+  `X-Forwarded-Host` and `X-Forwarded-Proto`; nothing in the server reads
+  either, and `src/forwarded.test.ts` fails when an answer of either plane
+  changes with them.
+- **Read at start.** The list is not read again on SIGHUP: changing it is a
+  restart.
+- **The log names people.** With a proxy listed, the log holds each
+  client's address where it held the proxy's: personal data, kept as long
+  as the log is.
+
+The composed stack names its web front's address on the network it shares
+with the server, and the address cloudflared takes in the Cloudflare
+overlay, and nothing wider. `src/forwarded.test.ts` holds what the server
+believes over the real server, and the getting-started gate reads the
+composed server's log for a request it did not believe nginx about.
 
 ### Publication under review
 

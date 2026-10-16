@@ -70,8 +70,24 @@ later.
   would otherwise send as bare `text/plain` and a browser read in a
   guessed encoding. The headers are one module that the deploy writes as
   Cloudflare's `_headers` file and the browser gate serves the page with.
+- **`FORMANCY_DATA_TRUSTED_PROXIES` names the proxies whose
+  `X-Forwarded-For` the server believes**, so behind nginx, or nginx behind
+  cloudflared, each person is a rate-limit bucket of their own and the log
+  names their address. Until now everybody behind a proxy shared one
+  bucket, the proxy's, so one script could spend it and every other person
+  was refused with them; `FORMANCY_DATA_RATE_LIMIT` could only raise that
+  bucket. Each entry is an IP address or a CIDR range; `true`, `*`, a
+  prefix of 0 and a hop count stop the server, because any of them lets a
+  client name its own address and choose its own bucket, and so do an
+  empty entry and a range written with an interface's address,
+  `172.16.238.250/24`, which trusts the whole network where one address
+  was meant. A forwarded value that is not an IP address is not believed.
+  Embedders pass the same list as `trustedProxies`
+  ([0071](docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md);
+  the data server's README says what a list too wide or too narrow does).
 
 ### Changed
+
 
 - **Unset, nothing changes.** Every administrator publishes alone, as
   before, and upgrading puts no deployment under review. The composed stack
@@ -125,6 +141,29 @@ later.
   version file exported from 0.1.0 is refused by this release's import as
   not what this server generates: upgrade the source deployment and
   regenerate there first, or propose the form again in the target.
+- **Unset, nobody is believed about their address**, as before: a server
+  that upgrades without the setting counts and logs every request by the
+  peer that connected (0071).
+- **The composed stack trusts its web front, and the Cloudflare overlay's
+  cloudflared.** `compose.yaml` fixes the web front's address on a new
+  network, `proxy`, that it shares with the server alone, and the address
+  cloudflared takes on `edge`, and names both, not their networks, in the
+  server's `FORMANCY_DATA_TRUSTED_PROXIES`: a network's gateway is how a
+  local process reaches a container, and trusting it would let that process
+  choose its own address. Behind the tunnel each visitor is therefore a
+  bucket of their own, and the server's log names each visitor's address,
+  which is personal data, where it named cloudflared's. The web front left
+  compose's network for `proxy`. Both networks' ranges are fixed, at
+  172.16.238.0/24 and 172.16.239.0/24, outside Docker's default pools, and
+  Docker refuses a second network in the same range, so two stacks from
+  `compose.yaml` no longer run at once on one machine, the getting-started
+  gate's included; the guide's section 0 says what to do when the ranges
+  are taken. The guide's Cloudflare section no longer advises the edge's
+  rate-limiting rule to protect everybody's one bucket: it keeps one
+  address's requests off the machine.
+- **The log's request line names the forwarded address without the
+  proxy's port.** Beside an address a trusted proxy forwarded, the socket's
+  port is the proxy's connection, not the client's.
 
 What review costs, in 0065: every submit and approval asks the database, so
 one that cannot be reached refuses both; nothing deletes a draft; nobody is
@@ -161,6 +200,17 @@ asks Google for the fonts; and the policy names Google's hosts, so fonts
 that move are refused until it is edited.
 The Worker runs no code and none of the product -- no server, no
 database, neither plane -- which stays where 0037 puts it.
+
+What believing a proxy costs, in 0071: a list too wide lets a client that
+connects from inside it choose its own bucket and the address the log
+names, and one too narrow is one bucket again, which nothing reports; the
+list is read at start, not on SIGHUP; only `X-Forwarded-For` is read, not
+RFC 7239's `Forwarded`; a client is its address, so people behind one NAT
+share a bucket and an IPv6 client is counted by its /64; the log holds
+people's addresses where it held a proxy's; behind the tunnel the server
+believes Cloudflare's edge about the visitor, which was read in
+Cloudflare's documentation and not measured; and a private network route
+to the tunnel would let an enrolled device name its own address.
 
 ## 0.1.0 — 2026-10-16
 
