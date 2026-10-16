@@ -185,13 +185,32 @@ function actsOver(plane) {
     for (const name of ['React', 'Angular']) await untilSnapshot(pane(page, name), named, { within: WITHIN, what: `the ${name} pane's customer` })
   }
   const both = (page) => ({ React: pane(page, 'React'), Angular: pane(page, 'Angular') })
-  let lookups = 0
   return {
     'host-typeahead': async (page) => {
-      await page.route('**/v1/forms/*/lookups/*/query', async (route) => {
-        lookups += 1
-        await route.fallback()
-      })
+      // "As clara types, the page asks the runtime plane": the answer to her
+      // search itself, waited for. A list on the screen is not that, nor is
+      // a query counted from here: @formancy/react 0.5.0's typeahead
+      // searches from no characters, so the page asks this lookup with an
+      // empty search once the panes are drawn, and again later, and the box
+      // keeps its last answer -- tenant 1's Muster AG -- on the screen until
+      // the next arrives. A check that counted the queries routed after the
+      // act began found her customer offered before her search was asked,
+      // none counted, in 2 of 3 runs of --check once the pages drew their
+      // own faces (0072), and again in 2 of 3 instrumented, whose pass had
+      // counted an empty search asked while she typed; main's --check,
+      // which refused the faces, passed 3 of 3 (Chromium 153.0.8010.12 on
+      // Linux, 2026-10-16).
+      // Settled to a yes or a no at once, so a premise refused below leaves
+      // no wait to reject unheard when the page closes.
+      const answered = page
+        .waitForResponse((response) => {
+          const request = response.request()
+          return request.method() === 'POST' && /\/lookups\/[^/]+\/query$/.test(new URL(response.url()).pathname) && request.postDataJSON()?.search === SEARCH
+        })
+        .then(
+          () => true,
+          () => false,
+        )
       // The caption's premise, asked of the database's owner, whom row-level security does not bind.
       const matching = await owner`select tenant_id, customer_no, name from sales.customer where name ilike ${`%${SEARCH}%`}`
       const number = (tenant, name) => matching.find((row) => row.tenant_id === tenant && row.name === name)?.customer_no
@@ -200,10 +219,12 @@ function actsOver(plane) {
         throw new Error(`"${SEARCH}" matches ${JSON.stringify(matching)}, not tenant 1's ${journey.order.customer.choose} and tenant 2's ${OTHER_TENANT.name} under one customer number`)
       }
       await customer(page, 'React').pressSequentially(SEARCH)
+      if (!(await answered)) throw new Error(`no lookup query for "${SEARCH}" was answered by the runtime plane within ${String(WITHIN)} ms`)
+      // The list drawn from that answer: the box is busy until it is (a DOM
+      // read, as scripts/pictures/session.mjs's quiet() says why).
+      await customer(page, 'React').and(page.locator('[aria-busy="true"]')).waitFor({ state: 'detached' })
       const list = paper(page, 'React').getByRole('listbox')
       await list.getByRole('option', { name: journey.order.customer.choose, exact: true }).waitFor()
-      // "As clara types, the page asks the runtime plane": counted, never printed.
-      if (lookups === 0) throw new Error('the list was offered without a lookup query reaching the runtime plane')
       // Her tenant's customer alone, though the other tenant's matches too.
       const offered = await list.getByRole('option').count()
       if (offered !== 1) throw new Error(`the list offers ${String(offered)} customers for "${SEARCH}", not ${journey.order.customer.choose} alone`)
