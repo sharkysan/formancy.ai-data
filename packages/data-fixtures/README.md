@@ -225,12 +225,43 @@ dropped the key from the end of its order would show on both engines.
 Every adapter's suite asserts both lists are empty. That is how "both adapters
 pass the same mandatory suite" is something a test checks.
 
+## Which images
+
+`DEFAULT_IMAGES` is the image each engine's suites run on unless told
+otherwise, the one compose and the committed snapshots name.
+`MATRIX_IMAGES` is every image the adapter suites and this package's run
+on, the default first (0067): CI's `test-images` job runs this package and
+that engine's adapter suite once on each of the others, and
+`scripts/ci-test-jobs.test.mjs` fails when the job's legs and this list
+disagree. `FORMANCY_IMAGES` chooses for a run,
+one image per engine, each from the matrix; an engine it does not name keeps
+its default, and an image outside the matrix, two for one engine, or the
+variable set to nothing, is refused with the list:
+
+```bash
+FORMANCY_IMAGES=postgres:16-alpine pnpm exec turbo run test --filter=@formancy/data-postgres
+```
+
+turbo hashes the variable for `test` and `test:coverage`, so a run on one
+image is never replayed from another's cache. `selectedImage(engine)` is
+what a start without an image of its own runs.
+
+`VERSION_FACTS` names what the versions of one engine disagree on, as 0026
+names what the engines disagree on: each row's value per major, its source,
+how each value was measured, and the test that asserts it.
+`versionFact(name, server)` gives the value for the major the server
+answered -- never its image's tag -- and refuses a major the row has no
+value for, so a leg on a version nobody measured fails rather than
+asserting nothing. No test is skipped on a version.
+
 ## What a run records
 
 Every container a suite or a gate starts goes through here:
 `startPostgresContainer(image?)` and `startSqlServerContainer(image?)` start
-an empty server -- the image `DEFAULT_IMAGES` names for its engine, unless a
-test names another -- and the two fixtures are built on them. Each asks the
+an empty server -- the image `FORMANCY_IMAGES` chooses for its engine, which
+unset is the default, unless a test names another -- and the two fixtures,
+`startPostgresFixture(image?)` and `startSqlServerFixture(image?)`, are built
+on them. Each asks the
 server what it is (`server_version`, or `ProductVersion` -- what the adapters'
 pings read, and both adapters' ping tests hold them to it -- with
 `ProductUpdateLevel` and `Edition`) and writes that, the image and the file
@@ -292,9 +323,11 @@ adding to it. The fixture-load test declares nothing: it reads the values
 through raw drivers, which shows the database holds them and is not either
 adapter passing anything.
 
-The release report shows every case on every engine as passed, failed or
-missing, from the tests' declarations in that run, and a case that passed on
-one engine only fails the run. What it cannot show is that a test which
+The release report shows every case on every image of every engine's
+matrix as passed, failed or missing, from the tests' declarations in that
+run, each test counting for the images its own leg's servers answered on
+for its file (0067), and a case that passed on one engine or one image only
+fails the run. What it cannot show is that a test which
 declares a case asserts it; review holds that. `src/cases.test.ts` fails when
 this package exports a table of shared expectations that is no family of
 cases, and gives no reason why.

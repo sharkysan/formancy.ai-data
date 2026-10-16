@@ -779,8 +779,8 @@ says what an author and a publisher may each do, and what it costs).
 
 | | Tested with | Declared as |
 | --- | --- | --- |
-| **PostgreSQL** | `postgres:17-alpine`, unless a test names another image |  |
-| **SQL Server** | `mcr.microsoft.com/mssql/server:2022-latest`, unless a test names another image |  |
+| **PostgreSQL** | `postgres:17-alpine`, unless a test names another image; `@formancy/data-fixtures` and `@formancy/data-postgres` also on `postgres:15-alpine`, `postgres:16-alpine` and `postgres:18-alpine` |  |
+| **SQL Server** | `mcr.microsoft.com/mssql/server:2022-latest`, unless a test names another image; `@formancy/data-fixtures` and `@formancy/data-sqlserver` also on `mcr.microsoft.com/mssql/server:2019-latest` and `mcr.microsoft.com/mssql/server:2025-latest` |  |
 | `postgres`, by `@formancy/data-postgres` | 3.4.9 | `^3.4.9` |
 | `@fastify/rate-limit`, by `@formancy/data-server` | 11.2.0 | `^11.2.0` |
 | `fastify`, by `@formancy/data-server` | 5.12.5 | `^5.12.5` |

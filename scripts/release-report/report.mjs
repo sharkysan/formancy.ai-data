@@ -1,5 +1,6 @@
 // The release report (0035): which run it describes, what that run was tested
-// on, what it found, every shared case on both engines, the browser matrix
+// on, what it found, every shared case on every image of both engines' matrix
+// (0067), the browser matrix
 // as it is, the build identity of every published package, the release
 // gates, and the limitations -- derived from the run, then the ones the
 // decision records state -- built from the results every job collected.
@@ -11,7 +12,7 @@
 //
 // and on one machine, after collect.mjs --local --since <ISO instant>:
 //
-//   node scripts/release-report/report.mjs --local [--allow-missing verify,browser,install,container,getting-started]
+//   node scripts/release-report/report.mjs --local [--allow-missing verify,browser,install,container,getting-started,test-images]
 //
 // It writes release-report/release-report.json and release-report.md and
 // exits 1 when anything in `problems` fails the run; both files are written
@@ -31,7 +32,7 @@ import { namedPackages } from './collect.mjs'
 import { evaluateGates, evidenceKind, gatesProblems, readGates } from './gates.mjs'
 import { installed } from './installed.mjs'
 import { readRecords, readRegister, registerProblems, statedLimitations } from './limitations.mjs'
-import { browserMatrix, sharedCaseMatrix } from './matrix.mjs'
+import { browserMatrix, heldCells, sharedCaseMatrix } from './matrix.mjs'
 import { contentProblems, needsProblems, releaseGateProblems } from './problems.mjs'
 import { renderReport, renderSummary } from './render.mjs'
 import { fileOutcome, resultsInRun } from './results.mjs'
@@ -103,20 +104,20 @@ export function buildReport(inputs) {
     subject: subjectOf(inputs, results),
     testedOn: testedOnInRun({ results, facts }),
     results: resultsInRun({ results, covered, published: inputs.published }),
-    sharedCases: sharedCaseMatrix({ results, cases, engines: facts.engines }),
+    sharedCases: sharedCaseMatrix({ results, cases, engines: facts.engines, matrix: facts.matrix }),
     browserMatrix: browserMatrix({ results, apps: inputs.apps }),
     limitations: {
       registerProblems: registerProblems(register, records, { covered: covered.map((entry) => entry.path), exists }),
       stated: statedLimitations({ register, records, outcome: (file) => fileOutcome(results, file), repository, commit }),
     },
   }
-  const { rows, unknown, withoutEngine } = report.sharedCases
+  const { columns, rows, unknown, withoutEngine, withoutImage } = report.sharedCases
   report.gates = evaluateGates(inputs.gatesRegister, {
     fileOutcome: (file) => fileOutcome(results, file),
     browserGates: report.results.browserGates,
     browsers: facts.browser.pins.map((pin) => pin.browser),
     needs: ci ? inputs.needs : null,
-    sharedCasesPassed: unknown.length === 0 && withoutEngine.length === 0 && rows.every((row) => Object.values(row.cells).every((entry) => entry.state === 'passed')),
+    sharedCasesPassed: unknown.length === 0 && withoutEngine.length === 0 && withoutImage.length === 0 && rows.every((row) => heldCells(row, columns, allowMissing).every(([, entry]) => entry.state === 'passed')),
     documents: inputs.documents ?? {},
   })
   const { problems: releaseProblems, ...release } = releaseOf(report, inputs)

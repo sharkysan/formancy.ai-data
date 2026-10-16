@@ -7,10 +7,12 @@
       "outputs": ["dist/**"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "env": ["FORMANCY_IMAGES"]
     },
     "test:coverage": {
       "dependsOn": ["^build"],
+      "env": ["FORMANCY_IMAGES"],
       "outputs": ["coverage/**"]
     },
     "typecheck": {

@@ -2,7 +2,7 @@ import { appendFileSync, readFileSync } from 'node:fs'
 import { relative } from 'node:path'
 import { createDataClient } from '@formancy/data-client'
 import type { FormRecord } from '@formancy/data-core'
-import { connectDocker, POSTGRES_IMAGE, SIZED_CUSTOMERS, SQLSERVER_IMAGE } from '@formancy/data-fixtures'
+import { connectDocker, selectedImages, SIZED_CUSTOMERS } from '@formancy/data-fixtures'
 import type { DockerReader } from '@formancy/data-fixtures'
 import { latencyResult, scenarioResult } from './aggregate.js'
 import type { Measured } from './aggregate.js'
@@ -68,7 +68,8 @@ export async function runMeasurement(protocol: Protocol, options: RunOptions): P
     containers: containersBefore,
     dirtyFiles: await dirtyFiles(options.root, measuredPaths(product)),
     env: process.env,
-    missingImages: (await Promise.all([POSTGRES_IMAGE, SQLSERVER_IMAGE].map(async (image) => ((await docker.hasImage(image)) ? undefined : image)))).filter((image) => image !== undefined),
+    // The images the stack's fixtures will start: the defaults, unless FORMANCY_IMAGES names others (0067).
+    missingImages: (await Promise.all(Object.values(selectedImages()).map(async (image) => ((await docker.hasImage(image)) ? undefined : image)))).filter((image) => image !== undefined),
     tolerance: protocol.calibration.tolerance,
   })
   if (protocol.quiet.enforced && problems.length > 0) throw new Refusal(`The measurement did not start:\n  ${problems.join('\n  ')}`)

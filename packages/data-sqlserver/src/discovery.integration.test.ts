@@ -103,8 +103,9 @@ describe('discovery as the owner', () => {
     expect(snapshot.account).toEqual({ user: 'dbo', login: 'sa' })
     expect(snapshot.account).toEqual(fixture.owner)
     expect(snapshot.kind).toBe('sqlserver')
-    // As ping reports it: SQL Server 2022 is version 16.
-    expect(snapshot.serverVersion).toMatch(/^16\./)
+    // As ping reports it: the ProductVersion the server told the harness, on
+    // whichever image of the matrix this run chose (0067).
+    expect(snapshot.serverVersion).toBe(fixture.server.version)
   })
 
   // A check is translated into a form's allowed values from what the server
@@ -416,7 +417,7 @@ describe('discovery as the owner', () => {
     const snapshot = await discoverSqlServer(owner, { schemas: [] })
     expect(snapshot.objects).toEqual([])
     expect(snapshot.gaps).toEqual([])
-    expect(snapshot.serverVersion).toMatch(/^16\./)
+    expect(snapshot.serverVersion).toBe(fixture.server.version)
     expect(snapshot.account).toEqual(fixture.owner)
   })
 

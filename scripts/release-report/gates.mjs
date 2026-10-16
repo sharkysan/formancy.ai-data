@@ -9,7 +9,7 @@
 //   { "file": "<repo-relative test file>" }   every test in it passed in this run
 //   { "browserGate": "<app dir>" }             that app's browser gate in every browser, no failed check, no error, and a check made in a pass
 //   { "job": "<gates.yml job id>" }            that job's result in the report's needs is success
-//   { "sharedCases": true }                    every shared case passed on every engine
+//   { "sharedCases": true }                    every shared case passed on every image of every engine's matrix (0067)
 //   { "document": "<committed file>" }         stated: shown with its last change, never as passed
 //
 // A gate is "passed" in a run when it has evidence other than documents and

@@ -114,7 +114,9 @@ const DRIFT_NOTES = 'Call before delivery'
 async function startPlane() {
   let fixture
   try {
-    fixture = await startPostgresFixture()
+    // The default, named: the pictures say the image they were taken on, and
+    // FORMANCY_IMAGES left set in a shell must not move them to another.
+    fixture = await startPostgresFixture(POSTGRES_IMAGE)
   } catch (error) {
     throw new Error(`the host pictures need Docker, for their PostgreSQL, and testcontainers could not start one: ${String(error instanceof Error ? error.message : error).split('\n')[0]}`)
   }

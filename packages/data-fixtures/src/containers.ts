@@ -1,28 +1,14 @@
-import type { DatabaseKind, DiscoveryAccount } from '@formancy/data-core'
+import type { DiscoveryAccount } from '@formancy/data-core'
 import { MSSQLServerContainer } from '@testcontainers/mssqlserver'
 import type { StartedMSSQLServerContainer } from '@testcontainers/mssqlserver'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import mssql from 'mssql'
 import postgres from 'postgres'
+import { selectedImage } from './images.js'
 import { readFixture, splitBatches } from './load.js'
 import type { ServerAnswer, ServerRecord } from './servers.js'
 import { captureCaller, recordServer } from './servers.js'
-
-/**
- * The images the suites run against. The supported matrix is exactly these
- * until a test names another (0003): passing on 17 says nothing about 14.
- */
-export const POSTGRES_IMAGE = 'postgres:17-alpine'
-export const SQLSERVER_IMAGE = 'mcr.microsoft.com/mssql/server:2022-latest'
-
-/**
- * The image each engine's tests run on unless a file names another. The
- * supported matrix is exactly these until a test names another (0003), and
- * the release report lists every image a test started, these first (0035).
- * A record, so a third engine without an image is a compile error here.
- */
-export const DEFAULT_IMAGES: Readonly<Record<DatabaseKind, string>> = { postgres: POSTGRES_IMAGE, sqlserver: SQLSERVER_IMAGE }
 
 /** The restricted principal both fixture files create. */
 export const READER = {
@@ -98,10 +84,12 @@ async function askPostgres(uri: string): Promise<ServerAnswer> {
  * A PostgreSQL container, empty, and a record of the server that answered in
  * it (0035): every container a suite or a gate starts comes through here or
  * `startSqlServerContainer`, so the release report can say what each test
- * ran on. `image` is for a test that names another; the default is the one
- * every other test runs.
+ * ran on. `image` is for a test that names another; without one, the image
+ * FORMANCY_IMAGES chooses, which unset is the default (0067). So a bare call
+ * -- each adapter's ping file makes one -- runs on its leg's image: on the
+ * default, a leg's ping would be the default's test reported as the leg's.
  */
-export async function startPostgresContainer(image: string = POSTGRES_IMAGE): Promise<StartedServer<StartedPostgreSqlContainer>> {
+export async function startPostgresContainer(image: string = selectedImage('postgres')): Promise<StartedServer<StartedPostgreSqlContainer>> {
   // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
   const caller = captureCaller()
   const container = await new PostgreSqlContainer(image).start()
@@ -116,14 +104,15 @@ export async function startPostgresContainer(image: string = POSTGRES_IMAGE): Pr
 
 /**
  * A PostgreSQL container with the fixture loaded, the restricted principals
- * created, and the parity schema (0028) beside it.
+ * created, and the parity schema (0028) beside it, on `image`: the one
+ * FORMANCY_IMAGES chooses, unless the caller names another.
  *
  * One harness for every suite, so the two adapters, the codecs and anything
  * later all start from byte-identical databases. A suite that built its own
  * would drift from this one the first time somebody added a table to it.
  */
-export async function startPostgresFixture(): Promise<PostgresFixture> {
-  const { container, server } = await startPostgresContainer()
+export async function startPostgresFixture(image: string = selectedImage('postgres')): Promise<PostgresFixture> {
+  const { container, server } = await startPostgresContainer(image)
   const admin = container.getConnectionUri()
   const sql = postgres(admin, { onnotice: () => {} })
   try {
@@ -229,7 +218,7 @@ async function askSqlServer(config: mssql.config): Promise<ServerAnswer> {
  * the EULA is the operator's act; in a test it is this call, the decision
  * compose.yaml makes a developer spell out.
  */
-export async function startSqlServerContainer(image: string = SQLSERVER_IMAGE): Promise<StartedServer<StartedMSSQLServerContainer>> {
+export async function startSqlServerContainer(image: string = selectedImage('sqlserver')): Promise<StartedServer<StartedMSSQLServerContainer>> {
   // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
   const caller = captureCaller()
   const container = await new MSSQLServerContainer(image).acceptLicense().start()
@@ -244,10 +233,11 @@ export async function startSqlServerContainer(image: string = SQLSERVER_IMAGE): 
 
 /**
  * A SQL Server container with the fixture loaded into its own database, the
- * restricted principals created, and the parity schema (0028) beside it.
+ * restricted principals created, and the parity schema (0028) beside it, on
+ * `image`, as `startPostgresFixture`.
  */
-export async function startSqlServerFixture(): Promise<SqlServerFixture> {
-  const { container, server } = await startSqlServerContainer()
+export async function startSqlServerFixture(image: string = selectedImage('sqlserver')): Promise<SqlServerFixture> {
+  const { container, server } = await startSqlServerContainer(image)
   const owner = ownerOf(container, 'master')
   const base = { server: owner.server, port: owner.port, options: owner.options }
 

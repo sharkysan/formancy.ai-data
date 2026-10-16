@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { beforeAll, describe, expect, test } from 'vitest'
 import YAML from 'yaml'
 import { BROWSERS } from '../browsers.mjs'
-import { stale } from './readme.mjs'
+import { adapterLine, readmeTable, stale } from './readme.mjs'
 import { dockerfileImages, installed, NESTED, published, testedOn, workspace } from './tested-on.mjs'
 
 /**
@@ -62,6 +62,28 @@ describe('the README blocks', () => {
       stale(facts, repo).map(({ file }) => file),
       'run node scripts/release-report/readme.mjs --write',
     ).toEqual([])
+  })
+
+  // The release is tested on the matrix (0067), not on the default alone: a
+  // README naming 17 and 2022 only would undersell what runs, and one naming
+  // an image no leg runs would claim a version nothing tests. Each image of
+  // each engine's matrix is named, with the suites that run on it.
+  test('name every image of each engine’s matrix, and the suites that run on the others', async () => {
+    const { MATRIX_IMAGES, DEFAULT_IMAGES } = await import(pathToFileURL(join(repo, 'packages', 'data-fixtures', 'dist', 'index.mjs')).href)
+    expect(facts.matrix).toEqual(MATRIX_IMAGES)
+    expect(facts.images).toEqual(DEFAULT_IMAGES)
+    const table = readmeTable(facts)
+    for (const engine of facts.engines) {
+      const line = adapterLine(facts, engine)
+      for (const image of facts.matrix[engine]) {
+        expect(table, image).toContain(`\`${image}\``)
+        expect(line, image).toContain(`\`${image}\``)
+      }
+      expect(table).toContain(`\`@formancy/data-fixtures\` and \`@formancy/data-${engine}\` also on`)
+    }
+    // An image of the matrix no leg runs has no suites to name, and is refused rather than said.
+    const unled = { ...facts, legs: facts.legs.filter((leg) => leg.image !== facts.matrix.postgres[1]) }
+    expect(() => readmeTable(unled)).toThrow(`${facts.matrix.postgres[1]} is an image of the matrix that no leg of the test-images job runs`)
   })
 })
 

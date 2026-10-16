@@ -7,8 +7,9 @@ import { getContainerRuntimeClient } from 'testcontainers'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { blockTable } from './blocking.js'
 import type { PostgresFixture, SqlServerFixture } from './containers.js'
-import { POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
+import { startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
 import { connectDocker } from './docker.js'
+import { selectedImage } from './images.js'
 import { FILTER_PARITY } from './parity.js'
 import { DELIVERIES } from './uuid.js'
 import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
@@ -478,7 +479,7 @@ describe('what each start records for the release report', () => {
     const sql = postgres(pg.admin)
     try {
       const [row] = await sql<{ version: string }[]>`select current_setting('server_version') as version`
-      expect(pg.server).toMatchObject({ engine: 'postgres', image: POSTGRES_IMAGE, version: row?.version, updateLevel: null, edition: null, caller: here })
+      expect(pg.server).toMatchObject({ engine: 'postgres', image: selectedImage('postgres'), version: row?.version, updateLevel: null, edition: null, caller: here })
     } finally {
       await sql.end()
     }
@@ -488,7 +489,7 @@ describe('what each start records for the release report', () => {
         "select cast(serverproperty('ProductVersion') as nvarchar(128)) as version, cast(serverproperty('Edition') as nvarchar(128)) as edition",
       )
       const [row] = result.recordset
-      expect(ms.server).toMatchObject({ engine: 'sqlserver', image: SQLSERVER_IMAGE, version: row?.version, edition: row?.edition, caller: here })
+      expect(ms.server).toMatchObject({ engine: 'sqlserver', image: selectedImage('sqlserver'), version: row?.version, edition: row?.edition, caller: here })
     } finally {
       await pool.close()
     }
@@ -504,8 +505,8 @@ describe("the fixtures' containers", () => {
   test('are named by the id Docker holds them under, with the image the suites name', async () => {
     const client = await getContainerRuntimeClient()
     for (const [fixture, image] of [
-      [pg, POSTGRES_IMAGE],
-      [ms, SQLSERVER_IMAGE],
+      [pg, selectedImage('postgres')],
+      [ms, selectedImage('sqlserver')],
     ] as const) {
       const inspected = await client.container.inspect(client.container.getById(fixture.containerId))
       expect({ image: inspected.Config.Image, running: inspected.State.Running }).toEqual({ image, running: true })
@@ -521,8 +522,8 @@ describe("the fixtures' containers", () => {
     const docker = await connectDocker()
     const running = await docker.running()
     for (const [fixture, image] of [
-      [pg, POSTGRES_IMAGE],
-      [ms, SQLSERVER_IMAGE],
+      [pg, selectedImage('postgres')],
+      [ms, selectedImage('sqlserver')],
     ] as const) {
       const id = fixture.containerId.slice(0, 12)
       expect(running).toContainEqual(expect.objectContaining({ id, image }))

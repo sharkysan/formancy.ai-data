@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import { namedPackages } from './collect.mjs'
-import { collectStep, expectedKeys, gateJobs, readWorkflow } from './workflows.mjs'
+import { collectStep, expectedKeys, gateJobs, imageMatrix, readWorkflow } from './workflows.mjs'
 
 /**
  * The shape of the three workflows a release depends on (0035), parsed with
@@ -212,17 +212,57 @@ describe('gates.yml', () => {
   })
 
   // Every artefact the report expects is derived from this file; the matrix
-  // jobs give one per package, one per browser and one per Compose. No two
-  // share a key: the uploads overwrite, so that a job run again replaces its
-  // own earlier attempt, and a key two jobs wrote would leave only one of
-  // them -- which, for the browser legs, is one browser's results reported
-  // as another's.
-  test('gives the report one key per job, package, browser and Compose, and no key twice', () => {
-    const keys = expectedKeys(gates, namedPackages()).map((entry) => entry.key)
+  // jobs give one per package, one per image leg, one per browser and one
+  // per Compose. No two share a key: the uploads overwrite, so that a job run
+  // again replaces its own earlier attempt, and a key two jobs wrote would
+  // leave only one of them -- which, for the browser legs, is one browser's
+  // results reported as another's, and for the image legs one image's.
+  test('gives the report one key per job, package, image leg, browser and Compose, and no key twice', () => {
+    const expected = expectedKeys(gates, namedPackages())
+    const keys = expected.map((entry) => entry.key)
     expect(new Set(keys).size).toBe(keys.length)
     expect(keys).toEqual(expect.arrayContaining(['verify', 'browser-chromium', 'browser-firefox', 'browser-webkit', 'pictures', 'install', 'container', 'getting-started-runner', 'getting-started-2.20.3']))
     expect(keys).not.toContain('browser')
-    expect(keys.filter((key) => key.startsWith('test-')).sort()).toEqual(namedPackages().map((entry) => `test-${entry.id}`).sort())
+    const of = (job) => expected.filter((entry) => entry.job === job).map((entry) => entry.key)
+    expect(of('test').sort()).toEqual(namedPackages().map((entry) => `test-${entry.id}`).sort())
+    // Each leg's key names its package and its image, so the report expects
+    // every pair the job lists and no two legs share one.
+    expect(of('test-images')).toEqual(expect.arrayContaining(['test-images-data-fixtures-postgres-16-alpine', 'test-images-data-sqlserver-mcr.microsoft.com-mssql-server-2019-latest']))
+    expect(of('test-images')).toHaveLength(imageMatrix(gates).length)
+  })
+
+  // A job keyed by a package and an image runs the pairs it lists; read as a
+  // cross of two lists, or with a pair missing a value, the report would
+  // expect artefacts no leg leaves, or miss one a leg does.
+  test('reads a job keyed by two values as its include pairs, and refuses any other matrix', () => {
+    const leg = (matrix) => ({
+      jobs: {
+        legs: {
+          strategy: { matrix },
+          steps: [{ id: 'collect', run: 'node scripts/release-report/collect.mjs --job legs --package "$PACKAGE" --variant "$IMAGE"', env: { PACKAGE: '${{ matrix.package }}', IMAGE: '${{ matrix.image }}' } }],
+        },
+      },
+    })
+    const named = namedPackages()
+    expect(expectedKeys(leg({ include: [{ package: '@formancy/data-postgres', image: 'postgres:16-alpine' }] }), named)).toEqual([{ key: 'legs-data-postgres-postgres-16-alpine', job: 'legs' }])
+    expect(() => expectedKeys(leg({ package: ['@formancy/data-postgres'], include: [{ package: '@formancy/data-postgres', image: 'postgres:16-alpine' }] }), named)).toThrow(/its matrix lists package beside include/)
+    expect(() => expectedKeys(leg({ include: [{ package: '@formancy/data-postgres' }] }), named)).toThrow(/include entry 1 gives no image/)
+  })
+
+  // The image legs are the test job's command on another image (0067): a
+  // leg without --force could replay the default's cached run under its
+  // image's name, and one without FORMANCY_IMAGES runs the default. Coverage
+  // is the default leg's to upload: an image leg covers the same lines, and
+  // Codecov merges by commit.
+  test('runs each image leg as the test job runs its package, on the leg’s image, uploading no coverage', () => {
+    const job = gates.jobs['test-images']
+    const run = job.steps.find((step) => String(step.run).includes('turbo run test:coverage'))
+    expect(run.run).toBe(gates.jobs.test.steps.find((step) => String(step.run).includes('turbo run test:coverage')).run)
+    expect(run.env).toEqual({ PACKAGE: '${{ matrix.package }}', FORMANCY_IMAGES: '${{ matrix.image }}' })
+    expect(job.steps.filter((step) => String(step.uses).startsWith('codecov/'))).toEqual([])
+    expect(collectStep(job).run).toBe('node scripts/release-report/collect.mjs --job test-images --package "$PACKAGE" --variant "$IMAGE"')
+    expect(collectStep(job).env).toEqual({ PACKAGE: '${{ matrix.package }}', IMAGE: '${{ matrix.image }}' })
+    expect(job.strategy['fail-fast']).toBe(false)
   })
 
   // The README's pictures are one look, Chromium's (0038): their check runs

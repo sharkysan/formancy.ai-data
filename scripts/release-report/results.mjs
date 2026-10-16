@@ -3,10 +3,14 @@
 // build identity of every published package, and what the gates measured on
 // the way, per browser.
 //
-// Pure over the run's results. Two times are shown for a suite, each named
-// for what it is: the task's wall time from turbo's run summary, and vitest's
-// span from the first test's start to the last test's end, which leaves out
-// container starts, hooks and teardown.
+// Pure over the run's results. A package's suite has a row per leg it ran
+// in: the `test` job's, on the default images, and one per image of the
+// matrix the `test-images` job ran it on (0067), so no test is counted
+// twice in a row and no two legs' wall times, which ran side by side, are
+// added. Two times are shown for a suite, each named for what it is: the
+// task's wall time from turbo's run summary, and vitest's span from the
+// first test's start to the last test's end, which leaves out container
+// starts, hooks and teardown.
 
 import { serversOf } from './versions.mjs'
 
@@ -15,9 +19,13 @@ const distinct = (values) => [...new Set(values)]
 /** A test's status, as the report counts it: anything but passed or failed is skipped, as vitest's pending and todo are. */
 const kind = (status) => (status === 'passed' || status === 'failed' ? status : status === 'todo' ? 'todo' : 'skipped')
 
-/** One row per package with a `test:coverage` script, or per suite of `path` for the repository's guards. */
-function suiteRow(suites, servers, { name, path, published }) {
-  if (suites.length === 0) return { package: name, path, published, present: false }
+/**
+ * One row per package with a `test:coverage` script and leg -- `image` null
+ * for the default leg -- or per suite of `path` for the repository's guards.
+ */
+function suiteRow(suites, servers, { name, path, published, image = null }) {
+  if (suites.length === 0) return { package: name, path, published, image, present: false }
+  const jobs = distinct(suites.map((suite) => suite.job))
   const files = suites.flatMap((suite) => suite.files)
   const tests = files.flatMap((file) => file.tests.map((test) => ({ ...test, file: file.file })))
   const count = (wanted) => tests.filter((test) => kind(test.status) === wanted).length
@@ -30,8 +38,9 @@ function suiteRow(suites, servers, { name, path, published }) {
     package: name,
     path,
     published,
+    image,
     present: true,
-    jobs: distinct(suites.map((suite) => suite.job)),
+    jobs,
     files: files.length,
     tests: tests.length,
     passed: count('passed'),
@@ -44,13 +53,20 @@ function suiteRow(suites, servers, { name, path, published }) {
     numFailedTestSuites: suites.reduce((total, suite) => total + (suite.numFailedTestSuites ?? 0), 0),
     wallMs: tasks.length === 0 ? null : tasks.reduce((total, task) => total + (task.endTime - task.startTime), 0),
     spanMs: starts.length === 0 || ends.length === 0 ? null : Math.max(...ends) - Math.min(...starts),
-    engines: distinct(servers.filter((server) => server.package === name && server.package !== null).map((server) => server.engine)).sort(),
+    engines: distinct(servers.filter((server) => server.package === name && server.package !== null && jobs.includes(server.job)).map((server) => server.engine)).sort(),
     coverage: coverage === null ? null : { lines: pct('lines'), branches: pct('branches'), functions: pct('functions'), statements: pct('statements') },
   }
 }
 
-/** The suites of the run, each with the key of the results file it came in. */
-const suitesOf = (results) => results.flatMap((result) => (result.suites ?? []).map((suite) => ({ ...suite, job: result.key })))
+/** The suites of the run, each with the key of the results file it came in and, for an image leg, its image. */
+const suitesOf = (results) => results.flatMap((result) => (result.suites ?? []).map((suite) => ({ ...suite, job: result.key, image: result.job === 'test-images' ? (result.variant ?? null) : null })))
+
+/** A package's rows: its default leg, present or not, then each image leg it ran in. */
+function packageRows(suites, servers, entry) {
+  const own = suites.filter((suite) => suite.package === entry.name)
+  const images = distinct(own.map((suite) => suite.image).filter((image) => image !== null))
+  return [suiteRow(own.filter((suite) => suite.image === null), servers, entry), ...images.map((image) => suiteRow(own.filter((suite) => suite.image === image), servers, { ...entry, image }))]
+}
 
 /** Every package's row, the repository's guards, the three gates, build identity and the observations. */
 export function resultsInRun({ results, covered, published }) {
@@ -60,7 +76,7 @@ export function resultsInRun({ results, covered, published }) {
   const install = results.map((result) => result.install).find((entry) => entry != null) ?? null
   const container = results.map((result) => result.container).find((entry) => entry != null) ?? null
   return {
-    packages: covered.map((entry) => suiteRow(suites.filter((suite) => suite.package === entry.name), servers, { ...entry, published: published.includes(entry.name) })),
+    packages: covered.flatMap((entry) => packageRows(suites, servers, { ...entry, published: published.includes(entry.name) })),
     repository: suiteRow(suites.filter((suite) => suite.package === null), servers, { name: null, path: '.', published: false }),
     browserGates: gates.map((gate) => ({
       gate: gate.gate,

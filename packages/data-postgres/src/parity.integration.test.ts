@@ -16,7 +16,7 @@ import type {
   UpdateRequest,
 } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { covers, defined, DISPLAY_PARITY, displayCase, FILTER_PARITY, filterCase, PARITY_SCOPE, REFUSAL_PARITY, refusalCase, startPostgresFixture, TEMPORAL_PARITY, temporalCase } from '@formancy/data-fixtures'
+import { covers, defined, DISPLAY_PARITY, displayCase, FILTER_PARITY, filterCase, PARITY_SCOPE, REFUSAL_PARITY, refusalCase, startPostgresFixture, TEMPORAL_PARITY, temporalCase, versionFact } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -535,6 +535,12 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
   // `unknown-outcome`, as any connection lost after the write was sent — not
   // the `unavailable` their SQLSTATEs would map to, which would claim nothing
   // was written. Here nothing was, and the adapter cannot know that.
+  //
+  // transaction_timeout is PostgreSQL 17's (VERSION_FACTS.transactionTimeout,
+  // 0067): 15 and 16 refuse the connection that sends it, before the insert
+  // is sent, with 42704, which the adapter throws as class 42. Asserted on
+  // each leg as its version answers, so a 15 leg that answered 17's way, or
+  // 17's that answered 15's, is red, and neither is skipped.
   test('a terminated backend and a transaction timeout close the connection, and a write is unknown-outcome', async () => {
     const victim = postgres(fixture.admin, { max: 1, onnotice: () => {} })
     const bounded = postgres(fixture.admin, { max: 1, onnotice: () => {}, connection: { transaction_timeout: '200' } })
@@ -547,8 +553,12 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
       const terminated = failed(await pending)
       expect([terminated.code, terminated.message]).toEqual(['unknown-outcome', expect.stringMatching(/CONNECTION_CLOSED/)])
 
-      const timedOut = failed(await insertGuarded(bounded, '8', 'slow'))
-      expect([timedOut.code, timedOut.message]).toEqual(['unknown-outcome', expect.stringMatching(/CONNECTION_CLOSED/)])
+      if (versionFact('transactionTimeout', fixture.server)) {
+        const timedOut = failed(await insertGuarded(bounded, '8', 'slow'))
+        expect([timedOut.code, timedOut.message]).toEqual(['unknown-outcome', expect.stringMatching(/CONNECTION_CLOSED/)])
+      } else {
+        await expect(insertGuarded(bounded, '8', 'slow')).rejects.toMatchObject({ code: '42704', message: 'unrecognized configuration parameter "transaction_timeout"' })
+      }
       expect(await guardedRows(7)).toEqual([])
       expect(await guardedRows(8)).toEqual([])
     } finally {

@@ -38,7 +38,9 @@ builds the report from all of them (`scripts/release-report/report.mjs`).
    container gate.
 4. **Shared cases on both engines:** every case `sharedCases()` derives from
    data-fixtures' shared tables, `passed`, `failed` or `missing` on each
-   engine, from the tests that declare it with `covers()`
+   image of each engine's matrix (`MATRIX_IMAGES`, 0067), from the tests
+   that declare it with `covers()`, each counting for the images its own
+   leg's servers answered on for its file
    ([packages/data-fixtures](../../packages/data-fixtures/README.md) says how).
 5. **The browser matrix:** each environment, app, renderer and engine as the
    run had them.
@@ -137,8 +139,13 @@ FORMANCY_BROWSERS=all pnpm test:browser   # every browser the gates run in: the 
 pnpm test:pictures                        # the README's pictures, in Chromium
 node scripts/install-test.mjs
 node scripts/release-report/collect.mjs --local --since "$since"
-node scripts/release-report/report.mjs --local --allow-missing container,getting-started
+node scripts/release-report/report.mjs --local --allow-missing container,getting-started,test-images
 ```
+
+A machine runs the default images unless `FORMANCY_IMAGES` names others, so
+the other images of the matrix answer nothing there: `test-images` allowed
+missing, a case missing on one of them is not a problem, and one that failed
+on an image that did run still is.
 
 `--since` has no default. A results file left by an earlier run, read as this
 one's, is the failure local mode has to rule out, and only the person running

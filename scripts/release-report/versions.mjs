@@ -1,12 +1,14 @@
 // The report's "Tested on" (0035): what this run's servers, Node and browsers
 // said about themselves, beside what the checkout says it is tested on.
 //
-// Pure over the run's results and testedOn()'s facts. Every image any job
-// started is listed under its engine, the default first, with each distinct
-// answer its servers gave -- version, update level, edition, digest -- and who
-// started it. Under 0003 an image a test starts is part of what is tested,
-// for that test, so no image is called a probe: this is 0003's matrix,
-// computed per run.
+// Pure over the run's results and testedOn()'s facts. Every image of the
+// engine's matrix (MATRIX_IMAGES, 0067) is listed under it, the default
+// first, whether or not it answered, and after them every other image any
+// job started, with each distinct answer its servers gave -- version, update
+// level, edition, digest -- who started it, and the suites that ran on it.
+// The matrix is what the release is tested on; an image outside it that one
+// file names is what that file showed (0067 narrows 0003), and is never
+// called a probe.
 
 const distinct = (values) => [...new Set(values)]
 const byJson = (values) => [...new Map(values.map((value) => [JSON.stringify(value), value])).values()]
@@ -19,25 +21,34 @@ export function serversOf(results) {
 /** Whether a record is the getting-started journey's composed database rather than a container a test or a gate started. */
 export const composed = (server) => server.script === 'getting-started'
 
-/** An engine's images, the default first, each with its answers, its starters and the files that asked for it. */
+/**
+ * An engine's images, its matrix first, the default leading, each with its
+ * answers, its starters, the files that asked for it and the packages whose
+ * suites ran on it.
+ */
 function enginesInRun(servers, facts) {
   return facts.engines.map((engine) => {
     const own = servers.filter((server) => server.engine === engine)
-    const images = distinct([facts.images[engine], ...own.map((server) => server.image).sort()])
+    const matrix = facts.matrix[engine]
+    if (!Array.isArray(matrix) || matrix[0] !== facts.images[engine]) throw new Error(`testedOn() gives ${engine} no matrix led by its default image`)
+    const images = distinct([facts.images[engine], ...matrix, ...own.map((server) => server.image).sort()])
       .map((image) => {
         const on = own.filter((server) => server.image === image)
         const tested = on.filter((server) => !composed(server))
         return {
           image,
           default: image === facts.images[engine],
+          matrix: matrix.includes(image),
           answers: byJson(on.map(({ version, updateLevel, edition, digest }) => ({ version, updateLevel, edition, digest: digest ?? null }))),
           startedBy: byJson(on.map(({ package: pkg, job }) => ({ package: pkg ?? null, job }))),
           callers: distinct(tested.map((server) => server.caller).filter((caller) => caller !== null)).sort(),
+          // A suite's records carry its package's npm name; a browser gate's, the app's path.
+          suites: distinct(tested.map((server) => server.package).filter((name) => typeof name === 'string' && name.startsWith('@'))).sort(),
           tested: byJson(tested.map(({ version, updateLevel, edition }) => ({ version, updateLevel, edition }))),
           composed: byJson(on.filter(composed).map(({ version, job }) => ({ version, job }))),
         }
       })
-      .filter((entry) => entry.default || entry.answers.length > 0)
+      .filter((entry) => entry.matrix || entry.answers.length > 0)
     return { engine, defaultImage: facts.images[engine], images }
   })
 }

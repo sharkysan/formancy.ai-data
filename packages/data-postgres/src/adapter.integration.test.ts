@@ -1,7 +1,7 @@
 import postgres from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { DatabaseAdapter } from '@formancy/data-core'
-import { startPostgresContainer, startTcpHop } from '@formancy/data-fixtures'
+import { selectedImage, startPostgresContainer, startTcpHop } from '@formancy/data-fixtures'
 import type { ServerRecord, StartedPostgreSqlContainer, TcpHop } from '@formancy/data-fixtures'
 import type { Sql } from 'postgres'
 import { createPostgresAdapter } from './adapter.js'
@@ -18,7 +18,8 @@ let server: ServerRecord
 let adapter: DatabaseAdapter
 
 beforeAll(async () => {
-  // The default image, through the harness that records what answered (0035).
+  // The image this run chose (FORMANCY_IMAGES, 0067), through the harness that
+  // records what answered (0035).
   ;({ container, server } = await startPostgresContainer())
   adapter = createPostgresAdapter(postgres(container.getConnectionUri()))
 })
@@ -39,6 +40,13 @@ describe('the PostgreSQL adapter', () => {
     const identity = await adapter.ping()
     expect(identity.kind).toBe('postgres')
     expect(identity.version).toBe(server.version)
+  })
+
+  // The start above names no image, so it is the one place a leg of the
+  // matrix (0067) depends on the bare call following FORMANCY_IMAGES: on
+  // the default, the 16 leg's ping would be 17's, reported as 16's.
+  test('runs on the image this run chose', () => {
+    expect(server.image).toBe(selectedImage('postgres'))
   })
 
   // A composition root closes on shutdown and again on an error path. The

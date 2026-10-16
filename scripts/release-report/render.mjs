@@ -21,30 +21,57 @@ const answer = (entry) => {
   return extra.length === 0 ? entry.version : `${entry.version} (${extra.join(', ')})`
 }
 
+const ran = (image) => (image.callers.length === 0 ? 'a file no record names' : prose(image.callers.map(code)))
+const answered = (image) => `${code(image.image)} (${prose(image.tested.map(answer))})`
+
 /**
- * The sentence each engine gets: what its default image answered, every
- * other image and the files that ran on it, and the composed stack. A
- * default that never answered fails the run; what the tests ran on instead
- * is still said.
+ * What the matrix's other images ran (0067), from their servers' records:
+ * for each group of images the same suites ran on, those suites and what
+ * each image answered; and every image of the matrix nothing ran on. Each
+ * clause begins `; `.
+ */
+function matrixClauses(images) {
+  const groups = new Map()
+  for (const image of images.filter((entry) => entry.tested.length > 0)) {
+    const who = image.suites.length === 0 ? `the tests in ${ran(image)}` : `the ${image.suites.length === 1 ? 'suite' : 'suites'} of ${prose(image.suites.map(code))}`
+    groups.set(who, [...(groups.get(who) ?? []), image])
+  }
+  const clauses = [...groups].map(([who, ranOn]) => `; ${who} also ran on ${prose(ranOn.map(answered))}`)
+  const none = images.filter((entry) => entry.tested.length === 0)
+  if (none.length > 0) clauses.push(`; no test ran on ${prose(none.map((entry) => code(entry.image)))}, ${none.length === 1 ? 'an image' : 'images'} of the matrix`)
+  return clauses.join('')
+}
+
+/**
+ * The sentence each engine gets: what its default image answered, what the
+ * other images of its matrix ran and answered, every image outside the
+ * matrix and the files that named it, and the composed stack. A default or
+ * an image of the matrix that never answered fails the run; what the tests
+ * ran on instead is still said. An image outside the matrix is what the file
+ * that names it showed, never a version the release was tested on (0067
+ * narrows 0003), and is said so.
  */
 function engineSentence(engine) {
   const name = engineName(engine.engine)
   const fallback = engine.images.find((image) => image.default)
-  const others = engine.images.filter((image) => !image.default && image.tested.length > 0)
-  const ran = (image) => (image.callers.length === 0 ? 'a file no record names' : prose(image.callers.map(code)))
-  const answered = (fallback?.tested.length ?? 0) > 0
+  const matrix = engine.images.filter((image) => image.matrix && !image.default)
+  const others = engine.images.filter((image) => !image.matrix && image.tested.length > 0)
+  const outside = (image) => `${answered(image)}, an image outside the matrix that only ${image.callers.length === 1 ? 'that file names' : 'those files name'}`
+  const any = (fallback?.tested.length ?? 0) > 0
   let sentence
-  if (answered) {
+  if (any) {
     sentence = `Every ${name} test ran on ${code(fallback.image)}, which answered ${prose(fallback.tested.map(answer))} in this run`
-    for (const other of others) sentence += `, except the tests in ${ran(other)}, which ran on ${code(other.image)} (${prose(other.tested.map(answer))})`
+    for (const other of others) sentence += `, except the tests in ${ran(other)}, which ran on ${outside(other)}`
   } else if (others.length > 0) {
-    sentence = `No ${name} test ran on the default ${code(engine.defaultImage)} in this run; ${others.map((other) => `the tests in ${ran(other)} ran on ${code(other.image)} (${prose(other.tested.map(answer))})`).join('; ')}`
+    sentence = `No ${name} test ran on the default ${code(engine.defaultImage)} in this run; ${others.map((other) => `the tests in ${ran(other)} ran on ${outside(other)}`).join('; ')}`
   } else sentence = `No ${name} server answered a test in this run`
+  sentence += matrixClauses(matrix)
   const composed = engine.images.filter((entry) => entry.composed.length > 0)
   for (const image of composed) {
     sentence += `; the getting-started job ran ${code(image.image)} through compose, which answered ${prose([...new Set(image.composed.map((entry) => entry.version))])}`
   }
-  return answered || others.length > 0 || composed.length > 0 ? `${sentence}. No other version, edition or managed service was tested.` : `${sentence}.`
+  const tested = any || others.length > 0 || composed.length > 0 || matrix.some((image) => image.tested.length > 0)
+  return tested ? `${sentence}. No other version, edition or managed service was tested.` : `${sentence}.`
 }
 
 /** The snapshots an app's files hold, as "PostgreSQL 17.11 and SQL Server 16.0.4295.3". */
@@ -178,7 +205,7 @@ function stated(item) {
 
 /** How one evidence item stood in the run. */
 function evidenceCell(item) {
-  const what = item.kind === 'file' ? code(item.value) : item.kind === 'browserGate' ? `the browser gate of ${item.value}` : item.kind === 'job' ? `the ${code(item.value)} job` : item.kind === 'sharedCases' ? 'every shared case on every engine' : code(item.value)
+  const what = item.kind === 'file' ? code(item.value) : item.kind === 'browserGate' ? `the browser gate of ${item.value}` : item.kind === 'job' ? `the ${code(item.value)} job` : item.kind === 'sharedCases' ? 'every shared case on every image of the matrix' : code(item.value)
   if (item.kind === 'document') return stated(item)
   const where = item.missing === undefined ? '' : ` in ${prose(item.missing.map(browserName))}`
   return `${what}: ${item.outcome === 'absent' ? `did not run${where}` : item.kind === 'job' && item.outcome === 'failed' ? `ended ${String(item.result)}` : item.outcome}`
@@ -202,7 +229,7 @@ const METHOD = [
   ['Subject', 'the GitHub run’s environment (`GITHUB_SHA`, `GITHUB_RUN_ID`), the report job’s `needs`, `packages/data-core/package.json`, and each job’s results file'],
   ['Tested on', '`scripts/release-report/tested-on.mjs` over the checkout, and every `test-results/servers/*.json` a job left: data-fixtures’ `recordServer` for each container a suite or gate started, and the getting-started journey for each composed database, each with `docker image inspect` for its digest'],
   ['Results', 'each package’s `test-results/vitest.json` and `coverage/coverage-summary.json`, turbo’s run summary (`--summarize`), each app’s `test-results/browser-<browser>.json` for each browser the gates run in, the install gate’s `test-results/install.json`, and `collect.mjs --job container`'],
-  ['Shared cases', '`sharedCases()` from data-fixtures against the `covers()` each test declared, in vitest’s JSON'],
+  ['Shared cases', '`sharedCases()` from data-fixtures against the `covers()` each test declared, in vitest’s JSON, on each image of data-fixtures’ `MATRIX_IMAGES`, a test counting for the images its own leg’s servers answered on for its file'],
   ['The browser matrix', 'jsdom as each app loads it, each browser a gate launched, the renderers each app declares, and the engines its servers ran'],
   ['What the browsers disagree on', '`FACTS` in `scripts/browsers.mjs`; what each browser said it was, under *Tested on*, is each gate’s recorded `environment`'],
   ['Build identity', '`scripts/release-report/dist-hash.mjs` over every published package’s `dist/` in every job, and over each tarball’s `package/dist/`'],
@@ -297,14 +324,17 @@ function factsSection() {
   ].join('\n')
 }
 
+/** A suite's row as the table names it: the package, and the image of an image leg (0067). */
+const leg = (row) => (row.image == null ? row.package : `${row.package} on ${row.image}`)
+
 const pct = (coverage) => (coverage === null ? '' : ['lines', 'branches', 'functions', 'statements'].map((metric) => (coverage[metric] === null ? '-' : String(coverage[metric]))).join(' / '))
 
 /** Section 3: results per package, the repository's guards and the gates. */
 function resultsSection({ results }) {
   const rows = results.packages.map((row) =>
     row.present
-      ? [row.package, row.published ? 'yes' : 'no', row.files, row.tests, row.passed, row.failed, row.skipped + row.todo, row.failedFiles.length, seconds(row.wallMs) || 'not measured', seconds(row.spanMs), row.engines.join(', '), pct(row.coverage) || 'not measured']
-      : [row.package, row.published ? 'yes' : 'no', 'no results', '', '', '', '', '', '', '', '', ''],
+      ? [leg(row), row.published ? 'yes' : 'no', row.files, row.tests, row.passed, row.failed, row.skipped + row.todo, row.failedFiles.length, seconds(row.wallMs) || 'not measured', seconds(row.spanMs), row.engines.join(', '), pct(row.coverage) || 'not measured']
+      : [leg(row), row.published ? 'yes' : 'no', 'no results', '', '', '', '', '', '', '', '', ''],
   )
   const repository = results.repository
   const install = results.install
@@ -329,12 +359,14 @@ function resultsSection({ results }) {
 }
 
 /** Sections 4 to 7: the shared cases, the browser matrix, what the browsers disagree on and build identity. */
-function matricesSection({ sharedCases, browserMatrix, results, testedOn }) {
-  const engines = testedOn.engines.map((engine) => engine.engine)
+function matricesSection({ sharedCases, browserMatrix, results }) {
+  const images = sharedCases.columns.map((column) => column.image)
   return [
     '## Shared cases on both engines',
     '',
-    table(['Case', ...engines], sharedCases.rows.map((row) => [row.id, ...engines.map((engine) => row.cells[engine].state)])),
+    'One column per image of each engine’s matrix, the default first (0067); a test counts for each image its own leg’s servers answered on for its file.',
+    '',
+    table(['Case', ...images], sharedCases.rows.map((row) => [row.id, ...images.map((image) => row.cells[image].state)])),
     '',
     '## The browser matrix',
     '',
@@ -427,14 +459,22 @@ export function renderReport(report, { local = false, partial = [] } = {}) {
  * limitations; never the observations, which are not figures (0034).
  */
 export function renderSummary(report, { section = null, link = null } = {}) {
-  const packages = report.results.packages.filter((row) => row.present)
-  const passed = packages.reduce((total, row) => total + row.passed, 0)
-  const tests = packages.reduce((total, row) => total + row.tests, 0)
+  const present = report.results.packages.filter((row) => row.present)
+  // Each test once: the default legs' counts, then the image legs' apart.
+  const packages = present.filter((row) => row.image == null)
+  const legs = present.filter((row) => row.image != null)
+  const sum = (rows, field) => rows.reduce((total, row) => total + row[field], 0)
   const cases = report.sharedCases.rows
+  const named = [...new Set(legs.map((row) => row.package))]
+  const images = [...new Set(legs.map((row) => row.image))]
+  const again = legs.length === 0 ? [] : [`The ${named.length === 1 ? 'suite' : 'suites'} of ${prose(named.map(code))} ran again on ${prose(images.map(code))}: ${String(sum(legs, 'passed'))} of ${String(sum(legs, 'tests'))} tests passed.`]
   return [
     ...(link === null ? [] : [`The full report of the run that gated this: ${link}`, '']),
     ...(section === null ? [] : [`The notes above are CHANGELOG.md’s ${code(section)} section.`, '']),
-    `${String(passed)} of ${String(tests)} tests passed across ${String(packages.length)} packages; ${String(cases.filter((row) => Object.values(row.cells).every((entry) => entry.state === 'passed')).length)} of ${String(cases.length)} shared cases passed on every engine.`,
+    [
+      `${String(sum(packages, 'passed'))} of ${String(sum(packages, 'tests'))} tests passed across ${String(packages.length)} packages; ${String(cases.filter((row) => Object.values(row.cells).every((entry) => entry.state === 'passed')).length)} of ${String(cases.length)} shared cases passed on every image of the matrix.`,
+      ...again,
+    ].join(' '),
     '',
     ...derivedLimitations(report).map((sentence) => `- ${sentence}`),
   ].join('\n')

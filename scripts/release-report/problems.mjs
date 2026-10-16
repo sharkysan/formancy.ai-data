@@ -4,10 +4,11 @@
 // 1. Both files are still written, so a red run says why.
 //
 // Pure over a built report. `allowMissing` names what a local, partial report
-// may lack (verify, browser, install, container, getting-started); CI allows
-// none.
+// may lack (verify, browser, install, container, getting-started, and
+// test-images, the image legs of the matrix); CI allows none.
 
 import { browserName, FACTS, launchedBuild, prose } from '../browsers.mjs'
+import { heldCells } from './matrix.mjs'
 import { unmeasured } from './results.mjs'
 
 /** Readable names for the engines; a third engine without one shows its own name. */
@@ -16,9 +17,9 @@ export const engineName = (engine) => ENGINE[engine] ?? engine
 
 const list = (items, most = 5) => (items.length <= most ? items.join('; ') : `${items.slice(0, most).join('; ')}; and ${String(items.length - most)} more`)
 
-/** Each package's suite: present, ran something, every test passed, every file passed, vitest said success. */
+/** Each package's suite in each leg: present, ran something, every test passed, every file passed, vitest said success. */
 function suiteProblems(row) {
-  const name = row.package ?? 'the repository guards'
+  const name = row.package === null ? 'the repository guards' : row.image == null ? row.package : `${row.package} on ${row.image}`
   if (!row.present) return [`${name}: no results from its suite`]
   const problems = []
   if (row.tests === 0) problems.push(`${name}: its suite ran no tests`)
@@ -170,20 +171,32 @@ function packagingProblems(report, published, allowMissing) {
   return problems
 }
 
-/** Every case on every engine, every declaration known, and every engine's default image answered. */
-function caseProblems(report) {
+/**
+ * Every case on every image of every engine's matrix, every declaration
+ * known and of a file its leg's servers name, and every image of the matrix
+ * answered: the default always, the others unless a local run allowed the
+ * image legs missing.
+ */
+function caseProblems(report, allowMissing) {
   const problems = []
+  const { columns } = report.sharedCases
   for (const row of report.sharedCases.rows) {
-    const cells = Object.entries(row.cells)
-    if (cells.every(([, cell]) => cell.state === 'passed')) continue
-    const said = cells.map(([engine, cell]) => `${cell.state} on ${engine}`).join(', ')
-    problems.push(`${row.id}: ${said}${cells.some(([, cell]) => cell.state === 'missing') ? ' (declared with covers(); see packages/data-fixtures/README.md)' : ''}`)
+    const held = heldCells(row, columns, allowMissing)
+    if (held.every(([, cell]) => cell.state === 'passed')) continue
+    const said = Object.entries(row.cells).map(([image, cell]) => `${cell.state} on ${image}`).join(', ')
+    problems.push(`${row.id}: ${said}${held.some(([, cell]) => cell.state === 'missing') ? ' (declared with covers(); see packages/data-fixtures/README.md)' : ''}`)
   }
   for (const entry of report.sharedCases.unknown) problems.push(`${entry.file} › ${entry.name} declares "${entry.id}", which is no shared case`)
   for (const entry of report.sharedCases.withoutEngine) problems.push(`${entry.file} › ${entry.name} declares shared cases on ${String(entry.engine)}, which is no engine`)
+  for (const entry of report.sharedCases.withoutImage) {
+    problems.push(`${entry.file} › ${entry.name} declares shared cases on ${entry.engine} in ${entry.leg}, and no server that leg recorded names its file, so no image can be said for it`)
+  }
   for (const engine of report.testedOn.engines) {
     const image = engine.images.find((entry) => entry.default)
     if (image === undefined || image.tested.length === 0) problems.push(`${engineName(engine.engine)}'s default image ${engine.defaultImage} never answered a test in this run`)
+    for (const other of engine.images.filter((entry) => entry.matrix && !entry.default && entry.tested.length === 0)) {
+      if (!allowMissing.includes('test-images')) problems.push(`${engineName(engine.engine)}'s matrix image ${other.image} never answered a test in this run`)
+    }
     for (const other of engine.images) {
       if (other.callers.length === 0 && other.tested.length > 0) problems.push(`${engineName(engine.engine)} on ${other.image} answered a test whose file no record names`)
     }
@@ -260,7 +273,7 @@ export function contentProblems(report, { published, browserApps, allowMissing =
     ...(report.results.repository.present || !allowMissing.includes('verify') ? suiteProblems(report.results.repository) : []),
     ...gateProblems(report, browserApps, allowMissing),
     ...packagingProblems(report, published, allowMissing),
-    ...caseProblems(report),
+    ...caseProblems(report, allowMissing),
     ...identityProblems(report),
     ...limitationProblems(report),
   ]

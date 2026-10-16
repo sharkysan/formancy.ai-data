@@ -1,7 +1,7 @@
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { DatabaseAdapter } from '@formancy/data-core'
-import { startSqlServerContainer } from '@formancy/data-fixtures'
+import { selectedImage, startSqlServerContainer } from '@formancy/data-fixtures'
 import type { ServerRecord, StartedMSSQLServerContainer } from '@formancy/data-fixtures'
 import { createSqlServerAdapter } from './adapter.js'
 import { connectSqlServer } from './connect.js'
@@ -17,8 +17,9 @@ let server: ServerRecord
 let adapter: DatabaseAdapter
 
 beforeAll(async () => {
-  // The default image, through the harness that records what answered
-  // (0035), and that accepts the EULA as compose.yaml makes a developer do.
+  // The image this run chose (FORMANCY_IMAGES, 0067), through the harness
+  // that records what answered (0035), and that accepts the EULA as
+  // compose.yaml makes a developer do.
   ;({ container, server } = await startSqlServerContainer())
   const pool = await new mssql.ConnectionPool({
     server: container.getHost(),
@@ -50,6 +51,13 @@ describe('the SQL Server adapter', () => {
     const identity = await adapter.ping()
     expect(identity.kind).toBe('sqlserver')
     expect(identity.version).toBe(server.version)
+  })
+
+  // The start above names no image, so it is the one place a leg of the
+  // matrix (0067) depends on the bare call following FORMANCY_IMAGES: on
+  // the default, the 2019 leg's ping would be 2022's, reported as 2019's.
+  test('runs on the image this run chose', () => {
+    expect(server.image).toBe(selectedImage('sqlserver'))
   })
 
   // A composition root closes on shutdown and again on an error path. The
