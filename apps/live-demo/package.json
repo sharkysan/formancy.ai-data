@@ -1,0 +1,23 @@
+{
+  "name": "@formancy/data-live-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The live master-detail demo's own code: the sample sales data its database is loaded with, generated from a fixed seed. Never published.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "test:coverage": "vitest run --coverage",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@formancy/data-core": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "unrun": "^0.3.1",
+    "vitest": "catalog:"
+  }
+}
