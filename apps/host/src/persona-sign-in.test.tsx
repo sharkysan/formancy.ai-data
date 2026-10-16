@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -109,6 +110,17 @@ describe('signed out, the demo', () => {
     expect(within(card).getByRole('link', { name: 'sharkysan/formancy.ai-data' }).getAttribute('href')).toBe(REPOSITORY)
     expect(await floor('the people')).toEqual(CLEAN('the people'))
   })
+
+  // A page served without its Worker -- `vite preview`, or a route that
+  // lost it -- has nobody to offer. It says so, and offers no button that
+  // could only fail.
+  test('without the Worker, says the demo did not answer, and offers nobody; and passes the floor', async () => {
+    const notTheWorker: typeof globalThis.fetch = async () => new Response('<!doctype html><p>Not found', { status: 404, headers: { 'content-type': 'text/html' } })
+    mount(notTheWorker, { base: PREFIX, session: demoSession(notTheWorker, PREFIX) })
+    expect((await screen.findByRole('alert', {}, ARRIVES_WITHIN)).textContent).toBe('The demo did not answer in a way this page understands.')
+    expect(screen.queryByRole('list', { name: 'People' })).toBeNull()
+    expect(await floor('no Worker')).toEqual(CLEAN('no Worker'))
+  })
 })
 
 describe('signing in as a person', () => {
@@ -191,6 +203,18 @@ describe('signing in as a person', () => {
     expect(await floor('a start that failed')).toEqual(CLEAN('a start that failed'))
     await signInAs(user, 'Otto')
     await screen.findByRole('navigation', { name: 'Forms' }, ARRIVES_WITHIN)
+  })
+
+  // A token the server does not accept -- signed with another key than the
+  // one the visitor's server runs with, as a token from before a restart
+  // is -- is the server's sentence where the visitor pressed, and nothing
+  // is signed in.
+  test("a token the server refuses is the server's sentence, at sign-in", async () => {
+    const elsewhere = demoDoor({ fetch: plane.fetch, demoKey: randomBytes(32).toString('base64url') })
+    const { user } = demoPage(elsewhere)
+    await signInAs(user, 'Clara')
+    expect((await screen.findByRole('alert', {}, ARRIVES_WITHIN)).textContent).toBe('A valid host token is required.')
+    expect(screen.queryByRole('navigation', { name: 'Forms' })).toBeNull()
   })
 
   // A visitor's server stops ten minutes after their last request, and
