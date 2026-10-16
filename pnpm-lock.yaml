@@ -480,12 +480,18 @@ importers:
       '@formancy/data-core':
         specifier: workspace:*
         version: link:../../packages/data-core
+      '@formancy/data-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/data-fixtures
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.3(vitest@5.0.3)
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
       tsdown:
         specifier: 'catalog:'
         version: 0.23.0(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)(unrun@0.3.1)
