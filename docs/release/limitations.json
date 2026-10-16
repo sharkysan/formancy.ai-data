@@ -902,7 +902,7 @@
       "none": "A rule for this repository's branches; nobody who installs, integrates or operates the module meets it."
     },
     "0037": {
-      "reviewed": "sha256:99df0bb1149caa5d63f192261dcc2318b0823cf9af7388afb9094ca087a66390",
+      "reviewed": "sha256:1a5e8bb33ee516ba04703283597e7859f6fe212c206419d86a53413e8f361d72",
       "limitations": [
         {
           "area": "operations",
@@ -2150,7 +2150,7 @@
       ]
     },
     "0069": {
-      "reviewed": "sha256:9d23545e0e4c3a436aec71c260f659ff02674fd9f563ea2e3e9244f8faa69580",
+      "reviewed": "sha256:e82632a42c697845e1fcdb8153e6933b2f94cf8167ecac0a5d005bea74d093bb",
       "limitations": [
         {
           "area": "operations",
@@ -2158,11 +2158,27 @@
         },
         {
           "area": "operations",
-          "says": "Nothing in this repository reads what formancy.ai/data/examples/ serves: a failed deploy leaves the last one serving with its log in Cloudflare's dashboard, and the headers are applied as Cloudflare documents its _headers file, which was not measured against Cloudflare."
+          "says": "Nothing in this repository reads what formancy.ai/data/examples/ serves: a failed deploy leaves the last one serving with its log in Cloudflare's dashboard, and the headers -- the notices' UTF-8 type among them -- are applied as Cloudflare documents its _headers file, which was not measured against Cloudflare, nor whether a redirect or a 404 carries them."
+        },
+        {
+          "area": "operations",
+          "says": "The demo's Content-Security-Policy allows scripts, styles and fetches from all of formancy.ai's origin, the report's Studio and whatever is routed there later included, not only the demo's path, because a policy held to the path could not be measured in a gate that serves the page from 127.0.0.1."
+        },
+        {
+          "area": "operations",
+          "says": "The demo is a page on formancy.ai's hostname without the site's shell: no site bar, no site footer and no link back to formancy.ai."
         },
         {
           "area": "operations",
           "says": "The demo Worker's build settings are in Cloudflare's dashboard, where nothing here reads them; a test holds only what .github/REPO-METADATA.md records of them."
+        },
+        {
+          "area": "operations",
+          "says": "Workers Builds reads this repository through the Cloudflare Workers and Pages GitHub app, whose access is a setting of the rightsholder's GitHub account that nothing here reads."
+        },
+        {
+          "area": "operations",
+          "says": "The demo Worker's compatibility date stays until someone reads what moving it changes, and which of Cloudflare's changes tied to that date reach a Worker with no code was not read."
         },
         {
           "area": "operations",
@@ -2183,6 +2199,10 @@
         {
           "area": "testing",
           "says": "The examples gate fails on any console error in any browser, so a browser release that logs a new one fails it until someone reads why."
+        },
+        {
+          "area": "testing",
+          "says": "The examples gate's check of what the browser refused holds the page's code and not axe's: what Playwright evaluates, axe included, was measured to run outside the page's Content-Security-Policy in Chromium and Firefox."
         }
       ]
     }

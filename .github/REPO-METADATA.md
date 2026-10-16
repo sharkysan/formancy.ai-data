@@ -56,11 +56,13 @@ to theirs (0069). Its settings are in Cloudflare's dashboard, under the
 Worker's *Settings › Build*, where nothing here can read them.
 `scripts/demo.test.mjs` holds the Worker, the root directory, the branch and
 the two commands below to `apps/examples/wrangler.json` and
-`pnpm demo:deploy`. Review holds the rest.
+`pnpm demo:deploy`, and every repository and Worker this section names,
+the steps included, to data-core's manifest and that config. Review holds
+the rest.
 
 | Setting | Value | Why |
 |---|---|---|
-| Worker | `formancy-data-examples` | The name `apps/examples/wrangler.json` gives it |
+| Worker | `formancy-data-examples` | The name `apps/examples/wrangler.json` gives it, and the only one `scripts/demo.mjs` deploys to |
 | Git repository | `sharkysan/formancy.ai-data` | |
 | Production branch | `main` | The demo is main's examples page |
 | Builds for non-production branches | off | A branch's build would upload a version of the Worker from code no review has merged |
@@ -70,14 +72,42 @@ the two commands below to `apps/examples/wrangler.json` and
 | Build variables | none | Node from `.node-version`; pnpm the version `packageManager` names, which the image's pnpm switches to |
 | API token | the one Workers Builds generates | No Cloudflare token is held in GitHub |
 
-Created in the dashboard: *Workers & Pages › Create › Import a repository ›
-GitHub*, with the settings above, then *Create and deploy*; the first build
-deploys `main`. If the repository is not listed, the Cloudflare Workers and
-Pages GitHub app needs access to it (GitHub *Settings › Applications ›
-Cloudflare Workers and Pages › Configure › Repository access*). Afterwards,
-*Settings › Build › Branch control* turns off builds for non-production
-branches. Or `pnpm demo:deploy` first, which creates the Worker and its
-routes, and then *Settings › Build › Connect* with the same settings.
+### Creating the Worker
+
+Once, by the rightsholder, with a Cloudflare account that can edit Workers
+on formancy.ai's zone. Until then https://formancy.ai/data/examples/ is
+formancy.ai's 404.
+
+In the dashboard alone, which creates the Worker and whose first build
+deploys `main`, so it also shows that the deploy on a push works:
+
+1. *dash.cloudflare.com › Workers & Pages › Create › Import a repository ›
+   GitHub*. If `sharkysan/formancy.ai-data` is not listed, give the
+   Cloudflare Workers and Pages GitHub app access to it: in GitHub,
+   *Settings › Applications › Cloudflare Workers and Pages › Configure ›
+   Repository access*.
+2. Repository: `sharkysan/formancy.ai-data`.
+3. The settings in the table: project name `formancy-data-examples`, build
+   command `pnpm build`, deploy command `node scripts/demo.mjs`, root
+   directory `/`, production branch `main`, no variables.
+4. *Create and deploy*.
+5. Afterwards, on the Worker, *Settings › Build › Branch control*: builds
+   for non-production branches off.
+
+Or with Wrangler first, then connected:
+
+1. `pnpm demo:deploy`, from a clean checkout of `main` after the Wrangler
+   login [RELEASING.md](../RELEASING.md#the-demo-on-formancyai) names,
+   creates the Worker and its routes and puts the page online at once.
+2. Then in the dashboard, *formancy-data-examples › Settings › Build ›
+   Connect*, with the same settings, and step 5 above.
+
+Either way, open the address afterwards and press Validate in a preview:
+both renderers refuse the empty required fields. And
+`curl -sI https://formancy.ai/data/examples/THIRD-PARTY-NOTICES.txt`
+should say `Content-Type: text/plain; charset=utf-8`: the first reading of
+whether Cloudflare honours the `_headers` file's type (0069), which
+nothing here makes.
 
 ## Secrets the workflows expect
 

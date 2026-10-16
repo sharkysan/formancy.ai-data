@@ -44,7 +44,8 @@ later.
   Review step lists the drafts, draws one on white paper, says in words
   the policy approving it grants, and approves, rejects or withdraws it as
   the server allows.
-- **The examples page is online, at https://formancy.ai/data/examples/.**
+- **The examples page is served at https://formancy.ai/data/examples/**,
+  once its Worker is created by the steps in `.github/REPO-METADATA.md`.
   Until now it ran only from a clone, and an evaluator without one had the
   README's picture and nothing to try. It needs no server and no database,
   so a Cloudflare Worker of its own serves the built page as static files,
@@ -53,16 +54,20 @@ later.
   deploys it from `main` on every push, as formancy.ai-report's Studio is
   deployed at `/report/`; GitHub holds no Cloudflare token. `pnpm demo`
   serves the same build from a clone, and `pnpm demo:deploy` deploys it by
-  hand
+  hand. The deploy refuses a config that names another Worker, so it
+  cannot replace formancy.ai's site or the report's Studio
   ([0069](docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
 - **The demo is sent with a strict Content-Security-Policy**, so a script
-  injected into it would not run: nothing inline, nothing evaluated, the
-  page's own files and Google's fonts and no other host, no form sent
-  anywhere and no page framing it; with `nosniff`, `no-referrer`, a
-  Permissions-Policy that denies what the page does not use, and a year's
-  cache for the hashed chunks alone. The headers are one module that the
-  deploy writes as Cloudflare's `_headers` file and the browser gate serves
-  the page with.
+  injected into it would not run: nothing a directive does not name,
+  nothing inline, nothing evaluated, scripts, styles and fetches from
+  formancy.ai's own origin -- its whole site, not only the demo's path --
+  and Google's fonts and no other host, no form sent anywhere and no page
+  framing it; with `nosniff`, `no-referrer`, a Permissions-Policy that
+  denies what the page does not use, a year's cache for the hashed chunks
+  alone, and the third-party notices sent as UTF-8 text, which Cloudflare
+  would otherwise send as bare `text/plain` and a browser read in a
+  guessed encoding. The headers are one module that the deploy writes as
+  Cloudflare's `_headers` file and the browser gate serves the page with.
 
 ### Changed
 
@@ -83,20 +88,13 @@ later.
   because it is now served to anyone (0046). Its header says that no server
   and no database are behind it, and links this repository.
 - **The examples browser gate serves the page where the demo is**, under
-  `/data/examples/` with the demo's headers, and fails on anything the
-  browser refuses under the policy, on any console error, on a fetch from
-  anywhere but the page's path and Google Fonts, and when an inline script
-  put in the page runs or goes unheard. Its axe audits run without axe's
-  preload, which fetched Google's stylesheet against the policy and, as
-  measured, changed no rule's outcome on the page.
-
-What review costs, in 0065: every submit and approval asks the database, so
-one that cannot be reached refuses both; nothing deletes a draft; nobody is
-told a draft waits; a publisher sees a draft's review-level drift only once
-the approval has written it; the studio shows a draft, not what it changes
-from the version it replaces; a deployment under review needs two people;
-and roles are still read only from the token's `roles` claim.
-
+  `/data/examples/` with the demo's headers over the types Cloudflare
+  gives each file, and fails on anything the browser refuses under the
+  policy, on any console error, on a fetch from anywhere but the page's
+  path and Google Fonts, when an inline script put in the page runs or
+  goes unheard, and on notices not sent as UTF-8 text. Its axe audits run
+  without axe's preload, which fetched Google's stylesheet against the
+  policy and, as measured, changed no rule's outcome on the page.
 - **A lookup a person can search is generated as a typeahead, and the host
   page draws the control the published form names**
   ([0066](docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
@@ -126,6 +124,13 @@ and roles are still read only from the token's `roles` claim.
   not what this server generates: upgrade the source deployment and
   regenerate there first, or propose the form again in the target.
 
+What review costs, in 0065: every submit and approval asks the database, so
+one that cannot be reached refuses both; nothing deletes a draft; nobody is
+told a draft waits; a publisher sees a draft's review-level drift only once
+the approval has written it; the studio shows a draft, not what it changes
+from the version it replaces; a deployment under review needs two people;
+and roles are still read only from the token's `roles` claim.
+
 What the typeahead costs, in 0066: a short list is a typeahead too, and
 nobody can choose a plain list for it; a lookup that shows no text or whole
 number still lists only its first page; when that list's one search fails,
@@ -137,9 +142,16 @@ control changed.
 
 What the demo costs, in 0069: it is main's page, deployed without waiting
 for that commit's CI; its build settings are in Cloudflare's dashboard,
-and nothing here reads them or what the address serves; a visitor's
-browser asks Google for the fonts; and the policy names Google's hosts, so
-fonts that move are refused until it is edited.
+and Workers Builds reads this repository through the Cloudflare Workers
+and Pages GitHub app, and nothing here reads either; nothing has measured
+what Cloudflare sends at the address, the notices' type and the headers
+of a redirect or a 404 included; the Worker's compatibility date is one
+more date to move; `'self'` is all of formancy.ai, the report's Studio
+included; the page is on the site's hostname without the site's bar or
+footer; a visitor's browser asks Google for the fonts; and the policy
+names Google's hosts, so fonts that move are refused until it is edited.
+The Worker runs no code and none of the product -- no server, no
+database, neither plane -- which stays where 0037 puts it.
 
 ## 0.1.0 — 2026-10-16
 

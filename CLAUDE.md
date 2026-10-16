@@ -96,6 +96,10 @@ captured snapshot, `studio` speaks only the administrator plane, and `host`
 only the runtime plane, through `data-client`. `compose.yaml` and `deploy/`
 put the server image, both databases and one nginx serving both apps on the
 origin of `/v1` together, as `docs/getting-started.md` walks through (0032).
+The examples page alone is served on the internet, at
+`formancy.ai/data/examples/`, by a Worker with no code that Workers Builds
+deploys from `main` through `scripts/demo.mjs`; no workflow here holds a
+Cloudflare token (0069).
 
 Nothing fails when this map goes stale. It names files rather than counting
 them, so a rename is the edit to make here.

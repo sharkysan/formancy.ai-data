@@ -1,6 +1,6 @@
 # 0037 — Cloudflare is the edge, not the runtime: one locally-managed tunnel with generated doors, and a server that refuses a path a proxy could read differently
 
-- **Status:** accepted; extended by [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md): the runtime door's server passes `/v1/forms`, the menu of forms, as well as what is below `/v1/forms/`
+- **Status:** accepted; extended by [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md): the runtime door's server passes `/v1/forms`, the menu of forms, as well as what is below `/v1/forms/`; extended by [0069](0069-the-examples-page-is-served-at-formancy-ai-data-examples.md): Workers static assets, with no code, serve the examples page at formancy.ai/data/examples/, which speaks to no server, so the reason the studio and the host page are not served that way does not reach it
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**
