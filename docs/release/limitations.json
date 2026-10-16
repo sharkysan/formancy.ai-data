@@ -734,7 +734,7 @@
       ]
     },
     "0032": {
-      "reviewed": "sha256:aeb5af97bd8d423e2a82521def95b7f354882670ba8f839ffdc2b102d9e2ceba",
+      "reviewed": "sha256:67d09a79073932814a278919aff201f49a16fd8b26f3c0981475c19056cc8b3d",
       "limitations": [
         {
           "area": "operations",
@@ -817,7 +817,7 @@
       ]
     },
     "0034": {
-      "reviewed": "sha256:e3d5004ac60674b75f3e6a505798ccf3324e59ebaba4fbfe7df134775f98da02",
+      "reviewed": "sha256:554f3a23776b5a7a2ac3fb9f56511775276e33c03660074844dbec02c349fbb8",
       "limitations": [
         {
           "area": "databases",
@@ -840,7 +840,7 @@
         },
         {
           "area": "operations",
-          "says": "`FORMANCY_DATA_RATE_LIMIT` sets the requests a minute per client address, and with no `trustProxy` setting it raises the one bucket every client behind a proxy shares."
+          "says": "`FORMANCY_DATA_RATE_LIMIT` sets the requests a minute per client address, and behind a proxy `FORMANCY_DATA_TRUSTED_PROXIES` does not name it raises the one bucket every client behind that proxy shares (0071)."
         },
         {
           "area": "testing",
@@ -902,7 +902,7 @@
       "none": "A rule for this repository's branches; nobody who installs, integrates or operates the module meets it."
     },
     "0037": {
-      "reviewed": "sha256:1a5e8bb33ee516ba04703283597e7859f6fe212c206419d86a53413e8f361d72",
+      "reviewed": "sha256:06428a4b9a685b5db17abe07cbfe3c9d4e0a102350e359e3df4d9ba63138ac97",
       "limitations": [
         {
           "area": "operations",
@@ -936,7 +936,7 @@
         },
         {
           "area": "access",
-          "says": "Behind the tunnel every visitor shares the server's one rate-limit bucket; per-address limiting is the edge's rule, which counts per Cloudflare location and imprecisely, and counts a host application's backend as one visitor."
+          "says": "Behind the tunnel the server counts each visitor by the address Cloudflare's edge reported, because the composed stack names cloudflared and nginx as proxies (0071); the edge's rule counts per Cloudflare location and imprecisely, and both count a host application's backend as one visitor."
         },
         {
           "area": "operations",
@@ -2207,6 +2207,51 @@
         {
           "area": "testing",
           "says": "The examples gate's check of what the browser refused holds the page's code and not axe's: what Playwright evaluates, axe included, was measured to run outside the page's Content-Security-Policy in Chromium and Firefox."
+        }
+      ]
+    },
+    "0071": {
+      "reviewed": "sha256:5ad3e3656d3c077a567a618395b8067045ca236f5cb4877142b268c7da8684e0",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "`FORMANCY_DATA_TRUSTED_PROXIES` believes every address in its list about the clients behind it: a list too wide lets a client that connects from inside it choose its own rate-limit bucket and the address the log names, and one too narrow counts everybody behind the proxy it leaves out as one client, which nothing reports.",
+          "heldBy": "packages/data-server/src/forwarded.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "The trusted proxies are read at start, so changing them is a restart; they are not read again on SIGHUP."
+        },
+        {
+          "area": "operations",
+          "says": "A proxy that passes a client's `X-Forwarded-For` on without appending the address it saw is never safe to name: an address the client wrote is then believed, and nothing tells such a proxy from one that appends."
+        },
+        {
+          "area": "server",
+          "says": "Only `X-Forwarded-For` is read for a client's address, as Fastify reads it, not RFC 7239's `Forwarded`, `X-Real-IP` or `CF-Connecting-IP`, and a forwarded value that is not an IP address -- an address with its port among them -- is counted and logged as the proxy's.",
+          "heldBy": "packages/data-server/src/forwarded.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A client is its address: people behind one NAT or one proxy of their own share a rate-limit bucket, and an IPv6 client is counted by its /64.",
+          "heldBy": "packages/data-server/src/forwarded.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "With a proxy trusted, the server's log names each client's address where it named the proxy's -- behind the tunnel, each visitor's -- which is personal data, kept as long as the log is."
+        },
+        {
+          "area": "access",
+          "says": "Behind the tunnel the server believes the visitor's address Cloudflare's edge puts in `X-Forwarded-For`, as Cloudflare documents it and not measured here, and a private network route to the tunnel would let an enrolled device name an address of its own choice there."
+        },
+        {
+          "area": "operations",
+          "says": "Two stacks from `compose.yaml` do not run at once on one machine, the getting-started gate's included, and on a machine where another network holds 172.16.238.0/24 or 172.16.239.0/24 the stack does not start until that network is removed or five values in two files are changed together."
+        },
+        {
+          "area": "server",
+          "says": "From a trusted proxy, Fastify's `request.host` and `request.protocol` follow `X-Forwarded-Host` and `X-Forwarded-Proto`, which nginx passes on from any client; nothing in the server reads either.",
+          "heldBy": "packages/data-server/src/forwarded.test.ts"
         }
       ]
     }
