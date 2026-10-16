@@ -55,7 +55,17 @@
     (the page fetched 6 font files)"; and with the faces inlined:
     "font-src refused data", and no family loaded. With Plex Mono's imports
     taken out it passed every one of its 175 checks, which is why the
-    static case of the stacks exists. With the change, the three gates
+    static case of the stacks exists. The host gate failed in all 7 passes,
+    and on nothing else, with its grids' theme naming a header font as
+    `{ googleFont: 'IBM Plex Sans' }` and `loadThemeGoogleFonts: true`
+    given: "1 address on another origin, each refused:
+    https://fonts.googleapis.com/css2?family=IBM%20Plex%20Sans:wght@100;…".
+    AG Grid 36.2.0 asks Google only for a theme parameter given that way
+    -- Quartz as shipped names IBM Plex Sans so, the room's theme overrides
+    it -- and only for a grid given that option; with the option alone it
+    asks nothing, read in ag-stack's `_startUse` and the theme's own
+    parameters. The static test passed on that build: it does not read
+    JavaScript, where the loader is. With the change, the three gates
     passed every check in Chromium 153 on Windows 11 on 2026-10-16 -- 175,
     918 and 1,708 -- and the examples page's 175 in Firefox 155 too; WebKit
     runs on Linux only, so its legs in CI are the first to run them there.
