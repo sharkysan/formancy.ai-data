@@ -77,13 +77,14 @@ export const contentSecurityPolicy = (policy = POLICY) =>
 
 /**
  * Every feature the page does not use, denied to it and to anything it
- * could embed. Only names Chromium recognises: an unknown one is a console
- * message on every load, which the gate counts.
+ * could embed. Only names Chromium recognises on every platform the gate
+ * runs on: an unknown one is a console message on every load, which the gate
+ * counts. `bluetooth` is not among them: Chromium 153 on Linux, in CI on
+ * 2026-10-16, said "Unrecognized feature: 'bluetooth'" where Windows' did not.
  */
 export const DENIED_FEATURES = Object.freeze([
   'accelerometer',
   'autoplay',
-  'bluetooth',
   'browsing-topics',
   'camera',
   'display-capture',
@@ -171,7 +172,7 @@ export function parseHeadersFile(text) {
 function pattern(path) {
   if (/:[A-Za-z_]/.test(path)) throw new Error(`${path} has a placeholder, which this module does not model`)
   if ((path.match(/\*/g) ?? []).length > 1) throw new Error(`${path} has more than one splat, which Cloudflare refuses`)
-  return new RegExp(`^${path.replaceAll(/[.+?^${}()|[\]\\]/g, '\\$&').replace('*', '.*')}$`)
+  return new RegExp(`^${path.replaceAll(/[.+?^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*')}$`)
 }
 
 /** What a request for `pathname` is answered with: every matching rule's headers, a name two rules share joined with a comma. */
