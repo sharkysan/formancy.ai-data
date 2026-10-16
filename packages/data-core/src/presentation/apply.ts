@@ -1,8 +1,9 @@
 import type { FormSchema } from '@formancy/spec'
 import type { FormBindings } from '../generate/types.js'
-import type { FieldAnchor, PresentationOverrides, PresentedForm } from './types.js'
+import type { FieldAnchor, PresentationOverrides, PresentedForm, SectionAnchor } from './types.js'
 import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
-import { copyOf, hasKeys, isRecord, isText, readGeneratedLayout, same } from './layout.js'
+import { copyOf, describeSection, hasKeys, isRecord, isText, readGeneratedLayout, same } from './layout.js'
+import { homeOf, placements } from './placement.js'
 
 function isAnchor(value: unknown): value is FieldAnchor {
   if (!isRecord(value)) return false
@@ -10,6 +11,18 @@ function isAnchor(value: unknown): value is FieldAnchor {
   if (value['kind'] === 'lookup') return hasKeys(value, ['kind', 'foreignKey']) && typeof value['foreignKey'] === 'string'
   return false
 }
+
+function isSectionAnchor(value: unknown): value is SectionAnchor {
+  return (
+    isRecord(value) &&
+    hasKeys(value, ['label', 'occurrence']) &&
+    typeof value['label'] === 'string' &&
+    Number.isSafeInteger(value['occurrence']) &&
+    (value['occurrence'] as number) >= 0
+  )
+}
+
+const SECTION_ANCHOR = 'must be { label, occurrence } with a whole occurrence of at least 0'
 
 function describeAnchor(anchor: FieldAnchor): string {
   return anchor.kind === 'column' ? `column ${anchor.column}` : `the lookup over ${anchor.foreignKey}`
@@ -19,7 +32,7 @@ function fieldShapeProblems(entry: unknown, at: string, seen: Set<string>): stri
   if (!isRecord(entry)) return [`${at} must be an object`]
   const problems: string[] = []
   for (const key of Object.keys(entry)) {
-    if (!['field', 'anchor', 'label', 'span'].includes(key)) problems.push(`${at}/${key} is not a property of a field presentation`)
+    if (!['field', 'anchor', 'label', 'span', 'section'].includes(key)) problems.push(`${at}/${key} is not a property of a field presentation`)
   }
   if (typeof entry['field'] !== 'string') problems.push(`${at}/field must be a field key`)
   else if (seen.has(entry['field'])) problems.push(`${at}: ${entry['field']} appears twice`)
@@ -27,6 +40,7 @@ function fieldShapeProblems(entry: unknown, at: string, seen: Set<string>): stri
   if (!isAnchor(entry['anchor'])) problems.push(`${at}/anchor must be { kind: column, column } or { kind: lookup, foreignKey }`)
   if ('label' in entry && !isText(entry['label'])) problems.push(`${at}/label must be text`)
   if ('span' in entry && entry['span'] !== 'all' && entry['span'] !== 'one') problems.push(`${at}/span must be 'all' or 'one'`)
+  if ('section' in entry && !isSectionAnchor(entry['section'])) problems.push(`${at}/section ${SECTION_ANCHOR}`)
   return problems
 }
 
@@ -37,17 +51,10 @@ function sectionShapeProblems(entry: unknown, at: string, seen: Set<string>): st
     if (!['anchor', 'label', 'order'].includes(key)) problems.push(`${at}/${key} is not a property of a section presentation`)
   }
   const anchor = entry['anchor']
-  if (
-    !isRecord(anchor) ||
-    !hasKeys(anchor, ['label', 'occurrence']) ||
-    typeof anchor['label'] !== 'string' ||
-    !Number.isSafeInteger(anchor['occurrence']) ||
-    (anchor['occurrence'] as number) < 0
-  ) {
-    problems.push(`${at}/anchor must be { label, occurrence } with a whole occurrence of at least 0`)
-  } else {
-    const key = JSON.stringify([anchor['label'], anchor['occurrence']])
-    if (seen.has(key)) problems.push(`${at}: section "${anchor['label']}" (${String(anchor['occurrence'])}) appears twice`)
+  if (!isSectionAnchor(anchor)) problems.push(`${at}/anchor ${SECTION_ANCHOR}`)
+  else {
+    const key = JSON.stringify([anchor.label, anchor.occurrence])
+    if (seen.has(key)) problems.push(`${at}: section "${anchor.label}" (${String(anchor.occurrence)}) appears twice`)
     seen.add(key)
   }
   if ('label' in entry && !isText(entry['label'])) problems.push(`${at}/label must be text`)
@@ -98,12 +105,17 @@ type Section = { label: unknown; children: Array<{ children: Node[] }> }
 /**
  * The base with a presentation applied, or every reason it does not apply.
  *
- * Refuses, rather than skipping, whatever the four edits could not have
+ * Refuses, rather than skipping, whatever the studio's edits could not have
  * produced from this base: a key it lacks or that has no binding, an anchor
- * other than the key's own, a section it does not have, an order that is not
- * that section's fields rearranged. And refuses an entry that says what the
- * base already says, or nothing, so a presentation has one spelling and two
+ * other than the key's own, a section it does not have, a move that leaves a
+ * section with no field, an order that is not the fields its section holds
+ * after the moves, rearranged. And refuses an entry that says what the base
+ * already says, or nothing, so a presentation has one spelling and two
  * stored files that mean the same thing are byte-equal.
+ *
+ * A moved field keeps its node, width included, and lands after its new
+ * section's own fields (`placement.ts`); an order then rearranges each
+ * section.
  */
 export function applyPresentation(base: FormSchema, presentation: PresentationOverrides, bindings: FormBindings): PresentedForm {
   const shape = presentationShapeProblems(presentation)
@@ -118,6 +130,8 @@ export function applyPresentation(base: FormSchema, presentation: PresentationOv
   for (const section of nodes) for (const node of section.children[0]?.children ?? []) nodeOf.set(node.path, node)
   const order = form.model.fields.map((field) => field.key)
   const binding = new Map(bindings.fields.map((entry) => [entry.field, entry]))
+  /** Each moved key: the section it moved to, and the entry that says so. */
+  const moves = new Map<string, { to: number; at: string }>()
 
   let previous = -1
   for (const [index, entry] of presentation.fields.entries()) {
@@ -137,7 +151,7 @@ export function applyPresentation(base: FormSchema, presentation: PresentationOv
     }
     const own = fieldAnchor(bound)
     if (!same(entry.anchor, own)) problems.push(`${at}/anchor: ${entry.field} stands for ${describeAnchor(own)}, not ${describeAnchor(entry.anchor)}`)
-    if (entry.label === undefined && entry.span === undefined) problems.push(`${at}: says nothing; leave the field out`)
+    if (entry.label === undefined && entry.span === undefined && entry.section === undefined) problems.push(`${at}: says nothing; leave the field out`)
     if (entry.label !== undefined) {
       if (same(entry.label, field.label)) problems.push(`${at}/label: equals the base's; leave it out`)
       else field.label = entry.label
@@ -148,15 +162,31 @@ export function applyPresentation(base: FormSchema, presentation: PresentationOv
       else if (entry.span === 'all') node.span = 'all'
       else delete node.span
     }
+    if (entry.section !== undefined) {
+      const target = layout.sections.findIndex((section) => same(section.anchor, entry.section))
+      if (target < 0) problems.push(`${at}/section: the base has no section labelled "${entry.section.label}" at occurrence ${String(entry.section.occurrence)}`)
+      else if (target === homeOf(layout.sections, entry.field)) problems.push(`${at}/section: equals the base's; leave it out`)
+      else moves.set(entry.field, { to: target, at })
+    }
   }
+
+  // Where every field sits once the moves are made; none may leave a section empty.
+  const placed = placements(layout.sections, new Map([...moves].map(([key, move]) => [key, move.to])), order)
+  for (const [index, keys] of placed.entries()) {
+    const generated = layout.sections[index]
+    if (keys.length > 0 || generated === undefined) continue
+    const last = [...moves].filter(([key]) => generated.keys.includes(key)).at(-1)
+    if (last !== undefined) problems.push(`${last[1].at}/section: moving ${last[0]} leaves section ${describeSection(generated.anchor)} with no field`)
+  }
+  for (const [index, keys] of placed.entries()) (nodes[index]?.children[0] as { children: Node[] }).children = keys.map((key) => nodeOf.get(key) as Node)
 
   previous = -1
   for (const [index, entry] of presentation.sections.entries()) {
     const at = `/sections/${String(index)}`
     const position = layout.sections.findIndex((section) => same(section.anchor, entry.anchor))
-    const generated = layout.sections[position]
+    const keys = placed[position]
     const node = nodes[position]
-    if (generated === undefined || node === undefined) {
+    if (keys === undefined || node === undefined) {
       problems.push(`${at}/anchor: the base has no section labelled "${entry.anchor.label}" at occurrence ${String(entry.anchor.occurrence)}`)
       continue
     }
@@ -168,9 +198,9 @@ export function applyPresentation(base: FormSchema, presentation: PresentationOv
       else node.label = entry.label
     }
     if (entry.order !== undefined) {
-      const permutation = entry.order.length === generated.keys.length && entry.order.every((key) => generated.keys.includes(key))
-      if (!permutation) problems.push(`${at}/order: not an order of that section's fields (${generated.keys.join(', ')})`)
-      else if (same(entry.order, generated.keys)) problems.push(`${at}/order: equals the base's; leave it out`)
+      const permutation = entry.order.length === keys.length && entry.order.every((key) => keys.includes(key))
+      if (!permutation) problems.push(`${at}/order: not an order of that section's fields (${keys.join(', ')})`)
+      else if (same(entry.order, keys)) problems.push(`${at}/order: equals the base's; leave it out`)
       else (node.children[0] as { children: Node[] }).children = entry.order.map((key) => nodeOf.get(key) as Node)
     }
   }

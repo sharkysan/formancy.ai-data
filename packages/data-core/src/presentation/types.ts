@@ -30,12 +30,21 @@ export interface FieldPresentation {
   label?: Text
   /** 'all': spans the grid's row where the base did not; 'one': one column where the base spanned. */
   span?: 'all' | 'one'
+  /**
+   * The generated section it is placed in, present only where that is not
+   * the one the base places it in (0075). It lands after that section's own
+   * fields unless the section's `order` says otherwise.
+   */
+  section?: SectionAnchor
 }
 
 export interface SectionPresentation {
   anchor: SectionAnchor
   label?: Text
-  /** Every key the section's grid places, in the person's order; present only where it differs. */
+  /**
+   * Every key the section's grid places, in the person's order; present only
+   * where it differs from where the moves leave them (`placement.ts`).
+   */
   order?: string[]
 }
 
@@ -44,9 +53,10 @@ export interface SectionPresentation {
  * base, and nothing else. Arrays, never records: a field key may be
  * `__proto__`.
  *
- * Exactly the studio's four edits — a field's label, a section's label, a
- * field's place within its own section's grid, and full width. Each entry
- * holds only what differs from the base, so a presentation has one spelling.
+ * Exactly the studio's edits — a field's label, a section's label, a
+ * field's place within its section's grid and full width (0030), and the
+ * generated section a field is placed in (0075). Each entry holds only what
+ * differs from the base, so a presentation has one spelling.
  */
 export interface PresentationOverrides {
   version: typeof PRESENTATION_VERSION
@@ -62,12 +72,19 @@ export type PresentedForm = { ok: true; form: FormSchema } | { ok: false; proble
 /** What a rebase could not carry as it was, and what it did instead. */
 export type PresentationConflict =
   /** `field` is the old key. */
-  | { kind: 'field-gone'; field: string; anchor: FieldAnchor; property: 'label' | 'span'; yours: Text | 'all' | 'one'; resolution: 'dropped'; message: string }
+  | { kind: 'field-gone'; field: string; anchor: FieldAnchor; property: 'label' | 'span' | 'section'; yours: Text | 'all' | 'one' | SectionAnchor; resolution: 'dropped'; message: string }
   /** `field` is the new key, `from` the old. */
   | { kind: 'field-rekeyed'; field: string; from: string; anchor: FieldAnchor; resolution: 'followed'; message: string }
   /** Labels only: span has two values, so a span override is either still one or now the generator's. */
   | { kind: 'both-changed'; field: string; property: 'label'; yours: Text; generator: Text; resolution: 'kept-yours'; message: string }
+  /** `from` and `to` are where the field is placed: the section the person moved it to, else the generator's. */
   | { kind: 'moved-section'; field: string; from: SectionAnchor; to: SectionAnchor; resolution: 'followed'; message: string }
+  /**
+   * A move the rebase could not carry (0075): its section gone or not told
+   * apart, or carrying it would leave a section with no field. `field` is
+   * the new key, `section` the person's choice, `to` where the field is now.
+   */
+  | { kind: 'move-dropped'; field: string; anchor: FieldAnchor; section: SectionAnchor; to: SectionAnchor; resolution: 'dropped'; message: string }
   /** A section the rebase cannot find in the new base: gone, or one of two sharing a label whose number changed. */
   | { kind: 'section-gone'; section: SectionAnchor; property: 'label' | 'order'; yours: Text | string[]; resolution: 'dropped'; message: string }
 

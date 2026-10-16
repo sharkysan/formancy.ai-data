@@ -177,9 +177,11 @@ over a root as a request described it, so a rule added to one reaches both.
 A person's edits to a generated form are kept as a patch beside the base the
 generator wrote, and carried to the next base when the form is regenerated
 ([0030](../../docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
-The patch holds exactly four edits — a field's label, a section's label, a
-field's place within its own section's grid, and full width — and nothing
-else.
+The patch holds exactly the studio's edits — a field's label, a section's
+label, a field's place within its section's grid, full width, and the
+generated section a field is placed in
+([0075](../../docs/decisions/0075-a-field-may-move-to-another-generated-section.md))
+— and nothing else.
 
 ```ts
 import { presentationOf, rebasePresentation } from '@formancy/data-core'
@@ -194,10 +196,15 @@ const { presentation, form, conflicts } = rebasePresentation(
 A field is anchored by what it stands for — its column, or its lookup's
 foreign key — so a label follows the column when a colliding key renumbers.
 A section is anchored by the label the generator wrote and which of the
-sections with that label it is. What cannot be carried as it was is a
-conflict: a field gone, a field under another key, a field the generator put
-in another section, a section gone, a label the generator also changed (the
-person's is kept). `applyPresentation` is what the server checks a stored
+sections with that label it is. A field moved to another section is recorded
+on its own entry as `section`, that section's anchor; it lands after the
+section's own fields, and a section's order is of the fields it holds once
+the moves are made, one decision `placement.ts` makes for applying,
+deriving and rebasing alike. A section keeps at least one field. What cannot
+be carried as it was is a conflict: a field gone, a field under another key,
+a field now placed in another section, a move whose section is gone, cannot
+be told apart or would be left with no field (`move-dropped`), a section
+gone, a label the generator also changed (the person's is kept). `applyPresentation` is what the server checks a stored
 form against; `reassignedKeys` names keys that now stand for another column,
 whose grants somebody has to confirm — and the server refuses a publish that
 grants on one without confirming it
@@ -213,8 +220,9 @@ overrides are reported dropped rather than guessed across; a root whose own
 label is `Record` has two sections labelled Record, and when one of them
 comes or goes the rebase cannot tell which is left, so their overrides are
 reported dropped (`section-gone`) rather than put on the wrong one; help
-text, translations, `required`, a numeric span and a move between sections
-are refused, not carried.
+text, translations, `required`, a numeric span, a section added and a move
+that empties a section are refused, not carried. A version-1 reader before
+0075 refuses a presentation holding a move, naming `/fields/N/section`.
 
 ## Lookups
 

@@ -9,7 +9,7 @@ import { EMPTY_PRESENTATION } from './types.js'
 
 /*
  * presentationOf turns an edited form into the patch 0030 stores, and refuses
- * every difference that is not one of the studio's four edits. The base is
+ * every difference that is not one of the studio's edits (0030, 0075). The base is
  * real generateForm output over the drift fixture's order table: sections
  * "Order" (customer, order_date, status, amount, notes [all], created_by,
  * paid) and "Record" (id). Edits are made by JSON, as the studio's
@@ -57,11 +57,11 @@ describe('presentationOf', () => {
     expect(presentationOf(base, edited, bindings)).toEqual({ ok: true, presentation: EMPTY_PRESENTATION })
   })
 
-  // Each of the four edits derives exactly its own entry, anchored by what
+  // Each of 0030's four edits derives exactly its own entry, anchored by what
   // the field stands for — the lookup by its foreign key, a column by its
   // name — and nothing else. `span: 'one'` is the removal of a generated
   // full width, which is an edit too.
-  test('each of the four edits derives exactly its entry, and applying it gives the edited form back', () => {
+  test('each of the four edits within a section derives exactly its entry, and applying it gives the edited form back', () => {
     const edited = copy(base)
     field(edited, 'customer')['label'] = 'Buyer'
     section(edited, 0).label = 'Order details'
@@ -120,26 +120,85 @@ describe('presentationOf', () => {
     ])
   })
 
-  // builder-core accepts each of these (PD2), and none is one of the four
-  // edits: a field moved into the Record section would be placed by the
-  // person, not by what the database generates; a new section has no
-  // anchor; `span: 2` is not "full width" and would be lost in a wider grid.
-  test('refuses a move between sections, a new section and a numeric span', () => {
+  // Watched failing before 0075, which refused it as "paid moved between
+  // sections". A field placed in another generated section is a move,
+  // anchored by the field's column and the target's label and occurrence,
+  // and recorded on the field's own entry: a derive that refused it left the
+  // generator's Record section split off the identity for good, and one that
+  // recorded it as two orders would anchor it by key. Appended where the
+  // studio puts it, the move needs no order on either section.
+  test('derives a move between sections, and applying it gives the edited form back', () => {
     const moved = copy(base)
-    const paid = grid(moved, 0).children.pop()
-    grid(moved, 1).children.push(paid as Child)
-    expect(problems(moved)).toEqual([
-      '/layouts/0/nodes/0/children/0/children: paid is missing',
-      '/layouts/0/nodes/1/children/0/children/1/path: paid moved between sections',
-    ])
+    grid(moved, 1).children.push(grid(moved, 0).children.pop() as Child)
+    const outcome = presentationOf(base, moved, bindings)
+    expect(outcome).toEqual({
+      ok: true,
+      presentation: { version: 1, fields: [{ field: 'paid', anchor: { kind: 'column', column: 'paid' }, section: { label: 'Record', occurrence: 0 } }], sections: [] },
+    })
+    const applied = outcome.ok ? applyPresentation(base, outcome.presentation, bindings) : outcome
+    expect(applied.ok && canonicalize(applied.form)).toBe(canonicalize(moved))
+  })
 
+  // A moved field placed anywhere but last in its new section is a move and
+  // an order of the section it is in; the section it left needs none, since
+  // its order is its own fields that stayed. And a textarea keeps its full
+  // width wherever it goes: width is the field's, compared with its own
+  // generated span, so the move does not read as a width edit.
+  test('derives a move with the order of the section it went to, and keeps a moved field’s width its own', () => {
+    const first = copy(base)
+    grid(first, 1).children.unshift(grid(first, 0).children.pop() as Child)
+    expect(presentationOf(base, first, bindings)).toEqual({
+      ok: true,
+      presentation: {
+        version: 1,
+        fields: [{ field: 'paid', anchor: { kind: 'column', column: 'paid' }, section: { label: 'Record', occurrence: 0 } }],
+        sections: [{ anchor: { label: 'Record', occurrence: 0 }, order: ['paid', 'id'] }],
+      },
+    })
+
+    const wide = copy(base)
+    const children = grid(wide, 0).children
+    grid(wide, 1).children.push(children.splice(children.findIndex((entry) => entry.path === 'notes'), 1)[0] as Child)
+    expect(node(wide, 'notes').span).toBe('all')
+    const outcome = presentationOf(base, wide, bindings)
+    expect(outcome).toEqual({
+      ok: true,
+      presentation: { version: 1, fields: [{ field: 'notes', anchor: { kind: 'column', column: 'notes' }, section: { label: 'Record', occurrence: 0 } }], sections: [] },
+    })
+    const applied = outcome.ok ? applyPresentation(base, outcome.presentation, bindings) : outcome
+    expect(applied.ok && canonicalize(applied.form)).toBe(canonicalize(wide))
+  })
+
+  // A section with no field would draw a heading over nothing, and taking
+  // the section away is a section removed, which shifts the occurrences
+  // every other anchor rests on. So Record's only field, id, stays. And a
+  // field in two sections at once is drawn twice and saved once.
+  test('refuses a move that leaves a section with no field, and a field placed in two sections', () => {
+    const emptied = copy(base)
+    grid(emptied, 0).children.push(grid(emptied, 1).children.pop() as Child)
+    expect(problems(emptied)).toEqual(['/layouts/0/nodes/1/children/0/children: a section keeps at least one field'])
+
+    const twice = copy(base)
+    grid(twice, 1).children.push({ kind: 'field', path: 'paid' })
+    expect(problems(twice)).toEqual(['/layouts/0/nodes/1/children/0/children/1/path: paid is placed twice'])
+
+    // Taken out and placed nowhere is missing, said where the generator put it.
+    const lost = copy(base)
+    grid(lost, 0).children.pop()
+    expect(problems(lost)).toEqual(['/layouts/0/nodes/0/children/0/children: paid is missing'])
+  })
+
+  // builder-core accepts each of these (PD2), and neither is presentation:
+  // a new section has no anchor; `span: 2` is not "full width" and would be
+  // lost in a wider grid.
+  test('refuses a new section and a numeric span', () => {
     const added = copy(base)
     added.layouts?.[0]?.nodes.push({ kind: 'section', label: 'More', children: [] })
     expect(problems(added)).toEqual(['/layouts/0/nodes: a section was added or removed'])
 
     const numeric = copy(base)
     node(numeric, 'status').span = 2
-    expect(problems(numeric)).toEqual(["/layouts/0/nodes/0/children/0/children/2/span: a numeric span is not one of the four edits; full width is 'all'"])
+    expect(problems(numeric)).toEqual(["/layouts/0/nodes/0/children/0/children/2/span: a numeric span is not presentation; full width is 'all'"])
   })
 
   // The title, the logic and the translations are the document's, not its
@@ -152,9 +211,9 @@ describe('presentationOf', () => {
     edited.logic = { rules: [] }
     edited.i18n = { defaultLocale: 'en', messages: { en: {} } }
     expect(problems(edited)).toEqual([
-      '/title: changed, and only labels, order and full width are presentation',
-      '/logic: changed, and only labels, order and full width are presentation',
-      '/i18n: changed, and only labels, order and full width are presentation',
+      "/title: changed, and only labels, order, a field's section and full width are presentation",
+      "/logic: changed, and only labels, order, a field's section and full width are presentation",
+      "/i18n: changed, and only labels, order, a field's section and full width are presentation",
     ])
   })
 
@@ -184,7 +243,7 @@ describe('presentationOf', () => {
   })
 
   // A hand-written or damaged document is refused at the first place it is
-  // not the generated one plus the four edits, and that place is named, so
+  // not the generated one plus the studio's edits, and that place is named, so
   // the person can find it; a guess would publish something nobody chose.
   test('refuses an edited document of any other shape, naming where', () => {
     expect(presentationOf(base, null as unknown as FormSchema, bindings)).toEqual({ ok: false, problems: ['/: the edited form is not an object'] })
@@ -192,18 +251,18 @@ describe('presentationOf', () => {
     const grid0 = '/layouts/0/nodes/0/children/0'
     const cases: Array<[string[], (form: FormSchema) => void]> = [
       [['/model: the edited form has no fields'], (form) => { (form as unknown as { model: unknown }).model = {} }],
-      [['/model/extra: changed, and only labels, order and full width are presentation'], (form) => { (form.model as unknown as Record<string, unknown>)['extra'] = 1 }],
+      [["/model/extra: changed, and only labels, order, a field's section and full width are presentation"], (form) => { (form.model as unknown as Record<string, unknown>)['extra'] = 1 }],
       [['/model/fields: the fields are in another order, and the model order is not presentation'], (form) => { form.model.fields.reverse() }],
       [[`${at('notes')}/label: a label may change, not be removed`], (form) => { delete field(form, 'notes')['label'] }],
       [[`${at('notes')}/label: not text`], (form) => { field(form, 'notes')['label'] = 7 }],
       [['/layouts: the form keeps the one layout it was generated with'], (form) => { delete form.layouts }],
-      [['/layouts/0: changed, and only labels, order and full width are presentation', '/layouts/0/name: changed, and only labels, order and full width are presentation'], (form) => {
+      [["/layouts/0: changed, and only labels, order, a field's section and full width are presentation", "/layouts/0/name: changed, and only labels, order, a field's section and full width are presentation"], (form) => {
         (form.layouts as unknown as Array<Record<string, unknown>>)[0] = { name: 'web', nodes: form.layouts?.[0]?.nodes, label: 'x' }
       }],
       [['/layouts/0/nodes/0: a section may change its label, and is otherwise the generated one'], (form) => { (section(form, 0) as { kind: string }).kind = 'row' }],
       [['/layouts/0/nodes/0/label: not text'], (form) => { (section(form, 0) as unknown as { label: unknown }).label = 7 }],
       [['/layouts/0/nodes/0/children: a section holds the one grid it was generated with'], (form) => { section(form, 0).children.push(section(form, 0).children[0] as LayoutNode) }],
-      [[`${grid0}/columns: changed, and only labels, order and full width are presentation`], (form) => { grid(form, 0).columns = 3 }],
+      [[`${grid0}/columns: changed, and only labels, order, a field's section and full width are presentation`], (form) => { grid(form, 0).columns = 3 }],
       [[`${grid0}/children/0: a grid holds the fields it was generated with, and nothing else`, `${grid0}/children: customer is missing`], (form) => {
         (grid(form, 0).children as unknown[])[0] = { kind: 'static', path: 'customer' }
       }],

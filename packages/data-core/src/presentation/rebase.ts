@@ -5,6 +5,8 @@ import type { FormPolicy } from '../policy/types.js'
 import { applyPresentation } from './apply.js'
 import type { GeneratedSection } from './layout.js'
 import { describeSection, describeText, readGeneratedLayout, same } from './layout.js'
+import { placements } from './placement.js'
+import { carryMoves } from './rebase-moves.js'
 import type { FieldAnchor, FieldPresentation, PresentationConflict, PresentationOverrides, ReassignedKey, RebasedPresentation, SectionAnchor, SectionPresentation } from './types.js'
 import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
 
@@ -23,7 +25,7 @@ interface Regenerated {
  * Where a conflict sorts within its subject: what the field now is first,
  * then label, span and order, as the presentation's own properties run.
  */
-const RANK: Record<PresentationConflict['kind'], number> = { 'field-rekeyed': 0, 'both-changed': 1, 'field-gone': 1, 'moved-section': 3, 'section-gone': 1 }
+const RANK: Record<PresentationConflict['kind'], number> = { 'field-rekeyed': 0, 'both-changed': 1, 'field-gone': 1, 'moved-section': 3, 'move-dropped': 3, 'section-gone': 1 }
 
 /** A conflict with where it sorts: field subjects in old-base field order, then sections in old-base order. */
 interface Ranked {
@@ -69,11 +71,11 @@ function ambiguousLabels(before: readonly GeneratedSection[], after: readonly Ge
  * order, after its nearest preceding key in the new base that is already
  * placed, or first when none is.
  */
-function carryOrder(mine: readonly string[], section: GeneratedSection): string[] {
-  const placed = mine.filter((key) => section.keys.includes(key))
-  for (const [index, key] of section.keys.entries()) {
+function carryOrder(mine: readonly string[], keys: readonly string[]): string[] {
+  const placed = mine.filter((key) => keys.includes(key))
+  for (const [index, key] of keys.entries()) {
     if (placed.includes(key)) continue
-    const before = section.keys.slice(0, index).reverse().find((candidate) => placed.includes(candidate))
+    const before = keys.slice(0, index).reverse().find((candidate) => placed.includes(candidate))
     placed.splice(before === undefined ? 0 : placed.indexOf(before) + 1, 0, key)
   }
   return placed
@@ -88,7 +90,7 @@ function carryOrder(mine: readonly string[], section: GeneratedSection): string[
  * comes or goes. Sections are followed by the label the generator wrote and
  * which of the sections with that label they are. The rules:
  *
- * - a field whose anchor is gone takes its label and span with it
+ * - a field whose anchor is gone takes its label, span and section with it
  *   (`field-gone`); in an order it is simply left out, because drift already
  *   reports the drop;
  * - a field under another key keeps its overrides under the new one
@@ -96,9 +98,15 @@ function carryOrder(mine: readonly string[], section: GeneratedSection): string[
  * - a label the generator also changed keeps the person's (`both-changed`);
  *   one the generator now writes itself is no longer an override, and goes;
  * - a span is re-expressed against the new base, and goes when it agrees;
- * - an order keeps the person's sequence, sends a field now in another
- *   section where the generator put it (`moved-section`), and places each
- *   new field after its generated predecessor;
+ * - a move between sections (0075) is carried by `carryMoves`: dropped and
+ *   said where its section is gone or cannot be told apart, or where it
+ *   would leave a section with no field (`move-dropped`), and gone without a
+ *   word where the generator now puts the field there itself;
+ * - an order keeps the person's sequence over the fields its section holds
+ *   once the moves are made, sends a field now placed in another section
+ *   where it is placed (`moved-section`, compared by where the field was and
+ *   is placed, so a move the person made is not reported as one), and
+ *   places each new field after its generated predecessor;
  * - a section the new base does not have takes its overrides with it
  *   (`section-gone`), and so does one of two sections sharing a label when
  *   their number changed, because occurrence no longer says which is which;
@@ -129,21 +137,35 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
   const mine = new Map(published.presentation.fields.map((entry) => [entry.field, entry]))
   const ordered = new Map<string, SectionPresentation>()
   for (const entry of published.presentation.sections) ordered.set(canonicalize(entry.anchor), entry)
-  const hasOrder = (section: GeneratedSection | undefined) => section !== undefined && ordered.get(canonicalize(section.anchor))?.order !== undefined
+  const hasOrder = (anchor: SectionAnchor) => ordered.get(canonicalize(anchor))?.order !== undefined
 
-  // What each field the presentation names now is: under another key, or in another section.
+  // Moves between sections, by anchor, before anything asks where a field is.
+  const order = newFields.map((field) => field.key)
+  const moved = carryMoves({ entries: published.presentation.fields, after: after.sections, order, follow, told, report: (key, conflict) => add(subjectOf(key), conflict) })
+  const placed = placements(after.sections, moved.moves, order)
+
+  // Where a field is placed: the section the person moved it to, else the generator's.
+  const movedFrom = new Map(published.presentation.fields.flatMap((entry) => (entry.section === undefined ? [] : [[entry.field, entry.section] as const])))
+  const placedBefore = (key: string) => movedFrom.get(key) ?? sectionOf(before.sections, key)?.anchor
+  const placedAfter = (key: string) => {
+    const to = moved.moves.get(key)
+    return to === undefined ? sectionOf(after.sections, key)?.anchor : after.sections[to]?.anchor
+  }
+
+  // What each field the presentation names now is: under another key, or placed in another section.
   for (const [subject, field] of oldFields.entries()) {
     const now = follow(field.key)
-    const from = sectionOf(before.sections, field.key)
-    const named = mine.has(field.key) || hasOrder(from)
+    const from = placedBefore(field.key)
+    const named = mine.has(field.key) || (from !== undefined && hasOrder(from))
     if (now === undefined || !named) continue
     const anchor = anchorOf.get(field.key) as FieldAnchor
     if (now !== field.key) {
       add(subject, { kind: 'field-rekeyed', field: now, from: field.key, anchor, resolution: 'followed', message: `${field.key} is now ${now}: it stands for ${describeAnchor(anchor)}, and what you chose for it followed.` })
     }
-    const to = sectionOf(after.sections, now)
-    if (from !== undefined && to !== undefined && told(from.anchor) && told(to.anchor) && !same(from.anchor, to.anchor)) {
-      add(subject, { kind: 'moved-section', field: now, from: from.anchor, to: to.anchor, resolution: 'followed', message: `${now} moved from section ${describeSection(from.anchor)} to ${describeSection(to.anchor)}, where the generator put it.` })
+    // A dropped move is said once, as move-dropped.
+    const to = placedAfter(now)
+    if (from !== undefined && to !== undefined && !moved.dropped.has(now) && told(from) && told(to) && !same(from, to)) {
+      add(subject, { kind: 'moved-section', field: now, from: { ...from }, to: { ...to }, resolution: 'followed', message: `${now} moved from section ${describeSection(from)} to ${describeSection(to)}, where the generator put it.` })
     }
   }
 
@@ -153,10 +175,10 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
     const subject = subjectOf(entry.field)
     const now = follow(entry.field)
     if (now === undefined) {
-      for (const property of ['label', 'span'] as const) {
+      for (const property of ['label', 'span', 'section'] as const) {
         const yours = entry[property]
         if (yours === undefined) continue
-        const shown = property === 'label' ? describeText(yours as Text) : `'${String(yours)}'`
+        const shown = property === 'label' ? describeText(yours as Text) : property === 'section' ? describeSection(yours as SectionAnchor) : `'${String(yours)}'`
         add(subject, { kind: 'field-gone', field: entry.field, anchor: entry.anchor, property, yours, resolution: 'dropped', message: `The ${property} ${shown} you chose for ${entry.field} was dropped: ${describeAnchor(entry.anchor)} is not in the regenerated form.` })
       }
       continue
@@ -176,13 +198,14 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
 
   // Sections, by anchor, and the orders they hold.
   const sections: SectionPresentation[] = []
-  for (const section of after.sections) {
+  for (const [index, section] of after.sections.entries()) {
     const entry = ordered.get(canonicalize(section.anchor))
     if (entry === undefined || !told(section.anchor)) continue
     const merged: { label?: Text; order?: string[] } = entry.label === undefined ? {} : { label: entry.label }
+    const keys = placed[index] ?? []
     if (entry.order !== undefined) {
-      const order = carryOrder(entry.order.flatMap((key) => follow(key) ?? []), section)
-      if (!same(order, section.keys)) merged.order = order
+      const carriedOrder = carryOrder(entry.order.flatMap((key) => follow(key) ?? []), keys)
+      if (!same(carriedOrder, keys)) merged.order = carriedOrder
     }
     if (merged.label !== undefined || merged.order !== undefined) sections.push({ anchor: { ...section.anchor }, ...merged })
   }
@@ -202,7 +225,10 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
   const fields: FieldPresentation[] = []
   for (const binding of regenerated.bindings.fields) {
     const entry = carried.get(binding.field)
-    if (entry !== undefined) fields.push({ field: binding.field, anchor: fieldAnchor(binding), ...entry })
+    const to = moved.moves.get(binding.field)
+    const section = to === undefined ? undefined : after.sections[to]?.anchor
+    if (entry === undefined && section === undefined) continue
+    fields.push({ field: binding.field, anchor: fieldAnchor(binding), ...entry, ...(section === undefined ? {} : { section: { ...section } }) })
   }
   const position = (key: string) => newFields.findIndex((field) => field.key === key)
   fields.sort((left, right) => position(left.field) - position(right.field))
