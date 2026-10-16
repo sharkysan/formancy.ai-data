@@ -483,6 +483,9 @@ importers:
       '@formancy/data-fixtures':
         specifier: workspace:*
         version: link:../../packages/data-fixtures
+      '@formancy/data-server':
+        specifier: workspace:*
+        version: link:../../packages/data-server
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.5
