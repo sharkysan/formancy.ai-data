@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { fontPackages } from '../fonts.mjs'
-import { foreignFaces, lookFonts, MARGIN, padded, SETTINGS, stylesheet, widestBreakpoint } from './camera.mjs'
+import { fonts, foreignFaces, lookFonts, MARGIN, padded, SETTINGS, stylesheet, widestBreakpoint } from './camera.mjs'
 import { REPO } from './record.mjs'
 
 /**
@@ -114,5 +114,16 @@ describe("the look's faces (0072)", () => {
     const origin = 'http://examples.invalid'
     expect(foreignFaces(new Set([`${origin}/assets/archivo-latin-wght-normal-D9H2jx1E.woff2`]), origin)).toEqual([])
     expect(foreignFaces(new Set([`${origin}/assets/a.woff2`, 'https://fonts.gstatic.com/s/archivo/v25/k3k6o8.woff2']), origin)).toEqual(['https://fonts.gstatic.com/s/archivo/v25/k3k6o8.woff2'])
+  })
+})
+
+describe('the font wait', () => {
+  // Only a capture calls it, so nothing here ran it: a doc comment left open
+  // above it once made the function part of the comment, the module still
+  // loaded, every app's --check passed, and the first capture stopped at
+  // "fonts is not defined" (2026-10-16). Watched failing with the comment's
+  // close taken out again.
+  test('is a function the capture can call', () => {
+    expect(fonts).toBeTypeOf('function')
   })
 })

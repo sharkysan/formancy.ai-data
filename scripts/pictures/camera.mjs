@@ -171,6 +171,7 @@ export const foreignFaces = (urls, origin) => [...urls].filter((url) => new URL(
  * whose file never answers keeps it pending. Then refuses the capture if a
  * font file came from anywhere but the page's own origin, which the look
  * could not name.
+ */
 export async function fonts(page, names, { within }) {
   const deadline = Date.now() + within
   for (;;) {
