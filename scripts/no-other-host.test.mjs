@@ -67,8 +67,60 @@ function ownStylesheets(directory) {
 /** A custom property's value in `css`, or undefined. */
 const property = (css, name) => new RegExp(`${name}\\s*:\\s*([^;]+);`).exec(css)?.[1]
 
-/** The first family of a font stack, unquoted. */
-const firstFamily = (stack) => stack.split(',')[0].trim().replace(/^(["'])(.*)\1$/, '$2')
+/** The families of a font stack, in order, unquoted. */
+const familiesOf = (stack) => stack.split(',').map((family) => family.trim().replace(/^(["'])(.*)\1$/, '$2'))
+
+/**
+ * Why the stack `name` draws its text in no face of `families`, the ones the
+ * build declares, or undefined. Its first family has a face, or the family
+ * right after it is Fontsource's `<first> Variable` -- the name a variable
+ * package gives the face, which `--display` names after `'Archivo'` -- and
+ * that has one. A `Variable` face the stack does not name next is no face
+ * its text is drawn in: a family named between the two, a generic one or
+ * one the machine has, is drawn before it.
+ */
+function stackProblem(name, stack, families) {
+  const [first, next] = familiesOf(stack)
+  if (families.includes(first) || (next === `${first} Variable` && families.includes(next))) return undefined
+  const variable = families.includes(`${first} Variable`) ? `, and ${first} Variable, which has, is not the family the stack names next` : ''
+  return `${name}'s first family, ${first}, has no face in the build${variable}`
+}
+
+/** A width keyword of the `font` shorthand (CSS Fonts 4's `<font-width-css3>` but `normal`). */
+const WIDTH = /^(?:ultra-|extra-|semi-)?(?:condensed|expanded)$/i
+
+/** A percentage. */
+const PERCENTAGE = /^(?:\d+\.?\d*|\.\d+)%$/
+
+/** What can be a size in the `font` shorthand, with its `/<line-height>` if it has one: a length, a percentage or a size keyword, not an angle. */
+const SIZE = /^(?:(?:\d+\.?\d*|\.\d+)(?:%|(?!(?:deg|grad|rad|turn)(?:\/|$))[a-z]+)|xx-small|x-small|small|medium|large|x-large|xx-large|xxx-large|larger|smaller)(?:\/|$)/i
+
+/** A declaration's value as its space-separated words, a quoted string or a function call kept whole. */
+function words(value) {
+  return value.trim().match(/(?:"[^"]*"|'[^']*'|[^\s"'(]+(?:\([^)]*\))?|\([^)]*\))+/g) ?? []
+}
+
+/**
+ * Why `rules`, a stylesheet with its `@font-face` rules taken out, asks a
+ * face for a width: none, or each way it does -- `font-stretch` or
+ * `font-width`, a `wdth` variation, or a width in the `font` shorthand: a
+ * width keyword before the size, or a percentage right before it, which is
+ * how lightningcss writes `font-stretch` folded into the shorthand. The size
+ * is the first word that can be one and is not a percentage another size
+ * follows; what comes after it is the line height and the families, whose
+ * names may hold a keyword (`Roboto Condensed`).
+ */
+function widthProblems(rules) {
+  const problems = []
+  if (/(?:^|[{;\s])font-(?:stretch|width)\s*:/i.test(rules)) problems.push('sets font-stretch')
+  if (/font-variation-settings\s*:[^;}]*["']wdth["']/i.test(rules)) problems.push('sets a wdth variation')
+  for (const [, value] of rules.matchAll(/(?:^|[{;\s])font\s*:([^;}]*)/gi)) {
+    const said = words(value)
+    const size = said.findIndex((word, at) => SIZE.test(word) && !(PERCENTAGE.test(word) && SIZE.test(said[at + 1] ?? '')))
+    if (size > 0 && said.slice(0, size).some((word) => WIDTH.test(word) || PERCENTAGE.test(word))) problems.push(`asks a width in the font shorthand, ${value.trim()}`)
+  }
+  return problems
+}
 
 /**
  * The stacks the room and the theme draw text with, for `app`: `--display`,
@@ -153,7 +205,8 @@ describe('no page asks another host for anything (0072)', () => {
   // browser gates' fonts check, which reads them from the build, passes
   // with that text drawn in a fallback face. So every stack the room and
   // the theme define has its first family -- or Fontsource's `<family>
-  // Variable` of it -- among the faces the build carries.
+  // Variable` of it, where the stack names that right after it -- among the
+  // faces the build carries.
   test.each(APPS)('%s, as built: the first family of every stack the room and Blueprint draw with has a face', (app) => {
     const families = declaredFamilies(built(app))
     const problems = []
@@ -162,10 +215,31 @@ describe('no page asks another host for anything (0072)', () => {
         problems.push(`${name} is not defined where it was looked for`)
         continue
       }
-      const first = firstFamily(stack)
-      if (!families.includes(first) && !families.includes(`${first} Variable`)) problems.push(`${name}'s first family, ${first}, has no face in the build`)
+      const problem = stackProblem(name, stack, families)
+      if (problem !== undefined) problems.push(problem)
     }
     expect(problems).toEqual([])
+  })
+
+  // A guard on the rule above, with no build: Fontsource's variable packages
+  // call their face `<family> Variable`, and a stack that names only
+  // `<family>` never draws in it. The studio's build, all 18 of its IBM Plex
+  // Sans faces renamed `IBM Plex Sans Variable` -- what importing
+  // @fontsource-variable/ibm-plex-sans in place of the static package gives
+  // -- passed the rule that took `<family> Variable` for any stack, while
+  // every --sans and --fm-sans text was drawn in the fallback (2026-10-16).
+  // And a family named between the two draws before the variable face does.
+  test('the stack rule takes `<family> Variable` only where the stack names it right after `<family>`', () => {
+    const families = ['Archivo Variable', 'IBM Plex Mono', 'IBM Plex Sans', 'IBM Plex Sans Variable']
+    expect(stackProblem('--display', "'Archivo', 'Archivo Variable', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif", families)).toBeUndefined()
+    expect(stackProblem('--mono', "'IBM Plex Mono', ui-monospace, monospace", families)).toBeUndefined()
+    expect(stackProblem('--sans', "'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif", ['Archivo Variable', 'IBM Plex Sans Variable'])).toBe(
+      "--sans's first family, IBM Plex Sans, has no face in the build, and IBM Plex Sans Variable, which has, is not the family the stack names next",
+    )
+    expect(stackProblem('--display', "'Archivo', 'IBM Plex Sans', 'Archivo Variable', sans-serif", families)).toBe(
+      "--display's first family, Archivo, has no face in the build, and Archivo Variable, which has, is not the family the stack names next",
+    )
+    expect(stackProblem('--display', "'Archivo', 'Archivo Variable', sans-serif", ['IBM Plex Sans'])).toBe("--display's first family, Archivo, has no face in the build")
   })
 
   // The Archivo the apps import is its weight axis alone (wght.css): a rule
@@ -173,12 +247,26 @@ describe('no page asks another host for anything (0072)', () => {
   // stylesheet that works.
   test.each(APPS)('%s, as built: no rule asks a face for a width', (app) => {
     const problems = []
-    for (const { href, text } of builtStylesheets(built(app))) {
-      const rules = withoutFontFaces(text)
-      if (/(?:^|[{;\s])font-(?:stretch|width)\s*:/i.test(rules)) problems.push(`${href} sets font-stretch`)
-      if (/font-variation-settings\s*:[^;}]*["']wdth["']/i.test(rules)) problems.push(`${href} sets a wdth variation`)
-    }
+    for (const { href, text } of builtStylesheets(built(app))) problems.push(...widthProblems(withoutFontFaces(text)).map((problem) => `${href} ${problem}`))
     expect(problems).toEqual([])
+  })
+
+  // A guard on the rule above, with no build. lightningcss, which minifies
+  // every build here, folds `font-stretch` into the `font` shorthand when a
+  // rule sets every font longhand -- `font-stretch: 90%` as `90%`, and even
+  // `condensed` as `75%`, before the size -- and keeps a keyword written in
+  // the shorthand where the family is a var() (lightningcss 1.33.0, as Vite
+  // 8.3.3 resolves it, 2026-10-16). A rule reading the longhand alone missed
+  // all three. A family whose name holds a keyword, after the size, asks no
+  // width, and neither does a percentage that is the size.
+  test('the width rule reads the longhand, the variation and the font shorthand', () => {
+    expect(widthProblems('.a{font-weight:700;font-stretch:90%}')).toEqual(['sets font-stretch'])
+    expect(widthProblems(`.a{font-variation-settings:"wdth" 90}`)).toEqual(['sets a wdth variation'])
+    expect(widthProblems('.a{font:700 90% 1rem/1.2 Archivo}')).toEqual(['asks a width in the font shorthand, 700 90% 1rem/1.2 Archivo'])
+    expect(widthProblems('.a{font:italic 700 112.5% 2rem/1.1 Archivo,sans-serif}')).toEqual(['asks a width in the font shorthand, italic 700 112.5% 2rem/1.1 Archivo,sans-serif'])
+    expect(widthProblems('.b{font:700 condensed 2rem var(--display)}')).toEqual(['asks a width in the font shorthand, 700 condensed 2rem var(--display)'])
+    expect(widthProblems('.c{font:oblique 10deg Semi-Expanded 1rem x}')).toEqual(['asks a width in the font shorthand, oblique 10deg Semi-Expanded 1rem x'])
+    expect(widthProblems('.d{font:700 1rem Roboto Condensed}.e{font:90%/1.2 Archivo}.f{font:500 90% Archivo}.g{font:inherit}.h{font-family:var(--display);--font:condensed}')).toEqual([])
   })
 
   // One room, said once, as scripts/palette.test.mjs says it for the
