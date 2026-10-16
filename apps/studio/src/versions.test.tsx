@@ -9,6 +9,7 @@ import { createAdminClient } from './api.js'
 import type { AdminClient, Bundle } from './api.js'
 import { audit, focusedName, goTo, paragraphs, pressEnter, servedDocument, signIn } from './test-studio.js'
 import type { User } from './test-studio.js'
+import { orderBundle, publishReviewed, PUBLISHER_REQUIRED, readOnly } from './test-review.js'
 import { OWNER_SNAPSHOT, startPlane, TOKENS, withoutColumn } from './test-server.js'
 import { VersionsPanel } from './versions.js'
 import type { TestPlane } from './test-server.js'
@@ -279,6 +280,52 @@ describe('restoring a version', () => {
     expect((await within(versions).findByRole('status')).textContent).toMatch(/^Restored version 1 as version 3/)
     await within(drift).findByRole('region', { name: 'Version 3 of sales-order, against the database now' })
     expect(await audit()).toEqual([])
+  })
+
+  // Under review (0065) restoring stays one publisher's action, alone. An
+  // author is not offered it -- no version to choose, no button the server
+  // would refuse -- and is told why in the server's sentence; downloading
+  // a version is still theirs.
+  test('under review, offers an author no restore, and says why in the server’s words', async () => {
+    const reviewed = await startPlane({ review: true })
+    try {
+      await publishReviewed(reviewed, null, await orderBundle(reviewed))
+      await publishReviewed(reviewed, 1, await orderBundle(reviewed, readOnly(['auditor'])))
+      const user = await signIn(reviewed)
+      const drift = await goTo(user, 'Drift')
+      await user.type(within(drift).getByLabelText('Form id'), 'sales-order')
+      await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
+      const versions = await within(drift).findByRole('region', { name: 'Versions of sales-order' })
+      const restoring = await within(versions).findByRole('region', { name: 'Restore a version' })
+      expect(paragraphs(restoring)).toEqual([PUBLISHER_REQUIRED])
+      expect(within(restoring).queryByRole('button')).toBeNull()
+      expect(within(restoring).queryByRole('combobox')).toBeNull()
+      expect(await within(versions).findByRole('link', { name: 'Download version 2' })).toBeTruthy()
+      expect(await audit()).toEqual([])
+    } finally {
+      await reviewed.close()
+    }
+  })
+
+  // A publisher restores alone, with no draft and nobody else, which is
+  // the user's decision for 0065: a restore puts back what was reviewed
+  // before, and waiting for a second person is a cost when it is needed.
+  test('under review, lets a publisher restore alone', async () => {
+    const reviewed = await startPlane({ review: true })
+    try {
+      await publishReviewed(reviewed, null, await orderBundle(reviewed))
+      await publishReviewed(reviewed, 1, await orderBundle(reviewed, readOnly(['auditor'])))
+      const user = await signIn(reviewed, TOKENS.publisher)
+      const drift = await goTo(user, 'Drift')
+      await user.type(within(drift).getByLabelText('Form id'), 'sales-order')
+      await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
+      const versions = await within(drift).findByRole('region', { name: 'Versions of sales-order' })
+      await pressEnter(user, await within(versions).findByRole('button', { name: 'Restore version 1' }))
+      expect((await within(versions).findByRole('status')).textContent).toMatch(/^Restored version 1 as version 3/)
+      expect(await reviewed.store.versions('sales-order')).toEqual([1, 2, 3])
+    } finally {
+      await reviewed.close()
+    }
   })
 
   // A list that could not be read says so, in the client's words, rather

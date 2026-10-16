@@ -33,3 +33,39 @@ export function Change({ change, published }: { change: DriftChange; published: 
     </li>
   )
 }
+
+/**
+ * Changes, each a `Change`, under a heading of `level` named `heading`: what
+ * blocks a write, or what a write was allowed with -- an import, a draft
+ * submitted, a draft approved -- or `none` when a write was allowed with
+ * nothing to review. `id` names the list by its heading, so it is unique on
+ * the page.
+ */
+export function Changes({
+  changes,
+  published,
+  id,
+  heading,
+  level: Heading,
+  none,
+}: {
+  changes: readonly DriftChange[]
+  published: Published | null
+  id: string
+  heading: string
+  level: 'h3' | 'h4'
+  none?: string
+}): ReactElement | null {
+  if (changes.length === 0) return none === undefined ? null : <p>{none}</p>
+  return (
+    <>
+      <Heading id={id}>{heading}</Heading>
+      <ul aria-labelledby={id}>
+        {changes.map((change, index) => (
+          // A change is its subject and kind; the server's order is the order to read them in.
+          <Change key={index} change={change} published={published} />
+        ))}
+      </ul>
+    </>
+  )
+}

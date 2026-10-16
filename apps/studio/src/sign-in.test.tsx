@@ -90,6 +90,47 @@ describe('signing in', () => {
     expect(screen.queryByRole('navigation', { name: 'Steps' })).toBeNull()
   })
 
+  // Under review (0065) the steps an administrator sees depend on what the
+  // server refuses them, so the studio asks once the plane has let them in,
+  // and the workbench it opens is the reviewed one: Submit for Publish, and
+  // a Review step. A studio that did not ask would offer an author a
+  // Publish button the server refuses every time.
+  test('asks the server what the token may do, once the plane lets it in', async () => {
+    const reviewed = await startPlane({ review: true })
+    try {
+      await signIn(reviewed)
+      expect(reviewed.requests.map((request) => `${request.method} ${request.path}`)).toEqual(['GET /v1/whoami', 'GET /v1/connections', 'GET /v1/administration'])
+      const steps = within(screen.getByRole('navigation', { name: 'Steps' })).getAllByRole('button').map((button) => button.textContent)
+      expect(steps.slice(6)).toEqual(['7. Submit', '8. Drift', '9. Review'])
+      expect(await audit()).toEqual([])
+    } finally {
+      await reviewed.close()
+    }
+  })
+
+  // Not knowing whether the deployment reviews, the studio cannot know
+  // which steps work: a guess either way shows buttons the server refuses
+  // or hides a review step that is needed. So it does not sign in, says
+  // why in its own sentence and the client's, and shows who the token
+  // names, as for any other refusal after whoami.
+  test('refuses to sign in when the server does not say what the token may do', async () => {
+    const reviewed = await startPlane({ review: true })
+    try {
+      const user = userEvent.setup()
+      mount(async (input, init) => (String(input).endsWith('/v1/administration') ? Promise.reject(new TypeError('Failed to fetch')) : reviewed.fetch(input, init)))
+      await user.type(screen.getByLabelText('Host token'), TOKENS.publisher)
+      await user.click(screen.getByRole('button', { name: 'Sign in' }))
+      expect((await screen.findByRole('alert')).textContent).toBe(
+        'The server did not say what this token may do here, so the studio cannot tell which steps are yours: The data server could not be reached from this page.',
+      )
+      expect(identity(screen.getByRole('region', { name: 'Who this token names' }))).toEqual({ Actor: 'grace', Roles: 'data-publisher', tenant: '1' })
+      expect(screen.queryByRole('navigation', { name: 'Steps' })).toBeNull()
+      expect(await audit()).toEqual([])
+    } finally {
+      await reviewed.close()
+    }
+  })
+
   // A server started without the administrator plane answers 404 for it; the
   // studio says what that means rather than "not found". The 404 is the real
   // server's, started without the plane, not a body written here to look like it.

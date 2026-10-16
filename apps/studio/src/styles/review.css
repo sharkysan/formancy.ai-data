@@ -1,0 +1,91 @@
+/* ------------------------------------------------------------- review
+ *
+ * Publication under review (0065): the server's sentence for it on the steps
+ * that submit a draft, the queue of drafts waiting, and the draft open for
+ * review with its paper. Classes only: the open draft holds the paper, and a
+ * rule naming an element here would reach into it.
+ */
+
+/* What the server says of this deployment: its side of the room, teal at the edge. */
+.reviewed {
+  max-width: 72ch;
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.875rem;
+  border-inline-start: 3px solid var(--server);
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--server) 8%, transparent);
+  font-size: 0.875rem;
+}
+
+/* The queue and the open draft: glass panels, as a form's versions are. */
+.review {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 2%);
+}
+
+.review > h3 {
+  margin-top: 0;
+}
+
+/* A draft waiting is something a person decides on: violet, as what they act on. */
+.queue > ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queue > ul > li {
+  padding-inline-start: 0.75rem;
+  border-inline-start: 2px solid var(--client);
+}
+
+.queue > ul > li + li {
+  margin-top: 0.75rem;
+}
+
+.queue > ul > li > p {
+  margin: 0 0 0.375rem;
+  font-size: 0.875rem;
+}
+
+.review .described {
+  margin: 0.25rem 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* The paper on the panel, as on the bench, with room around it. */
+.draft .sheet {
+  margin: 1rem 0;
+}
+
+.draft .problem-box h4 {
+  margin: 0.5rem 0 0.25rem;
+}
+
+.draft .notice h4 {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+/* The draft's policy, in words: what approving it grants, below the paper and never on it. */
+.draft-policy h4 {
+  margin: 1rem 0 0.25rem;
+  font-size: 0.9375rem;
+}
+
+.draft-policy h5 {
+  margin: 0.5rem 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.draft-policy ul {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}

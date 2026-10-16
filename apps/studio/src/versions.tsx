@@ -107,17 +107,23 @@ function describeVersion(published: Published): string {
  * version the list was read with, so one published since is a conflict, not
  * a version silently replaced. It is configuration that comes back, never
  * the database.
+ *
+ * Under review (0065) a restore is a publisher's alone: for anybody else
+ * `refused` is the server's sentence, said where the restore would be.
  */
 export function VersionsPanel({
   client,
   formId,
   published = 0,
+  refused = null,
   onRestored,
 }: {
   client: AdminClient
   formId: string
   /** Changes when a version of this form was written from outside the panel -- an import -- so the list is read again. */
   published?: number
+  /** Why the server refuses this caller a restore, or `null` where it does not. */
+  refused?: string | null
   onRestored: () => void
 }): ReactElement {
   const [listed, setListed] = useState<Listed>({ state: 'reading' })
@@ -196,7 +202,9 @@ export function VersionsPanel({
       {listed.state !== 'read' ? null : (
         <section className="restore" aria-labelledby="restore-heading">
           <h4 id="restore-heading">Restore a version</h4>
-          {selected === null || newest === null ? (
+          {refused !== null ? (
+            <p className="none">{refused}</p>
+          ) : selected === null || newest === null ? (
             <p className="none">Only version {newest ?? 1} is published: there is nothing older to restore.</p>
           ) : (
             <>

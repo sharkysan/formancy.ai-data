@@ -4,6 +4,7 @@ import { createBuilderSession } from '@formancy/builder-core'
 import type { BuilderSession } from '@formancy/builder-core'
 import type { FormPolicy, MetadataSnapshot } from '@formancy/data-core'
 import type { Regeneration } from '@formancy/data-server'
+import { reviewedBy } from './api.js'
 import type { Failure, Proposal, ProposalRequest } from './api.js'
 import { asked, carriedAgain, carryDraft, decide } from './carry.js'
 import type { Carried } from './carry.js'
@@ -19,21 +20,30 @@ import { EMPTY_POLICY, pinsDiffer, withRequiredLookupPins } from './policy-model
 import { PresentationStep } from './presentation.js'
 import { PreviewStep } from './preview.js'
 import { PublishStep } from './publish.js'
+import { ReviewStep } from './review.js'
 import type { SignedIn } from './sign-in.js'
 
-type StepId = 'connect' | 'choose' | 'generate' | 'policy' | 'presentation' | 'preview' | 'publish' | 'drift'
+type StepId = 'connect' | 'choose' | 'generate' | 'policy' | 'presentation' | 'preview' | 'publish' | 'drift' | 'review'
 
-/** The journey of plan section 3, in its order. Signing in is the step before these. */
-const STEPS: ReadonlyArray<{ id: StepId; title: string }> = [
-  { id: 'connect', title: 'Connect' },
-  { id: 'choose', title: 'Choose' },
-  { id: 'generate', title: 'Generate' },
-  { id: 'policy', title: 'Policy' },
-  { id: 'presentation', title: 'Presentation' },
-  { id: 'preview', title: 'Preview' },
-  { id: 'publish', title: 'Publish' },
-  { id: 'drift', title: 'Drift' },
-]
+/**
+ * The journey of plan section 3, in its order. Signing in is the step before
+ * these. Under review (0065) nobody publishes directly: the Publish step
+ * submits a draft and is called Submit, and the Review step, last, is where
+ * drafts are approved, rejected and withdrawn.
+ */
+function stepsOf(review: boolean): ReadonlyArray<{ id: StepId; title: string }> {
+  return [
+    { id: 'connect', title: 'Connect' },
+    { id: 'choose', title: 'Choose' },
+    { id: 'generate', title: 'Generate' },
+    { id: 'policy', title: 'Policy' },
+    { id: 'presentation', title: 'Presentation' },
+    { id: 'preview', title: 'Preview' },
+    { id: 'publish', title: review ? 'Submit' : 'Publish' },
+    { id: 'drift', title: 'Drift' },
+    ...(review ? [{ id: 'review' as const, title: 'Review' }] : []),
+  ]
+}
 
 interface Discovered {
   connection: string
@@ -68,7 +78,8 @@ interface Generated {
  * nothing.
  */
 export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignOut: () => void }): ReactElement {
-  const { client, identity, connections } = signedIn
+  const { client, identity, connections, administration } = signedIn
+  const steps = stepsOf(administration.review)
   const [current, setCurrent] = useState<StepId>('connect')
   const [discovered, setDiscovered] = useState<Discovered | null>(null)
   const [chosen, setChosen] = useState<Chosen | null>(null)
@@ -93,6 +104,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     preview: generated === null ? 'after a form is generated' : null,
     publish: generated === null ? 'after a form is generated' : null,
     drift: null,
+    review: null,
   }
 
   function discovering(): void {
@@ -187,7 +199,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     setGenerated((previous) => (previous === null || previous.carried === null ? previous : { ...previous, carried: { ...previous.carried, version: null } }))
   }
 
-  const title = STEPS.find((entry) => entry.id === current)?.title ?? ''
+  const title = steps.find((entry) => entry.id === current)?.title ?? ''
   const stale = generated !== null && pinsDiffer(generated.request.pinned, policy.rowFilters)
 
   function body(): ReactElement | null {
@@ -204,7 +216,9 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
           />
         )
       case 'drift':
-        return <DriftStep client={client} formId={publishedId ?? generated?.request.formId ?? ''} onRegenerated={takeUp} />
+        return <DriftStep client={client} formId={publishedId ?? generated?.request.formId ?? ''} refuses={administration.refuses} onRegenerated={takeUp} />
+      case 'review':
+        return <ReviewStep client={client} me={identity.actor.id} />
       case 'choose':
         return discovered === null ? null : (
           <ChooseStep
@@ -258,8 +272,10 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             regeneratedFrom={carried?.version ?? null}
             undecided={open.map((entry) => entry.field)}
             confirmed={carried?.kept ?? []}
+            review={reviewedBy(administration.refuses, 'publish')}
             onPublished={published}
             onDrift={() => setCurrent('drift')}
+            onReview={() => setCurrent('review')}
           />
         )
     }
@@ -283,7 +299,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         </section>
         <nav aria-label="Steps">
           <ol className="steps">
-            {STEPS.map((entry, index) => {
+            {steps.map((entry, index) => {
               const reason = waiting[entry.id]
               return (
                 <li key={entry.id}>
