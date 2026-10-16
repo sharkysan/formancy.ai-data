@@ -17,12 +17,18 @@
 //     measurements, run here where they can be measured;
 //   - every web font the built page asks for had loaded by the end of each
 //     pass, and in the pass that refuses them, none had (0058): a state
-//     measured before a late family swapped in is not caught.
+//     measured before a late family swapped in is not caught;
+//   - the page is the demo formancy.ai serves (0069): under the path its
+//     Worker is routed at, with the headers its deploy writes, the browser
+//     refused nothing under the Content-Security-Policy, the console said
+//     nothing went wrong, the page fetched nothing but its own files and
+//     the web fonts, and an inline script put in the page was refused and
+//     heard -- so a pass under a policy nobody enforced fails.
 //
-// Against the page `vite build` produces, served over HTTP -- not the dev
-// server, which is a different program with its own transforms. Asserted as
-// numbers and computed results, never screenshots: a pixel baseline is a file
-// somebody updates when it goes red.
+// Against the page `vite build` produces, served over HTTP as formancy.ai
+// serves it -- not the dev server, which is a different program with its
+// own transforms. Asserted as numbers and computed results, never
+// screenshots: a pixel baseline is a file somebody updates when it goes red.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
 // scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
@@ -38,10 +44,21 @@ import { dirname, extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
 import { afterEveryPass } from '../../../scripts/browser-gate.mjs'
+import { demoBase, readDemoConfig } from '../../../scripts/demo.mjs'
+import { contentSecurityPolicy, headerRules, headersFile, headersFor, parseHeadersFile } from '../../../scripts/demo-headers.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(app, 'dist')
+
+/** The path formancy.ai serves the page under, read from the demo's Worker config: `/data/examples/`. */
+const BASE = demoBase(readDemoConfig())
+
+/** The headers the demo's deploy writes, read back from the `_headers` file's own text. */
+const HEADERS = parseHeadersFile(headersFile(headerRules(BASE)))
+
+/** Google Fonts, the one place the page may fetch from besides its own path. */
+const FONTS = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -50,10 +67,15 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2',
+  '.txt': 'text/plain; charset=utf-8',
 }
 
 /**
- * The built page over HTTP, on a port the operating system picks.
+ * The built page over HTTP, on a port the operating system picks, as
+ * formancy.ai serves it (0069): under BASE, each answer with the headers
+ * the deploy's `_headers` gives its path; the path without its slash sent
+ * to BASE, as the Worker's `auto-trailing-slash` sends it; and nothing
+ * outside BASE, which formancy.ai answers from its own site.
  *
  * Hand-rolled rather than `vite preview`, as upstream's is: what is checked is
  * what a host serves.
@@ -61,9 +83,17 @@ const TYPES = {
 function serve(directory) {
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost')
+    if (url.pathname === BASE.slice(0, -1)) {
+      response.writeHead(307, { location: BASE }).end()
+      return
+    }
+    if (!url.pathname.startsWith(BASE)) {
+      response.writeHead(404, { 'content-type': 'text/plain' }).end(`no ${url.pathname}: the demo is ${BASE}`)
+      return
+    }
     // `normalize` then a prefix check: a path with `..` in it must not leave
     // the directory, even on a server only this script talks to.
-    let file = join(directory, normalize(decodeURIComponent(url.pathname)))
+    let file = join(directory, normalize(decodeURIComponent(url.pathname.slice(BASE.length))))
     if (!file.startsWith(directory)) {
       response.writeHead(403).end()
       return
@@ -73,7 +103,7 @@ function serve(directory) {
       response.writeHead(404, { 'content-type': 'text/plain' }).end(`no ${url.pathname}`)
       return
     }
-    response.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' })
+    response.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', ...headersFor(HEADERS, url.pathname) })
     createReadStream(file).pipe(response)
   })
   return new Promise((ready) => {
@@ -212,13 +242,28 @@ const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.mi
  * with nothing measured, which is exactly the state this gate replaces. An
  * element axe could not decide the contrast of is a contrast nobody measured,
  * so it fails too.
+ *
+ * axe arrives through Playwright's evaluate, not a script element: the
+ * page's policy refuses an inline script, as it should, and what Playwright
+ * evaluates is the harness's code, run by the browser, not the page's
+ * (0069). axe builds a few functions from strings as it loads, inside that
+ * evaluation, where the browser does not ask the page's policy; that it
+ * builds none as it runs is held by every pass's violation check.
  */
 async function audit(page, target) {
-  if (!(await page.evaluate(() => 'axe' in window))) await page.addScriptTag({ content: AXE })
+  if (!(await page.evaluate(() => 'axe' in window))) await page.evaluate(`${AXE}\n;undefined`)
   const subject = target ?? (await page.evaluateHandle(() => document))
-  // Runs in the page, so it closes over nothing.
+  // Runs in the page, so it closes over nothing. No preload: by default axe
+  // fetches every cross-origin stylesheet to read its rules, which the
+  // page's connect-src refuses, so each audit was three violations of axe's
+  // own. Measured on 2026-10-16 in Chromium, over the built page: the
+  // preload fetched Google Fonts' stylesheet alone, and without it every
+  // rule's passes, violations, incompletes and inapplicables were the same.
+  // The two rules that ask for it are css-orientation-lock, experimental
+  // and outside the tags, and no-autoplay-audio, for media the page has none
+  // of.
   return subject.evaluate(async (context, tags) => {
-    const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags } })
+    const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, preload: false })
     const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
     return {
       axe: window.axe.version,
@@ -245,6 +290,46 @@ async function failSubmit(page) {
   )
 }
 
+/**
+ * What the page's document hears of its policy, from before its first
+ * script: every `securitypolicyviolation`, kept on the window for the gate
+ * to read. A violation is what the browser refused, and so something the
+ * page meant to do and could not under the headers formancy.ai sends.
+ */
+function hearViolations(page) {
+  return page.addInitScript(() => {
+    const heard = []
+    Object.defineProperty(window, '__formancyGateViolations', { value: heard })
+    document.addEventListener(
+      'securitypolicyviolation',
+      (event) => heard.push(`${event.effectiveDirective} refused ${event.blockedURI || 'something inline'} (${event.sourceFile || 'the page'}:${String(event.lineNumber)})`),
+      true,
+    )
+  })
+}
+
+/**
+ * The guard on that guard, at the end of a pass: an inline script put in
+ * the page, which the policy refuses. A pass in which it ran measured a page
+ * under no policy; one in which the browser refused it and the page heard
+ * nothing measured with a listener that hears nothing. Either way the
+ * violation check before it proved nothing, so this fails.
+ */
+async function canary(page) {
+  return page.evaluate(async () => {
+    const heard = window.__formancyGateViolations ?? []
+    const before = heard.length
+    const script = document.createElement('script')
+    script.textContent = 'window.__formancyGateCanary = true'
+    document.head.append(script)
+    script.remove()
+    // The report is queued as a task of its own. Two seconds is long past
+    // it, and is waited for only when nothing is heard.
+    for (let waited = 0; heard.length === before && waited < 2000; waited += 50) await new Promise((settle) => setTimeout(settle, 50))
+    return { ran: window.__formancyGateCanary === true, heard: heard.length - before }
+  })
+}
+
 /** Playwright, for recordedPerBrowser to launch each browser with: the one import of playwright, here where the app declares it. */
 async function load() {
   try {
@@ -261,7 +346,7 @@ async function run(gate, browser) {
   }
 
   const { server, port } = await serve(dist)
-  const url = `http://127.0.0.1:${String(port)}/`
+  const url = `http://127.0.0.1:${String(port)}${BASE}`
 
   const { check } = gate
   const sideways = (state, measured) => {
@@ -283,9 +368,31 @@ async function run(gate, browser) {
     for (const { label, width, refuseFonts = false } of list) {
       gate.pass({ label, width })
       const page = await browser.newPage({ viewport: { width, height: 900 } })
-      if (refuseFonts) await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort())
-      await page.goto(url, { waitUntil: 'load' })
+      if (refuseFonts) await page.route(FONTS, (route) => route.abort())
+      // What the page fetched, said and threw, from its first request. A
+      // request this pass refuses to Google Fonts fails in the console, and
+      // is the pass's doing, not the page's.
+      const elsewhere = new Set()
+      const said = []
+      page.on('request', (request) => {
+        const address = request.url()
+        if (!address.startsWith(url) && !/^(blob|data):/.test(address) && !FONTS.test(address)) elsewhere.add(address)
+      })
+      page.on('console', (message) => {
+        const text = message.text()
+        const refused = refuseFonts && FONTS.test(message.location()?.url ?? '')
+        if ((message.type() === 'error' && !refused) || /content[- ]security[- ]policy|permissions[- ]policy/i.test(text)) said.push(`${message.type()}: ${text.slice(0, 160)}`)
+      })
+      page.on('pageerror', (error) => said.push(`uncaught: ${error.message.slice(0, 160)}`))
+      await hearViolations(page)
+      const response = await page.goto(url, { waitUntil: 'load' })
       console.log(`\n${label} -- ${String(width)}x900`)
+
+      // The page as formancy.ai sends it, or every check of the policy below
+      // is a check of a page sent with none.
+      const sent = response?.headers() ?? {}
+      const unsent = Object.entries(headersFor(HEADERS, BASE)).filter(([name, value]) => sent[name.toLowerCase()] !== value)
+      check(`the page at ${BASE} was sent with the demo's headers`, unsent.length === 0 ? null : `not as the deploy writes them: ${unsent.map(([name]) => name).join(', ')}`)
 
       // The page is what is measured, so first that it is all there: a preview
       // whose renderer did not start would make every number below smaller.
@@ -325,6 +432,18 @@ async function run(gate, browser) {
       await failSubmit(page)
       sideways('after a failed submit', await measureWidth(page))
       audited('after a failed submit', await audit(page))
+
+      // Everything the page did in this pass, under the headers it was sent:
+      // what the policy refused, what the console said, what it fetched.
+      const violations = await page.evaluate(() => [...(window.__formancyGateViolations ?? [])])
+      check('the browser refused nothing under the page’s Content-Security-Policy', violations.length === 0 ? null : violations.slice(0, 4).join('; '))
+      check('the console reported no error and the page threw none', said.length === 0 ? null : said.slice(0, 4).join('; '))
+      check(`the page fetched nothing but its own files under ${BASE} and the web fonts`, elsewhere.size === 0 ? null : [...elsewhere].slice(0, 4).join(', '))
+      const probe = await canary(page)
+      check(
+        'and the policy held: an inline script put in the page was refused, and the page heard the refusal',
+        probe.ran ? `it ran, so the page was measured under no policy, not ${contentSecurityPolicy().slice(0, 32)}…` : probe.heard === 0 ? 'refused, and heard by nothing, so the check above heard nothing either' : null,
+      )
 
       // Whether every web font had loaded by the end of the pass, or, where it refuses them, none had.
       await afterEveryPass(gate, page, { dist, refused: refuseFonts })

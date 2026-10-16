@@ -395,7 +395,7 @@
       ]
     },
     "0021": {
-      "reviewed": "sha256:9c3435c4c0631707f967c81d2da0ded5fbe9b532c7545626c17c9758f9f2bf9e",
+      "reviewed": "sha256:9fdc2f63f59d1c4f72112a780a7698b659bf2a675e0f6f66b6ad98950a364079",
       "limitations": [
         {
           "area": "forms",
@@ -1296,7 +1296,7 @@
       ]
     },
     "0046": {
-      "reviewed": "sha256:bc6e4fd4ff2cfae13de07b795e999fd8dc16a8d721e79271aeac6e7a991d0e3e",
+      "reviewed": "sha256:3171bf9e2f198de27e13c3696175eebc994b781185bad50513f838047a8e6afb",
       "limitations": [
         {
           "area": "licence",
@@ -2146,6 +2146,43 @@
         {
           "area": "studio",
           "says": "The regeneration report does not say that a republish changes a lookup's control."
+        }
+      ]
+    },
+    "0069": {
+      "reviewed": "sha256:9d23545e0e4c3a436aec71c260f659ff02674fd9f563ea2e3e9244f8faa69580",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The demo at formancy.ai/data/examples/ is the examples page as main holds it, deployed by Cloudflare on every push without waiting for that commit's CI, so it can show what no release has published."
+        },
+        {
+          "area": "operations",
+          "says": "Nothing in this repository reads what formancy.ai/data/examples/ serves: a failed deploy leaves the last one serving with its log in Cloudflare's dashboard, and the headers are applied as Cloudflare documents its _headers file, which was not measured against Cloudflare."
+        },
+        {
+          "area": "operations",
+          "says": "The demo Worker's build settings are in Cloudflare's dashboard, where nothing here reads them; a test holds only what .github/REPO-METADATA.md records of them."
+        },
+        {
+          "area": "operations",
+          "says": "A visitor's browser asks Google for the demo's fonts, and its Content-Security-Policy names Google's two hosts, so fonts Google moves to another host are refused, and the page drawn in its fallback stack, until the policy is edited."
+        },
+        {
+          "area": "licence",
+          "says": "The demo's THIRD-PARTY-NOTICES.txt names the exact version of every package the examples page bundles, to anyone, and the repository's own LICENSE.md and NOTICE are reached through the page's link to the repository, not served beside it."
+        },
+        {
+          "area": "testing",
+          "says": "The data: images the demo's policy allows are drawn only by Safari on a touch device, which no browser gate runs, so that allowance is held by deriving it from the stylesheets, not by a browser."
+        },
+        {
+          "area": "testing",
+          "says": "The examples gate audits with axe's preload off, which was measured to change no rule's outcome on the page on 2026-10-16, and would audit less a page that gained media or a cross-origin stylesheet a rule reads."
+        },
+        {
+          "area": "testing",
+          "says": "The examples gate fails on any console error in any browser, so a browser release that logs a new one fails it until someone reads why."
         }
       ]
     }

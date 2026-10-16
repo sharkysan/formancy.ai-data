@@ -44,6 +44,25 @@ later.
   Review step lists the drafts, draws one on white paper, says in words
   the policy approving it grants, and approves, rejects or withdraws it as
   the server allows.
+- **The examples page is online, at https://formancy.ai/data/examples/.**
+  Until now it ran only from a clone, and an evaluator without one had the
+  README's picture and nothing to try. It needs no server and no database,
+  so a Cloudflare Worker of its own serves the built page as static files,
+  with no code, routed at that path of formancy.ai and nowhere else;
+  `/data` itself stays formancy.ai's, for the product's page. Workers Builds
+  deploys it from `main` on every push, as formancy.ai-report's Studio is
+  deployed at `/report/`; GitHub holds no Cloudflare token. `pnpm demo`
+  serves the same build from a clone, and `pnpm demo:deploy` deploys it by
+  hand
+  ([0069](docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
+- **The demo is sent with a strict Content-Security-Policy**, so a script
+  injected into it would not run: nothing inline, nothing evaluated, the
+  page's own files and Google's fonts and no other host, no form sent
+  anywhere and no page framing it; with `nosniff`, `no-referrer`, a
+  Permissions-Policy that denies what the page does not use, and a year's
+  cache for the hashed chunks alone. The headers are one module that the
+  deploy writes as Cloudflare's `_headers` file and the browser gate serves
+  the page with.
 
 ### Changed
 
@@ -58,6 +77,18 @@ later.
   which a store of your own must provide, and `AdminAuditEvent` has
   `draft` and the administration and draft operations. `createDataServer`
   takes `admin.publisherRoles`.
+- **The examples page is built with a relative base**, so one build is
+  right at the root of `vite preview` and under `/data/examples/`, and it
+  writes `THIRD-PARTY-NOTICES.txt` as the studio and the host page do,
+  because it is now served to anyone (0046). Its header says that no server
+  and no database are behind it, and links this repository.
+- **The examples browser gate serves the page where the demo is**, under
+  `/data/examples/` with the demo's headers, and fails on anything the
+  browser refuses under the policy, on any console error, on a fetch from
+  anywhere but the page's path and Google Fonts, and when an inline script
+  put in the page runs or goes unheard. Its axe audits run without axe's
+  preload, which fetched Google's stylesheet against the policy and, as
+  measured, changed no rule's outcome on the page.
 
 What review costs, in 0065: every submit and approval asks the database, so
 one that cannot be reached refuses both; nothing deletes a draft; nobody is
@@ -103,6 +134,12 @@ into, and asks again only when the form is drawn again; a version
 published before it with a lookup no label can spell still cannot list
 it until regenerated; and the regeneration report does not say that a
 control changed.
+
+What the demo costs, in 0069: it is main's page, deployed without waiting
+for that commit's CI; its build settings are in Cloudflare's dashboard,
+and nothing here reads them or what the address serves; a visitor's
+browser asks Google for the fonts; and the policy names Google's hosts, so
+fonts that move are refused until it is edited.
 
 ## 0.1.0 — 2026-10-16
 

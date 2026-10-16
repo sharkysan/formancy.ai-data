@@ -1,6 +1,6 @@
 # 0021 — Generated forms are previewed in both frameworks, generated in the browser from a captured snapshot
 
-- **Status:** accepted; its lookup bullet narrowed by [0029](0029-a-host-renders-a-published-form-through-one-client.md); extended by [0058](0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md): the gate runs in Chromium, Firefox and Linux WebKit, and a pass that does not refuse the web fonts fails when one does not arrive
+- **Status:** accepted; its lookup bullet narrowed by [0029](0029-a-host-renders-a-published-form-through-one-client.md); extended by [0058](0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md): the gate runs in Chromium, Firefox and Linux WebKit, and a pass that does not refuse the web fonts fails when one does not arrive; extended by [0069](0069-the-examples-page-is-served-at-formancy-ai-data-examples.md): the page is online at formancy.ai/data/examples/, and its gate serves it there, under the headers the deploy writes
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `apps/examples/src/previews.test.tsx` — for `sales.order` and

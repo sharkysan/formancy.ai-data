@@ -174,6 +174,27 @@ h1 {
   color: var(--text);
 }
 
+/* What the page is, for a visitor who reached it without the README. */
+.standing {
+  max-width: 72ch;
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* What a person acts on is violet: here the link's underline, under text as
+   bright as the page's own, strengthened on hover as the nav's border is. */
+.standing a {
+  color: var(--text);
+  text-decoration-color: color-mix(in srgb, var(--client) 55%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.2em;
+}
+
+.standing a:hover {
+  text-decoration-color: var(--client);
+}
+
 .masthead nav ul {
   display: flex;
   flex-wrap: wrap;

@@ -34,6 +34,13 @@ afterEach(cleanup)
 
 const EXAMPLES = generateExamples(FIXTURE_SNAPSHOT)
 
+/** The repository, as data-core's manifest names it for npm's provenance: `git+https://….git` read as the page's address. */
+const REPOSITORY = (
+  JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'packages', 'data-core', 'package.json'), 'utf8')) as {
+    repository: { url: string }
+  }
+).repository.url.replace(/^git\+/, '').replace(/\.git$/, '')
+
 function tableOf(subject: Example): string {
   return `${subject.request.root.schema}.${subject.request.root.name}`
 }
@@ -138,6 +145,19 @@ describe('the generator says what it chose, beside each form', () => {
   test('names the server the snapshot was captured from', async () => {
     await mounted()
     expect(screen.getByRole('banner').textContent).toContain(`PostgreSQL ${FIXTURE_SNAPSHOT.serverVersion}`)
+  })
+
+  // The page is online at formancy.ai/data/examples/ (0069), where a visitor
+  // arrives without the README. Before they type into a form it says that
+  // nothing is behind it -- a Validate that answers would otherwise read as
+  // a product that saved -- and where its source is, at the address the
+  // packages' manifests give, so the link moves when the repository does.
+  test('says in its header that no server and no database are behind it, and links the repository', async () => {
+    await mounted()
+    const banner = screen.getByRole('banner')
+    expect(paragraphs(banner).join('\n')).toMatch(/no server and no database/)
+    const link = within(banner).getByRole('link', { name: 'sharkysan/formancy.ai-data' })
+    expect(link.getAttribute('href')).toBe(REPOSITORY)
   })
 })
 
