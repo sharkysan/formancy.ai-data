@@ -24,11 +24,18 @@ const answer = (entry) => {
 const ran = (image) => (image.callers.length === 0 ? 'a file no record names' : prose(image.callers.map(code)))
 const answered = (image) => `${code(image.image)} (${prose(image.tested.map(answer))})`
 
+/** The files that started any of `images`, each once: who ran on the images outside the matrix. */
+function filesOf(images) {
+  const files = [...new Set(images.flatMap((image) => image.callers))].map(code)
+  return prose(images.some((image) => image.callers.length === 0) ? [...files, 'a file no record names'] : files)
+}
+
 /**
  * What the matrix's other images ran (0067), from their servers' records:
- * for each group of images the same suites ran on, those suites and what
- * each image answered; and every image of the matrix nothing ran on. Each
- * clause begins `; `.
+ * for each group of images the same suites ran on in their own legs, those
+ * suites and what each image answered; every image of the matrix that no
+ * leg of its own ran on but a file of another leg did, with that file; and
+ * every image of the matrix nothing ran on. Each clause begins `; `.
  */
 function matrixClauses(images) {
   const groups = new Map()
@@ -38,40 +45,51 @@ function matrixClauses(images) {
   }
   const clauses = [...groups].map(([who, ranOn]) => `; ${who} also ran on ${prose(ranOn.map(answered))}`)
   const none = images.filter((entry) => entry.tested.length === 0)
-  if (none.length > 0) clauses.push(`; no test ran on ${prose(none.map((entry) => code(entry.image)))}, ${none.length === 1 ? 'an image' : 'images'} of the matrix`)
+  for (const image of none.filter((entry) => (entry.aside?.tested ?? []).length > 0)) {
+    clauses.push(`; no leg of the matrix ran on ${code(image.image)}, though the tests in ${prose(image.aside.callers.map(code))} did (${prose(image.aside.tested.map(answer))})`)
+  }
+  const nothing = none.filter((entry) => (entry.aside?.tested ?? []).length === 0)
+  if (nothing.length > 0) clauses.push(`; no test ran on ${prose(nothing.map((entry) => code(entry.image)))}, ${nothing.length === 1 ? 'an image' : 'images'} of the matrix`)
   return clauses.join('')
 }
 
 /**
- * The sentence each engine gets: what its default image answered, what the
- * other images of its matrix ran and answered, every image outside the
- * matrix and the files that named it, and the composed stack. A default or
- * an image of the matrix that never answered fails the run; what the tests
- * ran on instead is still said. An image outside the matrix is what the file
- * that names it showed, never a version the release was tested on (0067
- * narrows 0003), and is said so.
+ * The sentences each engine gets. First what its default image answered,
+ * what the other images of its matrix ran and answered, the files whose
+ * tests ran elsewhere, and the composed stack, ending that no other version
+ * was tested when any of those was. Then one sentence for each image outside
+ * the matrix: what it answered, the files that named it, and that the
+ * release was not tested on it -- after the tested ones, because named
+ * before "No other version … was tested" it would read as one of them (0067
+ * narrows 0003). A default or an image of the matrix that never answered
+ * fails the run; what the tests ran on instead is still said.
  */
-function engineSentence(engine) {
+function engineSentences(engine) {
   const name = engineName(engine.engine)
   const fallback = engine.images.find((image) => image.default)
   const matrix = engine.images.filter((image) => image.matrix && !image.default)
   const others = engine.images.filter((image) => !image.matrix && image.tested.length > 0)
-  const outside = (image) => `${answered(image)}, an image outside the matrix that only ${image.callers.length === 1 ? 'that file names' : 'those files name'}`
+  const away = `the tests in ${filesOf(others)}`
+  const outsideImages = `${others.length === 1 ? 'an image' : 'images'} outside the matrix`
   const any = (fallback?.tested.length ?? 0) > 0
   let sentence
   if (any) {
     sentence = `Every ${name} test ran on ${code(fallback.image)}, which answered ${prose(fallback.tested.map(answer))} in this run`
-    for (const other of others) sentence += `, except the tests in ${ran(other)}, which ran on ${outside(other)}`
+    if (others.length > 0) sentence += `, except ${away}, which ran on ${outsideImages}`
   } else if (others.length > 0) {
-    sentence = `No ${name} test ran on the default ${code(engine.defaultImage)} in this run; ${others.map((other) => `the tests in ${ran(other)} ran on ${outside(other)}`).join('; ')}`
+    sentence = `No ${name} test ran on the default ${code(engine.defaultImage)} in this run; ${away} ran on ${outsideImages}`
   } else sentence = `No ${name} server answered a test in this run`
   sentence += matrixClauses(matrix)
   const composed = engine.images.filter((entry) => entry.composed.length > 0)
   for (const image of composed) {
     sentence += `; the getting-started job ran ${code(image.image)} through compose, which answered ${prose([...new Set(image.composed.map((entry) => entry.version))])}`
   }
-  const tested = any || others.length > 0 || composed.length > 0 || matrix.some((image) => image.tested.length > 0)
-  return tested ? `${sentence}. No other version, edition or managed service was tested.` : `${sentence}.`
+  const tested = any || composed.length > 0 || matrix.some((image) => image.tested.length > 0)
+  const outside = others.map(
+    (other) =>
+      `${answered(other)} is outside the matrix: only the tests in ${ran(other)} ran on it, and they show what ${other.callers.length === 1 ? 'that file shows' : 'those files show'}; this release was not tested on it.`,
+  )
+  return [tested ? `${sentence}. No other version, edition or managed service was tested.` : `${sentence}.`, ...outside]
 }
 
 /** The snapshots an app's files hold, as "PostgreSQL 17.11 and SQL Server 16.0.4295.3". */
@@ -130,7 +148,7 @@ function systemSentences(gates) {
 export function derivedLimitations(report) {
   const { testedOn, results, browserMatrix } = report
   const all = testedOn.engines.map((engine) => engine.engine)
-  const sentences = testedOn.engines.map(engineSentence)
+  const sentences = testedOn.engines.flatMap(engineSentences)
 
   sentences.push(
     testedOn.browsers.length === 0
@@ -248,7 +266,7 @@ function testedOnSection({ testedOn, results }) {
       prose(image.answers.map(answer)) || 'never answered',
       [...new Set(image.answers.map((entry) => entry.digest).filter((digest) => digest !== null))].map(code).join(', '),
       prose(image.startedBy.map((entry) => (entry.package === null ? entry.job : `${entry.package} (${entry.job})`))),
-      image.default ? '' : image.callers.map(code).join(', '),
+      image.default ? '' : [...new Set([...image.callers, ...(image.aside?.callers ?? [])])].map(code).join(', '),
     ]),
   )
   return [

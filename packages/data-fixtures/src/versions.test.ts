@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import { imageMajor, MATRIX_IMAGES } from './images.js'
@@ -12,6 +12,27 @@ import { serverMajor, VERSION_FACTS, versionFact } from './versions.js'
  * version is the test each row names, run on every leg of the matrix.
  */
 const REPO = fileURLToPath(new URL('../../../', import.meta.url))
+
+/** A single-quoted string literal on one line, its contents captured. */
+const LITERAL = String.raw`'((?:[^'\\\n]|\\.)*)'`
+
+/**
+ * Whether `title` is a test's or a describe's title in `source`: a literal
+ * that opens a call's arguments, or such a literal with one `%s`, as
+ * `describe.each` and `test.each` write a title, whose gap is another literal
+ * of the file.
+ */
+function titled(source: string, title: string): boolean {
+  const titles = [...source.matchAll(new RegExp(String.raw`\(\s*${LITERAL}`, 'g'))].map((match) => match[1] ?? '')
+  if (titles.includes(title)) return true
+  const literals = new Set([...source.matchAll(new RegExp(LITERAL, 'g'))].map((match) => match[1] ?? ''))
+  return titles.some((template) => {
+    const parts = template.split('%s')
+    if (parts.length !== 2) return false
+    const [before = '', after = ''] = parts
+    return title.length >= before.length + after.length && title.startsWith(before) && title.endsWith(after) && literals.has(title.slice(before.length, title.length - after.length))
+  })
+}
 
 const record = (engine: ServerRecord['engine'], version: string): ServerRecord => ({
   engine,
@@ -60,20 +81,34 @@ describe('VERSION_FACTS', () => {
   // the lookup above; held here too, so the matrix and the table move
   // together without a run. SQL Server's tags name a year, which
   // SQLSERVER_RELEASES turns into the major its server answers (imageMajor).
+  // A source or a measurement left empty is a value nobody can check, which
+  // the type alone lets through.
   test('gives each fact a value, a source and a measurement for the major of every image of its engine’s matrix', () => {
     for (const [name, fact] of Object.entries(VERSION_FACTS)) {
+      expect(fact.source.trim(), `${name}'s source`).not.toBe('')
       for (const major of MATRIX_IMAGES[fact.engine].map((image) => imageMajor(fact.engine, image))) {
         expect(typeof fact.values[major], `${name} on ${String(major)}`).toBe('boolean')
-        expect(fact.measured[major], `${name} on ${String(major)}`).toEqual(expect.any(String))
+        expect(fact.measured[major]?.trim() ?? '', `${name} on ${String(major)}`).not.toBe('')
       }
     }
   })
 
-  // A row whose test is gone, or renamed, is a sentence no leg holds.
-  test('names, for each fact, a test file that exists', () => {
-    for (const [name, fact] of Object.entries(VERSION_FACTS)) expect(existsSync(`${REPO}${fact.heldBy.file}`), `${name}: ${fact.heldBy.file}`).toBe(true)
+  // A row whose test is gone, or renamed, is a sentence no leg holds: the
+  // file is read, and the test's title must be one of its titles -- a
+  // literal opening a call, as `test(` and `describe(` take it, or a `%s`
+  // title of `.each` with one of the file's literals in its place. What it
+  // cannot show is that the test asserts the fact; review holds that.
+  test('names, for each fact, a test file that exists and a test that file has', () => {
+    for (const [name, fact] of Object.entries(VERSION_FACTS)) {
+      const file = `${REPO}${fact.heldBy.file}`
+      expect(existsSync(file), `${name}: ${fact.heldBy.file}`).toBe(true)
+      expect(titled(readFileSync(file, 'utf8'), fact.heldBy.test), `${name}: ${fact.heldBy.file} has no test "${fact.heldBy.test}"`).toBe(true)
+    }
   })
 
+  // The value is the major's, not the image's or the engine's: a lookup by
+  // tag, or by the other engine's major, would hold a leg to another
+  // version's value, and a 16 leg would assert 17's timeout.
   test('answers each value by the major the server answered', () => {
     expect(versionFact('transactionTimeout', record('postgres', '16.15'))).toBe(false)
     expect(versionFact('transactionTimeout', record('postgres', '17.11'))).toBe(true)

@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { beforeAll, describe, expect, test } from 'vitest'
 import { coveredPackages } from './codecov-config.mjs'
@@ -82,4 +82,46 @@ describe('the image legs', () => {
     const turbo = JSON.parse(readFileSync(join(root, 'turbo.json'), 'utf8'))
     for (const task of ['test', 'test:coverage']) expect(turbo.tasks[task].env ?? [], task).toContain(IMAGES_VARIABLE)
   })
+
+  // That hash gives FORMANCY_IMAGES to every package's `test`, and a start
+  // that names no image follows it. The server, client, host, studio and
+  // performance suites stay on the defaults (0067): a bare start in one of
+  // them would move it with a contributor's variable -- the host's test
+  // plane fills its tables with GENERATE_SERIES, which 2019 has not -- and
+  // its records would say an image no leg runs that suite on. Read from the
+  // code: a call of a starter with no argument, in a package no leg runs.
+  test('are the only suites whose starts follow FORMANCY_IMAGES: every other start names its image', () => {
+    const legged = new Set(imageMatrix(readWorkflow(root)).map((leg) => leg.package))
+    const starts = []
+    for (const entry of workspacePackages().filter((candidate) => !legged.has(candidate.name))) {
+      for (const file of sourceFiles(join(root, entry.path))) {
+        const text = readFileSync(file, 'utf8')
+        for (const match of text.matchAll(/\bstart(?:Postgres|SqlServer)(?:Fixture|Container)\((\s*\))?/g)) {
+          starts.push({ at: `${relative(root, file).replaceAll('\\', '/')}:${String(text.slice(0, match.index).split('\n').length)}`, bare: match[1] !== undefined })
+        }
+      }
+    }
+    expect(starts.filter((start) => start.bare).map((start) => start.at)).toEqual([])
+    // The guard on the guard: a walk that found no start would find no bare one either.
+    expect(starts.length).toBeGreaterThan(5)
+  })
 })
+
+/** Every workspace package and app, by its directory and npm name. */
+function workspacePackages() {
+  return ['packages', 'apps'].flatMap((group) =>
+    readdirSync(join(root, group))
+      .filter((name) => existsSync(join(root, group, name, 'package.json')))
+      .map((name) => ({ path: `${group}/${name}`, name: JSON.parse(readFileSync(join(root, group, name, 'package.json'), 'utf8')).name })),
+  )
+}
+
+/** The TypeScript and JavaScript a package holds, outside what an install, a build or a run leaves. */
+function sourceFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (['node_modules', 'dist', 'coverage', 'test-results'].includes(entry.name)) return []
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) return sourceFiles(path)
+    return /\.(?:[cm]?[jt]s|tsx)$/.test(entry.name) ? [path] : []
+  })
+}

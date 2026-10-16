@@ -45,7 +45,7 @@ describe('a run with an image leg', () => {
     expect(withLeg((inputs) => (inputs.results = inputs.results.filter((result) => result.key !== LEG))).problems).toEqual([
       `${CASES[0]}: passed on postgres:17-alpine, missing on ${SIXTEEN}, passed on ${SQLSERVER} (declared with covers(); see packages/data-fixtures/README.md)`,
       `${CASES[1]}: passed on postgres:17-alpine, missing on ${SIXTEEN}, passed on ${SQLSERVER} (declared with covers(); see packages/data-fixtures/README.md)`,
-      `PostgreSQL's matrix image ${SIXTEEN} never answered a test in this run`,
+      `PostgreSQL's matrix image ${SIXTEEN} never answered a test in a leg of its own in this run`,
     ])
   })
 
@@ -58,7 +58,7 @@ describe('a run with an image leg', () => {
     })
     expect(report.sharedCases.rows.map((row) => row.cells[SIXTEEN].state)).toEqual(['missing', 'missing'])
     expect(report.sharedCases.rows.map((row) => row.cells['postgres:17-alpine'].tests)).toEqual([2, 2])
-    expect(report.problems).toContain(`PostgreSQL's matrix image ${SIXTEEN} never answered a test in this run`)
+    expect(report.problems).toContain(`PostgreSQL's matrix image ${SIXTEEN} never answered a test in a leg of its own in this run`)
   })
 
   // A case that fails on one version and passes on the others is a version
@@ -101,7 +101,23 @@ describe('a run with an image leg', () => {
       ['passed', 'passed'],
       ['passed', 'passed'],
     ])
-    expect(report.problems).toEqual([])
+    // Its cases are held, and the image is still one no leg of its own ran: the case below.
+    expect(report.problems).toEqual([`PostgreSQL's matrix image ${SIXTEEN} never answered a test in a leg of its own in this run`])
+  })
+
+  // discovery-pg18 starts 18 in every PostgreSQL leg, the default one
+  // included. Counted as 18's answer, a run whose 18 legs never ran would
+  // call 18 answered, and the rule above could never fire for it: an image
+  // of the matrix is answered by the legs that ran on it alone.
+  test('fails when an image of the matrix was started only by a file in another leg', () => {
+    const report = withLeg((inputs) => {
+      inputs.results = inputs.results.filter((result) => result.key !== LEG)
+      job(inputs, 'test-data-postgres').servers.push(server({ image: SIXTEEN, version: '16.15', caller: 'packages/data-postgres/src/discovery-pg16.integration.test.ts' }))
+    })
+    expect(report.problems).toContain(`PostgreSQL's matrix image ${SIXTEEN} never answered a test in a leg of its own in this run`)
+    // And the same file beside a leg that ran: the leg answers, and nothing fails.
+    const green = withLeg((inputs) => job(inputs, 'test-data-postgres').servers.push(server({ image: SIXTEEN, version: '16.15', caller: 'packages/data-postgres/src/discovery-pg16.integration.test.ts' })))
+    expect(green.problems).toEqual([])
   })
 })
 
@@ -145,6 +161,26 @@ describe('the report’s words for the matrix', () => {
     const markdown = renderContent(withLeg((inputs) => (inputs.results = inputs.results.filter((result) => result.key !== LEG))))
     expect(markdown).toContain('Every PostgreSQL test ran on `postgres:17-alpine`, which answered 17.11 in this run; no test ran on `postgres:16-alpine`, an image of the matrix. No other version')
   })
+
+  // A file that names an image of the matrix in another leg ran its own
+  // tests there, not the suite: "the suite also ran on it" would say a leg
+  // ran that never did, and "no test ran on it" would leave out the file
+  // that did. Its suites are said from its own legs.
+  test('say an image of the matrix that no leg of its own ran on, and the files that did', () => {
+    const pg16 = (inputs) => job(inputs, 'test-data-postgres').servers.push(server({ image: SIXTEEN, version: '16.15', caller: 'packages/data-postgres/src/discovery-pg16.integration.test.ts' }))
+    const markdown = renderContent(
+      withLeg((inputs) => {
+        inputs.results = inputs.results.filter((result) => result.key !== LEG)
+        pg16(inputs)
+      }),
+    )
+    expect(markdown).toContain(
+      'Every PostgreSQL test ran on `postgres:17-alpine`, which answered 17.11 in this run; no leg of the matrix ran on `postgres:16-alpine`, though the tests in `packages/data-postgres/src/discovery-pg16.integration.test.ts` did (16.15). No other version',
+    )
+    expect(renderContent(withLeg(pg16))).toContain(
+      'Every PostgreSQL test ran on `postgres:17-alpine`, which answered 17.11 in this run; the suite of `@formancy/data-postgres` also ran on `postgres:16-alpine` (16.15). No other version',
+    )
+  })
 })
 
 describe('a local run', () => {
@@ -160,7 +196,7 @@ describe('a local run', () => {
       return buildReport(inputs).problems
     }
     expect(local(['test-images'])).toEqual([])
-    expect(local([])).toContain(`PostgreSQL's matrix image ${SIXTEEN} never answered a test in this run`)
+    expect(local([])).toContain(`PostgreSQL's matrix image ${SIXTEEN} never answered a test in a leg of its own in this run`)
     expect(
       local(['test-images'], (inputs) => {
         const file = job(inputs, 'test-data-postgres').suites[0].files[1]

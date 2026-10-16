@@ -13,8 +13,10 @@ import { discoverPostgres } from './index.js'
  * not validated), the conflation 0026 removes for SQL Server's disabled
  * checks, and a snapshot claimed an enforcement the database does not do.
  *
- * The rest of the suites run 17, the version the fixture names; this file
- * starts 18 for the one catalog fact that differs, and names its image here.
+ * The rest of the suites run the image the run selects, the default 17
+ * unless FORMANCY_IMAGES names another of the matrix (0067), 18 among them;
+ * this file starts 18 on every leg, for the one catalog fact the others do
+ * not show, and names its image here.
  * Measured on 2026-10-09 against postgres:18-alpine: the NOT ENFORCED check
  * lets -5 in, and catalogues as convalidated f, conenforced f.
  */

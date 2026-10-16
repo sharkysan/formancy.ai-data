@@ -497,11 +497,15 @@ describe('what each start records for the release report', () => {
   })
 
   // data-core's compatibility floor is the lowest level a matrix leg's
-  // fixture database answered (0068), so the record carries the level of
-  // the database the fixture was loaded into. Read from `master` it would
-  // be the server's default whatever the fixture's database said, and on
-  // an image whose `model` differs the floor would be held to a database no
-  // test ran on. Asked here by name, from `master`, the other way round.
+  // fixture database answered (0068), and each adapter's server test holds
+  // the floor to this record: a record with no level, or null, would leave
+  // the floor held to nothing on every leg. Asked here of the fixture's
+  // database by name, from `master`. What it cannot catch is the record
+  // read from master's own row: the fixture's database is created fresh
+  // and takes `model`'s level, which in a fresh container is master's
+  // too. That the adapter reads the connected database's level,
+  // not master's, is held where a database is set away from it
+  // (data-sqlserver's server.integration.test.ts, at 140).
   test('names the compatibility level of the database the SQL Server fixture was loaded into', async () => {
     const pool = await new mssql.ConnectionPool({ ...ms.admin, database: 'master' }).connect()
     try {

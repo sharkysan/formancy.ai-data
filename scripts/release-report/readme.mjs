@@ -65,10 +65,14 @@ function legsOf(facts, engine) {
   return [...groups.values()]
 }
 
-/** README.md's engine cell: the default, and the suites that also run on each other image of the matrix. */
+/**
+ * README.md's engine cell: the default, the suites that also run on each
+ * other image of the matrix, and that an image outside it one file names is
+ * not one the release is tested with (0067 narrows 0003).
+ */
 function engineCell(facts, engine) {
   const also = legsOf(facts, engine).map(([packages, images]) => `; ${prose(packages.map(code))} also on ${prose(images.map(code))}`)
-  return `${code(facts.images[engine])}, unless a test names another image${also.join('')}`
+  return `${code(facts.images[engine])}${also.join('')}; an image outside the matrix that one file names shows only what that file shows`
 }
 
 /** README.md's block: one table, every row derived. */
@@ -108,7 +112,7 @@ export function adapterLine(facts, engine) {
     .filter(([packages]) => packages.includes(`@formancy/data-${engine}`))
     .flatMap(([, images]) => images)
   const ci = again.length === 0 ? '' : `; CI runs them again on ${prose(again.map(code))}, each named in ${code(facts.imagesVariable)}`
-  return `The suites start ${code(facts.images[engine])} unless a test names another image, through ${prose(named)}${ci}.`
+  return `The suites start ${code(facts.images[engine])}, or the image a file names for a fact of its own, through ${prose(named)}${ci}.`
 }
 
 /** Every document with a block of this generator, and the body it should hold. */

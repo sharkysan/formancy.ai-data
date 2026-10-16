@@ -230,7 +230,7 @@ pass the same mandatory suite" is something a test checks.
 `DEFAULT_IMAGES` is the image each engine's suites run on unless told
 otherwise, the one compose and the committed snapshots name.
 `MATRIX_IMAGES` is every image the adapter suites and this package's run
-on, the default first (0067): CI's `test-images` job runs this package and
+on, the default first ([0067](../../docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)): CI's `test-images` job runs this package and
 that engine's adapter suite once on each of the others, and
 `scripts/ci-test-jobs.test.mjs` fails when the job's legs and this list
 disagree. `FORMANCY_IMAGES` chooses for a run,
@@ -244,12 +244,16 @@ FORMANCY_IMAGES=postgres:16-alpine pnpm exec turbo run test --filter=@formancy/d
 
 turbo hashes the variable for `test` and `test:coverage`, so a run on one
 image is never replayed from another's cache. `selectedImage(engine)` is
-what a start without an image of its own runs.
+what a start without an image of its own runs, and only this package's
+suite and the adapters' make one: every other suite and script names the
+default image, `POSTGRES_IMAGE` or `SQLSERVER_IMAGE`, at each start, so
+the variable moves no other suite, and `scripts/ci-test-jobs.test.mjs`
+fails on a start without an image in any of them.
 
 `imageMajor(engine, image)` is the major an image's tag names: PostgreSQL's
 names it, SQL Server's names a year, which data-core's `SQLSERVER_RELEASES`
 turns into the major the server answers (`2019-latest` is 15). data-core's
-`TESTED_SERVERS`, the servers the release calls tested (0068), cannot read
+`TESTED_SERVERS`, the servers the release calls tested ([0068](../../docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)), cannot read
 this package, so `images.test.ts` holds its majors to the matrix's, both
 ways, and each adapter's `server.integration.test.ts` holds every leg's
 server to the major its image names and to a standing of tested.
@@ -267,7 +271,7 @@ asserting nothing. No test is skipped on a version.
 Every container a suite or a gate starts goes through here:
 `startPostgresContainer(image?)` and `startSqlServerContainer(image?)` start
 an empty server -- the image `FORMANCY_IMAGES` chooses for its engine, which
-unset is the default, unless a test names another -- and the two fixtures,
+unset is the default, unless its caller names another -- and the two fixtures,
 `startPostgresFixture(image?)` and `startSqlServerFixture(image?)`, start
 theirs the same way. Each asks the
 server what it is (`server_version`, or `ProductVersion` -- what the adapters'
@@ -275,7 +279,7 @@ pings read, and both adapters' ping tests hold them to it -- with
 `ProductUpdateLevel` and `Edition`) and writes that, the image and the file
 that asked -- and for the SQL Server fixture the `compatibility_level` of the
 database it loaded, which data-core's compatibility floor is held to on
-every leg (0068); a bare container and PostgreSQL record none -- to
+every leg ([0068](../../docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)); a bare container and PostgreSQL record none -- to
 `test-results/servers/<script>-<engine>-<pid>-<n>.json` in the working
 directory, and returns it as `server`. The release report reads those files
 from every job and lists every image a run started, with what each server
@@ -336,7 +340,7 @@ adapter passing anything.
 The release report shows every case on every image of every engine's
 matrix as passed, failed or missing, from the tests' declarations in that
 run, each test counting for the images its own leg's servers answered on
-for its file (0067), and a case that passed on one engine or one image only
+for its file ([0067](../../docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)), and a case that passed on one engine or one image only
 fails the run. What it cannot show is that a test which
 declares a case asserts it; review holds that. `src/cases.test.ts` fails when
 this package exports a table of shared expectations that is no family of

@@ -10,8 +10,9 @@ import { composedServer, deleteOrder, proxyProblems, writeServerRecord } from '.
  * The getting-started journey's record of each composed database (0035),
  * held to the shape collect.mjs reads from data-fixtures. The server is a
  * loopback HTTP server answering the administrator plane's connection test
- * as the data server does, `{ kind, version }`: what is checked here is the
- * record the journey makes of that answer, not the database.
+ * as the data server does, the server's identity and its standing (0068):
+ * what is checked here is the record the journey makes of that answer, not
+ * the database.
  */
 let server
 let base
@@ -20,7 +21,9 @@ const asked = []
 beforeAll(async () => {
   server = createServer((request, response) => {
     asked.push({ method: request.method, url: request.url, authorization: request.headers.authorization })
-    response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ kind: 'sqlserver', version: '16.0.4295.3' }))
+    response
+      .writeHead(200, { 'content-type': 'application/json' })
+      .end(JSON.stringify({ kind: 'sqlserver', version: '16.0.4295.3', product: 'sqlserver', major: 16, compatibility: 160, standing: { tested: true, says: 'This release of Formancy Data was tested on SQL Server 2022 (16), and the database’s compatibility level, 160, is not below the lowest it was tested at, 150.' } }))
   })
   await new Promise((ready) => server.listen(0, '127.0.0.1', ready))
   base = `http://127.0.0.1:${String(server.address().port)}/`
@@ -39,6 +42,8 @@ describe('a composed database’s record', () => {
       engine: 'sqlserver',
       image: 'mcr.microsoft.com/mssql/server:2022-latest',
       version: '16.0.4295.3',
+      // The level of the database the connection reached, as the connection test answers it (0068).
+      compatibility: 160,
       caller: 'scripts/getting-started.mjs',
       script: 'getting-started',
     })

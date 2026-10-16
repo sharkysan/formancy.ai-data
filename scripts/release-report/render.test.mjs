@@ -70,18 +70,19 @@ describe('the limitations a run shows', () => {
   })
 
   // An image outside the matrix that one file names is what that file
-  // showed (0067 narrows 0003's "whatever the tests name"): the sentence
-  // names the file and what its server answered, says the image is outside
-  // the matrix, and never calls it a probe.
-  test('name the tests that ran on an image other than the default, and what it answered', () => {
-    const sentences = derivedLimitations(
-      report((inputs) => job(inputs, 'test-data-postgres').servers.push(server({ image: 'postgres:18-alpine', version: '18.6', caller: 'packages/data-postgres/src/discovery-pg18.integration.test.ts' }))),
-    )
+  // showed (0067 narrows 0003's "whatever the tests name"): its own
+  // sentence names the file and what its server answered, says the image is
+  // outside the matrix and that the release was not tested on it, and never
+  // calls it a probe. Named before "No other version … was tested", it
+  // would read as one of the versions that were.
+  test('name the tests that ran on an image outside the matrix, and what it answered, after what was tested', () => {
+    const file = 'packages/data-server/src/routes/admin-untested.integration.test.ts'
+    const sentences = derivedLimitations(report((inputs) => job(inputs, 'test-data-postgres').servers.push(server({ image: 'postgres:14-alpine', version: '14.24', caller: file }))))
     const postgres = sentences.find((sentence) => sentence.startsWith('Every PostgreSQL test'))
-    expect(postgres).toBe(
-      'Every PostgreSQL test ran on `postgres:17-alpine`, which answered 17.11 in this run, except the tests in `packages/data-postgres/src/discovery-pg18.integration.test.ts`, which ran on `postgres:18-alpine` (18.6), an image outside the matrix that only that file names. No other version, edition or managed service was tested.',
-    )
-    expect(postgres).not.toMatch(/probe/)
+    expect(postgres).toBe(`Every PostgreSQL test ran on \`postgres:17-alpine\`, which answered 17.11 in this run, except the tests in \`${file}\`, which ran on an image outside the matrix. No other version, edition or managed service was tested.`)
+    expect(postgres).not.toContain('postgres:14-alpine')
+    expect(sentences).toContain(`\`postgres:14-alpine\` (14.24) is outside the matrix: only the tests in \`${file}\` ran on it, and they show what that file shows; this release was not tested on it.`)
+    expect(sentences.filter((sentence) => /probe/.test(sentence))).toEqual([])
     expect(sentences.find((sentence) => sentence.startsWith('Every SQL Server test'))).toBe(
       'Every SQL Server test ran on `mcr.microsoft.com/mssql/server:2022-latest`, which answered 16.0.4295.3 (CU20, Developer Edition (64-bit)) in this run. No other version, edition or managed service was tested.',
     )
@@ -89,16 +90,17 @@ describe('the limitations a run shows', () => {
 
   // A run whose default image never answered fails (report.test.mjs), and
   // what it did run on is still said: "no server answered" beside a table
-  // of answers would be false, and only a red report would show it.
+  // of answers would be false, and only a red report would show it. Nothing
+  // of the matrix answered, so nothing is said to have been tested.
   test('say what the tests ran on when the default image never answered', () => {
     const sentences = derivedLimitations(
       report((inputs) => {
-        for (const result of inputs.results) result.servers = result.servers.map((entry) => (entry.engine === 'postgres' ? { ...entry, image: 'postgres:18-alpine', version: '18.6' } : entry))
+        for (const result of inputs.results) result.servers = result.servers.map((entry) => (entry.engine === 'postgres' ? { ...entry, image: 'postgres:14-alpine', version: '14.24' } : entry))
       }),
     )
-    expect(sentences.find((sentence) => sentence.includes('PostgreSQL test'))).toBe(
-      'No PostgreSQL test ran on the default `postgres:17-alpine` in this run; the tests in `apps/host/scripts/browser-test.mjs`, `apps/host/src/test-databases.ts`, `packages/data-postgres/src/parity.integration.test.ts` and `packages/data-postgres/src/records.integration.test.ts` ran on `postgres:18-alpine` (18.6), an image outside the matrix that only those files name. No other version, edition or managed service was tested.',
-    )
+    const files = '`apps/host/scripts/browser-test.mjs`, `apps/host/src/test-databases.ts`, `packages/data-postgres/src/parity.integration.test.ts` and `packages/data-postgres/src/records.integration.test.ts`'
+    expect(sentences.find((sentence) => sentence.includes('PostgreSQL test'))).toBe(`No PostgreSQL test ran on the default \`postgres:17-alpine\` in this run; the tests in ${files} ran on an image outside the matrix.`)
+    expect(sentences).toContain(`\`postgres:14-alpine\` (14.24) is outside the matrix: only the tests in ${files} ran on it, and they show what those files show; this release was not tested on it.`)
     const none = derivedLimitations(report((inputs) => (inputs.results = inputs.results.map((result) => ({ ...result, servers: result.servers.filter((entry) => entry.engine !== 'postgres') })))))
     expect(none).toContain('No PostgreSQL server answered a test in this run.')
   })

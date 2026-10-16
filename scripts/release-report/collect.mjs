@@ -108,6 +108,8 @@ export function checkedRecord(record, file) {
   const nullable = (key) => record?.[key] === null || typeof record?.[key] === 'string'
   for (const key of ['engine', 'image', 'version', 'script', 'at']) if (!string(key)) problems.push(`${key} is not a string`)
   for (const key of ['updateLevel', 'edition', 'description', 'caller']) if (!nullable(key)) problems.push(`${key} is neither a string nor null`)
+  // The level of the SQL Server database a fixture loaded, which data-core's floor is held to (0068); null when none was loaded.
+  if (!(record?.compatibility === null || Number.isInteger(record?.compatibility))) problems.push('compatibility is neither a whole number nor null')
   if (string('at') && Number.isNaN(Date.parse(record.at))) problems.push('at is not an instant')
   if (problems.length > 0) throw new Error(`${file} is not a server record: ${problems.join(', ')}`)
   return record

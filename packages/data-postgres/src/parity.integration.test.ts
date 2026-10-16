@@ -541,7 +541,7 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
   // is sent, with 42704, which the adapter throws as class 42. Asserted on
   // each leg as its version answers, so a 15 leg that answered 17's way, or
   // 17's that answered 15's, is red, and neither is skipped.
-  test('a terminated backend and a transaction timeout close the connection, and a write is unknown-outcome', async () => {
+  test('a terminated backend closes the connection and a write is unknown-outcome, as a transaction timeout does where the server has transaction_timeout; a server without it refuses the connection that sends it', async () => {
     const victim = postgres(fixture.admin, { max: 1, onnotice: () => {} })
     const bounded = postgres(fixture.admin, { max: 1, onnotice: () => {}, connection: { transaction_timeout: '200' } })
     try {

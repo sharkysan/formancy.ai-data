@@ -1,3 +1,4 @@
+import { serverStanding } from '@formancy/data-core'
 import { describe, expect, test } from 'vitest'
 import { postgresServer } from './server.js'
 
@@ -5,7 +6,7 @@ import { postgresServer } from './server.js'
  * What a PostgreSQL server's answer is translated into (0068): pure, over
  * answers this file writes, because no container can give them. Every image
  * the suites start is alpine, and every alpine server answers a bare
- * `server_version` -- `17.6` -- and a `version()` that begins "PostgreSQL";
+ * `server_version`, such as `17.11`, and a `version()` that begins "PostgreSQL";
  * a Debian package's `16.4 (Debian 16.4-1.pgdg120+1)` and a fork that is not
  * PostgreSQL are met only here. What each leg's real server answers is
  * server.integration.test.ts's.
@@ -50,5 +51,18 @@ describe('postgresServer', () => {
     expect(postgresServer(answer('13.0.0', '130000', 'CockroachDB CCL v23.1.11 (x86_64-pc-linux-gnu, built 2023/09/27 01:53:43, go1.19.10)')).product).toBe('other')
     expect(postgresServer(answer('17.6', '170006', 'postgresql 17.6')).product).toBe('other')
     expect(postgresServer(answer('17.6', '170006', 'PostgreSQLish 17.6')).product).toBe('other')
+  })
+
+  // The other side of that line, which the register states as a cost of
+  // 0068: a server built elsewhere -- a managed service, another platform,
+  // another compiler -- whose version() begins "PostgreSQL " is PostgreSQL
+  // of the major it states, and of a tested major it is called tested,
+  // whatever it changed. Called untested instead, every managed estate
+  // would read as one nobody ran; this holds the register's sentence to
+  // what the code does.
+  test('calls a server built elsewhere PostgreSQL of its major, and tested on a tested major, whatever else it changed', () => {
+    const elsewhere = postgresServer(answer('16.4', '160004', 'PostgreSQL 16.4 on aarch64-unknown-linux-gnu, compiled by aarch64-unknown-linux-gnu-gcc (GCC) 9.5.0, 64-bit'))
+    expect(elsewhere).toEqual({ kind: 'postgres', version: '16.4', product: 'postgresql', major: 16 })
+    expect(serverStanding('postgres', elsewhere).tested).toBe(true)
   })
 })

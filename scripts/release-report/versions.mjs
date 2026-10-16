@@ -8,23 +8,35 @@
 // level, edition, digest -- who started it, and the suites that ran on it.
 // The matrix is what the release is tested on; an image outside it that one
 // file names is what that file showed (0067 narrows 0003), and is never
-// called a probe.
+// called a probe. An image of the matrix off the default is answered by its
+// own legs alone -- a test-images leg whose variant it is -- and a file that
+// names it in another leg, as discovery-pg18 names 18 in every PostgreSQL
+// leg, is said apart, as what that file ran.
 
 const distinct = (values) => [...new Set(values)]
 const byJson = (values) => [...new Map(values.map((value) => [JSON.stringify(value), value])).values()]
 
-/** Every server record of the run, with the results file's key as its job. */
+/**
+ * Every server record of the run, with the results file's key as its job
+ * and, for a leg of the test-images job, the image that leg ran on.
+ */
 export function serversOf(results) {
-  return results.flatMap((result) => (result.servers ?? []).map((server) => ({ ...server, job: result.key })))
+  return results.flatMap((result) => (result.servers ?? []).map((server) => ({ ...server, job: result.key, leg: result.job === 'test-images' ? (result.variant ?? null) : null })))
 }
 
 /** Whether a record is the getting-started journey's composed database rather than a container a test or a gate started. */
 export const composed = (server) => server.script === 'getting-started'
 
+/** The files that asked for `records`' servers, once each. */
+const callersOf = (records) => distinct(records.map((server) => server.caller).filter((caller) => caller !== null)).sort()
+/** What `records`' servers answered, once each. */
+const answersOf = (records) => byJson(records.map(({ version, updateLevel, edition }) => ({ version, updateLevel, edition })))
+
 /**
  * An engine's images, its matrix first, the default leading, each with its
  * answers, its starters, the files that asked for it and the packages whose
- * suites ran on it.
+ * suites ran on it -- for an image of the matrix off the default, from its
+ * own legs, with what other legs' files ran on it `aside`.
  */
 function enginesInRun(servers, facts) {
   return facts.engines.map((engine) => {
@@ -34,17 +46,21 @@ function enginesInRun(servers, facts) {
     const images = distinct([facts.images[engine], ...matrix, ...own.map((server) => server.image).sort()])
       .map((image) => {
         const on = own.filter((server) => server.image === image)
-        const tested = on.filter((server) => !composed(server))
+        const started = on.filter((server) => !composed(server))
+        const legged = matrix.includes(image) && image !== facts.images[engine]
+        const tested = legged ? started.filter((server) => server.leg === image) : started
+        const aside = started.filter((server) => !tested.includes(server))
         return {
           image,
           default: image === facts.images[engine],
           matrix: matrix.includes(image),
           answers: byJson(on.map(({ version, updateLevel, edition, digest }) => ({ version, updateLevel, edition, digest: digest ?? null }))),
           startedBy: byJson(on.map(({ package: pkg, job }) => ({ package: pkg ?? null, job }))),
-          callers: distinct(tested.map((server) => server.caller).filter((caller) => caller !== null)).sort(),
+          callers: callersOf(tested),
           // A suite's records carry its package's npm name; a browser gate's, the app's path.
           suites: distinct(tested.map((server) => server.package).filter((name) => typeof name === 'string' && name.startsWith('@'))).sort(),
-          tested: byJson(tested.map(({ version, updateLevel, edition }) => ({ version, updateLevel, edition }))),
+          tested: answersOf(tested),
+          aside: { callers: callersOf(aside), tested: answersOf(aside) },
           composed: byJson(on.filter(composed).map(({ version, job }) => ({ version, job }))),
         }
       })

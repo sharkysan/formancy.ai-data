@@ -34,6 +34,7 @@ const record = (overrides) => ({
   updateLevel: null,
   edition: null,
   description: 'PostgreSQL 17.11',
+  compatibility: null,
   caller: null,
   script: 'test-coverage',
   at: at(1),
@@ -154,6 +155,22 @@ describe('a test job’s results', () => {
     const root = workspace()
     put(root, 'apps/host/test-results/servers/test-coverage-sqlserver-9-1.json', { engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', version: 16 })
     expect(() => collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine })).toThrow(/apps\/host\/test-results\/servers\/test-coverage-sqlserver-9-1\.json is not a server record: version is not a string/)
+  })
+
+  // data-core's compatibility floor is held to the level each SQL Server
+  // fixture recorded (0068). A writer that left the field out -- the
+  // journey's did, when data-fixtures' gained it -- or wrote it as text
+  // would diverge from the other and nothing would say so.
+  test('refuse a server record whose compatibility level is missing or not a whole number', () => {
+    for (const compatibility of [undefined, '150', 150.5]) {
+      const root = workspace()
+      const { compatibility: _, ...without } = record({ engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', version: '16.0.4295.3' })
+      put(root, 'apps/host/test-results/servers/test-coverage-sqlserver-9-1.json', compatibility === undefined ? without : { ...without, compatibility })
+      expect(() => collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine }), String(compatibility)).toThrow(/test-coverage-sqlserver-9-1\.json is not a server record: compatibility is neither a whole number nor null/)
+    }
+    const root = workspace()
+    put(root, 'apps/host/test-results/servers/test-coverage-sqlserver-9-1.json', record({ engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', version: '16.0.4295.3', compatibility: 160 }))
+    expect(collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine }).servers.map((server) => server.compatibility)).toContain(160)
   })
 })
 

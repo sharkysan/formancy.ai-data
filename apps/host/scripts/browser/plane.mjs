@@ -12,7 +12,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION } from '@formancy/data-core'
-import { startPostgresFixture } from '@formancy/data-fixtures'
+import { POSTGRES_IMAGE, startPostgresFixture } from '@formancy/data-fixtures'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, DRIVER_FACTORIES } from '@formancy/data-server'
 import postgres from 'postgres'
 
@@ -40,7 +40,7 @@ function clerkPolicy(bindings, extra = {}) {
 }
 
 export async function startPlane() {
-  const fixture = await startPostgresFixture()
+  const fixture = await startPostgresFixture(POSTGRES_IMAGE)
   const url = new URL(fixture.admin)
   const real = createConnectionRegistry(
     [{ id: 'pg', kind: 'postgres', host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } }],

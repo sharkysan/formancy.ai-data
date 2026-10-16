@@ -195,7 +195,7 @@ function caseProblems(report, allowMissing) {
     const image = engine.images.find((entry) => entry.default)
     if (image === undefined || image.tested.length === 0) problems.push(`${engineName(engine.engine)}'s default image ${engine.defaultImage} never answered a test in this run`)
     for (const other of engine.images.filter((entry) => entry.matrix && !entry.default && entry.tested.length === 0)) {
-      if (!allowMissing.includes('test-images')) problems.push(`${engineName(engine.engine)}'s matrix image ${other.image} never answered a test in this run`)
+      if (!allowMissing.includes('test-images')) problems.push(`${engineName(engine.engine)}'s matrix image ${other.image} never answered a test in a leg of its own in this run`)
     }
     for (const other of engine.images) {
       if (other.callers.length === 0 && other.tested.length > 0) problems.push(`${engineName(engine.engine)} on ${other.image} answered a test whose file no record names`)

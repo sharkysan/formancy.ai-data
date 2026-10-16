@@ -6,7 +6,7 @@ import { createServer } from 'node:net'
 import type { AddressInfo } from 'node:net'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { loadSizedCustomers, startPostgresFixture, startSqlServerFixture, startTcpHop, WRITER } from '@formancy/data-fixtures'
+import { loadSizedCustomers, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, startTcpHop, WRITER } from '@formancy/data-fixtures'
 import type { PostgresFixture, SizedLoad, SqlServerFixture, TcpHop } from '@formancy/data-fixtures'
 import mssql from 'mssql'
 import { driftingConnection, prepareDrifted } from './drifted.js'
@@ -98,7 +98,7 @@ async function stopChild(child: ChildProcess): Promise<void> {
 }
 
 export async function startStack(options: { runDir: string; rateLimit: number }): Promise<Stack> {
-  const [pg, ms] = await Promise.all([startPostgresFixture(), startSqlServerFixture()])
+  const [pg, ms] = await Promise.all([startPostgresFixture(POSTGRES_IMAGE), startSqlServerFixture(SQLSERVER_IMAGE)])
   const started: Array<() => Promise<void>> = [() => pg.stop(), () => ms.stop()]
   try {
     // One after the other, so each load's seconds are its own.

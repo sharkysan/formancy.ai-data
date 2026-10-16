@@ -25,7 +25,7 @@ export interface VersionFact {
   heldBy: { file: string; test: string }
 }
 
-export type VersionFactName = 'transactionTimeout' | 'notNullTestsRemoved' | 'viewSecurityDefinition'
+export type VersionFactName = 'transactionTimeout' | 'notNullTestsRemoved' | 'membershipInherit' | 'viewSecurityDefinition'
 
 export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
   transactionTimeout: {
@@ -42,7 +42,7 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
     },
     heldBy: {
       file: 'packages/data-postgres/src/parity.integration.test.ts',
-      test: 'a terminated backend and a transaction timeout close the connection, and a write is unknown-outcome',
+      test: 'a terminated backend closes the connection and a write is unknown-outcome, as a transaction timeout does where the server has transaction_timeout; a server without it refuses the connection that sends it',
     },
   },
   notNullTestsRemoved: {
@@ -62,6 +62,23 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
       test: 'lookups over the sized customers on the order form, filtered to the tenant',
     },
   },
+  membershipInherit: {
+    engine: 'postgres',
+    says:
+      'PostgreSQL makes inheritance a property of each membership, set by GRANT role TO member WITH INHERIT TRUE or FALSE (0027, B4); a server without it refuses that grant as a syntax error at or near "inherit" (42601), and whether a member inherits is the member role’s own INHERIT or NOINHERIT',
+    values: { 15: false, 16: true, 17: true, 18: true },
+    source: 'PostgreSQL 16’s release notes, under privileges: GRANT gains WITH INHERIT, which sets whether one membership inherits, where the member role’s INHERIT or NOINHERIT alone decided it before; 15’s GRANT has no such option',
+    measured: {
+      15: '2026-10-16, postgres:15-alpine answering 15.19, on Docker Desktop on Windows: GRANT … WITH INHERIT FALSE failed with PostgresError 42601, syntax error at or near "inherit", and a NOINHERIT member’s privilege functions answered false and its read 42501',
+      16: '2026-10-16, postgres:16-alpine answering 16.15, on Docker Desktop on Windows: as 17',
+      17: 'every run, on the default image: granted, the WITH INHERIT FALSE member’s privilege functions answered false and its read 42501 (0027, B4)',
+      18: '2026-10-16, postgres:18-alpine answering 18.6, on Docker Desktop on Windows: as 17',
+    },
+    heldBy: {
+      file: 'packages/data-postgres/src/discovery-access.integration.test.ts',
+      test: 'a WITH INHERIT FALSE membership reports no capability, and the read is refused; a server without the option refuses the grant, and a NOINHERIT member reports none',
+    },
+  },
   viewSecurityDefinition: {
     engine: 'sqlserver',
     says: 'SQL Server has the database permission VIEW SECURITY DEFINITION, which shows no security policy (0027, B10d); a server without it refuses the grant as a syntax error, "Incorrect syntax near \'view\'."',
@@ -70,7 +87,7 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
     measured: {
       15: '2026-10-16, mcr.microsoft.com/mssql/server:2019-latest answering 15.0.4500.2 (CU32), on Docker Desktop on Windows: the grant failed with RequestError "Incorrect syntax near \'view\'."',
       16: 'every run, on the default image: granted, and has_perms_by_name answers 1 for it',
-      17: 'by source only until the 2025 leg of the matrix runs it',
+      17: '2026-10-16, mcr.microsoft.com/mssql/server:2025-latest answering 17.0.5015.4 (CU9), on Docker Desktop on Windows: as 16',
     },
     heldBy: {
       file: 'packages/data-sqlserver/src/discovery-access.integration.test.ts',

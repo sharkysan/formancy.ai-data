@@ -1,7 +1,7 @@
 import { findObject } from '@formancy/data-core'
 import type { MetadataSnapshot, ObjectMeta, RecordColumn, RecordOutcome, RecordTarget, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { accessDisagreements, covers, defined, FIXTURE_MODEL, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startPostgresFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
+import { accessDisagreements, covers, defined, FIXTURE_MODEL, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startPostgresFixture, versionFact, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -274,15 +274,20 @@ describe('every capability the snapshot reports is the answer the database gives
 })
 
 describe('privileges through roles', () => {
+  // A membership's own INHERIT is PostgreSQL 16's
+  // (VERSION_FACTS.membershipInherit, 0067); on 15 the member role's
+  // NOINHERIT decides instead. Each leg makes the two members its server
+  // can make, so 15 holds the same answer and is not skipped.
+  let perMembership = true
   beforeAll(async () => {
+    perMembership = versionFact('membershipInherit', fixture.server)
     await owner.unsafe(`
       create role inh_target nologin;
       grant usage on schema probe to inh_target;
       grant select on probe.numbered to inh_target;
-      create role inh_none login password 'inherit-false-password';
+      create role inh_none login ${perMembership ? '' : 'noinherit '}password 'inherit-false-password';
       create role inh_full login password 'inherit-true-password';
-      grant inh_target to inh_none with inherit false;
-      grant inh_target to inh_full with inherit true;
+      ${perMembership ? 'grant inh_target to inh_none with inherit false; grant inh_target to inh_full with inherit true;' : 'grant inh_target to inh_none; grant inh_target to inh_full;'}
     `)
   })
 
@@ -290,8 +295,14 @@ describe('privileges through roles', () => {
   // member WITH INHERIT FALSE holds the role's privileges only after SET
   // ROLE, which this module never issues, so the read is refused and the
   // snapshot must say no -- while an inheriting member's says yes. An
-  // adapter that walked pg_auth_members itself would get the first wrong.
-  test('a WITH INHERIT FALSE membership reports no capability, and the read is refused', async () => {
+  // adapter that walked pg_auth_members itself would get the first wrong,
+  // and on 15, where a NOINHERIT member stands in for it, one that read the
+  // memberships without the member's attribute would too. There the grant
+  // 16 takes is refused, so a 15 leg that answered 16's way is red.
+  test('a WITH INHERIT FALSE membership reports no capability, and the read is refused; a server without the option refuses the grant, and a NOINHERIT member reports none', async () => {
+    if (!perMembership) {
+      await expect(owner.unsafe('grant inh_target to inh_full with inherit false')).rejects.toMatchObject({ code: '42601', message: 'syntax error at or near "inherit"' })
+    }
     const none = connect(as('inh_none', 'inherit-false-password'))
     const full = connect(as('inh_full', 'inherit-true-password'))
     const [withoutInherit, withInherit] = await Promise.all([discoverPostgres(none, { schemas: ['probe'] }), discoverPostgres(full, { schemas: ['probe'] })])

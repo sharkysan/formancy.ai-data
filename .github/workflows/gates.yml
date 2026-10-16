@@ -216,7 +216,9 @@ jobs:
   test-images:
     name: test-images (${{ matrix.package }}, ${{ matrix.image }})
     runs-on: ubuntu-latest
-    # The `test` job's limit, for the same pull and the same suites.
+    # The `test` job's limit, copied: these legs pull other images than its
+    # legs do and have not been measured against it (0067); their first CI
+    # runs measure them.
     timeout-minutes: 25
     strategy:
       fail-fast: false

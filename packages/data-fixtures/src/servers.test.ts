@@ -1,6 +1,6 @@
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, test } from 'vitest'
 import { callerOf, captureCaller, recordServer, scriptName } from './servers.js'
@@ -92,12 +92,12 @@ describe('the caller a record names', () => {
   // path otherwise, frames of installed modules and of Node in between. The
   // first file that is none of those is the caller.
   test('skips Node, installed modules and this package, and reads a file URL as a path', () => {
-    const own = join(tmpdir(), 'data-fixtures') + '/'
+    const own = join(tmpdir(), 'data-fixtures') + sep
     const test = join(tmpdir(), 'data-postgres', 'src', 'adapter.integration.test.ts')
     const stack = [
       'Error: caller',
-      `    at captureCaller (${own}src/servers.ts:70:12)`,
-      `    at startPostgresContainer (${pathToFileURL(`${own}dist/index.mjs`).href}:10:3)`,
+      `    at captureCaller (${join(own, 'src', 'servers.ts')}:70:12)`,
+      `    at startPostgresContainer (${pathToFileURL(join(own, 'dist', 'index.mjs')).href}:10:3)`,
       '    at async Promise.all (index 0)',
       `    at ${pathToFileURL(join(tmpdir(), 'node_modules', '.pnpm', 'vitest', 'dist', 'run.js')).href}:1:1`,
       '    at node:internal/process/task_queues:105:5',
@@ -105,8 +105,27 @@ describe('the caller a record names', () => {
     ].join('\n')
     expect(callerOf(stack, own)).toBe(test)
     // A test file inside this package is a caller: its own suite starts containers.
-    const ownTest = `${own}src/fixtures.integration.test.ts`
-    expect(callerOf(`Error\n    at x (${own}src/servers.ts:1:1)\n    at ${ownTest}:5:5`, own)).toBe(ownTest)
+    const ownTest = join(own, 'src', 'fixtures.integration.test.ts')
+    expect(callerOf(`Error\n    at x (${join(own, 'src', 'servers.ts')}:1:1)\n    at ${ownTest}:5:5`, own)).toBe(ownTest)
     expect(callerOf('Error\n    at node:internal/x:1:1', own)).toBeNull()
+  })
+
+  // vitest on Windows writes a frame's path with `/`, and this package's
+  // path, from fileURLToPath, has `\`: compared as written, no frame was
+  // this package's or an installed module's, every record named servers.ts
+  // as its caller, and the report could say no image for any test. On
+  // Linux both are written with `/`, so there this is the case above.
+  test('reads a frame written with forward slashes as the path this platform writes', () => {
+    const forward = (path: string): string => path.replaceAll(sep, '/')
+    const own = join(tmpdir(), 'data-fixtures') + sep
+    const test = join(tmpdir(), 'data-postgres', 'src', 'adapter.integration.test.ts')
+    const stack = [
+      'Error: caller',
+      `    at captureCaller (${forward(join(own, 'src', 'servers.ts'))}:70:12)`,
+      `    at startPostgresFixture (${forward(join(own, 'src', 'containers.ts'))}:120:3)`,
+      `    at ${forward(join(tmpdir(), 'node_modules', '.pnpm', 'vitest', 'dist', 'run.js'))}:1:1`,
+      `    at ${forward(test)}:20:5`,
+    ].join('\n')
+    expect(callerOf(stack, own)).toBe(test)
   })
 })

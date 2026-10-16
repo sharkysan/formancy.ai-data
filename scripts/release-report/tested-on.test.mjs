@@ -80,7 +80,15 @@ describe('the README blocks', () => {
         expect(line, image).toContain(`\`${image}\``)
       }
       expect(table).toContain(`\`@formancy/data-fixtures\` and \`@formancy/data-${engine}\` also on`)
+      // 0067 narrows 0003: an image one file names is what that file
+      // showed, not what the release is tested with. 0003's old rule,
+      // "unless a test names another image", in the Tested with column
+      // would make postgres:14-alpine, which admin-untested names, read as
+      // tested.
+      expect(table, engine).toContain(`| \`${facts.images[engine]}\`; \`@formancy/data-fixtures\``)
+      expect(line, engine).not.toContain('unless a test names another image')
     }
+    expect(table).toContain('an image outside the matrix that one file names shows only what that file shows')
     // An image of the matrix no leg runs has no suites to name, and is refused rather than said.
     const unled = { ...facts, legs: facts.legs.filter((leg) => leg.image !== facts.matrix.postgres[1]) }
     expect(() => readmeTable(unled)).toThrow(`${facts.matrix.postgres[1]} is an image of the matrix that no leg of the test-images job runs`)
