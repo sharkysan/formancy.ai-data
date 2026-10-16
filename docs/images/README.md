@@ -82,9 +82,10 @@ listens on a port.
   family's Fontsource package, its version and Google's version of the face,
   read from the packages the app imports
   ([0072](../decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
-  A family no imported package declares, and a font file from any origin but
-  the app's, refuse the capture. `document.fonts.ready` alone once resolved
-  with a family missing.
+  A family no imported package declares refuses the capture, and so does a
+  font file from any origin but the app's, which only a capture reaches
+  (*What nothing checks*). `document.fonts.ready` alone once resolved with a
+  family missing.
 - **Parts.** A picture is the union of named whole elements, found by role and
   accessible name, with a bench of the page around them: up to 16 CSS px,
   less where something else is drawn nearer -- a neighbouring panel, a
@@ -226,6 +227,11 @@ Filed, not hidden, because a picture is the product as it is:
   font package that moved, or a Chromium rendering change leaves the text the same;
   `--check` prints a notice when the app's stylesheet changed, and fails on
   nothing. Review holds the looks.
+- **A face from another origin.** That a capture refuses a font file another
+  origin answered: `camera.test.mjs` holds the filter that names one, but
+  the refusal is in the capture's font step, which neither `pnpm test:repo`
+  nor `--check` takes. It was watched refusing once, on 2026-10-16
+  ([0072](../decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
 - **Unquoted sentences.** Whether a caption's unquoted words are true, beyond
   what the holds assert.
 - **Whether a picture persuades**, and how GitHub scales it.

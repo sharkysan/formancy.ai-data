@@ -13,10 +13,13 @@
     packages ships; the first family of every stack the room and Blueprint
     draw with -- `--display`, `--sans` and `--mono` of the palette copy,
     `--fm-sans` and `--fm-mono` of `@formancy/themes/blueprint.css` -- or
-    Fontsource's `<family> Variable` of it, has a face in the build; and no
-    rule of the build asks a face for a width. The three apps import the
-    same faces, at the versions the workspace catalog pins exactly, each as
-    `catalog:`. Watched failing on `main`, 10 of its 17 cases: each
+    Fontsource's `<family> Variable` of it, where the stack names that
+    right after it, as `--display` names `Archivo Variable` after
+    `Archivo`, has a face in the build; and no rule of the build asks a
+    face for a width, by `font-stretch`, a `wdth` variation or the `font`
+    shorthand. The three apps import the same faces, at the versions the
+    workspace catalog pins exactly, each as `catalog:`. Watched failing on
+    `main`, 10 of the 17 cases it then had: each
     `index.html`, and each built page, named `https://fonts.googleapis.com/`,
     `https://fonts.gstatic.com/` and the `css2` link; each build "--display's
     first family, Archivo, has no face in the build", and the same of
@@ -27,14 +30,43 @@
     "apps/studio imports … where apps/examples imports …"; with
     `font-stretch: 90%` on the examples page's `h1`: "sets font-stretch";
     and with Vite's `build.assetsInlineLimit` at 100,000: "a face of
-    Archivo Variable is inlined as a data: URL".
+    Archivo Variable is inlined as a data: URL". Review then found a build
+    that each of two cases passed when it should not have, and each case's
+    rule became a function with a case of its own, which failed against
+    the rule it replaced. The studio's build
+    with its 18 IBM Plex Sans faces renamed `IBM Plex Sans Variable` --
+    what importing `@fontsource-variable/ibm-plex-sans` in place of the
+    static package gives -- passed while its `--sans` and `--fm-sans` text
+    was drawn in a fallback face, because the rule took `<family>
+    Variable` for any stack; now it fails: "--sans's first family, IBM
+    Plex Sans, has no face in the build, and IBM Plex Sans Variable, which
+    has, is not the family the stack names next", and the same of
+    `--fm-sans`. And the examples page built with an `h1` setting every
+    font longhand and `font-stretch: 90%` passed, because lightningcss
+    1.33.0, which Vite 8.3.3 minifies with, wrote it as
+    `font:750 90% 2rem/1.15 Archivo,Archivo Variable,sans-serif` and no
+    `font-stretch` at all; now it fails: "asks a width in the font
+    shorthand".
   - **The browser gates of the examples page, the studio and the host
     page, in every browser.** `scripts/browser-gate.mjs`'s `guardRequests`
     routes every request a pass's page makes: one to an origin the gate
     does not serve is refused and named at the end of the pass -- in the
     studio, on each of its two origins -- and in the pass at 320 px that
     refuses the web fonts, every `.woff2` and `.woff` is refused, whatever
-    its origin. The fonts check reads its families from the faces the
+    its origin. On the examples page that check holds less, because the
+    page is served under 0069's policy: the browser refuses an address on
+    another host that the policy governs -- a stylesheet, a face, a
+    script, a fetch -- before any request exists, so `guardRequests` never
+    sees it. There the policy check names the address and the console
+    check fails with it, and the request check holds only what the policy
+    does not govern, such as a navigation. With a link to
+    `https://fonts.googleapis.com/css2?family=Archivo` put in the built
+    page, every pass of the examples gate passed "the page asked no other
+    origin for anything" and failed "the browser refused nothing under
+    the page's Content-Security-Policy" -- "style-src-elem refused
+    https://fonts.googleapis.com/css2?family=Archivo" -- and the console's
+    check, 14 checks in all (Chromium 153 on Windows 11, 2026-10-16).
+    The fonts check reads its families from the faces the
     stylesheets of the built page declare. `scripts/browser-gate.test.mjs`
     holds which requests are refused -- another port of `127.0.0.1` is
     another origin, `data:` and `blob:` are no request -- what the checks
@@ -43,7 +75,9 @@
     refused; 8 of its 20 cases failed against `main`'s module. Watched
     failing on `main`, in Chromium 153 on Windows 11, in every pass of all
     three gates -- 7 in the examples page's and the host page's, 6 in the
-    studio's on each of its two origins: "1 address on another origin,
+    studio's on each of its two origins; the examples page's because
+    `main`'s policy allowed Google's two hosts, so the browser made the
+    request: "1 address on another origin,
     each refused:
     https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,500..800&…",
     and "the built page's stylesheets declare no font face". Nothing else
@@ -91,12 +125,24 @@
     against a server of its own, failed against `main`'s check: "expected
     [] to deeply equal [ …(2) ]". `pnpm test:getting-started` itself was
     not run for this record; CI's `getting-started` job runs it.
-  - **`scripts/pictures/camera.test.mjs`, in `pnpm test:repo`.** The
-    look's faces are each family's package, version and Google's version of
-    the face, read from the packages and the same in every app; a family no
-    imported package declares, and a font file from any origin but the
-    app's, refuse a capture. Failed against `main`'s camera: "lookFonts is
-    not a function".
+  - **`scripts/pictures/camera.test.mjs`, in `pnpm test:repo`.** It holds
+    that the look's faces are each family's package, version and Google's
+    version of the face, read from the packages and the same in every app;
+    that a family no imported package declares is refused, which every
+    session, `--check` included, derives before it opens a browser; and
+    that the filter of the font files a capture was answered names one
+    from an origin other than the app's. Failed against `main`'s camera:
+    "lookFonts is not a function", the export missing rather than a guard
+    firing. **Review holds** that a capture refuses such a file: only a
+    capture reaches that refusal, in the camera's font step, `fonts()`,
+    and neither `pnpm test:repo` nor `--check` takes one. It was watched
+    once, in Chromium 153.0.8010.12 on Windows 11 on 2026-10-16, by a
+    script outside the repository that opened the camera's own context
+    and route over a page whose face another origin answered: `fonts()`
+    refused it, "the page was answered font files from another origin,
+    http://fonts.invalid/f.woff2, which the look does not name"; it
+    refused the same file from the page's own origin not at all, and,
+    with the refusal taken out, the other origin's not either.
   - **Review alone** holds that the faces' version is the one formancy.ai
     installs, and that a font fix upstream takes is taken here.
 
@@ -188,7 +234,10 @@ reads them from `dist`, as the pictures were taken.
 - **The notices carry the fonts' licence:** the three packages are listed
   with their OFL text, `@fontsource-variable/archivo 5.3.0`,
   `@fontsource/ibm-plex-mono 5.3.0` and `@fontsource/ibm-plex-sans 5.3.0`.
-- **The pages draw what formancy.ai's admin draws,** from the same files.
+- **The pages draw what formancy.ai's admin draws:** the same IBM Plex
+  files, and Archivo's weight-axis file where the admin's carries the width
+  axis too, which drew the same pixels at the default width, as measured
+  above in Chromium 153 on Linux; Firefox and WebKit were not compared.
 
 **What it costs.**
 - **Bytes in every build.** Each app's build carries 59 font files,
@@ -222,7 +271,9 @@ reads them from `dist`, as the pictures were taken.
   draws the headings in it. A browser gate on such a machine fails: the
   page never loads `Archivo Variable`.
 - **What the run-time check does not see:** a request only an interaction
-  the gates do not perform makes, and a connection with no request.
+  the gates do not perform makes, and a connection with no request. The
+  static guard reads no JavaScript, where the host page's bundle holds AG
+  Grid's loader of Google's fonts, unused.
 
 **What it forecloses.** Nothing that cannot be undone.
 

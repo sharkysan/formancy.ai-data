@@ -19,7 +19,11 @@
 //     pass, and in the pass that refuses every font file, none had (0058):
 //     a state measured before a late family swapped in is not caught;
 //   - the page asked no other origin for anything: every such request is
-//     refused, so the answer is the same with no network, and named (0072);
+//     refused, so the answer is the same with no network, and named (0072).
+//     An address the policy below governs -- a stylesheet, a face, a
+//     script, a fetch -- the browser refuses before any request exists, so
+//     the policy check names it and this one holds what the policy does
+//     not govern, such as a navigation;
 //   - the page is the demo formancy.ai serves (0069): under the path its
 //     Worker is routed at, with the headers its deploy writes, the browser
 //     refused nothing under the Content-Security-Policy, the console said
@@ -222,10 +226,11 @@ async function audit(page, target) {
   // rule's passes, violations, incompletes and inapplicables were the same.
   // That stylesheet is gone (0072) and the page links none from another
   // origin, so the preload would now fetch nothing; it stays off, so that a
-  // stylesheet from elsewhere is the request check's failure and not axe's
-  // own. The two rules that ask for it are css-orientation-lock,
-  // experimental and outside the tags, and no-autoplay-audio, for media the
-  // page has none of.
+  // stylesheet from elsewhere is the page's failure and not axe's own: the
+  // policy check's and the console's, as a link to Google's put in the
+  // built page showed on 2026-10-16 (0072). The two rules that ask for it
+  // are css-orientation-lock, experimental and outside the tags, and
+  // no-autoplay-audio, for media the page has none of.
   return subject.evaluate(async (context, tags) => {
     const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, preload: false })
     const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []

@@ -949,7 +949,7 @@
       ]
     },
     "0038": {
-      "reviewed": "sha256:ed1bef4c59da111c4b925e9f698a6235709ce76394631f354fa895464b4a5816",
+      "reviewed": "sha256:95ce8cec4e8c6c424104ac45259c0c1c62010cf018c6c8ba0e22640eadff376c",
       "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the pictures job's time. Nobody who installs, integrates or operates the module meets them."
     },
     "0039": {
@@ -2229,7 +2229,7 @@
       ]
     },
     "0069": {
-      "reviewed": "sha256:cfb97ddf45582e33a88bba10f3ef14b2d76aeea0cfe10adf8a0dc2c0ae2184c9",
+      "reviewed": "sha256:515f7f10cfe67f03d52f68407f49605db2ff858742b7a817b1d433938a3843df",
       "limitations": [
         {
           "area": "operations",
@@ -2331,7 +2331,7 @@
       ]
     },
     "0072": {
-      "reviewed": "sha256:54443450d02edc01d84b747bca1c72feedf8ffe73779112e994e178243212816",
+      "reviewed": "sha256:e055c4d4c01afe22f80e93033c657d5fbac29cccb483ae65d7e6416718ff789b",
       "limitations": [
         {
           "area": "licence",
@@ -2348,6 +2348,10 @@
         {
           "area": "host",
           "says": "On a machine with a font installed under the name Archivo, the studio, the host page and the examples page draw their headings in that font rather than the face they carry."
+        },
+        {
+          "area": "testing",
+          "says": "That no page asks another host for anything is held by the browser gates for the states they reach and by a static read of each index.html and built stylesheet, not of the JavaScript, where the host page's bundle holds AG Grid's loader of Google's fonts, unused: a request only an interaction the gates do not perform makes, or a connection with no request, is seen by nothing."
         }
       ]
     }
