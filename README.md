@@ -47,6 +47,9 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > from their own build, so that no page asks Google or any other host for
 > anything, where 0.1.0's pages ask Google for theirs
 > ([0072](./docs/decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)),
+> and a field moved to another generated section in the studio, which a
+> 0.1.0 server refuses to read or import
+> ([0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
@@ -131,9 +134,11 @@ and `pnpm demo` runs the same build from a clone
   step checks a delete grant with the function the server's publish check
   refuses one by
   ([0052](./docs/decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md)).
-- **Keeps presentation as a patch over the generated form**, carried through
-  a regeneration by what each field stands for
-  ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
+- **Keeps presentation as a patch over the generated form** -- labels,
+  order, full width, and a field moved to another generated section --
+  carried through a regeneration by what each field stands for
+  ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md),
+  [0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md)).
   A key that now names another column keeps its grants only once somebody
   confirms it in the publish over the version they were written in,
   whichever client publishes over a version the server still serves; grants
@@ -387,9 +392,9 @@ speaks only to the server's administrator plane and `/v1/whoami`
 
 *A form over `sales.order_line`, which has no tenant column, discovered as the fixture's owner because the order form's own account may not read the lines. Its Order list is filtered to the person's tenant; ticked, the box “Only rows of sales.order_line whose Order is one of these” makes another tenant's line not found on read and update, and “A row that names none is reached by nobody.” Unticked, the step notes that nothing scopes the rows; nothing requires the box ([0043](./docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)).*
 
-<img src="./docs/images/readme/studio-presentation.webp" width="874" alt="The Presentation step's Order section below Undo, Redo and the status “Moved Customer down.”: its section label, then a row each for Order date, Customer, Status with its label emptied and refused, Amount, notes labelled Remarks at full width, Group, Created by and Approved by, each naming the column it is bound to.">
+<img src="./docs/images/readme/studio-presentation.webp" width="874" alt="The Presentation step's Order section below Undo, Redo and the status “Moved Customer down.”: its section label, then a row each for Order date, Customer, Status with its label emptied and refused, Amount, notes labelled Remarks at full width, Group, Created by and Approved by, each naming the column it is bound to and offering Move to Record.">
 
-**Step 5, Presentation.** *Labels, order and width are a patch over the generated form: every row names the column it is bound to, nothing here adds, removes or renames a field, and an empty label is refused: “A label needs words a person can read.” ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).*
+**Step 5, Presentation.** *Labels, order, section and width are a patch over the generated form: every row names the column it is bound to and may move to the other section, nothing here adds, removes or renames a field, and an empty label is refused: “A label needs words a person can read.” ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md), [0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md)).*
 
 <img src="./docs/images/readme/studio-preview.webp" width="916" alt="The Preview step: a note that the Customer list is filled by the runtime plane once published, and the order form on white paper after Validate, with notes labelled Remarks at full width, Order date and Amount marked required, and Order date, Customer and Amount each saying required.">
 

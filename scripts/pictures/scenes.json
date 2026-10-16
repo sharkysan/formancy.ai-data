@@ -97,8 +97,8 @@
     "placement": "more",
     "title": "Presentation",
     "step": "5. Presentation",
-    "caption": "Labels, order and width are a patch over the generated form: every row names the column it is bound to, nothing here adds, removes or renames a field, and an empty label is refused: “A label needs words a person can read.” ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).",
-    "alt": "The Presentation step's Order section below Undo, Redo and the status “Moved Customer down.”: its section label, then a row each for Order date, Customer, Status with its label emptied and refused, Amount, notes labelled Remarks at full width, Group, Created by and Approved by, each naming the column it is bound to.",
+    "caption": "Labels, order, section and width are a patch over the generated form: every row names the column it is bound to and may move to the other section, nothing here adds, removes or renames a field, and an empty label is refused: “A label needs words a person can read.” ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md), [0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md)).",
+    "alt": "The Presentation step's Order section below Undo, Redo and the status “Moved Customer down.”: its section label, then a row each for Order date, Customer, Status with its label emptied and refused, Amount, notes labelled Remarks at full width, Group, Created by and Approved by, each naming the column it is bound to and offering Move to Record.",
     "quotes": {
       "A label needs words a person can read.": ["Order"],
       "Moved Customer down.": ["Said"]

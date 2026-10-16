@@ -430,7 +430,7 @@
       ]
     },
     "0024": {
-      "reviewed": "sha256:f1720aacea6471a08d7897983dd0029588cc9faf8d1fba1bdb51994c109a1fe1",
+      "reviewed": "sha256:4367da309caf601e3841e50efe59624db65d103d3ffb94abdd343f8fb7306afe",
       "limitations": [
         {
           "area": "studio",
@@ -628,7 +628,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:4989828770c624318ebbd22291964bd6373241899c0901384040318ddeba6159",
+      "reviewed": "sha256:1c785f351ffc5f21b7c9f9b0536b3101f4abfad2adc5017023baf917abc2131e",
       "limitations": [
         {
           "area": "studio",
@@ -660,7 +660,7 @@
         },
         {
           "area": "studio",
-          "says": "Anything outside the four presentation edits is refused at publish: help text, translations, new sections, a numeric span and moves between sections."
+          "says": "Anything outside the presentation edits is refused at publish: help text, translations, new sections and a numeric span."
         },
         {
           "area": "operations",
@@ -2352,6 +2352,38 @@
         {
           "area": "testing",
           "says": "That no page asks another host for anything is held by the browser gates for the states they reach and by a static read of each index.html and built stylesheet, not of the JavaScript, where the host page's bundle holds AG Grid's loader of Google's fonts, unused: a request only an interaction the gates do not perform makes, or a connection with no request, is seen by nothing."
+        }
+      ]
+    },
+    "0075": {
+      "reviewed": "sha256:5539784396613f55f29c61f5d72028edaebb930d1c6e8a7c608dc4fec91743a2",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "A section keeps at least one field, so a section's only field, often Record's `id`, cannot move out of it, and no section can be emptied or removed.",
+          "heldBy": "packages/data-core/src/presentation/derive.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "A field moved to another section lands last in it, and a person places it from there with Move up.",
+          "heldBy": "packages/data-core/src/presentation/apply.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A 0.1.0 server refuses to read or import a version holding a move between sections, naming `/fields/N/section`, as measured on 2026-10-16, so a deployment rolled back to 0.1.0 stops serving such a newest version until an earlier one is restored there; versions without a move move between them as before."
+        },
+        {
+          "area": "studio",
+          "says": "A regeneration drops a move into a section it no longer has or cannot tell apart, and every move out of a section the carried moves would leave with no field, not the fewest, reporting each as `move-dropped`; the person moves the field again.",
+          "heldBy": "packages/data-core/src/presentation/rebase.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "The studio's Move to buttons name a section by its current label, so two sections a person labelled alike read alike."
+        },
+        {
+          "area": "studio",
+          "says": "A field's help text is not offered: `@formancy/spec` 0.5.0 has no property to hold it."
         }
       ]
     }
