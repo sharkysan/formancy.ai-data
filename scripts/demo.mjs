@@ -174,6 +174,29 @@ export function unhashedAssets(names, copied) {
   return names.filter((name) => copied.includes(name) || !/-[\w-]{8}\.[a-z0-9]+$/i.test(name))
 }
 
+/**
+ * The files of the build's assets directory the page never loads: none
+ * named by `html`, or by a file it names, however deep. Each is named by a
+ * hash of its content, so its name is in the text of whatever loads it.
+ * turbo replays a cached build over the dist/ that is there and removes
+ * nothing, so a checkout that built before holds earlier builds' files, and
+ * a deploy from it would serve them all.
+ */
+export function unloadedAssets(files, html) {
+  const names = Object.keys(files)
+  const loaded = new Set()
+  const read = [html]
+  while (read.length > 0) {
+    const text = read.pop()
+    for (const name of names) {
+      if (loaded.has(name) || !text.includes(name)) continue
+      loaded.add(name)
+      read.push(files[name])
+    }
+  }
+  return names.filter((name) => !loaded.has(name))
+}
+
 /** The output options by which Vite names what it bundles. */
 const NAMED_BY = ['entryFileNames', 'chunkFileNames', 'assetFileNames']
 
@@ -237,6 +260,8 @@ async function buildProblems(dist, address) {
   const assets = readdirSync(join(dist, HASHED))
   const unhashed = unhashedAssets(assets, copied)
   if (unhashed.length > 0) problems.push(`${HASHED} holds files copied from the public directory or whose names carry no hash, which the headers would cache for a year: ${unhashed.join(', ')}`)
+  const unloaded = unloadedAssets(Object.fromEntries(assets.map((name) => [name, readFileSync(join(dist, HASHED, name), 'utf8')])), html)
+  if (unloaded.length > 0) problems.push(`${HASHED} holds files the page never loads, an earlier build's, which the deploy would serve too; delete apps/examples/dist and build again: ${unloaded.join(', ')}`)
   const stylesheets = assets.filter((name) => name.endsWith('.css')).map((name) => readFileSync(join(dist, HASHED, name), 'utf8'))
   for (const problem of policyProblems(POLICY, { html, stylesheets, address })) problems.push(`the Content-Security-Policy does not fit the built page: ${problem}`)
   if (!existsSync(join(dist, NOTICES_FILE))) problems.push(`the build has no ${NOTICES_FILE}, and the page bundles other people's packages, whose licences go with it (0046)`)

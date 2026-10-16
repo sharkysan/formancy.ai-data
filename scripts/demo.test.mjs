@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
-import { configProblems, demoBase, demoUrl, indexProblems, namingProblems, readDemoConfig, unhashedAssets, viteBuild, WORKER, WRANGLER } from './demo.mjs'
+import { configProblems, demoBase, demoUrl, indexProblems, namingProblems, readDemoConfig, unhashedAssets, unloadedAssets, viteBuild, WORKER, WRANGLER } from './demo.mjs'
 import { contentSecurityPolicy, headerRules, headersFile, headersFor, parseHeadersFile, policyProblems, POLICY } from './demo-headers.mjs'
 import { serveDemo } from './demo-serve.mjs'
 import { NOTICES_FILE } from './third-party-notices.mjs'
@@ -140,6 +140,27 @@ describe('the demo on formancy.ai (0069)', () => {
     expect(unhashedAssets(['index-BxKwE78K.js', 'angular-bootstrap-b1VPoZ-e.js', 'index-BgSCHOjx.css'], [])).toEqual([])
     expect(unhashedAssets(['index-BxKwE78K.js', 'index.js', 'logo.svg'], [])).toEqual(['index.js', 'logo.svg'])
     expect(unhashedAssets(['index-BxKwE78K.js', 'fixture-snapshot.json', 'brand-template.svg'], ['fixture-snapshot.json', 'brand-template.svg'])).toEqual(['fixture-snapshot.json', 'brand-template.svg'])
+  })
+
+  // turbo replays a cached build over the dist/ that is there and removes
+  // nothing, so a checkout that built before holds every earlier build's
+  // hashed files beside the page's (seen on 2026-10-16: six in assets/,
+  // three of them loaded). Deployed by hand from it, the demo would serve
+  // them all, a year's cache each. Workers Builds starts from a clone,
+  // where none is.
+  test('refuses a file in assets/ that the page never loads, through its own files or the files they name', () => {
+    const html = '<script type="module" src="./assets/index-BxKwE78K.js"></script><link rel="stylesheet" href="./assets/index-BgSCHOjx.css">'
+    const files = {
+      'index-BxKwE78K.js': 'import("./angular-bootstrap-b1VPoZ-e.js")',
+      'index-BgSCHOjx.css': 'body{}',
+      'angular-bootstrap-b1VPoZ-e.js': 'export {}',
+      'index-DzQepO-y.js': 'import("./angular-bootstrap-CLnQwhwK.js")',
+      'angular-bootstrap-CLnQwhwK.js': 'export {}',
+      'index-jUG2n6pz.css': 'body{}',
+    }
+    expect(unloadedAssets(files, html)).toEqual(['index-DzQepO-y.js', 'angular-bootstrap-CLnQwhwK.js', 'index-jUG2n6pz.css'])
+    // A chunk only another chunk loads is loaded, however deep.
+    expect(unloadedAssets({ 'a-11111111.js': 'import("./b-22222222.js")', 'b-22222222.js': 'import("./c-33333333.js")', 'c-33333333.js': '' }, '<script src="./assets/a-11111111.js"></script>')).toEqual([])
   })
 
   test.each([

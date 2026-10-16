@@ -114,7 +114,13 @@
     both `apps/examples/public/assets/` and the build's `assets/`, it
     refused the build: "assets/ holds files copied from the public
     directory or whose names carry no hash, which the headers would cache
-    for a year: fixture-snapshot.json".
+    for a year: fixture-snapshot.json". With a copy of a chunk put in the
+    build's `assets/` under another hashed name, as turbo leaves an
+    earlier build's files when it replays a cached build over `dist/`, it
+    refused the build: "assets/ holds files the page never loads, an
+    earlier build's, which the deploy would serve too" (the case in
+    `scripts/demo.test.mjs` watched failing first against a check that
+    found nothing).
   - **Review alone** holds what is in Cloudflare's dashboard and GitHub's
     settings: that the Worker is connected with the settings
     REPO-METADATA.md records, that no other branch is built and no
