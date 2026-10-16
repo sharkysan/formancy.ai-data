@@ -1,6 +1,6 @@
 import { generateForm, planDelete } from '@formancy/data-core'
 import type { DeleteOutcome, DeleteRequest, FormBindings, FormPolicy, MetadataSnapshot, PolicyContext, RecordAdapter } from '@formancy/data-core'
-import { cascadeAnswer, cascadeCase, covers, PARITY_CASCADES, PARITY_SCOPE, REACH_PRIVILEGE_LOSSES, startPostgresFixture } from '@formancy/data-fixtures'
+import { cascadeAnswer, cascadeCase, covers, PARITY_CASCADES, PARITY_SCOPE, REACH_PRIVILEGE_LOSSES, startPostgresFixture, versionFact } from '@formancy/data-fixtures'
 import type { CascadeCase, DeleteAnswer, PostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql, TransactionSql } from 'postgres'
@@ -135,6 +135,13 @@ async function asRole(role: string, grants: readonly string[]): Promise<Sql> {
   url.username = role
   url.password = 'role-fixture-password'
   return postgres(url.toString(), { onnotice: () => {} })
+}
+
+/** The role that owns `table`, as the catalog names it: the role a referential action on it runs as. */
+async function ownerOf(table: string): Promise<string> {
+  const [row] = await owner<{ owned: string }[]>`select pg_catalog.pg_get_userbyid(relowner)::text as owned from pg_catalog.pg_class where oid = ${table}::regclass`
+  if (row === undefined) throw new Error(`no relation ${table}`)
+  return row.owned
 }
 
 /** What a deleting role is granted: SELECT and DELETE on the parent, and DELETE on every table the delete reaches -- what 0051 holds a delete to. */
@@ -328,11 +335,14 @@ describe("the account's grants and row security on the tables a delete reaches",
   // What runs on a table a cascade reaches is PostgreSQL's, and not under
   // one identity. The referential action's delete runs as the referring
   // table's owner, so that table's BEFORE DELETE trigger and the rule that
-  // rewrites the action run as the owner, with the owner's grants; its
-  // AFTER DELETE trigger, queued to the end of the deleting statement, runs
-  // as the deleting account. Characterised (0051 P5), and never seen or
-  // governed here.
-  test("a cascaded table's BEFORE trigger and rule run as its owner, its AFTER trigger as the deleting account", async () => {
+  // rewrites the action run as the owner, with the owner's grants. Its AFTER
+  // DELETE trigger is queued to the end of the deleting statement: 18 runs it
+  // as the role that queued it, the owner, and 15 to 17 as the role active
+  // when it fires, the deleting account (VERSION_FACTS.afterTriggerAsQueuer;
+  // watched failing on 18 while this asserted the deleting account there,
+  // and on 17 with the row's value for 17 set to 18's). Characterised (0051
+  // P5), and never seen or governed here.
+  test('a cascaded table’s BEFORE trigger and rule run as its owner, its AFTER trigger as the role that queued it or the deleting account', async () => {
     const sql = await asRole('triggered_cascader', [...DELETER('triggered_cascader')])
     await owner.unsafe(`create table parity.cascade_log (fired text not null, by_whom text not null);
       grant insert on parity.cascade_log to triggered_cascader;
@@ -342,12 +352,12 @@ describe("the account's grants and row security on the tables a delete reaches",
       create trigger tr_cascade_after after delete on parity.removable_cascade for each row execute function parity.cascade_logged();
       create rule rl_cascade_logged as on delete to parity.removable_cascade do also insert into parity.cascade_log values ('RULE', current_user)`)
     try {
-      const [{ owned } = { owned: '' }] = await owner<{ owned: string }[]>`select pg_catalog.pg_get_userbyid(relowner)::text as owned from pg_catalog.pg_class where oid = 'parity.removable_cascade'::regclass`
+      const owned = await ownerOf('parity.removable_cascade')
       const parent = await family('cascade-triggers', 1, 0)
       const via = createPostgresRecords(sql)
       expect(answer(await via.delete(await planned(parent, via)))).toBe('deleted')
       expect([...(await owner.unsafe('select fired, by_whom from parity.cascade_log order by fired'))]).toEqual([
-        { fired: 'AFTER', by_whom: 'triggered_cascader' },
+        { fired: 'AFTER', by_whom: versionFact('afterTriggerAsQueuer', fixture.server) ? owned : 'triggered_cascader' },
         { fired: 'BEFORE', by_whom: owned },
         { fired: 'RULE', by_whom: owned },
       ])
@@ -358,6 +368,43 @@ describe("the account's grants and row security on the tables a delete reaches",
         drop trigger tr_cascade_after on parity.removable_cascade;
         drop function parity.cascade_logged();
         drop table parity.cascade_log`)
+    }
+  })
+
+  // What a person meets of it. A cascaded table's AFTER DELETE trigger that
+  // writes a table only the owner may write: where it runs as the deleting
+  // account, 15 to 17, the insert is refused, 42501, and the delete with it,
+  // `permission-denied`, the record and its rows kept; where it runs as the
+  // owner, 18, the delete is done and the trigger's row is the owner's. The
+  // same policy and grants answer differently by version, and this module
+  // decides neither (watched failing on 18 and on 17 with each value set to
+  // the other version's).
+  test('a cascaded table’s AFTER trigger that writes where only the owner may refuses the delete where it runs as the deleting account, and not where it runs as the owner', async () => {
+    const sql = await asRole('owner_triggered_cascader', [...DELETER('owner_triggered_cascader')])
+    await owner.unsafe(`create table parity.cascade_owner_log (fired text not null, by_whom text not null);
+      create function parity.cascade_owner_logged() returns trigger language plpgsql as $$
+        begin insert into parity.cascade_owner_log values (tg_when, current_user); return old; end $$;
+      create trigger tr_cascade_owner_after after delete on parity.removable_cascade for each row execute function parity.cascade_owner_logged()`)
+    try {
+      const owned = await ownerOf('parity.removable_cascade')
+      const parent = await family('cascade-owner-trigger', 1, 0)
+      const via = createPostgresRecords(sql)
+      const outcome = await via.delete(await planned(parent, via))
+      const logged = [...(await owner.unsafe('select fired, by_whom from parity.cascade_owner_log'))]
+      if (versionFact('afterTriggerAsQueuer', fixture.server)) {
+        expect(answer(outcome)).toBe('deleted')
+        expect(await left('cascade-owner-trigger')).toEqual(gone)
+        expect(logged).toEqual([{ fired: 'AFTER', by_whom: owned }])
+      } else {
+        expect(outcome).toMatchObject({ ok: false, code: 'permission-denied', message: expect.stringMatching(/SQLSTATE 42501/) })
+        expect(await left('cascade-owner-trigger')).toEqual(whole(1, 0))
+        expect(logged).toEqual([])
+      }
+    } finally {
+      await sql.end()
+      await owner.unsafe(`drop trigger tr_cascade_owner_after on parity.removable_cascade;
+        drop function parity.cascade_owner_logged();
+        drop table parity.cascade_owner_log`)
     }
   })
 })

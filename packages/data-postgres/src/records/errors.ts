@@ -12,10 +12,11 @@ const BY_STATE: ReadonlyMap<string, RecordFailureCode> = new Map([
   // An exclusion constraint is a generalised unique one: "conflicting key value".
   ['23P01', 'unique-violation'],
   ['23503', 'foreign-key-violation'],
-  // restrict_violation. PostgreSQL 17 reports a foreign key's ON DELETE
-  // RESTRICT as 23503, as it does NO ACTION (measured on 17.11, 2026-10-11,
-  // 0050 P3, held by delete.integration.test.ts's `restrict` case); kept for
-  // the code's own meaning, which nothing here provokes.
+  // restrict_violation: a foreign key's ON DELETE RESTRICT on PostgreSQL 18,
+  // which 15 to 17 report as 23503, as they do NO ACTION (0050 P3;
+  // VERSION_FACTS.restrictViolation, held on every leg by
+  // delete.integration.test.ts's `restrict` case, which failed on 18 without
+  // this entry: check-violation, class 23's default).
   ['23001', 'foreign-key-violation'],
   ['23502', 'not-null-violation'],
   ['23514', 'check-violation'],

@@ -25,7 +25,14 @@ export interface VersionFact {
   heldBy: { file: string; test: string }
 }
 
-export type VersionFactName = 'transactionTimeout' | 'notNullTestsRemoved' | 'membershipInherit' | 'viewSecurityDefinition'
+export type VersionFactName =
+  | 'transactionTimeout'
+  | 'notNullTestsRemoved'
+  | 'membershipInherit'
+  | 'afterTriggerAsQueuer'
+  | 'restrictViolation'
+  | 'notNullConstraints'
+  | 'viewSecurityDefinition'
 
 export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
   transactionTimeout: {
@@ -77,6 +84,57 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
     heldBy: {
       file: 'packages/data-postgres/src/discovery-access.integration.test.ts',
       test: 'a WITH INHERIT FALSE membership reports no capability, and the read is refused; a server without the option refuses the grant, and a NOINHERIT member reports none',
+    },
+  },
+  afterTriggerAsQueuer: {
+    engine: 'postgres',
+    says:
+      'PostgreSQL runs an AFTER trigger as the role that was active when its event was queued, so a cascaded table’s AFTER DELETE trigger, queued while the referential action deleted as that table’s owner, runs as the owner, with the owner’s grants, and a delete whose trigger writes where only the owner may is done; a server without it runs the trigger as the role active when it fires, the deleting account at the end of its statement, with that account’s grants, and such a delete is refused, permission-denied (0051, P5). Neither is seen or governed by the adapter',
+    values: { 15: false, 16: false, 17: false, 18: true },
+    source: 'PostgreSQL 18’s release notes, under the migration to version 18: "Execute AFTER triggers as the role that was active when trigger events were queued"; before, they ran as the role active when they fired',
+    measured: {
+      15: '2026-10-16, postgres:15-alpine answering 15.19, on Docker Desktop on Windows: the cascaded table’s AFTER DELETE trigger recorded the deleting account as current_user, its BEFORE trigger and its rule the owner; and with a trigger inserting into a table only the owner may write, the delete was refused, 42501, permission-denied, the record and its rows kept',
+      16: '2026-10-16, postgres:16-alpine answering 16.15, on Docker Desktop on Windows: as 15',
+      17: 'every run, on the default image: as 15 (0051, P5)',
+      18: '2026-10-16, postgres:18-alpine answering 18.6, on Docker Desktop on Windows: the AFTER DELETE trigger recorded the owner, as the BEFORE trigger and the rule did; and the delete whose trigger inserted where only the owner may was done, the trigger’s row the owner’s',
+    },
+    heldBy: {
+      file: 'packages/data-postgres/src/cascade.integration.test.ts',
+      test: 'a cascaded table’s AFTER trigger that writes where only the owner may refuses the delete where it runs as the deleting account, and not where it runs as the owner',
+    },
+  },
+  restrictViolation: {
+    engine: 'postgres',
+    says:
+      'PostgreSQL refuses a delete that an ON DELETE RESTRICT key forbids with restrict_violation, 23001, "violates RESTRICT setting of foreign key constraint", the key named; a server without it refuses one with foreign_key_violation, 23503, as it refuses NO ACTION (0050, P3). The adapter answers foreign-key-violation, the key named, for both, which the server answers referenced; a NO ACTION key is 23503 on every version',
+    values: { 15: false, 16: false, 17: false, 18: true },
+    source: 'PostgreSQL commit 086c84b23d, "Fix error code for referential action RESTRICT" (2024-12-02), first released in 18.0, which 18’s release notes do not list: ri_triggers.c raises ERRCODE_RESTRICT_VIOLATION on REL_18_STABLE and nowhere on REL_17_STABLE',
+    measured: {
+      15: '2026-10-16, postgres:15-alpine answering 15.19, on Docker Desktop on Windows: the delete of a row an ON DELETE RESTRICT key refers to failed with 23503, "violates foreign key constraint", the constraint named, as under NO ACTION',
+      16: '2026-10-16, postgres:16-alpine answering 16.15, on Docker Desktop on Windows: as 15',
+      17: 'every run, on the default image: as 15 (0050, P3)',
+      18: '2026-10-16, postgres:18-alpine answering 18.6, on Docker Desktop on Windows: 23001, "violates RESTRICT setting of foreign key constraint", the constraint named; a NO ACTION key’s refusal was 23503',
+    },
+    heldBy: {
+      file: 'packages/data-postgres/src/delete.integration.test.ts',
+      test: 'restrict: a row a RESTRICT key refers to stays, refused as NO ACTION is',
+    },
+  },
+  notNullConstraints: {
+    engine: 'postgres',
+    says:
+      'PostgreSQL files each column’s NOT NULL in pg_constraint, a row of type n for every column pg_attribute holds NOT NULL, which every role reads as it reads the rest of pg_catalog; a server without it keeps NOT NULL in pg_attribute.attnotnull alone, and pg_constraint has no row for it. Discovery reads NOT NULL from attnotnull and checks of type c alone, so its snapshot of one table is the same on both',
+    values: { 15: false, 16: false, 17: false, 18: true },
+    source: 'PostgreSQL 18’s release notes, under constraints: "Store column NOT NULL specifications in pg_constraint"',
+    measured: {
+      15: '2026-10-16, postgres:15-alpine answering 15.19, on Docker Desktop on Windows: the restricted reader counted five pg_constraint rows on sales.order, its keys and checks, none of type n',
+      16: '2026-10-16, postgres:16-alpine answering 16.15, on Docker Desktop on Windows: as 15',
+      17: 'every run, on the default image: as 15 (0006)',
+      18: '2026-10-16, postgres:18-alpine answering 18.6, on Docker Desktop on Windows: twelve, the same five and seven of type n, one for each of the seven columns pg_attribute holds NOT NULL; information_schema still showed the reader none',
+    },
+    heldBy: {
+      file: 'packages/data-postgres/src/discovery.integration.test.ts',
+      test: 'information_schema hides every constraint on sales.order from the reader; pg_catalog hides none',
     },
   },
   viewSecurityDefinition: {

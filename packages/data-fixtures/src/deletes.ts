@@ -40,8 +40,10 @@ export type DeleteExpectation = DeleteAnswer | Readonly<Record<DatabaseKind, Del
  *   never handed out again, so the new row is never the old one's.
  * - `referenced`: a row a NO ACTION key's row still refers to: the
  *   database keeps it.
- * - `restrict`: the same through PostgreSQL's ON DELETE RESTRICT, which is
- *   23503 there as NO ACTION is (measured, P3), and SQL Server's NO ACTION.
+ * - `restrict`: the same through PostgreSQL's ON DELETE RESTRICT -- 23503
+ *   on 15 to 17, as NO ACTION is (measured, P3), and 23001 on 18
+ *   (VERSION_FACTS.restrictViolation), the same answer either way -- and
+ *   SQL Server's NO ACTION.
  * - `self-reference`: a row another row of its own table refers to: SQL
  *   Server's SAME TABLE REFERENCE, PostgreSQL's 23503.
  * - `declined`: a trigger declines the delete without an error -- a
