@@ -129,18 +129,19 @@ export const LONG_CACHE = 'public, max-age=31536000, immutable'
 export const NOTICES_TYPE = 'text/plain; charset=utf-8'
 
 /**
- * The rules, for the page served under `base` (`/data/examples/`): every
- * file under it gets the policy and its companions, the hashed chunks a
- * year's cache, and the notices their encoding. The page itself keeps
- * Cloudflare's default cache, revalidated on every load, so a deploy is
- * seen at once.
+ * The rules, for the page served under `base` (`/data/examples/`) with
+ * `policy` -- POLICY, unless a record decides another, as 0070 does for the
+ * live demo: every file under it gets the policy and its companions, the
+ * hashed chunks a year's cache, and the notices their encoding. The page
+ * itself keeps Cloudflare's default cache, revalidated on every load, so a
+ * deploy is seen at once.
  */
-export function headerRules(base) {
+export function headerRules(base, policy = POLICY) {
   return [
     {
       path: `${base}*`,
       headers: {
-        'Content-Security-Policy': contentSecurityPolicy(),
+        'Content-Security-Policy': contentSecurityPolicy(policy),
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'no-referrer',
         'Permissions-Policy': DENIED_FEATURES.map((feature) => `${feature}=()`).join(', '),
@@ -151,9 +152,9 @@ export function headerRules(base) {
   ]
 }
 
-/** The rules as a `_headers` file. */
-export function headersFile(rules) {
-  const lines = ['# Written by scripts/demo.mjs from scripts/demo-headers.mjs (0069).']
+/** The rules as a `_headers` file, its first line saying what wrote it. */
+export function headersFile(rules, writer = 'scripts/demo.mjs from scripts/demo-headers.mjs (0069)') {
+  const lines = [`# Written by ${writer}.`]
   for (const { path, headers } of rules) {
     lines.push('', path, ...Object.entries(headers).map(([name, value]) => `  ${name}: ${value}`))
   }
@@ -232,8 +233,14 @@ const DECIDED = Object.keys(POLICY)
  *   own origin, and a face inlined as a data: URL is refused (0072);
  * - img-src allows `data:` exactly when the page or a stylesheet, outside
  *   its faces, uses a data: URL.
+ *
+ * `allowed` names, directive by directive, a source a record decided to
+ * allow although it is loose -- the live demo's `'unsafe-inline'` in
+ * style-src, for the style elements AG Grid injects (0070) -- so an
+ * allowance is one source in one directive, never a looser rule for every
+ * page. It does not let index.html carry an inline style.
  */
-export function policyProblems(policy, { html, stylesheets, address }) {
+export function policyProblems(policy, { html, stylesheets, address }, { allowed = {} } = {}) {
   const problems = []
   for (const name of DECIDED) if (policy[name] === undefined) problems.push(`the policy has no ${name}, which the record decides`)
   for (const name of Object.keys(policy)) if (!DECIDED.includes(name)) problems.push(`the policy has ${name}, which the record does not decide`)
@@ -242,13 +249,15 @@ export function policyProblems(policy, { html, stylesheets, address }) {
   // page uses, held below to the data: URLs it has.
   const loose = (source) => /^'unsafe-|^'wasm-unsafe-eval'$|\*/.test(source) || (/^[a-z][a-z0-9+.-]*:$/.test(source) && source !== 'data:')
   for (const [name, sources] of Object.entries(policy)) {
-    for (const source of sources.filter(loose)) problems.push(`${name} allows ${source}`)
+    for (const source of sources.filter((each) => loose(each) && !(allowed[name] ?? []).includes(each))) problems.push(`${name} allows ${source}`)
   }
 
   const scripts = elements(html, 'script')
   const links = elements(html, 'link')
   if (scripts.some((attributes) => attributes.src === undefined)) problems.push('index.html has an inline script, which script-src refuses')
-  if (/<style\b/i.test(html) || elements(html, '[a-z][\\w-]*').some((attributes) => attributes.style !== undefined)) problems.push('index.html has an inline style, which style-src refuses')
+  if (/<style\b/i.test(html) || elements(html, '[a-z][\\w-]*').some((attributes) => attributes.style !== undefined)) {
+    problems.push((allowed['style-src'] ?? []).includes("'unsafe-inline'") ? 'index.html has an inline style, which style-src allows only for what a script injects' : 'index.html has an inline style, which style-src refuses')
+  }
 
   const faces = stylesheets.flatMap((css) => fontFaces(css).flatMap((face) => face.sources))
   const loads = {

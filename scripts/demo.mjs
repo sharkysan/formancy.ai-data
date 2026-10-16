@@ -41,7 +41,7 @@
 import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { references, resolved } from './addresses.mjs'
 import { HASHED, headerRules, headersFile, POLICY, policyProblems } from './demo-headers.mjs'
@@ -222,49 +222,61 @@ export function namingProblems({ assetsDir, output }) {
 }
 
 /**
- * The examples page's Vite config, resolved as `vite build` resolves it,
- * with the Vite the page builds with: its public directory (none when it
- * is switched off), its assets directory and its output options.
+ * A page's Vite config -- the examples page's unless `root` names another
+ * app, in `mode` -- resolved as `vite build` resolves it, with the Vite
+ * that app builds with: its public directory (none when it is switched
+ * off), its assets directory and its output options. The live demo's
+ * deploy asks it of the host page in its demo mode (0070).
  */
-export async function viteBuild() {
-  const vite = await import(pathToFileURL(createRequire(join(app, 'package.json')).resolve('vite')).href)
-  const config = await vite.resolveConfig({ root: app, configFile: join(app, 'vite.config.ts'), logLevel: 'silent' }, 'build', 'production')
+export async function viteBuild(root = app, mode = 'production') {
+  const vite = await import(pathToFileURL(createRequire(join(root, 'package.json')).resolve('vite')).href)
+  const config = await vite.resolveConfig({ root, configFile: join(root, 'vite.config.ts'), logLevel: 'silent', mode }, 'build', mode)
   return { publicDir: config.publicDir || null, assetsDir: config.build.assetsDir, output: config.build.rolldownOptions?.output ?? config.build.rollupOptions?.output }
 }
 
 /**
  * A command's output, without its last newline; a command that fails stops
  * the deploy. Wrangler is told not to send Cloudflare its usage telemetry.
+ * The live demo's deploy runs its commands through this too (0070).
  */
-function run(command, args, options = {}) {
+export function run(command, args, options = {}) {
   const settings = { cwd: repo, encoding: 'utf8', env: { ...process.env, WRANGLER_SEND_METRICS: 'false' }, ...options }
-  // npx is a .cmd on Windows, which Node starts only through a shell: one
-  // command line, as the install gate's, rather than arguments beside
-  // `shell`, which Node would concatenate unescaped all the same (DEP0190).
+  // npx and pnpm are .cmd files on Windows, which Node starts only through a
+  // shell: one command line, as the install gate's, rather than arguments
+  // beside `shell`, which Node would concatenate unescaped all the same
+  // (DEP0190).
   const result =
-    command === 'npx' && process.platform === 'win32'
-      ? spawnSync(['npx.cmd', ...args.map((arg) => (/[\s"]/.test(arg) ? `"${arg.replaceAll('"', '\\"')}"` : arg))].join(' '), { ...settings, shell: true })
+    (command === 'npx' || command === 'pnpm') && process.platform === 'win32'
+      ? spawnSync([`${command}.cmd`, ...args.map((arg) => (/[\s"]/.test(arg) ? `"${arg.replaceAll('"', '\\"')}"` : arg))].join(' '), { ...settings, shell: true })
       : spawnSync(command, args, settings)
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} exited ${String(result.status)}`)
   return (result.stdout ?? '').trimEnd()
 }
 
-/** The checks on the build served at `address`, before anything is staged: one sentence per problem. */
-async function buildProblems(dist, address) {
+/**
+ * The checks on the build in `dist` served at `address`, before anything
+ * is staged: one sentence per problem. The examples page's build under
+ * POLICY unless `page` says otherwise -- the app whose Vite config built
+ * it, its mode, its name in a sentence, and the policy it is served with
+ * and that policy's allowances -- as the live demo's deploy says for the
+ * host page's demo build (0070).
+ */
+export async function buildProblems(dist, address, page = {}) {
+  const { root = app, mode = 'production', name = 'the examples page', policy = POLICY, allowed = {} } = page
   const html = readFileSync(join(dist, 'index.html'), 'utf8')
   const absolute = indexProblems(html, address)
   const problems = absolute.length === 0 ? [] : [`the built page asks formancy.ai for files other than by a path relative to it, which formancy.ai answers from its own site: ${absolute.join(', ')}`]
-  const vite = await viteBuild()
-  for (const problem of namingProblems(vite)) problems.push(`the examples page's Vite config ${problem}`)
+  const vite = await viteBuild(root, mode)
+  for (const problem of namingProblems(vite)) problems.push(`${name}'s Vite config ${problem}`)
   const copiedFrom = vite.publicDir === null ? null : join(vite.publicDir, HASHED)
   const copied = copiedFrom !== null && existsSync(copiedFrom) ? readdirSync(copiedFrom) : []
   const assets = readdirSync(join(dist, HASHED))
   const unhashed = unhashedAssets(assets, copied)
   if (unhashed.length > 0) problems.push(`${HASHED} holds files copied from the public directory or whose names carry no hash, which the headers would cache for a year: ${unhashed.join(', ')}`)
   const unloaded = unloadedAssets(Object.fromEntries(assets.map((name) => [name, readFileSync(join(dist, HASHED, name), 'utf8')])), html)
-  if (unloaded.length > 0) problems.push(`${HASHED} holds files the page never loads, an earlier build's, which the deploy would serve too; delete apps/examples/dist and build again: ${unloaded.join(', ')}`)
+  if (unloaded.length > 0) problems.push(`${HASHED} holds files the page never loads, an earlier build's, which the deploy would serve too; delete ${relative(repo, dist).replaceAll('\\', '/')} and build again: ${unloaded.join(', ')}`)
   const stylesheets = assets.filter((name) => name.endsWith('.css')).map((name) => readFileSync(join(dist, HASHED, name), 'utf8'))
-  for (const problem of policyProblems(POLICY, { html, stylesheets, address })) problems.push(`the Content-Security-Policy does not fit the built page: ${problem}`)
+  for (const problem of policyProblems(policy, { html, stylesheets, address }, { allowed })) problems.push(`the Content-Security-Policy does not fit the built page: ${problem}`)
   if (!existsSync(join(dist, NOTICES_FILE))) problems.push(`the build has no ${NOTICES_FILE}, and the page bundles other people's packages, whose licences go with it (0046)`)
   return problems
 }
@@ -297,7 +309,9 @@ async function main(args) {
   console.log(dryRun ? `\nchecked, and nothing uploaded: ${commit}${changed === '' ? '' : ', with uncommitted changes'} would be served at ${demoUrl(config)}` : `\n${commit} is served at ${demoUrl(config)}`)
 }
 
-if (process.argv[1]?.endsWith('demo.mjs')) {
+// Run as a program, and only as one: scripts/live-demo.mjs imports this
+// file, and its name ends in demo.mjs too.
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     await main(process.argv.slice(2))
   } catch (error) {

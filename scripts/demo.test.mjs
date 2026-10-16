@@ -205,10 +205,12 @@ describe('the demo on formancy.ai (0069)', () => {
   // would connect formancy.ai-report, or create its Worker a second time.
   test("REPO-METADATA.md's Workers Builds settings are pnpm demo:deploy's halves, for the demo's Worker and this repository", () => {
     const metadata = read('.github', 'REPO-METADATA.md')
-    const setting = (name) => new RegExp(`^\\| ${name} \\| \`([^\`]+)\` \\|`, 'm').exec(metadata)?.[1]
     const repository = JSON.parse(read('packages', 'data-core', 'package.json')).repository.url.replace(/^git\+https:\/\/github\.com\//, '').replace(/\.git$/, '')
     const start = metadata.indexOf("\n## The demo's Worker on Cloudflare\n")
     const worker = metadata.slice(start, metadata.indexOf('\n## ', start + 1))
+    // Read from this section alone: the live demo's has a table of the same
+    // settings for another Worker (0070).
+    const setting = (name) => new RegExp(`^\\| ${name} \\| \`([^\`]+)\` \\|`, 'm').exec(worker)?.[1]
     expect(start).toBeGreaterThan(-1)
     expect(setting('Git repository')).toBe(repository)
     const named = [...worker.matchAll(/\bsharkysan\/[\w.-]*[\w-]/g)].map((match) => match[0])
