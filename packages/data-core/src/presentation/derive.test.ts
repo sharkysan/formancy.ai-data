@@ -286,4 +286,16 @@ describe('presentationOf', () => {
     const unbound = { ...bindings, fields: bindings.fields.filter((entry) => entry.field !== 'paid') }
     expect(presentationOf(base, edited, unbound)).toEqual({ ok: false, problems: [`/model/fields/${index('paid')}: paid has no binding, so nothing anchors its presentation`] })
   })
+
+  // A move is presentation on the field's own entry (0075) and needs the
+  // field's anchor as a label does. Watched failing with the binding check
+  // reading only the label and the span: the unanchored move was dropped
+  // from the presentation, and the refusal was the closing comparison's
+  // "differs from the base", which names no field and no path.
+  test('refuses a move of a field the bindings do not name, as it refuses a label on one', () => {
+    const moved = copy(base)
+    grid(moved, 1).children.push(grid(moved, 0).children.pop() as Child)
+    const unbound = { ...bindings, fields: bindings.fields.filter((entry) => entry.field !== 'paid') }
+    expect(presentationOf(base, moved, unbound)).toEqual({ ok: false, problems: [`/model/fields/${index('paid')}: paid has no binding, so nothing anchors its presentation`] })
+  })
 })
