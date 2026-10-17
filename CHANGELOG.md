@@ -230,6 +230,39 @@ later.
   built would first fail on Cloudflare, beside a Worker already live; and
   `wrangler dev` runs no container on Windows, nor against Docker Desktop's
   kernel in WSL. The release report waits for the job.
+- **A person can download a form's records as one CSV file**,
+  `POST /v1/forms/:id/records/export`, and `exportRecords` in
+  `@formancy/data-client`. Until now a person saw their records a page at
+  a time in a grid and could take them nowhere, where Directus, Filament
+  and AdminJS export CSV. The file is every record the list would page
+  through for the same search, sort and parent, under the read right as it
+  stands: whoever may list may download, since a script could page the
+  list anyway, and nothing in a policy or a setting withholds one from the
+  other -- drop the path at your proxy to have no exports. The server makes
+  the whole file before it sends a byte, so a file is whole or refused with
+  its own code, never cut short: past 16 MiB (`422 export-too-large`) or 30
+  seconds (`503 export-timeout`), a memory budget and a bound derived from
+  nginx's default read timeout, neither measured; while another file is
+  being made through the same allowlisted connection in that server
+  (`503 export-busy`); when a record would appear twice because the rows
+  moved between two pages (`409 moved`); and for text UTF-8 cannot carry,
+  which SQL Server can hold, or a lookup whose key is too long for a token,
+  though the grid shows that row (`409 unencodable`). Each value is what a
+  read holds, digit for digit, a lookup its label beside its key, NULL an
+  empty cell and `''` as `""`, in UTF-8 after a byte-order mark, and a cell
+  a spreadsheet would read as a formula carries one apostrophe in front,
+  which taking one off every cell that has one undoes. It is not the table
+  at one moment: a row deleted meanwhile can be missing. The Cloudflare
+  runtime door forwards the route, and so does the live demo's Worker. The
+  host page has no button for it yet
+  ([0079](docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+  New exports of `@formancy/data-core`: `validateExportQuery`,
+  `exportColumns`, `exportHeader`, `exportRecord`, `exportText`,
+  `exportFileName`, `EXPORT_MAX_BYTES`, and the types `RecordExportQuery`,
+  `ExportColumns`, `ExportField`, `ExportLabels`, `ExportQueryCheck`,
+  `ExportQueryRefusal`, `CsvCell`, `CsvRefusal` and `CsvText`; of
+  `@formancy/data-client`: `exportRecords`, `EXPORT_MAX_BYTES`, and the
+  types `RecordFile` and `RecordExportQuery`.
 
 ### Changed
 
@@ -485,6 +518,13 @@ later.
   would have deployed the examples page first; and a comparison of the
   paths as given did nothing and exited 0 when the checkout was reached
   through a link, a deploy by hand reported that never ran.
+- **Every runtime audit event carries `rows`**: for an `export`, how many
+  records its file held, or held when it was refused -- 0 when no statement
+  ran -- so an operator can see that somebody took ten thousand rows, and
+  the trail is still no copy of them; `null` for every other operation. A
+  deployment's own sink sees the field on every event, and an embedder's
+  `RuntimeAuditEvent` has it; `RuntimeOperation` has `export`
+  ([0079](docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
 
 What review costs, in 0065: every submit and approval asks the database, so
 one that cannot be reached refuses both; nothing deletes a draft; nobody is
@@ -630,6 +670,18 @@ its connection behind empty slots, and no test shows what discovery then
 does; an integrator's own statements on a client it also hands the adapter
 meet the driver as it is; and the workaround stays when postgres.js fixes
 it, which only the spike suite's characterisation will say.
+
+What the export costs, in 0079: no policy lets a person browse and not
+download; the file is not the table at one moment, and a row deleted
+meanwhile is missing unseen; each page reads every row before its offset;
+16 MiB and 30 s are a budget and a derivation, and on PostgreSQL a page
+past nginx's 60 s gets the person a 504 while the server works on; one
+export per allowlisted connection at a time in each server; a text cell
+starting `=`, `+`, `-`, `@`, TAB, CR or `'` carries an apostrophe the
+database does not hold; instants to the second and times to the minute,
+as a read holds them; on SQL Server an unpaired surrogate or a NUL refuses
+the file; and what Excel shows of it -- the byte-order mark, a `;` locale,
+17 digits -- was not tried.
 
 ## 0.1.0 — 2026-10-16
 

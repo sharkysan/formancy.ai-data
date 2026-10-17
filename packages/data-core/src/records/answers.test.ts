@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest'
 import type { DatabaseKind } from '../adapter.js'
 import type { ApiValue } from '../codecs/codec.js'
 import { generateForm } from '../generate/generate.js'
-import { toFormAnswers } from './answers.js'
+import { canonicalValue, toFormAnswers } from './answers.js'
 import { planCreate, planRead, planUpdate } from './plan.js'
 import {
   ANSWERS as CLERK_ANSWERS,
@@ -152,6 +152,31 @@ describe('toFormAnswers', () => {
     const { answers } = toFormAnswers(renamed, ['__proto__'], read(STORED))
     expect(Object.hasOwn(answers, '__proto__')).toBe(true)
     expect(Object.getPrototypeOf(answers)).toBe(Object.prototype)
+  })
+})
+
+describe('canonicalValue', () => {
+  // A file of records holds the column's value, not the control's (0079):
+  // the radio's 'true' is the boolean true, a number field's 2 the text
+  // '2'. Each column field's answer goes back to exactly what was read, or
+  // a file would hold what no read returns.
+  test('undoes toFormAnswers for every column field', () => {
+    for (const paid of [true, false, null]) {
+      const { answers } = toFormAnswers(PG_FORM.bindings, ALL_FIELDS, read({ ...STORED, paid }))
+      for (const binding of PG_FORM.bindings.fields) {
+        if (binding.kind !== 'column') continue
+        expect(canonicalValue(binding, answers[binding.field] as ApiValue), binding.field).toBe(binding.column === 'paid' ? paid : STORED[binding.column])
+      }
+    }
+  })
+
+  // An answer its control could not hold is not one toFormAnswers made:
+  // thrown, never written as some text.
+  test('throws on an answer the field’s control could not hold', () => {
+    const binding = (field: string) => PG_FORM.bindings.fields.find((entry) => entry.field === field) as Parameters<typeof canonicalValue>[0]
+    expect(() => canonicalValue(binding('paid'), 'yes')).toThrow("'true' or 'false'")
+    expect(() => canonicalValue(binding('approved_by'), 2.5)).toThrow('whole number')
+    expect(() => canonicalValue(binding('approved_by'), '2')).toThrow('whole number')
   })
 })
 

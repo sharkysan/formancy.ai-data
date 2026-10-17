@@ -63,15 +63,19 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > part-way on its connection answering as it would have, where a 0.1.0
 > server can answer that lookup `unavailable` and refuse that read
 > ([0078](./docs/decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md));
-> and the [live demo](#live-demo) at https://formancy.ai/data/demo/,
+> the [live demo](#live-demo) at https://formancy.ai/data/demo/,
 > main's server and PostgreSQL in a Cloudflare Container of each visitor's
 > own, which Cloudflare deploys from `main` once its Worker is created and
 > not from a release
-> ([0070](./docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)),
+> ([0070](./docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md));
+> and a form's records downloaded as one CSV file, made whole or refused,
+> which a 0.1.0 server does not have
+> ([0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
-> page of records, the menu of forms or a delete, a host page that draws a
+> page of records, a file of them, the menu of forms or a delete, a button
+> on the host page that downloads a file, a host page that draws a
 > field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
 > a host page on another origin run in a browser, a run through a real
@@ -261,6 +265,20 @@ until then the address is formancy.ai's 404
   PostgreSQL's bytes in turn, SQL Server's byte groups -- total and stable on
   both, and not the same
   ([0056](./docs/decisions/0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md)).
+- **A person can download the records a list would show them as one CSV
+  file**, for the same search, sort and parent and under the same read
+  policy, with no right of its own, through the runtime plane and
+  `@formancy/data-client`'s `exportRecords`. The server makes the whole
+  file before it sends a byte, so a file is whole or refused with its own
+  code, never cut short: refused past 16 MiB or 30 seconds, and while
+  another file is being made through the same allowlisted connection.
+  Each value is what a read holds, digit for digit, a lookup its label
+  beside its key, and a cell a spreadsheet would read as a formula carries
+  one apostrophe in front, which taking one off every cell that has one
+  undoes. It is not the table at one moment: a record two pages would both
+  show refuses the file, and a row deleted meanwhile can be missing. The
+  host page has no button for it yet
+  ([0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
 - **A record can be deleted, one at a time, by its token and the version its
   person read**, under the policy's `operations.delete`, granted only to
   roles that may read and scoped as an update is, in one guarded statement

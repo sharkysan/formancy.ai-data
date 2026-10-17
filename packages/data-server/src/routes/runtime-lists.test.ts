@@ -398,8 +398,8 @@ describe('the list route', () => {
     await list('line', { search: 'Muster', sort: [{ field: 'quantity', direction: 'desc' }], parent: { field: 'order', record: 'k1:42' } })
     await list('customer', {}, 'stranger')
     expect(events).toEqual([
-      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'list', form: 'line', formVersion: 1, status: 200, outcome: 'ok', record: null },
-      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 's', operation: 'list', form: 'customer', formVersion: 1, status: 403, outcome: 'operation-denied', record: null },
+      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'list', form: 'line', formVersion: 1, status: 200, outcome: 'ok', record: null, rows: null },
+      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 's', operation: 'list', form: 'customer', formVersion: 1, status: 403, outcome: 'operation-denied', record: null, rows: null },
     ])
     expect(JSON.stringify(events)).not.toMatch(/Muster|quantity|k1:/)
   })

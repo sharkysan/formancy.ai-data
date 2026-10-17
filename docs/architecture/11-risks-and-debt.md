@@ -56,6 +56,11 @@ Server answers not found (0043,
 A cascade deletes the rows it reaches whatever the account's row security
 says of them
 ([0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)).
+One download reads every row a list would show the person
+([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)): nothing they could not have, since a script holding their
+token can page the list, but a stolen token reads a tenant's rows in one
+request rather than fifty a request, and no policy lets a person browse
+and not download -- only a proxy can drop the route, for everybody.
 
 ### Lost updates and ambiguous writes
 
@@ -176,6 +181,15 @@ between two pages shows one row twice or skips one (0044). A form published
 at 0.1.0 draws its lookups as plain selects until it is regenerated and
 published again
 ([0066](../decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
+A file of records is not the table at one moment: a row deleted meanwhile
+before an offset is missing unseen, and one inserted there refuses the file.
+A text cell that starts as a formula, or with an apostrophe, carries one
+apostrophe the database does not hold; on SQL Server text UTF-8 cannot
+carry refuses the whole file, and so, on either engine, does a lookup
+whose key is too long for a token, a row the grid shows; a header can
+repeat a label; and what a
+spreadsheet shows of the file -- its byte-order mark, a `;` locale, 17
+digits -- was not tried ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
 
 **Writes.** On SQL Server, a table with an enabled INSTEAD OF trigger cannot
 be written that way through the adapter, `returning` is the row before an
@@ -250,7 +264,14 @@ proves where a version file came from
 ([0062](../decisions/0062-a-published-version-moves-between-deployments-as-its-version-file.md)).
 Nothing deletes a draft, and an approval and a rejection of one draft at
 the same moment can both succeed (0065). A page of records has neither
-cancellation nor a deadline (0061).
+cancellation nor a deadline (0061). A file of records is refused past
+16 MiB or 30 s, a budget and a derivation from nginx's default read
+timeout, and one is made at a time per allowlisted connection in each
+process; on PostgreSQL a page past nginx's 60 s gets the person a 504
+while the server makes the file for nobody, and a page still running after
+its export was refused or left keeps that connection's gate, every other
+export through it refused `export-busy` until the statement returns
+(0079).
 
 **Operations.** An upstream fix reaches an installation only in a release
 of this module ([0002](../decisions/0002-depend-on-upstream-never-copy-it.md)),
@@ -392,6 +413,14 @@ moves between deployments as a file whose keeping is the team's to secure.
 and 0033: an event is written after the database or the store commits, by
 another system, so a crash between the two loses it, and nothing stops a
 privileged operator editing the log.
+
+**A file of records read by offsets, not in one snapshot.** The cost of
+[0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md), bought to keep every statement a guarded list page (0015) and
+no transaction across pages, which would hold a connection and VACUUM's
+horizon on PostgreSQL, and needs a database setting or blocks writers on
+SQL Server: page *k* reads every row before *k* × 50, and a row that moves
+between two pages is skipped unseen or refuses the file `moved`. Keyset
+paging, which 0044 declined, is what would pay it down.
 
 ## 11.6 People and process
 

@@ -1,6 +1,6 @@
 # 0028 — Row filters, labels and refusals mean the same on both engines
 
-- **Status:** accepted; narrowed by [0067](0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md): its `transaction_timeout` case holds on PostgreSQL 17 and later, and on 15 and 16, which have no such setting and refuse the connection that sends it with 42704, the case asserts that refusal (`VERSION_FACTS.transactionTimeout`)
+- **Status:** accepted; narrowed by [0067](0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md): its `transaction_timeout` case holds on PostgreSQL 17 and later, and on 15 and 16, which have no such setting and refuse the connection that sends it with 42704, the case asserts that refusal (`VERSION_FACTS.transactionTimeout`); extended by [0079](0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md): a file of records writes each lookup's label as a resolve gives it, under the person's read filter for that lookup, the same on both engines
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

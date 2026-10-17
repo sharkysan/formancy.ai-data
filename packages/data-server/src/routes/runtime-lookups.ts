@@ -6,6 +6,7 @@ import type { OpenConnection } from '../connections.js'
 import { lookupDeadline } from '../lookup-deadline.js'
 import { abandonment } from './abandoned.js'
 import { planRefusal } from './runtime-errors.js'
+import type { HttpRefusal } from './runtime-errors.js'
 
 /**
  * At most this many tokens are resolved in one request: a form holds one per
@@ -33,6 +34,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** A lookup field's configuration and this person's filter for its rows, or the refusal to answer. */
+export type LookupScope = { ok: true; config: LookupConfig; filters: RowFilters } | { ok: false; refusal: HttpRefusal }
+
+/**
+ * The configuration of the lookup `field` and the actor's filter for its
+ * rows under `operation` (0012), or the policy's refusal. Asks no database:
+ * the lookup routes and an export's labels (0079) both decide here, before
+ * any statement, so one lookup is never scoped two ways.
+ *
+ * Scoped as a record request's filter is (0028): a trusted value the column
+ * does not hold in that spelling is refused here, never left to the engine
+ * to convert.
+ */
+export function lookupScope(bundle: PublishedBundle, context: PolicyContext, operation: PolicyOperation, field: string): LookupScope {
+  const filter = lookupRowFilter(bundle.policy, context, bundle.bindings, operation, field)
+  if (!filter.ok) return { ok: false, refusal: planRefusal(filter.code, filter.message) }
+  const config = buildLookupConfig(bundle.bindings, field, { snapshot: bundle.snapshot })
+  // buildLookupConfig found the target in this snapshot, or it would have thrown.
+  const scoped = scopeRowFilters(findObject(bundle.snapshot, config.target) as ObjectMeta, filter.filter, `lookups.${field}`)
+  if (!scoped.ok) return { ok: false, refusal: planRefusal(scoped.code, scoped.message) }
+  return { ok: true, config, filters: scoped.filters }
+}
+
 /** The lookup field a source name stands for, its config and the actor's filter for it — or a reply already sent. */
 async function lookupFor(steps: LookupRouteSteps, request: LookupRequest, reply: FastifyReply, operation: unknown): Promise<{ open: OpenConnection; config: LookupConfig; filters: RowFilters } | undefined> {
   if (typeof operation !== 'string' || !OPERATIONS.has(operation as PolicyOperation)) {
@@ -46,26 +70,15 @@ async function lookupFor(steps: LookupRouteSteps, request: LookupRequest, reply:
     await reply.code(404).send({ code: 'unknown-lookup', message: `This form has no lookup called ${request.params.source}.` })
     return undefined
   }
-  const filter = lookupRowFilter(bundle.policy, steps.context(request), bundle.bindings, operation as PolicyOperation, binding.field)
-  if (!filter.ok) {
-    const refusal = planRefusal(filter.code, filter.message)
-    await reply.code(refusal.status).send(refusal.body)
-    return undefined
-  }
-  // Scoped as a record request's filter is (0028), before a connection is
-  // opened: a trusted value the column does not hold in that spelling is
-  // refused here, never left to the engine to convert.
-  const config = buildLookupConfig(bundle.bindings, binding.field, { snapshot: bundle.snapshot })
-  // buildLookupConfig found the target in this snapshot, or it would have thrown.
-  const scoped = scopeRowFilters(findObject(bundle.snapshot, config.target) as ObjectMeta, filter.filter, `lookups.${binding.field}`)
-  if (!scoped.ok) {
-    const refusal = planRefusal(scoped.code, scoped.message)
-    await reply.code(refusal.status).send(refusal.body)
+  // Decided before a connection is opened.
+  const scope = lookupScope(bundle, steps.context(request), operation as PolicyOperation, binding.field)
+  if (!scope.ok) {
+    await reply.code(scope.refusal.status).send(scope.refusal.body)
     return undefined
   }
   const open = await steps.connection(bundle, reply)
   if (open === undefined) return undefined
-  return { open, config, filters: scoped.filters }
+  return { open, config: scope.config, filters: scope.filters }
 }
 
 /** What each lookup says when it fails, or its resolve passes its deadline: `unavailable`, which invites another try. */

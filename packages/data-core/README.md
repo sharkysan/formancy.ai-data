@@ -422,6 +422,24 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   description its own statement carried by `driftRefusal(…, 'list')`: a
   read's refusal, and `LIST_REFUSED` when the table no longer holds the key
   unique and NOT NULL.
+- **A file of records** (0079). `validateExportQuery` checks an export's
+  body: a list's `search`, `sort` and `parent`, read by the same checks,
+  and nothing else -- an `offset` or a `limit` is `malformed`, since the
+  server reads every page. The pages are `planList`'s. `exportColumns(form,
+  bindings, readable)` is the file's columns: the readable fields in the
+  form's `model.fields` order, headed by a string label or else the key, a
+  lookup as two, its label and then its token under `<header> (key)`.
+  `exportHeader` writes the header row after a byte-order mark;
+  `exportRecord(columns, record, labels)` writes one record from a page's
+  answers and the labels the page's resolves gave, refusing `unencodable`
+  for a lookup whose key fits no token and, through `csv.ts`, for text
+  UTF-8 cannot carry or a NUL, naming the column and never the value.
+  `exportText(type, value)` is a cell's text: `displayText`'s, except a
+  time and a timestamp, written as read. `csv.ts` quotes by RFC 4180 and
+  puts one apostrophe before a cell that starts as a formula, or with an
+  apostrophe, unless it is a number. `EXPORT_MAX_BYTES`, 16 MiB, is the
+  budget server and client share, and `exportFileName(formId)` the name a
+  file is saved under, `<form id>.csv`.
 - **A delete** (0050). `planDelete(snapshot, bindings, policy, context,
   recordToken, expectedVersion, described)` asks the policy first -- its
   filters and throughs scope a delete as an update's do -- then whether the

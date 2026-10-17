@@ -725,7 +725,10 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   ways, a NOT NULL sort spelled without a placement, a parent over an
   integer and over a `char(2)` foreign key, a child's lines through their
   order, every row its read, and a page refused once its own description
-  says the key can be NULL or is not unique.
+  says the key can be NULL or is not unique; and a file of the shipments
+  (0079), `EXPORT_PARITY`'s `export: shipments`: the shipments listed
+  through the adapter and written by data-core are the shared file's
+  bytes.
 - `uuid.integration.test.ts` — a uuid key end to end (0056), each case
   `UUID_PARITY`'s, as the order form's own account: `sales.delivery`'s key
   and its `gen_random_uuid()` default discovered, the key read-only in the

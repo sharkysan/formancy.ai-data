@@ -1,6 +1,6 @@
 # 0008 — Exact values travel as strings, are canonical, and are never rounded
 
-- **Status:** accepted; text length narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md): counted in the column's own unit; a fixed-length text value's trailing spaces narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): dropped by the codec, as both engines read it
+- **Status:** accepted; text length narrowed by [0026](0026-name-every-column-fact-the-engines-disagree-on.md): counted in the column's own unit; a fixed-length text value's trailing spaces narrowed by [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): dropped by the codec, as both engines read it; extended by [0079](0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md): a file of records holds each value as its canonical text, digit for digit, a number never through a JavaScript number
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/codecs/codec.test.ts` — the fixture's

@@ -476,6 +476,23 @@ the server's log says why
 - **nginx's access log**, in the composed stack and behind Cloudflare, holds
   every visitor's address and every request line with its query: personal
   data on the operator's machine (0037).
+- **An export's deadline rests on the proxy's read timeout.** A file of
+  records is answered only once it is whole, so the proxy in front waits
+  for its first byte as long as the file takes. `EXPORT_DEADLINE_MS`, 30 s,
+  is derived from nginx's default `proxy_read_timeout`, 60 s, which
+  `deploy/web/nginx.conf` does not change, less a SQL Server list statement
+  in flight that runs on to mssql's 15 s; `export-limits.test.ts` fails when
+  a forwarding location of that file waits less. A proxy of the operator's
+  own that waits less than 45 s answers a long export with its own 504
+  while the server finishes it; nothing holds that. Cloudflare waits 100 s
+  by its documentation, not tried. An operator who wants no exports drops
+  `POST /v1/forms/:id/records/export` at the proxy
+  ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+- **One export at a time per allowlisted connection in each replica**:
+  each holds at most one of its pool's connections while a page runs,
+  and up to about twice 16 MiB of memory while it is made; a file on its
+  way to a slow client holds its bytes until they are sent, after the
+  gate has opened for the next (0079).
 - **On SIGTERM or SIGINT** the server stops taking requests, finishes those
   in flight and closes every database pool (`main.ts`). That the pools close
   is held by review; no test sends the signal and looks.

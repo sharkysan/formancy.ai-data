@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { checkedRecord } from '../release-report/collect.mjs'
-import { composedServer, deleteOrder, proxyProblems, writeServerRecord } from './journey.mjs'
+import { composedServer, csvColumn, deleteOrder, exportOrders, proxyProblems, writeServerRecord } from './journey.mjs'
 
 /**
  * The getting-started journey's record of each composed database (0035),
@@ -164,5 +164,59 @@ describe('deleting an order over HTTP', () => {
     } finally {
       await stand.close()
     }
+  })
+})
+
+describe('exporting the orders over HTTP', () => {
+  // The journey's export (0079), asked of a loopback server standing in for
+  // the stack's web port that scopes order 7 to tenant 1 as the server
+  // does: tenant 1's file holds it in the id column and tenant 2's does
+  // not, each asked for with its own token and as CSV; and a stand-in that
+  // leaks order 7 into tenant 2's file is named. Watched failing with the
+  // check of tenant 2's file removed: it was never asked for, and the leak
+  // passed.
+  async function plane(leaks = false) {
+    const seen = []
+    const tenants = { 'clerk-1': '1', 'clerk-2': '2' }
+    const stand = createServer((request, response) => {
+      request.resume()
+      request.on('end', () => {
+        const tenant = tenants[(request.headers.authorization ?? '').replace('Bearer ', '')]
+        seen.push({ url: request.url, tenant, accept: request.headers.accept })
+        const rows = tenant === '1' || leaks ? '7,"Muster ""Zug"", AG"\r\n' : '8,Other Tenant GmbH\r\n'
+        response.writeHead(200, { 'content-type': 'text/csv; charset=utf-8' }).end(`﻿Id,Customer\r\n${rows}`)
+      })
+    })
+    await new Promise((ready) => stand.listen(0, '127.0.0.1', ready))
+    return { seen, url: `http://127.0.0.1:${String(stand.address().port)}/`, close: () => new Promise((done) => stand.close(done)) }
+  }
+
+  test("tenant 1's file holds tenant 1's order and tenant 2's does not", async () => {
+    const stand = await plane()
+    try {
+      await exportOrders(stand.url, { clerk1: 'clerk-1', clerk2: 'clerk-2' }, 'pg-order', 'k1:7', 'Id', 'pg:')
+      expect(stand.seen).toEqual([
+        { url: '/v1/forms/pg-order/records/export', tenant: '1', accept: 'text/csv, application/json' },
+        { url: '/v1/forms/pg-order/records/export', tenant: '2', accept: 'text/csv, application/json' },
+      ])
+    } finally {
+      await stand.close()
+    }
+  })
+
+  test("names tenant 1's order in tenant 2's file", async () => {
+    const stand = await plane(true)
+    try {
+      await expect(exportOrders(stand.url, { clerk1: 'clerk-1', clerk2: 'clerk-2' }, 'pg-order', 'k1:7', 'Id', 'pg:')).rejects.toThrow("pg: tenant 2's file of orders holds tenant 1's order")
+    } finally {
+      await stand.close()
+    }
+  })
+
+  // The column is read as RFC 4180 reads it: quotes off, a doubled quote
+  // one, a comma or a line break inside quotes part of the cell.
+  test('reads a column of a CSV file as RFC 4180 does', () => {
+    expect(csvColumn('﻿Id,Name\r\n7,"a, ""b""\r\nc"\r\n8,\r\n9,""\r\n', 'Name')).toEqual(['a, "b"\r\nc', '', ''])
+    expect(() => csvColumn('Id\r\n7\r\n', 'Name')).toThrow('the file has no column headed Name')
   })
 })

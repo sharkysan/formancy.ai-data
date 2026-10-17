@@ -141,6 +141,26 @@ function formValue(binding: ColumnBinding, value: ApiValue): ApiValue {
 }
 
 /**
+ * A column field's answer as its column's canonical value: `formValue`
+ * undone, for a reader of the value rather than of the control -- a file of
+ * records (0079). The radio's 'true' and 'false' are a nullable boolean's;
+ * a number is a whole-number field's, which the generator makes only for a
+ * range JavaScript holds exactly, so its decimal is the canonical text.
+ * Throws on an answer its control could not hold, as `formValue` throws on
+ * a value that is not canonical.
+ */
+export function canonicalValue(binding: ColumnBinding, answer: ApiValue): ApiValue {
+  const shape = shapeOf(binding)
+  if (answer === null || shape === 'as-is') return answer
+  if (shape === 'three-state') {
+    if (answer !== 'true' && answer !== 'false') throw new Error(`${binding.field} answers something other than 'true' or 'false'; its control is a radio of the two.`)
+    return answer === 'true'
+  }
+  if (typeof answer !== 'number' || !Number.isSafeInteger(answer)) throw new Error(`${binding.field} answers something other than a whole number its control holds.`)
+  return String(answer)
+}
+
+/**
  * A lookup's answer from its foreign-key columns: the token of their values,
  * `null` when any is NULL, and `undefined` — left out of the answers — when the
  * key is too long for a token. Left out rather than `null`, because a form

@@ -176,6 +176,15 @@ there would be either too loose to mean anything or flaky.
   ([0044](./decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)):
   what a page reads, its round trips and its time are not here, and no
   block of the harness sends one.
+- **No export.** `POST /v1/forms/:id/records/export` came after the figures
+  too
+  ([0079](./decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)):
+  it is every page of a list, one statement a page, and one resolve a page
+  per lookup field, so it costs what those pages cost, which is not
+  measured either, and by how both engines run an offset each page reads
+  every row before it. Its two bounds are not figures: 16 MiB is a memory
+  budget, and 30 s is nginx's default read timeout less a SQL Server
+  statement's overrun and a margin. No block of the harness sends one.
 - **No menu of forms.** `GET /v1/forms` came after the figures too
   ([0045](./decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)):
   it asks no database, and reads and validates every published form on

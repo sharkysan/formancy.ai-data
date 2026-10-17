@@ -187,6 +187,7 @@ describe('when the data server is not what answers', () => {
       await client.update('..', { record: 'k1:1', version: '1', answers: {} }),
       await client.query('..', 'customer', { operation: 'create', search: '' }),
       await client.resolve('pg-order', '..', { operation: 'create', tokens: ['k1:1'] }),
+      await client.exportRecords('..'),
     ]
     for (const refusal of refusals) expect(refusal).toMatchObject({ ok: false, status: 0, code: 'invalid-name' })
     expect(asked).toEqual([])
@@ -265,6 +266,7 @@ describe('across origins (0060)', () => {
       form: () => client.form('pg-order'),
       read: () => client.read('pg-order', 'k1:7'),
       list: () => client.list('pg-order', { search: 'a' }),
+      exportRecords: () => client.exportRecords('pg-order', { search: 'a' }),
       create: () => client.create('pg-order', { notes: 'a' }),
       update: () => client.update('pg-order', CHANGE),
       delete: () => client.delete('pg-order', { record: 'k1:7', version: '00000000000007d1' }),
@@ -567,5 +569,81 @@ describe('a delete (0050)', () => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ form: { model: {} }, operations: ['read', 'update'], readable: ['id'], list: null }))
     })
     expect(await createDataClient({ token: () => 't', base }).form('pg-ticket')).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+  })
+})
+
+describe('a file of records (0079)', () => {
+  const FILE = '﻿Id,Name\r\n7,Muster AG\r\n'
+
+  // The file is the server's bytes, byte-order mark included, under the
+  // name the form's id gives it -- never one read from a header, which a
+  // page on another origin cannot read (0060). Exactly the search, the
+  // sort and the parent travel, in a POST body, with the token in the
+  // header, and the answer is asked for as CSV or a JSON refusal.
+  test('is the server’s bytes under the form’s file name, asked for with exactly the query', async () => {
+    const seen: Array<{ accept: string | undefined; body: string }> = []
+    const { base, asked } = await serve((request, response) => {
+      void drained(request).then((body) => {
+        seen.push({ accept: request.headers.accept, body })
+        response.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="other.csv"' }).end(Buffer.from(FILE, 'utf8'))
+      })
+    })
+    const query = { search: 'Muster', sort: [{ field: 'name', direction: 'asc' as const }], parent: null, offset: 50, limit: 10 }
+    const outcome = await createDataClient({ token: () => 't', base }).exportRecords('pg-order', query)
+    if (!outcome.ok) throw new Error(`expected a file, got ${outcome.code}`)
+    expect(outcome.value.name).toBe('pg-order.csv')
+    expect(Buffer.from(await outcome.value.file.arrayBuffer())).toEqual(Buffer.from(FILE, 'utf8'))
+    expect(asked).toEqual(['POST /v1/forms/pg-order/records/export Bearer t'])
+    expect(seen).toEqual([{ accept: 'text/csv, application/json', body: JSON.stringify({ search: 'Muster', sort: [{ field: 'name', direction: 'asc' }], parent: null }) }])
+  })
+
+  // A 200 that is not a CSV file -- a captive portal's page, a proxy's
+  // JSON, a server older than exports that answers something else -- is
+  // not the file. Saved, it would be a page of markup under a .csv name.
+  // Watched failing with the content type unchecked: a file of `{}`.
+  test('a 200 that is not text/csv is unexpected', async () => {
+    for (const [type, body] of [['application/json', '{}'], ['text/html', '<html></html>'], ['text/csvx', 'a,b\r\n']]) {
+      const { base } = await serve((_request, response) => {
+        response.writeHead(200, { 'content-type': type as string }).end(body)
+      })
+      expect(await createDataClient({ token: () => 't', base }).exportRecords('pg-order'), type).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
+  })
+
+  // A file is whole only when its body arrived whole: a connection cut
+  // before the length the server announced is not a shorter file, which a
+  // person would open and take for every record. Watched failing with the
+  // body read as JSON reads it, a failed read taken for an empty body:
+  // a file of nothing.
+  test('a body cut off after a 200 is incomplete, never a file', async () => {
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-length': '1000' })
+      response.write(FILE)
+      setTimeout(() => response.destroy(), 20)
+    })
+    expect(await createDataClient({ token: () => 't', base }).exportRecords('pg-order')).toEqual({
+      ok: false,
+      status: 200,
+      code: 'incomplete',
+      message: 'The file did not arrive whole, so it was not kept. Try again.',
+    })
+  })
+
+  // A refusal is read as every read's is: the server's code and sentence,
+  // or `unexpected` for what is not the server's; and leaving the page
+  // while the file arrives rejects with the AbortError, never a refusal a
+  // page would show.
+  test('a refusal is the server’s, and an abort while the file arrives rejects with the AbortError', async () => {
+    const { base } = await serve((_request, response) => {
+      response.writeHead(422, { 'content-type': 'application/json' }).end(JSON.stringify({ code: 'export-too-large', message: 'The file would be larger than 16 MB.' }))
+    })
+    expect(await createDataClient({ token: () => 't', base }).exportRecords('pg-order')).toEqual({ ok: false, status: 422, code: 'export-too-large', message: 'The file would be larger than 16 MB.' })
+    const controller = new AbortController()
+    const { base: slow } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'text/csv; charset=utf-8' })
+      response.write(FILE)
+      setTimeout(() => controller.abort(), 20)
+    })
+    await expect(createDataClient({ token: () => 't', base: slow }).exportRecords('pg-order', {}, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
   })
 })
