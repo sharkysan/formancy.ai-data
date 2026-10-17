@@ -112,14 +112,22 @@ async function labelsOf(steps: ExportRouteSteps, making: Making, rows: readonly 
  * next offset, one guarded statement (0015), decided over the description
  * it carried as a list page is (0041, 0044), then its labels, then each
  * record written and counted. Refused at the first thing that stops it,
- * with nothing of what was written: a byte past `EXPORT_MAX_BYTES`, a token
+ * with nothing of what was written: a byte past `EXPORT_MAX_BYTES`, a key
  * already written -- the rows moved between two statements -- or text a
  * CSV file cannot carry.
+ *
+ * A record is known again by its key's values as the page read them, not
+ * by its token: a key that needs more characters as a token than a token
+ * holds is listed with none (`recordPage`) and written all the same, and a
+ * check on tokens would pass it twice. Every listed row has its key, since
+ * `listable` refuses a key that can be NULL; the page's rows and the
+ * statement's line up by index, the one row past the page left off.
  */
 async function made(steps: ExportRouteSteps, making: Making, header: string): Promise<Step<{ text: string }>> {
   const { request, bundle, open, columns } = making
   const parts = [header]
   let bytes = Buffer.byteLength(header, 'utf8')
+  const key = making.first.target.identity.map((column) => column.name)
   const written = new Set<string>()
   for (let offset = 0; ; offset += LIST_PAGE_SIZE) {
     const halted = stopped(making)
@@ -131,9 +139,11 @@ async function made(steps: ExportRouteSteps, making: Making, header: string): Pr
     const page = recordPage(bundle.bindings, making.fields, outcome.rows, LIST_PAGE_SIZE)
     const labelled = await labelsOf(steps, making, page.rows)
     if (!labelled.ok) return labelled
-    for (const record of page.rows) {
-      if (record.record !== null && written.has(record.record)) return stop(MOVED)
-      if (record.record !== null) written.add(record.record)
+    for (const [index, record] of page.rows.entries()) {
+      const values = (outcome.rows[index] as (typeof outcome.rows)[number]).values
+      const known = JSON.stringify(key.map((name) => values[name] ?? null))
+      if (written.has(known)) return stop(MOVED)
+      written.add(known)
       const line = exportRecord(columns, record, labelled.labels)
       if (!line.ok) return stop(refused(409, line.code, line.message))
       bytes += Buffer.byteLength(line.text, 'utf8')

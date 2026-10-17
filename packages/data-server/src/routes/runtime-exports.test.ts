@@ -29,6 +29,8 @@ const NAME: NormalizedType = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-
 const CODE: NormalizedType = { kind: 'text', maxLength: 2, lengthUnit: 'utf16-code-units', fixedLength: true }
 const NOTES: NormalizedType = { kind: 'text', maxLength: null, lengthUnit: 'utf16-code-units', fixedLength: false }
 const PHOTO: NormalizedType = { kind: 'binary', maxLength: null, fixedLength: false }
+/** Text long enough that a key of it needs more than `KEY_TOKEN_MAX_LENGTH` characters as a token: such a record is listed with no token. */
+const LONG: NormalizedType = { kind: 'text', maxLength: 400, lengthUnit: 'utf16-code-units', fixedLength: false }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
   name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
 })
@@ -66,6 +68,11 @@ const SNAPSHOT = createSnapshot({
       columns: [col('order_id', 1, INT32), col('line_no', 2, INT32), col('quantity', 3, INT32), col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' })],
       primaryKey: { name: 'pk_line', columns: ['order_id', 'line_no'] }, uniqueKeys: [], foreignKeys: [fk('fk_line_order', ['order_id'], 'order', ['id'])], checks: [], rowSecurity: 'none',
     },
+    {
+      ref: ref('tag'), kind: 'table', comment: null,
+      columns: [col('code', 1, LONG), col('name', 2, NAME)],
+      primaryKey: { name: 'pk_tag', columns: ['code'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+    },
   ],
 })
 
@@ -82,6 +89,8 @@ const POLICY: FormPolicy = {
 }
 /** customer_no, half the key, kept from the clerk: a list, and so a file, would hand out every customer number. */
 const HIDDEN_KEY: FormPolicy = { ...POLICY, fields: { ...POLICY.fields, customer_no: { read: [], write: ['clerk'] } } }
+/** Tags, which every clerk may read: nothing in them is a tenant's. */
+const TAG_POLICY: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: { code: RW, name: RW }, rowFilters: [], lookups: {} }
 /** An order's lines with nothing scoping them while the order's options are filtered: a read reaches a line by a guessed token, and a list would hand out all of them. */
 const UNSCOPED_LINE: FormPolicy = {
   version: 1,
@@ -129,6 +138,8 @@ let beforePage: (request: ListRequest) => Promise<ListOutcome | undefined>
 let resolves: Array<{ source: string; tokens: readonly string[]; filters: RowFilters }>
 /** What the fake resolve does: answers the labels it knows, or waits until its signal aborts. */
 let resolving: 'answer' | 'wait'
+/** Runs when a waiting resolve's signal aborts, with its reason and how long it really waited, before it rejects. */
+let stopping: (reason: unknown, waitedMs: number) => void
 let events: RuntimeAuditEvent[]
 let root: string
 const apps: FastifyInstance[] = []
@@ -162,7 +173,14 @@ function registry(): ConnectionRegistry {
     },
     resolve: async (config: LookupConfig, tokens, filters, signal) => {
       resolves.push({ source: config.source, tokens, filters })
-      if (resolving === 'wait') return new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+      if (resolving === 'wait') {
+        const started = performance.now()
+        return new Promise((_resolve, reject) =>
+          signal.addEventListener('abort', () => {
+            stopping(signal.reason, performance.now() - started)
+            reject(signal.reason)
+          }, { once: true }))
+      }
       return tokens.flatMap((token) => (LABELS.has(token) ? [{ token, label: LABELS.get(token) as string }] : []))
     },
     rejects: async () => {
@@ -191,6 +209,7 @@ beforeEach(async () => {
   beforePage = async () => undefined
   resolves = []
   resolving = 'answer'
+  stopping = () => {}
   events = []
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-exports-'))
   const store = createFileConfigurationStore(root)
@@ -198,9 +217,12 @@ beforeEach(async () => {
   const bundle: PublishedBundle = { format: 1, connection: 'erp', form: generated.form, bindings: generated.bindings, policy: POLICY, snapshot: SNAPSHOT }
   await store.publish('customer', null, bundle)
   await store.publish('customer-crm', null, { ...bundle, connection: 'crm' })
+  await store.publish('customer-2', null, bundle)
   await store.publish('hidden', null, { ...bundle, policy: HIDDEN_KEY })
   const line = generateForm(SNAPSHOT, { connection: 'erp', root: ref('line'), formId: 'line', title: 'Line', lookups: [{ foreignKey: 'fk_line_order', display: ['placed'] }] })
   await store.publish('unscoped-line', null, { ...bundle, form: line.form, bindings: line.bindings, policy: UNSCOPED_LINE })
+  const tag = generateForm(SNAPSHOT, { connection: 'erp', root: ref('tag'), formId: 'tag', title: 'Tag', lookups: [] })
+  await store.publish('tag', null, { ...bundle, form: tag.form, bindings: tag.bindings, policy: TAG_POLICY })
   app = await server()
 })
 
@@ -213,6 +235,11 @@ afterEach(async () => {
 const as = (token: string) => ({ authorization: `Bearer ${token}` })
 const exported = (form: string, payload: unknown = {}, token = 'clerk', on = app) =>
   on.inject({ method: 'POST', url: `/v1/forms/${form}/records/export`, headers: { ...as(token), accept: 'text/csv, application/json' }, payload: payload as Record<string, unknown> })
+/** An answer's status and body, a refusal's read as JSON and a file's left as text: a file where a refusal was expected then fails as a file, not as JSON that does not parse. */
+const answerOf = (response: Awaited<ReturnType<typeof exported>>) => ({
+  status: response.statusCode,
+  body: String(response.headers['content-type']).startsWith('application/json') ? (response.json() as unknown) : response.body,
+})
 
 /** The header row the clerk's file of customers starts with, after the byte-order mark. */
 const HEADER = '﻿Tenant id,Customer no,Name,Country,Country (key),Notes\r\n'
@@ -379,6 +406,25 @@ describe('the export route', () => {
     expect({ status: response.statusCode, body: response.json() }).toEqual({ status: 409, body: { code: 'moved', message: 'The records changed while the file was made. Try again.' } })
   })
 
+  // A record whose key needs more characters as a token than a token holds
+  // is listed with none, and written, its fields being its data -- so a
+  // check kept on tokens passes it by: one written from the first page and
+  // repeated by the second would be in a file sent 200 twice. The check is
+  // on the key itself. Watched failing with the check kept on tokens: 200.
+  test('refuses a file in which a record whose key fits no token would appear twice 409 moved', async () => {
+    table = Array.from({ length: 60 }, (_, index) => ({ values: { code: `${'k'.repeat(250)}${String(index + 1).padStart(2, '0')}`, name: `Tag ${String(index + 1)}` }, version: VERSION }))
+    // A guard on the guard: these records have no token, and a file of them, moved by nothing, is whole.
+    const listed = await app.inject({ method: 'POST', url: '/v1/forms/tag/records/list', headers: as('clerk'), payload: {} })
+    expect((listed.json() as { rows: Array<{ record: string | null }> }).rows.map(({ record }) => record)).toEqual(Array.from({ length: LIST_PAGE_SIZE }, () => null))
+    const whole = await exported('tag')
+    expect({ status: whole.statusCode, lines: whole.body.split('\r\n').length }).toEqual({ status: 200, lines: 1 + 60 + 1 })
+    table[50] = table[0] as Stored
+    const response = await exported('tag')
+    const written = response.body.split('\r\n').filter((line) => line.endsWith(',Tag 1')).length
+    expect({ status: response.statusCode, written }).toEqual({ status: 409, written: 0 })
+    expect(response.json()).toEqual({ code: 'moved', message: 'The records changed while the file was made. Try again.' })
+  })
+
   // A value UTF-8 cannot carry -- an unpaired surrogate SQL Server keeps --
   // refuses the file, naming the column and never the value; and so does a
   // label of the form's own, refused before any statement.
@@ -429,9 +475,12 @@ describe('the export route', () => {
   })
 
   // One export at a time per connection: a second meanwhile is refused
-  // before any statement, the first is answered whole, and an export from
-  // another connection is not held up. Watched failing without the gate:
-  // both ran.
+  // before any statement -- of the same form, and of another form on that
+  // connection, since the bound is on the pool's connections and not on a
+  // form -- the first is answered whole, and an export from another
+  // connection is not held up. Watched failing without the gate: both ran;
+  // and with the gate kept per form: customer-2's file was made beside
+  // customer's, 200.
   test('refuses a second export from the same connection meanwhile 503 export-busy', async () => {
     let release: () => void = () => {}
     const held = new Promise<void>((resolve) => {
@@ -450,8 +499,9 @@ describe('the export route', () => {
     }
     const first = exported('customer')
     await asked
-    const second = await exported('customer')
-    expect({ status: second.statusCode, body: second.json() }).toEqual({ status: 503, body: { code: 'export-busy', message: "Another file is being made from this form's database. Try again in a moment." } })
+    const busy = { status: 503, body: { code: 'export-busy', message: "Another file is being made from this form's database. Try again in a moment." } }
+    expect(answerOf(await exported('customer'))).toEqual(busy)
+    expect(answerOf(await exported('customer-2'))).toEqual(busy)
     expect(lists).toHaveLength(1)
     expect((await exported('customer-crm')).statusCode).toBe(200)
     release()
@@ -470,10 +520,68 @@ describe('the export route', () => {
     expect({ status: response.statusCode, body: response.json() }).toEqual({ status: 503, body: { code: 'unavailable', message: 'The labels of the records could not be loaded, so no file was made.' } })
   })
 
+  // A resolve gets the lookup's deadline cut to what is left of the
+  // export's: with 40 ms left of the file's 30 s, a resolve given the
+  // lookup's whole minute would hold the file, the gate and its connection
+  // that long past the export's own deadline. The resolve stops when the
+  // export's time is up, and the file is refused export-timeout. The page
+  // leaves 40 ms; the resolve, once its signal aborts, moves the clock by
+  // the time it really waited. Watched failing with the lookup's own
+  // deadline given: the signal said 60000 ms, a minute later.
+  test('gives a page’s labels only what is left of the export’s deadline', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const LEFT_MS = 40
+    beforePage = async () => {
+      vi.setSystemTime(Date.now() + EXPORT_DEADLINE_MS - LEFT_MS)
+      return undefined
+    }
+    let stoppedWith: unknown
+    resolving = 'wait'
+    stopping = (reason, waitedMs) => {
+      stoppedWith = reason
+      vi.setSystemTime(Date.now() + Math.ceil(waitedMs) + 1)
+    }
+    const long = await server({ lookupDeadlineMs: 60_000 })
+    table = many(10)
+    const response = await exported('customer', {}, 'clerk', long)
+    expect({ status: response.statusCode, body: response.json() }).toEqual({ status: 503, body: { code: 'export-timeout', message: 'The file could not be made within 30 seconds. Search for fewer records and try again.' } })
+    expect(stoppedWith).toMatchObject({ name: 'TimeoutError', message: `The lookup passed its deadline of ${String(LEFT_MS)} ms.` })
+    expect(events.map(({ status, outcome, rows }) => ({ status, outcome, rows }))).toEqual([{ status: 503, outcome: 'export-timeout', rows: 0 }])
+  })
+
+  // A person who leaves while a page's labels are being resolved stops the
+  // resolve in the database (0061), and the export is abandoned, not
+  // unavailable: a refusal that invites another try for nobody would tell
+  // the trail the database failed. Watched failing with the abandonment
+  // left unasked after a resolve: the trail said 503 unavailable.
+  test('stops a resolve when the client leaves, and audits 499 abandoned', async () => {
+    resolving = 'wait'
+    table = many(10)
+    const listening = await server({ lookupDeadlineMs: 60_000 })
+    await listening.listen({ host: '127.0.0.1', port: 0 })
+    const closed = new Promise<void>((resolve) => listening.server.on('connection', (socket: Socket) => socket.once('close', () => resolve())))
+    const controller = new AbortController()
+    const base = `http://127.0.0.1:${String((listening.server.address() as AddressInfo).port)}`
+    const sent = fetch(`${base}/v1/forms/customer/records/export`, { method: 'POST', headers: { ...as('clerk'), 'content-type': 'application/json' }, body: '{}', signal: controller.signal })
+    while (resolves.length === 0) await new Promise((resolve) => setTimeout(resolve, 5))
+    controller.abort()
+    await expect(sent).rejects.toThrow()
+    await closed
+    while (events.length === 0) await new Promise((resolve) => setTimeout(resolve, 5))
+    expect({ lists: lists.length, resolves: resolves.length }).toEqual({ lists: 1, resolves: 1 })
+    expect(events.map(({ status, outcome, rows }) => ({ status, outcome, rows }))).toEqual([{ status: 499, outcome: 'abandoned', rows: 0 }])
+  })
+
   // A person who leaves stops the export before its next statement; the
-  // statement in flight finishes in the database. The trail's one event
-  // says 499 abandoned, with the records read before. Watched failing with
-  // no check between pages: the second page was asked for nobody.
+  // statement in flight finishes in the database. The trail's event says
+  // 499 abandoned, with the records read before. Watched failing with no
+  // check between pages: the second page was asked for nobody. Until that
+  // statement returns, the export keeps its connection's gate, though
+  // nobody waits for the file -- the statement holds one of the pool's
+  // connections, which is what the gate bounds -- so another export from
+  // that connection is refused export-busy meanwhile, the cost 0079 states.
+  // Watched failing with the gate given back when the client left: the
+  // other form's file was made beside the statement, 200.
   test('stops at the next page when the client leaves, and audits 499 abandoned', async () => {
     // No country, so no resolve: the check between the pages is the one that stops it.
     table = Array.from({ length: 60 }, (_, index) => customer(index + 1, 'Unlabelled'))
@@ -495,10 +603,15 @@ describe('the export route', () => {
     controller.abort()
     await expect(sent).rejects.toThrow()
     await closed
+    expect(answerOf(await exported('customer-2', {}, 'clerk', listening))).toMatchObject({ status: 503, body: { code: 'export-busy' } })
     release()
-    while (events.length === 0) await new Promise((resolve) => setTimeout(resolve, 5))
+    while (events.length < 2) await new Promise((resolve) => setTimeout(resolve, 5))
     expect(lists).toHaveLength(1)
-    expect(events.map(({ status, outcome, rows }) => ({ status, outcome, rows }))).toEqual([{ status: 499, outcome: 'abandoned', rows: 50 }])
+    expect(events.map(({ form, status, outcome, rows }) => ({ form, status, outcome, rows }))).toEqual([
+      { form: 'customer-2', status: 503, outcome: 'export-busy', rows: 0 },
+      { form: 'customer', status: 499, outcome: 'abandoned', rows: 50 },
+    ])
+    expect((await exported('customer-2', {}, 'clerk', listening)).statusCode).toBe(200)
   })
 
   // One event per export, named `export`, naming no record, with how many
