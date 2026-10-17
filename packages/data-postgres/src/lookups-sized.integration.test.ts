@@ -1,7 +1,7 @@
 import { buildLookupConfig, encodeKeyToken, generateForm } from '@formancy/data-core'
 import type { LookupConfig, LookupResult, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { loadSizedCustomers, sizedLookupPage, sizedResolveKeys, sizedRowsRead, sizedTerms, startPostgresFixture } from '@formancy/data-fixtures'
+import { loadSizedCustomers, sizedLookupPage, sizedResolveKeys, sizedRowsRead, sizedTerms, startPostgresFixture, versionFact } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -42,6 +42,12 @@ const NEVER = new AbortController().signal
  * plan costing less than jit_above_cost. The family is pinned below; JIT and
  * the workers are printed. In this file's own container, so no other suite
  * sees the load.
+ *
+ * Each key's `is not null`, which the statement carries, is planned away on
+ * 17 and later, the key's columns being NOT NULL; 15 and 16 keep it, and
+ * print it in the index condition beside the tenant's, reading the same
+ * rows (VERSION_FACTS.notNullTestsRemoved, 0067). The family pinned is the
+ * one the server's version prints.
  */
 let fixture: PostgresFixture
 let owner: Sql
@@ -180,9 +186,12 @@ function expectedPage(search: string): LookupResult {
   return { rows: page.rows.map((row) => ({ token: tokenOf(row.tenantId, row.customerNo), label: row.name })), hasMore: page.hasMore, omitted: 0 }
 }
 
+/** The tenant's index condition as the server prints it: with each key's `is not null` where it keeps them (VERSION_FACTS.notNullTestsRemoved). */
+const tenantCondition = (): string => (versionFact('notNullTestsRemoved', fixture.server) ? '(tenant_id = 1)' : '((tenant_id IS NOT NULL) AND (tenant_id = 1) AND (customer_no IS NOT NULL))')
+
 describe.each([
-  ['the order form, filtered to the tenant', TENANT_1, TENANT_ROWS, 'Bitmap Heap Scan <- Bitmap Index Scan using pk_customer (tenant_id = 1)'],
-  ['a form with no tenant row filter', NO_TENANT_FILTER, TABLE_ROWS, 'Seq Scan'],
+  ['the order form, filtered to the tenant', TENANT_1, TENANT_ROWS, (): string => `Bitmap Heap Scan <- Bitmap Index Scan using pk_customer ${tenantCondition()}`],
+  ['a form with no tenant row filter', NO_TENANT_FILTER, TABLE_ROWS, (): string => 'Seq Scan'],
 ] as const)('lookups over the sized customers on %s', (_form, filters, pinned, family) => {
   // The answer both engines must give, row for row, in code-point order on
   // musl: a lookup whose page drifted from the generator's would make every
@@ -204,7 +213,7 @@ describe.each([
     for (const scan of customerScans(plan)) expect(scan['Actual Loops'], 'a scan on customer ran more than once').toBe(1)
     expect(plan.Plan['Actual Rows']).toBeLessThanOrEqual(51)
     expect(rowsRead(plan).read).toBe(pinned)
-    expect(shape(plan)).toEqual([family])
+    expect(shape(plan)).toEqual([family()])
   })
 
   // What the server runs: the default plan, parallel on this image. Its
@@ -219,7 +228,7 @@ describe.each([
     console.log(`${_form}, ${name}: workers launched ${JSON.stringify(nodes(plan.Plan).map((node) => node['Workers Launched']).filter((n) => n !== undefined))}, JIT ${JSON.stringify(plan.JIT ?? null)}, read ${String(read)} ± ${String(bound)}`)
     expect(plan.Plan['Actual Rows']).toBeLessThanOrEqual(51)
     expect(Math.abs(read - pinned), `read ${String(read)}, pinned ${String(pinned)}, rounding bound ${String(bound)}`).toBeLessThanOrEqual(bound)
-    expect(shape(plan)).toEqual([family])
+    expect(shape(plan)).toEqual([family()])
   })
 })
 

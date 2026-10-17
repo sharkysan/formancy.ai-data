@@ -12,6 +12,7 @@ import { allFields, byCodepoint, type Comparison, describe, type Draft, type Dri
 import { accountChanges, privilegeChanges } from './privileges.js'
 import { referrerChanges } from './referrers.js'
 import { checkChanges, lookupTargetChanges, rootRelationshipChanges } from './relationships.js'
+import { serverChanges } from './server.js'
 import type { DriftChange, DriftReport, DriftSeverity, DriftSubject, DriftVerdict } from './types.js'
 
 /** The root as a request describes it, before an adapter's definition is attached (0041). */
@@ -69,7 +70,9 @@ function counted(offered: Offered, policy: Pick<FormPolicy, 'operations'>): Offe
  * policy's lookup filters compare (0028), which is why the policy is given. A change elsewhere in scope is not this form's business and is left
  * out, so an empty report means nothing this form rests on changed, not that
  * nothing changed. Equal fingerprints are the fast path: `createSnapshot`
- * promises they describe the same thing, so nothing is walked.
+ * promises they describe the same thing, so nothing is walked. The server
+ * the current snapshot was read from is outside the fingerprint, and is
+ * said on every path when this release was not tested on it (0068).
  *
  * Fails closed. A change the form cannot be sure is harmless stops the writes
  * it puts in doubt, and something that vanished behind a gap is an access
@@ -84,15 +87,18 @@ function counted(offered: Offered, policy: Pick<FormPolicy, 'operations'>): Offe
 export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings, policy: DriftPolicy): DriftReport {
   const { before, offered } = entered(base, bindings)
   // The runtime takes the same shortcut, before anything is described: equal
-  // fingerprints are one database, whatever the objects passed in say.
-  if (current.fingerprint === base.fingerprint) return { changes: [], blocking: false, readable: true, writable: offered, runtime: { readable: true, writable: { ...offered } } }
+  // fingerprints are one database, whatever the objects passed in say. Not
+  // one server: an in-place upgrade keeps the fingerprint (0068).
+  if (current.fingerprint === base.fingerprint) return { ...finish(serverChanges(current), offered, policy), runtime: { readable: true, writable: { ...offered } } }
   if (current.kind !== base.kind) {
     throw new Error(`a ${base.kind} snapshot cannot be compared with a ${current.kind} one: a form's bindings belong to one engine`)
   }
 
   const after = findObject(current, bindings.root)
   // The account is said beside a missing root: under another principal it may be missing for that principal only.
-  if (after === undefined) return { ...finish([rootMissing(current, bindings), ...accountChanges(base, current, bindings)], offered, policy), runtime: NOTHING_LEFT }
+  if (after === undefined) {
+    return { ...finish([rootMissing(current, bindings), ...accountChanges(base, current, bindings), ...serverChanges(current)], offered, policy), runtime: NOTHING_LEFT }
+  }
 
   const comparison: Comparison = { base, current, bindings, policy, before, after, cited: new Set() }
   const report = finish(
@@ -103,6 +109,8 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
       ...privilegeChanges(comparison),
       // What refers to the root is review's, never in a request's description (0050).
       ...referrerChanges(comparison),
+      // Whether this release was tested on the server is review's alone, never a request's (0068).
+      ...serverChanges(current),
       // Last: a gap is reported on its own only when no change above gave it as its reason.
       ...gapChanges(comparison),
     ],

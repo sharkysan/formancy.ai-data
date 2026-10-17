@@ -12,7 +12,7 @@ import { readObjects } from './objects.js'
 import { readReferencedBy, referencedByGaps } from './referenced-by.js'
 import { readPolicies, rowSecurityOf } from './row-security.js'
 import { readObjectVisibility } from './visibility.js'
-import { readServerVersion } from '../version.js'
+import { discoveryRefusal, readServer } from '../server.js'
 
 /**
  * What this connection's account can see of the tables and views in `scope`,
@@ -37,16 +37,23 @@ import { readServerVersion } from '../version.js'
  * another. A graph edge constraint, which is not a foreign key, is a gap on
  * each node table it connects, for any account (referenced-by.ts).
  *
+ * A server without sys.edge_constraints -- every SQL Server before 2019 -- is
+ * refused before the catalog is read, naming the release it answered (0068):
+ * the one refusal a version meets, and decided by that view, not by a major.
+ *
  * The pool is the caller's. Nothing here opens a connection or reads
  * configuration, and nothing here closes the pool.
  */
 export async function discoverSqlServer(pool: ConnectionPool, scope: DiscoveryScope): Promise<MetadataSnapshot> {
   const schemas = [...new Set(scope.schemas)]
-  // The same query ping runs, so the version a snapshot records and the
-  // version a ping reports cannot differ. The account before the early
-  // return: an empty snapshot is still somebody's.
-  const [version, account] = await Promise.all([readServerVersion(pool), readAccount(pool)])
-  if (schemas.length === 0) return createSnapshot({ kind: 'sqlserver', serverVersion: version, account, scope, objects: [], gaps: [] })
+  // The same query ping runs, so the server a snapshot records and the one
+  // a ping reports cannot differ. The account before the early return: an
+  // empty snapshot is still somebody's.
+  const [read, account] = await Promise.all([readServer(pool), readAccount(pool)])
+  const refusal = discoveryRefusal(read)
+  if (refusal !== undefined) throw new Error(refusal)
+  const { kind: _kind, version, ...server } = read.identity
+  if (schemas.length === 0) return createSnapshot({ kind: 'sqlserver', serverVersion: version, server, account, scope, objects: [], gaps: [] })
 
   const [objects, columns, keys, foreignKeys, referencedBy, checks, visibility, policed] = await Promise.all([
     readObjects(pool, schemas),
@@ -78,6 +85,7 @@ export async function discoverSqlServer(pool: ConnectionPool, scope: DiscoverySc
   return createSnapshot({
     kind: 'sqlserver',
     serverVersion: version,
+    server,
     account,
     scope,
     objects: assembled,

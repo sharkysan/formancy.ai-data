@@ -24,18 +24,8 @@ export { CASCADE_PARITY, cascadeAnswer, PARITY_CASCADES, REACH_PRIVILEGE_LOSSES 
 export type { CascadeCase } from './cascades.js'
 export type { DeleteAnswer, DeleteCase, DeleteExpectation } from './deletes.js'
 export type { ThroughCase } from './cases.js'
-export {
-  DEFAULT_IMAGES,
-  POSTGRES_IMAGE,
-  READER,
-  SQLSERVER_DATABASE,
-  SQLSERVER_IMAGE,
-  startPostgresContainer,
-  startPostgresFixture,
-  startSqlServerContainer,
-  startSqlServerFixture,
-  WRITER,
-} from './containers.js'
+export { READER, SQLSERVER_DATABASE, startPostgresContainer, startPostgresFixture, startSqlServerContainer, startSqlServerFixture, WRITER } from './containers.js'
+export { DEFAULT_IMAGES, imageMajor, IMAGES_VARIABLE, MATRIX_IMAGES, POSTGRES_IMAGE, selectedImage, selectedImages, SQLSERVER_IMAGE } from './images.js'
 export type { PostgresFixture, SqlServerFixture, StartedServer } from './containers.js'
 export { restrictedDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'
 export { defined } from './defined.js'
@@ -93,3 +83,5 @@ export type { ServerAnswer, ServerRecord } from './servers.js'
 // testcontainers itself (0035).
 export type { StartedMSSQLServerContainer } from '@testcontainers/mssqlserver'
 export type { StartedPostgreSqlContainer } from '@testcontainers/postgresql'
+export { serverMajor, VERSION_FACTS, versionFact } from './versions.js'
+export type { VersionFact, VersionFactName } from './versions.js'

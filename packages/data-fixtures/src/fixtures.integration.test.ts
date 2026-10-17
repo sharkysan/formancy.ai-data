@@ -7,8 +7,9 @@ import { getContainerRuntimeClient } from 'testcontainers'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { blockTable } from './blocking.js'
 import type { PostgresFixture, SqlServerFixture } from './containers.js'
-import { POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
+import { SQLSERVER_DATABASE, startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
 import { connectDocker } from './docker.js'
+import { selectedImage } from './images.js'
 import { FILTER_PARITY } from './parity.js'
 import { DELIVERIES } from './uuid.js'
 import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
@@ -478,7 +479,7 @@ describe('what each start records for the release report', () => {
     const sql = postgres(pg.admin)
     try {
       const [row] = await sql<{ version: string }[]>`select current_setting('server_version') as version`
-      expect(pg.server).toMatchObject({ engine: 'postgres', image: POSTGRES_IMAGE, version: row?.version, updateLevel: null, edition: null, caller: here })
+      expect(pg.server).toMatchObject({ engine: 'postgres', image: selectedImage('postgres'), version: row?.version, updateLevel: null, edition: null, compatibility: null, caller: here })
     } finally {
       await sql.end()
     }
@@ -488,11 +489,32 @@ describe('what each start records for the release report', () => {
         "select cast(serverproperty('ProductVersion') as nvarchar(128)) as version, cast(serverproperty('Edition') as nvarchar(128)) as edition",
       )
       const [row] = result.recordset
-      expect(ms.server).toMatchObject({ engine: 'sqlserver', image: SQLSERVER_IMAGE, version: row?.version, edition: row?.edition, caller: here })
+      expect(ms.server).toMatchObject({ engine: 'sqlserver', image: selectedImage('sqlserver'), version: row?.version, edition: row?.edition, caller: here })
     } finally {
       await pool.close()
     }
     expect(written()).toEqual(expect.arrayContaining([pg.server, ms.server]))
+  })
+
+  // data-core's compatibility floor is the lowest level a matrix leg's
+  // fixture database answered (0068), and each adapter's server test holds
+  // the floor to this record: a record with no level, or null, would leave
+  // the floor held to nothing on every leg. Asked here of the fixture's
+  // database by name, from `master`. What it cannot catch is the record
+  // read from master's own row: the fixture's database is created fresh
+  // and takes `model`'s level, which in a fresh container is master's
+  // too. That the adapter reads the connected database's level,
+  // not master's, is held where a database is set away from it
+  // (data-sqlserver's server.integration.test.ts, at 140).
+  test('names the compatibility level of the database the SQL Server fixture was loaded into', async () => {
+    const pool = await new mssql.ConnectionPool({ ...ms.admin, database: 'master' }).connect()
+    try {
+      const result = await pool.request().input('name', mssql.NVarChar, SQLSERVER_DATABASE).query<{ level: number }>('select compatibility_level as level from sys.databases where name = @name')
+      expect(result.recordset).toEqual([{ level: ms.server.compatibility }])
+      expect(ms.server.compatibility).toEqual(expect.any(Number))
+    } finally {
+      await pool.close()
+    }
   })
 })
 
@@ -504,8 +526,8 @@ describe("the fixtures' containers", () => {
   test('are named by the id Docker holds them under, with the image the suites name', async () => {
     const client = await getContainerRuntimeClient()
     for (const [fixture, image] of [
-      [pg, POSTGRES_IMAGE],
-      [ms, SQLSERVER_IMAGE],
+      [pg, selectedImage('postgres')],
+      [ms, selectedImage('sqlserver')],
     ] as const) {
       const inspected = await client.container.inspect(client.container.getById(fixture.containerId))
       expect({ image: inspected.Config.Image, running: inspected.State.Running }).toEqual({ image, running: true })
@@ -521,8 +543,8 @@ describe("the fixtures' containers", () => {
     const docker = await connectDocker()
     const running = await docker.running()
     for (const [fixture, image] of [
-      [pg, POSTGRES_IMAGE],
-      [ms, SQLSERVER_IMAGE],
+      [pg, selectedImage('postgres')],
+      [ms, selectedImage('sqlserver')],
     ] as const) {
       const id = fixture.containerId.slice(0, 12)
       expect(running).toContainEqual(expect.objectContaining({ id, image }))

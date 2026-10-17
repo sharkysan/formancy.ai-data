@@ -21,9 +21,11 @@ builds the report from all of them (`scripts/release-report/report.mjs`).
 
 1. **Subject:** the version, the release (a tag, `dry-run` or none), the
    commit, the run, and each job's attempt, runner image, Node and Docker.
-2. **Tested on:** every image any test started, the default first, with the
-   version, update level and edition each server answered, its digest, and
-   who started it, and the version each composed database of the
+2. **Tested on:** every image of each engine's matrix, the default first,
+   an image no test answered included, and every other image a test
+   started, with the version, update level and edition each server
+   answered, its digest, who started it and the suites that ran on it, and
+   the version each composed database of the
    getting-started job answered through the server's own adapter, which
    reports no edition; every runtime dependency of every published package, its
    published range, the version the suites loaded and what a clean
@@ -31,14 +33,18 @@ builds the report from all of them (`scripts/release-report/report.mjs`).
    as launched, and what each browser said it was to the page and of the
    machine; the tools; and each captured snapshot against what this run
    answered.
-3. **Results:** a row per package with a suite -- files, tests, what did not
-   pass, the task's wall time from turbo, vitest's span, the engines its run
-   started, and coverage, reported and never gated -- then the repository's
+3. **Results:** a row per package with a suite and per leg it ran in --
+   the `test` job's, on the default images, and each `test-images` leg's,
+   on its image -- with files, tests, what did not pass, the task's wall
+   time from turbo, vitest's span, the engines its run started, and
+   coverage, reported and never gated; then the repository's
    guards, each browser gate in each browser, the install gate and the
    container gate.
 4. **Shared cases on both engines:** every case `sharedCases()` derives from
    data-fixtures' shared tables, `passed`, `failed` or `missing` on each
-   engine, from the tests that declare it with `covers()`
+   image of each engine's matrix (`MATRIX_IMAGES`, 0067), from the tests
+   that declare it with `covers()`, each counting for the images its own
+   leg's servers answered on for its file
    ([packages/data-fixtures](../../packages/data-fixtures/README.md) says how).
 5. **The browser matrix:** each environment, app, renderer and engine as the
    run had them.
@@ -82,8 +88,12 @@ the install gate failed, packing other than one tarball
 per published package, or packing one at another version than data-core;
 the container gate missing; the getting-started job recording no composed
 database for a connection of its journey; a shared case missing or
-failed on an engine, or declared under an unknown id; an engine's default
-image never answering; a published package whose `dist/` no job recorded,
+failed on an image of an engine's matrix, declared under an unknown id, or
+declared by a test whose file no server record of its own leg names, so that
+no image can be said for it; an engine's default image never answering, or
+another image of its matrix never answering in a leg of its own, which a file
+of another leg that names it does not count for
+([0067](../decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)); a published package whose `dist/` no job recorded,
 so its tarball is compared with nothing; two builds of one package that
 differ; a gate whose
 evidence did not pass, or a limitation whose `heldBy` test did not; either
@@ -137,8 +147,13 @@ FORMANCY_BROWSERS=all pnpm test:browser   # every browser the gates run in: the 
 pnpm test:pictures                        # the README's pictures, in Chromium
 node scripts/install-test.mjs
 node scripts/release-report/collect.mjs --local --since "$since"
-node scripts/release-report/report.mjs --local --allow-missing container,getting-started
+node scripts/release-report/report.mjs --local --allow-missing container,getting-started,test-images
 ```
+
+A machine runs the default images unless `FORMANCY_IMAGES` names others, so
+the other images of the matrix answer nothing there: `test-images` allowed
+missing, a case missing on one of them is not a problem, and one that failed
+on an image that did run still is.
 
 `--since` has no default. A results file left by an earlier run, read as this
 one's, is the failure local mode has to rule out, and only the person running

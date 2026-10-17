@@ -40,7 +40,8 @@ export async function startPlane({ review = false } = {}) {
     open: async (id) => {
       const now = databases.get(id)
       if (now === undefined) return undefined
-      const adapter = { kind: now.kind, ping: async () => ({ kind: now.kind, version: now.serverVersion }), discover: async () => databases.get(id), close: async () => {} }
+      // The ping answers the server the capture records (0068), as the adapters read it beside discovery.
+      const adapter = { kind: now.kind, ping: async () => ({ kind: now.kind, version: now.serverVersion, ...now.server }), discover: async () => databases.get(id), close: async () => {} }
       return { adapter, lookups: {}, records: {} }
     },
     close: async () => {},

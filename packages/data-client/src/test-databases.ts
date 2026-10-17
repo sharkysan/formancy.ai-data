@@ -1,12 +1,14 @@
-import { startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
+import { POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { TestProject } from 'vitest/node'
 
 /*
  * Both databases, once for the whole run (0003): the shared fixture on real
  * PostgreSQL 17 and SQL Server 2022, started by the harness every adapter is
- * tested against. Each suite file builds its own server over them, so a file
- * is a fresh server and a fresh configuration store, and only the database --
- * which is the thing under test -- is shared.
+ * tested against, on the default images, named so that FORMANCY_IMAGES
+ * moves no suite but the adapters' and data-fixtures' (0067). Each suite
+ * file builds its own server over them, so a file is a fresh server and a
+ * fresh configuration store, and only the database -- which is the thing
+ * under test -- is shared.
  *
  * What is provided is how to connect, not a connection: a worker cannot be
  * handed a socket, and the server under test opens its own through the real
@@ -29,7 +31,7 @@ declare module 'vitest' {
 }
 
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
-  const [pg, ms] = await Promise.all([startPostgresFixture(), startSqlServerFixture()])
+  const [pg, ms] = await Promise.all([startPostgresFixture(POSTGRES_IMAGE), startSqlServerFixture(SQLSERVER_IMAGE)])
   const pgUrl = new URL(pg.admin)
   project.provide('databases', {
     pg: {

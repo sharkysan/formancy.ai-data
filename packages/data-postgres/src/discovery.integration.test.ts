@@ -12,6 +12,7 @@ import {
   snapshotDisagreements,
   startPostgresFixture,
   structuralDisagreements,
+  versionFact,
 } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
@@ -249,14 +250,25 @@ describe('discovery as the restricted reader', () => {
   // constraint only to an account with a privilege other than SELECT on its
   // table, so the reader sees no constraint at all on the table it reads: an
   // adapter built on it would report sales.order with no key and no
-  // relationships, and nothing would say so.
+  // relationships, and nothing would say so. PostgreSQL 18 also files each
+  // NOT NULL in pg_constraint, a row of type n for every column pg_attribute
+  // holds NOT NULL, and the reader sees those as it sees the rest; 15 to 17
+  // file none (VERSION_FACTS.notNullConstraints; watched failing on 18 while
+  // this counted every row as one of the five, and with 18's value given to
+  // 17). Discovery reads NOT NULL from attnotnull and checks of type c alone,
+  // so its snapshot of the table is the same on each: the shared model's
+  // cases above hold that on every leg.
   test('information_schema hides every constraint on sales.order from the reader; pg_catalog hides none', async () => {
-    const [hidden] = await reader<{ referential: number; listed: number; catalog: number }[]>`
+    const [hidden] = await reader<{ referential: number; listed: number; catalog: number; notNull: number; notNullColumns: number }[]>`
       select
         (select count(*)::int from information_schema.referential_constraints where constraint_schema = 'sales') as referential,
         (select count(*)::int from information_schema.table_constraints where table_schema = 'sales' and table_name = 'order') as listed,
-        (select count(*)::int from pg_catalog.pg_constraint where conrelid = 'sales."order"'::regclass) as catalog`
-    expect(hidden).toEqual({ referential: 0, listed: 0, catalog: 5 })
+        (select count(*)::int from pg_catalog.pg_constraint where conrelid = 'sales."order"'::regclass and contype <> 'n') as catalog,
+        (select count(*)::int from pg_catalog.pg_constraint where conrelid = 'sales."order"'::regclass and contype = 'n') as "notNull",
+        (select count(*)::int from pg_catalog.pg_attribute where attrelid = 'sales."order"'::regclass and attnum > 0 and not attisdropped and attnotnull) as "notNullColumns"`
+    const { notNullColumns = 0, ...counted } = hidden ?? {}
+    expect(notNullColumns).toBeGreaterThan(0)
+    expect(counted).toEqual({ referential: 0, listed: 0, catalog: 5, notNull: versionFact('notNullConstraints', fixture.server) ? notNullColumns : 0 })
   })
 
   describe('privileges short of a whole table', () => {

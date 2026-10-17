@@ -1,6 +1,11 @@
 {
   "kind": "sqlserver",
   "serverVersion": "16.0.4295.3",
+  "server": {
+    "product": "sqlserver",
+    "major": 16,
+    "compatibility": 160
+  },
   "account": {
     "user": "dbo",
     "login": "sa"

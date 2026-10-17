@@ -1,6 +1,6 @@
 import type { DatabaseKind } from '@formancy/data-core'
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { join, sep } from 'node:path'
+import { join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /**
@@ -24,6 +24,13 @@ export interface ServerRecord extends ServerAnswer {
   engine: DatabaseKind
   /** The image the container was started from, as the starter named it. */
   image: string
+  /**
+   * SQL Server: the `compatibility_level` of the database the fixture was
+   * loaded into, which data-core's compatibility floor is held to (0068).
+   * Null for a bare container, which loads none, and for PostgreSQL, which
+   * has no such level.
+   */
+  compatibility: number | null
   /** The absolute path of the file that asked for the server, or null when no frame named one. */
   caller: string | null
   /** The package script that was running (`test-coverage`, `test-browser`), or `direct`. */
@@ -70,10 +77,16 @@ function frameFile(line: string): string | undefined {
  * await it, nor anything across a timer or an event, where the test fails.
  */
 export function callerOf(stack: string | undefined, own: string = PACKAGE): string | null {
+  // On Windows vitest writes a frame's path with `/` and fileURLToPath with
+  // `\`, so both sides are compared as this platform's path: compared as
+  // written, no frame was this package's and every record named servers.ts.
+  const ownPath = normalize(own)
   for (const line of (stack ?? '').split('\n').slice(1)) {
-    const file = frameFile(line)
-    if (file === undefined || file.startsWith('node:') || file.includes(`${sep}node_modules${sep}`) || file.includes('/node_modules/')) continue
-    if (file.startsWith(own) && !TEST_FILE.test(file)) continue
+    const found = frameFile(line)
+    if (found === undefined || found.startsWith('node:')) continue
+    const file = normalize(found)
+    if (file.includes(`${sep}node_modules${sep}`)) continue
+    if (file.startsWith(ownPath) && !TEST_FILE.test(file)) continue
     return file
   }
   return null

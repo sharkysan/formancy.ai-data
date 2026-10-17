@@ -57,14 +57,14 @@ only enforcement is "we remember" says so plainly.
 |---|---|---|
 | [0001](0001-a-paid-module-in-its-own-repository.md) | A paid module lives in its own repository, under its own licence | accepted; extended by 0048 |
 | [0002](0002-depend-on-upstream-never-copy-it.md) | Depend on released upstream packages at exact versions; never copy them | accepted; spec 4 window closed, 0042; extended by 0055 |
-| [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted |
+| [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted; narrowed by 0067 |
 | [0004](0004-a-snapshot-says-what-it-could-not-see.md) | A metadata snapshot says what it could not see, and is made in one place | accepted; narrowed by 0027; extended by 0049 |
 | [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026, 0027, 0034, 0043, 0049, 0056 |
-| [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057 |
-| [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted; narrowed by 0026, 0027; extended by 0049 |
+| [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057, 0067 |
+| [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted; narrowed by 0026, 0027, 0067; extended by 0049, 0068 |
 | [0008](0008-exact-values-travel-as-strings.md) | Exact values travel as strings, are canonical, and are never rounded | accepted; narrowed by 0026, 0028 |
 | [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042, 0056; extended by 0066 |
-| [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050; extended by 0030, 0051 |
+| [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050; extended by 0030, 0051, 0068 |
 | [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted; extended by 0043, 0050 |
 | [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted; narrowed by 0028, 0056; extended by 0044, 0061 |
 | [0013](0013-published-configuration-is-files-with-link-based-swap.md) | Published configuration is files, and compare-and-swap is a hard link | accepted; extended by 0030, 0065; narrowed by 0062 |
@@ -82,14 +82,14 @@ only enforcement is "we remember" says so plainly.
 | [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted; extended by 0061 |
 | [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted; narrowed by 0040 |
 | [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted; extended by 0049 |
-| [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md) | Row filters, labels and refusals mean the same on both engines | accepted |
+| [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md) | Row filters, labels and refusals mean the same on both engines | accepted; narrowed by 0067 |
 | [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047, 0060, 0066; extended by 0032, 0058 |
 | [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042, 0066; extended by 0062 |
 | [0031](0031-an-answer-lost-after-a-write-is-unknown.md) | An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here | accepted; extended by 0040, 0041, 0047, 0050, 0053, 0058 |
 | [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md) | A clean install is the composed stack behind one proxy, and CI runs its guide | accepted; extended by 0035, 0037, 0046, 0051, 0059, 0071 |
 | [0033](0033-the-administrator-plane-is-audited.md) | The administrator's plane is audited like the runtime, one event per request | accepted; extended by 0060, 0062, 0065 |
 | [0034](0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md) | Performance is measured through the shipped server against a sized lookup table, and held without a clock by rows read and round trips | accepted; narrowed by 0061, 0063, 0071; extended by 0061 |
-| [0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md) | A release report is derived from the run that gated the release, and says what it did not test | accepted; extended by 0034, 0058, 0064 |
+| [0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md) | A release report is derived from the run that gated the release, and says what it did not test | accepted; extended by 0034, 0058, 0064, 0067, 0068 |
 | [0036](0036-a-merged-branch-is-deleted-by-the-merge.md) | A merged branch is deleted by the merge, and only by the merge | accepted |
 | [0037](0037-cloudflare-is-the-edge-not-the-runtime.md) | Cloudflare is the edge, not the runtime: one locally-managed tunnel with generated doors, and a server that refuses a path a proxy could read differently | accepted; extended by 0045, 0069; narrowed by 0071 |
 | [0038](0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md) | README pictures are taken by a script from states the product reaches, and held to the text they show | accepted; extended by 0058; narrowed by 0062 |
@@ -104,8 +104,8 @@ only enforcement is "we remember" says so plainly.
 | [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md) | A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone | accepted; extended by 0050, 0058; narrowed by 0053 |
 | [0048](0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md) | The licence is in force before a lawyer has read it | accepted; extended by 0054; amended by 0064 |
 | [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md) | A snapshot says whether its account may delete from each table, and every foreign key that refers to it | accepted; narrowed by 0050; extended by 0056 |
-| [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md) | A record is deleted one at a time, by its token and the version its person read, under the form's policy, in one guarded statement | accepted; extended by 0051, 0052, 0053, 0057 |
-| [0051](0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md) | A delete reaches other tables only through foreign keys the policy names, each with what it does | accepted; extended by 0052, 0053 |
+| [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md) | A record is deleted one at a time, by its token and the version its person read, under the form's policy, in one guarded statement | accepted; narrowed by 0067; extended by 0051, 0052, 0053, 0057 |
+| [0051](0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md) | A delete reaches other tables only through foreign keys the policy names, each with what it does | accepted; narrowed by 0067; extended by 0052, 0053 |
 | [0052](0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md) | The studio says before publication who may delete and what a delete also does, and asks for each foreign key by name | accepted; extended by 0058 |
 | [0053](0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md) | A host deletes a record from its detail or its row, after a confirmation in place, and says what the server did | accepted; extended by 0058 |
 | [0054](0054-version-1-1-names-the-address-for-a-redistribution-agreement-too.md) | Version 1.1 of the licence names the address for a redistribution agreement too | accepted |
@@ -121,5 +121,7 @@ only enforcement is "we remember" says so plainly.
 | [0064](0064-the-first-releases-notes-summarise-the-development-before-it.md) | The first release's notes summarise the development before it | accepted |
 | [0065](0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md) | With publisher roles set, a draft is published only when a publisher who did not submit it approves it, and a restore is one publisher's alone | accepted |
 | [0066](0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md) | A lookup a person can search is generated as a typeahead, and a host draws the control it is given | accepted |
+| [0067](0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md) | The adapter suites run on every image of a per-engine matrix, and what the versions disagree on is named | accepted |
+| [0068](0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md) | A snapshot records the server it was read from, data-core says whether this release was tested on it, and nothing refuses a server discovery can read | accepted |
 | [0069](0069-the-examples-page-is-served-at-formancy-ai-data-examples.md) | The examples page is served at formancy.ai/data/examples/, by a Worker of its own that Cloudflare deploys from main, under a policy that refuses anything inline | accepted |
 | [0071](0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md) | The server believes a forwarded client address only from the proxies an operator names, each by its address, and the composed stack names its nginx and cloudflared alone | accepted |

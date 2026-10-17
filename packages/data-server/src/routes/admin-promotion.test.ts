@@ -50,7 +50,7 @@ function snapshotOf(database: Database): MetadataSnapshot {
 
 /** Every id in `allowlist` names the deployment's one database; a database that is down throws what a driver throws, address and all. */
 function registry(database: Database, allowlist: readonly string[]): ConnectionRegistry {
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0' }), discover: async () => snapshotOf(database), close: async () => {} } as DatabaseAdapter
+  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => snapshotOf(database), close: async () => {} } as DatabaseAdapter
   return {
     ids: () => [...allowlist],
     scope: (id) => (allowlist.includes(id) ? { schemas: ['sales'] } : undefined),

@@ -1,4 +1,4 @@
-import { EDGE_VALUES, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
+import { EDGE_VALUES, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import type { TestProject } from 'vitest/node'
@@ -7,9 +7,11 @@ import { SECOND_CUSTOMER } from './test-values.js'
 /*
  * Both databases, once for the whole run (0003): the shared fixture on real
  * PostgreSQL 17 and SQL Server 2022, started by the harness every adapter is
- * tested against. Each suite file builds its own server over them -- a fresh
- * server and a fresh configuration store -- and only the databases, which are
- * the thing under test, are shared.
+ * tested against, on the default images, named so that FORMANCY_IMAGES
+ * moves no suite but the adapters' and data-fixtures' (0067): the test
+ * plane's GENERATE_SERIES needs 2022. Each suite file builds its own server
+ * over them -- a fresh server and a fresh configuration store -- and only
+ * the databases, which are the thing under test, are shared.
  *
  * One row is added to the fixture on both engines: a second customer of
  * tenant 1, so a person can change an order's customer to another one they
@@ -51,7 +53,7 @@ declare module 'vitest' {
 
 
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
-  const [pg, ms] = await Promise.all([startPostgresFixture(), startSqlServerFixture()])
+  const [pg, ms] = await Promise.all([startPostgresFixture(POSTGRES_IMAGE), startSqlServerFixture(SQLSERVER_IMAGE)])
   const pgUrl = new URL(pg.admin)
   const details = {
     pg: {

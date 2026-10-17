@@ -82,7 +82,8 @@ jobs:
       # The repository's own guards: codecov.yml matches its generator, every
       # CLA signature names the current text, upstream is depended on at exact
       # versions, no source file is past the 600-line budget, the `test`
-      # job's matrix names every package with a suite, these workflows keep
+      # job's matrix names every package with a suite and the `test-images`
+      # job's every image of the matrix, these workflows keep
       # the shape the release depends on, the release report's registers
       # hold, and docs/performance.md is what its committed results render.
       # A guard that is not a gate is a comment.
@@ -186,6 +187,85 @@ jobs:
         run: node scripts/release-report/collect.mjs --job test --package "$PACKAGE"
         env:
           PACKAGE: ${{ matrix.package }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: release-results-${{ steps.collect.outputs.key }}
+          path: release-results/
+          if-no-files-found: error
+          overwrite: true
+
+  # data-fixtures and each engine's adapter suite again, on every image of
+  # the matrix but the default (0067): packages/data-fixtures' MATRIX_IMAGES,
+  # which scripts/ci-test-jobs.test.mjs holds these pairs to, so an image
+  # without a leg, or a leg on an image the matrix does not list, is red
+  # there. Passing on the default says nothing of 16 or 2019: database
+  # semantics are the product (0003), and they move between versions.
+  #
+  # The `test` job's command, told its image through FORMANCY_IMAGES, which
+  # turbo hashes for the suites (turbo.json), so no leg replays a cached run
+  # of another image; the image reaches the report from the servers' own
+  # records, never from this name. One leg per pair, so a red leg names its
+  # package and its image. The server, client, host, studio and performance
+  # suites stay on the defaults: they test the server, not the database's
+  # semantics. A PostgreSQL leg of data-fixtures starts the default SQL Server
+  # too, whose fixture suite starts both engines.
+  #
+  # No coverage upload: an image leg covers the lines the default leg
+  # covers, and Codecov merges every upload of a commit into one.
+  test-images:
+    name: test-images (${{ matrix.package }}, ${{ matrix.image }})
+    runs-on: ubuntu-latest
+    # The `test` job's limit, copied: these legs pull other images than its
+    # legs do and have not been measured against it (0067); their first CI
+    # runs measure them.
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { package: '@formancy/data-fixtures', image: 'postgres:15-alpine' }
+          - { package: '@formancy/data-postgres', image: 'postgres:15-alpine' }
+          - { package: '@formancy/data-fixtures', image: 'postgres:16-alpine' }
+          - { package: '@formancy/data-postgres', image: 'postgres:16-alpine' }
+          - { package: '@formancy/data-fixtures', image: 'postgres:18-alpine' }
+          - { package: '@formancy/data-postgres', image: 'postgres:18-alpine' }
+          - { package: '@formancy/data-fixtures', image: 'mcr.microsoft.com/mssql/server:2019-latest' }
+          - { package: '@formancy/data-sqlserver', image: 'mcr.microsoft.com/mssql/server:2019-latest' }
+          - { package: '@formancy/data-fixtures', image: 'mcr.microsoft.com/mssql/server:2025-latest' }
+          - { package: '@formancy/data-sqlserver', image: 'mcr.microsoft.com/mssql/server:2025-latest' }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec turbo run test:coverage --filter="$PACKAGE" --force --summarize
+        env:
+          PACKAGE: ${{ matrix.package }}
+          FORMANCY_IMAGES: ${{ matrix.image }}
+
+      - name: Keep what this job found, for the report
+        id: collect
+        if: ${{ !cancelled() }}
+        run: node scripts/release-report/collect.mjs --job test-images --package "$PACKAGE" --variant "$IMAGE"
+        env:
+          PACKAGE: ${{ matrix.package }}
+          IMAGE: ${{ matrix.image }}
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -1075,22 +1155,23 @@ jobs:
 
   # The release report (0035), built from what every job above found: what
   # this run was tested on, every package's results, every shared case on
-  # both engines, the build identity of what a release publishes, the release
-  # gates and the known limitations. It fails the run on anything in its
-  # problems -- a job that ended other than success, an artefact missing,
-  # twice or another run's, a test skipped or failed, a shared case on one
-  # engine only, two builds of one package that differ -- and writes the
-  # report either way, into the job summary and the `release-report`
-  # artefact. For a release or a rehearsal it also writes the release body,
-  # and fails here, before anything is published, when the body has no
-  # changelog section or is longer than GitHub accepts.
+  # every image of both engines' matrix (0067), the build identity of what a
+  # release publishes, the release gates and the known limitations. It fails
+  # the run on anything in its problems -- a job that ended other than
+  # success, an artefact missing, twice or another run's, a test skipped or
+  # failed, a shared case missing on an engine or an image, an image of the
+  # matrix that answered no test, two builds of one package that differ --
+  # and writes the report either way, into the job summary and the
+  # `release-report` artefact. For a release or a rehearsal it also writes
+  # the release body, and fails here, before anything is published, when the
+  # body has no changelog section or is longer than GitHub accepts.
   #
   # The limit is not measured on CI yet: it is verify's, whose install and
   # build this job shares, until three green runs give a slowest time to
   # triple (0035 says so). The checkout keeps the whole history, for a
   # document's last change when a gate's evidence is a document.
   report:
-    needs: [verify, test, browser, pictures, install, container, getting-started, cloudflare]
+    needs: [verify, test, test-images, browser, pictures, install, container, getting-started, cloudflare]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -1116,8 +1197,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # DATABASE_KINDS, DEFAULT_IMAGES and sharedCases(), from the built code
-      # that uses them.
+      # DATABASE_KINDS, DEFAULT_IMAGES, MATRIX_IMAGES and sharedCases(), from the
+      # built code that uses them.
       - run: pnpm exec turbo run build --filter=@formancy/data-fixtures
 
       # One directory per artefact, never merged: two jobs that wrote one key

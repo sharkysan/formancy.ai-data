@@ -190,6 +190,35 @@ describe('createSnapshot', () => {
     expect(base.account).toEqual(OWNER)
   })
 
+  // What server the catalog was read from (0068) is carried for the
+  // standing a person is shown, and is not what a form binds to: in the
+  // hash, a major upgrade or a compatibility change would read as drift of
+  // every form, and two servers holding one catalog would differ. Dropped,
+  // nobody could say whether the server was tested.
+  test('carries the server outside the fingerprint, and leaves it out of a snapshot that names none', () => {
+    const objects = [table('a', [column('x', 1)])]
+    const base = snapshot(objects)
+    const on17 = snapshot(objects, { server: { product: 'postgresql', major: 17 } })
+    expect(on17.server).toEqual({ product: 'postgresql', major: 17 })
+    expect(on17.fingerprint).toBe(base.fingerprint)
+    expect(snapshot(objects, { server: { product: 'postgresql', major: 18 } }).fingerprint).toBe(base.fingerprint)
+    const sqlserver = snapshot(objects, { kind: 'sqlserver', server: { product: 'sqlserver', major: 16, compatibility: 140 } })
+    expect(sqlserver.server).toEqual({ product: 'sqlserver', major: 16, compatibility: 140 })
+    expect(snapshot(objects, { kind: 'sqlserver', server: { product: 'sqlserver', major: 16, compatibility: 160 } }).fingerprint).toBe(sqlserver.fingerprint)
+    // A snapshot taken before 0068 has no such property, and gains none.
+    expect(base).not.toHaveProperty('server')
+  })
+
+  // The server is outside the hash, so a posted bundle's could say anything
+  // and still hash to its fingerprint: a product no adapter answers, or a
+  // major that is not a whole number, is refused as no catalog's.
+  test('refuses server facts no adapter could answer', () => {
+    const objects = [table('a', [column('x', 1)])]
+    expect(() => snapshot(objects, { server: { product: 'mysql' as never, major: 8 } })).toThrow(/the server's product "mysql" is not one the contract names/)
+    expect(() => snapshot(objects, { server: { product: 'postgresql', major: 16.5 } })).toThrow(/the server's major 16.5 is neither a whole number nor null/)
+    expect(() => snapshot(objects, { server: { product: 'sqlserver', major: 16, compatibility: '160' as never } })).toThrow(/the server's compatibility level 160 is not a whole number/)
+  })
+
   // A revoked column grant is a change to what a form bound to the column can
   // do, so it must move the fingerprint, or drift's fast path would never look.
   // So must row security starting to apply.

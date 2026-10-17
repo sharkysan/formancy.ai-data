@@ -40,6 +40,18 @@
   font-size: 0.8125rem;
 }
 
+/* "Not tested" is not "refused" (0068): the same warm colour, beside the
+   server it is about -- a sentence of its own under the metadata's server
+   line, and the rest of a connection test's answer. */
+.untested {
+  color: var(--warn);
+}
+
+p.untested {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.875rem;
+}
+
 .problem-box,
 .field-problem {
   margin: 0.75rem 0 0;

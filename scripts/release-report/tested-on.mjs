@@ -1,8 +1,9 @@
 // What this checkout is tested on, as far as the tree itself can say (0035):
-// the images the suites start unless a file names another, every runtime
-// dependency a published package declares and the version the suites load,
-// the upstream packages, Node, the build of each browser the gates launch,
-// and the tools.
+// the images the suites start unless a file names another, the matrix of
+// images the adapter suites and data-fixtures run on and the CI legs that
+// run them (0067), every runtime dependency a published package declares and
+// the version the suites load, the upstream packages, Node, the build of each
+// browser the gates launch, and the tools.
 //
 // Static facts, derived: nothing here is typed except NESTED, and a guard
 // holds that. What a run actually met -- each server's own version and image
@@ -19,6 +20,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import YAML from 'yaml'
 import { BROWSERS, PINNED_AS } from '../browsers.mjs'
 import { installed, mustBeInstalled } from './installed.mjs'
+import { imageMatrix, readWorkflow } from './workflows.mjs'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -202,12 +204,17 @@ function snapshots(root, kinds) {
 export async function testedOn(root = repo) {
   const packages = workspace(root)
   const local = new Set(packages.map(({ manifest }) => manifest.name))
-  const { DEFAULT_IMAGES } = await built(root, 'packages/data-fixtures')
+  const { DEFAULT_IMAGES, IMAGES_VARIABLE, MATRIX_IMAGES } = await built(root, 'packages/data-fixtures')
   const { DATABASE_KINDS } = await built(root, 'packages/data-core')
   const rootManifest = readJson(join(root, 'package.json'))
   return {
     engines: [...DATABASE_KINDS],
     images: { ...DEFAULT_IMAGES },
+    // Each engine's images, its default first, and the test-images job's
+    // legs, `{ package, image }`, which scripts/ci-test-jobs.test.mjs holds to them.
+    matrix: Object.fromEntries(Object.entries(MATRIX_IMAGES).map(([engine, images]) => [engine, [...images]])),
+    legs: imageMatrix(readWorkflow(root)),
+    imagesVariable: IMAGES_VARIABLE,
     runtime: runtime(root, published(root), local),
     upstream: upstream(root, packages, local),
     node: {

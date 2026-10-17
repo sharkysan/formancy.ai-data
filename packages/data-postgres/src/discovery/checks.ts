@@ -27,9 +27,14 @@ interface CheckRow {
  * Named as a column, the query would fail on 17; not read, an unenforced
  * check on 18 was reported enforced (discovery-pg18.integration.test.ts).
  *
- * On PostgreSQL 17 a NOT NULL is a column property (`attnotnull`), not a
- * pg_constraint row, so none is reported as a check. PostgreSQL 18 adds them
- * as constraints of type `n`, which `contype = 'c'` leaves out.
+ * On PostgreSQL 15 to 17 a NOT NULL is a column property (`attnotnull`),
+ * not a pg_constraint row, so none is reported as a check. PostgreSQL 18
+ * files each as a constraint of type `n` too (VERSION_FACTS.notNullConstraints),
+ * which `contype = 'c'` leaves out: NOT NULL is read from `attnotnull` on
+ * every version (columns.ts), and the shared model's cases hold the checks
+ * to the same list on every leg. A NOT NULL added NOT VALID, which only 18
+ * has, sets `attnotnull` though older rows may hold NULL, and is read as
+ * NOT NULL (discovery-pg18.integration.test.ts).
  */
 export async function readChecks(sql: TransactionSql, schemas: readonly string[]): Promise<Map<number, CheckMeta[]>> {
   const rows = await sql<CheckRow[]>`

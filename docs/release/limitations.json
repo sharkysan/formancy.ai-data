@@ -20,8 +20,8 @@
       ]
     },
     "0003": {
-      "reviewed": "sha256:72c6843e2a78deb9aa8f6f80d1483f72649ac8b23a80c8d12f7d4b8a7dae9216",
-      "none": "Its user-facing cost, that what is tested is exactly the images the tests name, is the report's tested-on section, derived from each run."
+      "reviewed": "sha256:c17e2c6e68afcf10009b7ee6f5d4adf9f355df8b6a4c82e960905e43d3bd1d70",
+      "none": "Its user-facing cost, that what is tested is the images of each engine's matrix and no other, is the report's tested-on section, derived from each run, and 0067's limitations."
     },
     "0004": {
       "reviewed": "sha256:ca98cd0ed9328133061f0515d273f1173a03c6742880ed018581a29a6ba28a7d",
@@ -37,7 +37,7 @@
       "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
     },
     "0006": {
-      "reviewed": "sha256:1c07494da5cb6dafb8ed58673ac695a13b02d182b12d64c65a799e1f7c2b80c4",
+      "reviewed": "sha256:cede534c64dc36ab5acd95680303d104be0404bc97d0560601ecd2b21a5e6a4d",
       "limitations": [
         {
           "area": "databases",
@@ -45,7 +45,7 @@
         },
         {
           "area": "databases",
-          "says": "PostgreSQL 18's `NOT NULL` constraints in `pg_constraint` and its virtual generated columns are not tested here."
+          "says": "PostgreSQL 18 runs the whole adapter suite, but no test is about a `NOT NULL` made `NO INHERIT` or its virtual generated columns."
         },
         {
           "area": "databases",
@@ -62,7 +62,7 @@
       ]
     },
     "0007": {
-      "reviewed": "sha256:e93dc88863213d377d5ca12263fe6769a4a7ab05b4079062afeb8dd86770a591",
+      "reviewed": "sha256:1cefb4b99b1a515a0d5d42c108c21aab17749bd680d12a3a6084ecbe5b3ccd83",
       "limitations": [
         {
           "area": "forms",
@@ -78,7 +78,7 @@
         },
         {
           "area": "databases",
-          "says": "SQL Server discovery's queries name catalog columns a release older than 2022 may not have."
+          "says": "SQL Server discovery's queries name catalog views and columns a release outside the matrix may not have."
         }
       ]
     },
@@ -113,7 +113,7 @@
       ]
     },
     "0010": {
-      "reviewed": "sha256:82e8c9ae129e3c02624eb40363b6006cf61fe6877f6502652cd55013dca7f874",
+      "reviewed": "sha256:f3f20c5b14e9912fd3d8e120072cb2bbdd97ad356e4cc0f74eb5506213a3fa7d",
       "limitations": [
         {
           "area": "forms",
@@ -551,7 +551,7 @@
       ]
     },
     "0028": {
-      "reviewed": "sha256:aa967a444a81a9b2f351fa436cb34e04803b12d202d7adb136a4bc64bdd6d2b8",
+      "reviewed": "sha256:219693bbb3314e34e976de186eb1e2af71cac0e4b44f259f400ff916f565dc47",
       "limitations": [
         {
           "area": "databases",
@@ -873,11 +873,11 @@
       ]
     },
     "0035": {
-      "reviewed": "sha256:ad22fbb14977f3147fdf5204d36a4fc81ac8096b3906be217bec988ff3c7ae72",
+      "reviewed": "sha256:b03fac6259950848212c28ad4148aa1d149ad654575c2dda663afc195c354cb6",
       "limitations": [
         {
           "area": "databases",
-          "says": "Nothing in the product refuses a server version no test ran: what a release says it was tested on is not what it accepts."
+          "says": "Nothing in the product refuses a server version that discovery can read and no test ran: what a release says it was tested on is not what it accepts; the connection test, the studio and drift review say so."
         },
         {
           "area": "testing",
@@ -1427,7 +1427,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:369088fbc185aef02d34f8e4c811a0e5abe6e99199a49c1529a78c8842a33e3e",
+      "reviewed": "sha256:1deb888de814a88866c564b19102ef7e23113b83ff904c83e5798046400556a6",
       "limitations": [
         {
           "area": "writes",
@@ -1500,7 +1500,7 @@
       ]
     },
     "0051": {
-      "reviewed": "sha256:226be55f50c769f6167443bff69ab8395110356404083b635b00422013958ba2",
+      "reviewed": "sha256:127b5aaefe73555492fb203b2017a42dcad98d0cb8846a53e6f76dc283c468c1",
       "limitations": [
         {
           "area": "forms",
@@ -1543,7 +1543,7 @@
         },
         {
           "area": "databases",
-          "says": "On PostgreSQL a cascaded table's BEFORE DELETE triggers and its rules run as that table's owner, with the owner's grants, and may do what the deleting account could not; its AFTER DELETE triggers run as the deleting account. Neither is seen nor refused here.",
+          "says": "On PostgreSQL a cascaded table's BEFORE DELETE triggers and its rules run as that table's owner, with the owner's grants, and may do what the deleting account could not; its AFTER DELETE triggers run as the deleting account on 15 to 17 and as the owner on 18. Neither is seen nor refused here.",
           "heldBy": "packages/data-postgres/src/cascade.integration.test.ts"
         },
         {
@@ -2150,6 +2150,81 @@
         {
           "area": "studio",
           "says": "The regeneration report does not say that a republish changes a lookup's control."
+        }
+      ]
+    },
+    "0067": {
+      "reviewed": "sha256:58071cd9e5be80d40a18da1fe9f003ea7dc6bc68b3f5d05d43c25750b2dfdeea",
+      "limitations": [
+        {
+          "area": "testing",
+          "says": "Only the adapter suites and data-fixtures run on every image of each engine's matrix: the server, client, host, studio and performance suites, the browser gates and the composed stack run each engine's default image alone, so what the routes, the client and the pages do on another version is not tested."
+        },
+        {
+          "area": "databases",
+          "says": "PostgreSQL 14 and older, and SQL Server 2017 and older, are not images of the matrix, and a release is not tested on them."
+        },
+        {
+          "area": "testing",
+          "says": "What the versions of one engine disagree on is named only where a test has met it: a difference no suite reaches is in no table, and the release report prints none of them."
+        },
+        {
+          "area": "access",
+          "says": "On PostgreSQL 18 a cascaded table's AFTER DELETE trigger runs with its owner's grants, so a delete that 15 to 17 refuse, `permission-denied`, because the trigger writes where the deleting account may not, is done.",
+          "heldBy": "packages/data-postgres/src/cascade.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL 18 a `NOT NULL` added `NOT VALID` is read as NOT NULL, though rows older than it may hold NULL.",
+          "heldBy": "packages/data-postgres/src/discovery-pg18.integration.test.ts"
+        }
+      ]
+    },
+    "0068": {
+      "reviewed": "sha256:0cb994e0fb7538e38b5a321b3df797457b1a284d6be0f1075492863ca96233c4",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "Nothing refuses a server this release was not tested on: a form is generated, published and served on one as on a server it was tested on, and the runtime plane never discovers again, so a server upgraded in place is seen only by the next discovery, and a person filling a form is never told."
+        },
+        {
+          "area": "databases",
+          "says": "A managed PostgreSQL, or any server whose `version()` begins \"PostgreSQL \", reads as PostgreSQL of its major, and as tested, whatever else it changed.",
+          "heldBy": "packages/data-postgres/src/server.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A SQL Server database is called tested at any compatibility level from the lowest a matrix leg's fixture database answered upward, on any tested release, though each leg's fixture runs at its release's own default level.",
+          "heldBy": "packages/data-core/src/server.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "SQL Server discovery refuses a server whose catalog has no `sys.edge_constraints`, every release before 2019, naming its release, so no form is generated from SQL Server 2017 or older; no such server answered a test here: the refusal's sentence and condition are held by a unit test, and that discovery throws it before reading the catalog is held by nothing.",
+          "heldBy": "packages/data-sqlserver/src/server.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A snapshot taken before 0068 records no server, so whether the release was tested on it cannot be said until it is discovered again.",
+          "heldBy": "packages/data-core/src/server.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "Drift review lists a `server-untested` change, for review, on every review of every form whose current snapshot names a server this release was not tested on, an unchanged catalog included, for as long as that server and this release stay as they are; of a snapshot that records no server it says nothing.",
+          "heldBy": "packages/data-core/src/drift/server.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "An administrator is told that this release was not tested on a server by the connection test, the studio and drift review; a server it was not tested on is answered, discovered, published and imported as any other.",
+          "heldBy": "packages/data-server/src/routes/admin-untested.integration.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "A posted bundle's `server` is the client's: outside the fingerprint, it is checked for its shape alone, and only a fresh discovery speaks for the server.",
+          "heldBy": "packages/data-core/src/snapshot.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "An embedder's own `DatabaseAdapter` must report `product` and `major`, and for SQL Server `compatibility`, from `ping`, since `ServerIdentity` now extends `ServerFacts`; and an exhaustive `switch` over `DriftKind` must handle its new `server-untested`."
         }
       ]
     },

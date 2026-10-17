@@ -7,7 +7,7 @@ import { createAdminClient } from './api.js'
 import type { Drift } from './api.js'
 import { audit, generateOrder, goTo, grantOrderDelete, paragraphs, signIn, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
-import { OWNER_SNAPSHOT, READER_SNAPSHOT, startPlane, TOKENS, withColumn, withForeignKey, withGap, withoutColumn, withoutDelete } from './test-server.js'
+import { onServer, OWNER_SNAPSHOT, READER_SNAPSHOT, startPlane, TOKENS, withColumn, withForeignKey, withGap, withoutColumn, withoutDelete } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
 /**
@@ -158,6 +158,26 @@ describe('drift', () => {
     expect(items(report, 'Review')).toEqual(server.changes.filter((change) => change.severity === 'review').map((change) => written(change, {})))
     expect(paragraphs(report)).toContain('Blocks nothing. A person has something to decide.')
     expect(within(report).queryByRole('list', { name: 'Blocking' })).toBeNull()
+  })
+
+  // The same catalog on a server this release was not tested on (0068): the
+  // fingerprint is the published one, so a studio that took "nothing in the
+  // catalog changed" for "nothing to say" would hide the one change there
+  // is. Under Review, naming the server, and the form usable as published:
+  // nothing is stopped for it.
+  test('shows a server this release was not tested on as something to review that blocks nothing', async () => {
+    const user = await signIn(plane)
+    const drift = await published(user)
+    plane.databases.set('fixture', onServer(OWNER_SNAPSHOT, '14.24', { product: 'postgresql', major: 14 }))
+    await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
+    const report = await within(drift).findByRole('region', { name: 'Version 1 of sales-order, against the database now' })
+    const server = await serverReport()
+    expect(server.changes.map((change) => [change.kind, change.severity])).toEqual([['server-untested', 'review']])
+    expect(within(report).getByRole('status').textContent).toBe('1 change, 0 blocking.')
+    expect(items(report, 'Review')).toEqual(server.changes.map((change) => written(change, {})))
+    expect(items(report, 'Review')[0]).toContain('This release of Formancy Data was not tested on PostgreSQL 14:')
+    expect(items(report, 'What the published form may still do')).toEqual(['Read: still allowed', 'Create: still allowed', 'Update: still allowed', 'As a whole: usable as published.'])
+    expect(await audit()).toEqual([])
   })
 
   // The connection now discovers as the restricted reader, who may not read

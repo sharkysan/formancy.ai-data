@@ -1,6 +1,7 @@
 // What one job of a run found, in one file the release report reads (0035).
 //
 //   node scripts/release-report/collect.mjs --job test --package @formancy/data-host
+//   node scripts/release-report/collect.mjs --job test-images --package @formancy/data-postgres --variant postgres:16-alpine
 //   node scripts/release-report/collect.mjs --job browser --variant chromium
 //   node scripts/release-report/collect.mjs --job getting-started --variant 2.20.3
 //   node scripts/release-report/collect.mjs --job container --image formancy/data-server:ci
@@ -8,9 +9,11 @@
 //
 // It writes `release-results/<key>.json` and, on GitHub, `key=<key>` to the
 // step's outputs, so the artefact's name and the file's key have one source.
-// The key is the job, `test-<id>` for a package's suite with the id
-// codecov-config.mjs gives it, and the job with `--variant` appended for a
-// job a matrix runs more than once.
+// The key is the job, `<job>-<id>` for a job given a package's suite with
+// `--package` -- `test-<id>`, and `test-images-<id>` for a leg of the image
+// matrix (0067) -- with the id codecov-config.mjs gives it, and either with
+// `--variant` appended for a job a matrix runs more than once: an image leg's
+// image, which the leg's suite must have started.
 //
 // Node's built-ins, coveredPackages() and scripts/browsers.mjs only: it runs
 // in the container and getting-started jobs, which install nothing.
@@ -58,10 +61,10 @@ const safe = (value) => String(value).replaceAll(/[^A-Za-z0-9.]+/g, '-')
 /** The key of a job's results: the artefact is `release-results-<key>`. */
 export function keyFor({ job, pkg, variant }, covered) {
   let key = job
-  if (job === 'test') {
+  if (job === 'test' || pkg !== undefined) {
     const entry = covered.find((candidate) => candidate.name === pkg)
     if (entry === undefined) throw new Error(`--package ${String(pkg)} is no workspace package with a test:coverage script`)
-    key = `test-${entry.id}`
+    key = `${job}-${entry.id}`
   }
   return variant === undefined ? key : `${key}-${safe(variant)}`
 }
@@ -105,6 +108,8 @@ export function checkedRecord(record, file) {
   const nullable = (key) => record?.[key] === null || typeof record?.[key] === 'string'
   for (const key of ['engine', 'image', 'version', 'script', 'at']) if (!string(key)) problems.push(`${key} is not a string`)
   for (const key of ['updateLevel', 'edition', 'description', 'caller']) if (!nullable(key)) problems.push(`${key} is neither a string nor null`)
+  // The level of the SQL Server database a fixture loaded, which data-core's floor is held to (0068); null when none was loaded.
+  if (!(record?.compatibility === null || Number.isInteger(record?.compatibility))) problems.push('compatibility is neither a whole number nor null')
   if (string('at') && Number.isNaN(Date.parse(record.at))) problems.push('at is not an instant')
   if (problems.length > 0) throw new Error(`${file} is not a server record: ${problems.join(', ')}`)
   return record
@@ -279,6 +284,15 @@ export function collect({ root = repo, job, pkg, variant, image, local = false, 
     installOf()
   } else if (job === 'test') {
     suiteOf(packages.find((entry) => entry.name === pkg).path, pkg)
+  } else if (job === 'test-images') {
+    if (variant === undefined) throw new Error('--job test-images needs --variant <image>, the image its leg runs on')
+    suiteOf(packages.find((entry) => entry.name === pkg).path, pkg)
+    // The leg's image comes to the report from these records, never from
+    // its name (0067); a leg that started none of it ran something else.
+    if (!servers.some((server) => server.image === variant)) {
+      const started = [...new Set(servers.map((server) => server.image))].sort()
+      missing.push(`a server of ${variant}, the image this leg runs on: its suite started ${started.length === 0 ? 'no server' : `only ${started.join(', ')}`}`)
+    }
   } else if (job === 'verify') {
     suiteOf('.', null)
   } else if (job === 'browser') {

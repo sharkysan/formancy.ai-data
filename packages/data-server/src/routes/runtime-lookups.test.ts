@@ -84,7 +84,7 @@ function registry(): ConnectionRegistry {
       return { ok: true, values: { id: '1', country_code: 'CH' }, version: null }
     },
   } as unknown as RecordAdapter
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0' }), discover: async () => SNAPSHOT, close: async () => {} } as DatabaseAdapter
+  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => SNAPSHOT, close: async () => {} } as DatabaseAdapter
   return {
     ids: () => ['erp'],
     scope: () => ({ schemas: ['sales'] }),

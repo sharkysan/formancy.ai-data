@@ -3,6 +3,8 @@ import type { DatabaseKind } from '../adapter.js'
 import { generateForm } from '../generate/generate.js'
 import type { FormBindings, GenerationRequest } from '../generate/types.js'
 import type { ColumnMeta, CoverageAspect, CoverageGap, CoverageSubject, DiscoveryAccount, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
+import { serverStanding } from '../server.js'
+import type { ServerFacts } from '../server.js'
 import { createSnapshot, findObject, recordsDeleteFacts } from '../snapshot.js'
 import type { DriftPolicy } from './context.js'
 import { describedOf, diffRootDefinition, diffSnapshots as review } from './diff.js'
@@ -111,6 +113,8 @@ export interface Options {
   schemas?: string[]
   kind?: DatabaseKind
   serverVersion?: string
+  /** What the server is (0068). None by default, as no snapshot an adapter took before 0068 records it. */
+  server?: ServerFacts
   account?: DiscoveryAccount
   /** The published policy's lookup filters, which drift compares by type on each target (0028), and its operations (0050). None by default. */
   policy?: DriftPolicy
@@ -154,6 +158,7 @@ export function snapshot(edit: (objects: ObjectMeta[]) => void = () => {}, optio
     scope: { schemas: options.schemas ?? ['crm', 'sales'] },
     objects,
     gaps: options.gaps ?? [],
+    ...(options.server === undefined ? {} : { server: options.server }),
   })
 }
 
@@ -233,12 +238,15 @@ const refKey = (ref: ObjectRef): string => `${ref.schema}\u0000${ref.name}`
 /**
  * Whether `current` differs from `base` only in the root's own definition --
  * its kind, columns, keys and foreign keys -- with the same gaps, account and
- * scope, every other object the same, and every column the base has keeping
- * its access and comment: what a request's description of the root holds. A
- * lookup through the root itself is excluded, because its target is the root.
+ * scope, every other object the same, every column the base has keeping its
+ * access and comment, and a server review says nothing of: what a request's
+ * description of the root holds. A lookup through the root itself is
+ * excluded, because its target is the root.
  */
 function onlyTheRootDefinition(base: MetadataSnapshot, current: MetadataSnapshot, root: ObjectRef, targets: readonly ObjectRef[]): boolean {
   if (base.kind !== current.kind || base.fingerprint === current.fingerprint) return false
+  // Whether this release was tested on the server is review's alone (0068): no request describes the server.
+  if (current.server !== undefined && !serverStanding(current.kind, current.server).tested) return false
   if (targets.some((target) => refKey(target) === refKey(root))) return false
   if (JSON.stringify([base.account, base.scope, base.gaps]) !== JSON.stringify([current.account, current.scope, current.gaps])) return false
   const others = (snapshot: MetadataSnapshot) => JSON.stringify(snapshot.objects.filter((object) => refKey(object.ref) !== refKey(root)))

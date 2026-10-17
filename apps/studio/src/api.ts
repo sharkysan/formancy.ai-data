@@ -1,5 +1,5 @@
-import type { DriftChange, DriftReport, GeneratedForm, GenerationRequest, LookupChoice, MetadataSnapshot, ObjectRef, ReassignedKey, ServerIdentity } from '@formancy/data-core'
-import type { Administration, Approval, BundleV2, DraftQueue, DraftRead, DraftRejection, DraftSubmission, HostIdentity, Importation, PublishedBundle, Regeneration, Restoration } from '@formancy/data-server'
+import type { DriftChange, DriftReport, GeneratedForm, GenerationRequest, LookupChoice, MetadataSnapshot, ObjectRef, ReassignedKey } from '@formancy/data-core'
+import type { Administration, Approval, BundleV2, ConnectionTest, DraftQueue, DraftRead, DraftRejection, DraftSubmission, HostIdentity, Importation, PublishedBundle, Regeneration, Restoration } from '@formancy/data-server'
 
 /**
  * The studio's whole vocabulary: the data server's administrator plane, and
@@ -68,7 +68,7 @@ export interface Published {
 export interface AdminClient {
   whoami(): Promise<Outcome<HostIdentity>>
   connections(): Promise<Outcome<string[]>>
-  test(connection: string): Promise<Outcome<ServerIdentity>>
+  test(connection: string): Promise<Outcome<ConnectionTest>>
   metadata(connection: string): Promise<Outcome<MetadataSnapshot>>
   propose(request: ProposalRequest): Promise<Outcome<Proposal>>
   /**

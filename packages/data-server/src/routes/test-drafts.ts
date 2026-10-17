@@ -63,7 +63,7 @@ export function registry(): ConnectionRegistry {
     await db.discovering()
     return snapshot()
   }
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0' }), discover, close: async () => {} } as DatabaseAdapter
+  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover, close: async () => {} } as DatabaseAdapter
   return {
     ids: () => [...db.allowlist],
     scope: (id) => (db.allowlist.includes(id) ? { schemas: ['sales'] } : undefined),

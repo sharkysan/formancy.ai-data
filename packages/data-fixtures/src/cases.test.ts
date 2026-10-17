@@ -76,6 +76,9 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   POSTGRES_IMAGE: 'an image, which the report lists from the run',
   SQLSERVER_IMAGE: 'an image, which the report lists from the run',
   DEFAULT_IMAGES: 'the images, which the report lists from the run',
+  MATRIX_IMAGES: 'the images the adapter suites run on, a CI leg each (0067), which the report holds the run to',
+  IMAGES_VARIABLE: 'the variable a run is told its images by',
+  VERSION_FACTS: 'what the versions of one engine disagree on, each asserted on every leg by the test it names (0067)',
   FIXTURE_SCOPE: 'a discovery scope',
   PARITY_SCOPE: 'a discovery scope',
   MODEL_CASES: 'the ids themselves',
@@ -133,6 +136,19 @@ describe('the shared cases', () => {
   })
 })
 
+/**
+ * This file declares shared cases to test covers() itself, and holds none:
+ * it starts no database. So each test that read a declaration takes it back
+ * once read, and the report, which reads a test's meta, counts none of them
+ * -- on main before 0067 it counted three cases as held by a unit test, and
+ * 0067's rule that a declaration needs a server its leg recorded refused
+ * them in CI (run 38945745676).
+ */
+function takeBack(task: { meta: { engine?: unknown; covers?: unknown } }): void {
+  delete task.meta.engine
+  delete task.meta.covers
+}
+
 describe('covers()', () => {
   // An id typed by hand that matches no case would be a declaration the
   // report counts for nothing, and an empty one a test that declares and
@@ -149,19 +165,22 @@ describe('covers()', () => {
     // vitest merges meta shallowly: a test inside declaring covers() of its
     // own would replace the suite's cases rather than add to them, and the
     // suite's would silently stop counting.
-    test('refuses a declaration inside it', () => {
+    test('refuses a declaration inside it', ({ task }) => {
       expect(nested).toMatch(/already declares edge: orderDate, shipment: first/)
+      takeBack(task)
     })
 
     // What the report reads is the test's meta, through the JSON reporter's
     // filter; a suite's declaration must reach the tests inside it.
     test('gives each test inside it the engine and the cases', ({ task }) => {
       expect(task.meta).toMatchObject({ engine: 'postgres', covers: [edgeCase('orderDate'), shipmentCase('first')] })
+      takeBack(task)
     })
   })
 
   // A test's own declaration is its own meta.
   test('declared on a test, is that test’s meta', covers('sqlserver', refusalCase('deadlockVictim')), ({ task }) => {
     expect(task.meta).toMatchObject({ engine: 'sqlserver', covers: [refusalCase('deadlockVictim')] })
+    takeBack(task)
   })
 })

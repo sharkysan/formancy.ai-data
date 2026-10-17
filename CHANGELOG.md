@@ -85,6 +85,64 @@ later.
   Embedders pass the same list as `trustedProxies`
   ([0071](docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md);
   the data server's README says what a list too wide or too narrow does).
+- **The adapter suites run on every image of a matrix per engine**:
+  PostgreSQL 15, 16, 17 and 18, and SQL Server 2019, 2022 and 2025, where
+  they ran on 17 and 2022 alone. Why: passing on 17 said nothing of 16. The
+  first runs on the other images met differences the defaults could not
+  show -- PostgreSQL 15 and 16 have no `transaction_timeout`, and keep in a
+  lookup's plan the `IS NOT NULL` tests 17 plans away; PostgreSQL 15 has no
+  membership granted `WITH INHERIT`; PostgreSQL 18 runs a cascaded table's
+  AFTER DELETE trigger as the table's owner, where 15 to 17 run it as the
+  deleting account, refuses a delete an ON DELETE RESTRICT key forbids with
+  23001 where they send 23503, and files each NOT NULL in `pg_constraint`;
+  SQL Server 2019 has no `VIEW SECURITY DEFINITION` -- and each is now a
+  named fact,
+  `VERSION_FACTS`, which the suites assert as each version answers, with no
+  test skipped. A CI job of its own, `test-images`, runs data-fixtures and
+  each engine's adapter suite on every image but the default, and the
+  release report holds every shared case on every image, failing a run in
+  which one is missing or failed on any of them. The server, client, host,
+  studio and performance suites, the browser gates and the composed stack
+  stay on the defaults
+  ([0067](docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)).
+- **A snapshot records the server it was read from**, as `server`: the
+  product, the major version and, for SQL Server, the compatibility level
+  of the database discovery read -- outside the fingerprint, as
+  `serverVersion` is, so neither an upgrade nor a second server holding the
+  same catalog reads as drift. Why: whether a release was tested on a
+  server could not be said from its version string, which a Debian build of
+  PostgreSQL follows with its packaging and Azure SQL Database answers as
+  12, a boxed SQL Server 2014's major. `@formancy/data-core` decides it, in
+  one place for both engines: `serverStanding(kind, facts)` says tested or
+  not tested, with a sentence, against `TESTED_SERVERS` -- the majors of the
+  matrix, and the lowest compatibility level a matrix leg's SQL Server
+  fixture database answered -- and anything unknown is not tested. Nothing
+  refuses a server for being untested
+  ([0068](docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
+  New exports of `@formancy/data-core`: `serverStanding`, `serverName`,
+  `isServerProduct`, `TESTED_SERVERS` and `SQLSERVER_RELEASES`, and the
+  types `ServerFacts`, `ServerProduct`, `ServerStanding` and
+  `TestedServer`.
+- **Drift review says when this release was not tested on the server**: a
+  `server-untested` change, for review, naming the server, on every review
+  of a form whose current snapshot was read from such a server -- the drift
+  route, a regeneration, a restore, an import and a draft's submit and
+  approval alike -- including a review of an unchanged catalog, since the
+  server is outside the fingerprint and an upgrade in place keeps it. Why:
+  nothing refuses such a server, so the review is where an administrator is
+  told after publishing. It stops nothing, and the runtime is not told
+  (0068).
+- **The studio says it too**: the Connect step's answer and the metadata
+  pane under its server line carry data-core's sentence when this release
+  was not tested on the server, and nothing more when it was.
+- **`FORMANCY_IMAGES`**, for a contributor's run, names at most one image
+  per engine from the matrix:
+  `FORMANCY_IMAGES=postgres:16-alpine pnpm exec turbo run test --filter=@formancy/data-postgres`.
+  Unset, every suite runs the defaults; set, it moves the adapter suites
+  and data-fixtures' alone, since every other suite names the default at
+  each start; an image outside the matrix, two for one engine, or the
+  variable set to nothing is refused. turbo hashes it, so a cached run on
+  one image is never replayed for another.
 
 ### Changed
 
@@ -178,6 +236,44 @@ later.
 - **The log's request line names the forwarded address without the
   proxy's port.** Beside an address a trusted proxy forwarded, the socket's
   port is the proxy's connection, not the client's.
+- **A SQL Server older than 2019 is refused at discovery, and says which
+  release it is.** Its catalog has no `sys.edge_constraints`, which
+  discovery and every delete read, so discovery failed as "Invalid object
+  name 'sys.edge_constraints'." and said nothing of the version. It now
+  refuses before reading the catalog: "SQL Server 2017 (14) cannot be
+  discovered: this adapter reads sys.edge_constraints, which SQL Server has
+  from 2019 (15)." The administrator's plane still answers 503, "could not
+  be read", and logs the sentence. The view decides, not the major, so Azure
+  SQL Database, which answers 12, is never refused (0068).
+- **The connection test answers what the server is**: `product`, `major`
+  and, for SQL Server, `compatibility`, beside `kind` and `version`, and
+  its `standing`, `{ tested, says }`: whether this release was tested on
+  that server, in data-core's sentence. A server it was not tested on is
+  answered 200 as before.
+- **For embedders**: `ServerIdentity` now extends `ServerFacts`, so a
+  `DatabaseAdapter` of your own must report `product` and `major`, and for
+  SQL Server `compatibility`, from `ping` -- a breaking change for an
+  implementer, and additive for a reader. `MetadataSnapshot` has an
+  optional `server`, which `createSnapshot` copies and checks. `DriftKind`
+  has a new member, `server-untested`, so an exhaustive `switch` over it
+  no longer compiles until it handles it. `@formancy/data-server` exports
+  `ConnectionTest`, the connection test's answer.
+- **For contributors**: data-fixtures' `startPostgresFixture` and
+  `startSqlServerFixture` take an image, and every start that names none,
+  `startPostgresContainer()` and `startSqlServerContainer()` included, runs
+  the one `FORMANCY_IMAGES` chooses; only the adapters' suites and
+  data-fixtures' make one, and `scripts/ci-test-jobs.test.mjs` fails on one
+  anywhere else. The SQL Server fixture's server record names the
+  compatibility level of the database it loaded, as the getting-started
+  journey's record does of the composed one, and collect refuses a record
+  without it. On Windows a server record names the file that asked for it,
+  where it named data-fixtures' own `servers.ts`. The release report keys
+  each shared case's cells by image, holds an image of the matrix to the
+  legs that ran on it, says an image outside the matrix in a sentence of
+  its own as not tested, and gives a suite a row per leg, and a report
+  built on one machine passes
+  `--allow-missing container,getting-started,test-images`, since a machine
+  runs the defaults ([`docs/release/`](docs/release/README.md)).
 
 What review costs, in 0065: every submit and approval asks the database, so
 one that cannot be reached refuses both; nothing deletes a draft; nobody is
@@ -214,6 +310,28 @@ asks Google for the fonts; and the policy names Google's hosts, so fonts
 that move are refused until it is edited.
 The Worker runs no code and none of the product -- no server, no
 database, neither plane -- which stays where 0037 puts it.
+What the matrix costs, in 0067: more CI jobs a run, and the wait for
+runners they add; some default work repeated, since every data-fixtures leg
+starts both engines; more moving tags; runs that go red for a difference no
+user of the defaults meets; what the routes, the client, the host page and
+the studio do on another version is still not tested; PostgreSQL 14 is not
+tested; and what the image legs show on CI's runners is first shown by
+their first runs there. What it names and does not change: on PostgreSQL
+18 a delete whose cascaded table's AFTER DELETE trigger writes where only
+the table's owner may is done, where 15 to 17 refuse it,
+`permission-denied`; a delete an ON DELETE RESTRICT key forbids is answered
+`referenced` on every version, though 18 sends another SQLSTATE; and
+discovery describes a table the same on 18 as on 17, though 18 files its
+NOT NULLs in `pg_constraint` -- but a NOT NULL added NOT VALID, which only
+18 has, is read as NOT NULL though rows older than it may hold NULL. What
+0068 does not do: refuse a server this release was not tested on, which is
+generated, published and served on as before; tell a managed PostgreSQL
+from PostgreSQL; or call a SQL Server database untested at a level between
+the lowest tested and its release's own. What it costs: drift review lists
+`server-untested` on every review against such a server, for as long as it
+stays untested, and a person filling a form is never told. A snapshot taken
+before it records no server until it is discovered again, and drift says
+nothing of its server meanwhile.
 
 What believing a proxy costs, in 0071: a list too wide lets a client that
 connects from inside it choose its own bucket and the address the log

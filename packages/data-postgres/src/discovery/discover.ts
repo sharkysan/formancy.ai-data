@@ -10,6 +10,7 @@ import { readForeignKeys } from './foreign-keys.js'
 import { readKeys } from './keys.js'
 import { readObjects } from './objects.js'
 import { readKeysBelow, readReferencedBy } from './referenced-by.js'
+import { readServer } from '../server.js'
 
 /**
  * A metadata snapshot of the schemas in scope, read from pg_catalog (0006).
@@ -51,7 +52,7 @@ export async function discoverPostgres(sql: Sql, scope: DiscoveryScope): Promise
   const schemas = [...scope.schemas]
   return sql.begin('isolation level repeatable read read only', async (tx) => {
     await searchCatalogFirst(tx)
-    const { version: serverVersion, encoding } = await readSettings(tx)
+    const [{ kind: _kind, version: serverVersion, ...server }, encoding] = await Promise.all([readServer(tx), readEncoding(tx)])
     const [account, inScope, columns, access, deletes, keys, foreignKeys, referencedBy, keysBelow, checks, comments] = await Promise.all([
       readAccount(tx),
       readObjects(tx, schemas),
@@ -95,7 +96,7 @@ export async function discoverPostgres(sql: Sql, scope: DiscoveryScope): Promise
       }
     })
 
-    return createSnapshot({ kind: 'postgres', serverVersion, account, scope, objects, gaps: [...inScope.gaps, ...keysBelow] })
+    return createSnapshot({ kind: 'postgres', serverVersion, server, account, scope, objects, gaps: [...inScope.gaps, ...keysBelow] })
   })
 }
 
@@ -128,16 +129,15 @@ async function searchCatalogFirst(sql: TransactionSql): Promise<void> {
 }
 
 /**
- * The server's version — the same setting `createPostgresAdapter().ping()`
- * reports, so the two cannot disagree — and the encoding of the database this
- * connection is in, fixed when it was created, which decides what a text
- * length counts.
+ * The encoding of the database this connection is in, fixed when it was
+ * created, which decides what a text length counts. The server itself is
+ * `readServer`'s, the query `createPostgresAdapter().ping()` runs, so the
+ * two cannot disagree.
  */
-async function readSettings(sql: TransactionSql): Promise<{ version: string; encoding: string }> {
-  const [row] = await sql<{ version: string; encoding: string }[]>`
-    select pg_catalog.current_setting('server_version') as version, pg_catalog.current_setting('server_encoding') as encoding`
+async function readEncoding(sql: TransactionSql): Promise<string> {
+  const [row] = await sql<{ encoding: string }[]>`select pg_catalog.current_setting('server_encoding') as encoding`
   // Never reached: a SELECT of one row of expressions returns one row. Kept,
-  // as in ping, because `row` is `T | undefined` under noUncheckedIndexedAccess.
-  if (row === undefined) throw new Error('PostgreSQL answered the settings query with no row')
-  return row
+  // as in readServer, because `row` is `T | undefined` under noUncheckedIndexedAccess.
+  if (row === undefined) throw new Error('PostgreSQL answered the encoding query with no row')
+  return row.encoding
 }

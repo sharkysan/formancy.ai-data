@@ -66,7 +66,7 @@ let store: ConfigurationStore
 let app: FastifyInstance
 
 function registry(): ConnectionRegistry {
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0' }), discover: async () => snapshot(), close: async () => {} } as DatabaseAdapter
+  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => snapshot(), close: async () => {} } as DatabaseAdapter
   return {
     ids: () => ['erp'],
     scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined),

@@ -49,10 +49,36 @@ function versions(tool) {
   return tool.versions.map(({ version, from }) => `${version} (${from.join(', ')})`).join('; ')
 }
 
+/**
+ * The images of `engine`'s matrix past its default (0067), grouped by the
+ * suites the test-images job runs on them: `[[packages, images]]`. Throws
+ * for an image of the matrix no leg runs, which has no suite to name.
+ */
+function legsOf(facts, engine) {
+  const groups = new Map()
+  for (const image of facts.matrix[engine].slice(1)) {
+    const packages = facts.legs.filter((leg) => leg.image === image).map((leg) => leg.package).sort()
+    if (packages.length === 0) throw new Error(`${image} is an image of the matrix that no leg of the test-images job runs`)
+    const key = JSON.stringify(packages)
+    groups.set(key, [packages, [...(groups.get(key)?.[1] ?? []), image]])
+  }
+  return [...groups.values()]
+}
+
+/**
+ * README.md's engine cell: the default, the suites that also run on each
+ * other image of the matrix, and that an image outside it one file names is
+ * not one the release is tested with (0067 narrows 0003).
+ */
+function engineCell(facts, engine) {
+  const also = legsOf(facts, engine).map(([packages, images]) => `; ${prose(packages.map(code))} also on ${prose(images.map(code))}`)
+  return `${code(facts.images[engine])}${also.join('')}; an image outside the matrix that one file names shows only what that file shows`
+}
+
 /** README.md's block: one table, every row derived. */
 export function readmeTable(facts) {
   const rows = [
-    ...facts.engines.map((engine) => [`**${engineName(engine)}**`, `${code(facts.images[engine])}, unless a test names another image`, '']),
+    ...facts.engines.map((engine) => [`**${engineName(engine)}**`, engineCell(facts, engine), '']),
     ...facts.runtime.map((entry) => [
       entry.under === undefined ? `${code(entry.name)}, by ${code(entry.package)}` : `${code(entry.name)}, under ${code(entry.under)}`,
       entry.loaded,
@@ -82,7 +108,11 @@ export function adapterLine(facts, engine) {
   const named = drivers.map((entry) =>
     entry.under === undefined ? `${code(entry.name)} ${entry.loaded} (published as ${code(entry.range)})` : `the ${code(entry.name)} ${entry.loaded} under it (${declared(entry)})`,
   )
-  return `The suites start ${code(facts.images[engine])} unless a test names another image, through ${prose(named)}.`
+  const again = legsOf(facts, engine)
+    .filter(([packages]) => packages.includes(`@formancy/data-${engine}`))
+    .flatMap(([, images]) => images)
+  const ci = again.length === 0 ? '' : `; CI runs them again on ${prose(again.map(code))}, each named in ${code(facts.imagesVariable)}`
+  return `The suites start ${code(facts.images[engine])}, or the image a file names for a fact of its own, through ${prose(named)}${ci}.`
 }
 
 /** Every document with a block of this generator, and the body it should hold. */

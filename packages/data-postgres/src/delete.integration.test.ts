@@ -1,6 +1,6 @@
 import { findObject, generateForm, planDelete, planUpdate } from '@formancy/data-core'
 import type { DeleteOutcome, DeleteRequest, FormBindings, FormPolicy, MetadataSnapshot, PolicyContext, RecordAdapter, RecordColumn } from '@formancy/data-core'
-import { covers, deleteAnswer, deleteCase, PARITY_SCOPE, startPostgresFixture, UPDATE_RECREATED, UPDATE_RECREATED_CASE } from '@formancy/data-fixtures'
+import { covers, deleteAnswer, deleteCase, PARITY_SCOPE, startPostgresFixture, UPDATE_RECREATED, UPDATE_RECREATED_CASE, versionFact } from '@formancy/data-fixtures'
 import type { DeleteAnswer, DeleteCase, PostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql, TransactionSql } from 'postgres'
@@ -246,14 +246,20 @@ describe('what the database keeps', () => {
     expect(await versionOf('removable', parent)).toBe('1')
   })
 
-  // ON DELETE RESTRICT refuses with 23503 on PostgreSQL 17, as NO ACTION
-  // does, not 23001 (measured, P3).
+  // ON DELETE RESTRICT is refused as NO ACTION is: foreign-key-violation,
+  // the key named, which the server answers `referenced`. Its SQLSTATE is
+  // 23503 on 15 to 17, as NO ACTION's (measured, P3), and 23001,
+  // restrict_violation, on 18 (VERSION_FACTS.restrictViolation; watched
+  // failing on 18 while this asserted 23503 there, and with 23001 left out
+  // of the adapter's map: check-violation, class 23's default, which the
+  // server answers `refused`).
   test('restrict: a row a RESTRICT key refers to stays, refused as NO ACTION is', covers('postgres', deleteCase('restrict')), async () => {
     const parent = await inserted('removable', { tenant_id: 1, note: 'restricted' })
     await owner.unsafe('insert into parity.removable_restrict (removable_id) values ($1)', [parent])
     const outcome = await records.delete(await planned('removable', CLARA, `k1:${parent}`, '1'))
     expect(answer(outcome)).toBe(expected('restrict'))
-    expect(outcome).toMatchObject({ constraint: 'fk_removable_restrict_removable', message: expect.stringMatching(/23503/) })
+    const state = versionFact('restrictViolation', fixture.server) ? '23001' : '23503'
+    expect(outcome).toMatchObject({ constraint: 'fk_removable_restrict_removable', message: `PostgreSQL refused the statement with SQLSTATE ${state} on constraint fk_removable_restrict_removable.` })
     expect(await versionOf('removable', parent)).toBe('1')
   })
 

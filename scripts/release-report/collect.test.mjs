@@ -34,6 +34,7 @@ const record = (overrides) => ({
   updateLevel: null,
   edition: null,
   description: 'PostgreSQL 17.11',
+  compatibility: null,
   caller: null,
   script: 'test-coverage',
   at: at(1),
@@ -95,6 +96,17 @@ describe('a job’s key', () => {
     expect(keyFor({ job: 'verify' }, covered)).toBe('verify')
     expect(() => keyFor({ job: 'test', pkg: '@formancy/nothing' }, covered)).toThrow(/no workspace package/)
   })
+
+  // An image leg runs one package on one image (0067): keyed by the package
+  // alone, a package's legs would share a key and overwrite one another's
+  // artefact; by the image alone, data-fixtures' and the adapter's legs on
+  // one image would.
+  test('names both the package and the image of an image leg', () => {
+    const covered = [{ path: 'packages/data-postgres', id: 'data-postgres', name: '@formancy/data-postgres' }]
+    expect(keyFor({ job: 'test-images', pkg: '@formancy/data-postgres', variant: 'postgres:16-alpine' }, covered)).toBe('test-images-data-postgres-postgres-16-alpine')
+    expect(keyFor({ job: 'test-images', pkg: '@formancy/data-postgres', variant: 'mcr.microsoft.com/mssql/server:2019-latest' }, covered)).toBe('test-images-data-postgres-mcr.microsoft.com-mssql-server-2019-latest')
+    expect(() => keyFor({ job: 'test-images', pkg: '@formancy/nothing', variant: 'postgres:16-alpine' }, covered)).toThrow(/no workspace package/)
+  })
 })
 
 describe('a test job’s results', () => {
@@ -117,12 +129,48 @@ describe('a test job’s results', () => {
     expect(result.dist).toEqual([{ package: '@formancy/data-core', distHash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/) }])
   })
 
+  // An image leg's results are its suite's, as the default leg's are, under
+  // the leg's key, with the image it was given.
+  test('keep an image leg’s suite and servers under its key and its image', () => {
+    const root = workspace()
+    put(root, 'apps/host/test-results/servers/test-coverage-postgres-1-1.json', record({ image: 'postgres:16-alpine', version: '16.15', caller: join(root, 'apps/host/src/test-databases.ts') }))
+    const result = collect({ root, job: 'test-images', pkg: '@formancy/data-host', variant: 'postgres:16-alpine', ...machine })
+    expect(result).toMatchObject({ key: 'test-images-app-host-postgres-16-alpine', job: 'test-images', package: '@formancy/data-host', variant: 'postgres:16-alpine', missing: [] })
+    expect(result.suites.map((suite) => suite.package)).toEqual(['@formancy/data-host'])
+    expect(result.servers.map((server) => [server.image, server.caller])).toEqual([['postgres:16-alpine', 'apps/host/src/test-databases.ts']])
+  })
+
+  // A leg whose suite never started its image -- FORMANCY_IMAGES dropped on
+  // the way, so every start ran the default -- would be the default's
+  // results under the image's name.
+  test('list an image leg whose suite started no server of its image', () => {
+    const root = workspace()
+    const result = collect({ root, job: 'test-images', pkg: '@formancy/data-host', variant: 'postgres:16-alpine', ...machine })
+    expect(result.missing).toEqual(['a server of postgres:16-alpine, the image this leg runs on: its suite started only postgres:17-alpine'])
+  })
+
   // Two writers make server records: data-fixtures and the getting-started
   // journey. If they ever disagree, this is where anybody finds out.
   test('refuse a malformed server record, naming its file', () => {
     const root = workspace()
     put(root, 'apps/host/test-results/servers/test-coverage-sqlserver-9-1.json', { engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', version: 16 })
     expect(() => collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine })).toThrow(/apps\/host\/test-results\/servers\/test-coverage-sqlserver-9-1\.json is not a server record: version is not a string/)
+  })
+
+  // data-core's compatibility floor is held to the level each SQL Server
+  // fixture recorded (0068). A writer that left the field out -- the
+  // journey's did, when data-fixtures' gained it -- or wrote it as text
+  // would diverge from the other and nothing would say so.
+  test('refuse a server record whose compatibility level is missing or not a whole number', () => {
+    for (const compatibility of [undefined, '150', 150.5]) {
+      const root = workspace()
+      const { compatibility: _, ...without } = record({ engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', version: '16.0.4295.3' })
+      put(root, 'apps/host/test-results/servers/test-coverage-sqlserver-9-1.json', compatibility === undefined ? without : { ...without, compatibility })
+      expect(() => collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine }), String(compatibility)).toThrow(/test-coverage-sqlserver-9-1\.json is not a server record: compatibility is neither a whole number nor null/)
+    }
+    const root = workspace()
+    put(root, 'apps/host/test-results/servers/test-coverage-sqlserver-9-1.json', record({ engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', version: '16.0.4295.3', compatibility: 160 }))
+    expect(collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine }).servers.map((server) => server.compatibility)).toContain(160)
   })
 })
 

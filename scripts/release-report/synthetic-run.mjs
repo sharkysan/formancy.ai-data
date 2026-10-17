@@ -65,7 +65,9 @@ export function greenRun() {
         file('packages/data-postgres/src/records.integration.test.ts', [test('edge values', { engine: 'postgres', covers: [CASES[0]] })]),
       ]),
     ],
-    servers: [server({})],
+    // A server per file, as every adapter file starts its own fixture: a
+    // shared case counts for the image its own file's server answered on.
+    servers: [server({}), server({ caller: 'packages/data-postgres/src/records.integration.test.ts' })],
     dist: dist(PUBLISHED.slice(0, 1)),
   }
   const ms = {
@@ -77,7 +79,10 @@ export function greenRun() {
         file('packages/data-sqlserver/src/records.integration.test.ts', [test('edge values', { engine: 'sqlserver', covers: [CASES[0]] })]),
       ]),
     ],
-    servers: [server({ ...SQLSERVER, caller: 'packages/data-sqlserver/src/parity.integration.test.ts', package: '@formancy/data-sqlserver' })],
+    servers: [
+      server({ ...SQLSERVER, caller: 'packages/data-sqlserver/src/parity.integration.test.ts', package: '@formancy/data-sqlserver' }),
+      server({ ...SQLSERVER, caller: 'packages/data-sqlserver/src/records.integration.test.ts', package: '@formancy/data-sqlserver' }),
+    ],
     dist: dist(PUBLISHED.slice(0, 1)),
   }
   const host = {
@@ -142,6 +147,9 @@ export function greenRun() {
     facts: {
       engines: ['postgres', 'sqlserver'],
       images: { postgres: 'postgres:17-alpine', sqlserver: 'mcr.microsoft.com/mssql/server:2022-latest' },
+      // The defaults alone, so a defect elsewhere gives its own sentence and
+      // nothing else; withImageLeg() adds an image and its leg.
+      matrix: { postgres: ['postgres:17-alpine'], sqlserver: ['mcr.microsoft.com/mssql/server:2022-latest'] },
       runtime: [
         { package: '@formancy/data-postgres', name: 'postgres', range: '^3.4.9', loaded: '3.4.9' },
         { package: '@formancy/data-server', name: 'fastify', range: '^5.12.5', loaded: '5.12.5' },
@@ -256,6 +264,25 @@ export function withBrowser(inputs, { browser, revision, version, image, offset,
         measurements: [{ name: gate.measurements[0].name, value, unit: 'ms' }],
       },
     ],
+  })
+  return inputs
+}
+
+/**
+ * `inputs` (a copy of greenRun()) as a run whose matrix has `image` beside
+ * PostgreSQL's default, and in which data-postgres's suite ran again on it in
+ * a leg of the test-images job (0067): the same files and tests, and each
+ * file's server on `image`, answering `version`.
+ */
+export function withImageLeg(inputs, { image = 'postgres:16-alpine', version = '16.15' } = {}) {
+  inputs.facts.matrix.postgres.push(image)
+  const pg = job(inputs, 'test-data-postgres')
+  inputs.results.push({
+    ...structuredClone(pg),
+    job: 'test-images',
+    key: `test-images-data-postgres-${image.replaceAll(/[^A-Za-z0-9.]+/g, '-')}`,
+    variant: image,
+    servers: pg.servers.map((entry) => ({ ...entry, image, version, description: `PostgreSQL ${version}`, digest: `postgres@sha256:${version}` })),
   })
   return inputs
 }

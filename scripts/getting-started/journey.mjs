@@ -123,8 +123,10 @@ function connectionUser(connection) {
  * own adapter reports it, through the administrator plane's connection test,
  * and its image from compose's resolved configuration (`config`). The
  * record has data-fixtures' shape, whose `updateLevel`, `edition` and
- * `description` the ping does not give, so they are null; collect.mjs refuses
- * a record of any other shape, which is how the two writers are held alike.
+ * `description` the ping does not give, so they are null, and whose
+ * `compatibility` is the level the test answers for the SQL Server database
+ * the connection reaches (0068), null for PostgreSQL; collect.mjs refuses a
+ * record of any other shape, which is how the two writers are held alike.
  */
 export async function composedServer(base, admin, form, config) {
   const at = `${form.connection}:`
@@ -140,6 +142,7 @@ export async function composedServer(base, admin, form, config) {
     updateLevel: null,
     edition: null,
     description: null,
+    compatibility: answer.json.compatibility ?? null,
     caller: 'scripts/getting-started.mjs',
     script: 'getting-started',
     at: new Date().toISOString(),

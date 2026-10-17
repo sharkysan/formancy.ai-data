@@ -25,7 +25,8 @@
 //     store wrote, byte for byte, which in the suite is only a Blob (0062);
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules jsdom cannot measure -- on every step, including the states
-//     that add colour: gaps, a refused policy, a delete refused for what it
+//     that add colour: gaps, a server this release was not tested on, said
+//     by the connection test and the metadata (0068), a refused policy, a delete refused for what it
 //     also does and its reach accepted (0052), a failed preview, a conflict,
 //     a blocking drift, a refused restore, a regeneration and what it
 //     carried (0030), a version file chosen and its import refused (0062),

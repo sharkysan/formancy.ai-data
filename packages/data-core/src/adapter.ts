@@ -1,4 +1,5 @@
 import type { DiscoveryScope, MetadataSnapshot } from './metadata.js'
+import type { ServerFacts } from './server.js'
 
 /**
  * The databases the first release speaks, as a tuple so that a `switch` over
@@ -20,17 +21,21 @@ export function isDatabaseKind(value: unknown): value is DatabaseKind {
 }
 
 /**
- * What answered a ping: the engine's own name for itself, and its version as
- * the server states it rather than as the driver was configured for.
+ * What answered a ping: the engine's own name for itself, its version as the
+ * server states it rather than as the driver was configured for, and what
+ * the adapter translated that answer into (0068): the product, the major
+ * and, for SQL Server, the connected database's compatibility level. Whether
+ * this release was tested on it is `serverStanding`'s to say, from those
+ * facts alone, so the two adapters translate and data-core decides.
  */
-export interface ServerIdentity {
+export interface ServerIdentity extends ServerFacts {
   kind: DatabaseKind
   /**
    * `major.minor[.…]` as the server reports it: `17.6` from PostgreSQL's
    * `server_version`, `16.0.4205.1` from SQL Server's `ProductVersion`. Kept
-   * as the server's own string, because the two do not share a shape and
-   * normalising them is a decision the metadata layer will take with the
-   * capability model, not one a ping should take alone.
+   * as the server's own string, for a person: the major is read from what
+   * each engine states as a number (`ServerFacts.major`), never parsed out of
+   * this, which a Debian build of PostgreSQL follows with its packaging.
    */
   version: string
 }

@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
-import type { MetadataSnapshot, ServerIdentity } from '@formancy/data-core'
+import type { MetadataSnapshot } from '@formancy/data-core'
+import type { ConnectionTest } from '@formancy/data-server'
 import type { AdminClient, Outcome } from './api.js'
 import { ENGINE_NAMES, MetadataView } from './metadata.js'
 
-type Tested = Outcome<ServerIdentity> | 'testing'
+type Tested = Outcome<ConnectionTest> | 'testing'
 
 /**
  * Step 2: the connections the deployment allows, a test of each, and what
@@ -15,6 +16,8 @@ type Tested = Outcome<ServerIdentity> | 'testing'
  * rather than a password (0014), and the studio has no way to add one. A
  * failure says that the database did not answer, never why in the driver's
  * words -- those name hosts and ports, and the server keeps them in its log.
+ * An answer from a server this release was not tested on says so, in the
+ * server's sentence, and is an answer like any other (0068).
  */
 export function ConnectStep({
   client,
@@ -85,6 +88,13 @@ export function ConnectStep({
                   {result === undefined || result === 'testing' ? null : result.ok ? (
                     <p role="status" className="answered">
                       {ENGINE_NAMES[result.value.kind]} {result.value.version} answered.
+                      {/* In the same status, so it is heard with the answer: said only when the release was not tested on that server (0068). */}
+                      {result.value.standing.tested ? null : (
+                        <>
+                          {' '}
+                          <span className="untested">{result.value.standing.says}</span>
+                        </>
+                      )}
                     </p>
                   ) : (
                     <p role="alert" className="problem-box">

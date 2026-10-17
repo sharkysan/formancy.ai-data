@@ -69,7 +69,7 @@ async function authenticate(request: FastifyRequest): Promise<HostIdentity | und
 let reachable: boolean
 /** The allowlist knows `erp` and nothing else; a database that is down throws what a driver throws, address and all. */
 function registry(): ConnectionRegistry {
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0' }), discover: async () => snapshot(), close: async () => {} } as DatabaseAdapter
+  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => snapshot(), close: async () => {} } as DatabaseAdapter
   return {
     ids: () => ['erp'],
     scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined),

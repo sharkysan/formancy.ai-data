@@ -52,7 +52,10 @@ describe('the administrator plane, through the studio client', () => {
   test('reads every route the studio uses in the shape the server sends', async () => {
     expect(await admin.whoami()).toEqual({ ok: true, value: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } })
     expect(await admin.connections()).toEqual({ ok: true, value: ['fixture', 'fixture-reader', 'fixture-sqlserver', 'fixture-sqlserver-reader', 'fixture-writer'] })
-    expect(await admin.test('fixture')).toEqual({ ok: true, value: { kind: 'postgres', version: '17.11' } })
+    expect(await admin.test('fixture')).toEqual({
+      ok: true,
+      value: { kind: 'postgres', version: '17.11', product: 'postgresql', major: 17, standing: { tested: true, says: 'This release of Formancy Data was tested on PostgreSQL 17.' } },
+    })
     // The connection whose catalog hides what it may not use, and says so as gaps (0027).
     const metadata = await admin.metadata('fixture-sqlserver-reader')
     expect(metadata.ok && metadata.value.gaps.length).toBeGreaterThan(0)

@@ -90,7 +90,7 @@ describe('the shared cases', () => {
       withDefect((inputs) => {
         for (const entry of job(inputs, 'test-data-sqlserver').suites[0].files) for (const one of entry.tests) one.meta.covers = one.meta.covers.filter((id) => id !== CASES[1])
       }),
-    ).toEqual([`${CASES[1]}: passed on postgres, missing on sqlserver (declared with covers(); see packages/data-fixtures/README.md)`])
+    ).toEqual([`${CASES[1]}: passed on postgres:17-alpine, missing on mcr.microsoft.com/mssql/server:2022-latest (declared with covers(); see packages/data-fixtures/README.md)`])
   })
 
   // An id typed by hand, or left behind when the data changed, is a
@@ -147,15 +147,17 @@ describe('versions', () => {
   })
 
   // A run whose PostgreSQL tests all started another image would report the
-  // default as tested on the README's word alone.
+  // default as tested on the README's word alone; and every case those tests
+  // declared ran on that image, not the default's, so each is missing there.
   test('fail the run when an engine’s default image never answered a test', () => {
+    const missing = (id) => `${id}: missing on postgres:17-alpine, passed on mcr.microsoft.com/mssql/server:2022-latest (declared with covers(); see packages/data-fixtures/README.md)`
     expect(
       withDefect((inputs) => {
         for (const result of inputs.results) {
           result.servers = result.servers.map((entry) => (entry.engine === 'postgres' ? { ...entry, image: 'postgres:18-alpine' } : entry))
         }
       }),
-    ).toEqual(["PostgreSQL's default image postgres:17-alpine never answered a test in this run"])
+    ).toEqual([missing(CASES[0]), missing(CASES[1]), "PostgreSQL's default image postgres:17-alpine never answered a test in this run"])
   })
 
   // A server whose record names no file cannot be said to have run any test.

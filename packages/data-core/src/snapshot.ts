@@ -15,6 +15,8 @@ import type {
   RowSecurity,
   TextLengthUnit,
 } from './metadata.js'
+import { isServerProduct } from './server.js'
+import type { ServerFacts } from './server.js'
 
 /**
  * Codepoint order, deliberately not `localeCompare`.
@@ -159,6 +161,23 @@ function assertAccount(input: Omit<MetadataSnapshot, 'fingerprint'>): void {
   if (typeof account !== 'object' || account === null) throw new Error('the snapshot names no account; it was taken before 0027')
   if (typeof account.user !== 'string' || account.user === '') throw new Error('the account names no user')
   if (typeof account.login !== 'string' || account.login === '') throw new Error('the account names no login')
+}
+
+/**
+ * The server facts (0068), when there are any, as the contract names them:
+ * outside the fingerprint, so a posted bundle's would otherwise hash to its
+ * fingerprint whatever they said. Read back from JSON, so nothing about
+ * their shape is assumed. The copy holds only what the contract names.
+ */
+function checkedServer(server: ServerFacts): ServerFacts {
+  const facts = server as unknown as Record<string, unknown>
+  if (!isServerProduct(facts['product'])) throw new Error(`the server's product ${JSON.stringify(facts['product'])} is not one the contract names`)
+  const { major, compatibility } = facts
+  if (major !== null && !Number.isInteger(major)) throw new Error(`the server's major ${String(major)} is neither a whole number nor null`)
+  if (compatibility !== undefined && !Number.isInteger(compatibility)) throw new Error(`the server's compatibility level ${String(compatibility)} is not a whole number`)
+  const checked: ServerFacts = { product: facts['product'], major: major as number | null }
+  if (compatibility !== undefined) checked.compatibility = compatibility as number
+  return checked
 }
 
 /**
@@ -367,7 +386,8 @@ function sortGaps(gaps: readonly CoverageGap[]): CoverageGap[] {
  * JSON is exactly the kind of thing that is subtly different the second time
  * it is written. The login and the server version are carried and not hashed
  * (0027): a login mapped to the same user is the same principal, and a patch
- * upgrade is not drift.
+ * upgrade is not drift; nor are the server facts (0068), whose major and
+ * compatibility level move with an upgrade and not with anything a form binds.
  *
  * A schema subject is not compared with `scope.schemas`: SQL Server matches
  * the scope by the database's collation, so `SALES` finds the schema the
@@ -394,10 +414,13 @@ export function createSnapshot(input: Omit<MetadataSnapshot, 'fingerprint'>): Me
   const scope = { schemas: [...new Set(input.scope.schemas)].sort(byCodepoint) }
 
   const account = { user: input.account.user, login: input.account.login }
+  // Only when present: a snapshot taken before 0068 has no such property.
+  const server = input.server === undefined ? {} : { server: checkedServer(input.server) }
 
   return {
     kind: input.kind,
     serverVersion: input.serverVersion,
+    ...server,
     account,
     scope,
     objects,

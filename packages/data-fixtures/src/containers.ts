@@ -1,28 +1,14 @@
-import type { DatabaseKind, DiscoveryAccount } from '@formancy/data-core'
+import type { DiscoveryAccount } from '@formancy/data-core'
 import { MSSQLServerContainer } from '@testcontainers/mssqlserver'
 import type { StartedMSSQLServerContainer } from '@testcontainers/mssqlserver'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import mssql from 'mssql'
 import postgres from 'postgres'
+import { selectedImage } from './images.js'
 import { readFixture, splitBatches } from './load.js'
 import type { ServerAnswer, ServerRecord } from './servers.js'
 import { captureCaller, recordServer } from './servers.js'
-
-/**
- * The images the suites run against. The supported matrix is exactly these
- * until a test names another (0003): passing on 17 says nothing about 14.
- */
-export const POSTGRES_IMAGE = 'postgres:17-alpine'
-export const SQLSERVER_IMAGE = 'mcr.microsoft.com/mssql/server:2022-latest'
-
-/**
- * The image each engine's tests run on unless a file names another. The
- * supported matrix is exactly these until a test names another (0003), and
- * the release report lists every image a test started, these first (0035).
- * A record, so a third engine without an image is a compile error here.
- */
-export const DEFAULT_IMAGES: Readonly<Record<DatabaseKind, string>> = { postgres: POSTGRES_IMAGE, sqlserver: SQLSERVER_IMAGE }
 
 /** The restricted principal both fixture files create. */
 export const READER = {
@@ -98,16 +84,18 @@ async function askPostgres(uri: string): Promise<ServerAnswer> {
  * A PostgreSQL container, empty, and a record of the server that answered in
  * it (0035): every container a suite or a gate starts comes through here or
  * `startSqlServerContainer`, so the release report can say what each test
- * ran on. `image` is for a test that names another; the default is the one
- * every other test runs.
+ * ran on. `image` is for a test that names another; without one, the image
+ * FORMANCY_IMAGES chooses, which unset is the default (0067). So a bare call
+ * -- each adapter's ping file makes one -- runs on its leg's image: on the
+ * default, a leg's ping would be the default's test reported as the leg's.
  */
-export async function startPostgresContainer(image: string = POSTGRES_IMAGE): Promise<StartedServer<StartedPostgreSqlContainer>> {
+export async function startPostgresContainer(image: string = selectedImage('postgres')): Promise<StartedServer<StartedPostgreSqlContainer>> {
   // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
   const caller = captureCaller()
   const container = await new PostgreSqlContainer(image).start()
   try {
     const answer = await askPostgres(container.getConnectionUri())
-    return { container, server: recordServer({ engine: 'postgres', image, caller, ...answer }) }
+    return { container, server: recordServer({ engine: 'postgres', image, caller, compatibility: null, ...answer }) }
   } catch (error) {
     await container.stop()
     throw error
@@ -116,14 +104,15 @@ export async function startPostgresContainer(image: string = POSTGRES_IMAGE): Pr
 
 /**
  * A PostgreSQL container with the fixture loaded, the restricted principals
- * created, and the parity schema (0028) beside it.
+ * created, and the parity schema (0028) beside it, on `image`: the one
+ * FORMANCY_IMAGES chooses, unless the caller names another.
  *
  * One harness for every suite, so the two adapters, the codecs and anything
  * later all start from byte-identical databases. A suite that built its own
  * would drift from this one the first time somebody added a table to it.
  */
-export async function startPostgresFixture(): Promise<PostgresFixture> {
-  const { container, server } = await startPostgresContainer()
+export async function startPostgresFixture(image: string = selectedImage('postgres')): Promise<PostgresFixture> {
+  const { container, server } = await startPostgresContainer(image)
   const admin = container.getConnectionUri()
   const sql = postgres(admin, { onnotice: () => {} })
   try {
@@ -224,18 +213,15 @@ async function askSqlServer(config: mssql.config): Promise<ServerAnswer> {
 }
 
 /**
- * A SQL Server container, empty, accepting logins, and a record of the
- * server that answered in it (0035), as `startPostgresContainer`. Accepting
+ * A SQL Server container, accepting logins, and what its server said about
+ * itself: recorded by whoever started it, who knows what it loaded. Accepting
  * the EULA is the operator's act; in a test it is this call, the decision
  * compose.yaml makes a developer spell out.
  */
-export async function startSqlServerContainer(image: string = SQLSERVER_IMAGE): Promise<StartedServer<StartedMSSQLServerContainer>> {
-  // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
-  const caller = captureCaller()
+async function launchSqlServer(image: string): Promise<{ container: StartedMSSQLServerContainer; answer: ServerAnswer }> {
   const container = await new MSSQLServerContainer(image).acceptLicense().start()
   try {
-    const answer = await askSqlServer(ownerOf(container, 'master'))
-    return { container, server: recordServer({ engine: 'sqlserver', image, caller, ...answer }) }
+    return { container, answer: await askSqlServer(ownerOf(container, 'master')) }
   } catch (error) {
     await container.stop()
     throw error
@@ -243,14 +229,24 @@ export async function startSqlServerContainer(image: string = SQLSERVER_IMAGE): 
 }
 
 /**
- * A SQL Server container with the fixture loaded into its own database, the
- * restricted principals created, and the parity schema (0028) beside it.
+ * A SQL Server container, empty, accepting logins, and a record of the
+ * server that answered in it (0035), as `startPostgresContainer`. It loads
+ * no database, so its record names no compatibility level.
  */
-export async function startSqlServerFixture(): Promise<SqlServerFixture> {
-  const { container, server } = await startSqlServerContainer()
-  const owner = ownerOf(container, 'master')
-  const base = { server: owner.server, port: owner.port, options: owner.options }
+export async function startSqlServerContainer(image: string = selectedImage('sqlserver')): Promise<StartedServer<StartedMSSQLServerContainer>> {
+  // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
+  const caller = captureCaller()
+  const { container, answer } = await launchSqlServer(image)
+  return { container, server: recordServer({ engine: 'sqlserver', image, caller, compatibility: null, ...answer }) }
+}
 
+/**
+ * Creates the fixture's database and principals, loads the fixture into it,
+ * and answers that database's compatibility level: the one it took from the
+ * server's `model` when it was created, which data-core's floor is held to
+ * (0068), asked of the database itself rather than of `master`.
+ */
+async function loadSqlServerFixture(owner: mssql.config): Promise<number> {
   // Server-level work happens in master: the database and the login. Both are
   // constants of this module, not input, which is why they can be spliced in.
   const master = await connectWhenAcceptingLogins(owner)
@@ -263,18 +259,46 @@ export async function startSqlServerFixture(): Promise<SqlServerFixture> {
     await master.close()
   }
 
-  const admin: mssql.config = { ...owner, database: SQLSERVER_DATABASE }
-  const pool = await new mssql.ConnectionPool(admin).connect()
+  const pool = await new mssql.ConnectionPool({ ...owner, database: SQLSERVER_DATABASE }).connect()
   try {
     for (const batch of splitBatches(readFixture('sqlserver.sql'))) await pool.request().batch(batch)
     for (const batch of splitBatches(readFixture('sqlserver.restricted.sql'))) await pool.request().batch(batch)
     for (const batch of splitBatches(readFixture('sqlserver.parity.sql'))) await pool.request().batch(batch)
+    const result = await pool.request().query<{ level: number }>('select compatibility_level as level from sys.databases where database_id = db_id()')
+    const level = result.recordset[0]?.level
+    if (level === undefined) throw new Error('SQL Server answered the compatibility query with no row')
+    return level
   } finally {
     await pool.close()
   }
+}
+
+/**
+ * A SQL Server container with the fixture loaded into its own database, the
+ * restricted principals created, and the parity schema (0028) beside it, on
+ * `image`, as `startPostgresFixture`. Its record names the compatibility
+ * level of the database the fixture was loaded into.
+ */
+export async function startSqlServerFixture(image: string = selectedImage('sqlserver')): Promise<SqlServerFixture> {
+  // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
+  const caller = captureCaller()
+  const { container, answer } = await launchSqlServer(image)
+  const owner = ownerOf(container, 'master')
+  const base = { server: owner.server, port: owner.port, options: owner.options }
+
+  let compatibility: number
+  try {
+    compatibility = await loadSqlServerFixture(owner)
+  } catch (error) {
+    // The server answered, and a file asked for it: recorded as it was
+    // before the fixture's database had a level to record.
+    recordServer({ engine: 'sqlserver', image, caller, compatibility: null, ...answer })
+    throw error
+  }
+  const server = recordServer({ engine: 'sqlserver', image, caller, compatibility, ...answer })
 
   return {
-    admin,
+    admin: { ...owner, database: SQLSERVER_DATABASE },
     reader: { ...base, user: READER.user, password: READER.sqlServerPassword, database: SQLSERVER_DATABASE },
     writer: { ...base, user: WRITER.user, password: WRITER.sqlServerPassword, database: SQLSERVER_DATABASE },
     owner: { user: 'dbo', login: String(owner.user) },

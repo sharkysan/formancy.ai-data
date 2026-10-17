@@ -1,8 +1,8 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createSnapshot, EMPTY_PRESENTATION } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, NormalizedType, ObjectMeta, RecordAdapter } from '@formancy/data-core'
+import { createSnapshot, EMPTY_PRESENTATION, serverStanding } from '@formancy/data-core'
+import type { ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, NormalizedType, ObjectMeta, RecordAdapter, ServerIdentity } from '@formancy/data-core'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
@@ -52,13 +52,15 @@ let root: string
 let store: ConfigurationStore
 let app: FastifyInstance
 let reachable: boolean
+/** What the server says it is when the connection is tested; a test changes it to be a server this release was not tested on. */
+let identity: ServerIdentity
 /** The plane's trail is admin-audit.test.ts's subject; here it is required and discarded. */
 const audit = { sink: () => {} }
 
 function registry(): ConnectionRegistry {
   const adapter = {
     kind: 'sqlserver',
-    ping: async () => ({ kind: 'sqlserver', version: '16.0' }),
+    ping: async () => identity,
     discover: async () => snapshot(),
     close: async () => {},
   } as DatabaseAdapter
@@ -89,6 +91,7 @@ beforeEach(async () => {
   account = { user: 'dbo', login: 'sa' }
   department = null
   reachable = true
+  identity = { kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }
   root = await mkdtemp(join(tmpdir(), 'formancy-data-admin-'))
   store = createFileConfigurationStore(root)
   app = await createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'], audit } })
@@ -124,13 +127,31 @@ describe('the administrator plane', () => {
   // database that is down is 503 without the driver's message, which names
   // hosts and ports.
   test('tests and discovers allowlisted connections, and says nothing about an unreachable one', async () => {
-    expect((await app.inject({ method: 'POST', url: '/v1/connections/erp/test', headers: as('admin') })).json()).toEqual({ kind: 'sqlserver', version: '16.0' })
+    expect((await app.inject({ method: 'POST', url: '/v1/connections/erp/test', headers: as('admin') })).json()).toEqual({
+      kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160, standing: { tested: true, says: serverStanding('sqlserver', identity).says },
+    })
     expect((await app.inject({ method: 'GET', url: '/v1/connections/erp/metadata', headers: as('admin') })).json()).toMatchObject({ kind: 'sqlserver', objects: [{ ref: { name: 'employee' } }] })
     expect((await app.inject({ method: 'GET', url: '/v1/connections/elsewhere/metadata', headers: as('admin') })).statusCode).toBe(404)
     reachable = false
     const down = await app.inject({ method: 'POST', url: '/v1/connections/erp/test', headers: as('admin') })
     expect(down.statusCode).toBe(503)
     expect(down.body).not.toContain('10.0.0.5')
+  })
+
+  // The answer says whether this release was tested on the server that
+  // answered (0068), as data-core decides it, and a server it was not
+  // tested on is answered like any other: a test that refused it would turn
+  // away an estate that discovery reads and the form serves. A database
+  // restored from 2017 onto 2022 keeps its level, 140: below the floor, the
+  // lowest a matrix leg's fixture database answered.
+  test('says whether this release was tested on the server that answered, and refuses none', async () => {
+    identity = { kind: 'sqlserver', version: '16.0.4295.3', product: 'sqlserver', major: 16, compatibility: 140 }
+    const tested = await app.inject({ method: 'POST', url: '/v1/connections/erp/test', headers: as('admin') })
+    expect(tested.statusCode).toBe(200)
+    expect(tested.json()).toEqual({ ...identity, standing: { tested: false, says: serverStanding('sqlserver', identity).says } })
+    expect(tested.json().standing.says).toMatch(/compatibility level, 140, is below/)
+    identity = { kind: 'sqlserver', version: '12.0.2000.8', product: 'azure-sql-database', major: 12 }
+    expect((await app.inject({ method: 'POST', url: '/v1/connections/erp/test', headers: as('admin') })).json().standing).toEqual({ tested: false, says: serverStanding('sqlserver', identity).says })
   })
 
   // A proposal is generateForm over a fresh discovery: the form, its bindings,

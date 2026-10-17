@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION, MAX_LOOKUP_DEADLINE_MS } from '@formancy/data-core'
 import type { FieldBinding, FormPolicy, ObjectRef } from '@formancy/data-core'
-import { blockTable, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
+import { blockTable, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { BlockedTable, PostgresFixture, SqlServerFixture } from '@formancy/data-fixtures'
 import type { FastifyInstance } from 'fastify'
 import { SignJWT } from 'jose'
@@ -87,7 +87,7 @@ async function listening(app: FastifyInstance): Promise<string> {
 }
 
 beforeAll(async () => {
-  ;[pg, ms] = await Promise.all([startPostgresFixture(), startSqlServerFixture()])
+  ;[pg, ms] = await Promise.all([startPostgresFixture(POSTGRES_IMAGE), startSqlServerFixture(SQLSERVER_IMAGE)])
   const pgUrl = new URL(pg.admin)
   const connections: ConnectionConfig[] = [
     { id: 'pg', kind: 'postgres', host: pgUrl.hostname, port: Number(pgUrl.port), database: pgUrl.pathname.slice(1), user: decodeURIComponent(pgUrl.username), password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },

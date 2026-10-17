@@ -1,6 +1,8 @@
 export { DATABASE_KINDS, isDatabaseKind } from './adapter.js'
 export type { DatabaseAdapter, DatabaseKind, ServerIdentity } from './adapter.js'
 export { createSnapshot, findObject, gapCovers, inSnapshotOrder, isComplete } from './snapshot.js'
+export { isServerProduct, serverName, serverStanding, SQLSERVER_RELEASES, TESTED_SERVERS } from './server.js'
+export type { ServerFacts, ServerProduct, ServerStanding, TestedServer } from './server.js'
 export type {
   CheckMeta,
   ColumnAccess,

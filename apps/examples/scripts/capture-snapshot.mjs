@@ -26,13 +26,13 @@
 import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { FIXTURE_SCOPE, snapshotDisagreements, startPostgresFixture } from '@formancy/data-fixtures'
+import { FIXTURE_SCOPE, POSTGRES_IMAGE, snapshotDisagreements, startPostgresFixture } from '@formancy/data-fixtures'
 import { discoverPostgres } from '@formancy/data-postgres'
 import postgres from 'postgres'
 
 const source = join(dirname(fileURLToPath(import.meta.url)), '..', 'src')
 
-const fixture = await startPostgresFixture()
+const fixture = await startPostgresFixture(POSTGRES_IMAGE)
 const owner = postgres(fixture.admin, { onnotice: () => {} })
 try {
   const snapshot = await discoverPostgres(owner, FIXTURE_SCOPE)

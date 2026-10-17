@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ColumnAccess, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { accessDisagreements, covers, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startSqlServerFixture, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
+import { accessDisagreements, covers, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startSqlServerFixture, versionFact, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
 import { discoverSqlServer } from './index.js'
 
 /**
@@ -381,8 +381,15 @@ describe('whether a security policy filters what the account sees', () => {
 
   // VIEW SECURITY DEFINITION sounds like the grant that shows security
   // policies, and shows none (B10d). Accepted as proof, it would report the
-  // fixture's policy on customer as "none" to an account it filters.
+  // fixture's policy on customer as "none" to an account it filters. The
+  // permission is SQL Server 2022's (VERSION_FACTS.viewSecurityDefinition,
+  // 0067): 2019 refuses the grant as a syntax error, so there it settles
+  // nothing, and that refusal is what is asserted.
   test('VIEW SECURITY DEFINITION alone does not settle row security', async () => {
+    if (!versionFact('viewSecurityDefinition', fixture.server)) {
+      await expect(connectAs('probe_security_viewer', ['grant view security definition to probe_security_viewer'])).rejects.toThrow("Incorrect syntax near 'view'.")
+      return
+    }
     const pool = await connectAs('probe_security_viewer', ['grant view security definition to probe_security_viewer', 'grant select on sales.customer to probe_security_viewer'])
     const held = await pool.request().query<{ held: number }>("select has_perms_by_name(quotename(db_name()), N'DATABASE', N'VIEW SECURITY DEFINITION') as held")
     expect(held.recordset).toEqual([{ held: 1 }])

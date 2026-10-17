@@ -32,6 +32,17 @@ browser.
   short. Both are absent from a snapshot taken before, which keeps its
   fingerprint; `createSnapshot` refuses one without the other, and a key
   between two tables of the snapshot said otherwise at its two ends.
+- **The server a snapshot was read from**: `server`, its product, major
+  and, for SQL Server, the connected database's compatibility level, as
+  each adapter's `ping` reports them too (`ServerIdentity` extends
+  `ServerFacts`) -- outside the fingerprint, so an upgrade is no drift.
+  `serverStanding(kind, server)` says whether this release was tested on
+  it, against `TESTED_SERVERS`, the majors of the test matrix and SQL
+  Server's compatibility floor, with a sentence a person reads; anything
+  unknown, a snapshot without `server` included, is not tested.
+  `serverName` names a server, a SQL Server release by its year from
+  `SQLSERVER_RELEASES`. Nothing refuses a server for being untested
+  ([0068](../../docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
 - **Form generation**: `generateForm(snapshot, request)` returns a spec 3
   formancy document, its `FormBindings`, and a note on every choice it made.
   `GENERATED_SPEC_VERSION` is that `"3"`, which the data server also holds
@@ -138,6 +149,16 @@ so any change to one of those types, wider or narrower, blocks the lookup
 column, a new one and a hint, never inferred. Tables the form neither binds nor
 looks up are left out, so an empty report means nothing this form rests on
 changed. See [0010](../../docs/decisions/0010-drift-is-classified-against-the-bindings.md).
+
+One change is not about the catalog: when the current snapshot was read from
+a server this release was not tested on, as `serverStanding` decides, every
+report against it says so, as a `server-untested` change for review that
+stops nothing -- an unchanged catalog included, since the server is outside
+the fingerprint and an upgrade in place keeps it. A report whose only change
+is that one means nothing the form rests on changed, on a server this
+release was not tested on. A snapshot that records no server says nothing
+here
+([0068](../../docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
 
 The report also says `readable` -- no change breaks what the form shows --
 and `runtime`, what a request decides against this database (0041): the

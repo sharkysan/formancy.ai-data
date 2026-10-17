@@ -7,9 +7,11 @@
 //
 // A job's results key is derived the way collect.mjs derives it at run time,
 // from the job's own collect step: `--job <id>`, and, for a job a matrix runs
-// more than once, `--package "$X"` or `--variant "$X"` with X taken from
-// `${{ matrix.<name> }}` in the step's env. A matrix value added to the
-// workflow is an artefact the report then expects, without an edit here.
+// more than once, `--package "$X"`, `--variant "$X"` or both, with X taken
+// from `${{ matrix.<name> }}` in the step's env -- both from an include-only
+// matrix, read as its pairs, as the `test-images` job's legs are (0067). A
+// matrix value added to the workflow is an artefact the report then expects,
+// without an edit here.
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -38,6 +40,17 @@ export function testMatrix(workflow) {
   return values.map(String)
 }
 
+/**
+ * The `test-images` job's legs, `{ package, image }` each, as its
+ * include-only matrix lists them: data-fixtures and an adapter suite on an
+ * image of the matrix other than the default (0067).
+ */
+export function imageMatrix(workflow) {
+  const include = workflow?.jobs?.['test-images']?.strategy?.matrix?.include
+  if (!Array.isArray(include)) throw new Error(`${GATES_WORKFLOW} has no test-images job whose matrix includes its legs`)
+  return include.map((entry) => ({ package: String(entry?.package), image: String(entry?.image) }))
+}
+
 /** A job's step with `id: collect`, which writes what the job found for the report. */
 export function collectStep(job) {
   return (job?.steps ?? []).find((step) => step?.id === 'collect')
@@ -49,16 +62,39 @@ function argument(step, flag) {
   return name === undefined ? undefined : { name, expression: step.env?.[name] }
 }
 
-/** Every value `${{ matrix.<name> }}` takes in `job`: its list, then each `include` entry's. */
-function matrixValues(job, { name, expression }, where) {
+/** The matrix field `${{ matrix.<name> }}` names, from the expression the step's env gives an argument. */
+function matrixField({ name, expression }, where) {
   const field = /^\$\{\{\s*matrix\.([\w-]+)\s*\}\}$/.exec(String(expression ?? '').trim())?.[1]
   if (field === undefined) throw new Error(`${where}: ${name} is not \${{ matrix.<name> }} in the step's env`)
+  return field
+}
+
+/** Every value `${{ matrix.<name> }}` takes in `job`: its list, then each `include` entry's. */
+function matrixValues(job, argument, where) {
+  const field = matrixField(argument, where)
   const matrix = job.strategy?.matrix ?? {}
   const listed = Array.isArray(matrix[field]) ? matrix[field] : []
   const included = (matrix.include ?? []).map((entry) => entry?.[field]).filter((value) => value !== undefined)
   const values = [...listed, ...included].map(String)
   if (values.length === 0) throw new Error(`${where}: the job's matrix gives ${field} no value`)
   return values
+}
+
+/**
+ * The pairs two arguments take in `job`, one per `include` entry: a job keyed
+ * by two values runs exactly the pairs it lists, and a list beside them would
+ * cross every value with every pair, which no key here can say.
+ */
+function matrixPairs(job, first, second, where) {
+  const [a, b] = [matrixField(first, where), matrixField(second, where)]
+  const matrix = job.strategy?.matrix ?? {}
+  const crossed = Object.keys(matrix).filter((key) => key !== 'include')
+  if (crossed.length > 0) throw new Error(`${where} collects with --package and --variant, and its matrix lists ${crossed.join(', ')} beside include, whose pairs alone a key can name`)
+  const pairs = (matrix.include ?? []).map((entry) => [entry?.[a], entry?.[b]])
+  if (pairs.length === 0) throw new Error(`${where}: the job's matrix includes no ${a} and ${b}`)
+  const partial = pairs.findIndex((pair) => pair.includes(undefined))
+  if (partial !== -1) throw new Error(`${where}: the job's include entry ${String(partial + 1)} gives no ${pairs[partial][0] === undefined ? a : b}`)
+  return pairs.map(([one, other]) => [String(one), String(other)])
 }
 
 /**
@@ -79,9 +115,12 @@ export function expectedKeys(workflow, named) {
     if (collects !== id) throw new Error(`${where} collects as --job ${String(collects)}, not as itself`)
     const pkg = argument(step, '--package')
     const variant = argument(step, '--variant')
-    if (pkg !== undefined && variant !== undefined) throw new Error(`${where} collects with both --package and --variant; a key names one`)
     if (pkg === undefined && variant === undefined) {
       keys.push({ key: keyFor({ job: id }, named), job: id })
+      continue
+    }
+    if (pkg !== undefined && variant !== undefined) {
+      for (const [one, other] of matrixPairs(job, pkg, variant, where)) keys.push({ key: keyFor({ job: id, pkg: one, variant: other }, named), job: id })
       continue
     }
     for (const value of matrixValues(job, pkg ?? variant, where)) {
