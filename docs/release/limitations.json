@@ -1325,7 +1325,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:4fcb9d088f6d0f89f6a37abbdb2fe0aa5b0a403dce1f538ae227321564e804dc",
+      "reviewed": "sha256:cab66ee5e04a98291b20a20d0f897ba57f07f2427205fce6d0b7971bbca30985",
       "limitations": [
         {
           "area": "host",
@@ -2597,7 +2597,7 @@
       ]
     },
     "0079": {
-      "reviewed": "sha256:6fa97b45865cc9e03184674941f6164694deeebaa8bee5fffd7bc9e144732597",
+      "reviewed": "sha256:60314f898cec6da5edd124d6417dc56bad45f7a945a20e5048e88b5bd227b421",
       "limitations": [
         {
           "area": "server",
@@ -2668,6 +2668,32 @@
           "area": "server",
           "says": "A form that binds a column with no text -- which only a format-1 bundle edited where it is stored can -- answers its file 500, and no file.",
           "heldBy": "packages/data-server/src/routes/runtime-exports.test.ts"
+        }
+      ]
+    },
+    "0080": {
+      "reviewed": "sha256:74a314eda667963e010d2a4ac03e6414ae1d3d0823277dfc3fd57ca23de88c58",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "Leaving a form, signing out or opening another parent while Download CSV makes a file drops the file, and the page says nothing; pressing again makes it.",
+          "heldBy": "apps/host/src/export.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Download CSV says the page handed the file to the browser, not that the browser saved it: a browser that asks where to save, a person who cancels, or a download the browser blocks is heard by nothing."
+        },
+        {
+          "area": "host",
+          "says": "Download CSV says the name of the file and not how many records it holds."
+        },
+        {
+          "area": "host",
+          "says": "The host page holds the whole file in memory before the browser saves it, up to the server's `EXPORT_MAX_BYTES`."
+        },
+        {
+          "area": "testing",
+          "says": "The host page saves a file through an object URL and a clicked anchor, which the browser gate measures in Playwright's Chromium, Firefox and Linux WebKit; Safari and the browsers on a phone are not tried."
         }
       ]
     },

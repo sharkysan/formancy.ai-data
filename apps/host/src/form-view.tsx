@@ -375,7 +375,7 @@ export function FormView({
       {notice}
       <div className="lanes" data-layout={layout} data-view={separate ? view : 'records'} ref={lanes} style={style}>
         <Records
-          ref={grid}
+          gridRef={grid}
           client={client}
           formId={formId}
           definition={definition}

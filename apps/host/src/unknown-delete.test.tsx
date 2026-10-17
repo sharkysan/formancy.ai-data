@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { NOT_FOUND } from './deletion.js'
 import { focusedName, paragraphs } from './test-accessible.js'
-import { chooseForm, chooseRenderer, gridSection, mount, newRecord, rendered, searchRecords, shows, signIn, stamp, unsavedNotice } from './test-host.js'
+import { chooseForm, chooseRenderer, gridSection, gridStatus, mount, newRecord, rendered, searchRecords, shows, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, losingWrites, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -113,7 +113,7 @@ describe.each(ENGINES)('a deletion whose answer was lost, on $engine', (engine) 
 
     await user.click(within(notice()).getByRole('button', { name: 'Close the record' }))
     await waitFor(() => expect(focusedName()).toBe('Records'))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe(`Closed Order ${record}. No records match “${notes}”.`), ARRIVES)
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`Closed Order ${record}. No records match “${notes}”.`), ARRIVES)
   })
 
   // Lost before it reached the server: still stored at the version sent,

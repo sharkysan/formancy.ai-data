@@ -252,7 +252,7 @@ over `fetch` and nothing else (0029): `forms`, `form`, `read`, `list`,
 `exportRecords`, `create`, `update`, `delete`, `query` and `resolve` in
 `client.ts`, plus `reconcile`. `exportRecords` is the transport's one
 answer read as bytes: a `Blob` and the name the form's id gives it, a 200
-that is not CSV `unexpected` and a body cut short `incomplete` ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)). The token is asked of the host on every request and sent in the
+that is not CSV `unexpected` and a body cut short `incomplete` ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)); `exportFileName`, re-exported, is that name for a page that says it before the file arrives ([0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)). The token is asked of the host on every request and sent in the
 Authorization header only. The base is the page's own origin unless the
 host names another, which the server answers only when its operator lists
 the page's origin (0060). `writes.ts` and `reconcile.ts` carry a write whose
@@ -358,8 +358,12 @@ else ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-i
 save's answer does — framework-neutral, so both renderers show one decision
 (0029). `src/forms-nav.tsx` draws the menu (0045); `src/record-grid.tsx`,
 `src/grid-datasource.ts` and `src/grid-options.tsx` put a page of records
-at a time in AG Grid Community (0044); `src/children.tsx` lists a record's
-child rows; `src/guard.ts` and `src/leave.ts` are one guard over every way
+at a time in AG Grid Community (0044), the grid's handle giving the sort
+its datasource last asked with; `src/children.tsx` lists a record's
+child rows; `src/download.tsx` is Download CSV in the head of the Records
+panel and of each child section, and `src/save-file.ts` hands the file to
+the browser through an object URL and a clicked `<a download>`
+([0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)); `src/guard.ts` and `src/leave.ts` are one guard over every way
 of leaving a form; `src/delete-flow.ts` and `src/deletion.ts` a delete
 confirmed in place
 ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md));
@@ -367,8 +371,8 @@ confirmed in place
 form, layout and view, never the record (`src/layout.ts`). `src/host.tsx`
 loads the workspace, AG Grid with it, only after sign-in.
 `src/plane.test.tsx` reads every request off the wire against the server's
-own `ROUTE_OPERATIONS` and fails on any other; the suites run against the
-real server on both engines. Its demo build, `build:demo`, is the live
+own `ROUTE_OPERATIONS`, fails on any other and on any it never sent; the
+suites run against the real server on both engines. Its demo build, `build:demo`, is the live
 demo's page: `src/main.tsx` takes the demo's wiring only in Vite's `demo`
 mode, which the ordinary build drops; `src/demo.ts` asks the path the page
 was served from for the demo's people and a sign-in, and

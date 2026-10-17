@@ -254,15 +254,33 @@ later.
   which taking one off every cell that has one undoes. It is not the table
   at one moment: a row deleted meanwhile can be missing. The Cloudflare
   runtime door forwards the route, and so does the live demo's Worker. The
-  host page has no button for it yet
+  host page saves it with Download CSV, below
   ([0079](docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
   New exports of `@formancy/data-core`: `validateExportQuery`,
   `exportColumns`, `exportHeader`, `exportRecord`, `exportText`,
   `exportFileName`, `EXPORT_MAX_BYTES`, and the types `RecordExportQuery`,
   `ExportColumns`, `ExportField`, `ExportLabels`, `ExportQueryCheck`,
   `ExportQueryRefusal`, `CsvCell`, `CsvRefusal` and `CsvText`; of
-  `@formancy/data-client`: `exportRecords`, `EXPORT_MAX_BYTES`, and the
-  types `RecordFile` and `RecordExportQuery`.
+  `@formancy/data-client`: `exportRecords`, `EXPORT_MAX_BYTES`,
+  `exportFileName`, and the types `RecordFile` and `RecordExportQuery`.
+- **The host page downloads the records a grid lists, with Download CSV.**
+  The file above was there for an integrator to ask for and for nobody on
+  the page to press. Beside New record in the Records panel, and beside each
+  child section's New under a saved record, Download CSV asks the server
+  for the file of exactly what that grid lists -- the search as submitted,
+  never as typed, the grid's sort, a child section's record -- and hands it
+  to the browser to save as `<form id>.csv`, through an object URL and a
+  clicked `<a download>`, because the token travels in a header and a link
+  could not carry it. It is a secondary button, since New record stays the
+  one primary action. Its line says while the file is made, with the
+  button `aria-disabled` and a second press sending nothing; names the
+  file once it is handed over; and says a refusal in the server's words,
+  pressing again being the retry. Leaving the form or signing out stops a
+  file in the making and says nothing, and opening another record stops
+  its child sections'. It names no count of records, and does not know
+  whether the browser kept the file. `@formancy/data-client` re-exports
+  `exportFileName`, so a page can name the file before it arrives
+  ([0080](docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)).
 - **A SQL Server connection may log in as a Microsoft Entra principal**: a
   managed identity, user-assigned by its client id or the host's own, or a
   service principal whose client secret is a reference, as a password is.

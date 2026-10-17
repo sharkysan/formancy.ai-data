@@ -1,5 +1,5 @@
 import type { IDatasource, IGetRowsParams, SortModelItem } from 'ag-grid-community'
-import type { DataClient, FormRecord, PublishedForm, RecordListQuery } from '@formancy/data-client'
+import type { DataClient, FormRecord, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
 
 /*
  * What a record grid asks the runtime plane for, and what it says about the
@@ -123,7 +123,8 @@ export function answered({
 
 /** What the datasource tells the grid component as it goes. */
 export interface DatasourceHooks {
-  loading(start: number, end: number): void
+  /** A block asked for, in this order: the grid keeps the sort, which a file of its records is sorted by (0080). */
+  loading(start: number, end: number, sort: ListSortTerm[]): void
   answered(start: number, rows: readonly GridRow[], hasMore: boolean): void
   refused(message: string): void
 }
@@ -153,8 +154,8 @@ export function createDatasource({
   let current: AbortController | undefined
   const lookups = columns.filter((column) => column.source !== null)
 
-  async function rowsFor(params: IGetRowsParams, signal: AbortSignal): Promise<{ rows: GridRow[]; hasMore: boolean } | string> {
-    const listed = await client.list(formId, listQuery({ search, sortModel: params.sortModel, parent, startRow: params.startRow, endRow: params.endRow }), signal)
+  async function rowsFor(params: IGetRowsParams, query: RecordListQuery, signal: AbortSignal): Promise<{ rows: GridRow[]; hasMore: boolean } | string> {
+    const listed = await client.list(formId, query, signal)
     if (!listed.ok) return listed.message
     const rows = rowsOf(listed.value.rows, params.startRow)
     // One resolve per lookup column for the whole page; a label it does not
@@ -178,8 +179,9 @@ export function createDatasource({
       current?.abort()
       const controller = new AbortController()
       current = controller
-      hooks.loading(params.startRow, params.endRow)
-      rowsFor(params, controller.signal).then(
+      const query = listQuery({ search, sortModel: params.sortModel, parent, startRow: params.startRow, endRow: params.endRow })
+      hooks.loading(params.startRow, params.endRow, query.sort)
+      rowsFor(params, query, controller.signal).then(
         (answer) => {
           if (controller.signal.aborted) return params.failCallback()
           if (typeof answer === 'string') {

@@ -1,6 +1,8 @@
 import { lazy, Suspense, useState } from 'react'
 import type { MouseEvent, ReactElement } from 'react'
 import type { DemoSession } from './demo.js'
+import { SaveContext, saveFile } from './save-file.js'
+import type { SaveFile } from './save-file.js'
 import { SignIn } from './sign-in.js'
 import type { SignedIn } from './sign-in.js'
 
@@ -27,8 +29,12 @@ const Workspace = lazy(() => import('./workspace.js').then((module) => ({ defaul
  * The skip link puts the keyboard on main and does nothing else: it does not
  * navigate, so the address, which holds the workspace's state, and the
  * history stay as they were.
+ *
+ * A file the page makes -- Download CSV (0080) -- is handed to `save`: the
+ * browser's download unless the page is mounted with another, as the suites
+ * mount it in jsdom, which has no object URLs.
  */
-export function Host({ fetch, base = '', session }: { fetch: typeof globalThis.fetch; base?: string; session?: DemoSession | undefined }): ReactElement {
+export function Host({ fetch, base = '', session, save = saveFile }: { fetch: typeof globalThis.fetch; base?: string; session?: DemoSession | undefined; save?: SaveFile }): ReactElement {
   const [signedIn, setSignedIn] = useState<SignedIn | null>(null)
   // Signed out from the workspace, rather than arrived: the question takes
   // the keyboard then, and only then -- on arrival the skip link is first.
@@ -40,49 +46,51 @@ export function Host({ fetch, base = '', session }: { fetch: typeof globalThis.f
   }
 
   return (
-    <div className={signedIn === null ? 'page' : 'page in'}>
-      <a className="skip" href="#host-main" onClick={skip}>
-        Skip to the workspace
-      </a>
-      <header className={signedIn === null ? 'masthead' : 'masthead appbar'}>
-        <p className="eyebrow">Formancy Data &middot; host</p>
-        <h1>Published forms, in both renderers</h1>
+    <SaveContext.Provider value={save}>
+      <div className={signedIn === null ? 'page' : 'page in'}>
+        <a className="skip" href="#host-main" onClick={skip}>
+          Skip to the workspace
+        </a>
+        <header className={signedIn === null ? 'masthead' : 'masthead appbar'}>
+          <p className="eyebrow">Formancy Data &middot; host</p>
+          <h1>Published forms, in both renderers</h1>
+          {signedIn === null ? (
+            <p className="lead">
+              What a host application&rsquo;s people see: the forms they may read, their records in a grid, and each record drawn
+              by <code>@formancy/react</code> and <code>@formancy/angular</code> through <code>@formancy/data-client</code>.
+              Every answer is the data server&rsquo;s.
+            </p>
+          ) : null}
+        </header>
+
         {signedIn === null ? (
-          <p className="lead">
-            What a host application&rsquo;s people see: the forms they may read, their records in a grid, and each record drawn
-            by <code>@formancy/react</code> and <code>@formancy/angular</code> through <code>@formancy/data-client</code>.
-            Every answer is the data server&rsquo;s.
-          </p>
-        ) : null}
-      </header>
+          <main id="host-main" tabIndex={-1}>
+            <SignIn fetch={fetch} base={base} session={session} onSignedIn={setSignedIn} focus={signedOut} />
+          </main>
+        ) : (
+          <Suspense
+            fallback={
+              <main id="host-main" tabIndex={-1}>
+                <p role="status" className="hint">
+                  Opening the workspace…
+                </p>
+              </main>
+            }
+          >
+            <Workspace
+              signedIn={signedIn}
+              onSignOut={() => {
+                setSignedIn(null)
+                setSignedOut(true)
+              }}
+            />
+          </Suspense>
+        )}
 
-      {signedIn === null ? (
-        <main id="host-main" tabIndex={-1}>
-          <SignIn fetch={fetch} base={base} session={session} onSignedIn={setSignedIn} focus={signedOut} />
-        </main>
-      ) : (
-        <Suspense
-          fallback={
-            <main id="host-main" tabIndex={-1}>
-              <p role="status" className="hint">
-                Opening the workspace…
-              </p>
-            </main>
-          }
-        >
-          <Workspace
-            signedIn={signedIn}
-            onSignOut={() => {
-              setSignedIn(null)
-              setSignedOut(true)
-            }}
-          />
-        </Suspense>
-      )}
-
-      <footer className="colophon">
-        <p>Formancy Data is source-available, not open source. The formancy packages it renders with are Apache-2.0.</p>
-      </footer>
-    </div>
+        <footer className="colophon">
+          <p>Formancy Data is source-available, not open source. The formancy packages it renders with are Apache-2.0.</p>
+        </footer>
+      </div>
+    </SaveContext.Provider>
   )
 }

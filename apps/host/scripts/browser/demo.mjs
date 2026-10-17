@@ -74,7 +74,8 @@ const paper = (scope, form) => scope.getByRole('form', { name: `${form}, React`,
 
 /** Waits until the status of `region` matches `pattern`. */
 async function says(region, pattern) {
-  const status = region.getByRole('status').first()
+  // The grid's line: the first status with no name -- Download CSV's, before it, is named by its button (0080).
+  const status = region.getByRole('status', { name: /^$/ }).first()
   await status.filter({ hasText: pattern }).waitFor(WITHIN)
 }
 
