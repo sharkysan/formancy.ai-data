@@ -6,7 +6,8 @@
  * front of the real server, the image's gate -- can answer
  * `/data/demo/session`, forward `/data/demo/v1/…` and sign tokens exactly
  * as the Worker does; scripts/live-demo.mjs reads the Worker's limits from
- * it. A barrel: it re-exports and does nothing.
+ * it, and the image's gate how much data each tenant has. A barrel: it
+ * re-exports and does nothing.
  */
 export { FORWARDED_HEADERS, forwardedRequest, forwardFailed, jsonAnswer, methodNotAllowed, NOT_RUNNING, notFound, notRunning, PAGE_SAFE_HEADERS, pageSafe, START_FAILED, startFailed, streamingOption, WORKER_HEADERS } from './answers.js'
 export { COOKIE_NAME, instanceCookie, instanceNameOf, newInstanceName } from './cookie.js'
@@ -24,3 +25,4 @@ export type { DemoFormId, DemoRole, FormGrants, Persona } from '../personas.js'
 export { AUDIENCE, ISSUER, MIN_KEY_BYTES, mintToken, TENANT_CLAIM, TOKEN_SECONDS } from '../token.js'
 export type { MintedToken, TokenClaims } from '../token.js'
 export { IDENTITY_SECRET_VARIABLE, SERVER_PORT } from '../image/contract.js'
+export { PER_TENANT, TENANTS } from '../data/model.js'
