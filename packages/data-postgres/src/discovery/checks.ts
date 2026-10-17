@@ -10,6 +10,32 @@ interface CheckRow {
 }
 
 /**
+ * Whether column `a`'s type is a row type: a composite, or a domain over one
+ * at any depth, which is what PostgreSQL asks (`type_is_rowtype`) before it
+ * reads `col IS NOT NULL` as "every field of col is non-null" rather than
+ * "col is not the NULL value". A domain's `typbasetype` is the type it was
+ * declared over, which may be another domain, so the chain is walked to its
+ * end. An array of a composite is not a row type: IS NOT NULL asks only
+ * whether the array is NULL. Measured on 18.6 on 2026-10-17: a NOT NULL took
+ * row(null, null) in a column of a composite, of a domain over it and of a
+ * domain over that domain, and CHECK (col IS NOT NULL) refused it in each;
+ * pg_get_expr spells CHECK (col IS DISTINCT FROM NULL) as
+ * `(col IS DISTINCT FROM NULL)` (discovery-pg18.integration.test.ts holds the
+ * NOT NULL taking it and the two spellings alike).
+ */
+const ROW_TYPED = `exists (
+        with recursive base(typtype, typbasetype) as (
+          select t.typtype, t.typbasetype from pg_catalog.pg_type t where t.oid = a.atttypid
+          union all
+          select t.typtype, t.typbasetype
+          from pg_catalog.pg_type t
+          join base on t.oid = base.typbasetype
+          where base.typtype = 'd'
+        )
+        select from base where base.typtype = 'c'
+      )`
+
+/**
  * Check constraints, by the oid of their table.
  *
  * The expression is `pg_get_expr(conbin)`: the expression alone, as the
@@ -40,7 +66,10 @@ interface CheckRow {
  * name quoted as `pg_get_expr` quotes it (`format`'s `%I` is the same
  * `quote_identifier`). A type-`n` row has no `conbin`, so the expression is
  * spelled here; `pg_get_constraintdef` would give DDL, `NOT NULL amount NOT
- * VALID`. Its `enforced` is read as a check's is, from `conenforced`
+ * VALID`. Over a row type (`ROW_TYPED`) that check is spelled IS DISTINCT
+ * FROM NULL, the rule a NOT NULL keeps there, where IS NOT NULL would refuse
+ * a value whose every field is NULL, which the column takes. Its `enforced`
+ * is read as a check's is, from `conenforced`
  * (discovery-pg18.integration.test.ts).
  */
 export async function readChecks(sql: TransactionSql, schemas: readonly string[]): Promise<Map<number, CheckMeta[]>> {
@@ -49,6 +78,7 @@ export async function readChecks(sql: TransactionSql, schemas: readonly string[]
       k.conrelid as oid,
       k.conname as name,
       case
+        when k.contype = 'n' and ${sql.unsafe(ROW_TYPED)} then pg_catalog.format('(%I IS DISTINCT FROM NULL)', a.attname)
         when k.contype = 'n' then pg_catalog.format('(%I IS NOT NULL)', a.attname)
         else pg_catalog.pg_get_expr(k.conbin, k.conrelid)
       end as expression,

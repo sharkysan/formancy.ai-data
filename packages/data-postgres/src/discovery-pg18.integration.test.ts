@@ -55,6 +55,21 @@ beforeAll(async () => {
     create table eighteen.settled (id integer primary key, amount integer);
     insert into eighteen.settled (id, amount) values (1, null);
     alter table eighteen.settled add constraint nn_settled_amount not null amount not valid;
+    create type eighteen.pair as (low integer, high integer);
+    create domain eighteen.span as eighteen.pair;
+    create domain eighteen.bounded_span as eighteen.span;
+    create table eighteen.ranged (id integer primary key, pair eighteen.pair, span eighteen.span, bounded eighteen.bounded_span, pairs eighteen.pair[]);
+    insert into eighteen.ranged (id) values (1);
+    alter table eighteen.ranged add constraint nn_ranged_pair not null pair not valid;
+    alter table eighteen.ranged add constraint nn_ranged_span not null span not valid;
+    alter table eighteen.ranged add constraint nn_ranged_bounded not null bounded not valid;
+    alter table eighteen.ranged add constraint nn_ranged_pairs not null pairs not valid;
+    create table eighteen.ranged_check (id integer primary key, pair eighteen.pair, span eighteen.span, bounded eighteen.bounded_span, pairs eighteen.pair[]);
+    insert into eighteen.ranged_check (id) values (1);
+    alter table eighteen.ranged_check add constraint ck_ranged_pair check (pair is distinct from null) not valid;
+    alter table eighteen.ranged_check add constraint ck_ranged_span check (span is distinct from null) not valid;
+    alter table eighteen.ranged_check add constraint ck_ranged_bounded check (bounded is distinct from null) not valid;
+    alter table eighteen.ranged_check add constraint ck_ranged_pairs check (pairs is not null) not valid;
   `)
 })
 
@@ -131,4 +146,35 @@ test('a NOT NULL added NOT VALID on PostgreSQL 18, once validated, reads as NOT 
   const after = findObject(await discoverPostgres(sql, { schemas: ['eighteen'] }), eighteen('settled'))
   expect(after?.columns.find((column) => column.name === 'amount')?.nullable).toBe(false)
   expect(after?.checks).toEqual([])
+})
+
+// A NOT NULL refuses the NULL value and nothing else. IS NOT NULL asks more of
+// a row type -- a composite, or a domain over one at any depth -- where it is
+// true only when every field is non-null, so the same rule spelled as a check
+// is CHECK (pair IS DISTINCT FROM NULL), and an array of a composite is not a
+// row type. Spelled (pair IS NOT NULL) whatever the type, the check claimed a
+// rule stricter than the database keeps: a row(null, null) the column holds
+// read as one the rule refuses (watched failing on '(pair IS NOT NULL)' and,
+// with the domain chain walked one step, on '(bounded IS NOT NULL)'; 0077).
+test('a NOT NULL added NOT VALID over a row type on PostgreSQL 18 reads as CHECK (… IS DISTINCT FROM NULL) NOT VALID does, the rule it keeps', async () => {
+  // The server, first: each column of both tables takes a value whose every
+  // field is NULL, which IS NOT NULL calls null and IS DISTINCT FROM NULL
+  // does not, and the NULL value itself is refused.
+  for (const table of ['ranged', 'ranged_check']) {
+    await sql`insert into eighteen.${sql(table)} (id, pair, span, bounded, pairs) values (2, row(null, null), row(null, null), row(null, null), array[row(null, null)]::eighteen.pair[])`
+  }
+  expect([...(await sql`select (row(null, null)::eighteen.bounded_span) is not null as "notNull", (row(null, null)::eighteen.bounded_span) is distinct from null as "distinct"`)]).toEqual([{ notNull: false, distinct: true }])
+  await expect(sql`insert into eighteen.ranged (id, pair, span, bounded, pairs) values (3, null, row(1, 1), row(1, 1), '{}')`).rejects.toMatchObject({ code: '23502', column_name: 'pair' })
+  const snapshot = await discoverPostgres(sql, { schemas: ['eighteen'] })
+  const ranged = findObject(snapshot, eighteen('ranged'))
+  const checked = findObject(snapshot, eighteen('ranged_check'))
+  expect(ranged?.columns.filter(({ nullable }) => nullable).map(({ name }) => name)).toEqual(['pair', 'span', 'bounded', 'pairs'])
+  expect(ranged?.columns).toEqual(checked?.columns)
+  expect(ranged?.checks.map(({ name, expression }) => ({ name, expression }))).toEqual([
+    { name: 'nn_ranged_bounded', expression: '(bounded IS DISTINCT FROM NULL)' },
+    { name: 'nn_ranged_pair', expression: '(pair IS DISTINCT FROM NULL)' },
+    { name: 'nn_ranged_pairs', expression: '(pairs IS NOT NULL)' },
+    { name: 'nn_ranged_span', expression: '(span IS DISTINCT FROM NULL)' },
+  ])
+  expect(ranged?.checks.map(({ name: _name, ...check }) => check)).toEqual(checked?.checks.map(({ name: _name, ...check }) => check))
 })

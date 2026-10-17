@@ -147,6 +147,19 @@ describe('diffSnapshots: columns', () => {
     expect(only(drift((objects) => retype(objects, 'order', 'attachment', 'varbinary(100)', { kind: 'binary', maxLength: 100, fixedLength: false })))).toMatchObject({ kind: 'column-tightened', severity: 'info', affects: [] })
   })
 
+  // But one no field writes, made NOT NULL with no default, must now be given
+  // a value by every create, and nothing gives one, so the database refuses
+  // each: on PostgreSQL 18 a NOT NULL added NOT VALID over such a column,
+  // validated, reads so (0077). Reported as stopping nothing, as a tightened
+  // column the form only shows is, create stayed offered over an INSERT the
+  // database always refuses; reported as stopping update too, a save that
+  // never names the column would be lost.
+  test('a column no field writes, made NOT NULL with no default, stops create and only create', () => {
+    const report = drift((objects) => (column(objects, 'order', 'attachment').nullable = false))
+    expect(only(report)).toMatchObject({ kind: 'column-tightened', severity: 'blocking', affects: [], message: expect.stringMatching(/no field of this form can/) })
+    expect(report.writable).toEqual({ create: false, update: true, delete: false })
+  })
+
   // Wider is harmless only while the published field can hold every value.
   // A number field rounds past 2^53 in the browser, and a save writes the
   // rounded number back (0009); a checkbox has no "unknown", so a NULL read

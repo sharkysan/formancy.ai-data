@@ -567,8 +567,11 @@ though rows older than it may hold NULL, so it is read as the same rule
 spelled `CHECK (column IS NOT NULL) NOT VALID` is on every version: the
 column nullable, and a check by the constraint's name, `(column IS NOT
 NULL)`, enforced and not validated, until `VALIDATE CONSTRAINT` makes it the
-column's NOT NULL (0077). A request's description of a table (0041) reads
-it the same way. A stored
+column's NOT NULL (0077). Over a row type -- a composite, or a domain over
+one at any depth -- the check is `(column IS DISTINCT FROM NULL)`, the rule
+the NOT NULL keeps there: `IS NOT NULL` asks that every field be non-null,
+and the column takes `row(null, null)`. A request's description of a table
+(0041) reads the column the same way. A stored
 generated column is `computed`
 and has no default, though PostgreSQL files its expression where defaults
 live.
@@ -650,7 +653,9 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   can hold, on `postgres:18-alpine` in every leg: a `NOT ENFORCED` check,
   reported as not enforced, and a NOT NULL added NOT VALID, read as the
   same rule spelled as a check added NOT VALID is, column, quoting and
-  description included, and as NOT NULL once it is validated (0077).
+  description included, over a composite, a domain over it and a domain
+  over that domain as `IS DISTINCT FROM NULL`, and as NOT NULL once it is
+  validated (0077).
 - `discovery/columns.test.ts` — the generation codes, including one no server
   can produce yet, called directly.
 - `spike.integration.test.ts` — the driver's numbers, untyped parameters, and

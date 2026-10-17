@@ -370,7 +370,10 @@ later.
   the same rule spelled `CHECK (column IS NOT NULL) NOT VALID` does on every
   version: the column nullable, and a check by the constraint's name,
   `(column IS NOT NULL)`, enforced and not validated, until `VALIDATE
-  CONSTRAINT` makes it the column's NOT NULL. A request's description of
+  CONSTRAINT` makes it the column's NOT NULL. Over a composite type, or a
+  domain over one, the check is `(column IS DISTINCT FROM NULL)`, the rule
+  the NOT NULL keeps there, since `IS NOT NULL` would refuse a value whose
+  every field is NULL, which the column takes. A request's description of
   the table reads it the same way, so the runtime agrees with review.
   PostgreSQL 15 to 17 cannot hold such a constraint, and SQL Server has
   none, so nothing else reads differently
@@ -471,13 +474,19 @@ PostgreSQL 18 its column is generated optional until the constraint is
 validated, so a create or an update that leaves it empty is refused by the
 database, `not-null-violation`, where the form would have said a value is
 required, and a key over it lists no page and it is not offered as a
-version column; validating it tightens the column, which drift review
-reports and which blocks the writes of a form that writes it until the form
-is reviewed; a form published on 18 before this over such a column reads it
-as loosened and a check as new, and where its control cannot hold NULL --
-a boolean shown as a checkbox -- its writes are blocked until it is
-reviewed; and the check's expression is spelled by the adapter as the
-server spells the hand-written check on 18, and on no other version.
+version column; where no field writes it on create and it has no default
+-- a type no codec reads, say -- create is offered and the database refuses
+every one, where it was not offered; validating it tightens the column,
+which drift review reports and which blocks the writes of a form that
+writes it, and the create of a form that does not, until the form is
+reviewed; a form published on 18 before this over such a column reads it
+as loosened and a check as new, so one keyed by a unique key over it lists
+no page until the constraint is validated, one whose version column it is
+has update and delete blocked and a review cannot confirm the column again
+until then, and one whose control cannot hold NULL -- a boolean shown as
+a checkbox -- has its writes of the column blocked until it is reviewed;
+and the check's expression is spelled by the adapter as the server spells
+the hand-written check on 18, and on no other version.
 
 ## 0.1.0 — 2026-10-16
 
