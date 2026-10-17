@@ -3,7 +3,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
 import type { PublishedForm, RecordExportQuery } from '@formancy/data-client'
 import { focusedName } from './test-accessible.js'
-import { answeredOnce, chooseForm, exportButton, exportLine, formLink, gridSection, keeping, load, mount, newRecord, searchRecords, signIn, stamp } from './test-host.js'
+import { answeredOnce, chooseForm, exportButton, exportLine, formLink, gridSection, gridStatus, keeping, load, loaded, mount, newRecord, searchRecords, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, holdingRequests, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane, Sent } from './test-plane.js'
@@ -286,43 +286,90 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     expect(kept.saved).toEqual([])
   })
 
-  // A child section's file is its parent's rows: the parent travels, the
-  // search is none, and the file -- the child form's, whole -- keeps the
+  // A child section's file is its parent's rows, in its grid's order: the
+  // parent travels, the search is none, the sort is the one the grid last
+  // asked with, and the file -- the child form's, whole -- keeps the
   // parent's column the grid leaves out, so it says whose rows they are
   // (watched failing with the parent left out of the request: "parent":
-  // null; and with the grid's columns in reverse: the file's header no
-  // longer the grid's).
-  test("in a child section, sends the parent and saves that parent's rows, the parent's column kept", async () => {
-    const order = await freshOrder(engine, stamp('lines'), [1, 2])
+  // null; with the section's sort left out: "sort": []; and with the grid's
+  // columns in reverse: the file's header no longer the grid's).
+  test("in a child section, sends the parent and the grid's sort, and saves that parent's rows in that order, the parent's column kept", async () => {
+    const order = await freshOrder(engine, stamp('lines'), [1, 2, 3])
     const kept = keeping()
     const user = await workspace(plane.fetch, engine.formId, kept.save)
     await load(user, order)
     await waitFor(() => expect(within(gridSection('Order line')).queryByRole('grid', { name: 'Order line' })).not.toBeNull(), ARRIVES)
-    expect(await answeredOnce('Order line')).toBe('Order line rows 1–2.')
+    expect(await answeredOnce('Order line')).toBe('Order line rows 1–3.')
+    // Read before the sort, for the Records case's reason.
+    const headers = gridHeaders('Order line')
+    // Line no descending, from the keyboard, as the Records case sorts Id: a cell of the column, up to its header, Enter twice.
+    const grid = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
+    await user.click(within(grid).getAllByRole('gridcell')[0] as HTMLElement)
+    await user.keyboard('{ArrowUp}{Enter}{Enter}')
+    await waitFor(() => expect(within(grid).getByRole('columnheader', { name: /^Line no/ }).getAttribute('aria-sort')).toBe('descending'), ARRIVES)
+    await waitFor(() => expect(firstCells('Order line')).toEqual(['3', '2', '1']), ARRIVES)
     plane.sent.length = 0
     await pressFromKeyboard(user, 'Order line')
     await waitFor(() => expect(exportLine('Order line').textContent).toBe(made(engine.lines)), ARRIVES)
     const parent = { field: 'order', record: order }
-    expect(exportsSent(plane.sent, engine.lines).map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([{ search: '', sort: [], parent }])
+    const sort = [{ field: 'line_no', direction: 'desc' as const }]
+    expect(exportsSent(plane.sent, engine.lines).map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([{ search: '', sort, parent }])
     const [saved] = kept.saved
     if (saved === undefined) throw new Error('nothing was saved')
-    expect({ name: saved.name, bytes: await bytesOf(saved.file) }).toEqual({ name: `${engine.lines}.csv`, bytes: (await serversFile(engine.lines, { parent })).bytes })
+    expect({ name: saved.name, bytes: await bytesOf(saved.file) }).toEqual({ name: `${engine.lines}.csv`, bytes: (await serversFile(engine.lines, { parent, sort })).bytes })
     const definition = await definitionOf(engine.lines)
     const [header, ...rows] = records(await saved.file.text())
     const label = String(definition.form.model.fields.find((field) => field.key === 'order')?.label)
-    expect(header?.filter((cell) => cell !== label && cell !== `${label} (key)`)).toEqual(headerFor(gridHeaders('Order line'), definition))
-    expect(rows.map((cells) => cells[(header ?? []).indexOf(`${label} (key)`)])).toEqual([order, order])
+    expect(header?.filter((cell) => cell !== label && cell !== `${label} (key)`)).toEqual(headerFor(headers, definition))
+    expect(rows.map((cells) => cells[(header ?? []).indexOf(`${label} (key)`)])).toEqual([order, order, order])
+    expect(rows.map((cells) => cells[(header ?? []).indexOf('Line no')])).toEqual(['3', '2', '1'])
     // The record's own Download CSV, in the Records panel, is a button of its own.
     expect(exportLine('Records').textContent).toBe('')
+  })
+
+  // A line's file in the making is its order's: opening another order
+  // mounts the section again, for that order, which stops the file -- the
+  // request's signal aborted -- says nothing on the new section's line, and
+  // saves nothing (watched failing with the order left out of the section's
+  // key: the signal still live once the other order's lines were listed).
+  test("stops a line's file in the making when another order is opened, and says nothing", async () => {
+    const notes = stamp('parents')
+    const [first, second] = [await freshOrder(engine, notes, [1, 2]), await freshOrder(engine, notes, [1, 2, 3])]
+    const signals: AbortSignal[] = []
+    const held = holdingRequests(plane.fetch, ({ path }) => path.endsWith('/records/export'))
+    const fetch: typeof globalThis.fetch = (input, init) => {
+      if (init?.signal != null && new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname.endsWith('/records/export')) signals.push(init.signal)
+      return held.fetch(input, init)
+    }
+    const kept = keeping()
+    const user = await workspace(fetch, engine.formId, kept.save)
+    await load(user, first)
+    await waitFor(() => expect(gridStatus('Order line')?.textContent).toBe('Order line rows 1–2.'), ARRIVES)
+    await pressFromKeyboard(user, 'Order line')
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+
+    await load(user, second)
+    await waitFor(() => expect(gridStatus('Order line')?.textContent).toBe('Order line rows 1–3.'), ARRIVES)
+    expect(signals.map((signal) => signal.aborted)).toEqual([true])
+    await held.pass()
+    expect(exportLine('Order line').textContent).toBe('')
+    expect(exportButton('Order line').getAttribute('aria-disabled')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(kept.saved).toEqual([])
   })
 
   // Offered exactly where the definition says a list can be read: in the
   // Records panel and in each child section with a saved parent -- a new
   // record's section has no rows to give -- and nowhere once the form's
-  // version hides its key from the person, so `list` is null (watched
-  // failing with the button drawn whatever `list` says: a Download CSV
-  // where nothing can be listed). Last of its
-  // engine's cases: it publishes the order form's version 2.
+  // version hides its key from the person, so `list` is null: not in the
+  // Records panel, and not under an order whose lines' form did so after
+  // the menu named it, whose section the workspace leaves out when the
+  // order form is chosen (watched failing with the Records panel's button
+  // drawn whatever `list` says: a Download CSV where nothing can be
+  // listed; and with the workspace keeping a child whose `list` is null:
+  // an Order line section under the order, and its Download CSV). Last of
+  // its engine's cases: it publishes version 2 of the lines' form and of
+  // the order form.
   test('is offered exactly where the definition lists records', async () => {
     expect((await definitionOf(engine.formId)).list).not.toBeNull()
     const user = await workspace(plane.fetch, engine.formId)
@@ -331,6 +378,28 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     const waiting = await waitFor(() => gridSection('Order line'), ARRIVES)
     expect(within(waiting).queryByRole('button', { name: 'Download CSV' })).toBeNull()
     expect(within(waiting).getByRole('status').textContent).toBe('Order line rows are listed once this Order is saved.')
+    cleanup()
+
+    // The menu is read at sign-in, naming Order line under Order; the lines' form then hides Line no, half its key.
+    // Arriving on no form: with the fragment the first mount left, sign-in would open the order form, its children read, before the publish.
+    window.history.replaceState(null, '', '/')
+    const order = await freshOrder(engine, stamp('unlisted'), [1])
+    const reader = mount(plane.fetch)
+    await signIn(reader, TOKENS.clerk)
+    await formLink(engine.formId)
+    const menu = await plane.clerk.forms()
+    expect(menu.ok && menu.value.forms.find((form) => form.id === engine.formId)?.children).toContainEqual({ form: engine.lines, field: 'order' })
+    const lines = (await plane.store.read(engine.lines, 1)) as { policy: { fields: Record<string, { read: string[] }> } }
+    const lineNo = lines.policy.fields['line_no']
+    if (lineNo === undefined) throw new Error('the lines form has no line_no field')
+    lineNo.read = []
+    expect(await plane.store.publish(engine.lines, 1, lines)).toEqual({ ok: true, version: 2 })
+    expect((await definitionOf(engine.lines)).list).toBeNull()
+    await chooseForm(reader, engine.formId)
+    await load(reader, order)
+    await loaded(order)
+    expect(screen.queryByRole('region', { name: 'Order line' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: 'Download CSV' })).toEqual([exportButton('Records')])
     cleanup()
 
     const stored = (await plane.store.read(engine.formId, 1)) as { policy: { fields: Record<string, { read: string[] }> } }

@@ -58,6 +58,9 @@ type ChildOpen = null | { kind: 'new' } | { kind: 'record'; token: string }
  * Under a saved parent its head offers Download CSV (0080): the child form's
  * file of that parent's rows, in the grid's sort, the parent's column kept,
  * so the file says whose rows they are. A new parent has no rows to give.
+ * The section is drawn only for a child whose `list` this person is offered
+ * -- the workspace leaves any other out when the form is chosen -- so the
+ * button asks nothing more of the definition.
  */
 export function ChildSection({
   client,
@@ -255,7 +258,7 @@ export function ChildSection({
             New {title}
           </button>
         ) : null}
-        {parent.kind === 'record' && definition.list !== null ? <DownloadCsv client={client} formId={child.form} idBase={`${headingId}-export`} query={() => ({ search: '', sort: grid.current?.sort() ?? [], parent: { field: child.field, record: parent.token } })} /> : null}
+        {parent.kind === 'record' ? <DownloadCsv client={client} formId={child.form} idBase={`${headingId}-export`} query={() => ({ search: '', sort: grid.current?.sort() ?? [], parent: { field: child.field, record: parent.token } })} /> : null}
       </div>
       {waiting ? (
         <p role="status" id={`${headingId}-waiting`} className="status" data-kind="loading">
