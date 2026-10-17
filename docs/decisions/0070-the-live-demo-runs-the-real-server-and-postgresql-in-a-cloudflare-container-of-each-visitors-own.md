@@ -7,8 +7,10 @@
   - **`apps/live-demo`'s suite, in its own test job.**
     - The data, `src/data/`. `generate.test.ts` holds the generated rows to
       every invariant `invariants.ts` states -- an order's amount the sum
-      of its lines, a delivery if and only if the order is shipped, one to
-      six lines numbered from one, a town of the customer's own country,
+      of its lines, a delivery if and only if the order is shipped, shipped
+      on a weekday and never for an order whose note says the customer
+      collects it, one to six lines numbered from one, a town of the
+      customer's own country,
       names unique within a tenant, one tree of employees under one
       managing director, approvals by heads and never on a draft -- and to
       the same rows twice, other rows from another seed, and more than
@@ -17,7 +19,11 @@
       the SQL, which refuses data that breaks one. Watched failing against
       the generator broken in turn: "order 7: amount 1793.31 is not its
       lines' sum 1793.30", "order 4 is placed and has a delivery", "names
-      Hamburg, a town of DE, not of FR", and the seed ignored.
+      Hamburg, a town of DE, not of FR", and the seed ignored; and the
+      generator as first committed, against the two rules added after it: 267
+      deliveries shipped on a Saturday or a Sunday, and 7 shipped orders
+      saying "Customer collects", order 27, shipped by DHL Express, among
+      them.
     - `src/data/load.integration.test.ts`, on `postgres:17-alpine` through
       data-fixtures' `startPostgresContainer`: the fixture's `postgres.sql`
       and the demo's SQL in one transaction, as the image loads them; the
@@ -251,11 +257,15 @@ emulate an instance type's share and are not Cloudflare's scheduler:
   and for a 23-request journey: at `lite`'s share 16,367 ms and 12,553 ms;
   at `basic`'s 4,691 to 5,172 ms and 2,814 to 2,897 ms over three; at
   `standard-1`'s 2,759 ms and 1,520 ms.
-- **The data** (2026-10-16, PostgreSQL 17.11): 6,580 rows -- 7 countries,
-  18 employees, 240 customers, 840 orders, 2,885 lines, 864 deliveries and
-  1,726 parcels -- in 344,490 bytes of SQL, generated in 44 to 46 ms and
-  loaded with the fixture in one transaction in 361 to 388 ms over six
-  runs; the database 8,951,475 bytes loaded, 7,537,167 empty.
+- **The data** (2026-10-17, PostgreSQL 17.11, three runs of
+  `load.integration.test.ts`): 6,580 rows -- 7 countries, 18 employees,
+  240 customers, 840 orders, 2,885 lines, 864 deliveries and 1,726 parcels
+  -- in 344,556 bytes of SQL, generated in 53 to 71 ms and loaded with the
+  fixture in one transaction in 403 to 431 ms; the database 8,951,475 bytes
+  loaded, 7,537,167 empty. On 2026-10-16, before deliveries kept to
+  weekdays and collected orders to no carrier, the same rows were 344,490
+  bytes, generated in 44 to 46 ms and loaded in 361 to 388 ms over six
+  runs.
 - **The image** (2026-10-16, at `basic`'s share): built uncached in 53.1 s
   and 56.4 s; 531,629,545 bytes, 197,538,291 through `docker save | gzip
   -1`; `/health` answering 4,825 to 5,278 ms after `docker run` over six

@@ -21,7 +21,7 @@ import {
 import type { Random } from './random.js'
 import { stream } from './random.js'
 import type { CountryWords, Region } from './words.js'
-import { COUNTRIES, CREDIT_LIMITS_CENTS, FIRST_NAMES, FIXTURE_COUNTRIES, LAST_NAMES, NOTES, STEMS, TENANT_COUNTRIES, TRADES, UNIT_PRICES_CENTS } from './words.js'
+import { COLLECTS, COUNTRIES, CREDIT_LIMITS_CENTS, FIRST_NAMES, FIXTURE_COUNTRIES, LAST_NAMES, NOTES, STEMS, TENANT_COUNTRIES, TRADES, UNIT_PRICES_CENTS } from './words.js'
 
 /*
  * The live demo's sample data, generated: pure, deterministic, from a seed
@@ -179,6 +179,9 @@ function statusFor(random: Random, age: number): OrderStatus {
   ])
 }
 
+/** What a shipped order's note may say: anything but that the customer collects it, since a carrier took it. */
+const SHIPPED_NOTES = NOTES.filter((note) => note !== COLLECTS)
+
 /** An order before its id: drawn in any order, numbered once sorted. */
 interface Unnumbered {
   tenantId: Tenant
@@ -218,7 +221,7 @@ function generateOrders(random: Random, customers: readonly Drawn[], employees: 
         day,
         customerNo: customer.customerNo,
         status,
-        notes: random.chance(SHARES.note) ? random.pick(NOTES) : null,
+        notes: random.chance(SHARES.note) ? random.pick(status === 'shipped' ? SHIPPED_NOTES : NOTES) : null,
         createdBy: creator.id,
         approvedBy,
         lines: Array.from({ length: random.int(LINES_PER_ORDER.min, LINES_PER_ORDER.max) }, () => ({
@@ -260,7 +263,7 @@ function uuid(random: Random): string {
   return `${digits.slice(0, 8)}-${digits.slice(8, 12)}-${digits.slice(12, 16)}-${digits.slice(16, 20)}-${digits.slice(20)}`
 }
 
-/** One delivery per shipped order, sometimes two, each of one to three parcels; none for any other order. */
+/** One delivery per shipped order, sometimes two, each shipped on a weekday and of one to three parcels; none for any other order. */
 function generateDeliveries(random: Random, orders: readonly DemoOrder[], customers: readonly DemoCustomer[]): { deliveries: DemoDelivery[]; parcels: DemoParcel[] } {
   const anchor = dayNumber(ANCHOR)
   const deliveries: DemoDelivery[] = []
@@ -273,15 +276,18 @@ function generateDeliveries(random: Random, orders: readonly DemoOrder[], custom
     if (customer === undefined) throw new Error(`order ${String(order.id)} has no customer`)
     const carriers = countryWords(customer.countryCode).carriers
     const day = dayNumber(order.orderDate)
-    const latest = Math.min(DAYS_TO_SHIP.max, anchor - day)
+    // The weekdays a carrier may take it: one to six days on, not after the anchor.
+    const shipping = Array.from({ length: Math.min(DAYS_TO_SHIP.max, anchor - day) - DAYS_TO_SHIP.min + 1 }, (_, i) => day + DAYS_TO_SHIP.min + i).filter(isWeekday)
+    /* c8 ignore next -- a shipped order is a weekday's, a day or more before the anchor, itself a weekday; this says so if either moves */
+    if (shipping.length === 0) throw new Error(`order ${String(order.id)} is shipped and no weekday is left to ship it on`)
     const count = random.chance(SHARES.split) ? DELIVERIES_PER_SHIPPED_ORDER.max : DELIVERIES_PER_SHIPPED_ORDER.min
-    const offsets = Array.from({ length: count }, () => random.int(DAYS_TO_SHIP.min, latest)).sort((a, b) => a - b)
-    for (const offset of offsets) {
+    const days = Array.from({ length: count }, () => random.pick(shipping)).sort((a, b) => a - b)
+    for (const shipped of days) {
       let id = uuid(random)
       /* c8 ignore next -- 122 random bits; a repeat would break the primary key, so it is drawn again */
       while (ids.has(id)) id = uuid(random)
       ids.add(id)
-      deliveries.push({ id, tenantId: order.tenantId, orderId: order.id, carrier: random.pick(carriers), shippedAt: during(random, day + offset) })
+      deliveries.push({ id, tenantId: order.tenantId, orderId: order.id, carrier: random.pick(carriers), shippedAt: during(random, shipped) })
       const n = random.int(PARCELS_PER_DELIVERY.min, PARCELS_PER_DELIVERY.max)
       for (let i = 1; i <= n; i += 1) parcels.push({ id: parcels.length + 1, deliveryId: id, label: `Parcel ${String(i)} of ${String(n)}` })
     }

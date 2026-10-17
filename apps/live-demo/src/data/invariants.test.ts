@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { generateDemoData } from './generate.js'
 import { demoDataProblems } from './invariants.js'
 import type { DemoCustomer, DemoData, DemoOrder } from './model.js'
-import { ANCHOR, DEMO_SEED, FIRST_CUSTOMER_NO, PER_TENANT, RECENT_DAYS, dayNumber, dayOf, decimal, startOfDay } from './model.js'
+import { ANCHOR, DEMO_SEED, FIRST_CUSTOMER_NO, PER_TENANT, RECENT_DAYS, dayNumber, dayOf, decimal, isWeekday, startOfDay } from './model.js'
+import { COLLECTS } from './words.js'
 
 /**
  * Each invariant refuses what it names. A check that never fails proves
@@ -219,6 +220,22 @@ describe('the demo data’s invariants refuse', () => {
     })).toEqual([`delivery id ${upper} is not a lower-case version-4 uuid`])
     const other = data.deliveries.find((each) => each.id !== delivery!.id)!
     expect(problemsAfter((copy) => void (copy.deliveries.find((each) => each.id === other.id)!.id = delivery!.id))).toEqual(expect.arrayContaining([`delivery id ${delivery!.id} is given twice`]))
+  })
+
+  // What a visitor reads on an order, its child rows must not contradict:
+  // an order whose note says the customer collects it, shipped all the
+  // same by a carrier, or a despatch on a Saturday from a business that
+  // takes its orders on weekdays alone.
+  test('a shipped order the customer collects, and a delivery shipped on a weekend', () => {
+    const [delivery] = deliveriesOf(shipped)
+    expect(problemsAfter((copy) => void (copy.orders.find((order) => order.id === shipped.id)!.notes = COLLECTS))).toEqual([
+      `order ${String(shipped.id)} says "${COLLECTS}" and was shipped by ${delivery!.carrier}`,
+    ])
+    const day = dayNumber(shipped.orderDate)
+    const weekend = find([1, 2, 3, 4, 5, 6].map((after) => day + after), (each) => !isWeekday(each) && each <= anchor, 'weekend day within six days of the order')
+    expect(problemsAfter((copy) => void (copy.deliveries.find((each) => each.id === delivery!.id)!.shippedAt = startOfDay(weekend) + 3_600_000))).toEqual([
+      `delivery ${delivery!.id} shipped on ${dayOf(weekend)}, a weekend day`,
+    ])
   })
 
   // Parcels: one to three per delivery, numbered from one, labelled as the

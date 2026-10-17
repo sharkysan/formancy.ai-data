@@ -161,6 +161,9 @@ export const LAST_NAMES: readonly string[] = [
   'Bossi', 'Crettenand', 'Dällenbach', 'Eberle', 'Fankhauser', 'Gilliéron', 'Hürlimann', 'Iten',
 ]
 
+/** The note of an order the customer fetches themselves: such an order is never shipped by a carrier. */
+export const COLLECTS = 'Customer collects'
+
 /** What a note on an order says, when it has one. */
 export const NOTES: readonly string[] = [
   'Call before delivery',
@@ -173,7 +176,7 @@ export const NOTES: readonly string[] = [
   'Fragile: glass components',
   'Collect the empty pallets',
   'Ring the bell at gate 2',
-  'Customer collects',
+  COLLECTS,
   'Confirm the delivery date by email',
 ]
 

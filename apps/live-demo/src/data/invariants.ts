@@ -18,7 +18,7 @@ import {
   firstOrderDay,
   isWeekday,
 } from './model.js'
-import { COUNTRIES, CREDIT_LIMITS_CENTS, FIXTURE_COUNTRIES, NOTES, TENANT_COUNTRIES, UNIT_PRICES_CENTS } from './words.js'
+import { COLLECTS, COUNTRIES, CREDIT_LIMITS_CENTS, FIXTURE_COUNTRIES, NOTES, TENANT_COUNTRIES, UNIT_PRICES_CENTS } from './words.js'
 
 /*
  * What the demo's data must hold, each as a sentence naming the row that
@@ -239,11 +239,12 @@ function deliveryProblems(data: DemoData): string[] {
     if (order.status !== 'shipped' && count > 0) problems.push(`order ${String(order.id)} is ${order.status} and has a delivery`)
     if (order.status === 'shipped' && count === 0) problems.push(`order ${String(order.id)} is shipped and has no delivery`)
     if (order.status === 'shipped' && count > DELIVERIES_PER_SHIPPED_ORDER.max) problems.push(`order ${String(order.id)} has ${String(count)} deliveries, not ${range(DELIVERIES_PER_SHIPPED_ORDER)}`)
+    if (order.notes === COLLECTS && count > 0) problems.push(`order ${String(order.id)} says "${COLLECTS}" and was shipped by ${(deliveriesOf.get(order.id) ?? []).map((delivery) => delivery.carrier).join(' and ')}`)
   }
   return problems
 }
 
-/** A delivery agrees with its order: the tenant, a carrier of the customer's country, shipped days after the order and not after the anchor. */
+/** A delivery agrees with its order: the tenant, a carrier of the customer's country, shipped on a weekday days after the order and not after the anchor. */
 function deliveryOfOrderProblems(delivery: DemoDelivery, order: DemoOrder, customer: DemoCustomer | undefined, anchor: number): string[] {
   const problems: string[] = []
   if (delivery.tenantId !== order.tenantId) problems.push(`delivery ${delivery.id} is of tenant ${String(delivery.tenantId)}, its order ${String(order.id)} of tenant ${String(order.tenantId)}`)
@@ -253,6 +254,7 @@ function deliveryOfOrderProblems(delivery: DemoDelivery, order: DemoOrder, custo
   const after = shipped - dayNumber(order.orderDate)
   if (after < DAYS_TO_SHIP.min || after > DAYS_TO_SHIP.max) problems.push(`delivery ${delivery.id} shipped ${String(after)} days after its order, not ${range(DAYS_TO_SHIP)}`)
   if (shipped > anchor) problems.push(`delivery ${delivery.id} shipped on ${dayOf(shipped)}, after ${ANCHOR}`)
+  if (!isWeekday(shipped)) problems.push(`delivery ${delivery.id} shipped on ${dayOf(shipped)}, a weekend day`)
   return problems
 }
 

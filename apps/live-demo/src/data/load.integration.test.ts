@@ -22,17 +22,20 @@ import { FIXTURE_COUNTRIES } from './words.js'
  *
  * The beforeAll prints a "demo data" line on every run: rows per table, the
  * SQL's bytes, generating it, loading it with the fixture, and the
- * database's size loaded and empty. Measured on 2026-10-16, three runs, on
+ * database's size loaded and empty. Measured on 2026-10-17, three runs, on
  * the Windows 11 workstation with Docker Desktop's engine 28.3.3, Node
- * 24.21.0, against postgres:17-alpine (PostgreSQL 17.11): 7 countries added
- * to the fixture's 2, 18 employees, 240 customers, 840 orders, 2,885 lines,
- * 864 deliveries and 1,726 parcels; 344,490 bytes of SQL; generated and
- * rendered in 44-46 ms in process (`node dist/data/cli.mjs`, Node's start
- * included, 194-234 ms); loaded with the fixture in one transaction in
- * 371-388 ms; `pg_database_size` 8,951,475 bytes after the load against
- * 7,537,167 for an empty database, so the load adds 1,414,308. Those are
- * this seed's rows; another seed or generator gives others, and the line
- * says which.
+ * 24.21.0, against postgres:17-alpine (PostgreSQL 17.11), once deliveries
+ * shipped on weekdays alone and no shipped order said the customer
+ * collects it: 7 countries added to the fixture's 2, 18 employees, 240
+ * customers, 840 orders, 2,885 lines, 864 deliveries and 1,726 parcels;
+ * 344,556 bytes of SQL; generated and rendered in 53-71 ms in process;
+ * loaded with the fixture in one transaction in 403-431 ms;
+ * `pg_database_size` 8,951,475 bytes after the load against 7,537,167 for
+ * an empty database, so the load adds 1,414,308. On 2026-10-16, before
+ * those two rules, the same rows were 344,490 bytes, generated in 44-46 ms
+ * (`node dist/data/cli.mjs`, Node's start included, 194-234 ms) and loaded
+ * in 371-388 ms. Those are this seed's rows; another seed or generator
+ * gives others, and the line says which.
  */
 let started: StartedServer<StartedPostgreSqlContainer>
 const connections: postgres.Sql[] = []
