@@ -282,9 +282,6 @@ describe('gates.yml', () => {
     expect(gates.jobs.report.needs).toContain('pictures')
   })
 
-  // WebKit's networking, EGL and fallback fonts are the runner image's: a
-  // label that moved would move 0058's facts under the WebKit leg with no
-  // change in the repository, and the pictures' fonts with them.
   // The live demo's gate (0070) builds its image and drives its page in
   // Chromium against it: a job of its own, in the report's needs, so an
   // image that no longer builds fails CI before Workers Builds deploys it
@@ -300,6 +297,9 @@ describe('gates.yml', () => {
     expect(gates.jobs.report.needs).toContain('live-demo')
   })
 
+  // WebKit's networking, EGL and fallback fonts are the runner image's: a
+  // label that moved would move 0058's facts under the WebKit leg with no
+  // change in the repository, and the pictures' fonts with them.
   test('runs the browser legs and the pictures on a pinned image, and installs system libraries for WebKit alone', () => {
     expect(gates.jobs.browser['runs-on']).toBe('ubuntu-24.04')
     expect(gates.jobs.pictures['runs-on']).toBe('ubuntu-24.04')
