@@ -20,7 +20,15 @@ export const AUDIENCE = 'formancy-data-demo'
 /** The claim the server reads a person's tenant from: the image's FORMANCY_DATA_ATTRIBUTES is `tenant=tid`. */
 export const TENANT_CLAIM = 'tid'
 
-/** How long a token is good for: an hour, which a visit -- ten minutes after its last request at most -- does not outlast. */
+/**
+ * How long a token is good for: an hour. Ten minutes is how long a
+ * visitor's server outlives their last request, not how long a visit lasts:
+ * every request keeps the server running, so a visit that goes on past the
+ * hour has its token refused, 401, by a server that still runs. The page
+ * signs nobody in again by itself; Sign out and a new sign-in asks the same
+ * Durable Object, which signs the new token with the key it stored, so the
+ * visitor reaches the same server and what they changed (0070).
+ */
 export const TOKEN_SECONDS = 3600
 
 /** The shortest key the server starts with, in UTF-8 bytes (KeySet.fromSecret): nothing shorter is signed with. */

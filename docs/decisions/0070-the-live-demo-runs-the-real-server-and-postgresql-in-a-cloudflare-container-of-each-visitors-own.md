@@ -374,7 +374,12 @@ memory, billed whether used or not.
 of the container it is for (`src/token.ts`, WebCrypto): HS256, issuer and
 audience `formancy-data-demo`, the person as `sub`, their roles, their
 tenant as `tid`, an hour's lifetime, which is what the server reads. A
-token from before a restart is refused by the new key. The page holds it as
+token from before a restart is refused by the new key. A visit can outlast
+the hour, since every request keeps its container running: its token is
+then refused, 401 "A valid host token is required.", by a server that
+still runs, and the page does not sign anybody in again by itself. Sign
+out and a new sign-in, signed with the key the Durable Object stored,
+reach the same server and what the visitor changed. The page holds it as
 the host page always has, in memory, in `Authorization` alone
 ([0029](0029-a-host-renders-a-published-form-through-one-client.md)).
 
@@ -545,6 +550,9 @@ Builds does not wait for it and a deploy is not one transaction.
 - **0037 narrowed,** for this demo alone. A reader of 0037 meets a
   Cloudflare that runs the product's server here, and must read why it
   does not for a deployment.
+- **A visit longer than an hour signs in again.** The token lasts an hour
+  and is not renewed; past it every request is refused 401 until the
+  visitor signs out and signs in, which reaches the same running server.
 - **The cookie is the credential.** Whoever holds a visitor's cookie while
   their browser keeps it can sign in to their container and see and change
   what they changed. It is one cookie, strictly necessary, holding a

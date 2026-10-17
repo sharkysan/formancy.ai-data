@@ -786,7 +786,9 @@ delete, for the reasons the generator's notes give.
   server and nothing else, and goes when the browser closes. Whoever holds
   it can sign in to your server: it is the only credential your changes
   have. Your token stays in the page's memory, as the host page always
-  keeps it.
+  keeps it, and lasts an hour: a visit longer than that is refused "A
+  valid host token is required." until you sign out and sign in again,
+  which reaches the same server and what you changed while it runs.
 - At most 10 servers run at once, and one visitor can hold them all; when
   none can start, the sign-in says so.
 - PostgreSQL only. Cloudflare decrypts what you send, and holds what you

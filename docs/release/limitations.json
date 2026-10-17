@@ -2281,7 +2281,7 @@
       ]
     },
     "0070": {
-      "reviewed": "sha256:3e632acc92ff47e167f79929f9544323ba3b42b7d05ebf542c01eac2d2c16342",
+      "reviewed": "sha256:4a36f6fbf0fd84a12a350a39466a14ad85978424f53e70043f127c30906b37e7",
       "limitations": [
         {
           "area": "operations",
@@ -2310,6 +2310,10 @@
         {
           "area": "access",
           "says": "The live demo's one cookie, `__Secure-formancy-data-demo`, is the only credential of a visitor's server: whoever holds it while that browser keeps it can sign in to that server and read and change what the visitor changed."
+        },
+        {
+          "area": "access",
+          "says": "A live demo token lasts an hour and the page does not renew it: a visit that goes on longer is refused, 401, by a server that still runs, until the visitor signs out and signs in again, which reaches the same server."
         },
         {
           "area": "operations",
