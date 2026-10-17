@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WRITE_ID_HEADER } from '@formancy/data-core'
 import type { FormMenu, PublishedForm as OpenedForm } from '@formancy/data-core'
-import { readFixture, startPostgresContainer } from '@formancy/data-fixtures'
+import { POSTGRES_IMAGE, readFixture, startPostgresContainer } from '@formancy/data-fixtures'
 import type { StartedPostgreSqlContainer, StartedServer } from '@formancy/data-fixtures'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, createIdentityVerifier, DRIVER_FACTORIES, parseConnections } from '@formancy/data-server'
 import type { ConnectionRegistry } from '@formancy/data-server'
@@ -24,8 +24,9 @@ import type { PublishedForm } from './publish.js'
 
 /**
  * The image's build, short of the image: PostgreSQL 17 (data-fixtures'
- * POSTGRES_IMAGE, through startPostgresContainer, so the release report
- * records it) loaded as deploy/demo/build.sh loads it -- the fixture's
+ * POSTGRES_IMAGE, which the image is built from, named so FORMANCY_IMAGES
+ * never moves it, and started through startPostgresContainer, so the
+ * release report records it) loaded as deploy/demo/build.sh loads it -- the fixture's
  * postgres.sql, the demo's rows and deploy/demo/accounts.sql in one `psql
  * -1` with ON_ERROR_STOP, then deploy/demo/password.sql with the password
  * in psql's environment -- inside the container, from the same files. The
@@ -80,7 +81,7 @@ const write = (token: string, path: string, body: unknown) => call(token, path, 
 const as = (id: string): string => tokens.get(id) as string
 
 beforeAll(async () => {
-  started = await startPostgresContainer()
+  started = await startPostgresContainer(POSTGRES_IMAGE)
   await started.container.copyContentToContainer([
     { content: readFixture('postgres.sql'), target: '/demo/postgres.sql' },
     { content: demoSql(data), target: '/demo/demo-data.sql' },

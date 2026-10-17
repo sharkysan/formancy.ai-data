@@ -220,7 +220,7 @@ describe("the live demo's headers (0070)", () => {
     expect(LIVE_ALLOWED).toEqual({ 'style-src': ["'unsafe-inline'"] })
     expect(LIVE_POLICY).toEqual({ ...POLICY, 'style-src': [...POLICY['style-src'], "'unsafe-inline'"] })
     expect(contentSecurityPolicy(LIVE_POLICY)).toBe(
-      "default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     )
   })
 

@@ -1,4 +1,4 @@
-import { readFixture, startPostgresContainer } from '@formancy/data-fixtures'
+import { POSTGRES_IMAGE, readFixture, startPostgresContainer } from '@formancy/data-fixtures'
 import type { StartedPostgreSqlContainer, StartedServer } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -11,9 +11,10 @@ import { FIXTURE_COUNTRIES } from './words.js'
 /**
  * The demo's SQL loaded as the image loads it -- the fixture's postgres.sql,
  * byte for byte as every suite loads it, then the demo's rows, in one
- * transaction -- into PostgreSQL 17, the image the adapter suites run on
- * (data-fixtures' POSTGRES_IMAGE, started through startPostgresContainer so
- * the release report records the server). Then the database is asked: the
+ * transaction -- into PostgreSQL 17, the image the demo's own is built from
+ * (data-fixtures' POSTGRES_IMAGE, named, so FORMANCY_IMAGES never moves it,
+ * and started through startPostgresContainer so the release report records
+ * the server). Then the database is asked: the
  * rows it holds are exactly the ones generated, they hold every invariant
  * as it stores them, its own `line_total` adds up to each order's amount,
  * every foreign key is valid, each identity starts past its rows, and two
@@ -163,7 +164,7 @@ beforeAll(async () => {
   const generation = performance.now()
   demoSql(generateDemoData())
   const generationMs = performance.now() - generation
-  started = await startPostgresContainer()
+  started = await startPostgresContainer(POSTGRES_IMAGE)
   const owner = postgres(started.container.getConnectionUri(), { onnotice: () => {}, max: 1 })
   try {
     await owner.unsafe('create database demo_first')
