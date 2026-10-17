@@ -149,14 +149,20 @@ and each of these fails on the change that breaks what it holds:
 - **Size and look.** `scripts/source-size.test.mjs`: no source file past
   the budget `CLAUDE.md` sets. `scripts/palette.test.mjs`: every stylesheet
   that copies `admin.css`'s variables says the same value for each.
+  `scripts/no-other-host.test.mjs`: no app's `index.html`, built page or
+  linked stylesheet names an address on another host, every family the
+  room and Blueprint draw with has a face in the build, and the apps import
+  the same faces; it reads no JavaScript
+  ([0072](../decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
 - **This documentation.** `scripts/architecture.test.mjs`: `docs/README.md`
   and these twelve sections exist; the building blocks name every workspace
   package and app; every decision record is linked from a section; every
   relative link reaches a file and every fragment a heading; and every
   repository path written in backticks names something git would commit
   ([0076](../decisions/0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md)).
-  It holds names, links and paths, never whether a sentence is still true,
-  which is review's.
+  A path given from inside a package, or whose first directory is
+  misspelled, is not read as one, a package named that the workspace does
+  not have passes, and whether a sentence is still true is review's.
 - **Derived files.** `scripts/codecov-config.test.mjs`: `codecov.yml` is
   what its generator makes of the workspace.
   `scripts/generated-block.test.mjs`: every generated region of the
@@ -215,6 +221,13 @@ reflow width; that the first Tab lands on the skip link and the next in the
 content; axe's colour-contrast and target-size rules; and that no rule of
 the app's own stylesheet reaches the form's paper. The host page's gate also
 fails when Enter on the skip link leaves the keyboard anywhere but `<main>`.
+`guardRequests` in the harness refuses and names every request to an origin
+the gate does not serve, and the pass that measures the fallback stack
+refuses every font file; on the examples page the demo's policy refuses
+such an address before any request exists, and its check names it
+([0072](../decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
+A request only an interaction the gates do not perform makes is seen by
+nothing.
 It starts PostgreSQL alone, because layout, focus and colour do not depend on
 the engine.
 

@@ -125,13 +125,17 @@ publish, that a bundle's base and bindings are exactly what its own
 generator writes from the request the bundle carries. A client other than
 the studio therefore cannot publish a binding change as a layout edit:
 whatever is not one of the presentation's edits is refused, naming its JSON
-path (0030). A regenerated form keeps its presentation by what each field
+path (0030). A field may move to another generated section, which is
+presentation too, recorded on the field's own entry
+([0075](../decisions/0075-a-field-may-move-to-another-generated-section.md)).
+A regenerated form keeps its presentation by what each field and section
 stands for, says what it could not carry, and keeps a moved key's grants only
 once somebody confirms them
 ([0039](../decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md)).
 
 Held by `packages/data-core/src/generate/generate.test.ts`,
 `packages/data-core/src/presentation/derive.test.ts`,
+`packages/data-core/src/presentation/rebase.test.ts`,
 `packages/data-server/src/bundle.test.ts` and
 `packages/data-server/src/routes/admin.test.ts`, and in the studio by
 `apps/studio/src/presentation.test.tsx`, where nothing the presentation step

@@ -281,11 +281,12 @@ one sees no other. Workers Builds deploys it from `main` on every push, with
 Worker config naming any other Worker, and a build holding a file the page
 never loads, not fitting the Content-Security-Policy of
 `scripts/demo-headers.mjs`, or carrying no `THIRD-PARTY-NOTICES.txt`. Every
-file is sent with that policy, which refuses anything inline.
-`scripts/demo.test.mjs` holds the config, the refusals and the headers; the
-examples page's browser gate serves the build under the same path and
-headers through `scripts/demo-serve.mjs`, and fails on anything the policy
-refuses.
+file is sent with that policy, which refuses anything inline and allows
+styles and fonts from the page's own origin alone, where its faces are
+(0072). `scripts/demo.test.mjs` holds the config, the refusals and the
+headers; the examples page's browser gate serves the build under the same
+path and headers through `scripts/demo-serve.mjs`, and fails on anything
+the policy refuses.
 
 **What it costs.** The demo is `main`'s page, not the latest release's, and
 Workers Builds deploys a push without waiting for that commit's CI. The

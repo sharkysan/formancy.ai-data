@@ -2418,7 +2418,7 @@
       ]
     },
     "0076": {
-      "reviewed": "sha256:b602f3bde111e5dbb347710869d0c8781fbc4ca205b09c954a661c6c678ac3a5",
+      "reviewed": "sha256:a37d99e570d9690172c18c129cf0df66884ca8dc650ccb5eca51ae2c9931c31c",
       "none": "A rule for this repository's documentation: the architecture sections and the guard that holds them are read by contributors, reviewers and evaluators, and nobody who installs, integrates or operates the module meets their costs."
     }
   }

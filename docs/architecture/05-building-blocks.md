@@ -43,9 +43,9 @@ What each manifest lets it import:
 | `@formancy/data-server` | yes | data-core, data-postgres, data-sqlserver, `@formancy/spec`, `fastify`, `@fastify/rate-limit`, `jose` | data-fixtures |
 | `@formancy/data-fixtures` | no | data-core, `postgres`, `mssql`, testcontainers, `vitest` | — |
 | `@formancy/data-performance` | no | data-core, data-client, data-server, both adapters, data-fixtures, both drivers, `jose` | — |
-| `@formancy/data-examples` | no | data-core; formancy's renderers, engine, spec and themes; React, Angular | data-fixtures, data-postgres and `postgres` for the snapshot capture; `@formancy/conformance` |
-| `@formancy/data-studio` | no | data-core, `@formancy/builder-core`; formancy's React renderer, engine, spec and themes; React | data-server, both adapters, data-fixtures, `@formancy/conformance` |
-| `@formancy/data-host` | no | data-client; formancy's renderers, engine, spec and themes; AG Grid Community; React, Angular | data-core, data-server, data-fixtures, both drivers, `@formancy/conformance` |
+| `@formancy/data-examples` | no | data-core; formancy's renderers, engine, spec and themes; Fontsource's faces; React, Angular | data-fixtures, data-postgres and `postgres` for the snapshot capture; `@formancy/conformance` |
+| `@formancy/data-studio` | no | data-core, `@formancy/builder-core`; formancy's React renderer, engine, spec and themes; Fontsource's faces; React | data-server, both adapters, data-fixtures, `@formancy/conformance` |
+| `@formancy/data-host` | no | data-client; formancy's renderers, engine, spec and themes; Fontsource's faces; AG Grid Community; React, Angular | data-core, data-server, data-fixtures, both drivers, `@formancy/conformance` |
 
 **What holds it.** The manifests, and pnpm's isolated linker
 (`node-linker=isolated` in `.npmrc`), which links into a package's
@@ -76,9 +76,12 @@ version alone
 declares the source-available licence and ships `LICENSE.md` and `NOTICE`
 ([0001](../decisions/0001-a-paid-module-in-its-own-repository.md)):
 `scripts/verify-licenses.mjs`, in the gates. And only `data-fixtures` may
-declare testcontainers, so a database starts in one place
-([0003](../decisions/0003-real-databases-in-every-test-run.md)):
-`scripts/release-report/tested-on.test.mjs`.
+declare testcontainers, so a suite or a gate that starts a container
+through it does so through data-fixtures, which records what answered for
+the release report
+([0035](../decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)):
+`scripts/release-report/tested-on.test.mjs`. It reads declarations only;
+compose and `docker run` start databases it does not see.
 
 Packages meet each other through `dist/`: every `exports` map points there,
 and turbo builds a package's dependencies before its tests
@@ -103,7 +106,7 @@ Node. Its suites sit beside the modules they test and need no Docker.
 | `server.ts` | Which servers this release was tested on, and whether a given one is: `TESTED_SERVERS`, the majors of the test matrix and SQL Server's compatibility floor; `serverStanding`, tested or not with a sentence a person reads, an unknown never tested; `SQLSERVER_RELEASES`, the one table of SQL Server's years. Each adapter translates what its server answered into these facts, the snapshot carries them outside the fingerprint, and nothing here refuses a server ([0068](../decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)) |
 | `generate/` | `generateForm`: a spec 3 document, its `FormBindings` and a note on every choice, the same bytes on every run ([0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)). `controls.ts` is the control a column's type gets; `access.ts` what the account may do, applied to the form; `names.ts` the field keys; `offers.ts` which writes a form offers, and `numbersKey`, the one answer to whether the database numbers a key ([0056](../decisions/0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md), [0057](../decisions/0057-a-key-of-one-column-filled-by-a-never-repeating-default-counts-as-numbered.md)); `version.ts` the spec version written and the bindings version read ([0042](../decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)). A lookup a person can search is a typeahead ([0066](../decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)) |
 | `policy/` | `FormPolicy` over a trusted `PolicyContext`, deny by default ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md)). `inputs.ts` reads both at run time before anything is decided; `evaluate.ts` answers each question or refuses; `validate.ts` is `validatePolicy`; `through.ts` scopes a child form through a parent ([0043](../decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)); `cascades.ts` is what a delete also does, and whether the policy names it ([0050](../decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md), [0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)) |
-| `presentation/` | The patch over the generated base ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)). `layout.ts` reads the one layout shape the generator writes; `derive.ts` (`presentationOf`) refuses every edit but a label, a place in its own section's grid and full width; `apply.ts` is what the server checks a stored form against; `rebase.ts` carries a patch to a new base and names the keys that now stand for another column ([0039](../decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md)) |
+| `presentation/` | The patch over the generated base ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)). `layout.ts` reads the one layout shape the generator writes; `derive.ts` (`presentationOf`) refuses every edit but a label, a place in its section's grid, a move to another generated section that leaves each section a field ([0075](../decisions/0075-a-field-may-move-to-another-generated-section.md)), and full width; `placement.ts` is where fields sit once the moves are made, which applying, deriving and rebasing all ask; `apply.ts` is what the server checks a stored form against; `rebase.ts` carries a patch to a new base, its moves through `rebase-moves.ts`, and names the keys that now stand for another column ([0039](../decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md)) |
 | `records/` | Where a browser's request meets the policy, the codecs, the tokens and the bindings ([0018](../decisions/0018-one-planner-turns-answers-into-requests.md)): `plan.ts` for one record, `list.ts` for a page ([0044](../decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)), `delete.ts` ([0050](../decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)), `drift.ts` for what a request refuses over the table as it described it ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)), `menu.ts` and `children.ts` for the menu ([0045](../decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)). `types.ts` declares `RecordAdapter`. Each `*-terms.ts` is how an adapter reads a request, and throws on one the planner would not have made |
 | `lookup/` | The database-neutral half of a lookup ([0012](../decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md)): `token.ts` the key token, `config.ts` `buildLookupConfig`, `rows.ts` membership and paging, `filters.ts` and `display.ts` row filters and labels that mean the same on both engines ([0028](../decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)), `search.ts` and `searchable.ts` what a search may be, shared with a list. `types.ts` declares `LookupAdapter`. `default-deadline.ts` holds the measured default deadline and nothing else ([0061](../decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md), [0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)) |
 | `drift/` | `diffSnapshots`, every change classified against one form's bindings and policy ([0010](../decisions/0010-drift-is-classified-against-the-bindings.md)), and `diffRootDefinition`, its root families alone, which a request asks (0041). One family per file: `columns.ts`, `relationships.ts`, `access.ts` for gaps, `privileges.ts` for the account, `referrers.ts` for what a delete acts through, `server.ts` for a server this release was not tested on, which stops nothing (0068). `fixture.ts` is test support that `index.ts` does not reach |
@@ -293,7 +296,11 @@ Every app is private, built by Vite, and carries the licence and notice
 texts of everything it bundles in `THIRD-PARTY-NOTICES.txt` (0046). Each
 is formancy.ai's admin applied: `admin.css`'s variables copied into the
 app's stylesheet, which `scripts/palette.test.mjs` holds to the other
-apps' and nothing holds to upstream's. Each has a browser gate,
+apps' and nothing holds to upstream's, and the room's faces imported in
+`apps/*/src/main.tsx` from Fontsource's packages and bundled, so no page
+asks another host for anything
+([0072](../decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
+Each has a browser gate,
 `apps/*/scripts/browser-test.mjs`, which CI runs in Chromium, Firefox and
 WebKit
 ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)),
@@ -320,8 +327,9 @@ shows to the released spec.
 `src/api.ts` is one function per route and `/v1/whoami`, the token held in
 memory. `src/workbench.tsx` is the journey's steps: connect, choose,
 generate, policy, presentation, preview, publish, drift, and under review a
-Review step (0065). Presentation edits go through `@formancy/builder-core`'s
-session with controls of the studio's own (`src/presentation.tsx`, 0030);
+Review step (0065). Presentation edits, a field's move to another section
+among them (0075), go through `@formancy/builder-core`'s session with
+controls of the studio's own (`src/presentation.tsx`, 0030);
 the Policy step asks `validatePolicy` and `deleteProblems` as the server
 does and names each key a delete acts through
 ([0052](../decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md));

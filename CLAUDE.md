@@ -104,8 +104,9 @@ Cloudflare token (0069).
 Nothing fails when this map goes stale. It names files rather than counting
 them, so a rename is the edit to make here. The full map, every package and
 app with what it may import and what is inside it, is
-[the building blocks](docs/architecture/05-building-blocks.md), which
-`scripts/architecture.test.mjs` holds to the workspace.
+[the building blocks](docs/architecture/05-building-blocks.md);
+`scripts/architecture.test.mjs` fails when they leave out a workspace
+package or app, and nothing checks what they say a package may import.
 
 ## Every change keeps the documentation true
 
@@ -147,11 +148,13 @@ and the document says what. Three shapes, in order of preference:
    file is not what the generator produces; `scripts/check-cla.test.mjs` fails
    when `CLA.md` changes under a signature; `scripts/upstream-deps.test.mjs`
    fails on an inexact upstream version; `scripts/architecture.test.mjs`
-   fails when the architecture names a package, a record, a link, a heading
-   or a path the repository does not have, or leaves out a package or a
-   record it has -- it holds names, links and paths, and never whether a
-   sentence is still true. All of them run as `pnpm test:repo`, and CI runs
-   that — **a guard that is not a gate is a comment.**
+   fails when a relative link in the architecture, or the heading it points
+   at, names nothing, when a path from the repository's root written there
+   in backticks names nothing, when the building blocks leave out a
+   workspace package and when no section links a decision record -- it
+   never reads whether a sentence is still true. All of them run as
+   `pnpm test:repo`, and CI runs that — **a guard that is not a gate is a
+   comment.**
 3. **Measure it.** Below.
 
 Counts written into prose go stale. **Prefer wording without a number.** Where a

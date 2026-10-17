@@ -6,9 +6,8 @@ fails when it stops being true; where nothing fails, it says that instead.
 
 ## 8.1 Exact values, and the codecs that hold them
 
-A value is never carried by a JavaScript `Number` or a driver's date where
-that could change it
-([0008](../decisions/0008-exact-values-travel-as-strings.md)).
+A value is never carried by a JavaScript `Number` or a driver's date that
+could change it ([0008](../decisions/0008-exact-values-travel-as-strings.md)).
 `codecFor(column)` in `packages/data-core/src/codecs/` validates and
 canonicalises one API value from metadata alone. Decimals are strings only,
 canonical as the database returns them -- `12.5` into `numeric(14,2)` is
@@ -85,9 +84,8 @@ Test paths without a package are under `packages/data-server/src/`.
 
 **What it costs.** Closed is visible as refusal. A form is blocked by a gap
 until an administrator reviews it, though reads might have worked; a lost
-answer is "it may have been saved" in cases where nothing was stored, which
-0031 lists; a field a regeneration adds is invisible until somebody grants
-it (0011).
+answer is "it may have been saved" where nothing was stored, which 0031
+lists; a field a regeneration adds is invisible until it is granted (0011).
 
 ## 8.3 Identifiers from approved metadata, values bound
 
@@ -229,8 +227,7 @@ one version give one winner and one `stale`;
 `packages/data-server/src/e2e-lost-answer.integration.test.ts`, release gate
 6, which fails if anything replays a write; `write-once.test.ts` and
 `runtime.test.ts` in `packages/data-server/src/routes/`; and the host page's
-browser gate, which holds what each browser does with a lost POST as a named
-fact
+browser gate, which names what each browser does with a lost POST as a fact
 ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
 
 **What it costs.** It over-reports: several failures read as "it may have
@@ -301,6 +298,12 @@ user interface is the rule, and this is what each part of it rests on.
   ([0024](../decisions/0024-the-studio-speaks-only-the-admin-plane.md)).
   `scripts/palette.test.mjs` holds every copy to the same values; nothing
   fails when upstream's `admin.css` moves.
+- **The room's own faces**: Fontsource's packages at the release
+  formancy.ai installs, bundled into each app, so no page asks another
+  host for anything
+  ([0072](../decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)):
+  `scripts/no-other-host.test.mjs` and the browser gates; review holds the
+  pins to upstream's.
 - **Forms on white paper, in a shipped theme**, through `@formancy/react` or
   `@formancy/angular`: side by side on the examples page
   ([0021](../decisions/0021-generated-forms-preview-in-both-frameworks.md)),

@@ -44,9 +44,11 @@ formancy.ai documents its architecture as arc42, in `docs/architecture/`
 with `docs/README.md` as the entry, and its `CLAUDE.md` asks every change to
 update the section it touches. formancy.ai-report and formancy.ai-health
 are being given the same shape at the same time, under the same twelve file
-names, each with a guard holding the first four rules below. A reader who
-knows one of the four repositories finds things in the others where they
-expect them.
+names, each with a guard holding at least the first four checks that
+`scripts/architecture.test.mjs` makes here: the sections and the entry, the
+packages named, the records cited, and the links and their headings. A
+reader who knows one of the four repositories finds things in the others
+where they expect them.
 
 `CLAUDE.md` already asks that a change is not done until the documents that
 describe it say so, and that a claim in prose is backed by something that
@@ -110,10 +112,12 @@ still points at the old one. The four repositories read alike.
   restate where they can, and still restate some, so a change can leave a
   second sentence behind.
 - What the guard does not read passes unread: a path given from inside a
-  package, a path in a fenced block or wrapped over a line, a file named
-  without a slash, and a sentence that names a package without saying what
-  it does. Nothing holds a section's length; the source-size budget counts
-  source files, not documents.
+  package, a path whose first directory is misspelled, a path in a fenced
+  block or wrapped over a line, a file named without a slash, a record
+  named without a link, a package named that the workspace does not have,
+  and a sentence that names a package without saying what it does.
+  Nothing holds a section's length; the source-size budget counts source
+  files, not documents.
 - A link into a heading is checked as GitHub anchored `#` headings when this
   was written; a heading written another way is refused rather than read.
 

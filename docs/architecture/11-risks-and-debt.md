@@ -3,17 +3,21 @@
 Written so that a reader can tell what is known and accepted from what is
 merely not done yet. The costs below come from the decision records' cost
 paragraphs. Their complete list is the register
-`docs/release/limitations.json`, which holds an entry for every record and
-which every release report prints in full
+`docs/release/limitations.json`, an entry for every record, which every
+release report prints in full
 ([0035](../decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md));
-this section summarises it by area and links the records, and where the two
-differ the register and its records are right.
+this section summarises it by area, and where the two differ the register
+and its records are right.
 
 ## 11.1 The riskiest pieces
 
 Formancy Data connects to a customer's existing database and writes to it.
-`SECURITY.md` names the areas that follow from that. Each has a mitigation
-already applied and a residual that is not closed.
+The first three areas below are among those `SECURITY.md` names as highest
+risk; the two others it names, secret exposure and metadata disclosure, are
+[8.4](08-crosscutting-concepts.md#84-secrets-handled-once) and
+[8.8](08-crosscutting-concepts.md#88-errors-are-fixed-sentences); the last
+two are this design's own. Each has a mitigation already applied and a
+residual that is not closed.
 
 ### Identifiers and values reaching SQL
 
@@ -74,8 +78,7 @@ again anyway" may make a duplicate.
 *Mitigation, already applied:* every column fact the engines disagree on is
 named in the contract
 ([0026](../decisions/0026-name-every-column-fact-the-engines-disagree-on.md)),
-and filters, labels and refusals are one expectation run through both
-adapters
+and filters, labels and refusals are one expectation both adapters run
 ([0028](../decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)).
 
 *Residual, by design and said:* text order and search folding are each
@@ -112,15 +115,16 @@ SQL Server discovery is several queries side by side, which a concurrent
 `ALTER` can tear
 ([0007](../decisions/0007-sqlserver-discovery-and-what-it-hides.md)), and
 refuses a catalog without `sys.edge_constraints`, every release before
-2019, naming its release ([0068](../decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)). Nothing else refuses a server this release
-was not tested on: a form is generated, published and served on it, the
-runtime never discovers again, so a server upgraded in place is seen only
-by the next discovery, drift review lists `server-untested` on every review
-until it changes, and a managed PostgreSQL whose `version()` begins
-"PostgreSQL " reads as tested (0068). PostgreSQL 14 and older and SQL
-Server 2017 and older are not images of the matrix, and on PostgreSQL 18 a
-cascaded table's AFTER DELETE trigger runs with its owner's grants, so a
-delete that 15 to 17 refuse is done ([0067](../decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)).
+2019, naming its release
+([0068](../decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
+Nothing else refuses a server this release was not tested on: the runtime
+never discovers again, so a server upgraded in place is seen only by the
+next discovery, drift review lists `server-untested` until it changes, and
+a managed PostgreSQL whose `version()` begins "PostgreSQL " reads as tested
+(0068). PostgreSQL 14 and older and SQL Server 2017 and older are not
+images of the matrix, and on PostgreSQL 18 a cascaded table's AFTER DELETE
+trigger runs with its owner's grants, so it does a delete 15 to 17 refuse
+([0067](../decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)).
 Every lookup search reads every row its form's row filter admits: no
 trigram index, prefix mode or minimum length ships, and the lookup deadline
 caps how long a search runs, not how much it reads
@@ -183,8 +187,7 @@ Publication is reviewed only when `FORMANCY_DATA_PUBLISHER_ROLES` is set,
 and a publisher restores any version alone
 ([0065](../decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)).
 A client is its address, so people behind one NAT share a rate-limit
-bucket, and a trusted-proxy list too wide or too narrow is reported by
-nothing
+bucket, and nothing reports a trusted-proxy list too wide or too narrow
 ([0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)).
 
 **The host page.** `hasMore` and `omitted` do not reach the person, the
@@ -207,9 +210,13 @@ in any browser
 lookup options, and reloading it signs the administrator out
 ([0024](../decisions/0024-the-studio-speaks-only-the-admin-plane.md)).
 A column rename loses its presentation overrides, a publish conflict is a
-rebase rather than a merge, and anything outside the four presentation
-edits, a move between sections among them, is refused at publish
+rebase rather than a merge, and anything outside the presentation edits is
+refused at publish
 ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
+A field moved to another section lands last in it, a section keeps one
+field, a move a regeneration cannot carry is dropped and said, and a 0.1.0
+server refuses a version holding a move
+([0075](../decisions/0075-a-field-may-move-to-another-generated-section.md)).
 What a delete also does is listed by foreign key only, never by trigger or
 rule ([0052](../decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md)),
 and the Review step does not show what a draft changes from the version it
@@ -230,11 +237,10 @@ Nothing deletes a draft, and an approval and a rejection of one draft at
 the same moment can both succeed (0065). A page of records has neither
 cancellation nor a deadline (0061).
 
-**Operations.** An upstream fix reaches an installation only through a
-release of this module
-([0002](../decisions/0002-depend-on-upstream-never-copy-it.md)), and an
-image built within a day of an adopted upstream release skips pnpm's
-release age for it
+**Operations.** An upstream fix reaches an installation only in a release
+of this module ([0002](../decisions/0002-depend-on-upstream-never-copy-it.md)),
+and an image built within a day of an adopted upstream release skips
+pnpm's release age for it
 ([0055](../decisions/0055-an-upstream-release-is-adopted-the-day-it-is-published.md)).
 The file store serves one instance, and finding a form's newest version is
 linear in its versions
@@ -242,16 +248,13 @@ linear in its versions
 The composed stack is not a production deployment, and `down -v` destroys
 its secrets with every token signed by the old key
 ([0032](../decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
-Behind Cloudflare, the edge decrypts every request and answer, host tokens
-and record values included, and the tunnel's login token is the operator's
-to revoke by hand
+Behind Cloudflare, the price of a tunnel with no inbound port, the edge
+decrypts every request and answer, host tokens and record values included,
+and the tunnel's login token is the operator's to revoke by hand
 ([0037](../decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)).
 Origins and trusted proxies are read at start, and a key set is read again
 only on SIGHUP, which Windows cannot send
 ([0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)).
-The audit trail is written after the database commits, so a crash between
-the two loses an event
-([0023](../decisions/0023-the-audit-trail-is-operational-not-evidence.md)).
 A change to the default lookup deadline alone does not mark the published
 figures stale
 ([0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)).
@@ -275,6 +278,9 @@ packages with this module's, so an audit reads each package's licence
 built app's notices are the texts each bundled package ships, and miss what
 Vite folds in as text
 ([0046](../decisions/0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md)).
+The apps bundle their fonts under the SIL Open Font License 1.1, and a
+font fix reaches them only when the catalog's pins move
+([0072](../decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
 A release's SBOM names what cdxgen finds, which on 2026-10-09 left out
 `tedious`, the package under `mssql` that speaks to SQL Server (0035). The
 examples demo is the page as `main` holds it, deployed without waiting for
@@ -303,10 +309,9 @@ lawyer has reviewed.
 `docs/release/gates.json` names each of the delivery plan's release gates
 by number with its evidence, or the reason it has none, and every report
 prints it ([0035](../decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)).
-Three have none:
+These have none:
 
-- **Gate 8, an AI proposal workflow.** None is built, so nothing exists to
-  test.
+- **Gate 8, an AI proposal workflow.** None is built; nothing exists to test.
 - **Gate 10, legal review.** It needs people: a legal review of
   `LICENSE.md`, the dependency inventory and customer terms. The licence is
   in force without one, by decision, and says so at its top
@@ -317,23 +322,23 @@ Three have none:
   licence names is an open question, and no price is published.
   `scripts/licence-status.test.mjs` fails if the gate is given evidence
   while the licence says no lawyer has reviewed it.
-- **Gate 12, design partners.** No design-partner acceptance run has
-  happened.
+- **Gate 12, design partners.** No design-partner acceptance has been run.
 
 Gate 11 is stated by `docs/performance.md`, a document, and is shown as
 stated, never as passed in a run.
 
 ## 11.5 Accepted architectural risks
 
-These are not debt. They are consequences of decisions made with the
-downside understood.
+Not debt: consequences of decisions made with the downside understood.
 
-**Two adapters written by hand, forever.** The cost of
-[0025](../decisions/0025-each-adapter-owns-its-driver.md) and
-[0005](../decisions/0005-one-fixture-written-twice.md): every operation is
-implemented twice, and every change to the model is made in two dialects.
-Paid down by the shared cases, which make a divergence a failed run rather
-than a discovery.
+**Two adapters written by hand, forever.** Each engine's operations are its
+own record, [0016](../decisions/0016-postgres-operations.md) and
+[0017](../decisions/0017-sqlserver-operations.md), and `CLAUDE.md` prefers
+that duplication to an abstraction over both: every operation is
+implemented twice. The business model is written in two dialects
+([0005](../decisions/0005-one-fixture-written-twice.md)), and every change
+to it is made in both. Paid down by the shared cases, which make a
+divergence a failed run rather than a discovery.
 
 **Real databases in every run.** The cost of
 [0003](../decisions/0003-real-databases-in-every-test-run.md): a cold run
@@ -352,13 +357,11 @@ used, and a whole-number field has no `step` to refuse a fraction with.
 for no lock, no daemon and no second database: one instance, and a version
 moves between deployments as a file whose keeping is the team's to secure.
 
-**The audit trail is not evidence.** The cost of 0023 and 0033: an event is
-written after the database or the store commits, by another system, so a
-crash between the two loses it, and nothing stops a privileged operator
-editing the log.
-
-**Cloudflare is the edge, and sees everything there.** The cost of 0037,
-for a tunnel with no inbound port.
+**The audit trail is not evidence.** The cost of
+[0023](../decisions/0023-the-audit-trail-is-operational-not-evidence.md)
+and 0033: an event is written after the database or the store commits, by
+another system, so a crash between the two loses it, and nothing stops a
+privileged operator editing the log.
 
 ## 11.6 People and process
 
@@ -387,13 +390,9 @@ says what those entries say
 
 ## 11.7 Work in progress, not on main
 
-When this section was written (2026-10-17), the following was on open
-branches or planned, and **none of it is described in these documents as
-done**: the apps' web fonts served from the page's own origin rather than
-Google's; a live master-detail demo running the real server and PostgreSQL
-in a Cloudflare Container; a field moved between sections in the studio's
-presentation step, which 0030 still refuses; Azure SQL Database, which a
+On 2026-10-17 these were on open branches or planned, and **none of it is
+described here as done**: a live master-detail demo running the real server
+and PostgreSQL in a Cloudflare Container; Azure SQL Database, which a
 snapshot already names and calls not tested (0068); and Microsoft Entra
 authentication to SQL Server. The numbers the decision index skips are
-taken by records on those branches. Each says what it decides, and costs,
-when it reaches `main`.
+taken by records on those branches, each placed here when it merges.
