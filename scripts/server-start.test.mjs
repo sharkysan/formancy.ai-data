@@ -27,6 +27,13 @@ const CLIENT = '0f9e8d7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f'
 const CLIENT_SECRET = `Zq8~${randomBytes(24).toString('base64url')}`
 const TOKEN_FILE = '/var/run/secrets/azure/tokens/azure-identity-token'
 
+/**
+ * How long a test waits for its servers: one start took 1.7 to 1.8 s on a
+ * Windows 11 workstation alone (2026-10-17), and more than vitest's default
+ * 5 s with the rest of `pnpm test:repo` running beside it.
+ */
+const STARTS = 60_000
+
 const scratch = mkdtempSync(join(tmpdir(), 'server-start-'))
 afterAll(() => rmSync(scratch, { recursive: true, force: true }))
 
@@ -105,7 +112,7 @@ describe('the built server, with Entra connections in its allowlist', () => {
       [40, 'No test of this release logs in as an Entra principal; connection erp-sp logs in as one.'],
     ])
     for (const value of [TENANT, CLIENT, CLIENT_SECRET]) expect(run.stdout + run.stderr).not.toContain(value)
-  })
+  }, STARTS)
 
   // With AZURE_FEDERATED_TOKEN_FILE set, @azure/identity's managed identity
   // logs in by workload identity, as the environment's tenant, client and
@@ -124,5 +131,5 @@ describe('the built server, with Entra connections in its allowlist', () => {
     for (const value of [TOKEN_FILE, TENANT, CLIENT]) expect(run.stdout + run.stderr).not.toContain(value)
     const principalOnly = await start(workload, CONNECTIONS.filter((connection) => connection.id !== 'erp-mi'))
     expect(principalOnly.listening, principalOnly.stderr).toBe(true)
-  })
+  }, STARTS)
 })
