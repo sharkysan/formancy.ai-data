@@ -124,6 +124,15 @@ RUN sh /demo/build.sh
 # on for a line that would hold one.
 ENV FORMANCY_DATA_IDENTITY_SECRET=env:FORMANCY_DATA_DEMO_IDENTITY_SECRET
 
+# The server's lookup deadline at the share of a CPU the container runs at:
+# the default, 892 ms, is the slowest lookup measured on a whole machine
+# (0061), and basic gives a quarter of one, so 892 / 0.25. At the default,
+# three cold visitors at once beside a type-check had a new order's three
+# lookups answer 503 lookup-timeout (2026-10-17, `docker run --cpus 0.25`).
+# scripts/live-demo-gate/docker.test.mjs derives it from data-core's default
+# and apps/live-demo/wrangler.json's instance type, and fails when this differs.
+ENV FORMANCY_DATA_LOOKUP_DEADLINE_MS=3568
+
 EXPOSE 4390
 
 # The base says SIGINT. Cloudflare stops a container with SIGTERM, and so

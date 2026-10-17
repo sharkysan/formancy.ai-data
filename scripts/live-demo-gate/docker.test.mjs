@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
-import { INSTANCE_TYPES, leaks, memoryUsed, publishedPort, quotaOf, runArguments } from './docker.mjs'
+import { DEFAULT_LOOKUP_DEADLINE_MS } from '../../packages/data-core/dist/index.mjs'
+import { INSTANCE_TYPES, leaks, lookupDeadlineFor, memoryUsed, publishedPort, quotaOf, runArguments } from './docker.mjs'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const config = JSON.parse(readFileSync(join(repo, 'apps', 'live-demo', 'wrangler.json'), 'utf8'))
@@ -25,6 +26,30 @@ describe('the quota a visitor’s container runs under', () => {
   // report a cold start no instance has.
   test('is refused for an instance type the table does not know', () => {
     expect(() => quotaOf('standard-9')).toThrow(/standard-9 is no instance type .* lite, basic/)
+  })
+})
+
+describe("the image's lookup deadline", () => {
+  // The server's default deadline is the slowest lookup measured on a whole
+  // machine (0061). At basic's quarter of a CPU the same lookups take up to
+  // four times as long: on 2026-10-17 three cold visitors at once, beside a
+  // type-check, had the new order's customer, created-by and approved-by
+  // lookups answer 503 lookup-timeout after the default's 892 ms. So the
+  // image's deadline is the default over the instance type's CPU share,
+  // derived from both, never typed.
+  test("is the measured default over wrangler.json's instance type's CPU share, as the Dockerfile sets it", () => {
+    const [container] = config.containers
+    const expected = lookupDeadlineFor(container.instance_type, DEFAULT_LOOKUP_DEADLINE_MS)
+    expect(expected).toBe(Math.ceil(DEFAULT_LOOKUP_DEADLINE_MS / INSTANCE_TYPES[container.instance_type].vcpu))
+    const dockerfile = readFileSync(join(repo, 'deploy', 'demo', 'Dockerfile'), 'utf8')
+    const set = [...dockerfile.matchAll(/\bFORMANCY_DATA_LOOKUP_DEADLINE_MS=(\S+)/g)].map((match) => match[1])
+    expect(set).toEqual([String(expected)])
+  })
+
+  // A whole CPU or more needs no more than what was measured on one.
+  test('is never below the measured default', () => {
+    expect(lookupDeadlineFor('standard-4', 892)).toBe(892)
+    expect(lookupDeadlineFor('lite', 892)).toBe(892 * 16)
   })
 })
 

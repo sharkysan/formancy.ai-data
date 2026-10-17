@@ -28,6 +28,19 @@ export function quotaOf(type) {
 }
 
 /**
+ * The lookup deadline for a server at `type`'s CPU share: `measured`, the
+ * slowest lookup measured on a whole machine (data-core's
+ * DEFAULT_LOOKUP_DEADLINE_MS, 0061), over the share, rounded up -- the same
+ * work at a quarter of a CPU takes up to four times as long -- and never
+ * below what was measured.
+ */
+export function lookupDeadlineFor(type, measured) {
+  const found = INSTANCE_TYPES[type]
+  if (found === undefined) throw new Error(`${String(type)} is no instance type Cloudflare lists: ${Object.keys(INSTANCE_TYPES).join(', ')}`)
+  return Math.ceil(measured / Math.min(found.vcpu, 1))
+}
+
+/**
  * The arguments of the `docker run` that is one visitor's container:
  * linux/amd64, under `quota`, `port` published on loopback alone at a port
  * the engine picks, and each of `variables` named without a value, so the
