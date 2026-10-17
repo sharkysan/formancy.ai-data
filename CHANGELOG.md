@@ -194,6 +194,42 @@ later.
   package the workspace does not have, and whether a sentence is still true
   are review's
   ([0076](docs/decisions/0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md)).
+- **A live demo of the product, at https://formancy.ai/data/demo/**, once
+  its Worker is created by the steps in `.github/REPO-METADATA.md`; until
+  then the address is formancy.ai's 404. Why: the examples page shows a
+  generated form with nothing behind it, and an evaluator who wanted to see
+  what the runtime does -- a page of orders searched and paged, a
+  customer found with the typeahead, an order with its lines and
+  deliveries in linked grids, a save, a create, a delete, another tenant's
+  record refused -- had to clone the repository and run the composed
+  stack. A visitor signs in as one of three people, Clara and Otto, order
+  clerks of two tenants, or Vera, an auditor, and gets a data server and a
+  PostgreSQL of their own, main's, in a Cloudflare Container, with sample
+  sales data generated from a fixed seed. Everything they change is gone
+  when their container sleeps, a little over ten minutes after their last
+  request. The
+  Worker starts a container only on a sign-in from the page, at most ten
+  at once, each with a key made for that start, and forwards the runtime
+  plane's routes to it, exactly those 0037's runtime door forwards, and
+  nothing else, none of the administrator's beside them under `/v1/forms`;
+  it sets one cookie, a random name for the
+  visitor's container, which is that container's only credential.
+  Workers Builds deploys it from `main` on every push, as the examples
+  page; `pnpm live-demo:deploy` deploys it by hand, and GitHub holds no
+  Cloudflare token. It needs the Workers Paid plan, and costs money while
+  people use it
+  ([0070](docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md);
+  the README's *Live demo* says what a visitor meets).
+- **`pnpm test:live-demo`, and a CI job of its own, `live-demo`,** which
+  build the demo's image and run the Worker's own code in front of it, over
+  a stand-in for Cloudflare's runtime whose containers are `docker run`s of
+  the image at the share of a CPU and the memory the demo's instance type
+  has, and walk a visitor's journey over HTTP and then in Chromium. Why:
+  Workers Builds deploys without waiting for CI, and Wrangler activates the
+  Worker before it builds and pushes the image, so an image that no longer
+  built would first fail on Cloudflare, beside a Worker already live; and
+  `wrangler dev` runs no container on Windows, nor against Docker Desktop's
+  kernel in WSL. The release report waits for the job.
 
 ### Changed
 
@@ -411,6 +447,35 @@ later.
   failed to launch Chromium in that image while each app's script run
   directly passed; `turbo.json` now passes it to both, and
   `scripts/browsers.test.mjs` fails when it does not.
+- **The host page has a demo build**,
+  `pnpm --filter @formancy/data-host build:demo`, for the live demo
+  ([0070](docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
+  It asks the path it is served from for the demo's people and signs a
+  visitor in as one of them, where the ordinary build asks for a token,
+  and its client reaches the runtime plane under that path through
+  data-client's `base`. Why a build of the host page and not a page of
+  its own: the demo is meant to show the host page's workspace as it is.
+  The ordinary build drops the demo's branch and `src/demo.ts`, and
+  carries the persona sign-in, which it never draws without a session;
+  the host page gains a development dependency on the live demo's private
+  package, for the Worker's answer types.
+- **The live demo's page allows inline styles**, where the examples page's
+  allows none. AG Grid injects its theme as `<style>` elements, which
+  `style-src 'self'` refuses: the gate watched Chromium refuse them under
+  the examples page's policy. The live policy is the examples page's with
+  `'unsafe-inline'` added to `style-src` and nothing else, named in the
+  deploy as one allowance in one directive, so no other page's policy
+  loosens with it.
+- **For contributors**: the examples deploy's checks, `scripts/demo.mjs`
+  and `scripts/demo-headers.mjs`, take the page, its mode, the policy and
+  one named allowance, so the live demo's deploy holds the host page's
+  demo build to them; and `scripts/demo.mjs` deploys only when it is run as
+  itself, which it and `scripts/live-demo.mjs` judge by the program's real
+  path. Why: it deployed whenever the program's name ended in
+  `demo.mjs`, which `scripts/live-demo.mjs`'s does, so the live deploy
+  would have deployed the examples page first; and a comparison of the
+  paths as given did nothing and exited 0 when the checkout was reached
+  through a link, a deploy by hand reported that never ran.
 
 What review costs, in 0065: every submit and approval asks the database, so
 one that cannot be reached refuses both; nothing deletes a draft; nobody is
@@ -445,6 +510,34 @@ all of formancy.ai, the report's Studio included; and the page is on the
 site's hostname without the site's bar or footer.
 The Worker runs no code and none of the product -- no server, no
 database, neither plane -- which stays where 0037 puts it.
+
+What the live demo costs, in 0070: the Workers Paid plan, $5 a month, and
+then money while people use it -- about $0.0037 a visit of ten minutes'
+use once the plan's included amounts, about 67 such visits a month, are
+spent, and at most $201.66 for ten containers running a whole 30-day month
+with every CPU busy, at the prices read on 2026-10-16, beside the Worker's
+and the Durable Objects' requests, storage and alarms, not computed;
+anybody can start a container, one visitor can take all ten, and a rate
+limiting rule on the sign-in is the operator's to add; every change
+is gone when a container sleeps and on every deploy whose image changed,
+which restarts every running demo at once; PostgreSQL alone; a first
+sign-in that waits for a start, 5.7 to 11.7 s through the Worker at the
+instance type's share on a workstation and not measured on Cloudflare, and
+refused past 30 s; Cloudflare runs code on formancy.ai's zone, decrypts
+every request and holds what a visitor types until their container stops;
+the cookie is the container's credential, and any script can name a
+Durable Object of its own; a token that lasts an hour, after which a visit
+signs in again; no logs of its own, though the zone's analytics still see
+its requests; a lookup may run for 3,568 ms before it is stopped, four
+times the default, at a quarter of a CPU; inline styles allowed on its
+page; an image of about 198 MB
+compressed pushed by every deploy that changed it, deleted by hand; a
+second whole build of the repository on every push; and the Durable
+Object's code held by review, what the cap answers and how long a
+container outlives its visitor read once, by hand, after the first deploy.
+A deployment of the product is not changed: 0037 is narrowed for this demo
+alone.
+
 What the matrix costs, in 0067: more CI jobs a run, and the wait for
 runners they add; some default work repeated, since every data-fixtures leg
 starts both engines; more moving tags; runs that go red for a difference no

@@ -302,6 +302,20 @@ examples demo is the page as `main` holds it, deployed without waiting for
 that commit's CI, and what it serves was read by hand once
 ([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
 
+**The live demo.** Accepted rather than fixed, for a demo that is not a
+deployment of the product: it costs the rightsholder money while anybody
+uses it, bounded only by its cap, and one visitor can take every place;
+every change goes when a visitor's container sleeps or a deploy changes the
+image; it shows PostgreSQL alone; Cloudflare runs its code on formancy.ai's
+zone and holds what a visitor types until their container stops; the
+cookie is the container's credential; with observability off a failed start
+leaves no log; its page allows inline styles for AG Grid; and its lookup
+deadline is four times the product's default, for a quarter of a CPU. What
+no gate reaches: the Durable Object's code on Cloudflare, what the cap
+answers, how long a container outlives its visitor, a start's time there,
+and the page in Firefox and WebKit
+([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
+
 ## 11.3 Filed defects, and what is not done yet
 
 Filed in `docs/images/README.md`, because a picture is the product as it
@@ -316,8 +330,9 @@ is upstream's renderer and themes.
 The README's *Status* paragraph names what is not there yet: figures for a
 page of records, the menu of forms and a delete; a host page on another
 origin run in a browser; a run through a real Cloudflare tunnel; anything
-that reads what Cloudflare serves at the demo's address; and a licence a
-lawyer has reviewed.
+that reads what Cloudflare serves at the examples page's address; the live
+demo's Worker, which nobody has created, and anything read of the demo on
+Cloudflare; and a licence a lawyer has reviewed.
 
 ## 11.4 The release gates still open
 
@@ -405,8 +420,7 @@ says what those entries say
 
 ## 11.7 Work in progress, not on main
 
-On 2026-10-17 these were on open branches or planned, and **none of it is
-described here as done**: a live master-detail demo running the real server
-and PostgreSQL in a Cloudflare Container; and Microsoft Entra
-authentication to SQL Server. The numbers the decision index skips are
-taken by records on those branches, each placed here when it merges.
+On 2026-10-17 this was on an open branch or planned, and **none of it is
+described here as done**: Microsoft Entra authentication to SQL Server. The
+numbers the decision index skips are taken by records on open branches,
+each placed here when it merges.

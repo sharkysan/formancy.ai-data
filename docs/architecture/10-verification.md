@@ -192,7 +192,11 @@ and each of these fails on the change that breaks what it holds:
   ([0037](../decisions/0037-cloudflare-is-the-edge-not-the-runtime.md));
   `scripts/demo.test.mjs` for the examples demo's Worker, deploy and
   headers
-  ([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
+  ([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md));
+  `scripts/live-demo.test.mjs` for the live demo's Worker config, deploy
+  and headers, `scripts/live-demo-docs.test.mjs` for what the README says
+  of it, and `scripts/live-demo-gate/*.test.mjs` for its gate's pure parts
+  ([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
 - **The release.** `scripts/release-report/*.test.mjs`: the report, the
   registers and what a publish refuses;
   `scripts/release-notes.test.mjs`: each changelog section a release could
@@ -310,6 +314,24 @@ by Cloudflare from `main`, not by a workflow here. `scripts/demo.test.mjs`
 holds its configuration and headers; what Cloudflare actually serves was
 read by hand once, and nothing here reads it again
 ([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
+
+**The live demo.** `pnpm test:live-demo` (`scripts/live-demo-gate.mjs`), the
+`live-demo` job, builds the host page's demo build and the image of
+`deploy/demo/Dockerfile`, and runs the Worker's own module in front of it
+over a stand-in for Cloudflare's runtime, `scripts/live-demo-gate/cloudflare.mjs`:
+one Durable Object per name with its storage and alarm, and containers that
+are `docker run`s of the image at the instance type's share of a CPU and
+its memory. It walks a visitor's journey over HTTP -- each person's menu,
+paging, a search, the typeahead, writes and refusals, a second visitor's
+own data, neither secret in what the container wrote, the reset -- and
+then the page in Chromium under the live headers, with axe, at 320 pixels
+and by keyboard. It is not workerd and not Cloudflare: it does not take a
+container's network away, stop it when idle or cap how many run, and
+`wrangler dev` was measured not to run a container here, so the Durable
+Object's code is held by review until the first deploy is read by hand.
+`apps/live-demo`'s own suite holds the data, the image's forms and the
+Worker's pure parts, two of its files against PostgreSQL 17
+([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
 
 ## 10.9 The release report and its registers
 

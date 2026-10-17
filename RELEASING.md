@@ -29,6 +29,7 @@ pnpm build && pnpm typecheck && pnpm test:coverage && pnpm check:pkg && pnpm tes
 node scripts/verify-licenses.mjs
 pnpm test:getting-started   # docs/getting-started.md as written; needs Docker, not the build
 pnpm test:cloudflare        # docs/deploy/cloudflare.md's overlay, offline; needs Docker and the server's build
+pnpm test:live-demo         # the live demo's image behind its Worker's own code, and a visitor's journey; needs Docker and the build
 
 # 4. Get the release commit onto main, through a pull request like any other.
 
@@ -63,7 +64,9 @@ cannot be taken back:
    licences and the repository guards; each package's suite on a runner of
    its own, against both databases; the browser gates; the install gate,
    which packs, installs and runs the tarballs and keeps them; the server
-   image; and [`docs/getting-started.md`](docs/getting-started.md) as written,
+   image; the live demo's image behind its Worker's own code
+   ([0070](docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)),
+   which a release does not deploy; and [`docs/getting-started.md`](docs/getting-started.md) as written,
    from a clean checkout, once with the runner's Compose and once with the
    oldest the guide names
    ([0032](docs/decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
@@ -220,6 +223,104 @@ serve that branch's page until the next push to `main`.
 `node scripts/demo.mjs --dry-run`, after `pnpm build`, does everything but
 the upload and the refusal of uncommitted changes, with no login: it
 checks a working tree as it stands.
+
+## The live demo on formancy.ai
+
+The Worker `formancy-data-demo` is created once, in Cloudflare's dashboard
+or by a first `pnpm live-demo:deploy`, by the steps in
+[REPO-METADATA.md](.github/REPO-METADATA.md#creating-the-live-demos-worker),
+on an account with the Workers Paid plan; until then
+https://formancy.ai/data/demo/ is formancy.ai's 404. From then on
+Cloudflare deploys the live demo there on every push to `main`, through
+Workers Builds
+([0070](docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)): the host page's demo build as static assets, the
+Worker, and the image of `deploy/demo/Dockerfile` that each visitor's
+container runs. The Worker builds with `pnpm build` and deploys with
+`node scripts/live-demo.mjs`, the two halves of `pnpm live-demo:deploy`.
+So the live demo is main's server and page, not the latest release's, and
+a release needs nothing more for it. GitHub's workflows hold no Cloudflare
+token and never deploy.
+
+`node scripts/live-demo.mjs` refuses:
+- a checkout with changes;
+- a Worker config in `apps/live-demo/wrangler.json` that is not the live
+  demo's: another Worker's name; a route but `formancy.ai/data/demo` and
+  `formancy.ai/data/demo/*` on formancy.ai's zone, or a Custom Domain;
+  workers.dev or version addresses; a variable, secret or binding of any
+  kind beyond its one Durable Object; an assets binding, or the Worker run
+  before the files for anything but the session and the runtime plane;
+  more than one container, another image, build context, instance type or
+  cap, or anything else on it -- SSH, authorized keys, constraints, image
+  variables; another Durable Object binding or export; observability on;
+- Docker not answering, since Wrangler builds the image;
+- a host page demo build that fails the examples' checks -- a file asked
+  for other than by a path relative to the page, a file in `assets/` with
+  no hash or that the page never loads, no `THIRD-PARTY-NOTICES.txt` --
+  or does not fit the Content-Security-Policy of
+  `scripts/live-demo-headers.mjs`, which is the examples page's with
+  `'unsafe-inline'` added to `style-src` for the style elements AG Grid
+  injects, and nothing else.
+
+Then it stages the build under `data/demo/` with the `_headers` file beside
+it, and deploys with the pinned Wrangler and `--containers-rollout=immediate`,
+with the commit in the deployment's message. Wrangler builds the image,
+pushes it when it changed, and then replaces every running container with
+the new image at once: every visitor's changes are gone, as they are when
+their server sleeps. Cloudflare's deploy guide says `wrangler deploy`
+uploads and activates the Worker before it processes the containers, and
+not as one transaction: an image that fails after the Worker is live leaves
+the new Worker beside the old image. The build's log is on the Worker's
+page in Cloudflare's dashboard, and nothing in this repository reads it.
+
+By hand, from a clean checkout of `main`, with Docker running and a
+Cloudflare login that can edit Workers and Containers on formancy.ai's
+account and zone:
+
+```bash
+npx --yes wrangler@4.146.0 login     # once per machine
+pnpm live-demo:deploy
+```
+
+`node scripts/live-demo.mjs --dry-run`, after `pnpm build`, does everything
+but the upload and the refusal of uncommitted changes. Wrangler 4.146.0
+builds the image in a dry run too and pushes nothing, and asks for no login
+for one, as its published code reads; that was read, not run, on
+2026-10-16.
+
+What nothing here can measure, read by hand once after the first deploy,
+and the result recorded in 0070, as 0069's were:
+
+1. Open https://formancy.ai/data/demo/, sign in as each person, page through
+   the orders, open one with its lines and deliveries, and create, change
+   and delete an order. How long the first sign-in took is the start on
+   Cloudflare, which was measured only locally.
+2. `curl -sI` the page, a file under `assets/`, `THIRD-PARTY-NOTICES.txt`, a
+   file that is not there and `https://formancy.ai/data/demo`: the page and
+   its files with the live policy, the notices as
+   `text/plain; charset=utf-8`, the missing file the Worker's 404 with its
+   own headers, and the path without its slash a 307 to it.
+3. What `max_instances` answers: eleven sign-ins with no cookie, one after
+   another within ten minutes, each starting a server of its own --
+   `curl -s -X POST https://formancy.ai/data/demo/session -H 'Origin: https://formancy.ai' -H 'Content-Type: application/json' -d '{"persona":"vera"}' -o /dev/null -w '%{http_code} %{time_total}\n'`
+   -- and what the eleventh answered, and how long it took.
+4. How long a server outlives its visitor, one request a trial: every
+   request reaches the visitor's Durable Object, makes it active again and
+   starts the countdown again, so a server asked once a minute never
+   stops. Sign in with no cookie -- a new private window, or step 3's
+   `curl` with `-c` to keep the cookie -- send nothing for N minutes, then
+   ask for the forms once with that cookie and token: 200 means the server
+   outlived N minutes, and the 503 that says no server is running that it
+   did not. Start at the Worker's IDLE_MINUTES and try N + 1, N + 2 and
+   N + 3, each with a sign-in of its own, until the answer is the 503.
+5. `npx --yes wrangler@4.146.0 containers list` and
+   `npx --yes wrangler@4.146.0 containers images list`: the application and
+   the images pushed. Every deploy that changes the image pushes one, and
+   an account holds 50 GB of them; delete old ones now and then with
+   `npx --yes wrangler@4.146.0 containers images delete`.
+
+The browser's console is expected to show one error on every load, as the
+examples page's does: the bot-detection script Cloudflare puts into the
+page, which the policy refuses (0069). Any other error is not expected.
 
 ## Provenance
 

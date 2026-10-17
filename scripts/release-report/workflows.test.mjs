@@ -221,7 +221,7 @@ describe('gates.yml', () => {
     const expected = expectedKeys(gates, namedPackages())
     const keys = expected.map((entry) => entry.key)
     expect(new Set(keys).size).toBe(keys.length)
-    expect(keys).toEqual(expect.arrayContaining(['verify', 'browser-chromium', 'browser-firefox', 'browser-webkit', 'pictures', 'install', 'container', 'getting-started-runner', 'getting-started-2.20.3']))
+    expect(keys).toEqual(expect.arrayContaining(['verify', 'browser-chromium', 'browser-firefox', 'browser-webkit', 'pictures', 'install', 'container', 'getting-started-runner', 'getting-started-2.20.3', 'live-demo']))
     expect(keys).not.toContain('browser')
     const of = (job) => expected.filter((entry) => entry.job === job).map((entry) => entry.key)
     expect(of('test').sort()).toEqual(namedPackages().map((entry) => `test-${entry.id}`).sort())
@@ -280,6 +280,21 @@ describe('gates.yml', () => {
     expect(runs('pictures')).toContain('pnpm --filter @formancy/data-examples exec playwright install chromium')
     expect(runs('browser').filter((run) => run.includes('pictures'))).toEqual([])
     expect(gates.jobs.report.needs).toContain('pictures')
+  })
+
+  // The live demo's gate (0070) builds its image and drives its page in
+  // Chromium against it: a job of its own, in the report's needs, so an
+  // image that no longer builds fails CI before Workers Builds deploys it
+  // from main, where the deploy is not transactional.
+  test('runs the live demo’s gate in a job of its own, with Chromium from the host app, and the report waits for it', () => {
+    const manifest = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'))
+    expect(manifest.scripts['test:live-demo']).toBe('node scripts/live-demo-gate.mjs')
+    const runs = gates.jobs['live-demo'].steps.map((step) => step.run).filter(Boolean)
+    expect(runs).toContain('pnpm --filter @formancy/data-host exec playwright install chromium')
+    expect(runs).toContain('pnpm test:live-demo')
+    expect(runs.indexOf('pnpm test:live-demo')).toBeGreaterThan(runs.findIndex((run) => run.startsWith('pnpm exec turbo run build')))
+    expect(gates.jobs['live-demo']['timeout-minutes']).toBeGreaterThan(0)
+    expect(gates.jobs.report.needs).toContain('live-demo')
   })
 
   // WebKit's networking, EGL and fallback fonts are the runner image's: a

@@ -5,6 +5,7 @@ import { expect } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { getRole, isInaccessible } from 'dom-accessibility-api'
+import type { DemoSession } from './demo.js'
 import { Host } from './host.js'
 import type { Plane } from './test-plane.js'
 import { TOKENS } from './test-plane.js'
@@ -34,12 +35,16 @@ export function servedDocument(): void {
   document.title = served.title
 }
 
-/** The page, mounted where index.html mounts it, in a `#root`, as the studio's suite does and for its reason. */
-export function mount(fetch: typeof globalThis.fetch): User {
+/**
+ * The page, mounted where index.html mounts it, in a `#root`, as the studio's
+ * suite does and for its reason. With `page`, as main.tsx mounts the live
+ * demo's build (0070): its routes under `base`, and its people to sign in as.
+ */
+export function mount(fetch: typeof globalThis.fetch, page: { base?: string; session?: DemoSession } = {}): User {
   servedDocument()
   const root = document.createElement('div')
   root.id = 'root'
-  render(<Host fetch={fetch} />, { container: document.body.appendChild(root) })
+  render(<Host fetch={fetch} {...page} />, { container: document.body.appendChild(root) })
   return userEvent.setup()
 }
 
@@ -49,6 +54,11 @@ const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\
 export async function signIn(user: User, token: string): Promise<void> {
   await user.type(screen.getByLabelText('Host token'), token)
   await user.click(screen.getByRole('button', { name: 'Sign in' }))
+}
+
+/** Sign in to the live demo as the person called `name`, once the page has listed them. Nothing else is waited for. */
+export async function signInAs(user: User, name: string): Promise<void> {
+  await user.click(await screen.findByRole('button', { name: `Sign in as ${name}` }, ARRIVES_WITHIN))
 }
 
 /** A form's link under Forms: named by its title, then its id. */

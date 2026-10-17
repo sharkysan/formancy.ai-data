@@ -1,0 +1,16 @@
+{
+  // The Worker as Cloudflare runs it: src/worker.ts and everything it
+  // imports -- worker/, the personas, the token, the image's contract --
+  // checked against the Workers runtime's types alone, with no Node types,
+  // so a Node API that workerd lacks is a type error here rather than a
+  // Worker that fails on its first request. Checking only: Wrangler bundles
+  // the Worker from source when it deploys.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "noEmit": true,
+    "types": ["@cloudflare/workers-types"]
+  },
+  "include": ["src/worker.ts", "src/worker/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}

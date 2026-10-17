@@ -18,11 +18,13 @@
     "test:pictures": "turbo run test:pictures",
     "test:getting-started": "node scripts/getting-started.mjs",
     "test:cloudflare": "node scripts/cloudflare.mjs",
+    "test:live-demo": "node scripts/live-demo-gate.mjs",
     "pictures": "node scripts/pictures.mjs",
     "typecheck": "turbo run typecheck",
     "check:pkg": "turbo run check:pkg",
     "demo": "pnpm build && pnpm --filter @formancy/data-examples preview",
     "demo:deploy": "pnpm build && node scripts/demo.mjs",
+    "live-demo:deploy": "pnpm build && node scripts/live-demo.mjs",
     "performance": "pnpm build && pnpm --filter @formancy/data-performance run measure && pnpm --filter @formancy/data-performance run render"
   },
   "devDependencies": {

@@ -59,10 +59,15 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > column with an unvalidated check, which a 0.1.0 server reads as NOT NULL
 > though rows older than it may hold NULL
 > ([0077](./docs/decisions/0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md));
-> and, on PostgreSQL, a lookup or a record statement after one stopped
+> on PostgreSQL, a lookup or a record statement after one stopped
 > part-way on its connection answering as it would have, where a 0.1.0
 > server can answer that lookup `unavailable` and refuse that read
-> ([0078](./docs/decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md)),
+> ([0078](./docs/decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md));
+> and the [live demo](#live-demo) at https://formancy.ai/data/demo/,
+> main's server and PostgreSQL in a Cloudflare Container of each visitor's
+> own, which Cloudflare deploys from `main` once its Worker is created and
+> not from a release
+> ([0070](./docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
@@ -71,8 +76,9 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
 > a host page on another origin run in a browser, a run through a real
 > Cloudflare tunnel, anything that reads what Cloudflare sends at the
-> demo's address, which was read by hand once, on 2026-10-16, and a
-> licence a lawyer has reviewed.
+> examples page's address, which was read by hand once, on 2026-10-16,
+> the live demo's Worker, which nobody has created, and so anything read
+> of the demo on Cloudflare, and a licence a lawyer has reviewed.
 > [`CHANGELOG.md`](./CHANGELOG.md) says what the release contains and what
 > each step before it found.
 
@@ -95,6 +101,16 @@ database behind them. Cloudflare deploys it from `main` on every push
 ([the Worker's settings](./.github/REPO-METADATA.md#the-demos-worker-on-cloudflare)),
 and `pnpm demo` runs the same build from a clone
 ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
+
+With nothing installed either, the [live demo](#live-demo) at
+https://formancy.ai/data/demo/ is the product itself: the host page's
+workspace over a data server and a PostgreSQL of your own, started on
+Cloudflare when you sign in as one of the demo's people, with sample sales
+data, and gone with everything you changed when it sleeps. Cloudflare
+deploys it from `main` once its Worker is created
+([the Worker's settings](./.github/REPO-METADATA.md#the-live-demos-worker-on-cloudflare));
+until then the address is formancy.ai's 404
+([0070](./docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
 
 ## What it does
 
@@ -622,6 +638,14 @@ the real server on PostgreSQL, which needs Docker: the workspace in every
 layout down to 320 pixels, the grids' keyboard and colours, the record's
 journey, and a delete's confirmations and answers.
 
+The page has a second build, for the [live demo](#live-demo):
+`pnpm --filter @formancy/data-host build:demo` writes it to
+`apps/host/dist-demo`. It is the same workspace, which asks the path it is
+served from for the demo's people and signs a visitor in as one of them
+where this build asks for a token, and reaches the runtime plane under that
+path through data-client's `base`. This build leaves that branch out
+([0070](./docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
+
 ## Examples
 
 `apps/examples` is a page, never published to npm, that shows a generated
@@ -720,6 +744,95 @@ in-memory source over the captured customers, because this page has no
 server, and the page says so; a host gets the customer options from the
 runtime plane, as the host page above shows.
 
+## Live demo
+
+https://formancy.ai/data/demo/ is the product itself, live: the host page's
+workspace over a data server and a PostgreSQL database of your own, main's,
+started on Cloudflare when you sign in, with sample sales data. Until the
+rightsholder creates its Worker, by the steps in
+[REPO-METADATA.md](./.github/REPO-METADATA.md#creating-the-live-demos-worker),
+the address is formancy.ai's 404
+([0070](./docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
+
+You sign in as one of three people, each sentence the page shows derived
+from what the forms' policies grant:
+- **Clara**, order clerk of tenant 1: reads tenant 1's customers, orders,
+  order lines and deliveries, and nothing of tenant 2's; adds customers;
+  adds, changes and deletes orders and deliveries; adds and changes order
+  lines.
+- **Otto**, the same for tenant 2.
+- **Vera**, auditor of tenant 1: reads, and changes nothing.
+
+Each tenant has 120 customers and 420 orders, with their lines and
+deliveries, generated from a fixed seed and dated back from a fixed day, so
+every build holds the same rows (`apps/live-demo/src/data/`). Search the
+orders and page through them, open
+one with its lines and deliveries in the linked grids, find a customer with
+the typeahead, change an order, add one with a line and delete it again. As
+Otto, tenant 1's orders are not there; as Vera, every write is refused. The
+four forms are what the generator made from the demo account's grants,
+published when the image is built through the real administrator's plane:
+the customer form offers no change or delete and the order line no
+delete, for the reasons the generator's notes give.
+
+**What you meet.**
+- Your first sign-in waits while your server starts: 5.7 to 11.7 s through
+  the Worker at the instance's share of a CPU on a workstation, over four
+  runs on 2026-10-17, and not yet measured on Cloudflare.
+- Everything you change is gone when your server stops, a little over 10
+  minutes after your last request, and on every deploy. Sign in again and the data is as
+  generated.
+- One cookie, `__Secure-formancy-data-demo`, holds a random name for your
+  server and nothing else, and goes when the browser closes. Whoever holds
+  it can sign in to your server: it is the only credential your changes
+  have. Your token stays in the page's memory, as the host page always
+  keeps it, and lasts an hour: a visit longer than that is refused "A
+  valid host token is required." until you sign out and sign in again,
+  which reaches the same server and what you changed while it runs.
+- At most 10 servers run at once, and one visitor can hold them all; when
+  none can start, the sign-in says so.
+- PostgreSQL only. Cloudflare decrypts what you send, and holds what you
+  type in your container until it stops: the data is synthetic, and what
+  you type should be too.
+
+**What it costs the rightsholder.** Cloudflare's Workers Paid plan, and for
+each running server its memory and disk, and its CPU while busy. The cap
+bounds it; 0070 does the sums at the prices read, and names every other
+cost.
+
+**How it runs.** One Worker, `formancy-data-demo`, routed at `/data/demo/`
+of formancy.ai and nowhere else, serves the host page's demo build as static
+files and answers two things itself: the people and a sign-in, at
+`/data/demo/session`, and the runtime plane's routes under
+`/data/demo/v1/forms`, exactly those 0037's runtime door forwards and none
+of the administrator's beside them, which it forwards to your server
+through a Durable Object of yours.
+Only a sign-in from the page starts a server: no link, crawler or form on
+another site does. Each start makes a new key, so a token from before a
+restart is refused. The image, `deploy/demo/Dockerfile`, is PostgreSQL 17
+with the demo's data, and the data server built from the checkout beside
+it, with the runtime plane alone; its disk is the image's on every start.
+The page's Content-Security-Policy is the examples page's with inline
+styles allowed, which AG Grid's theme needs, and nothing else.
+
+Cloudflare's Workers Builds deploys it from `main` on every push, with
+`pnpm build` and `node scripts/live-demo.mjs`, as it deploys the examples
+page; GitHub's workflows hold no Cloudflare token and never deploy. By
+hand, `pnpm live-demo:deploy` deploys from a clean checkout of `main` with
+Docker running, after the Wrangler login
+[RELEASING.md](./RELEASING.md#the-live-demo-on-formancyai) names, and
+`node scripts/live-demo.mjs --dry-run`, after `pnpm build`, checks the
+config and the build and uploads nothing.
+
+`pnpm test:live-demo`, which needs Docker, builds the image and runs the
+Worker's own code in front of it, over a stand-in for Cloudflare's runtime
+whose containers are `docker run`s at the instance's share of a CPU and its
+memory, and walks a visitor's journey over HTTP and then in Chromium; CI
+runs it in a job of its own. `wrangler dev` is not the gate: it runs no
+container on Windows, nor against Docker Desktop's kernel in WSL, so the
+Worker's Durable Object code on Cloudflare is held by review until the
+first deploy is read.
+
 ## Packages
 
 | Package | What it is |
@@ -769,7 +882,11 @@ with the runner's
 behind a locally-managed Cloudflare Tunnel, with Access in front of the
 studio and a second hostname on which nothing but the runtime plane's routes
 reaches the server. Cloudflare is the edge here, not the runtime: nothing of
-the product runs at Cloudflare. The tunnel's configuration is generated from
+a deployment runs at Cloudflare, and the [live demo](#live-demo), whose
+server and PostgreSQL run in a Cloudflare Container of each visitor's own,
+is not a deployment of the product
+([0070](./docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
+The tunnel's configuration is generated from
 the server's own routes and checked against the pinned cloudflared, offline;
 nothing has been run through a real tunnel
 ([0037](./docs/decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)).

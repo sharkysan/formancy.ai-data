@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:demo": "vite build --mode demo --base ./ --outDir dist-demo",
     "typecheck": "tsc --noEmit",
     "test:coverage": "vitest run --coverage",
     "test": "vitest run",
@@ -42,6 +43,7 @@
     "@formancy/conformance": "0.5.0",
     "@formancy/data-core": "workspace:*",
     "@formancy/data-fixtures": "workspace:*",
+    "@formancy/data-live-demo": "workspace:*",
     "@formancy/data-server": "workspace:*",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",

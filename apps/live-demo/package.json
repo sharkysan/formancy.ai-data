@@ -1,0 +1,38 @@
+{
+  "name": "@formancy/data-live-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The live master-detail demo's own code: the sample sales data its database is loaded with, generated from a fixed seed; the personas a visitor signs in as and the tokens signed for them; the forms its image publishes at build time; and the Worker that starts each visitor's own server on Cloudflare and forwards the page's requests to it. Never published.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "type": "module",
+  "exports": {
+    "./worker": {
+      "types": "./dist/worker/pure.d.mts",
+      "import": "./dist/worker/pure.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "test:coverage": "vitest run --coverage",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json"
+  },
+  "dependencies": {
+    "@formancy/data-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261001.1",
+    "@formancy/data-fixtures": "workspace:*",
+    "@formancy/data-server": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "postgres": "^3.4.9",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "unrun": "^0.3.1",
+    "vitest": "catalog:"
+  }
+}

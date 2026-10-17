@@ -82,6 +82,10 @@ component_management:
       name: apps/host
       paths:
         - apps/host/**
+    - component_id: app-live-demo
+      name: apps/live-demo
+      paths:
+        - apps/live-demo/**
     - component_id: app-studio
       name: apps/studio
       paths:

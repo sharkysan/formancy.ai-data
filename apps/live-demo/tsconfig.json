@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  // The Worker's entry imports `cloudflare:workers`, which only the Workers
+  // runtime's types declare: tsconfig.worker.json checks it, and with it
+  // every file it imports, against those types and without Node's.
+  "exclude": ["src/worker.ts"]
+}

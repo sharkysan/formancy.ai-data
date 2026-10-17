@@ -133,7 +133,7 @@ jobs:
       # Every suite reports, rather than the first failure cancelling the rest.
       fail-fast: false
       matrix:
-        package: ['@formancy/data-core', '@formancy/data-fixtures', '@formancy/data-postgres', '@formancy/data-sqlserver', '@formancy/data-server', '@formancy/data-client', '@formancy/data-performance', '@formancy/data-examples', '@formancy/data-studio', '@formancy/data-host']
+        package: ['@formancy/data-core', '@formancy/data-fixtures', '@formancy/data-postgres', '@formancy/data-sqlserver', '@formancy/data-server', '@formancy/data-client', '@formancy/data-performance', '@formancy/data-examples', '@formancy/data-studio', '@formancy/data-host', '@formancy/data-live-demo']
     steps:
       - uses: actions/checkout@v4
 
@@ -1153,6 +1153,77 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
+  # The live demo at formancy.ai/data/demo/ (0070), end to end on this
+  # runner: `pnpm test:live-demo` builds the host page's demo build and
+  # deploy/demo/Dockerfile's image, and runs the Worker's own module in
+  # front of it, over a stand-in for Cloudflare's runtime whose containers
+  # are `docker run`s of the image at the share of the instance type the
+  # Worker's config asks for. It walks a visitor's journey over HTTP and in
+  # Chromium: the session, each persona's menu, paging, a search, a
+  # typeahead, writes and refusals, a second visitor's own data, the reset,
+  # and the page under its headers with no policy violation and axe clean.
+  # The deploy is not transactional and Workers Builds does not wait for
+  # CI, so an image that no longer builds would first fail on Cloudflare,
+  # after the new Worker was live. No Cloudflare account is reached:
+  # nothing here can.
+  #
+  # The limit is the container job's. On the Windows workstation on
+  # 2026-10-17 the whole gate took 125 s with the image's install cached,
+  # and the image's build alone 314 s with it not; it has not been measured
+  # on CI, and three green runs give a slowest time to triple, as the report
+  # job's comment says of its own.
+  live-demo:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      # The Chromium leg's cache, by the same key.
+      - name: Cache the chromium download
+        uses: actions/cache@v4
+        if: inputs.release == ''
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - run: pnpm --filter @formancy/data-host exec playwright install chromium
+        timeout-minutes: 5
+
+      # The Worker's module and its pure parts, and everything the host
+      # page's demo build imports.
+      - run: pnpm exec turbo run build --filter=@formancy/data-live-demo... --filter=@formancy/data-host...
+
+      - run: pnpm test:live-demo
+
+      - name: Keep what this job found, for the report
+        id: collect
+        if: ${{ !cancelled() }}
+        run: node scripts/release-report/collect.mjs --job live-demo
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: release-results-${{ steps.collect.outputs.key }}
+          path: release-results/
+          if-no-files-found: error
+          overwrite: true
+
   # The release report (0035), built from what every job above found: what
   # this run was tested on, every package's results, every shared case on
   # every image of both engines' matrix (0067), the build identity of what a
@@ -1171,7 +1242,7 @@ jobs:
   # triple (0035 says so). The checkout keeps the whole history, for a
   # document's last change when a gate's evidence is a document.
   report:
-    needs: [verify, test, test-images, browser, pictures, install, container, getting-started, cloudflare]
+    needs: [verify, test, test-images, browser, pictures, install, container, getting-started, cloudflare, live-demo]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15

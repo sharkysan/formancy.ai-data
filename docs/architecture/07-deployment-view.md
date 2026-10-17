@@ -2,9 +2,11 @@
 
 The product is one server process beside the operator's databases. This
 section is how that process is built, what stands in front of it, and how it
-is configured. Two other things are deployed from this repository and are not
-the product: the composed stack, an evaluation install on one machine, and
-the examples page on formancy.ai, which has no server at all.
+is configured. Three other things are deployed from this repository and are
+not the product: the composed stack, an evaluation install on one machine;
+the examples page on formancy.ai, which has no server at all; and the live
+demo on formancy.ai, which runs the server for each visitor and is not a
+deployment of it.
 
 ## What is built, and what is released
 
@@ -15,6 +17,7 @@ the examples page on formancy.ai, which has no server at all.
 | The npm packages | `release.yml` | with provenance, each tarball with `LICENSE.md` and `NOTICE` | `scripts/verify-licenses.mjs`; the release's `check` job |
 | The Cloudflare overlay, `deploy/cloudflare/` | Compose on the operator's machine | never; in no package and no image | `pnpm test:cloudflare` |
 | The examples page, `apps/examples` | Workers Builds, from `main` | served at formancy.ai/data/examples/ | `scripts/demo.test.mjs`; `scripts/demo.mjs` refuses before it deploys |
+| The live demo: the Worker of `apps/live-demo`, the image of `deploy/demo/Dockerfile` and the host page's demo build | Workers Builds, from `main`; the image also by the `live-demo` job on every pull request | served at formancy.ai/data/demo/, the image pushed to the Cloudflare account's registry | `scripts/live-demo.test.mjs`; `pnpm test:live-demo`; `scripts/live-demo.mjs` refuses before it deploys |
 
 **The server image** has two stages on Node's alpine image. The build stage
 installs the server's workspace dependencies against the lockfile with
@@ -261,7 +264,9 @@ policy, who holds Tunnel edit permission, the zone's settings, a private
 network route added after setup looked once. Cloudflare decrypts everything
 at its edge, host tokens included, and anybody with Tunnel edit permission
 can stream the tunnel's log at debug level. Running the product on
-Cloudflare's Containers is left by 0037 to a later record.
+Cloudflare's Containers is left by 0037 to a later record; the live demo,
+below, runs the server there for itself alone, which is not a deployment
+of the product.
 
 ## The examples page on formancy.ai
 
@@ -294,6 +299,79 @@ Worker's build settings live in Cloudflare's dashboard, where nothing reads
 them, and what the address sends was read by hand once, on 2026-10-16. No
 workflow here deploys the demo or holds a Cloudflare token, which
 `scripts/demo.test.mjs` checks.
+
+## The live demo on formancy.ai
+
+https://formancy.ai/data/demo/ runs the product's own server and a
+PostgreSQL for each visitor, in a Cloudflare Container of their own, behind
+a Worker, `formancy-data-demo`, and a Durable Object per visitor
+([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
+It narrows 0037 for this demo alone: it is not a deployment of the product
+-- no durable store, no write ids that outlive a container, no
+administrator's plane, PostgreSQL alone -- and every change a visitor makes
+is meant to go when their container sleeps.
+
+```
+ browser ─TLS─▶ Cloudflare's edge
+                    │ /data/demo/ and its files: static assets, no code runs
+                    │ /data/demo/session and /data/demo/v1/…: the Worker
+                    ▼
+                Worker              one cookie, a random name, picks the
+                formancy-data-demo  visitor's Durable Object; forwards the
+                    │               runtime plane alone, with an allowlist
+                    ▼               of headers
+                DemoServer          starts the container only on a sign-in,
+                (Durable Object)    with a key of its own; signs the tokens
+                    │
+                    ▼
+                container, basic    the data server, runtime plane only,
+                                    and PostgreSQL on 127.0.0.1, its disk
+                                    the image's on every start
+```
+
+`apps/live-demo/wrangler.json` routes the Worker at `formancy.ai/data/demo/*`
+and the path without its slash, runs it before the files only for the
+session and the runtime plane, attaches one container of
+`deploy/demo/Dockerfile` at the `basic` instance type with at most ten
+running at once, and turns observability off. A sign-in from the page
+starts a container if the visitor's is not running; a request to the
+runtime plane for a container that is not running is the Worker's 503,
+`unavailable`, which data-client reads as nothing saved. The container
+stops ten minutes after its Durable Object is inactive, and with it the
+visitor's data, key and write ids.
+
+The image is built from the repository root, so it is main's code: on
+`postgres:17-alpine` with the server image's Node, `deploy/demo/build.sh`
+loads the fixture's schema and the demo's generated rows, and publishes
+the four forms through the real administrator's plane under a build-only
+key; `deploy/demo/start.sh` gives the demo's account a new password and
+runs the server with the runtime plane alone, its lookup deadline the
+default over the instance's quarter of a CPU.
+
+Workers Builds deploys it from `main` on every push, with `pnpm build` and
+`node scripts/live-demo.mjs`, which together are `pnpm live-demo:deploy`.
+`scripts/live-demo.mjs` refuses a checkout with changes, a config that is
+not exactly the demo's, Docker not answering, and a host page demo build
+that fails the examples page's checks under the live policy,
+`scripts/live-demo-headers.mjs`: the examples page's, with `'unsafe-inline'`
+added to `style-src` for AG Grid's style elements and nothing else. It
+deploys with `--containers-rollout=immediate`, so every running demo
+restarts with a new image. `scripts/live-demo.test.mjs` holds the config,
+the refusals and the headers; `pnpm test:live-demo`
+(`scripts/live-demo-gate.mjs`), in the `live-demo` job, builds the image
+and runs the Worker's own module in front of it over a stand-in for
+Cloudflare's runtime (`scripts/live-demo-gate/cloudflare.mjs`), and walks a
+visitor's journey over HTTP and in Chromium.
+
+**What it costs.** The Workers Paid plan, and money for each container
+while it runs, bounded by the cap; anybody can start one, and one visitor
+can take every place. A first sign-in waits for a start, measured only
+under Docker quotas on a workstation. Cloudflare runs code on formancy.ai's
+zone and decrypts and holds what a visitor types. The Durable Object's
+code is held by review, since `wrangler dev` runs no container here, and
+what the cap answers and how long a container outlives its visitor are
+read by hand after the first deploy; until the Worker is created, the
+address is formancy.ai's 404. 0070 does the sums and names the rest.
 
 ## Configuration
 

@@ -340,9 +340,11 @@ user interface is the rule, and this is what each part of it rests on.
   ([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 - **One shell for every page of the site**
   ([formancy.ai 0106](https://github.com/sharkysan/formancy.ai/blob/main/docs/decisions/0106-one-shell-for-every-page-of-the-site.md))
-  has nothing to hold yet: `formancy.ai/data` is not a page, and the
+  has nothing to hold yet: `formancy.ai/data` is not a page, the
   examples page is an app with a masthead of its own
-  ([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
+  ([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)),
+  and the live demo is the host page with its own header
+  ([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
 
 **What it costs.** WebKit here is Playwright's Linux port, not Safari;
 nothing runs on a phone; a Playwright release can turn a leg red (0058).
@@ -370,7 +372,8 @@ name and version, with the full text of every licence and notice file it
 ships. A package with no licence text, a module from outside node_modules
 and this repository, and a worker each stop the build. The examples page's
 deploy refuses a build without the file
-([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
+([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)),
+and so does the live demo's, of the host page's demo build (0070).
 **Held by** `scripts/third-party-notices.test.mjs`, in real Vite builds,
 which fails the day Vite reports what the plugin is known to miss: what Vite
 folds in as text, and the bundler's own helpers.
