@@ -1,9 +1,10 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { getCACertificates, setDefaultCACertificates } from 'node:tls'
 import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
 import type { FieldBinding, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
-import { SQLSERVER_IMAGE, startSqlServerFixture } from '@formancy/data-fixtures'
+import { startSqlServerFixture } from '@formancy/data-fixtures'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
 import type { FormSchema } from '@formancy/spec'
 import type { FastifyInstance } from 'fastify'
@@ -12,7 +13,7 @@ import { createDataServer } from '../app.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionConfig, ConnectionRegistry } from '../connections.js'
-import { createConnectionRegistry } from '../connections.js'
+import { createConnectionRegistry, parseConnections } from '../connections.js'
 import { DRIVER_FACTORIES } from '../drivers.js'
 import type { IdentityVerifier } from '../identity.js'
 
@@ -21,21 +22,21 @@ import type { IdentityVerifier } from '../identity.js'
  * real routes, the real driver and a real SQL Server (0074): what the
  * connection test, an opened form, a record read and a lookup answer when
  * the login fails, and that nothing of the principal -- its secret, its
- * tenant, its client, or the path its secret is read from -- reaches the
- * server's log, an answer or an audit event.
+ * tenant, its client, or the path a resolved secret is read from --
+ * reaches the server's log, an answer or an audit event.
  *
- * The server is SQL Server 2022 on Linux, the default image, named here as
- * every start of this suite names it. It takes no Entra login and refuses
- * one at once (measured: data-sqlserver's adapter.integration.test.ts), so
- * every login here fails, and that is all this shows: no test of this
- * release logs in as an Entra principal. A form is published over each
- * connection while it is still a SQL login, and the server that serves it
- * then has the same connections as Entra principals.
+ * An Entra login logs in over TDS 8.0 alone, and of the matrix only SQL
+ * Server 2025 takes it, with a certificate configured (measured:
+ * data-sqlserver's entra.integration.test.ts). So the server here is 2025,
+ * named for that fact, started with a certificate for `localhost` that this
+ * process trusts. It takes no Entra login and refuses one at once, so every
+ * login here fails, and that is all this shows: no test of this release
+ * logs in as an Entra principal. A form is published over each connection
+ * while it is still a SQL login, and the server that serves it then has the
+ * same connections as Entra principals.
  *
- * The Entra connections are built as ConnectionConfig directly, as
- * createConnectionRegistry takes them, and not through parseConnections:
- * an operator's Entra entry refuses `trustServerCertificate`, and the
- * container's certificate is self-signed. TLS is on, as the adapter
+ * The Entra connections are an operator's entries, through
+ * parseConnections: TLS on and the certificate checked, as the allowlist
  * requires. The leak check is scripts/getting-started/stack.mjs's
  * `leaks()`, written again here over this suite's own capture, since no
  * package's test imports scripts/.
@@ -51,6 +52,10 @@ const TENANT = '7c1f6a2e-3b4d-4e5f-9a8b-0c1d2e3f4a5b'
 const CLIENT = '0f9e8d7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f'
 const SECRET = 'Zq8~entra-client-secret-value-e81'
 const SECRET_PATH = '/run/secrets/erp-client-secret'
+/** A secret file that is not there: an operator's mount that went missing. */
+const UNMOUNTED_PATH = '/run/secrets/erp-unmounted-client-secret'
+/** The image this file names for a fact of its own: the one of the matrix that takes TDS 8.0. */
+const SQLSERVER_2025_IMAGE = 'mcr.microsoft.com/mssql/server:2025-latest'
 /** The adapter's sentence for a login the server refused (data-sqlserver's entra.ts). */
 const REFUSED = 'The SQL Server login as an Entra principal failed: the server refused it.'
 const UNREACHABLE = { code: 'unavailable', message: 'The database cannot be reached. Nothing was saved.' }
@@ -67,6 +72,8 @@ const CONNECTIONS: ReadonlyArray<{ id: string; login: NonNullable<ConnectionConf
   { id: 'erp-mi', login: { type: 'entra-managed-identity', client: CLIENT } },
 ]
 
+/** The process's trusted certificates before this file added the container's. */
+const trusted = getCACertificates('default')
 let ms: SqlServerFixture
 let root: string
 let store: ConfigurationStore
@@ -123,23 +130,24 @@ async function publishAsSqlLogin(): Promise<void> {
 }
 
 beforeAll(async () => {
-  ms = await startSqlServerFixture(SQLSERVER_IMAGE)
+  ms = await startSqlServerFixture(SQLSERVER_2025_IMAGE, { certificate: true })
+  if (ms.certificate === undefined) throw new Error('the container was started without its certificate')
+  setDefaultCACertificates([...trusted, ms.certificate])
   root = await mkdtemp(join(tmpdir(), 'formancy-data-entra-'))
   store = createFileConfigurationStore(root)
   await publishAsSqlLogin()
 
-  const address = { kind: 'sqlserver' as const, host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), schemas: ['sales'], tls: { enabled: true, trustServerCertificate: true } }
-  registry = createConnectionRegistry(
-    CONNECTIONS.map(({ id, login }) => ({ id, ...address, login })),
-    DRIVER_FACTORIES,
-    {
-      env: {},
-      readFile: async (path) => {
-        if (path !== SECRET_PATH) throw new Error('no such file')
-        return `${SECRET}\n`
-      },
+  const address = { kind: 'sqlserver', host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), schemas: ['sales'] }
+  const unmounted = { id: 'erp-unmounted', ...address, login: { type: 'entra-service-principal', tenant: TENANT, client: CLIENT, secret: `file:${UNMOUNTED_PATH}` } }
+  const parsed = parseConnections([...CONNECTIONS.map(({ id, login }) => ({ id, ...address, login })), unmounted])
+  if (!parsed.ok) throw new Error(parsed.problems.join('\n'))
+  registry = createConnectionRegistry(parsed.connections, DRIVER_FACTORIES, {
+    env: {},
+    readFile: async (path) => {
+      if (path !== SECRET_PATH) throw new Error('no such file')
+      return `${SECRET}\n`
     },
-  )
+  })
   const sink = (event: unknown) => {
     audited.push(JSON.stringify(event))
   }
@@ -152,6 +160,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  setDefaultCACertificates(trusted)
   await app?.close()
   await registry?.close()
   await ms?.stop()
@@ -203,9 +212,29 @@ describe.each(CONNECTIONS)('a connection that logs in as an Entra principal, $id
   })
 })
 
+// A service principal whose secret file cannot be read -- a mount that
+// went missing -- is refused where the connection is opened, as a SQL
+// login's password is (secrets.ts): the answer is the fixed 503, and the
+// log line names the file, which is what the operator has to fix, and
+// nothing else of the principal. The file's path is the allowlist's, never
+// the secret. Watched failing with resolveSecret's sentence naming no file.
+test('a secret file that cannot be read is named in the log, and in no answer or audit event', async () => {
+  expect(await ask('POST', '/v1/connections/erp-unmounted/test', 'admin')).toEqual({ status: 503, json: { code: 'unavailable', message: 'Connection erp-unmounted cannot be reached.' } })
+  const opened = written.map((line) => JSON.parse(line) as { msg?: string; connection?: string; error?: string }).filter((line) => line.msg === 'connection could not be opened' && line.connection === 'erp-unmounted')
+  expect(opened.map((line) => line.error)).toEqual([`the secret file ${UNMOUNTED_PATH} cannot be read`])
+  const found = leaks(
+    [["unread secret's path", UNMOUNTED_PATH]],
+    [
+      { where: 'an answer', text: answered.join('\n') },
+      { where: 'an audit event', text: audited.join('\n') },
+    ],
+  )
+  expect(found).toEqual([])
+})
+
 // After every request above: the principal's secret, tenant, client and
 // the path its secret is read from are nowhere in the server's log, in an
-// answer or in an audit event, for either login.
+// answer or in an audit event, for either login whose secret resolved.
 test('nothing of a principal reaches the log, an answer or an audit event', () => {
   expect(written.length).toBeGreaterThan(0)
   expect(audited.length).toBeGreaterThan(0)

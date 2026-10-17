@@ -59,6 +59,8 @@ export interface SqlServerFixture {
   server: ServerRecord
   /** The container's id, as for PostgreSQL. */
   containerId: string
+  /** The certificate the server presents, PEM, when the fixture was started with one (`SqlServerStart`). */
+  certificate: string | undefined
   stop(): Promise<void>
 }
 
@@ -212,16 +214,56 @@ async function askSqlServer(config: mssql.config): Promise<ServerAnswer> {
   }
 }
 
+/** How a SQL Server container is started, beyond its image. */
+export interface SqlServerStart {
+  /**
+   * The server presents a certificate made for it as the container starts,
+   * for `localhost` and 127.0.0.1, rather than SQL Server's self-signed
+   * fallback, and the certificate is answered, PEM, for the client to
+   * trust. A connection that opens with TLS (TDS 8.0, `encrypt: 'strict'`)
+   * needs one: without it SQL Server 2025 resets such a connection, and
+   * SQL Server 2019 and 2022 on Linux reset it either way (measured
+   * 2026-10-17, data-sqlserver's entra.integration.test.ts).
+   */
+  certificate?: boolean
+}
+
+/** Where a container started with a certificate keeps it, and its key: the server's own directory, which its user owns. */
+const CERTIFICATE_FILE = '/var/opt/mssql/formancy-tls.pem'
+const CERTIFICATE_KEY_FILE = '/var/opt/mssql/formancy-tls.key'
+
 /**
- * A SQL Server container, accepting logins, and what its server said about
- * itself: recorded by whoever started it, who knows what it loaded. Accepting
- * the EULA is the operator's act; in a test it is this call, the decision
+ * The command such a container starts with, in place of the image's: the
+ * image's own openssl makes a key and a certificate valid for a day, which
+ * outlives any run, mssql.conf names them, and the server starts as the
+ * image would start it. The images' entrypoints run the command they are
+ * given (permissions_check.sh's `exec "$@"`).
+ */
+const WITH_CERTIFICATE = [
+  '/bin/bash',
+  '-c',
+  [
+    `openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost -addext subjectAltName=DNS:localhost,IP:127.0.0.1 -keyout ${CERTIFICATE_KEY_FILE} -out ${CERTIFICATE_FILE}`,
+    `printf '[network]\\ntlscert = ${CERTIFICATE_FILE}\\ntlskey = ${CERTIFICATE_KEY_FILE}\\n' > /var/opt/mssql/mssql.conf`,
+    'exec /opt/mssql/bin/sqlservr',
+  ].join(' && '),
+]
+
+/**
+ * A SQL Server container, accepting logins, what its server said about
+ * itself, and the certificate it presents when it was started with one:
+ * recorded by whoever started it, who knows what it loaded. Accepting the
+ * EULA is the operator's act; in a test it is this call, the decision
  * compose.yaml makes a developer spell out.
  */
-async function launchSqlServer(image: string): Promise<{ container: StartedMSSQLServerContainer; answer: ServerAnswer }> {
-  const container = await new MSSQLServerContainer(image).acceptLicense().start()
+async function launchSqlServer(image: string, start: SqlServerStart): Promise<{ container: StartedMSSQLServerContainer; answer: ServerAnswer; certificate: string | undefined }> {
+  const container = await (start.certificate === true ? new MSSQLServerContainer(image).withCommand(WITH_CERTIFICATE) : new MSSQLServerContainer(image)).acceptLicense().start()
   try {
-    return { container, answer: await askSqlServer(ownerOf(container, 'master')) }
+    const answer = await askSqlServer(ownerOf(container, 'master'))
+    if (start.certificate !== true) return { container, answer, certificate: undefined }
+    const read = await container.exec(['cat', CERTIFICATE_FILE])
+    if (read.exitCode !== 0 || !read.stdout.includes('BEGIN CERTIFICATE')) throw new Error(`the container's certificate could not be read: ${read.stderr}`)
+    return { container, answer, certificate: read.stdout }
   } catch (error) {
     await container.stop()
     throw error
@@ -231,13 +273,17 @@ async function launchSqlServer(image: string): Promise<{ container: StartedMSSQL
 /**
  * A SQL Server container, empty, accepting logins, and a record of the
  * server that answered in it (0035), as `startPostgresContainer`. It loads
- * no database, so its record names no compatibility level.
+ * no database, so its record names no compatibility level. Started with a
+ * certificate, it answers the certificate too.
  */
-export async function startSqlServerContainer(image: string = selectedImage('sqlserver')): Promise<StartedServer<StartedMSSQLServerContainer>> {
+export async function startSqlServerContainer(
+  image: string = selectedImage('sqlserver'),
+  start: SqlServerStart = {},
+): Promise<StartedServer<StartedMSSQLServerContainer> & { certificate: string | undefined }> {
   // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
   const caller = captureCaller()
-  const { container, answer } = await launchSqlServer(image)
-  return { container, server: recordServer({ engine: 'sqlserver', image, caller, compatibility: null, ...answer }) }
+  const { container, answer, certificate } = await launchSqlServer(image, start)
+  return { container, server: recordServer({ engine: 'sqlserver', image, caller, compatibility: null, ...answer }), certificate }
 }
 
 /**
@@ -277,12 +323,13 @@ async function loadSqlServerFixture(owner: mssql.config): Promise<number> {
  * A SQL Server container with the fixture loaded into its own database, the
  * restricted principals created, and the parity schema (0028) beside it, on
  * `image`, as `startPostgresFixture`. Its record names the compatibility
- * level of the database the fixture was loaded into.
+ * level of the database the fixture was loaded into. Started with a
+ * certificate, it answers the certificate too.
  */
-export async function startSqlServerFixture(image: string = selectedImage('sqlserver')): Promise<SqlServerFixture> {
+export async function startSqlServerFixture(image: string = selectedImage('sqlserver'), start: SqlServerStart = {}): Promise<SqlServerFixture> {
   // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
   const caller = captureCaller()
-  const { container, answer } = await launchSqlServer(image)
+  const { container, answer, certificate } = await launchSqlServer(image, start)
   const owner = ownerOf(container, 'master')
   const base = { server: owner.server, port: owner.port, options: owner.options }
 
@@ -304,6 +351,7 @@ export async function startSqlServerFixture(image: string = selectedImage('sqlse
     owner: { user: 'dbo', login: String(owner.user) },
     server,
     containerId: container.getId(),
+    certificate,
     stop: async () => {
       await container.stop()
     },

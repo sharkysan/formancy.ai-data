@@ -1,15 +1,17 @@
+import { createServer } from 'node:net'
+import type { AddressInfo } from 'node:net'
 import { inspect } from 'node:util'
 import { AuthenticationError } from '@azure/identity'
 import type { AccessToken, GetTokenOptions, TokenCredential } from '@azure/identity'
 import mssql from 'mssql'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { connectSqlServer } from './connect.js'
-import { AZURE_SQL_SCOPE, ENTRA_NO_TOKEN, ENTRA_REFUSED, ENTRA_SCOPE_REFUSED, ENTRA_UNENCRYPTED, entraCredential, entraLoginFailure, scopedToAzureSql } from './entra.js'
+import { connectSqlServer, sqlServerConfig } from './connect.js'
+import { AZURE_SQL_SCOPE, ENTRA_NO_TOKEN, ENTRA_REFUSED, ENTRA_SCOPE_REFUSED, ENTRA_UNCHECKED, ENTRA_UNENCRYPTED, entraCredential, entraLoginFailure, scopedToAzureSql } from './entra.js'
 
 /*
  * An Entra login's credential and its failures, without a server and
  * without Entra (0074). No container sends the FEDAUTHINFO token that makes
- * tedious ask for a token (measured on 2022: adapter.integration.test.ts),
+ * tedious ask for a token (entra.integration.test.ts, on 2025 over TDS 8.0),
  * and no test asks Entra, so the token's path is reached here alone.
  *
  * @azure/identity's two classes are wrapped, not replaced: each records what
@@ -90,14 +92,15 @@ afterEach(() => {
 })
 
 describe('entraCredential', () => {
-  // The allowlist's tenant, client and secret are the principal, and the
+  // The login's tenant, client and secret are the principal, and the
   // public cloud's host its authority, written down: left out, the class
   // reads AZURE_AUTHORITY_HOST, so a variable set on the host for another
   // program would send this secret to another authority. The environment
   // here names another principal and another authority, and changes
-  // nothing. Watched failing with the authority left out, and with the
-  // tenant and client swapped.
-  test('builds a service principal as a ClientSecretCredential of the allowlist’s ids at the public cloud, whatever the environment names', () => {
+  // nothing. How the allowlist's entry becomes this login is the server's
+  // (drivers.test.ts). Watched failing with the authority left out, and
+  // with the tenant and client swapped.
+  test('builds a service principal as a ClientSecretCredential of the login’s ids at the public cloud, whatever the environment names', () => {
     vi.stubEnv('AZURE_TENANT_ID', '11111111-1111-4111-8111-111111111111')
     vi.stubEnv('AZURE_CLIENT_ID', '22222222-2222-4222-8222-222222222222')
     vi.stubEnv('AZURE_CLIENT_SECRET', 'an-environment-secret')
@@ -225,7 +228,24 @@ describe('entraLoginFailure', () => {
   })
 })
 
+/** A TCP listener that answers nothing: it keeps the first bytes each connection sends, and closes it. */
+async function firstBytes(): Promise<{ port: number; seen: Buffer[]; close: () => Promise<void> }> {
+  const seen: Buffer[] = []
+  const server = createServer((socket) => {
+    socket.on('error', () => {})
+    socket.once('data', (chunk: Buffer) => {
+      seen.push(chunk)
+      socket.destroy()
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const { port } = server.address() as AddressInfo
+  return { port, seen, close: () => new Promise<void>((resolve) => server.close(() => resolve())) }
+}
+
 describe('connectSqlServer, for an Entra principal', () => {
+  const NOWHERE = { host: '127.0.0.1', port: 1, database: 'erp' } as const
+
   // Without encrypt, tedious offers the server no TLS at all
   // (prelogin-payload.js: ENCRYPT.NOT_SUP), and the token, a bearer token
   // for every database the principal reaches, would cross the network in
@@ -233,8 +253,76 @@ describe('connectSqlServer, for an Entra principal', () => {
   // otherwise be refused by the operating system, which is a different
   // sentence. Watched failing with the check removed.
   test('refuses to log in without TLS, before it connects', async () => {
-    await expect(
-      connectSqlServer({ host: '127.0.0.1', port: 1, database: 'erp', encrypt: false, trustServerCertificate: false, entra: { type: 'managed-identity' } }),
-    ).rejects.toThrow(ENTRA_UNENCRYPTED)
+    await expect(connectSqlServer({ ...NOWHERE, encrypt: false, trustServerCertificate: false, entra: { type: 'managed-identity' } })).rejects.toThrow(ENTRA_UNENCRYPTED)
+  })
+
+  // A trusted certificate is a token handed to whichever server answered.
+  // Under TDS 8.0 tedious checks the certificate whatever it is told
+  // (connection.js, wrapWithTls passes no rejectUnauthorized), so this is
+  // the adapter saying so rather than an embedder's setting ignored in
+  // silence. Watched failing with the check removed: the operating
+  // system's refusal of port 1 came back instead.
+  test('refuses to log in with the server’s certificate trusted, before it connects', async () => {
+    await expect(connectSqlServer({ ...NOWHERE, encrypt: true, trustServerCertificate: true, entra: { type: 'managed-identity' } })).rejects.toThrow(ENTRA_UNCHECKED)
+  })
+
+  // `encrypt: true` is TDS 7's: TLS is started only if the server's
+  // PRELOGIN answer asks for it (connection.js, performTlsNegotiation), so
+  // an on-path attacker who answers ENCRYPT_NOT_SUP receives the LOGIN7
+  // and then the token in the clear -- shown by review on 2026-10-17 with
+  // the guard and Azure SQL's SPN. `'strict'` is TDS 8.0: TLS before the
+  // first TDS message, the certificate checked, nothing to negotiate
+  // down. Watched failing before 0074 took strict: the pool was given
+  // `true`.
+  test('opens every connection of the pool over TDS 8.0, the certificate checked', () => {
+    for (const entra of [{ type: 'managed-identity' } as const, SERVICE_PRINCIPAL]) {
+      const { options } = sqlServerConfig({ ...NOWHERE, encrypt: true, trustServerCertificate: false, entra })
+      expect(options).toEqual({ encrypt: 'strict', trustServerCertificate: false })
+    }
+  })
+
+  // A pool whose open failed is forgotten, and the next request opens
+  // another (the server's registry, 0019). Were each pool given a new
+  // credential, each would start with an empty token cache: a principal
+  // the server refuses after its token -- no contained user, the commonest
+  // first-run mistake -- would cost a request to Entra, or to the host's
+  // identity endpoint, on every request the server answers. The same
+  // login object is the same credential, its cache included; another
+  // object, which the composition root makes when a secret changes, is
+  // another. Watched failing with the credential built for each pool
+  // (two constructed for one object).
+  test('opens a pool again with the credential the last one had, for the same login, and a new one for another', async () => {
+    const login = { type: 'managed-identity', clientId: CLIENT } as const
+    const open = (entra: typeof login) => connectSqlServer({ ...NOWHERE, encrypt: true, trustServerCertificate: false, entra }).then(() => undefined, (rejected: unknown) => rejected)
+    expect(await open(login)).toMatchObject({ code: 'ESOCKET' })
+    expect(await open(login)).toMatchObject({ code: 'ESOCKET' })
+    expect(constructed).toHaveLength(1)
+    const credentialOf = (entra: typeof login) => (sqlServerConfig({ ...NOWHERE, encrypt: true, trustServerCertificate: false, entra }).authentication?.options as { credential: unknown }).credential
+    expect(credentialOf(login)).toBe(credentialOf(login))
+    expect(credentialOf({ ...login })).not.toBe(credentialOf(login))
+    expect(constructed).toHaveLength(2)
+  })
+
+  // The attack itself, on the wire: whatever listens on the server's port
+  // and does not speak TLS -- here a listener that answers nothing -- is
+  // sent a TLS ClientHello (record type 0x16) and never a PRELOGIN (TDS
+  // packet type 0x12), so it has no PRELOGIN to answer ENCRYPT_NOT_SUP to,
+  // and no credential is asked for a token. Watched failing with
+  // `encrypt: true` in sqlServerConfig: the first byte was 0x12.
+  test('sends a TLS ClientHello before any TDS message, and asks for no token', async () => {
+    const { ManagedIdentityCredential } = await vi.importActual<typeof import('@azure/identity')>('@azure/identity')
+    const asked = vi.spyOn(ManagedIdentityCredential.prototype, 'getToken').mockRejectedValue(new Error('not here'))
+    const listener = await firstBytes()
+    try {
+      const error = await connectSqlServer({ host: '127.0.0.1', port: listener.port, database: 'erp', encrypt: true, trustServerCertificate: false, entra: { type: 'managed-identity' } }).then(
+        () => undefined,
+        (rejected: unknown) => rejected,
+      )
+      expect(error).toMatchObject({ code: 'ESOCKET' })
+      expect(listener.seen.map((chunk) => chunk[0])).toEqual([0x16])
+      expect(asked).not.toHaveBeenCalled()
+    } finally {
+      await listener.close()
+    }
   })
 })

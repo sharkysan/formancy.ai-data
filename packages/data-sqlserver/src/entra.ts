@@ -22,6 +22,8 @@ export const ENTRA_SCOPE_REFUSED = `${FAILED} the server asked for a token for a
 export const ENTRA_REFUSED = `${FAILED} the server refused it.`
 /** An Entra login over a connection without TLS, refused before it is opened. */
 export const ENTRA_UNENCRYPTED = 'An Entra login needs TLS to the server: without it the token would cross the network in the clear.'
+/** An Entra login told to trust the server's certificate, refused before it is opened. */
+export const ENTRA_UNCHECKED = "An Entra login checks the server's certificate: trusted, the token would go to whichever server answered."
 
 /**
  * What the guard rejects with when no token comes: a sentence and, at most,
@@ -69,17 +71,21 @@ export function scopedToAzureSql(inner: TokenCredential): TokenCredential {
 }
 
 /**
- * The credential one pool logs in with, built once for the pool, which
- * mssql hands every connection it opens (0074). tedious's own Entra types
- * would build one per login and leave the scope to the server.
+ * The credential a login logs in with, which connect.ts builds once for each
+ * login object and mssql hands every connection of every pool opened with
+ * it (0074). tedious's own Entra types would build one per login and leave
+ * the scope to the server.
  *
- * A service principal's tenant, client and secret are the allowlist's, and
- * its authority is the public cloud's, written here so that the class never
+ * A service principal's tenant, client and secret are the login's, and its
+ * authority is the public cloud's, written here so that the class never
  * reads AZURE_AUTHORITY_HOST. @azure/identity and MSAL still read what they
  * read for every credential: the region (AZURE_REGIONAL_AUTHORITY_NAME,
  * MSAL_FORCE_REGION, REGION_NAME), the log level (AZURE_LOG_LEVEL) and the
  * proxy (HTTPS_PROXY, HTTP_PROXY, NO_PROXY). A managed identity reads its
- * platform's endpoint from the environment, which is how it is found.
+ * platform's endpoint from the environment, which is how it is found, and
+ * with AZURE_TENANT_ID, AZURE_FEDERATED_TOKEN_FILE and a client id set takes
+ * workload identity's token exchange instead, which the server refuses at
+ * start (data-server's connections.ts).
  */
 export function entraCredential(login: EntraLogin): TokenCredential {
   const inner =

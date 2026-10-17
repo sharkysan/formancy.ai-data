@@ -1,9 +1,15 @@
+import type { TokenCredential } from '@azure/identity'
 import mssql from 'mssql'
 import type { ConnectionPool } from 'mssql'
-import { ENTRA_UNENCRYPTED, entraCredential, entraLoginFailure } from './entra.js'
+import { ENTRA_UNCHECKED, ENTRA_UNENCRYPTED, entraCredential, entraLoginFailure } from './entra.js'
 import type { EntraLogin } from './entra.js'
 
-/** Where the server is, and TLS. The composition root decides TLS; there is no default here to forget. */
+/**
+ * Where the server is, and TLS. The composition root decides TLS; there is
+ * no default here to forget. For an Entra principal it can only say yes:
+ * `encrypt` must be true and `trustServerCertificate` false, and the pool is
+ * TDS 8.0 (sqlServerConfig).
+ */
 interface SqlServerAddress {
   host: string
   port: number
@@ -50,22 +56,46 @@ export const SQLSERVER_LOGINS: readonly SqlServerLogin[] = [
 ]
 
 /**
- * What mssql is given for a pool. A SQL login is a user and a password; an
- * Entra principal is one credential, built here once for the pool, which
- * mssql hands every connection the pool opens, and no user or password at
- * all, so nothing can log in as a SQL login in its place. Neither ever sets
- * mssql's `debug` or tedious's `options.debug`: tedious's debug output
- * prints a login's password (login7-payload.js).
+ * The credential each Entra login object logs in with, built the first time
+ * a pool is opened with that object and kept while the object lives. A pool
+ * whose open failed is dropped, and the next one is opened with the same
+ * login, so it gets the same credential and the token cache the credential
+ * keeps: a principal the server refuses after its token costs one token,
+ * not one per attempt. The composition root keeps one object for each
+ * connection, and a new one when its secret changes (0074).
+ */
+const credentials = new WeakMap<EntraLogin, TokenCredential>()
+
+function credentialFor(login: EntraLogin): TokenCredential {
+  let credential = credentials.get(login)
+  if (credential === undefined) {
+    credential = entraCredential(login)
+    credentials.set(login, credential)
+  }
+  return credential
+}
+
+/**
+ * What mssql is given for a pool. A SQL login is a user and a password, over
+ * the TLS the composition root chose. An Entra principal is one credential,
+ * which mssql hands every connection the pool opens, and no user or password
+ * at all, so nothing can log in as a SQL login in its place; and it is
+ * always TDS 8.0, `encrypt: 'strict'`: TLS before the first TDS message,
+ * with the server's certificate checked. `encrypt: true` is TDS 7's, which
+ * starts TLS only when the server's PRELOGIN answer asks for it
+ * (connection.js, performTlsNegotiation), so whoever answered in the
+ * server's place could decline it and be sent the token in the clear
+ * (0074). Neither ever sets mssql's `debug` or tedious's `options.debug`:
+ * tedious's debug output prints a login's password (login7-payload.js).
  */
 export function sqlServerConfig(options: SqlServerConnectOptions): mssql.config {
-  const base = {
-    server: options.host,
-    port: options.port,
-    database: options.database,
-    options: { encrypt: options.encrypt, trustServerCertificate: options.trustServerCertificate },
+  const base = { server: options.host, port: options.port, database: options.database }
+  if (options.entra === undefined) return { ...base, options: { encrypt: options.encrypt, trustServerCertificate: options.trustServerCertificate }, user: options.user, password: options.password }
+  return {
+    ...base,
+    options: { encrypt: 'strict', trustServerCertificate: false },
+    authentication: { type: 'token-credential', options: { credential: credentialFor(options.entra) } },
   }
-  if (options.entra === undefined) return { ...base, user: options.user, password: options.password }
-  return { ...base, authentication: { type: 'token-credential', options: { credential: entraCredential(options.entra) } } }
 }
 
 /**
@@ -80,15 +110,17 @@ export function sqlServerConfig(options: SqlServerConnectOptions): mssql.config 
  * Found by the end-to-end suite; no unit test could see it. Opening the pool
  * here means the pool and the types always come from one copy.
  *
- * An Entra principal is refused without TLS, before anything is opened, and
- * a failed Entra login rejects with a sentence that names no tenant, client
- * or secret (entra.ts). A login that fails later, when the pool opens
- * another connection, reaches whoever asked for the connection as mssql
- * rejects it: the records' adapter answers it `unavailable`.
+ * An Entra principal is refused without TLS or with the server's
+ * certificate trusted, before anything is opened, and a failed Entra login
+ * rejects with a sentence that names no tenant, client or secret
+ * (entra.ts). A login that fails later, when the pool opens another
+ * connection, reaches whoever asked for the connection as mssql rejects
+ * it: the records' adapter answers it `unavailable`.
  */
 export async function connectSqlServer(options: SqlServerConnectOptions): Promise<ConnectionPool> {
   if (options.entra === undefined) return new mssql.ConnectionPool(sqlServerConfig(options)).connect()
   if (!options.encrypt) throw new Error(ENTRA_UNENCRYPTED)
+  if (options.trustServerCertificate) throw new Error(ENTRA_UNCHECKED)
   try {
     return await new mssql.ConnectionPool(sqlServerConfig(options)).connect()
   } catch (error) {

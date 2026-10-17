@@ -4,7 +4,7 @@ import type { DatabaseAdapter, LookupAdapter, RecordAdapter } from '@formancy/da
 import { SQLSERVER_LOGINS } from '@formancy/data-sqlserver'
 import { describe, expect, test } from 'vitest'
 import type { ConnectionConfig, ConnectionFactory, OpenConnection } from './connections.js'
-import { CONNECTION_LOGINS, createConnectionRegistry, parseConnections, untestedLogins } from './connections.js'
+import { CONNECTION_LOGINS, createConnectionRegistry, entraEnvironmentProblems, parseConnections, untestedLogins } from './connections.js'
 
 const ERP: ConnectionConfig = {
   id: 'erp',
@@ -177,6 +177,32 @@ describe('parseConnections, for an Entra principal', () => {
       'No test of this release logs in as an Entra principal; connection erp-sp logs in as one.',
     ])
     for (const value of [TENANT, CLIENT, 'erp-client-secret']) expect(said.join(' ')).not.toContain(value)
+  })
+
+  // @azure/identity 4.13.3's ManagedIdentityCredential does not ask the
+  // host's identity endpoint when AZURE_FEDERATED_TOKEN_FILE,
+  // AZURE_TENANT_ID and a client id are set: it takes AKS workload
+  // identity's token exchange (tokenExchangeMsi.js), as the tenant
+  // AZURE_TENANT_ID names, the client AZURE_CLIENT_ID names when the entry
+  // names none, at the authority AZURE_AUTHORITY_HOST names -- review sent
+  // it to a listener there on 2026-10-17. That is another principal, at
+  // another authority, than the reviewed entry says, and a way in this
+  // release does not take. Refused at start on the token file alone,
+  // naming the variable and never its value; a service principal reads
+  // none of these, and is not refused. Watched failing with the check
+  // made for every Entra entry (the service principal refused), and with
+  // it removed from main.ts (scripts/server-start.test.mjs).
+  test('refuses a managed identity while AZURE_FEDERATED_TOKEN_FILE is set, naming the variable and never its value', () => {
+    const file = '/var/run/secrets/azure/tokens/azure-identity-token'
+    const workload = { AZURE_FEDERATED_TOKEN_FILE: file, AZURE_TENANT_ID: TENANT, AZURE_CLIENT_ID: CLIENT }
+    const problems = entraEnvironmentProblems([ERP, MANAGED, SYSTEM, PRINCIPAL], workload)
+    expect(problems).toEqual([
+      'connection erp-mi logs in as a managed identity, which logs in by workload identity while AZURE_FEDERATED_TOKEN_FILE is set, as the tenant, client and authority the environment names; this release does not take workload identity. Unset it, or log in as a service principal (0074).',
+      'connection erp-system logs in as a managed identity, which logs in by workload identity while AZURE_FEDERATED_TOKEN_FILE is set, as the tenant, client and authority the environment names; this release does not take workload identity. Unset it, or log in as a service principal (0074).',
+    ])
+    for (const value of [file, TENANT, CLIENT]) expect(problems.join(' ')).not.toContain(value)
+    expect(entraEnvironmentProblems([ERP, MANAGED, SYSTEM, PRINCIPAL], { AZURE_TENANT_ID: TENANT, AZURE_CLIENT_ID: CLIENT })).toEqual([])
+    expect(entraEnvironmentProblems([ERP, PRINCIPAL], workload)).toEqual([])
   })
 
   // The login types the allowlist takes are the adapter's, which the

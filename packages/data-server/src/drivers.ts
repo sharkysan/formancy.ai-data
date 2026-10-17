@@ -2,7 +2,7 @@ import type { DatabaseAdapter, DatabaseKind } from '@formancy/data-core'
 import { connectPostgres, createPostgresAdapter, createPostgresLookups, createPostgresRecords } from '@formancy/data-postgres'
 import { connectSqlServer, createSqlServerAdapter, createSqlServerLookups, createSqlServerRecords } from '@formancy/data-sqlserver'
 import type { EntraLogin } from '@formancy/data-sqlserver'
-import type { ConnectionConfig, ConnectionFactory } from './connections.js'
+import type { ConnectionConfig, ConnectionFactory, ConnectionLogin } from './connections.js'
 
 /** TLS unless the operator turned it off, and certificates checked unless the operator trusts the server's. */
 function tls(config: ConnectionConfig): { enabled: boolean; trust: boolean } {
@@ -63,15 +63,27 @@ const openPostgres: ConnectionFactory = async (config, secret) => {
   return { adapter, lookups: createPostgresLookups(lookupSql), records: createPostgresRecords(sql) }
 }
 
+/** The adapter's login for each allowlist login, kept so that a connection opened again is given the same object. */
+const entraLogins = new WeakMap<ConnectionLogin, EntraLogin>()
+
 /**
  * The Entra principal an allowlist login names, for the adapter (0074): a
  * service principal with its resolved client secret, a managed identity by
- * its client id or none.
+ * its client id or none. One object for each allowlist login while its
+ * secret is the same: the adapter keeps a credential, and its token cache,
+ * for each login object, and the registry opens a connection again after a
+ * failed open with its secret resolved again. A secret that changed is a
+ * new object, so the corrected or rotated secret is the one logged in with.
  */
-function entraLogin(login: NonNullable<ConnectionConfig['login']>, secret: string | undefined): EntraLogin {
-  if (login.type === 'entra-managed-identity') return login.client === undefined ? { type: 'managed-identity' } : { type: 'managed-identity', clientId: login.client }
-  if (secret === undefined) throw new Error('a service principal logs in with its client secret, and none was resolved')
-  return { type: 'service-principal', tenantId: login.tenant, clientId: login.client, clientSecret: secret }
+export function entraLogin(login: ConnectionLogin, secret: string | undefined): EntraLogin {
+  const kept = entraLogins.get(login)
+  if (kept !== undefined && (kept.type === 'managed-identity' || kept.clientSecret === secret)) return kept
+  let made: EntraLogin
+  if (login.type === 'entra-managed-identity') made = login.client === undefined ? { type: 'managed-identity' } : { type: 'managed-identity', clientId: login.client }
+  else if (secret === undefined) throw new Error('a service principal logs in with its client secret, and none was resolved')
+  else made = { type: 'service-principal', tenantId: login.tenant, clientId: login.client, clientSecret: secret }
+  entraLogins.set(login, made)
+  return made
 }
 
 /** SQL Server: no native module, no ODBC. A SQL login, or an Entra principal, which no test of this release logs in as (0074). */

@@ -189,6 +189,30 @@ export function untestedLogins(connections: readonly ConnectionConfig[]): string
   return connections.filter((connection) => connection.login !== undefined).map((connection) => `No test of this release logs in as an Entra principal; connection ${connection.id} logs in as one.`)
 }
 
+/** The variable under which @azure/identity's managed identity logs in by workload identity's token exchange instead. */
+const WORKLOAD_TOKEN_FILE = 'AZURE_FEDERATED_TOKEN_FILE'
+
+/**
+ * What in the environment `env` stops the server at start, for the Entra
+ * connections among `connections`: a managed identity while
+ * AZURE_FEDERATED_TOKEN_FILE is set. @azure/identity 4.13.3 then logs in by
+ * AKS workload identity's token exchange (tokenExchangeMsi.js), as the
+ * tenant, client and authority host the environment names rather than the
+ * reviewed entry, and this release does not take workload identity (0074).
+ * The library takes it when AZURE_TENANT_ID and a client id are set too;
+ * the token file alone is refused here, and named, never its value.
+ * main.ts passes the process's environment: nothing here reads it.
+ */
+export function entraEnvironmentProblems(connections: readonly ConnectionConfig[], env: Readonly<Record<string, string | undefined>>): string[] {
+  if (env[WORKLOAD_TOKEN_FILE] === undefined) return []
+  return connections
+    .filter((connection) => connection.login?.type === 'entra-managed-identity')
+    .map(
+      (connection) =>
+        `connection ${connection.id} logs in as a managed identity, which logs in by workload identity while ${WORKLOAD_TOKEN_FILE} is set, as the tenant, client and authority the environment names; this release does not take workload identity. Unset it, or log in as a service principal (0074).`,
+    )
+}
+
 /** The secret reference an entry names: a SQL login's password, a service principal's client secret, or none. */
 function secretReference(config: ConnectionConfig): string | undefined {
   if (config.login === undefined) return config.password

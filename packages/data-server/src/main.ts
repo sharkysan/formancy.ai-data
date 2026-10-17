@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { createDataServer } from './app.js'
 import type { DataServerOptions } from './app.js'
 import { createFileConfigurationStore } from './config-store.js'
-import { createConnectionRegistry, parseConnections, untestedLogins } from './connections.js'
+import { createConnectionRegistry, entraEnvironmentProblems, parseConnections, untestedLogins } from './connections.js'
 import type { ConnectionRegistry } from './connections.js'
 import { corsOriginsSetting } from './cors.js'
 import { DRIVER_FACTORIES } from './drivers.js'
@@ -168,6 +168,14 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
   const parsed = parseConnections(JSON.parse(await readFile(connectionsFile, 'utf8')) as unknown)
   if (!parsed.ok) {
     console.error(`${connectionsFile}:\n  ${parsed.problems.join('\n  ')}`)
+    process.exit(1)
+  }
+  // A managed identity that the environment would turn into workload
+  // identity, another principal at another authority, stops the process
+  // here, naming the variable and never its value (0074).
+  const environment = entraEnvironmentProblems(parsed.connections, process.env)
+  if (environment.length > 0) {
+    console.error(environment.join('\n'))
     process.exit(1)
   }
   registry = createConnectionRegistry(parsed.connections, DRIVER_FACTORIES)
