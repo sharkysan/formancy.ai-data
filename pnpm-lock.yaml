@@ -884,6 +884,9 @@ importers:
 
   packages/data-sqlserver:
     dependencies:
+      '@azure/identity':
+        specifier: 4.13.3
+        version: 4.13.3(supports-color@7.2.0)
       '@formancy/data-core':
         specifier: workspace:*
         version: link:../data-core
