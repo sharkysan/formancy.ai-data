@@ -55,8 +55,9 @@ async function forward(request: Request, path: string, named: InstanceNamed): Pr
  * sign-in on the instance the visitor's cookie names, or on a new one; the
  * runtime plane's request forwarded to that instance; and its own 404 and
  * 405 for anything else. Only a sign-in reaches an instance's start, and
- * only a request with a name of the Worker's making reaches an instance at
- * all.
+ * only a sign-in or a request whose cookie has the shape of the Worker's
+ * names reaches an instance at all; a name of that shape a client wrote
+ * itself reaches an instance of its own (cookie.ts).
  */
 export async function handle(request: Request, named: InstanceNamed): Promise<Response> {
   const route = routeOf(request.method, new URL(request.url))

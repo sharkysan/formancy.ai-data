@@ -29,8 +29,13 @@ export function instanceCookie(name: string): string {
 /**
  * The instance name in a Cookie header: the first value of COOKIE_NAME
  * that has the shape the Worker makes, or undefined. A value of any other
- * shape is no cookie, so a visitor can never choose which Durable Object
- * they reach.
+ * shape is no cookie. The shape is all that is checked: the Worker cannot
+ * tell a name it made from one of the same shape a client wrote, so a
+ * script that sends 32 hex characters of its choosing reaches, and on
+ * Cloudflare makes, the Durable Object of that name. What that reaches is
+ * an object nobody else holds the name of -- another visitor's name is 128
+ * random bits -- and what it costs is a Durable Object request, which a
+ * sign-in without a cookie costs too (0070).
  */
 export function instanceNameOf(header: string | null): string | undefined {
   for (const pair of (header ?? '').split(';')) {

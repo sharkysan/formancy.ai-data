@@ -2281,7 +2281,7 @@
       ]
     },
     "0070": {
-      "reviewed": "sha256:9fef562d94a41cbb89f7cd605410b84f5ec1f3384304982bf6ab38a4bd993f09",
+      "reviewed": "sha256:9ce0948b89ffc42e037ddac67bd8dd0b76b8158b840d5d95b4e1e7f2a9c62ab5",
       "limitations": [
         {
           "area": "operations",
@@ -2310,6 +2310,10 @@
         {
           "area": "access",
           "says": "The live demo's one cookie, `__Secure-formancy-data-demo`, is the only credential of a visitor's server: whoever holds it while that browser keeps it can sign in to that server and read and change what the visitor changed."
+        },
+        {
+          "area": "operations",
+          "says": "The live demo's Worker checks only the shape of the name in its cookie, so a script can address, and on Cloudflare create, Durable Objects by names of its own choosing, each a billed Durable Object request, and start a container in one by signing in; that reaches no other visitor's server, whose name is 128 random bits."
         },
         {
           "area": "operations",

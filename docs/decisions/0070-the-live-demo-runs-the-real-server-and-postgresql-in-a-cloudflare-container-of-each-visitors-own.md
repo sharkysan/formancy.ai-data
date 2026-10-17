@@ -323,9 +323,12 @@ that loads nothing.
 `__Secure-formancy-data-demo`: 128 random bits as hex, `Path=/data/demo/`,
 `Secure`, `HttpOnly`, `SameSite=Strict`, no lifetime, so the browser
 forgets it when it closes. It names the visitor's Durable Object,
-`DemoServer`, and a value of any other shape is no cookie. Two tabs share
-one container. **The cookie is that container's only credential**, and the
-page says so.
+`DemoServer`, by `idFromName`, and a value of any other shape is no
+cookie. The shape is all the Worker can check: a client that writes 32
+hex characters of its own reaches the Durable Object of that name, a new
+one nobody else holds, since every visitor's name is 128 random bits. Two
+tabs share one container. **The cookie is that container's only
+credential**, and the page says so.
 
 **Started only by a sign-in from the page.** A `POST` to the session starts
 anything only when its `Origin` is the page's, its body is declared JSON,
@@ -541,6 +544,17 @@ Builds does not wait for it and a deploy is not one transaction.
   their browser keeps it can sign in to their container and see and change
   what they changed. It is one cookie, strictly necessary, holding a
   random name.
+- **Any client can choose a Durable Object's name.** The Worker cannot
+  tell a name it made from one of the same shape a script wrote, so a
+  script can address, and on Cloudflare create, Durable Objects by names
+  of its choosing, each a Durable Object request billed, and start a
+  container in one by signing in. That reaches no other visitor's server,
+  whose name is 128 random bits, and does nothing a sign-in without a
+  cookie, which makes a new object every time, does not already. Names the
+  Worker could tell from a script's -- `newUniqueId()` checked with
+  `idFromString` -- were not chosen: what `idFromString` refuses was not
+  read in Cloudflare's documentation for this record, nor seen, since
+  nothing here runs workerd.
 - **No logs.** With observability off, a failed start is diagnosed by
   reproducing it, not by reading what happened.
 - **The Durable Object's code is held by review.** `wrangler dev` runs no

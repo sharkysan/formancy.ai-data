@@ -39,8 +39,11 @@ describe("the visitor's instance cookie", () => {
   })
 
   // A value of another shape names no instance the Worker made: read as a
-  // name, it would let a visitor choose the Durable Object -- one name for
-  // everybody, or a key with a path in it. It is no cookie, as no header is.
+  // name, it would reach a Durable Object by a name no name of the Worker's
+  // looks like -- one short enough for everybody to share, or a key with a
+  // path in it. It is no cookie, as no header is. (A name of the right
+  // shape that a client wrote still reaches an object of its own; cookie.ts
+  // says what that costs.)
   test('treats a value of any other shape, or none, as no cookie', () => {
     const name = newInstanceName()
     for (const header of [
