@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, test } from 'vitest'
 import { styleReferences } from '../addresses.mjs'
+import { pagePolicy } from '../web-policies.mjs'
 import { classify, MISSING } from './journey.mjs'
 import { anonymousMountProblems, auditEvents, bindMountProblems, configProblems, exposureProblems, leaks, namedSecretFiles, noticesProblem, pageProblems, pageReferences, redact } from './stack.mjs'
 
@@ -284,7 +285,8 @@ describe('the page check', () => {
       if (request.url === '/') return response.writeHead(302, { location: '/studio/' }).end()
       const answer = answers[request.url ?? '']
       if (answer === undefined) return response.writeHead(404).end()
-      return response.writeHead(200, { 'content-type': answer[0] }).end(answer[1])
+      const policy = request.url === '/studio/' || request.url === '/host/' ? { 'content-security-policy': pagePolicy(request.url) } : {}
+      return response.writeHead(200, { 'content-type': answer[0], ...policy }).end(answer[1])
     })
     await new Promise((listening) => server.listen(0, '127.0.0.1', () => listening(undefined)))
     try {
@@ -293,6 +295,38 @@ describe('the page check', () => {
       expect(await pageProblems(`http://127.0.0.1:${String(port)}/`)).toEqual([
         '/studio/assets/index-D.css names https://fonts.gstatic.com/s/a/v1/x.woff2, which is not this origin',
         '/host/ loads https://fonts.googleapis.com/css2?family=Archivo, which is not this origin',
+      ])
+    } finally {
+      server.close()
+    }
+  })
+
+  // Each page is sent with the policy scripts/web-policies.mjs gives it and
+  // the browser gates held it to (0083): a web image built from an
+  // nginx.conf that lost its add_header, or whose map sends one page the
+  // other's policy, passes every browser gate -- they serve the pages
+  // themselves -- and is caught only here, through the nginx the guide
+  // starts.
+  test("fails a page sent with no policy, or with another page's", async () => {
+    const answers = {
+      '/studio/': ['text/html', '<p>studio</p>', {}],
+      '/host/': ['text/html', '<p>host</p>', { 'content-security-policy': pagePolicy('/studio/') }],
+      '/studio/THIRD-PARTY-NOTICES.txt': ['text/plain; charset=utf-8', 'notices', {}],
+      '/host/THIRD-PARTY-NOTICES.txt': ['text/plain; charset=utf-8', 'notices', {}],
+    }
+    const server = createServer((request, response) => {
+      if (request.url === '/') return response.writeHead(302, { location: '/studio/' }).end()
+      const answer = answers[request.url ?? '']
+      if (answer === undefined) return response.writeHead(404).end()
+      return response.writeHead(200, { 'content-type': answer[0], ...answer[2] }).end(answer[1])
+    })
+    await new Promise((listening) => server.listen(0, '127.0.0.1', () => listening(undefined)))
+    try {
+      const address = server.address()
+      const port = typeof address === 'object' && address !== null ? address.port : 0
+      expect(await pageProblems(`http://127.0.0.1:${String(port)}/`)).toEqual([
+        `/studio/ was sent with no Content-Security-Policy, not scripts/web-policies.mjs's "${pagePolicy('/studio/')}"`,
+        `/host/ was sent with Content-Security-Policy "${pagePolicy('/studio/')}", not scripts/web-policies.mjs's "${pagePolicy('/host/')}"`,
       ])
     } finally {
       server.close()
