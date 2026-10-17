@@ -1,6 +1,6 @@
 # 0002 — Depend on released upstream packages at exact versions; never copy them
 
-- **Status:** accepted; the spec 4 window its costs name closed on 2026-10-09 without an exact-decimal type, see [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md); extended by [0055](0055-an-upstream-release-is-adopted-the-day-it-is-published.md)
+- **Status:** accepted; the spec 4 window its costs name closed on 2026-10-09 without an exact-decimal type, see [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md), and the type was proposed upstream on 2026-10-16 as [formancy.ai#258](https://github.com/sharkysan/formancy.ai/issues/258); extended by [0055](0055-an-upstream-release-is-adopted-the-day-it-is-published.md)
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `scripts/upstream-deps.mjs`, through
