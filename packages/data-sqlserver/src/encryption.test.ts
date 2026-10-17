@@ -91,6 +91,35 @@ test('a SQL login with encrypt: true is refused an answer with no ENCRYPTION opt
   expect(error).toMatchObject({ code: 'EENCRYPT', message: UNREADABLE_ANSWER })
 })
 
+// Why the guard stays now that tedious 20.3.7 refuses an unencrypted answer
+// itself: a server that sends part of its first message -- a packet not
+// marked last -- and then closes leaves tedious's connect pending without
+// end, past its own connect timeout, because readPreloginResponse, abandoned,
+// awaits its iterator's `return()`, which waits on the read it abandoned
+// (measured on 2026-10-17 with 20.3.7: not settled 40 s after the close).
+// The server's registry then holds that connection's open as pending until
+// the process is killed. The guard withholds the part and ends with the
+// socket, so the connect fails at once. Watched failing with the guard
+// left out of the config: still pending 2 s after the close.
+test('a SQL login with encrypt: true, sent part of an answer and then closed, fails at once and sends no LOGIN7', async () => {
+  const standIn = await startPreloginStandIn(tdsPacket(TDS_PACKET.RESPONSE, preloginPayload(PRELOGIN_ENCRYPTION.NOT_SUP), false))
+  let outcome: unknown = 'pending'
+  void connectSqlServer(sqlLogin(standIn.port)).then(
+    () => (outcome = 'connected'),
+    (error: unknown) => (outcome = error),
+  )
+  try {
+    while (standIn.sent[0]?.length !== 1) await new Promise((resolve) => setTimeout(resolve, 5))
+    // The stand-in answers as the PRELOGIN is in; on loopback the part is read well within this.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  } finally {
+    await standIn.close()
+  }
+  for (let waited = 0; outcome === 'pending' && waited < 2000; waited += 20) await new Promise((resolve) => setTimeout(resolve, 20))
+  expect(standIn.sent).toEqual([[TDS_PACKET.PRELOGIN]])
+  expect(outcome).toMatchObject({ code: 'ESOCKET' })
+})
+
 describe('what mssql is given', () => {
   // The guard is where it is needed and nowhere else: every SQL login that
   // asked for TLS, and not one the operator set unencrypted -- the login
