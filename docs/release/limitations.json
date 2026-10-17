@@ -2672,7 +2672,7 @@
       ]
     },
     "0080": {
-      "reviewed": "sha256:d5500f45d28abc05eb3ec585183b485878416860d0531110a9e14c8c7d28b0d2",
+      "reviewed": "sha256:74a314eda667963e010d2a4ac03e6414ae1d3d0823277dfc3fd57ca23de88c58",
       "limitations": [
         {
           "area": "host",
@@ -2689,7 +2689,7 @@
         },
         {
           "area": "host",
-          "says": "The host page holds the whole file in memory before the browser saves it, up to 16 MiB."
+          "says": "The host page holds the whole file in memory before the browser saves it, up to the server's `EXPORT_MAX_BYTES`."
         },
         {
           "area": "testing",

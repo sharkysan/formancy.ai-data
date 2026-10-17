@@ -250,8 +250,9 @@ not ask before leaving unsaved work
 There is no bulk delete and no undo
 ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
 Download CSV drops a file in the making when the person leaves the form or
-signs out, says nothing about it, names no count of records, and says the
-page handed the file over, not that the browser kept it; its save is
+signs out, and a child section's when they open another record, says
+nothing about it, names no count of records, and says the page handed the
+file over, not that the browser kept it; its save is
 measured in Playwright's three browsers and nowhere else
 ([0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)).
 A page on another origin is answered only when its origin is listed

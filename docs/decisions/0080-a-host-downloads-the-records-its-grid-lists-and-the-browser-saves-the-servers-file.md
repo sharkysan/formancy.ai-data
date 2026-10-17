@@ -21,14 +21,22 @@
   the refusal's code shown for its sentence: `unavailable`); choosing
   another form, or signing out, while a file is made aborts its request,
   says nothing and saves nothing (watched failing with nothing aborted when
-  the section leaves: the signal still live); a child section's file sends
-  its parent and no search, is that parent's rows, and keeps the parent's
-  column the grid leaves out (watched failing with the parent left out:
-  `"parent": null`; and with the grid's columns in reverse: the header no
+  the section leaves: the signal still live), and so does opening another
+  order while a file of its lines is made (watched failing with the order
+  left out of the child section's key: the signal still live once the
+  other order's lines were listed); a child section's file sends its
+  parent, no search and the grid's sort, is that parent's rows in that
+  order, and keeps the parent's column the grid leaves out (watched failing
+  with the parent left out: `"parent": null`; with the section's sort left
+  out: `"sort": []`; and with the grid's columns in reverse: the header no
   longer the grid's); and the button is offered in the Records panel and in
   a child section under a saved parent, not under a new one, and nowhere
   once a version hides the form's key from the person so its `list` is
-  `null` (watched failing with the button drawn whatever `list` says).
+  `null` -- not in the Records panel, and not under an order whose lines'
+  form did so after the menu named it (watched failing with the Records
+  panel's button drawn whatever `list` says; and with the workspace
+  keeping a child whose `list` is `null`: an Order line section under
+  the order).
   `apps/host/src/save-file.test.ts` -- the anchor is in the document when
   it is clicked, carries the object URL and the file's name, is gone after,
   and the URL is revoked in a later task (watched failing with the anchor
@@ -99,11 +107,14 @@ child section, its parent -- and says on a line under it what is
 happening.**
 
 - **Where.** In the section's head, after New record, where the
-  definition says the records can be listed:
+  definition read when the form was chosen says the records can be listed:
   `definition.list !== null`, the one condition the server's `listable`
-  answers (0079). A child section under a new parent has none: it has no
-  rows to give. A plain `button`, the room's secondary look, never
-  `primary`: New record stays the section's one primary action.
+  answers (0079). The Records panel asks it; a child section does not need
+  to, because the workspace leaves out a child whose `list` is `null`
+  when the form is chosen (0047), its section and the button with it. A
+  child section under a new parent has none: it has no rows to give. A
+  plain `button`, the room's secondary look, never `primary`: New record
+  stays the section's one primary action.
 - **What it sends.** When pressed, `exportRecords(formId, { search, sort,
   parent }, signal)`: the Records panel's submitted search, never the
   box's text, or none in a child section; the grid's sort as its datasource

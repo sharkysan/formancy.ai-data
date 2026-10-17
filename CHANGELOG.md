@@ -275,11 +275,11 @@ later.
   one primary action. Its line says while the file is made, with the
   button `aria-disabled` and a second press sending nothing; names the
   file once it is handed over; and says a refusal in the server's words,
-  pressing again being the retry. Leaving the form, or signing out, stops a
-  file in the making and says nothing. It names no count of records, and
-  does not know whether the browser kept the file. `@formancy/data-client`
-  re-exports `exportFileName`, so a page can name the file before it
-  arrives
+  pressing again being the retry. Leaving the form or signing out stops a
+  file in the making and says nothing, and opening another record stops
+  its child sections'. It names no count of records, and does not know
+  whether the browser kept the file. `@formancy/data-client` re-exports
+  `exportFileName`, so a page can name the file before it arrives
   ([0080](docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)).
 - **A SQL Server connection may log in as a Microsoft Entra principal**: a
   managed identity, user-assigned by its client id or the host's own, or a

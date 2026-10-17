@@ -585,8 +585,9 @@ sort and, in a child section, its record, whose column the file keeps
 and not under a record not saved yet. While the file is made its line says
 so and a press sends nothing; once it is made the line names it and the
 browser saves it as `<form id>.csv`; a refusal is the server's sentence,
-and pressing again asks again. Leaving the form, or signing out, stops a
-file in the making without a word. The line names the file, not how many
+and pressing again asks again. Leaving the form or signing out stops a
+file in the making without a word, and so does opening another record for
+its child sections' files. The line names the file, not how many
 records it holds, and says the page handed it over, not that the browser
 kept it.
 
