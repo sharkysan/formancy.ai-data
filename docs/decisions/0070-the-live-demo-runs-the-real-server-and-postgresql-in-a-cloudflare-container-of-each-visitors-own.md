@@ -349,9 +349,11 @@ start may take up to its deadline of 30 s, and a callback that runs past
   with it as `FORMANCY_DATA_DEMO_IDENTITY_SECRET`, `enableInternet: false`;
 - sets the inactivity timeout to **10 minutes**, after the start and again
   in its constructor when a container already runs;
-- asks `/health` every 250 ms for at most 30 s -- about six times the
-  starts measured at `basic`'s share, plus Cloudflare's documented 1 to
-  3 s -- and gives up when a container it saw running stops;
+- asks `/health` every 250 ms for at most 30 s -- about three times the
+  slowest of the gate's eight starts at `basic`'s share, 9,787 ms, and
+  Cloudflare documents 1 to 3 s more for a cold start; a start on a busy
+  Docker engine, about 31 s, was past it -- and gives up when a container
+  it saw running stops;
 - once the server answers, keeps the key in its own storage and sets an
   alarm a day on, which deletes the key when no container runs, so
   nothing about a visitor outlives a day;
@@ -436,15 +438,21 @@ schema keeps it the sum of the lines.
 mode, a relative base), which signs a visitor in as one of the people
 rather than with a pasted token, and reaches the session and the runtime
 plane beside its own files through data-client's `base`. The ordinary build
-leaves that branch out. Every file is sent with
+leaves `main.tsx`'s demo wiring and `src/demo.ts` out, and keeps
+`PersonaSignIn`, which `sign-in.tsx` imports and renders only when given a
+session, which the ordinary build never gives it. Every file is sent with
 `scripts/live-demo-headers.mjs`'s headers: 0069's, with `'unsafe-inline'`
 added to `style-src` and nothing else, for AG Grid's style elements:
 `default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
 font-src 'self'; img-src data:; connect-src 'self'; object-src 'none';
 base-uri 'none'; form-action 'none'; frame-ancestors 'none'`.
 
-**Observability is off,** for the Worker and the container: Cloudflare
-keeps no log of anybody's requests to the demo.
+**Observability is off,** for the Worker and the container: no Workers
+Logs of the Worker and no logs of the containers. That is all the config
+turns off. The zone's own analytics -- HTTP and security analytics, with
+sampled requests and their clients' addresses -- and any Logpush or WAF
+events of formancy.ai's zone still cover `/data/demo/`; they are
+formancy.ai's settings, which nothing here reads or sets.
 
 **Cloudflare deploys it from `main`,** as 0069's: Workers Builds with root
 `/`, build command `pnpm build`, deploy command `node
@@ -568,8 +576,10 @@ Builds does not wait for it and a deploy is not one transaction.
   `idFromString` -- were not chosen: what `idFromString` refuses was not
   read in Cloudflare's documentation for this record, nor seen, since
   nothing here runs workerd.
-- **No logs.** With observability off, a failed start is diagnosed by
-  reproducing it, not by reading what happened.
+- **No logs of its own.** With observability off, a failed start is
+  diagnosed by reproducing it, not by reading what happened. The zone's
+  analytics and logging still see the demo's requests, as they see the
+  rest of formancy.ai's.
 - **The Durable Object's code is held by review.** `wrangler dev` runs no
   container here, so the gate runs the Worker's module over a stand-in
   written from the documentation, and the containers as `docker run`s
@@ -580,8 +590,13 @@ Builds does not wait for it and a deploy is not one transaction.
   visitor are the first deploy's to read, by hand, once.
 - **The page is measured in Chromium alone,** inside the gate; the host
   page's browser gate does not run the demo build in Firefox or WebKit.
-  That the ordinary host build carries none of the demo's code was read in
-  its chunks once, on 2026-10-16, and nothing checks it.
+  What the ordinary host build carries of the demo was read in its chunks
+  on 2026-10-17, and nothing checks it: none of `src/demo.ts` -- its "The
+  demo could not be reached." is in no chunk -- and `PersonaSignIn`
+  whole, its "Starting your own server and database" and "Sign in as" in
+  the entry chunk, code it never runs. It was read once before, on
+  2026-10-16, and said then to carry none of the demo's code, which was
+  not so.
 - **The policy allows inline styles,** a weaker `style-src` than the
   examples page's, for AG Grid's injected theme. `font-src`, `img-src` and
   `connect-src` still keep an injected style from loading anything from
@@ -604,7 +619,9 @@ Builds does not wait for it and a deploy is not one transaction.
   server is not among *What it is tested on*'s, which would need the report
   to learn a second kind of composed server.
 - **The host page depends on the live demo's package** for the Worker's
-  answer types, and its entry has a branch the ordinary build drops.
+  answer types, and its entry has a branch the ordinary build drops; the
+  persona sign-in, which the ordinary build keeps and never draws, is in
+  every host page's entry chunk.
 
 **What it forecloses.** Nothing that cannot be undone. Deleting the Worker
 gives `/data/demo/` back to formancy.ai's 404, and `wrangler containers

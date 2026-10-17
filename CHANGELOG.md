@@ -455,7 +455,8 @@ later.
   and its client reaches the runtime plane under that path through
   data-client's `base`. Why a build of the host page and not a page of
   its own: the demo is meant to show the host page's workspace as it is.
-  The ordinary build drops the demo's branch and is otherwise unchanged;
+  The ordinary build drops the demo's branch and `src/demo.ts`, and
+  carries the persona sign-in, which it never draws without a session;
   the host page gains a development dependency on the live demo's private
   package, for the Worker's answer types.
 - **The live demo's page allows inline styles**, where the examples page's
@@ -514,18 +515,22 @@ What the live demo costs, in 0070: the Workers Paid plan, $5 a month, and
 then money while people use it -- about $0.0037 a visit of ten minutes'
 use once the plan's included amounts, about 67 such visits a month, are
 spent, and at most $201.66 for ten containers running a whole 30-day month
-with every CPU busy, at the prices read on 2026-10-16, beside requests not
-computed; anybody can start a container, one visitor can take all ten, and
-a rate limiting rule on the sign-in is the operator's to add; every change
+with every CPU busy, at the prices read on 2026-10-16, beside the Worker's
+and the Durable Objects' requests, storage and alarms, not computed;
+anybody can start a container, one visitor can take all ten, and a rate
+limiting rule on the sign-in is the operator's to add; every change
 is gone when a container sleeps and on every deploy whose image changed,
 which restarts every running demo at once; PostgreSQL alone; a first
 sign-in that waits for a start, 5.7 and 6.8 s through the Worker at the
 instance type's share on a workstation and not measured on Cloudflare, and
 refused past 30 s; Cloudflare runs code on formancy.ai's zone, decrypts
 every request and holds what a visitor types until their container stops;
-the cookie is the container's credential; no logs; a lookup may run for
-3,568 ms before it is stopped, four times the default, at a quarter of a
-CPU; inline styles allowed on its page; an image of about 198 MB
+the cookie is the container's credential, and any script can name a
+Durable Object of its own; a token that lasts an hour, after which a visit
+signs in again; no logs of its own, though the zone's analytics still see
+its requests; a lookup may run for 3,568 ms before it is stopped, four
+times the default, at a quarter of a CPU; inline styles allowed on its
+page; an image of about 198 MB
 compressed pushed by every deploy that changed it, deleted by hand; a
 second whole build of the repository on every push; and the Durable
 Object's code held by review, what the cap answers and how long a

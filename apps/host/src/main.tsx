@@ -24,7 +24,8 @@ const fetch = window.fetch.bind(window)
 // (0070): its routes are beside its files, wherever it is served, and a
 // visitor signs in as one of the demo's people. Vite writes the mode into
 // the build as a constant, so the ordinary build drops this branch and
-// demo.ts with it.
+// demo.ts with it. It keeps persona-sign-in.tsx, which sign-in.tsx imports
+// and renders only when given a session, which nothing gives it there.
 const demo = import.meta.env.MODE === 'demo'
 const base = demo ? demoBase(window.location.pathname) : ''
 

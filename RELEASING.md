@@ -303,10 +303,15 @@ and the result recorded in 0070, as 0069's were:
    another within ten minutes, each starting a server of its own --
    `curl -s -X POST https://formancy.ai/data/demo/session -H 'Origin: https://formancy.ai' -H 'Content-Type: application/json' -d '{"persona":"vera"}' -o /dev/null -w '%{http_code} %{time_total}\n'`
    -- and what the eleventh answered, and how long it took.
-4. How long a server outlives its visitor: sign in, wait the Worker's
-   IDLE_MINUTES and then a minute at a time, and ask for the forms with the
-   same cookie and token, until the answer is the 503 that says no server
-   is running.
+4. How long a server outlives its visitor, one request a trial: every
+   request reaches the visitor's Durable Object, makes it active again and
+   starts the countdown again, so a server asked once a minute never
+   stops. Sign in with no cookie -- a new private window, or step 3's
+   `curl` with `-c` to keep the cookie -- send nothing for N minutes, then
+   ask for the forms once with that cookie and token: 200 means the server
+   outlived N minutes, and the 503 that says no server is running that it
+   did not. Start at the Worker's IDLE_MINUTES and try N + 1, N + 2 and
+   N + 3, each with a sign-in of its own, until the answer is the 503.
 5. `npx --yes wrangler@4.146.0 containers list` and
    `npx --yes wrangler@4.146.0 containers images list`: the application and
    the images pushed. Every deploy that changes the image pushes one, and

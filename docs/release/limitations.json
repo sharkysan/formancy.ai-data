@@ -2281,7 +2281,7 @@
       ]
     },
     "0070": {
-      "reviewed": "sha256:4a36f6fbf0fd84a12a350a39466a14ad85978424f53e70043f127c30906b37e7",
+      "reviewed": "sha256:b63852f00c9af039716c9295b976717d1b3ca4de1de1dd79b1719e7dd3276e26",
       "limitations": [
         {
           "area": "operations",
@@ -2345,7 +2345,7 @@
         },
         {
           "area": "testing",
-          "says": "The live demo's page is measured in Chromium alone, by its gate, and that the ordinary host build carries none of the demo's code was read once, on 2026-10-16, and nothing checks it."
+          "says": "The live demo's page is measured in Chromium alone, by its gate, and the ordinary host build, which leaves out the demo's wiring and `src/demo.ts`, carries the persona sign-in it never draws, as its chunks were read on 2026-10-17, which nothing checks."
         },
         {
           "area": "testing",
