@@ -46,8 +46,8 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > the studio, the host page and the examples page serving their fonts
 > from their own build, so that no page asks Google or any other host for
 > anything, where 0.1.0's pages ask Google for theirs
-> ([0072](./docs/decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)),
-> and a field moved to another generated section in the studio, which a
+> ([0072](./docs/decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md));
+> a field moved to another generated section in the studio, which a
 > 0.1.0 server refuses to read or import
 > ([0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md));
 > and saying, where 0.1.0 said nothing, that no test runs on Azure SQL
