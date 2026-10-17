@@ -3,7 +3,10 @@
 // map this module writes (`node scripts/web-policies.mjs --write`), and
 // scripts/web-policies.test.mjs fails when that map is not what this module
 // writes, when a location of nginx.conf that serves files has no page here,
-// and when anything in nginx.conf would keep the header from one; the
+// when a location answers some other way than a page, the data server, a
+// redirect or an error, and when nginx.conf keeps the header from a page in
+// one of the ways nginxPolicyProblems names -- not sent `always`, dropped
+// by a location's own add_header, or a request moved out of the page; the
 // studio's and the host page's browser gates serve each page with its
 // policy from here (apps/*/scripts/browser/serve.mjs) and fail, in every
 // browser, on anything the browser refuses under it; and the getting-started
@@ -190,20 +193,111 @@ export function mapValue(entries, value) {
 /** A location's prefix, its modifier aside. */
 const prefixOf = (location) => location.args.at(-1)
 
+/** Whether a location serves files, by `alias` or `root`: what the guard counts as a page. */
+const servesFiles = (location) => below(location.block, 'alias').length + below(location.block, 'root').length > 0
+
+/**
+ * The composed stack's data server, as nginx.conf forwards to it: compose's
+ * `server`, whose answers are JSON and never a document (0083), so a
+ * location that forwards there needs no policy. Another address is not
+ * known to answer only so, and the guard fails a location forwarding to it.
+ */
+const DATA_SERVER = 'http://server:4390'
+
+/** A `return` that answers with no page of its own: a redirect, by its status or by a URL alone, or an error. */
+const redirectOrError = ({ args }) => /^(30[12378]|[45]\d\d)$/.test(args[0] ?? '') || /^https?:\/\//.test(args[0] ?? '')
+
+/**
+ * Whether a location that serves no files answers with no page: it forwards
+ * only to the data server, or returns only a redirect or an error, and it
+ * does one of them. A location with neither falls to nginx's static
+ * handler, which serves files from nginx's own root: `/etc/nginx/html` in
+ * the web image's base, nginxinc/nginx-unprivileged:1.30.5-alpine, run with
+ * this file and such a location on 2026-10-17.
+ */
+function answersNoPage(location) {
+  const forwards = below(location.block, 'proxy_pass')
+  const returns = below(location.block, 'return')
+  return forwards.length + returns.length > 0 && forwards.every((each) => each.args[0] === DATA_SERVER) && returns.every(redirectOrError)
+}
+
+/** `directives` and every directive in their blocks, except the blocks named in `skip`, which are not the request's. */
+const flat = (directives, skip = []) => directives.flatMap((each) => (skip.includes(each.name) ? [] : [each, ...flat(each.block ?? [], skip)]))
+
+/**
+ * The paths a directive moves a request to, by an internal redirect, after
+ * which nginx sends the answer for that path: an error page, each file
+ * try_files may settle on, a rewrite that is not a redirect, an index.
+ */
+function movedTo({ name, args }) {
+  if (name === 'error_page') return args.slice(-1)
+  if (name === 'try_files' || name === 'index') return args
+  if (name === 'rewrite') return ['redirect', 'permanent'].includes(args[2] ?? '') ? [] : args.slice(1, 2)
+  return []
+}
+
+/**
+ * Whether a request under `prefix` moved to `target` is still under it: a
+ * path under the prefix, the path as asked (`$uri`) or a file beside it, a
+ * relative index; and what moves it nowhere -- a status (`=404`), a named
+ * location, which keeps the path, or a URL, which is a redirect the browser
+ * follows. A `..` is never under anything.
+ */
+function staysUnder(name, target, prefix) {
+  if (/^[@=]/.test(target) || /^https?:\/\//.test(target)) return true
+  if (target.split('/').includes('..')) return false
+  if (target.startsWith('$uri')) return true
+  if (name === 'index' && !target.startsWith('/')) return true
+  return target.startsWith(prefix)
+}
+
+/**
+ * What moves a request under the page at `location` out of it: the
+ * directives a request there is subject to -- the file's own, its server's
+ * outside every location, and the location's, `if` blocks included -- that
+ * move it to a path outside the prefix. nginx chooses the header's value
+ * by the path the answer is sent for, so such an answer goes out with the
+ * other path's value. Measured on 2026-10-17 in the web image's base,
+ * nginxinc/nginx-unprivileged:1.30.5-alpine, run with this file: an
+ * `error_page 404 /missing.html;` in the host page's location, or one at
+ * its server's level, sent /host/nope's 404 with no policy, and
+ * `try_files $uri /index.html;` sent /host/ so.
+ */
+function movesOut(tree, server, location) {
+  const prefix = prefixOf(location)
+  const subject = [...flat(tree, ['server', 'map']), ...flat(server.block, ['location']), ...flat(location.block)]
+  return subject.flatMap((directive) =>
+    movedTo(directive)
+      .filter((target) => !staysUnder(directive.name, target, prefix))
+      .map(
+        (target) =>
+          `${directive.name} (line ${String(directive.line)}) moves a request under ${prefix} to ${target}, outside the page, where nginx sends the header that path is given, not the page's policy`,
+      ),
+  )
+}
+
 /**
  * What is wrong with how nginx.conf's text `text` sends the pages their
  * policies, one sentence each, none when nothing is:
  *
  * - its generated map is what policyMap() writes;
  * - every location that serves files, by `alias` or `root`, is a page here,
- *   and every page here is a location that serves files;
+ *   and every page here is a location that serves files; every other
+ *   location answers with no page, forwarding only to DATA_SERVER or
+ *   returning only a redirect or an error (answersNoPage);
  * - the map, as nginx reads it, gives each page's location, its index.html
  *   and its hashed assets that page's policy;
  * - the server of each such location sends the map's variable as
  *   Content-Security-Policy, `always`, so a 404 under the page carries it
  *   too; and neither the location nor anything inside it has an add_header
  *   of its own, which in nginx drops every add_header of the server for
- *   that location.
+ *   that location;
+ * - nothing a request under a page is subject to moves it out of the page
+ *   (movesOut): an error_page, try_files, rewrite or index whose target is
+ *   outside the prefix.
+ *
+ * It reads only nginx.conf, and only those directives: a module or an
+ * include that changes headers some other way is not read.
  */
 export function nginxPolicyProblems(text) {
   const problems = []
@@ -221,7 +315,13 @@ export function nginxPolicyProblems(text) {
   const served = new Set()
   for (const server of tree.filter((each) => each.name === 'server')) {
     const locations = server.block.filter((each) => each.name === 'location')
-    const pages = locations.filter((location) => below(location.block, 'alias').length + below(location.block, 'root').length > 0)
+    for (const location of locations) {
+      if (servesFiles(location) || answersNoPage(location)) continue
+      problems.push(
+        `location ${prefixOf(location)} answers neither with a page's files, nor from the data server, nor with a redirect or an error, so what it sends could be a page that ${GENERATOR} gives no policy`,
+      )
+    }
+    const pages = locations.filter(servesFiles)
     if (pages.length === 0) continue
     const sends = server.block.filter((each) => each.name === 'add_header' && each.args[0]?.toLowerCase() === 'content-security-policy')
     const listens = below(server.block, 'listen').map((each) => each.args[0]).join(', ')
@@ -238,6 +338,7 @@ export function nginxPolicyProblems(text) {
         problems.push(`location ${prefix} serves files, and ${GENERATOR} has no policy for a page there`)
         continue
       }
+      problems.push(...movesOut(tree, server, location))
       const wanted = contentSecurityPolicy(known.policy)
       for (const path of [prefix, `${prefix}index.html`, `${prefix}assets/index-a1b2c3.js`]) {
         const sent = mapValue(entries, path)

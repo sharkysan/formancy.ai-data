@@ -109,6 +109,55 @@ describe('nginx.conf sends each page its policy (0083)', () => {
     expect(nginxPolicyProblems(own)).toEqual([expect.stringMatching(/^location \/host\/ has an add_header of its own \(line \d+\), which drops every add_header of its server there, the policy among them$/)])
   })
 
+  // nginx chooses the header's value by the path the response is sent
+  // for, and an internal redirect changes that path: with `error_page 404
+  // /missing.html;` put in location /host/, the web image's nginx answered
+  // /host/nope with a 404 page and no policy, while the guard passed it.
+  // So a directive that moves a request under a page -- in the page's
+  // location, or at its server's level, which the location inherits -- to
+  // a path outside it fails, and one that keeps it inside does not.
+  test('fails a directive that moves a request under a page to a path outside it', () => {
+    const inHost = (line) => conf.replace('    location /host/ {\n', `    location /host/ {\n        ${line}\n`)
+    const moves = (name, target, prefix = '/host/') =>
+      expect.stringMatching(new RegExp(`^${name} \\(line \\d+\\) moves a request under ${prefix} to ${target.replaceAll(/[.$]/g, '\\$&')}, outside the page, where nginx sends the header that path is given, not the page's policy$`))
+    expect(nginxPolicyProblems(inHost('error_page 404 /missing.html;'))).toEqual([moves('error_page', '/missing.html')])
+    expect(nginxPolicyProblems(inHost('error_page 404 =200 /index.html;'))).toEqual([moves('error_page', '/index.html')])
+    expect(nginxPolicyProblems(inHost('try_files $uri /index.html;'))).toEqual([moves('try_files', '/index.html')])
+    expect(nginxPolicyProblems(inHost('rewrite ^/host/(.*)$ /$1 break;'))).toEqual([moves('rewrite', '/$1')])
+    expect(nginxPolicyProblems(inHost('index /index.html;'))).toEqual([moves('index', '/index.html')])
+    expect(nginxPolicyProblems(inHost('if ($arg_x) { rewrite ^ /elsewhere last; }'))).toEqual([moves('rewrite', '/elsewhere')])
+    expect(nginxPolicyProblems(inHost('index ../outside.html;'))).toEqual([moves('index', '../outside.html')])
+    // At the server's level it moves a request under every page.
+    const atServer = conf.replace('    server_tokens off;\n', '    server_tokens off;\n    error_page 404 /404.html;\n')
+    expect(nginxPolicyProblems(atServer)).toEqual([moves('error_page', '/404.html', '/studio/'), moves('error_page', '/404.html')])
+    // And at the file's, which is nginx's http block, under every page of every server.
+    expect(nginxPolicyProblems(`error_page 404 /404.html;\n${conf}`)).toEqual([moves('error_page', '/404.html', '/studio/'), moves('error_page', '/404.html')])
+    // What keeps a request under the page is no problem: a target under
+    // it, the path tried as it is, a status, a named location, which
+    // keeps the path, and a redirect, which sends the browser elsewhere.
+    for (const line of ['error_page 404 /host/404.html;', 'error_page 404 @gone;', 'try_files $uri $uri/ =404;', 'rewrite ^/host/old$ /studio/ permanent;', 'rewrite ^/host/a$ /host/b break;', 'index index.html;']) {
+      expect(nginxPolicyProblems(inHost(line)), line).toEqual([])
+    }
+  })
+
+  // The guard counts a location as a page when it serves files by alias or
+  // root. One that answers some other way could answer with a page too --
+  // proxied from somewhere other than the data server, whose answers are
+  // JSON, returned with a 200, or served from nginx's own root by a
+  // location with no handler of its own -- and the map would give it no
+  // policy, so it fails until it is a page here or answers otherwise.
+  test('fails a location that could answer with a page and is no page here', () => {
+    const add = (block) => conf.replace('    location /v1/ {', `${block}\n\n    location /v1/ {`)
+    const unknown = (prefix) =>
+      `location ${prefix} answers neither with a page's files, nor from the data server, nor with a redirect or an error, so what it sends could be a page that scripts/web-policies.mjs gives no policy`
+    expect(nginxPolicyProblems(add('    location /docs/ {\n        proxy_pass http://docs:8000;\n    }'))).toEqual([unknown('/docs/')])
+    expect(nginxPolicyProblems(add('    location = /hello {\n        default_type text/html;\n        return 200 "<p>hello</p>";\n    }'))).toEqual([unknown('/hello')])
+    expect(nginxPolicyProblems(add('    location /bare/ {\n    }'))).toEqual([unknown('/bare/')])
+    for (const block of ['    location = /old {\n        return 301 /studio/;\n    }', '    location = /gone {\n        return 410;\n    }', '    location = /elsewhere {\n        return https://example.com/;\n    }']) {
+      expect(nginxPolicyProblems(add(block)), block).toEqual([])
+    }
+  })
+
   // The header sent without `always` is left off a 404 under the page and
   // every other answer nginx does not count as a success; not sent at all,
   // the map is a variable nobody reads.
