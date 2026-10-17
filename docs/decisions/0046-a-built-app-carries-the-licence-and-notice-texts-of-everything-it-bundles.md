@@ -1,6 +1,6 @@
 # 0046 — A built app carries the licence and notice texts of everything it bundles
 
-- **Status:** accepted; extends [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md); extended by [0069](0069-the-examples-page-is-served-at-formancy-ai-data-examples.md): the examples page, served at formancy.ai/data/examples/, carries its notices too
+- **Status:** accepted; extends [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md); extended by [0069](0069-the-examples-page-is-served-at-formancy-ai-data-examples.md): the examples page, served at formancy.ai/data/examples/, carries its notices too; extended by [0072](0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md): the fonts are in the builds, from Fontsource's packages, and in the notices with their OFL text
 - **Date:** 2026-10-11
 - **Deciders:** Daniel Bacher
 - **Verified by:** `scripts/third-party-notices.test.mjs` (`pnpm test:repo`)

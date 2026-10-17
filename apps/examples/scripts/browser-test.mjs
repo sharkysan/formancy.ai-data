@@ -15,14 +15,20 @@
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules @formancy/conformance switches off in jsdom because they are
 //     measurements, run here where they can be measured;
-//   - every web font the built page asks for had loaded by the end of each
-//     pass, and in the pass that refuses them, none had (0058): a state
-//     measured before a late family swapped in is not caught;
+//   - every web font the built page declares had loaded by the end of each
+//     pass, and in the pass that refuses every font file, none had (0058):
+//     a state measured before a late family swapped in is not caught;
+//   - the page asked no other origin for anything: every such request is
+//     refused, so the answer is the same with no network, and named (0072).
+//     An address the policy below governs -- a stylesheet, a face, a
+//     script, a fetch -- the browser refuses before any request exists, so
+//     the policy check names it and this one holds what the policy does
+//     not govern, such as a navigation;
 //   - the page is the demo formancy.ai serves (0069): under the path its
 //     Worker is routed at, with the headers its deploy writes, the browser
 //     refused nothing under the Content-Security-Policy, the console said
-//     nothing went wrong, the page fetched nothing but its own files and
-//     the web fonts, and an inline script put in the page was refused and
+//     nothing went wrong, the page fetched nothing but its own files under
+//     the path, and an inline script put in the page was refused and
 //     heard -- so a pass under a policy nobody enforced fails; and its
 //     THIRD-PARTY-NOTICES.txt was sent as UTF-8 text, over the bare
 //     text/plain Cloudflare gives a .txt. At the address itself the
@@ -47,7 +53,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
-import { afterEveryPass } from '../../../scripts/browser-gate.mjs'
+import { afterEveryPass, guardRequests } from '../../../scripts/browser-gate.mjs'
 import { contentSecurityPolicy, headerRules, headersFile, headersFor, parseHeadersFile } from '../../../scripts/demo-headers.mjs'
 import { serveDemo } from '../../../scripts/demo-serve.mjs'
 import { noticesProblem } from '../../../scripts/getting-started/stack.mjs'
@@ -56,9 +62,6 @@ import { NOTICES_FILE } from '../../../scripts/third-party-notices.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(app, 'dist')
-
-/** Google Fonts, the one place the page may fetch from besides its own path. */
-const FONTS = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//
 
 /**
  * The widths worth measuring, and why each is in the list.
@@ -76,10 +79,10 @@ function widths() {
     // WCAG 2.2 SC 1.4.10, Reflow: content at 320 CSS pixels with no
     // horizontal scrolling. The narrowest phone there is.
     { label: 'reflow, 320', width: 320 },
-    // The same, with the web fonts refused: a network that blocks Google Fonts
-    // gets the fallback stack, whose widths are not Archivo's, and that page
-    // has to fit too. Refused here rather than left to whether this machine is
-    // online, so the run measures it either way.
+    // The same, with every font file refused: before the faces arrive, and
+    // in a browser or behind an extension that refuses web fonts, the page
+    // is drawn in the fallback stack, whose widths are not Archivo's, and
+    // that page has to fit too.
     { label: 'reflow, 320, web fonts refused', width: 320, refuseFonts: true },
     // The commonest Android width, and the second phone of 0021's hand check.
     { label: 'phone, 360', width: 360 },
@@ -122,8 +125,8 @@ async function mounted(page) {
     if (seen === expected && expected > 0) break
     await page.waitForTimeout(100)
   }
-  // Whatever the mounted page has begun to load from Google Fonts, waited
-  // for before the first state is measured, as before 0058. It waits for no
+  // Whatever font files the mounted page has begun to load, waited for
+  // before the first state is measured, as before 0058. It waits for no
   // family a later state starts to use, and holds nothing: what a pass
   // measured with is afterEveryPass's check, at its end.
   await page.evaluate(() => document.fonts.ready)
@@ -221,9 +224,13 @@ async function audit(page, target) {
   // own. Measured on 2026-10-16 in Chromium, over the built page: the
   // preload fetched Google Fonts' stylesheet alone, and without it every
   // rule's passes, violations, incompletes and inapplicables were the same.
-  // The two rules that ask for it are css-orientation-lock, experimental
-  // and outside the tags, and no-autoplay-audio, for media the page has none
-  // of.
+  // That stylesheet is gone (0072) and the page links none from another
+  // origin, so the preload would now fetch nothing; it stays off, so that a
+  // stylesheet from elsewhere is the page's failure and not axe's own: the
+  // policy check's and the console's, as a link to Google's put in the
+  // built page showed on 2026-10-16 (0072). The two rules that ask for it
+  // are css-orientation-lock, experimental and outside the tags, and
+  // no-autoplay-audio, for media the page has none of.
   return subject.evaluate(async (context, tags) => {
     const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, preload: false })
     const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
@@ -337,19 +344,22 @@ async function run(gate, browser) {
     for (const { label, width, refuseFonts = false } of list) {
       gate.pass({ label, width })
       const page = await browser.newPage({ viewport: { width, height: 900 } })
-      if (refuseFonts) await page.route(FONTS, (route) => route.abort())
-      // What the page fetched, said and threw, from its first request. A
-      // request this pass refuses to Google Fonts fails in the console, and
-      // is the pass's doing, not the page's.
+      // Every request to another origin refused and named at the end of the
+      // pass, and in the refusing pass every font file (0072).
+      const origin = new URL(url).origin
+      const guard = await guardRequests(page, { origins: [origin], refuseFonts })
+      // What the page fetched on its own origin, said and threw, from its
+      // first request. A font file this pass refuses fails in the console,
+      // and is the pass's doing, not the page's.
       const elsewhere = new Set()
       const said = []
       page.on('request', (request) => {
         const address = request.url()
-        if (!address.startsWith(url) && !/^(blob|data):/.test(address) && !FONTS.test(address)) elsewhere.add(address)
+        if (address.startsWith(`${origin}/`) && !address.startsWith(url)) elsewhere.add(address)
       })
       page.on('console', (message) => {
         const text = message.text()
-        const refused = refuseFonts && FONTS.test(message.location()?.url ?? '')
+        const refused = [...guard.refused].some((file) => message.location()?.url === file || text.includes(file))
         if ((message.type() === 'error' && !refused) || /content[- ]security[- ]policy|permissions[- ]policy/i.test(text)) said.push(`${message.type()}: ${text.slice(0, 160)}`)
       })
       page.on('pageerror', (error) => said.push(`uncaught: ${error.message.slice(0, 160)}`))
@@ -407,7 +417,7 @@ async function run(gate, browser) {
       const violations = await page.evaluate(() => [...(window.__formancyGateViolations ?? [])])
       check('the browser refused nothing under the page’s Content-Security-Policy', violations.length === 0 ? null : violations.slice(0, 4).join('; '))
       check('the console reported no error and the page threw none', said.length === 0 ? null : said.slice(0, 4).join('; '))
-      check(`the page fetched nothing but its own files under ${BASE} and the web fonts`, elsewhere.size === 0 ? null : [...elsewhere].slice(0, 4).join(', '))
+      check(`the page fetched nothing of its origin but its own files under ${BASE}`, elsewhere.size === 0 ? null : [...elsewhere].slice(0, 4).join(', '))
       const probe = await canary(page)
       check(
         'and the policy held: an inline script put in the page was refused, and the page heard the refusal',
@@ -415,8 +425,10 @@ async function run(gate, browser) {
       )
       if (probe.after !== null) gate.measure({ name: 'the policy’s report of the inline script, after the script was put in the page', value: probe.after, unit: 'ms' })
 
-      // Whether every web font had loaded by the end of the pass, or, where it refuses them, none had.
-      await afterEveryPass(gate, page, { dist, refused: refuseFonts })
+      // Whether the page asked another origin for anything, and whether
+      // every web font had loaded by the end of the pass, or, where it
+      // refuses them, none had.
+      await afterEveryPass(gate, page, { dist, refused: refuseFonts, guard })
 
       // The notices, as the browser is sent them: text that says it is
       // UTF-8 (0046), or a browser guesses the encoding of their curly

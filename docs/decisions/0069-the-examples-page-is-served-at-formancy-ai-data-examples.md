@@ -1,6 +1,6 @@
 # 0069 — The examples page is served at formancy.ai/data/examples/, by a Worker of its own that Cloudflare deploys from main, under a policy that refuses anything inline
 
-- **Status:** accepted; extends [0021](0021-generated-forms-preview-in-both-frameworks.md), [0037](0037-cloudflare-is-the-edge-not-the-runtime.md) and [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md)
+- **Status:** accepted; extends [0021](0021-generated-forms-preview-in-both-frameworks.md), [0037](0037-cloudflare-is-the-edge-not-the-runtime.md) and [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md); narrowed by [0072](0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md): the policy names no font host -- `style-src 'self'` and `font-src 'self'`, derived from the faces the built stylesheets name -- its costs *Google is asked for the fonts* and *The policy names hosts* are history, its alternative *Fonts served from the page's own path* is taken, and the gate's check that the page fetched nothing but its own files and the web fonts exempts no font host: it reads what the page fetched of its own origin, under `/data/examples/`, and an address on another host fails the check of what the browser refused under the policy, or, where the policy does not govern it, 0072's check of every request to another origin
 - **Date:** 2026-10-16
 - **Deciders:** Daniel Bacher
 - **Verified by:**

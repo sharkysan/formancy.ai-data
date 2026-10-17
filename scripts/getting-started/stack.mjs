@@ -16,6 +16,7 @@ import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { connect } from 'node:net'
 import { dirname, join } from 'node:path'
+import { styleReferences } from '../addresses.mjs'
 import { NOTICES_FILE } from '../third-party-notices.mjs'
 
 /** Every profile, so compose describes, logs and tears down every service the guide can start. */
@@ -362,9 +363,6 @@ export function machine() {
   return `Docker Engine ${engine} on ${system} (${platform}, ${cpus} CPUs, ${gib} GiB, storage driver ${driver}), Compose ${composeVersion}`
 }
 
-/** Google Fonts, which the apps load from Google by design; the guide says so. */
-const FONTS = new Set(['fonts.googleapis.com', 'fonts.gstatic.com'])
-
 const ATTRIBUTE = (name) => new RegExp(`\\s${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i')
 
 /** Every `<script src>` and `<link href>` of a page, as written. */
@@ -374,14 +372,6 @@ export function pageReferences(html) {
     const attribute = ATTRIBUTE(name.toLowerCase() === 'script' ? 'src' : 'href').exec(tag)
     if (attribute !== null) found.push({ tag: name.toLowerCase(), url: attribute[2] ?? attribute[3] ?? attribute[4] })
   }
-  return found
-}
-
-/** Every `url(...)` and quoted `@import` of a stylesheet, as written. */
-export function styleReferences(css) {
-  const found = []
-  for (const match of css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)) found.push(match[1] ?? match[2] ?? match[3])
-  for (const match of css.matchAll(/@import\s+(?:"([^"]*)"|'([^']*)')/gi)) found.push(match[1] ?? match[2])
   return found
 }
 
@@ -410,8 +400,9 @@ async function get(url) {
  * The web front as a browser meets it: `/` sends the browser to the studio,
  * anything else unknown is 404, both pages are HTML, and every script and
  * stylesheet they name -- and every file those stylesheets name -- is
- * served from this origin with its type, or is Google's fonts, or inline;
- * and beside each page, its third-party notices as UTF-8 text.
+ * served from this origin with its type, or inline -- no page asks another
+ * host for anything (0072) -- and beside each page, its third-party
+ * notices as UTF-8 text.
  * A build without its base, or a proxy rule that lost a path, fails here.
  * Returns problems, checking everything rather than stopping at the first.
  */
@@ -442,7 +433,7 @@ export async function pageProblems(base) {
       if (reference.url.startsWith('data:')) continue
       const url = new URL(reference.url, pageUrl)
       if (url.origin !== pageUrl.origin) {
-        if (reference.tag === 'script' || !FONTS.has(url.hostname)) problems.push(`${path} loads ${url.href}, which is neither this origin nor Google's fonts`)
+        problems.push(`${path} loads ${url.href}, which is not this origin`)
         continue
       }
       const asset = await get(url)
@@ -456,7 +447,7 @@ export async function pageProblems(base) {
         if (inner === '' || inner.startsWith('data:') || inner.startsWith('#')) continue
         const target = new URL(inner, url)
         if (target.origin !== pageUrl.origin) {
-          if (!FONTS.has(target.hostname)) problems.push(`${url.pathname} names ${target.href}, which is neither this origin nor Google's fonts`)
+          problems.push(`${url.pathname} names ${target.href}, which is not this origin`)
           continue
         }
         const file = await get(target)

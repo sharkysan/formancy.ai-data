@@ -29,12 +29,15 @@
 // Nothing here reads what formancy.ai answers again: the gate holds the page
 // to these headers as this module reads the file.
 
+import { elements, rel, resolved, styleImports, stylesheetLinks } from './addresses.mjs'
+import { fontFaces, withoutFontFaces } from './fonts.mjs'
 import { NOTICES_FILE } from './third-party-notices.mjs'
 
 /**
  * The Content-Security-Policy, directive by directive. Each source is one
- * the built page uses, and policyProblems holds the hosts to what
- * index.html loads.
+ * the built page uses, and policyProblems holds the hosts to what the page
+ * and its stylesheets load. No directive names another host: the page asks
+ * none for anything (0072).
  *
  * `'self'` is formancy.ai's whole origin -- its site, its playground, the
  * report's Studio at /report/ and whatever is routed there later -- and not
@@ -52,14 +55,13 @@ export const POLICY = Object.freeze({
   // builds a function from a string; the browser gate fails on every
   // violation the page reports.
   'script-src': ["'self'"],
-  // The built stylesheet, from formancy.ai's origin, and Google Fonts'
-  // stylesheet, which index.html links. No inline style: React and Angular
-  // set a style through the CSSOM, which this directive does not govern, and
-  // the page carries no style attribute or element.
-  'style-src': ["'self'", 'https://fonts.googleapis.com'],
-  // The font files Google's stylesheet names, from the host index.html
-  // preconnects to for them.
-  'font-src': ['https://fonts.gstatic.com'],
+  // The built stylesheet, from formancy.ai's origin. No inline style: React
+  // and Angular set a style through the CSSOM, which this directive does
+  // not govern, and the page carries no style attribute or element.
+  'style-src': ["'self'"],
+  // The faces the built stylesheet names, files of the build, from
+  // formancy.ai's origin.
+  'font-src': ["'self'"],
   // The page loads no image. The Blueprint theme draws the date and time
   // fields' icons as data: SVGs where Safari on a touch device draws no
   // picker icon of its own, and index.html's icon is `data:,`.
@@ -192,39 +194,6 @@ export function headersFor(rules, pathname) {
 }
 
 /**
- * An attribute as HTML writes it: a name, and a value double-quoted,
- * single-quoted or unquoted, or none.
- */
-const ATTRIBUTE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g
-
-/**
- * Each `tag` element of `html` (a pattern), as its attributes: lowercased
- * names, `true` for one with no value. A `>` inside a quoted value does not
- * end the tag.
- */
-function elements(html, tag) {
-  return [...html.matchAll(new RegExp(`<${tag}\\b((?:[^>"']|"[^"]*"|'[^']*')*)>`, 'gi'))].map((match) =>
-    Object.fromEntries([...match[1].matchAll(ATTRIBUTE)].map(([, name, double, single, bare]) => [name.toLowerCase(), double ?? single ?? bare ?? true])),
-  )
-}
-
-/** Every `src` and `href` of every element of `html`, as `{ name, value }`, in order. */
-export function references(html) {
-  return elements(html, '[a-z][\\w-]*').flatMap((attributes) =>
-    ['src', 'href'].filter((name) => typeof attributes[name] === 'string').map((name) => ({ name, value: attributes[name] })),
-  )
-}
-
-/** `value` resolved as the page at `address` resolves it, or null for one that is no URL. */
-export function resolved(value, address) {
-  try {
-    return new URL(value, address)
-  } catch {
-    return null
-  }
-}
-
-/**
  * The origins of the http(s) addresses in `list` other than the page's own,
  * resolved as the page at `address` resolves them -- a protocol-relative
  * `//host/…` included -- once each, sorted.
@@ -251,14 +220,18 @@ const DECIDED = Object.keys(POLICY)
  *   allows nothing inline, nothing evaluated and no host by wildcard;
  * - the page has no inline script, style element or style attribute, which
  *   the policy refuses;
- * - script-src names the hosts of the page's scripts, style-src those of
- *   its stylesheet links, and font-src those it preconnects to for a
- *   CORS-mode fetch (`crossorigin`), which is how a browser fetches a font
- *   -- each address resolved against `address`, however it is quoted, and
- *   every host but the page's own one the directive must name; no directive
- *   names a host the page does not load from;
- * - img-src allows `data:` exactly when the page or a stylesheet uses a
- *   data: URL.
+ * - script-src names the hosts of the page's scripts; style-src those of
+ *   its stylesheet links and of the stylesheets a stylesheet imports; and
+ *   font-src those of the faces a stylesheet's `@font-face` names, and
+ *   those the page preconnects to for a CORS-mode fetch (`crossorigin`),
+ *   which is how a browser fetches a font -- each address resolved against
+ *   `address`, however it is quoted, and every host but the page's own one
+ *   the directive must name; no directive names a host the page does not
+ *   load from;
+ * - font-src allows `'self'` when a stylesheet names a face on the page's
+ *   own origin, and a face inlined as a data: URL is refused (0072);
+ * - img-src allows `data:` exactly when the page or a stylesheet, outside
+ *   its faces, uses a data: URL.
  */
 export function policyProblems(policy, { html, stylesheets, address }) {
   const problems = []
@@ -277,23 +250,27 @@ export function policyProblems(policy, { html, stylesheets, address }) {
   if (scripts.some((attributes) => attributes.src === undefined)) problems.push('index.html has an inline script, which script-src refuses')
   if (/<style\b/i.test(html) || elements(html, '[a-z][\\w-]*').some((attributes) => attributes.style !== undefined)) problems.push('index.html has an inline style, which style-src refuses')
 
-  const rel = (attributes) => String(attributes.rel ?? '').toLowerCase().split(/\s+/)
+  const faces = stylesheets.flatMap((css) => fontFaces(css).flatMap((face) => face.sources))
   const loads = {
     'script-src': foreign(scripts.map((attributes) => attributes.src), address),
-    'style-src': foreign(links.filter((attributes) => rel(attributes).includes('stylesheet')).map((attributes) => attributes.href), address),
-    'font-src': foreign(links.filter((attributes) => rel(attributes).includes('preconnect') && attributes.crossorigin !== undefined).map((attributes) => attributes.href), address),
+    'style-src': foreign([...stylesheetLinks(html), ...stylesheets.flatMap(styleImports)], address),
+    'font-src': foreign([...faces, ...links.filter((attributes) => rel(attributes).includes('preconnect') && attributes.crossorigin !== undefined).map((attributes) => attributes.href)], address),
   }
   for (const [name, sources] of Object.entries(policy)) {
     const named = origins(sources)
     const wanted = loads[name] ?? []
-    for (const host of wanted.filter((each) => !named.includes(each))) problems.push(`index.html loads from ${host}, and ${name} does not name it`)
-    for (const host of named.filter((each) => !wanted.includes(each))) problems.push(`${name} names ${host}, which index.html does not load from`)
+    for (const host of wanted.filter((each) => !named.includes(each))) problems.push(`the page loads from ${host}, and ${name} does not name it`)
+    for (const host of named.filter((each) => !wanted.includes(each))) problems.push(`${name} names ${host}, which the page does not load from`)
   }
   for (const [name, wanted] of Object.entries(loads)) {
-    if (policy[name] === undefined) for (const host of wanted) problems.push(`index.html loads from ${host}, and ${name} does not name it`)
+    if (policy[name] === undefined) for (const host of wanted) problems.push(`the page loads from ${host}, and ${name} does not name it`)
   }
+  const fontSources = policy['font-src'] ?? []
+  const own = new URL(address).origin
+  if (faces.some((source) => resolved(source, address)?.origin === own) && !fontSources.includes("'self'")) problems.push("a stylesheet names a face on the page's own origin, and font-src does not allow 'self'")
+  if (faces.some((source) => source.trim().startsWith('data:')) && !fontSources.includes('data:')) problems.push('a stylesheet inlines a face as a data: URL, which font-src refuses')
 
-  const usesData = links.some((attributes) => String(attributes.href ?? '').startsWith('data:')) || stylesheets.some((css) => /url\(\s*["']?data:/i.test(css))
+  const usesData = links.some((attributes) => String(attributes.href ?? '').startsWith('data:')) || stylesheets.some((css) => /url\(\s*["']?data:/i.test(withoutFontFaces(css)))
   const allowsData = (policy['img-src'] ?? []).includes('data:')
   if (usesData && !allowsData) problems.push('the page or its stylesheets use a data: URL, and img-src does not allow data:')
   if (!usesData && allowsData) problems.push('img-src allows data:, and neither the page nor its stylesheets use a data: URL')

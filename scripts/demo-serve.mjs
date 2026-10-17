@@ -28,6 +28,9 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2',
+  // Each face's fallback (0072): no browser the gate runs asks for one, and
+  // one that did would be sent it as Cloudflare would, not as octets.
+  '.woff': 'font/woff',
   '.txt': 'text/plain',
 }
 

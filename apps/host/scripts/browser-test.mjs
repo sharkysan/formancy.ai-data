@@ -71,9 +71,14 @@
 //     from which it takes its widths (0047);
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules jsdom cannot measure -- in every state below;
-//   - every web font the built page asks for had loaded by the end of each
-//     pass, and in the pass that refuses them, none had (0058): a state
-//     measured before a late family swapped in is not caught.
+//   - every web font the built page declares had loaded by the end of each
+//     pass, and in the pass that refuses every font file, none had (0058):
+//     a state measured before a late family swapped in is not caught;
+//   - the page asked no other origin for anything: every such request is
+//     refused, so the answer is the same with no network, and named (0072)
+//     -- AG Grid's own loader of Google's fonts among them, which in 36.2.0
+//     asks Google for a theme parameter given as `{ googleFont }`, and only
+//     for a grid given `loadThemeGoogleFonts`: the page does neither.
 //
 // Against the page `vite build` produces, served over HTTP from the same
 // origin as the real data server -- createDataServer, in this process, over
@@ -100,7 +105,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { startTcpHop } from '@formancy/data-fixtures'
-import { afterEveryPass, agGridRowProblem, environmentOf, focusScrollProblem, rowUnmeasured } from '../../../scripts/browser-gate.mjs'
+import { afterEveryPass, agGridRowProblem, environmentOf, focusScrollProblem, guardRequests, rowUnmeasured } from '../../../scripts/browser-gate.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { deleteJourney } from './browser/deleting.mjs'
 import { recordJourney } from './browser/journey.mjs'
@@ -164,7 +169,10 @@ async function run(gate, browser) {
       pass += 1
       gate.pass({ label, width })
       const page = await browser.newPage({ viewport: { width, height: 900 } })
-      if (refuseFonts) await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort())
+      // Every request to another origin refused and named at the end of the
+      // pass, and in the refusing pass every font file (0072). The page is
+      // the hop's origin: the client speaks to the origin it was served from.
+      const guard = await guardRequests(page, { origins: [`http://127.0.0.1:${String(hop.port)}`], refuseFonts })
       try {
         await page.goto(`http://127.0.0.1:${String(hop.port)}/`, { waitUntil: 'load' })
         console.log(`\n${label} -- ${String(width)}x900`)
@@ -199,8 +207,10 @@ async function run(gate, browser) {
           await act(page)
           await measured(page, state)
         }
-        // Whether every web font had loaded by the end of the pass, or, where it refuses them, none had.
-        await afterEveryPass(gate, page, { dist: DIST, refused: refuseFonts })
+        // Whether the page asked another origin for anything, and whether
+        // every web font had loaded by the end of the pass, or, where it
+        // refuses them, none had.
+        await afterEveryPass(gate, page, { dist: DIST, refused: refuseFonts, guard })
       } finally {
         await page.close()
       }

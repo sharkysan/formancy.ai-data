@@ -49,6 +49,14 @@ catalog:
   "@arethetypeswrong/cli": ^0.18.5
   "@types/node": ^22.10.0
 
+  # The room's faces, served by each app's own build rather than a font
+  # service (0072): one exact release for all three apps, the one
+  # formancy.ai's site and admin install. A font fix reaches the pages only
+  # when these move.
+  '@fontsource-variable/archivo': 5.3.0
+  '@fontsource/ibm-plex-mono': 5.3.0
+  '@fontsource/ibm-plex-sans': 5.3.0
+
   # The repository's guards and the release report read YAML: the workflows,
   # compose.yaml's services and CI's setup-node versions (0035). Already in
   # the lockfile through vite.

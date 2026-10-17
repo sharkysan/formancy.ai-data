@@ -1,9 +1,11 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, test } from 'vitest'
+import { styleReferences } from '../addresses.mjs'
 import { classify, MISSING } from './journey.mjs'
-import { anonymousMountProblems, auditEvents, bindMountProblems, configProblems, exposureProblems, leaks, namedSecretFiles, noticesProblem, pageReferences, redact, styleReferences } from './stack.mjs'
+import { anonymousMountProblems, auditEvents, bindMountProblems, configProblems, exposureProblems, leaks, namedSecretFiles, noticesProblem, pageProblems, pageReferences, redact } from './stack.mjs'
 
 /**
  * The gate's checks that need no Docker, held to cases (0032). Each is also
@@ -243,10 +245,10 @@ describe('the page check', () => {
   // Vite writes the stylesheet's link over several lines and with its
   // attributes in any order; a reader that missed it would check no asset.
   test('reads every script src and link href, across lines', () => {
-    const html = '<script type="module" crossorigin src="/studio/assets/index-B7.js"></script>\n<link\n  href="https://fonts.googleapis.com/css2?family=X"\n  rel="stylesheet"\n/>\n<link rel=stylesheet href=/studio/assets/index-D.css>'
+    const html = '<script type="module" crossorigin src="/studio/assets/index-B7.js"></script>\n<link\n  href="https://cdn.example/x.css"\n  rel="stylesheet"\n/>\n<link rel=stylesheet href=/studio/assets/index-D.css>'
     expect(pageReferences(html)).toEqual([
       { tag: 'script', url: '/studio/assets/index-B7.js' },
-      { tag: 'link', url: 'https://fonts.googleapis.com/css2?family=X' },
+      { tag: 'link', url: 'https://cdn.example/x.css' },
       { tag: 'link', url: '/studio/assets/index-D.css' },
     ])
   })
@@ -260,6 +262,41 @@ describe('the page check', () => {
       'data:image/png;base64,AA',
       'a.css',
     ])
+  })
+
+  // No page asks another host for anything (0072): not for a stylesheet,
+  // not for a face its stylesheet names, and not Google for its fonts,
+  // which the check let through while the pages took them from there. A
+  // web front that answered the pages' own files and let one of them ask
+  // elsewhere would pass the guide and tell that host about every visitor.
+  test('fails a page or a stylesheet that names another host, Google’s fonts included, and passes its own files', async () => {
+    const answers = {
+      '/studio/': ['text/html', '<link rel="stylesheet" href="/studio/assets/index-D.css"><script type="module" src="/studio/assets/index-B7.js"></script>'],
+      '/host/': ['text/html', '<link href="https://fonts.googleapis.com/css2?family=Archivo" rel="stylesheet"><script type="module" src="/host/assets/index-B7.js"></script>'],
+      '/studio/assets/index-D.css': ['text/css', '@font-face{font-family:A;src:url(./a-latin-400-normal-CcBhy9p4.woff2) format("woff2"),url(https://fonts.gstatic.com/s/a/v1/x.woff2) format("woff2")}'],
+      '/studio/assets/a-latin-400-normal-CcBhy9p4.woff2': ['font/woff2', 'wOF2'],
+      '/studio/assets/index-B7.js': ['text/javascript', 'export {}'],
+      '/host/assets/index-B7.js': ['text/javascript', 'export {}'],
+      '/studio/THIRD-PARTY-NOTICES.txt': ['text/plain; charset=utf-8', 'notices'],
+      '/host/THIRD-PARTY-NOTICES.txt': ['text/plain; charset=utf-8', 'notices'],
+    }
+    const server = createServer((request, response) => {
+      if (request.url === '/') return response.writeHead(302, { location: '/studio/' }).end()
+      const answer = answers[request.url ?? '']
+      if (answer === undefined) return response.writeHead(404).end()
+      return response.writeHead(200, { 'content-type': answer[0] }).end(answer[1])
+    })
+    await new Promise((listening) => server.listen(0, '127.0.0.1', () => listening(undefined)))
+    try {
+      const address = server.address()
+      const port = typeof address === 'object' && address !== null ? address.port : 0
+      expect(await pageProblems(`http://127.0.0.1:${String(port)}/`)).toEqual([
+        '/studio/assets/index-D.css names https://fonts.gstatic.com/s/a/v1/x.woff2, which is not this origin',
+        '/host/ loads https://fonts.googleapis.com/css2?family=Archivo, which is not this origin',
+      ])
+    } finally {
+      server.close()
+    }
   })
 
   // Each page's build writes its third-party notices beside it (0046), in

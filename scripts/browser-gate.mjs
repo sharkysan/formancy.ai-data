@@ -1,8 +1,9 @@
 // What every browser gate does to a page in every browser (0058): start the
-// keyboard from the top of the page the harness's way, check that the web
-// fonts the built page asks for arrived -- or, in the pass that refuses them,
-// that none did -- measure the scrollbar, and record once per browser's run
-// what the browser said it was and the system it ran on.
+// keyboard from the top of the page the harness's way, refuse and name
+// every request to an origin the gate does not serve (0072), check that the
+// web fonts the built page declares arrived -- or, in the pass that refuses
+// them, that none did -- measure the scrollbar, and record once per
+// browser's run what the browser said it was and the system it ran on.
 //
 // Each apps/*/scripts/browser-test.mjs calls these on the page it is given;
 // this module holds no package import, so it never loads a second copy of
@@ -10,9 +11,10 @@
 // the app's `load` for the same reason).
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { browserName, FACTS, prose, SYSTEM_PACKAGES } from './browsers.mjs'
+import { declaredFamilies } from './fonts.mjs'
+
+export { declaredFamilies }
 
 /**
  * The harness putting the start of sequential navigation at the top of the
@@ -51,48 +53,93 @@ export async function fromTheTop(page) {
   await page.evaluate(() => window.getSelection()?.collapse(document.body, 0))
 }
 
-/**
- * The families the built page asks Google Fonts for, from `dist/index.html`:
- * each `family=` of a fonts.googleapis.com stylesheet link, the name before
- * its axes, `+` read as a space. Read from the page the gate measures, so a
- * family added to or dropped from index.html is checked without an edit
- * here; empty when the page asks for none.
- */
-export function declaredFamilies(dist) {
-  const html = readFileSync(join(dist, 'index.html'), 'utf8')
-  const families = []
-  for (const [, href] of html.matchAll(/href="(https:\/\/fonts\.googleapis\.com\/css2?\?[^"]*)"/g)) {
-    const query = href.replaceAll('&amp;', '&').slice(href.indexOf('?') + 1)
-    for (const value of new URLSearchParams(query).getAll('family')) families.push(value.split(':')[0])
+/** A request for a font file: a `.woff2` or a `.woff`, from whatever origin. */
+const FONT_FILE = /\.woff2?$/i
+
+/** Whether `address` asks for a font file, whatever its origin: what the refusing pass refuses. */
+export function isFontFile(address) {
+  try {
+    return FONT_FILE.test(new URL(address).pathname)
+  } catch {
+    return false
   }
-  return [...new Set(families)]
+}
+
+/**
+ * Whether `address` is a request to an origin not in `origins`: another
+ * host, and another port of 127.0.0.1, which is another server. A `data:`
+ * or `blob:` address is the page's own bytes, asked of nobody.
+ */
+export function isForeign(address, origins) {
+  const url = new URL(address)
+  if (url.protocol === 'data:' || url.protocol === 'blob:') return false
+  return !origins.has(url.origin)
+}
+
+/**
+ * Every request `page` makes, from its first, routed (0072): one to an
+ * origin not in `origins` is aborted, so the answer is the same with no
+ * network and the runner tells nobody anything, and kept for the pass to
+ * name; and where `refuseFonts`, every font file is aborted too, whatever
+ * its origin, and kept, so a console line about one is the pass's doing.
+ * A route the gate adds later for one request runs first, and this one for
+ * everything it leaves. Returns `allow(origin)`, for a pass that signs in
+ * on a second origin; `refused`, the font files aborted; and `foreign()`,
+ * the addresses aborted since it was last asked.
+ */
+export async function guardRequests(page, { origins, refuseFonts = false }) {
+  const allowed = new Set(origins)
+  const asked = []
+  const refused = new Set()
+  await page.route(/.*/, (route) => {
+    const address = route.request().url()
+    if (isForeign(address, allowed)) {
+      asked.push(address)
+      return route.abort()
+    }
+    if (refuseFonts && isFontFile(address)) {
+      refused.add(address)
+      return route.abort()
+    }
+    return route.fallback()
+  })
+  return { allow: (origin) => allowed.add(origin), refused, foreign: () => asked.splice(0) }
+}
+
+/** What the check that a pass asked no other origin for anything fails with, or null: each address once, the first four. */
+export function foreignProblem(asked) {
+  if (asked.length === 0) return null
+  const each = [...new Set(asked)]
+  return `${String(each.length)} address${each.length === 1 ? '' : 'es'} on another origin, each refused: ${each.slice(0, 4).join(', ')}${each.length > 4 ? ', …' : ''}`
 }
 
 /**
  * Every family of a loaded face in the page, once `document.fonts` has
- * nothing pending -- what the page drew with -- and how many files the page
- * fetched from Google Fonts, its stylesheet and the font files, by the
- * page's own resource timing: what a failure says, so that a pass whose
- * stylesheet never arrived reads as the network's and not the page's.
+ * nothing pending -- what the page drew with -- and how many font files the
+ * page fetched, by its own resource timing: what a failure says, so that a
+ * pass whose faces never arrived can be told from a page that stopped
+ * declaring them.
  */
 export function webFonts(page) {
-  return page.evaluate(async () => {
+  return page.evaluate(async (pattern) => {
     await document.fonts.ready
+    const fontFile = new RegExp(pattern, 'i')
     return {
       loaded: [...new Set([...document.fonts].filter((face) => face.status === 'loaded').map((face) => face.family.replaceAll(/["']/g, '')))].sort(),
-      fetched: performance.getEntriesByType('resource').filter((entry) => /^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(entry.name)).length,
+      fetched: performance.getEntriesByType('resource').filter((entry) => fontFile.test(new URL(entry.name).pathname)).length,
     }
-  })
+  }, FONT_FILE.source)
 }
 
 /**
  * What a pass's fonts check fails with, or null: in a pass that does not
- * refuse the web fonts, every family the page asks for loaded; in the pass
- * that refuses them, none did; and a page that asks for none fails both.
+ * refuse the web fonts, every family the built stylesheets declare loaded;
+ * in the pass that refuses them, none did; and a page whose stylesheets
+ * declare none fails both.
  */
 export function fontProblem({ families, loaded, fetched, refused }) {
-  if (families.length === 0) return 'the built page asks Google Fonts for nothing; the gate reads its families from dist/index.html'
-  const files = fetched === undefined ? '' : ` (the page fetched ${String(fetched)} file${fetched === 1 ? '' : 's'} from Google Fonts)`
+  if (families.length === 0) return "the built page's stylesheets declare no font face; the gate reads its families from the stylesheets dist/index.html links"
+  const files = fetched === undefined ? '' : ` (the page fetched ${String(fetched)} font file${fetched === 1 ? '' : 's'})`
   if (refused) {
     const arrived = families.filter((family) => loaded.includes(family))
     return arrived.length === 0 ? null : `${prose(arrived)} loaded anyway, so this pass measured the web fonts, not the fallback stack${files}`
@@ -261,14 +308,16 @@ export function focusScrollProblem(browser, counts) {
 /**
  * What every gate does at the end of every pass, on the page the pass drew,
  * in every browser: records once per run what the browser said it was and
- * the system it ran on; checks the web fonts against what `dist` asks for --
- * at the end, once every state of the pass has drawn the text that uses
- * each family; and measures the scrollbar's width, `innerWidth` less the
- * root's `clientWidth`, which is zero in headless Chromium because
- * Playwright launches it with --hide-scrollbars.
+ * the system it ran on; checks that the page asked no other origin for
+ * anything, from what `guard` (guardRequests) refused; checks the web fonts
+ * against what `dist` declares -- at the end, once every state of the pass
+ * has drawn the text that uses each family; and measures the scrollbar's
+ * width, `innerWidth` less the root's `clientWidth`, which is zero in
+ * headless Chromium because Playwright launches it with --hide-scrollbars.
  */
-export async function afterEveryPass(gate, page, { dist, refused }) {
+export async function afterEveryPass(gate, page, { dist, refused, guard }) {
   if (!gate.hasEnvironment()) gate.environment({ ...(await environmentOf(page)), system: systemOf(gate.asked) })
+  gate.check('the page asked no other origin for anything', foreignProblem(guard.foreign()))
   const problem = fontProblem({ families: declaredFamilies(dist), ...(await webFonts(page)), refused })
   gate.check(refused ? 'with the web fonts refused, none loaded' : 'every web font the page asks for loaded', problem)
   gate.measure({ name: 'the scrollbar’s width, innerWidth less the root’s clientWidth', value: await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth), unit: 'px' })

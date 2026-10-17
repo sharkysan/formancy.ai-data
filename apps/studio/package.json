@@ -17,6 +17,9 @@
     "snapshot": "node scripts/capture-snapshots.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/archivo": "catalog:",
+    "@fontsource/ibm-plex-mono": "catalog:",
+    "@fontsource/ibm-plex-sans": "catalog:",
     "@formancy/builder-core": "0.5.0",
     "@formancy/core": "0.5.0",
     "@formancy/data-core": "workspace:*",

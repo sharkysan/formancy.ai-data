@@ -734,7 +734,7 @@
       ]
     },
     "0032": {
-      "reviewed": "sha256:67d09a79073932814a278919aff201f49a16fd8b26f3c0981475c19056cc8b3d",
+      "reviewed": "sha256:95be055f7eaa0bd546ca41675eb8b01f1623a9757a034860ebe7bf4d3cf6a2c2",
       "limitations": [
         {
           "area": "operations",
@@ -949,7 +949,7 @@
       ]
     },
     "0038": {
-      "reviewed": "sha256:cd2cb5a26473d2276e31622e3e6f93a926b33711f3250a1d5a0e2d9a52e7c810",
+      "reviewed": "sha256:95ce8cec4e8c6c424104ac45259c0c1c62010cf018c6c8ba0e22640eadff376c",
       "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the pictures job's time. Nobody who installs, integrates or operates the module meets them."
     },
     "0039": {
@@ -1296,7 +1296,7 @@
       ]
     },
     "0046": {
-      "reviewed": "sha256:3171bf9e2f198de27e13c3696175eebc994b781185bad50513f838047a8e6afb",
+      "reviewed": "sha256:d6fdc44fb77ac3e9c33ce8b24fe16e2abfdb62b2fb6e0e6d1d3b901b736d7a39",
       "limitations": [
         {
           "area": "licence",
@@ -1711,7 +1711,7 @@
       ]
     },
     "0058": {
-      "reviewed": "sha256:3f364c93d33fe27effb66a8f3ce916f0fe4abfbe6f95b29d570001a72b3bf470",
+      "reviewed": "sha256:30b72f70ea4400c02e4b4c73fb9aefde4ad85b0553230b77c6cac08db4c65bd2",
       "limitations": [
         {
           "area": "testing",
@@ -2229,7 +2229,7 @@
       ]
     },
     "0069": {
-      "reviewed": "sha256:f867a9d9854a8c8675a2059c28c78cada2f08dfe10bddaecb5e2c8b41aecb284",
+      "reviewed": "sha256:515f7f10cfe67f03d52f68407f49605db2ff858742b7a817b1d433938a3843df",
       "limitations": [
         {
           "area": "operations",
@@ -2262,10 +2262,6 @@
         {
           "area": "operations",
           "says": "The demo Worker's compatibility date stays until someone reads what moving it changes, and which of Cloudflare's changes tied to that date reach a Worker with no code was not read."
-        },
-        {
-          "area": "operations",
-          "says": "A visitor's browser asks Google for the demo's fonts, and its Content-Security-Policy names Google's two hosts, so fonts Google moves to another host are refused, and the page drawn in its fallback stack, until the policy is edited."
         },
         {
           "area": "licence",
@@ -2331,6 +2327,31 @@
           "area": "server",
           "says": "From a trusted proxy, Fastify's `request.host` and `request.protocol` follow `X-Forwarded-Host` and `X-Forwarded-Proto`, which nginx passes on from any client; nothing in the server reads either.",
           "heldBy": "packages/data-server/src/forwarded.test.ts"
+        }
+      ]
+    },
+    "0072": {
+      "reviewed": "sha256:87b18bc36ef927de06baca9926022285383dfd6b3b10aa426878167239abaee9",
+      "limitations": [
+        {
+          "area": "licence",
+          "says": "The studio, the host page and the examples page bundle the Archivo, IBM Plex Sans and IBM Plex Mono fonts under the SIL Open Font License 1.1, not this repository's licence, and the notices beside each page carry that licence's text."
+        },
+        {
+          "area": "operations",
+          "says": "The pages' fonts are the Fontsource release the workspace catalog pins, so a fix Google ships to a face reaches them only when this repository moves the pins, and nothing says one is due."
+        },
+        {
+          "area": "operations",
+          "says": "Each app's build carries 59 font files, 757,316 bytes, and the web image two such sets, most of them subsets and WOFF fallbacks no visitor's browser fetches (measured with Vite 8.3.3 on 2026-10-16)."
+        },
+        {
+          "area": "host",
+          "says": "On a machine with a font installed under the name Archivo, the studio, the host page and the examples page draw their headings in that font rather than the face they carry."
+        },
+        {
+          "area": "testing",
+          "says": "That no page asks another host for anything is held by the browser gates for the states they reach and by a static read of each index.html and built stylesheet, not of the JavaScript, where the host page's bundle holds AG Grid's loader of Google's fonts, unused: a request only an interaction the gates do not perform makes, or a connection with no request, is seen by nothing."
         }
       ]
     }
