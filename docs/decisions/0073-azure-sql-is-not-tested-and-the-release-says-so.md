@@ -1,6 +1,6 @@
 # 0073 — Azure SQL Database and Azure SQL Managed Instance are not tested, and the release says so where it said nothing
 
-- **Status:** accepted
+- **Status:** accepted; narrowed by [0074](0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md): an Azure database that accepts Entra logins only can be named in the allowlist, as an Entra managed identity or service principal, which no test logs in as
 - **Date:** 2026-10-17
 - **Deciders:** Daniel Bacher
 - **Verified by:**

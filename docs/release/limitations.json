@@ -20,8 +20,8 @@
       ]
     },
     "0003": {
-      "reviewed": "sha256:4800c48de296f1cc38f1f032c2f75c4f4aa58f1307a67f872d6cee248b195c65",
-      "none": "Its user-facing cost, that what is tested is the images of each engine's matrix and no other, is the report's tested-on section, derived from each run, and 0067's and 0073's limitations."
+      "reviewed": "sha256:cc8be46a7ee3d9d300c6b3df05de1f4fe25c3d9ed67f9cafec6aeb7e08c92ce5",
+      "none": "Its user-facing cost, that what is tested is the images of each engine's matrix and no other, is the report's tested-on section, derived from each run, and 0067's, 0073's and 0074's limitations."
     },
     "0004": {
       "reviewed": "sha256:ca98cd0ed9328133061f0515d273f1173a03c6742880ed018581a29a6ba28a7d",
@@ -365,7 +365,7 @@
       ]
     },
     "0019": {
-      "reviewed": "sha256:4ae642eeb992fe2eda4cc3f817e9d00adbb8a6100cf2be58218f36c30bea9aa9",
+      "reviewed": "sha256:894742002e97ed49ea2040b74809aa8f5e2b0a298673716b8378f6f8beb991cd",
       "limitations": [
         {
           "area": "operations",
@@ -451,7 +451,7 @@
       ]
     },
     "0025": {
-      "reviewed": "sha256:e4306a46a1128d57cd5081419fe5b3d473018334b4996e1e78e5f06ce1b3f899",
+      "reviewed": "sha256:243558c9b27de7bfc8b496635ae0fa14c0887c21118cecac6051eac0f171290e",
       "limitations": [
         {
           "area": "operations",
@@ -2424,7 +2424,7 @@
       ]
     },
     "0073": {
-      "reviewed": "sha256:ddac04a48a77c90e65d67fe71d558f39e788ce82ae85561e4ca5d92961b96b0c",
+      "reviewed": "sha256:c455c47ef646345d68d8caf5437a96aaee572e6a63fe45a898325c614a1bce6c",
       "limitations": [
         {
           "area": "databases",
@@ -2446,10 +2446,54 @@
         {
           "area": "operations",
           "says": "Under Azure SQL's Redirect connection policy a client goes on from port 1433 to a port from 11000 to 11999, and a paused serverless database answers error 40613 while it resumes, both as Microsoft documents them; no test meets either, so what a connection test, a discovery or a record request answers then is not known."
+        }
+      ]
+    },
+    "0074": {
+      "reviewed": "sha256:a2d8a693d28b2d017153b8252ab4f97dc19e84e33c3b40e5f21a3d4d883a9ca2",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "The allowlist accepts an Entra managed identity or service principal for a SQL Server connection, and no test logs in with either: the tests show only that a SQL Server 2022 container refuses such a login, that nothing is retried as a SQL login and that no secret is written.",
+          "heldBy": "packages/data-sqlserver/src/adapter.integration.test.ts"
         },
         {
           "area": "databases",
-          "says": "An Azure database that accepts Entra logins only cannot be connected to: the allowlist takes a SQL login alone."
+          "says": "An Entra token is asked for Azure SQL's resource in the public cloud alone, so Azure Government's and Azure China's are refused, and a tenant is named by its id, never by its domain name."
+        },
+        {
+          "area": "databases",
+          "says": "An Entra connection refuses TLS turned off and a trusted server certificate, so a server whose certificate is self-signed, or re-signed by a proxy, cannot be reached as an Entra principal.",
+          "heldBy": "packages/data-server/src/connections.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "An allowlist with a key this release does not read, at an entry, in `tls` or in `login`, or a `tls` setting that is not true or false, stops the server at start, naming the key: a file with a stray key that an earlier release started with no longer starts.",
+          "heldBy": "packages/data-server/src/connections.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Only the first connection of an Entra pool says why its login failed: a login refused later, when the pool opens another connection, is `unavailable` on a record request, but discovery's log line then gives no reason."
+        },
+        {
+          "area": "operations",
+          "says": "A managed identity off Azure failed to get a token in 0.00 to 0.02 s on a Windows 11 host and in 4.53 to 6.37 s in the server image's base under Docker Desktop, measured on 2026-10-17, inside mssql's 15 s connect timeout; a host that drops packets to the metadata address rather than refusing them was not measured, and could fail the login as a timeout naming the host instead."
+        },
+        {
+          "area": "operations",
+          "says": "@azure/identity and MSAL read the region, the proxy and the log level from the environment for any Entra login, and a managed identity its platform's endpoint, workload identity's token file included, outside the reviewed allowlist; `AZURE_LOG_LEVEL` writes their lines to standard error, outside the server's log."
+        },
+        {
+          "area": "operations",
+          "says": "@azure/identity is a dependency of `@formancy/data-sqlserver` at exactly 4.13.3, so a fix to it reaches an installation only through a release of this module that moves the version."
+        },
+        {
+          "area": "server",
+          "says": "An embedder's `ConnectionConfig.user` and `password` are optional beside `login`, and a `ConnectionFactory` of their own is given its secret as `string | undefined`."
+        },
+        {
+          "area": "testing",
+          "says": "The README's tested-on row calls the SQL login tested from a value typed in `SQLSERVER_LOGINS`: no server record says which login a test made, so the release report does not say that every SQL Server login of a run was a SQL login."
         }
       ]
     },

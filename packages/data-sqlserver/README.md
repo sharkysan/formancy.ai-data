@@ -20,6 +20,28 @@ await adapter.ping() // { kind: 'sqlserver', version: '16.0.4205.1', product: 's
 await adapter.close()
 ```
 
+Or as a Microsoft Entra principal, a managed identity or a service
+principal, where the server is Azure SQL and takes Entra logins:
+
+```ts
+const pool = await connectSqlServer({ host, port, database, encrypt: true, trustServerCertificate: false, entra: { type: 'managed-identity', clientId } })
+// or entra: { type: 'service-principal', tenantId, clientId, clientSecret }
+```
+
+**No test of this release logs in as either**, which `SQLSERVER_LOGINS`
+says and the README's tested-on table derives from it: no container takes
+an Entra login, and no test asks Entra. The pool is given one credential,
+built when it is opened, which asks Entra for Azure SQL's token,
+`https://database.windows.net/.default`, and refuses any other resource a
+server names. A service principal's authority is the public cloud's,
+written down, so `AZURE_AUTHORITY_HOST` is never read. An Entra principal
+without `encrypt` is refused before anything is opened, and a failed login
+rejects with a sentence, with Entra's AADSTS code when it gave one, that
+names no tenant, client or secret. The options are plain strings, so no
+`@azure` type is in this package's declarations; `@azure/identity` is its
+dependency at exactly 4.13.3, the copy tedious already installs
+([0074](../../docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
+
 Open the pool with `connectSqlServer`, not with an `mssql` you imported
 yourself. This package binds every value with `mssql.NVarChar` and friends from
 its own copy of mssql, and tedious checks those by identity: a pool from

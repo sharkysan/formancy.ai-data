@@ -263,6 +263,29 @@ later.
   `ExportQueryRefusal`, `CsvCell`, `CsvRefusal` and `CsvText`; of
   `@formancy/data-client`: `exportRecords`, `EXPORT_MAX_BYTES`, and the
   types `RecordFile` and `RecordExportQuery`.
+- **A SQL Server connection may log in as a Microsoft Entra principal**: a
+  managed identity, user-assigned by its client id or the host's own, or a
+  service principal whose client secret is a reference, as a password is.
+  Why: an Azure SQL database set to Entra-only authentication has no SQL
+  login to give, so the allowlist could not name it at all. **No test of
+  this release logs in as either**: no container takes an Entra login and
+  no test asks Entra, so the tests show only that a SQL Server 2022
+  container refuses one, that nothing is tried again as a SQL login and
+  that no secret, tenant or client reaches a log, an answer or an audit
+  event. The server says so at start, once for each such connection, and
+  the README's *What it is tested on* says so in a row of its own,
+  derived from the adapter. The credential is built once for each pool
+  and asked for Azure SQL's token alone, whatever resource the server
+  names; an Entra entry refuses TLS turned off, a trusted server
+  certificate, a tenant named by its domain and a secret that is not a
+  reference; and a failed login says why in a sentence, with Entra's
+  AADSTS code when it gave one, and nothing of the principal
+  ([0074](docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md);
+  the data server's README has the entry's shape).
+  New exports of `@formancy/data-sqlserver`: `SQLSERVER_LOGINS`, and the
+  types `EntraLogin` and `SqlServerLogin`. **`@azure/identity` 4.13.3 is
+  a new dependency** of `@formancy/data-sqlserver`, at that exact version;
+  tedious already installed it.
 
 ### Changed
 
@@ -370,6 +393,22 @@ later.
   its `standing`, `{ tested, says }`: whether this release was tested on
   that server, in data-core's sentence. A server it was not tested on is
   answered 200 as before.
+- **The allowlist refuses a key it does not read**, on every entry and
+  inside `tls` and `login`, naming the key and never its value, and a
+  `tls` setting that is not true or false. Why: an entry was kept whole
+  once its known fields passed, so a key a later release reads -- `login`
+  among them -- would have been dropped by this one and the entry would
+  have logged in some other way; and `"enabled": "false"`, a string, did
+  not turn TLS off. **Breaking for a file with a stray key**: the server no
+  longer starts, and says which key (0074). `deploy/connections.json`,
+  which the getting-started guide runs, and the allowlist the performance
+  stack writes hold only keys it reads.
+- **For embedders**: `ConnectionConfig`'s `user` and `password` are
+  optional beside the new `login`, so code that reads `config.user` as a
+  string no longer compiles, and a `ConnectionFactory` of your own is
+  given its secret as `string | undefined`: a password, a client secret,
+  or none for a managed identity. `connectSqlServer` takes `user` and
+  `password` or `entra`, and refuses `entra` without `encrypt` (0074).
 - **For embedders**: `ServerIdentity` now extends `ServerFacts`, so a
   `DatabaseAdapter` of your own must report `product` and `major`, and for
   SQL Server `compatibility`, from `ping` -- a breaking change for an
@@ -643,7 +682,9 @@ documented at all; every boxed SQL Server, on any host and in any edition,
 SQL Server on Azure Virtual Machines among them, is called tested when its
 release and its database's level are, though every test ran the Developer
 edition on Linux in a container; and an Azure database that accepts Entra
-logins only cannot be connected to.
+logins only is reached only as an Entra principal no test logs in as
+(0074).
+
 What reading a NOT NULL added NOT VALID as nullable costs, in 0077: on
 PostgreSQL 18 its column is generated optional until the constraint is
 validated, so a create or an update that leaves it empty is refused by the
@@ -682,6 +723,25 @@ database does not hold; instants to the second and times to the minute,
 as a read holds them; on SQL Server an unpaired surrogate or a NUL refuses
 the file; and what Excel shows of it -- the byte-order mark, a `;` locale,
 17 digits -- was not tried.
+What logging in as an Entra principal costs, in 0074: no test logs in as
+one, so a partner makes the first successful login, and nothing shows a
+token refreshed, a pool outliving its token, Azure SQL's resource passing
+the guard or a managed identity's endpoint on any host; a new dependency,
+moved by hand; an allowlist with a stray key no longer starts the server;
+an embedder's `ConnectionConfig.user` is no longer always a string; what
+@azure/identity and MSAL read from the environment -- the region, the
+proxy, the log level, a managed identity's platform -- is outside the
+reviewed allowlist, and `AZURE_LOG_LEVEL` writes outside the server's
+log; only the first connection of an Entra pool says why its login
+failed, and a later one is `unavailable` with no reason in discovery's
+log line; a managed identity off Azure failed to get a token in 0.00 to
+0.02 s on a Windows 11 host and in 4.53 to 6.37 s in the server image's
+base under Docker Desktop, measured on 2026-10-17, inside mssql's 15 s
+connect timeout, and a host that drops packets to the metadata address
+was not measured; only the public cloud, and only a tenant's id; no
+Entra login to a server whose certificate the operator must trust; and
+the README's row calls the SQL login tested from a value typed in the
+adapter, since no server record says which login a test made.
 
 ## 0.1.0 — 2026-10-16
 

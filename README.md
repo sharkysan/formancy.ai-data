@@ -68,9 +68,15 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > own, which Cloudflare deploys from `main` once its Worker is created and
 > not from a release
 > ([0070](./docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md));
-> and a form's records downloaded as one CSV file, made whole or refused,
+> a form's records downloaded as one CSV file, made whole or refused,
 > which a 0.1.0 server does not have
-> ([0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)),
+> ([0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md));
+> and a SQL Server connection that logs in as an Entra managed identity or
+> service principal, which the server says at start no test logs in as,
+> with every allowlist entry refusing a key it does not read, where
+> a 0.1.0 server ignores those keys and refuses an Entra entry for want of
+> a user and a password
+> ([0074](./docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
@@ -144,6 +150,12 @@ until then the address is formancy.ai's 404
   matrix runs, SQL Server on Azure Virtual Machines among them, is called
   tested on its strength
   ([0073](./docs/decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md)).
+  A SQL Server connection may log in as an Entra managed identity or
+  service principal instead of a SQL login, its credential built once for
+  each pool and asked for Azure SQL's token alone. No test logs in as
+  either: the server says so at start for each such connection, and
+  [*What it is tested on*](#what-it-is-tested-on) says so in a row of its
+  own ([0074](./docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 - **Generates a form deterministically**, and says what it inferred, made
   read-only, excluded and blocked, and why
   ([0009](./docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)).

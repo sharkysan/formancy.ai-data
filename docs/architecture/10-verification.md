@@ -416,6 +416,13 @@ and a number typed here would drift from the next run.
   review tell an administrator when this release was not tested on it
   ([0068](../decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)). The report says what the run met, and an installation may meet
   another.
+- **No test logs in as an Entra principal.** A SQL Server connection may
+  log in as an Entra managed identity or service principal, and the tests
+  show only that a SQL Server 2022 container refuses one, that nothing is
+  tried again as a SQL login and that nothing of the principal is
+  written; the token's path is reached by a unit test alone. Nothing
+  verifies that an Entra login succeeds
+  ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 - **No gate is required before a merge.** Every gate reports on every pull
   request and fails a release; what stops a red one from being merged is
   the maintainer reading it (`GOVERNANCE.md`, [§11.6](11-risks-and-debt.md#116-people-and-process)).

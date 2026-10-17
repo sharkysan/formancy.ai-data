@@ -1,6 +1,6 @@
 # 0025 — Each adapter package owns its driver, and one suite runs the whole product on both engines
 
-- **Status:** accepted; extended by [0061](0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md): PostgreSQL lookups run on a client of their own, named `formancy-data lookups`
+- **Status:** accepted; extended by [0061](0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md): PostgreSQL lookups run on a client of their own, named `formancy-data lookups`; extended by [0074](0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md): the SQL Server adapter builds the Entra credential it logs in with, one per pool, from its own copy of @azure/identity
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/e2e.integration.test.ts` — on
