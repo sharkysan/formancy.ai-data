@@ -737,8 +737,10 @@ can be adopted the day it is published: its packages, and nothing else, are
 exempt from pnpm's one-day minimum release age, each by its exact version
 ([0055](./docs/decisions/0055-an-upstream-release-is-adopted-the-day-it-is-published.md)),
 and the same guard refuses any other exemption. A generic improvement the
-module needs — an exact-decimal field type, say — goes upstream through
-formancy's own contribution rules rather than being patched here.
+module needs — an exact-decimal field type, say, proposed as
+[formancy.ai#258](https://github.com/sharkysan/formancy.ai/issues/258) — goes
+upstream through formancy's own contribution rules rather than being patched
+here.
 
 Generated forms stay on formancy's spec 3 after spec 4's release, and the
 server publishes and serves no other version
