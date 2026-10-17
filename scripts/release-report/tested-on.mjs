@@ -2,8 +2,9 @@
 // the images the suites start unless a file names another, the matrix of
 // images the adapter suites and data-fixtures run on and the CI legs that
 // run them (0067), the products a snapshot recognises that no test runs on
-// (0073), every runtime dependency a published package declares and
-// the version the suites load, the upstream packages, Node, the build of each
+// (0073), the SQL Server logins the adapter opens and which of them a test
+// logs in with (0074), every runtime dependency a published package declares
+// and the version the suites load, the upstream packages, Node, the build of each
 // browser the gates launch, and the tools.
 //
 // Static facts, derived: nothing here is typed except NESTED, and a guard
@@ -12,9 +13,9 @@
 // launched -- comes from that run's results, in the report; this is what the
 // README's generated table and the report's "range -> loaded" columns read.
 //
-// Run after `pnpm install` and `pnpm build`: the images, the engines and the
-// untested products come from data-fixtures' and data-core's built output,
-// the code that uses them.
+// Run after `pnpm install` and `pnpm build`: the images, the engines, the
+// untested products and the logins come from data-fixtures', data-core's
+// and data-sqlserver's built output, the code that uses them.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
@@ -208,6 +209,7 @@ export async function testedOn(root = repo) {
   const local = new Set(packages.map(({ manifest }) => manifest.name))
   const { DEFAULT_IMAGES, IMAGES_VARIABLE, MATRIX_IMAGES } = await built(root, 'packages/data-fixtures')
   const { DATABASE_KINDS, UNTESTED_PRODUCTS } = await built(root, 'packages/data-core')
+  const { SQLSERVER_LOGINS } = await built(root, 'packages/data-sqlserver')
   const rootManifest = readJson(join(root, 'package.json'))
   return {
     engines: [...DATABASE_KINDS],
@@ -221,6 +223,10 @@ export async function testedOn(root = repo) {
     // tested, `{ product, name }`: Azure SQL Database and Managed Instance
     // today (0073).
     untested: UNTESTED_PRODUCTS.map(({ product, name }) => ({ product, name })),
+    // Every way into SQL Server the adapter opens a pool with, `{ login,
+    // name, tested }`: a SQL login, which every suite logs in with, and the
+    // Entra principals, which no test logs in as (0074).
+    logins: SQLSERVER_LOGINS.map(({ login, name, tested }) => ({ login, name, tested })),
     runtime: runtime(root, published(root), local),
     upstream: upstream(root, packages, local),
     node: {

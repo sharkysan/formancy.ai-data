@@ -89,11 +89,25 @@ function untestedRows(facts) {
   return [['**Recognised, not tested**', `None: ${prose(facts.untested.map(({ name }) => name))} ${are} recognised by a snapshot and called not tested`, '']]
 }
 
+/**
+ * README.md's row for the ways into SQL Server (0074), from data-sqlserver's
+ * SQLSERVER_LOGINS: under "Tested with", the logins a test logs in with,
+ * then the others, said as accepted and not tested -- the Entra principals,
+ * which an allowlist may name and no test logs in as.
+ */
+function loginRow(facts) {
+  const tested = facts.logins.filter((login) => login.tested).map((login) => login.name)
+  const untested = facts.logins.filter((login) => !login.tested).map((login) => login.name)
+  const said = untested.length === 0 ? '' : `; ${prose(untested)} ${untested.length === 1 ? 'is' : 'are'} accepted and not tested`
+  return ['**SQL Server logins**', `${tested.length === 0 ? 'None' : prose(tested)}${said}`, '']
+}
+
 /** README.md's block: one table, every row derived. */
 export function readmeTable(facts) {
   const rows = [
     ...facts.engines.map((engine) => [`**${engineName(engine)}**`, engineCell(facts, engine), '']),
     ...untestedRows(facts),
+    loginRow(facts),
     ...facts.runtime.map((entry) => [
       entry.under === undefined ? `${code(entry.name)}, by ${code(entry.package)}` : `${code(entry.name)}, under ${code(entry.under)}`,
       entry.loaded,
