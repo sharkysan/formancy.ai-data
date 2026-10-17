@@ -70,7 +70,7 @@ only enforcement is "we remember" says so plainly.
 | [0013](0013-published-configuration-is-files-with-link-based-swap.md) | Published configuration is files, and compare-and-swap is a hard link | accepted; extended by 0030, 0065; narrowed by 0062 |
 | [0014](0014-host-identity-is-verified-offline.md) | Host identity is a token verified offline, with a pinned algorithm | accepted; extended by 0059 |
 | [0015](0015-a-record-operation-is-one-guarded-statement.md) | A record operation is one guarded statement, canonical in and out, never retried | accepted; narrowed by 0041; extended by 0031, 0043, 0044, 0050 |
-| [0016](0016-postgres-operations.md) | PostgreSQL operations: canonical text in and out, every name from pg_catalog | accepted; narrowed by 0028, 0040, 0041; extended by 0031, 0043, 0044, 0050, 0051, 0061 |
+| [0016](0016-postgres-operations.md) | PostgreSQL operations: canonical text in and out, every name from pg_catalog | accepted; narrowed by 0028, 0040, 0041; extended by 0031, 0043, 0044, 0050, 0051, 0061, 0078 |
 | [0017](0017-sqlserver-operations.md) | SQL Server operations: one guarded batch, and a write reported done only when the table holds it | accepted; narrowed by 0026, 0028, 0031, 0040, 0041; extended by 0027, 0031, 0043, 0044, 0050, 0051, 0061 |
 | [0018](0018-one-planner-turns-answers-into-requests.md) | One planner turns answers into requests, and leaves membership to the database | accepted; narrowed by 0028, 0041; extended by 0040, 0043, 0044, 0050 |
 | [0019](0019-a-published-form-is-checked-every-time-it-is-read.md) | A published form is one bundle, checked every time it is read; a form reaches only allowlisted databases | accepted; extended by 0030, 0041, 0042, 0045, 0062 |
@@ -130,3 +130,4 @@ only enforcement is "we remember" says so plainly.
 | [0075](0075-a-field-may-move-to-another-generated-section.md) | A field may move to another generated section, recorded on its own entry and carried by what it stands for | accepted |
 | [0076](0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md) | The architecture is documented as arc42 in docs/architecture, and every change updates the section it touches | accepted |
 | [0077](0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md) | A NOT NULL that PostgreSQL 18 added NOT VALID is read as the check it is: the column nullable, the constraint enforced and not validated | accepted |
+| [0078](0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md) | A PostgreSQL statement's rows are collected as the driver reads them, never taken from the array it resolves with | accepted |

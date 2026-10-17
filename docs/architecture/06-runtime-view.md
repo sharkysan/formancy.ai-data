@@ -353,7 +353,13 @@ default is not what the figures derive; and each adapter's
 What it costs: a search still reads every row its filter admits, so the
 deadline caps how long and not how much; that a proxy passes the abort on
 is held by no test; the PostgreSQL adapter reads and patches three private
-properties of postgres.js, which an upgrade can move (0061).
+properties of postgres.js, which an upgrade can move (0061). A cancel that
+lands while a statement's rows are on their way ends it part-way, which
+postgres.js 3.4.9 answered by placing the next statement's rows on that
+connection after empty slots; the adapter collects each statement's rows
+itself, so the next lookup answers as it would have, and nothing of the
+stopped statement reaches it
+([0078](../decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md)).
 
 ## 6.9 Reviewing drift, regenerating and restoring
 

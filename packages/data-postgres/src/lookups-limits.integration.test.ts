@@ -139,6 +139,45 @@ async function backendOf(application: string): Promise<{ pid: number; state: str
   return row
 }
 
+/**
+ * A statement that runs long in its execute, not in its parse: a sleep, with
+ * a parameter so postgres.js has PostgreSQL describe it first, as it does
+ * every lookup. Named by its column, so pg_stat_activity tells it apart.
+ */
+const sleeping = (name: string) => ({ text: `select pg_catalog.pg_sleep($1::pg_catalog.text::pg_catalog.float8) as ${name}`, params: ['30'] })
+
+/**
+ * A statement that sends tenant 2's customers, key and name as a search
+ * reads them, and then sleeps in its execute: a lookup stopped part-way
+ * through its answer. Appended after the rows, so PostgreSQL has put them in
+ * its answer before it sleeps; a cancel then ends the statement with an
+ * error after them. Named by its column, so pg_stat_activity tells it apart.
+ */
+const PART_WAY = {
+  text: `select r.tenant_id::pg_catalog.text, r.customer_no::pg_catalog.text, r.name::pg_catalog.text as limits_part_way
+    from sales.customer as r where r.tenant_id = $1::pg_catalog.text::pg_catalog.int4
+    union all select null, null, pg_catalog.pg_sleep(30)::pg_catalog.text`,
+  params: ['2'],
+}
+
+/** Whether the backend `application` holds is inside a pg_sleep: past its parse, its describe and the start of its execute. */
+async function asleep(application: string): Promise<boolean> {
+  const [row] = await owner<Array<{ wait_event: string | null }>>`select wait_event from pg_catalog.pg_stat_activity where application_name = ${application}`
+  return row?.wait_event === 'PgSleep'
+}
+
+/**
+ * Whether the backend `application` holds has finished the sleep named
+ * `name`: idle, with that statement as its last. Before the sleep is parsed
+ * the last statement is another; while it sleeps it is active; and from its
+ * parse until its execute arrives it is active too, since PostgreSQL reports
+ * idle only once a statement's Sync is done.
+ */
+async function finished(application: string, name: string): Promise<boolean> {
+  const [row] = await owner<Array<{ state: string; query: string }>>`select state, query from pg_catalog.pg_stat_activity where application_name = ${application}`
+  return row?.state === 'idle' && row.query.includes(name)
+}
+
 type Operation = 'search' | 'resolve' | 'rejects'
 const OPERATIONS: readonly Operation[] = ['search', 'resolve', 'rejects']
 
@@ -378,25 +417,6 @@ describe('a connection that goes while a lookup runs on it', () => {
   })
 })
 
-/**
- * A statement that runs long in its execute, not in its parse: a sleep, with
- * a parameter so postgres.js has PostgreSQL describe it first, as it does
- * every lookup. Named by its column, so pg_stat_activity tells it apart.
- */
-const sleeping = (name: string) => ({ text: `select pg_catalog.pg_sleep($1::pg_catalog.text::pg_catalog.float8) as ${name}`, params: ['30'] })
-
-/**
- * Whether the backend `application` holds has finished the sleep named
- * `name`: idle, with that statement as its last. Before the sleep is parsed
- * the last statement is another; while it sleeps it is active; and from its
- * parse until its execute arrives it is active too, since PostgreSQL reports
- * idle only once a statement's Sync is done.
- */
-async function finished(application: string, name: string): Promise<boolean> {
-  const [row] = await owner<Array<{ state: string; query: string }>>`select state, query from pg_catalog.pg_stat_activity where application_name = ${application}`
-  return row?.state === 'idle' && row.query.includes(name)
-}
-
 describe('an abort before PostgreSQL has described the statement', () => {
   // postgres.js has PostgreSQL parse and describe a statement with
   // parameters before it sends them and the execute: a round trip in which,
@@ -459,6 +479,34 @@ describe('an abort before PostgreSQL has described the statement', () => {
     expect(await pending).toBe(reason)
     await until(() => finished(application, 'limits_first_trip'), 'the sleep was stopped')
     expect(await ask(sql, 'search', AbortSignal.timeout(ANSWERS_WITHIN))).toEqual(expected)
+  })
+})
+
+describe('a lookup stopped part-way through its answer', () => {
+  // postgres.js 3.4.9 numbers the rows of a statement on its connection and
+  // starts again from 0 only when a statement completes. One stopped after
+  // some of its rows were sent left the count where it stopped, and the next
+  // statement's rows were placed after that many empty slots (0078). A
+  // search and a resolve read them as rows and threw a TypeError; a rejects
+  // read them as no key and answered rightly. CI's "same tick" case met it
+  // on 2026-10-17, and a probe the same day 6 and 7 times in 1,000 same-tick
+  // aborts on PostgreSQL 17 and 18 (porsager/postgres#1253). The slots held
+  // nothing: the next statement's own rows followed them. Here the stopped
+  // statement has sent tenant 2's customer when its cancel lands, and the
+  // next lookup, under tenant 1's filter, must answer as it would have --
+  // no TypeError, and none of tenant 2's rows.
+  test.each(OPERATIONS)("the next lookup on its connection, a %s, answers as it would have, and nothing of the stopped one's", async (operation) => {
+    const application = `limits-part-way-${operation}`
+    const sql = lookupClient(application)
+    const expected = await ask(sql, operation, NEVER)
+    const controller = new AbortController()
+    const pending = failure(runLookup(sql, PART_WAY, controller.signal))
+    await until(() => asleep(application), 'the statement sent its rows and slept')
+    const reason = new Error('typed on')
+    controller.abort(reason)
+    expect(await pending).toBe(reason)
+    await until(() => finished(application, 'limits_part_way'), 'the statement was stopped')
+    expect(await ask(sql, operation, AbortSignal.timeout(ANSWERS_WITHIN))).toEqual(expected)
   })
 })
 

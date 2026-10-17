@@ -94,6 +94,31 @@ describe('reading sales.order through the postgres driver', () => {
   })
 })
 
+describe("the driver's array of rows after a statement that failed part-way", () => {
+  // Characterised, because 0078 works around it. postgres.js 3.4.9 places a
+  // row at an index it counts per connection and resets only when a
+  // statement completes, so after one that failed with rows already sent the
+  // next statement's rows come after that many empty slots
+  // (porsager/postgres#1119, #1253). The slots hold nothing: no row of the
+  // failed statement reaches the next one's array. A postgres.js that resets
+  // the count (#1254) fails here by name, and 0078 can be reconsidered.
+  test("places the next statement's rows after one empty slot for each row the failed one sent, and nothing of it", async () => {
+    const sql = postgres(fixture.admin, { max: 1, onnotice: () => {} })
+    try {
+      const failure = await sql`select 'theirs' as owner, 1 / (x - 3) as n from pg_catalog.generate_series(1, 5) as x`.then(() => undefined, (error: unknown) => error)
+      expect(failure).toMatchObject({ code: '22012' })
+      const rows = await sql<Array<{ owner: string }>>`select 'mine' as owner`
+      expect(rows.length).toBe(3)
+      expect(Object.keys(rows)).toEqual(['2'])
+      expect(rows[2]).toEqual({ owner: 'mine' })
+      // The count starts again once a statement completes.
+      expect([...(await sql`select 'mine again' as owner`)]).toEqual([{ owner: 'mine again' }])
+    } finally {
+      await sql.end({ timeout: 1 })
+    }
+  })
+})
+
 describe('binding a value the driver did not type', () => {
   // postgres.js sends a statement with untyped parameters as Parse and
   // Describe, learns the type the server inferred for each, and serialises

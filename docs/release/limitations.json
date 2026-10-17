@@ -248,7 +248,7 @@
       ]
     },
     "0016": {
-      "reviewed": "sha256:60bf07dbb6589d84b14178d14625268be6a4dc4031384fa310a6ae861778281d",
+      "reviewed": "sha256:bf71817ab1c83ece07b205fcb93294b8b3183380e9bd59b4539ba3aa74d0a9a8",
       "limitations": [
         {
           "area": "databases",
@@ -2442,6 +2442,20 @@
           "area": "databases",
           "says": "The expression of a `NOT NULL` added `NOT VALID` is spelled by the PostgreSQL adapter as `pg_get_expr` spells the same check on 18, and a later version that deparsed it otherwise would differ from the hand-written check unseen until a test ran on it.",
           "heldBy": "packages/data-postgres/src/discovery-pg18.integration.test.ts"
+        }
+      ]
+    },
+    "0078": {
+      "reviewed": "sha256:10921979729ffc058682f28343859e79170b7849f6af526ee8015f1571ccec41",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "The PostgreSQL adapter's catalog reads -- discovery's, and the server's version read -- still take postgres.js 3.4.9's array of rows, so one that failed part-way would leave the next catalog read on its connection behind empty slots, and no test shows what discovery then does."
+        },
+        {
+          "area": "databases",
+          "says": "An integrator's own statements on a client it also hands the PostgreSQL adapter get their rows as postgres.js 3.4.9 gives them: after a statement on the same connection that ended part-way, behind one empty slot for each row it sent.",
+          "heldBy": "packages/data-postgres/src/spike.integration.test.ts"
         }
       ]
     }
