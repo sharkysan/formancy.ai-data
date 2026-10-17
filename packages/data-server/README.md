@@ -241,13 +241,18 @@ existed would be documented and inert.
   `content-disposition: attachment; filename="<form id>.csv"` and its
   length, or a JSON refusal and nothing of the file -- 409 `drift`,
   `moved` when a record would appear twice because the rows moved between
-  two pages, or `unencodable` for text UTF-8 cannot carry, which names the
-  column; 422 `export-too-large` past `EXPORT_MAX_BYTES`, 16 MiB; 503
-  `export-timeout` past `EXPORT_DEADLINE_MS`, 30 s, derived from nginx's
-  default read timeout and held below it by `export-limits.test.ts`; 503
-  `export-busy` while another file is being made from the same allowlisted
-  connection in this process; 503 `unavailable` when the labels cannot be
-  loaded; 499 `abandoned` when the client left, before the next statement.
+  two pages -- known by its key's values, so a record whose key fits no
+  token is held to it too -- or `unencodable` for text UTF-8 cannot carry,
+  which names the column, and for a lookup whose key is too long for a
+  token, which names the field; 422 `export-too-large` past
+  `EXPORT_MAX_BYTES`, 16 MiB; 503 `export-timeout` past
+  `EXPORT_DEADLINE_MS`, 30 s, derived from nginx's default read timeout and
+  held below it by `export-limits.test.ts`; 503 `export-busy` while another
+  file is being made from the same allowlisted connection in this process,
+  and while a page of one past its deadline or left by its client still
+  runs, until its statement returns; 503 `unavailable` when the labels
+  cannot be loaded; 499 `abandoned` when the client left, before the next
+  statement.
   The file is the readable fields in the form's order, each headed by its
   label, a lookup as its label then its token under `<label> (key)`, each
   value as a read holds it, NULL an empty cell and `''` as `""`, after a

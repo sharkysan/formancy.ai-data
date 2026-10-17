@@ -86,8 +86,11 @@ code -- `export-too-large` past `EXPORT_MAX_BYTES`, `export-timeout`,
 of its own: a 200 that is not `text/csv` is `unexpected`, and a body that
 did not arrive whole -- the connection cut, fewer bytes than the server
 announced, which `fetch` refuses -- is `incomplete`, never a shorter file.
-It asks for `text/csv, application/json`, an `accept` a browser sends
-across origins without asking first. An abort rejects with the AbortError.
+It asks for `text/csv, application/json`, an `accept` value CORS counts as
+safelisted, so the preflight a cross-origin export sends anyway -- for its
+`authorization` and its JSON `content-type` -- need not grant it, and the
+server's allowed request headers are unchanged. An abort rejects with the
+AbortError.
 Saving the `Blob` is the host's: an object URL and an `<a download>`.
 
 `forms` is the menu

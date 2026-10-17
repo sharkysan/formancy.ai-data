@@ -436,8 +436,10 @@ and a publisher alone restores any version, unreviewed ones too (0065).
    ([0061](../decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)).
 5. Each record is written by `exportRecord` through `csv.ts` -- canonical
    values, a lookup's label and token, the formula rule -- and counted:
-   a token already written is 409 `moved`, text UTF-8 cannot carry 409
-   `unencodable`, a byte past `EXPORT_MAX_BYTES` 422 `export-too-large`.
+   a key already written -- known by its values, so a record with no
+   token is held to it too -- is 409 `moved`, text UTF-8 cannot carry or
+   a lookup whose key fits no token 409 `unencodable`, a byte past
+   `EXPORT_MAX_BYTES` 422 `export-too-large`.
    The trail's `rows` grows with each record written (0023).
 6. When a page says nothing follows, the whole file is sent: 200,
    `text/csv; charset=utf-8`, `attachment; filename="<form id>.csv"`, its

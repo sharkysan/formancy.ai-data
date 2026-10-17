@@ -13,7 +13,11 @@ every pull request and before every release
 ([0032](./decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
 The job then does over HTTP what sections 4 and 5 have you do in the browser,
 with the values in this guide's tables, on both engines; the tables are
-generated from the same file the job reads. On each engine it then also
+generated from the same file the job reads. On each engine it also
+downloads the orders as a file as each tenant, and fails when tenant 2's
+holds the order tenant 1 created
+([0079](./decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)),
+which the host page has no button for yet; and it then
 deletes the fixture's order with its line, deliveries and parcels, through a
 second order form whose policy grants clerks delete and names each foreign
 key that delete acts through

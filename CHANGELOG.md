@@ -246,14 +246,15 @@ later.
   being made through the same allowlisted connection in that server
   (`503 export-busy`); when a record would appear twice because the rows
   moved between two pages (`409 moved`); and for text UTF-8 cannot carry,
-  which SQL Server can hold
-  (`409 unencodable`). Each value is what a read holds, digit for digit, a
-  lookup its label beside its key, NULL an empty cell and `''` as `""`, in
-  UTF-8 after a byte-order mark, and a cell a spreadsheet would read as a
-  formula carries one apostrophe in front, which taking one off every cell
-  that has one undoes. It is not the table at one moment: a row deleted
-  meanwhile can be missing. The Cloudflare runtime door forwards the route.
-  The host page has no button for it yet
+  which SQL Server can hold, or a lookup whose key is too long for a token,
+  though the grid shows that row (`409 unencodable`). Each value is what a
+  read holds, digit for digit, a lookup its label beside its key, NULL an
+  empty cell and `''` as `""`, in UTF-8 after a byte-order mark, and a cell
+  a spreadsheet would read as a formula carries one apostrophe in front,
+  which taking one off every cell that has one undoes. It is not the table
+  at one moment: a row deleted meanwhile can be missing. The Cloudflare
+  runtime door forwards the route, and so does the live demo's Worker. The
+  host page has no button for it yet
   ([0079](docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
   New exports of `@formancy/data-core`: `validateExportQuery`,
   `exportColumns`, `exportHeader`, `exportRecord`, `exportText`,

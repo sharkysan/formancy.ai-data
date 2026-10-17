@@ -66,7 +66,10 @@ describe('validateListQuery', () => {
  */
 describe('validateExportQuery', () => {
   // A download from an unsearched grid sends nothing; what it leaves out is
-  // every record in key order.
+  // every record in key order. The query is the check's own, not the
+  // body's: one that handed back the caller's sort array or parent would
+  // let whoever still holds the body change what was checked after the
+  // check passed.
   test('fills what a body leaves out, and returns a fresh query', () => {
     expect(validateExportQuery({})).toEqual({ ok: true, query: { search: '', sort: [], parent: null } })
     const body = { search: ' Muster ', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' } }

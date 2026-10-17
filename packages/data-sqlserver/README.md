@@ -528,8 +528,9 @@ checked once, by hand, on 2026-10-09, and is not a test.
 `pnpm test` starts SQL Server through `@formancy/data-fixtures`, once per
 test file, and runs the suite against it: discovery, the spike, lookups,
 what a lookup reads on the sized customers (0034), a lookup stopped when
-its caller goes (0061), records, the ways a
-record operation fails, a write whose answer is lost on the way back, and a
+its caller goes (0061), records, a page of them and a file of the
+shipments written by data-core (`list.integration.test.ts`, 0044, 0079),
+the ways a record operation fails, a write whose answer is lost on the way back, and a
 uuid key end to end (`uuid.integration.test.ts`, 0056: discovered, generated
 read-only, its token in lower case, created, updated, listed in this
 engine's order and offered by a lookup, tied options in that order too,

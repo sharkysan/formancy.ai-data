@@ -66,7 +66,10 @@ describe.each(ENGINES)('exports on $engine', ({ connection }) => {
     expect(sent?.body).not.toContain(plane.tokens.clerk)
   })
 
-  // The server's refusal, passed through in its own words.
+  // A refusal comes back as the server's code and sentence, which a page
+  // shows as said. The export reads a 200 as bytes; a client that took a
+  // refusal down that branch too would answer `unexpected`, and the person
+  // would never learn why.
   test("a refusal comes back as the server's code and sentence", async () => {
     expect(await plane.client().exportRecords(formId, { sort: [{ field: 'customer', direction: 'asc' }] })).toEqual({
       ok: false,

@@ -2533,7 +2533,7 @@
       ]
     },
     "0079": {
-      "reviewed": "sha256:63cbe7e1d55aa857a869d3e8c17e3ba074752dbd1a8135620258617cdf5e45be",
+      "reviewed": "sha256:34497c4aca511f59a08338c1076e3651eba42d3767e8dfd0a0ef837e82e9969d",
       "limitations": [
         {
           "area": "server",
@@ -2544,6 +2544,15 @@
           "area": "server",
           "says": "One file of records is made at a time per allowlisted connection in each server process; another meanwhile is refused `503 export-busy`, and each replica has a gate of its own.",
           "heldBy": "packages/data-server/src/routes/runtime-exports.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "An export refused at its deadline or left by its client keeps its connection's gate until the page it was running returns, so every other export through that connection is refused `503 export-busy` meanwhile: on SQL Server for at most mssql's 15 seconds, on PostgreSQL for as long as that statement runs, a lock wait included.",
+          "heldBy": "packages/data-server/src/routes/runtime-exports.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Each page of a file reads every row before its offset, about n²/100 rows for a file of n, and a sort no index serves reads every admitted row on every page; by how both engines run an offset, not measured."
         },
         {
           "area": "forms",
@@ -2565,8 +2574,13 @@
           "heldBy": "packages/data-server/src/e2e.integration.test.ts"
         },
         {
+          "area": "forms",
+          "says": "A lookup whose key needs more characters as a token than a token holds refuses the whole file `409 unencodable`, though the grid shows the row, so one such row stops every file of the form that would hold it.",
+          "heldBy": "packages/data-core/src/records/export.test.ts"
+        },
+        {
           "area": "host",
-          "says": "What a spreadsheet does with a file is not tried: by their documentation Excel shows `9007199254740993` to 15 significant digits, which the file does not, cannot tell `\"\"` from NULL, and in a locale whose list separator is `;` opens the file as one column; a reader that does not expect a byte-order mark glues it to the first header."
+          "says": "What a spreadsheet does with a file is not tried, so none of this is shown here: Excel is expected to show `9007199254740993` to 15 significant digits, which the file does not, not to tell `\"\"` from NULL, and in a locale whose list separator is `;` to open the file as one column; a reader that does not expect a byte-order mark glues it to the first header."
         },
         {
           "area": "access",

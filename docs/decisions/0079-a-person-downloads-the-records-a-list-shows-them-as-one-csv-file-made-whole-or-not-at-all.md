@@ -70,27 +70,42 @@
   a page's labels, with nothing of the file (watched failing with the check
   before each page removed: the second page was asked); drift on the third
   page 409 with nothing of the first two; a record on two pages 409
-  `moved` (watched failing with the tokens kept per page only); text UTF-8
+  `moved` (watched failing with the tokens kept per page only), a record
+  whose key fits no token among them (watched failing with the check kept
+  on tokens: a 200 holding that record twice); text UTF-8
   cannot carry, in a value or in the form's own label, 409 `unencodable`
-  naming the column; a second export from the same connection meanwhile
-  503 `export-busy`, the first whole, another connection's not held up
-  (watched failing without the gate: both ran); labels past the lookup
-  deadline 503 `unavailable` (watched failing with a failed resolve written
-  as empty labels: a 200); a client that leaves stops the export before
-  its next page, audited 499 `abandoned` (watched failing with the check
-  removed: the second page was asked for nobody); a format-1 bundle edited
+  naming the column; a second export from the same connection meanwhile,
+  of the same form or of another on it, 503 `export-busy`, the first
+  whole, another connection's not held up (watched failing without the
+  gate: both ran; and with the gate kept per form: the other form's file
+  200); labels past the lookup deadline 503 `unavailable` (watched failing
+  with a failed resolve written as empty labels: a 200); a resolve given
+  only what is left of the export's deadline, and the file then 503
+  `export-timeout` (watched failing with the lookup's own deadline given:
+  the resolve's signal said 60000 ms where 40 were left); a client that
+  leaves stops the export before its next page, audited 499 `abandoned`
+  (watched failing with the check removed: the second page was asked for
+  nobody), and the page still running keeps the gate until it returns
+  (watched failing with the gate given back when the client left: another
+  form's file 200 beside it); a client that leaves while a resolve waits
+  stops it, audited 499 `abandoned` (watched failing with the abandonment
+  left unasked after a resolve: 503 `unavailable`); a format-1 bundle edited
   where it is stored to bind a binary column is accepted, its list
   answered, and its file 500 with nothing of it; the event is `export`
   with `rows` and no record, and holds nothing the person sent (watched
   failing with `rows` left null). `export-limits.test.ts` -- the deadline
   and a statement in flight end before every forwarding location's
-  `proxy_read_timeout` in `deploy/web/nginx.conf`, or nginx's default
-  (watched failing with `proxy_read_timeout 30s` written into `/v1/`:
-  `[ { location: '/v1/', ms: 30000 } ]`). `runtime-lists.test.ts`,
-  `runtime-menu.test.ts`, `runtime.test.ts` and `audit.test.ts` -- every
-  other runtime event carries `rows: null` (watched failing before the
-  field existed). `routes/admin-audit.test.ts` -- the export route is one
-  the router holds, and emits exactly one event under its name.
+  `proxy_read_timeout` in `deploy/web/nginx.conf` -- its own, its
+  server's or the http block's, which is what the file sets outside every
+  block -- or nginx's default (watched failing with `proxy_read_timeout
+  30s` written into `/v1/`: `[ { location: '/v1/', ms: 30000 } ]`, and
+  with it written above the map: all four forwarding locations at 30 s;
+  the reading watched failing with what stands outside a block skipped).
+  `runtime-lists.test.ts`, `runtime-menu.test.ts`, `runtime.test.ts` and
+  `audit.test.ts` -- every other runtime event carries `rows: null`
+  (watched failing before the field existed). `routes/admin-audit.test.ts`
+  -- the export route is one the router holds, and emits exactly one
+  event under its name.
   `e2e.integration.test.ts`, on both engines through the real server and
   drivers -- tenant 1's file of orders is tenant 1's list of them, in its
   order, and holds none of tenant 2's, whose own file is theirs, with
@@ -128,7 +143,10 @@
   server registers, so the runtime door forwards the route (watched failing
   with `main`'s doors.json: "run node scripts/cloudflare/doors.mjs
   --write"), which `pnpm test:cloudflare` then holds the tunnel's
-  configuration to.
+  configuration to; `scripts/live-demo.test.mjs`, in `pnpm test:repo` --
+  the live demo's Worker forwards exactly the routes that door does
+  (watched failing once this branch met main's Worker: its pattern
+  without `records/export`).
   **Not mechanically enforced:** what Excel or any other program shows of
   the file -- its byte-order mark, its comma in a `;` locale, the
   apostrophe, a 17-digit number -- none of it tried; that the composed
@@ -227,9 +245,11 @@ its own code.**
   statement, `499 abandoned`, which nobody reads and the trail records;
   the statement in flight finishes in the database. The bundle and the
   token are read once, at the start.
-- **Not a snapshot.** A token already written refuses the file, `409
+- **Not a snapshot.** A key already written refuses the file, `409
   moved` -- "The records changed while the file was made. Try again." --
-  so no file holds a record twice. A row deleted before the offset between
+  so no file holds a record twice. A record is known by its key's values
+  as the page read them, not by its token, so one whose key fits no token
+  is held to it too. A row deleted before the offset between
   two pages is skipped, unseen, and the file is sent.
 - **The answer.** `content-type: text/csv; charset=utf-8`,
   `content-disposition: attachment; filename="<form id>.csv"`
@@ -237,16 +257,21 @@ its own code.**
   every answer gets. Its refusals: 400 `malformed` and the list's 400s;
   401; the list's 403s; 404; 409 `drift`, `moved`, `unencodable`; 422
   `export-too-large`; 499; 503 `export-timeout`, `export-busy`,
-  `unavailable`. The Cloudflare runtime door forwards it.
+  `unavailable`. The Cloudflare runtime door forwards it, and so does the
+  live demo's Worker, which forwards exactly the routes that door does
+  (0070).
 - **The client.** `exportRecords(formId, query?, signal?)` resolves to an
   `Outcome<RecordFile>`, `{ file: Blob, name }`, `name` from
   `exportFileName` and never from `content-disposition`, which a page on
   another origin cannot read (0060). Exactly the three keys travel; the
-  answer is asked for as `text/csv, application/json`, which a browser
-  sends across origins without a preflight. A 200 that is not `text/csv`
-  is `unexpected`; a body that did not arrive whole is `incomplete`, never
-  a file; a refusal is read as every read's; an abort rejects with the
-  AbortError. `EXPORT_MAX_BYTES` and `RecordExportQuery` are re-exported.
+  answer is asked for as `text/csv, application/json`, an `accept` value
+  CORS counts as safelisted, so the preflight a cross-origin export sends
+  anyway, for its `authorization` and its JSON `content-type`, need not
+  grant it, and `CROSS_ORIGIN_REQUEST_HEADERS` is unchanged. A 200 that
+  is not `text/csv` is `unexpected`; a body that did not arrive whole is
+  `incomplete`, never a file; a refusal is read as every read's; an abort
+  rejects with the AbortError. `EXPORT_MAX_BYTES` and `RecordExportQuery`
+  are re-exported.
 - **The audit.** One event per export, operation `export`, with no record
   and nothing the person sent. Every runtime event gains `rows`: for an
   export the records the file holds, or those written into it before it
@@ -259,7 +284,9 @@ design did not name; the client does not compare `content-length` with
 what arrived, since behind a compressing proxy it counts other bytes, and
 relies on `fetch`, which refuses a body cut short of it; a resolve is
 checked against the export's deadline too, so a page whose labels cannot be
-fetched in time is not written. Two facts the design left open are settled:
+fetched in time is not written; and the design's check on tokens passed a
+record whose key fits no token, which the export writes, so the check is on
+the key's values instead. Two facts the design left open are settled:
 a `{ $t }` label a presentation gives is refused by formancy's validator,
 which `validateBundle` runs, because neither the generator nor a
 presentation writes the `i18n` section it needs, while a form stored at
@@ -301,6 +328,14 @@ on both engines and run nothing when a spreadsheet opens them.
   worst case in memory is the allowlisted connections times about twice
   16 MiB, and besides that every file still on its way to a slow client,
   since the gate opens once a file is handed to its socket.
+- **A page still running keeps the gate.** An export refused at its
+  deadline, or left by its client, gives the gate back only once the
+  statement in flight returns, since that statement still holds one of the
+  pool's connections; until then every other export through that
+  connection is refused `export-busy`, "Try again in a moment". On SQL
+  Server that is at most mssql's 15 s; on PostgreSQL nothing bounds it, so
+  a page waiting on a lock keeps every export of that database refused for
+  as long as it waits.
 - **An apostrophe the database does not hold.** A text cell starting with
   `=`, `+`, `-`, `@`, TAB, CR or `'` -- `+41 44 …`, `@handle`, PostgreSQL's
   `-Infinity` -- carries one more, which a spreadsheet may show (not
@@ -310,6 +345,11 @@ on both engines and run nothing when a spreadsheet opens them.
   (0040); the file holds no more than a read does.
 - **On SQL Server an unpaired surrogate or a NUL** in any text the file
   would hold refuses the file; the JSON list carries both.
+- **A lookup whose key fits no token refuses the file**, `409
+  unencodable`, where the grid shows the row: the record holds no token
+  for it, and written empty the cell would read as NULL. One such row
+  stops every file of the form that would hold it, until the search, the
+  parent or the data leave it out.
 - **What a spreadsheet does with it, not tried.** Excel shows
   `9007199254740993` to 15 significant digits, which the file does not; a
   reader that does not expect a byte-order mark glues U+FEFF to the first
@@ -381,6 +421,17 @@ the pool cares about: ten people at once still hold every connection.
 **A row cap.** It bounds neither memory, since a row can be wide, nor time,
 since a page's cost grows with its offset.
 
+**Measure first, then set the bounds** -- `perf/record-pages`: time a page
+of records, and an export of the sized `sales.customer`, on both engines,
+and derive the deadline from what an export finishes in rather than from a
+proxy's default less a driver's. Not taken now: a page of records is
+unmeasured (0044), and the measurement would hold the export back without
+changing what the deadline protects -- that the proxy in front is still
+waiting when the answer leaves -- which the proxy's own timeout sets and
+`export-limits.test.ts` holds. A measurement that shows exports of a
+realistic size need more than 30 s, or far less, is the record that
+changes the number.
+
 ## Older records
 
 Extends [0008](0008-exact-values-travel-as-strings.md): a file's cells are
@@ -402,4 +453,7 @@ the file pages the list, and adds no grant. Extends
 no header is exposed, so the client names the file from the form's id.
 Extends [0061](0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md):
 a file's resolves stop when the client leaves or a deadline passes, and an
-export stops before its next statement when the client leaves.
+export stops before its next statement when the client leaves. Within
+[0070](0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)'s
+rule, unchanged: the live demo's Worker forwards the route, as it forwards
+every route the runtime door does.

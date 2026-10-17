@@ -302,13 +302,14 @@ the one where the engines answer differently, `moved-parent`, included, each
 `LIST_PARITY` case (0044), each `DELETE_PARITY` case and
 `update: recreated` (0050), each `CASCADE_PARITY` case (0051), and each
 `UUID_PARITY` case (0056), `order` included, whose expectation is each
-engine's own order.
+engine's own order, and each `EXPORT_PARITY` case (0079), a file's bytes.
 The ids are derived from the shared data --
 `filterCase(entry)`, `displayCase(column)`, `temporalCase(column)`,
 `refusalCase(name)`, `edgeCase(name)`,
 `shipmentCase('first')`, `driftingCase(name)`, `throughCase(name)`,
 `listCase(name)`, `deleteCase(name)`, `UPDATE_RECREATED_CASE`,
-`cascadeCase(name)`, `uuidCase(name)`, `MODEL_CASES.owner` -- so no test
+`cascadeCase(name)`, `uuidCase(name)`, `exportCase(name)`,
+`MODEL_CASES.owner` -- so no test
 types one.
 
 `DRIFTING` is the table of changes to a form's own table after it was

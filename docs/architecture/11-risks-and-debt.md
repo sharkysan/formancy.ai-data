@@ -185,7 +185,9 @@ A file of records is not the table at one moment: a row deleted meanwhile
 before an offset is missing unseen, and one inserted there refuses the file.
 A text cell that starts as a formula, or with an apostrophe, carries one
 apostrophe the database does not hold; on SQL Server text UTF-8 cannot
-carry refuses the whole file; a header can repeat a label; and what a
+carry refuses the whole file, and so, on either engine, does a lookup
+whose key is too long for a token, a row the grid shows; a header can
+repeat a label; and what a
 spreadsheet shows of the file -- its byte-order mark, a `;` locale, 17
 digits -- was not tried ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
 
@@ -266,7 +268,10 @@ cancellation nor a deadline (0061). A file of records is refused past
 16 MiB or 30 s, a budget and a derivation from nginx's default read
 timeout, and one is made at a time per allowlisted connection in each
 process; on PostgreSQL a page past nginx's 60 s gets the person a 504
-while the server makes the file for nobody (0079).
+while the server makes the file for nobody, and a page still running after
+its export was refused or left keeps that connection's gate, every other
+export through it refused `export-busy` until the statement returns
+(0079).
 
 **Operations.** An upstream fix reaches an installation only in a release
 of this module ([0002](../decisions/0002-depend-on-upstream-never-copy-it.md)),

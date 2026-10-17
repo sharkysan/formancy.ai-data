@@ -118,7 +118,11 @@ describe('the columns of a file', () => {
     expect(headersOf(exportColumns(stored, ORDER.bindings, readableBy(AUDITOR)))).toEqual(['Id', 'Order date', 'status'])
   })
 
-  // The header row is the first line, after the byte-order mark.
+  // The header row is the first line, after the byte-order mark. Without
+  // the mark, an otherwise correct file is left to a reader that guesses
+  // its encoding -- Excel on Windows takes the system's code page, by
+  // report and not tried -- and every non-ASCII cell arrives garbled; a
+  // header not on the first line would be read as a record.
   test('head the file', () => {
     expect(exportHeader(exportColumns(ORDER.form, ORDER.bindings, readableBy(AUDITOR)))).toEqual({ ok: true, text: '﻿Id,Order date,Status\r\n' })
   })

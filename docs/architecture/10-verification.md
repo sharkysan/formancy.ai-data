@@ -217,7 +217,8 @@ instead, beside the number it holds:
 `packages/data-server/src/export-limits.test.ts` reads
 `deploy/web/nginx.conf` and fails when an export's deadline, with a
 statement still running after it, is not below every forwarding location's
-`proxy_read_timeout`, or nginx's default where none is set
+`proxy_read_timeout` -- its own, its server's, or the http block's, set
+outside every block of the file -- or nginx's default where none is set
 ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
 
 ## 10.5 The browser gates
@@ -297,9 +298,13 @@ connects to no database.
 `docs/getting-started.md` as written, from a clean checkout with Node and
 Docker and nothing installed, then the journey over HTTP through the
 composed stack's one origin on both engines: propose, publish, lookup,
-create, a create sent again, update, a stale update and another tenant's
-refusal. It fails if a secret or a token reaches a log, compose's
-configuration or a container's inspect, and it runs twice, with the
+create, a create sent again, update, a stale update, another tenant's
+refusal, a file of the orders downloaded as each tenant, tenant 2's
+without the order tenant 1 created
+([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)),
+and the fixture's order deleted with what it reaches (0051). It fails if
+a secret or a token reaches a log, compose's configuration or a
+container's inspect, and it runs twice, with the
 runner's Compose and with the oldest release the guide names, so the
 guide's claim about that release fails here the day `compose.yaml` needs a
 newer one
