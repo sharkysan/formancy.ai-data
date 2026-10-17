@@ -20,6 +20,25 @@ await adapter.ping() // { kind: 'sqlserver', version: '16.0.4205.1', product: 's
 await adapter.close()
 ```
 
+**A SQL login with `encrypt: true` is never sent to a server that did not
+say it encrypts.** It goes over TDS 7, which every SQL Server image the
+suites run takes: the client's PRELOGIN and the server's answer cross in
+the clear, and tedious 20.3.3 starts TLS only when the answer says ON or
+REQ, and otherwise sends the login unencrypted. So the pool is given a
+connector of this package's own (`src/encryption.ts`), which opens each TCP
+connection as tedious's `connectInSequence` does and puts a stream in
+front of it that withholds the server's first message until it has read
+the whole of it. ON or REQ: it, and everything after it, passes unchanged.
+OFF or NOT_SUP: the connection ends before the login is sent, and
+`connectSqlServer` rejects with "The server answered that it would not
+encrypt the connection, so the login was not sent." and code `EENCRYPT`;
+an answer it cannot read is refused in a sentence of its own. Neither names
+the user or the password. With `encrypt: false` there is no guard: the
+login crosses unencrypted, as the caller chose. With
+`trustServerCertificate: true` the guard sees that TLS starts, not with
+whom
+([0081](../../docs/decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)).
+
 Or as a Microsoft Entra principal, a managed identity or a service
 principal, where the server is Azure SQL and takes Entra logins:
 
@@ -577,7 +596,12 @@ and answered in lower case; and, this engine's own, how it stores and orders
 a uniqueidentifier, and that `newsequentialid()`'s keys rise across
 tenants). It
 needs Docker and, the first time, a
-pull of about a gigabyte and a half. There is no mocked driver to fall back
+pull of about a gigabyte and a half. `encryption.test.ts` needs none: the
+real mssql and tedious against data-fixtures' PRELOGIN stand-in, which
+answers in the server's place that it will not encrypt and keeps the type
+of every packet the client sends after, and the guard's parser and stream
+over bytes and a loopback socket (0081); that a real server's TLS passes
+the guard is `adapter.integration.test.ts`'s, on each image. There is no mocked driver to fall back
 to — database semantics are what this package is for (0003). No test runs
 on Azure SQL Database or Azure SQL Managed Instance: neither has an image a
 test can start, and that `EngineEdition` 5 and 8 are read as them is a

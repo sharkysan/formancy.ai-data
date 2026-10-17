@@ -1,14 +1,17 @@
 import type { TokenCredential } from '@azure/identity'
 import mssql from 'mssql'
 import type { ConnectionPool } from 'mssql'
+import { encryptedConnector, encryptionRefusal } from './encryption.js'
 import { ENTRA_UNCHECKED, ENTRA_UNENCRYPTED, entraCredential, entraLoginFailure } from './entra.js'
 import type { EntraLogin } from './entra.js'
 
 /**
  * Where the server is, and TLS. The composition root decides TLS; there is
- * no default here to forget. For an Entra principal it can only say yes:
- * `encrypt` must be true and `trustServerCertificate` false, and the pool is
- * TDS 8.0 (sqlServerConfig).
+ * no default here to forget. For a SQL login, `encrypt` true is TDS 7's TLS,
+ * which a server that answers it will not encrypt is refused (0081), and
+ * false sends the login unencrypted, as the operator chose. For an Entra
+ * principal it can only say yes: `encrypt` must be true and
+ * `trustServerCertificate` false, and the pool is TDS 8.0 (sqlServerConfig).
  */
 interface SqlServerAddress {
   host: string
@@ -77,7 +80,12 @@ function credentialFor(login: EntraLogin): TokenCredential {
 
 /**
  * What mssql is given for a pool. A SQL login is a user and a password, over
- * the TLS the composition root chose. An Entra principal is one credential,
+ * the TLS the composition root chose: with `encrypt`, every connection is
+ * opened through encryption.ts's connector, which refuses one whose server
+ * answers that it will not encrypt before the login is sent (0081); TDS 7
+ * still, because SQL Server 2019 and 2022 on Linux take no TDS 8.0 (0074).
+ * Without `encrypt` there is nothing to refuse: the operator chose to send
+ * the login unencrypted. An Entra principal is one credential,
  * which mssql hands every connection the pool opens, and no user or password
  * at all, so nothing can log in as a SQL login in its place; and it is
  * always TDS 8.0, `encrypt: 'strict'`: TLS before the first TDS message,
@@ -90,7 +98,10 @@ function credentialFor(login: EntraLogin): TokenCredential {
  */
 export function sqlServerConfig(options: SqlServerConnectOptions): mssql.config {
   const base = { server: options.host, port: options.port, database: options.database }
-  if (options.entra === undefined) return { ...base, options: { encrypt: options.encrypt, trustServerCertificate: options.trustServerCertificate }, user: options.user, password: options.password }
+  if (options.entra === undefined) {
+    const tls = { encrypt: options.encrypt, trustServerCertificate: options.trustServerCertificate }
+    return { ...base, options: options.encrypt ? { ...tls, connector: encryptedConnector } : tls, user: options.user, password: options.password }
+  }
   return {
     ...base,
     options: { encrypt: 'strict', trustServerCertificate: false },
@@ -110,15 +121,24 @@ export function sqlServerConfig(options: SqlServerConnectOptions): mssql.config 
  * Found by the end-to-end suite; no unit test could see it. Opening the pool
  * here means the pool and the types always come from one copy.
  *
- * An Entra principal is refused without TLS or with the server's
- * certificate trusted, before anything is opened, and a failed Entra login
- * rejects with a sentence that names no tenant, client or secret
- * (entra.ts). A login that fails later, when the pool opens another
- * connection, reaches whoever asked for the connection as mssql rejects
- * it: the records' adapter answers it `unavailable`.
+ * A SQL login whose server answered, when TLS was asked for, that it would
+ * not encrypt rejects with encryption.ts's sentence, with nothing of the
+ * login in it (0081). An Entra principal is refused without TLS or with
+ * the server's certificate trusted, before anything is opened, and a
+ * failed Entra login rejects with a sentence that names no tenant, client
+ * or secret (entra.ts). A login that fails later, or a connection the guard
+ * refuses later, when the pool opens another connection, reaches whoever
+ * asked for the connection as mssql rejects it: the records' adapter
+ * answers it `unavailable`.
  */
 export async function connectSqlServer(options: SqlServerConnectOptions): Promise<ConnectionPool> {
-  if (options.entra === undefined) return new mssql.ConnectionPool(sqlServerConfig(options)).connect()
+  if (options.entra === undefined) {
+    try {
+      return await new mssql.ConnectionPool(sqlServerConfig(options)).connect()
+    } catch (error) {
+      throw encryptionRefusal(error) ?? error
+    }
+  }
   if (!options.encrypt) throw new Error(ENTRA_UNENCRYPTED)
   if (options.trustServerCertificate) throw new Error(ENTRA_UNCHECKED)
   try {

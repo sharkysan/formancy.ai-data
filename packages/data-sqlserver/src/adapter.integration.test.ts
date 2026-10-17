@@ -6,6 +6,7 @@ import { selectedImage, startSqlServerContainer } from '@formancy/data-fixtures'
 import type { ServerRecord, StartedMSSQLServerContainer } from '@formancy/data-fixtures'
 import { createSqlServerAdapter } from './adapter.js'
 import { connectSqlServer } from './connect.js'
+import { encryptedConnector } from './encryption.js'
 
 /**
  * Against REAL SQL Server. There is no mocked driver here and there is not
@@ -115,6 +116,25 @@ describe('connectSqlServer, for a SQL login', () => {
       await pool.close()
     }
   })
+
+  // TDS 7's TLS through the guard (0081), on the run's image: the server's
+  // answer of ON passes, the TLS handshake tedious wraps in PRELOGIN
+  // packets after it passes both ways, and the session the login opens is
+  // one the server itself calls encrypted. A guard that refused a real
+  // server's answer, or passed nothing after it, would refuse every server
+  // that encrypts, which no stand-in can show. Watched failing on
+  // 2026-10-17 with every answer refused, and with nothing passed after
+  // the answer.
+  test('logs in over TLS through the guard, and the server calls the session encrypted', async () => {
+    const pool = await connectSqlServer({ ...address(), user: container.getUsername(), password: container.getPassword() })
+    try {
+      expect(tediousConfigOf(pool).options.connector).toBe(encryptedConnector)
+      const session = await pool.request().query<{ encrypted: string }>('select encrypt_option as encrypted from sys.dm_exec_connections where session_id = @@spid')
+      expect(session.recordset).toEqual([{ encrypted: 'TRUE' }])
+    } finally {
+      await pool.close()
+    }
+  })
 })
 
 /*
@@ -176,6 +196,6 @@ function address(): { host: string; port: number; database: string; encrypt: boo
 }
 
 /** What mssql hands tedious for each connection it opens: the pool's private `_config()`. */
-function tediousConfigOf(pool: mssql.ConnectionPool): { authentication: { type: string; options: Record<string, unknown> }; options: { debug?: unknown } } {
+function tediousConfigOf(pool: mssql.ConnectionPool): { authentication: { type: string; options: Record<string, unknown> }; options: { debug?: unknown; connector?: unknown } } {
   return (pool as unknown as { _config(): ReturnType<typeof tediousConfigOf> })._config()
 }
