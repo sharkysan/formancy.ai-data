@@ -1,10 +1,13 @@
-import type { FormSchema, Text } from '@formancy/spec'
+import type { FieldDef, FormSchema, Text } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
 import type { FormBindings } from '../generate/types.js'
 import type { FormPolicy } from '../policy/types.js'
 import { applyPresentation } from './apply.js'
 import type { GeneratedSection } from './layout.js'
 import { describeSection, describeText, readGeneratedLayout, same } from './layout.js'
+import { placements } from './placement.js'
+import type { CarriedMoves } from './rebase-moves.js'
+import { carryMoves } from './rebase-moves.js'
 import type { FieldAnchor, FieldPresentation, PresentationConflict, PresentationOverrides, ReassignedKey, RebasedPresentation, SectionAnchor, SectionPresentation } from './types.js'
 import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
 
@@ -23,7 +26,7 @@ interface Regenerated {
  * Where a conflict sorts within its subject: what the field now is first,
  * then label, span and order, as the presentation's own properties run.
  */
-const RANK: Record<PresentationConflict['kind'], number> = { 'field-rekeyed': 0, 'both-changed': 1, 'field-gone': 1, 'moved-section': 3, 'section-gone': 1 }
+const RANK: Record<PresentationConflict['kind'], number> = { 'field-rekeyed': 0, 'both-changed': 1, 'field-gone': 1, 'moved-section': 3, 'move-dropped': 3, 'section-gone': 1 }
 
 /** A conflict with where it sorts: field subjects in old-base field order, then sections in old-base order. */
 interface Ranked {
@@ -31,6 +34,26 @@ interface Ranked {
   rank: number
   conflict: PresentationConflict
 }
+
+/** Both bases as the rebase reads them, and what each of its steps shares. */
+interface Rebase {
+  before: readonly GeneratedSection[]
+  after: readonly GeneratedSection[]
+  oldFields: readonly FieldDef[]
+  newFields: readonly FieldDef[]
+  /** Each old key's anchor, from the published bindings. */
+  anchorOf: ReadonlyMap<string, FieldAnchor>
+  /** An old key's new key, followed by what it stands for, or `undefined` when it is gone. */
+  follow: (key: string) => string | undefined
+  /** Whether a section anchor names one section in both bases (`ambiguousLabels`). */
+  told: (anchor: SectionAnchor) => boolean
+  /** An old key's place in the old base's fields, which is where a conflict about it sorts. */
+  subjectOf: (key: string) => number
+  add: (subject: number, conflict: PresentationConflict) => void
+}
+
+/** A field's label and span, as carried to the new base. */
+type Overrides = Pick<FieldPresentation, 'label' | 'span'>
 
 function describeAnchor(anchor: FieldAnchor): string {
   return anchor.kind === 'column' ? `column ${anchor.column}` : `the lookup over ${anchor.foreignKey}`
@@ -69,14 +92,122 @@ function ambiguousLabels(before: readonly GeneratedSection[], after: readonly Ge
  * order, after its nearest preceding key in the new base that is already
  * placed, or first when none is.
  */
-function carryOrder(mine: readonly string[], section: GeneratedSection): string[] {
-  const placed = mine.filter((key) => section.keys.includes(key))
-  for (const [index, key] of section.keys.entries()) {
+function carryOrder(mine: readonly string[], keys: readonly string[]): string[] {
+  const placed = mine.filter((key) => keys.includes(key))
+  for (const [index, key] of keys.entries()) {
     if (placed.includes(key)) continue
-    const before = section.keys.slice(0, index).reverse().find((candidate) => placed.includes(candidate))
+    const before = keys.slice(0, index).reverse().find((candidate) => placed.includes(candidate))
     placed.splice(before === undefined ? 0 : placed.indexOf(before) + 1, 0, key)
   }
   return placed
+}
+
+/**
+ * What each field the presentation names now is: under another key
+ * (`field-rekeyed`), or placed in another section (`moved-section`). Where
+ * a field is placed is the section the person moved it to, else the
+ * generator's, on both sides, so a move the person made is not reported as
+ * one. A move `carryMoves` dropped was said as `move-dropped` and is not
+ * said again, and no field is said to move between sections that cannot be
+ * told apart.
+ */
+function reportFollowed(rebase: Rebase, presentation: PresentationOverrides, moved: CarriedMoves, hasOrder: (anchor: SectionAnchor) => boolean): void {
+  const { before, after, oldFields, anchorOf, follow, told, add } = rebase
+  const mine = new Set(presentation.fields.map((entry) => entry.field))
+  const movedFrom = new Map(presentation.fields.flatMap((entry) => (entry.section === undefined ? [] : [[entry.field, entry.section] as const])))
+  const placedBefore = (key: string) => movedFrom.get(key) ?? sectionOf(before, key)?.anchor
+  const placedAfter = (key: string) => {
+    const to = moved.moves.get(key)
+    return to === undefined ? sectionOf(after, key)?.anchor : after[to]?.anchor
+  }
+
+  for (const [subject, field] of oldFields.entries()) {
+    const now = follow(field.key)
+    const from = placedBefore(field.key)
+    const named = mine.has(field.key) || (from !== undefined && hasOrder(from))
+    if (now === undefined || !named) continue
+    const anchor = anchorOf.get(field.key) as FieldAnchor
+    if (now !== field.key) {
+      add(subject, { kind: 'field-rekeyed', field: now, from: field.key, anchor, resolution: 'followed', message: `${field.key} is now ${now}: it stands for ${describeAnchor(anchor)}, and what you chose for it followed.` })
+    }
+    const to = placedAfter(now)
+    if (from !== undefined && to !== undefined && !moved.dropped.has(now) && told(from) && told(to) && !same(from, to)) {
+      add(subject, { kind: 'moved-section', field: now, from: { ...from }, to: { ...to }, resolution: 'followed', message: `${now} moved from section ${describeSection(from)} to ${describeSection(to)}, where the generator put it.` })
+    }
+  }
+}
+
+/**
+ * Each field entry's label and span carried, by anchor, to the key the
+ * field now has: a field that is gone takes its label, span and section
+ * with it (`field-gone`); a label the generator also changed keeps the
+ * person's (`both-changed`), and one the generator now writes itself goes;
+ * a span goes when the new base agrees with it.
+ */
+function carryFieldOverrides(rebase: Rebase, entries: readonly FieldPresentation[]): Map<string, Overrides> {
+  const { after, oldFields, newFields, follow, subjectOf, add } = rebase
+  const carried = new Map<string, Overrides>()
+  for (const entry of entries) {
+    const subject = subjectOf(entry.field)
+    const now = follow(entry.field)
+    if (now === undefined) {
+      for (const property of ['label', 'span', 'section'] as const) {
+        const yours = entry[property]
+        if (yours === undefined) continue
+        const shown = property === 'label' ? describeText(yours as Text) : property === 'section' ? describeSection(yours as SectionAnchor) : `'${String(yours)}'`
+        add(subject, { kind: 'field-gone', field: entry.field, anchor: entry.anchor, property, yours, resolution: 'dropped', message: `The ${property} ${shown} you chose for ${entry.field} was dropped: ${describeAnchor(entry.anchor)} is not in the regenerated form.` })
+      }
+      continue
+    }
+    const kept: Overrides = {}
+    const generator = newFields.find((field) => field.key === now)?.label
+    if (entry.label !== undefined && !same(entry.label, generator)) {
+      kept.label = entry.label
+      const was = oldFields.find((field) => field.key === entry.field)?.label
+      if (!same(was, generator) && generator !== undefined) {
+        add(subject, { kind: 'both-changed', field: now, property: 'label', yours: entry.label, generator, resolution: 'kept-yours', message: `You labelled ${now} ${describeText(entry.label)}, and the generator now labels it ${describeText(generator)}; yours is kept.` })
+      }
+    }
+    if (entry.span !== undefined && (entry.span === 'all') !== (sectionOf(after, now)?.wide.has(now) ?? false)) kept.span = entry.span
+    if (kept.label !== undefined || kept.span !== undefined) carried.set(now, kept)
+  }
+  return carried
+}
+
+/**
+ * Each section entry carried by its anchor, its order kept over the keys
+ * `placed` puts in its section once the moves are made, with each new field
+ * after its generated predecessor. A section the new base does not have
+ * takes its label and order with it (`section-gone`), and so does one of
+ * two sections sharing a label when their number changed.
+ */
+function carrySections(rebase: Rebase, ordered: ReadonlyMap<string, SectionPresentation>, placed: readonly (readonly string[])[]): SectionPresentation[] {
+  const { before, after, oldFields, follow, told, add } = rebase
+  const sections: SectionPresentation[] = []
+  for (const [index, section] of after.entries()) {
+    const entry = ordered.get(canonicalize(section.anchor))
+    if (entry === undefined || !told(section.anchor)) continue
+    const merged: { label?: Text; order?: string[] } = entry.label === undefined ? {} : { label: entry.label }
+    const keys = placed[index] ?? []
+    if (entry.order !== undefined) {
+      const carriedOrder = carryOrder(entry.order.flatMap((key) => follow(key) ?? []), keys)
+      if (!same(carriedOrder, keys)) merged.order = carriedOrder
+    }
+    if (merged.label !== undefined || merged.order !== undefined) sections.push({ anchor: { ...section.anchor }, ...merged })
+  }
+  for (const [index, section] of before.entries()) {
+    const entry = ordered.get(canonicalize(section.anchor))
+    if (entry === undefined || (told(section.anchor) && after.some((candidate) => same(candidate.anchor, section.anchor)))) continue
+    const subject = oldFields.length + index
+    const why = told(section.anchor)
+      ? 'is not in the regenerated form'
+      : `cannot be told apart in the regenerated form, where the number of sections labelled "${section.anchor.label}" changed`
+    const gone = (property: 'label' | 'order', yours: Text | string[]) =>
+      add(subject, { kind: 'section-gone', section: section.anchor, property, yours, resolution: 'dropped', message: `Section ${describeSection(section.anchor)} ${why}, so the ${property} you chose for it was dropped.` })
+    if (entry.label !== undefined) gone('label', entry.label)
+    if (entry.order !== undefined) gone('order', entry.order)
+  }
+  return sections
 }
 
 /**
@@ -88,7 +219,7 @@ function carryOrder(mine: readonly string[], section: GeneratedSection): string[
  * comes or goes. Sections are followed by the label the generator wrote and
  * which of the sections with that label they are. The rules:
  *
- * - a field whose anchor is gone takes its label and span with it
+ * - a field whose anchor is gone takes its label, span and section with it
  *   (`field-gone`); in an order it is simply left out, because drift already
  *   reports the drop;
  * - a field under another key keeps its overrides under the new one
@@ -96,13 +227,23 @@ function carryOrder(mine: readonly string[], section: GeneratedSection): string[
  * - a label the generator also changed keeps the person's (`both-changed`);
  *   one the generator now writes itself is no longer an override, and goes;
  * - a span is re-expressed against the new base, and goes when it agrees;
- * - an order keeps the person's sequence, sends a field now in another
- *   section where the generator put it (`moved-section`), and places each
- *   new field after its generated predecessor;
+ * - a move between sections (0075) is carried by `carryMoves`: dropped and
+ *   said where its section is gone or cannot be told apart, or where it
+ *   would leave a section with no field (`move-dropped`), and gone without a
+ *   word where the generator now puts the field there itself;
+ * - an order keeps the person's sequence over the fields its section holds
+ *   once the moves are made, sends a field now placed in another section
+ *   where it is placed (`moved-section`, compared by where the field was and
+ *   is placed, so a move the person made is not reported as one), and
+ *   places each new field after its generated predecessor;
  * - a section the new base does not have takes its overrides with it
  *   (`section-gone`), and so does one of two sections sharing a label when
  *   their number changed, because occurrence no longer says which is which;
  *   no field is said to move between sections that cannot be told apart.
+ *
+ * Each rule is one step below, run in that order: the moves, what each
+ * field now is, labels and spans, then sections. Conflicts tied on subject
+ * and rank are said in the order the steps found them.
  *
  * Pure and deterministic. It throws when the published presentation does
  * not apply to its own base, or the merged one to the new base: both are
@@ -115,94 +256,38 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
   const after = readGeneratedLayout(regenerated.base)
   if (!before.ok || !after.ok) throw new Error(`a base this release did not generate: ${before.ok ? '' : before.problem}${after.ok ? '' : after.problem}`)
   const unmatched = ambiguousLabels(before.sections, after.sections)
-  const told = (anchor: SectionAnchor) => !unmatched.has(anchor.label)
-
   const anchorOf = new Map(published.bindings.fields.map((binding) => [binding.field, fieldAnchor(binding)]))
   const newKeys = keysByAnchor(regenerated.bindings)
-  const follow = (key: string): string | undefined => newKeys.get(canonicalize(anchorOf.get(key)))
   const oldFields = published.base.model.fields
   const newFields = regenerated.base.model.fields
-  const subjectOf = (key: string) => oldFields.findIndex((field) => field.key === key)
   const conflicts: Ranked[] = []
-  const add = (subject: number, conflict: PresentationConflict) => conflicts.push({ subject, rank: RANK[conflict.kind], conflict })
-
-  const mine = new Map(published.presentation.fields.map((entry) => [entry.field, entry]))
-  const ordered = new Map<string, SectionPresentation>()
-  for (const entry of published.presentation.sections) ordered.set(canonicalize(entry.anchor), entry)
-  const hasOrder = (section: GeneratedSection | undefined) => section !== undefined && ordered.get(canonicalize(section.anchor))?.order !== undefined
-
-  // What each field the presentation names now is: under another key, or in another section.
-  for (const [subject, field] of oldFields.entries()) {
-    const now = follow(field.key)
-    const from = sectionOf(before.sections, field.key)
-    const named = mine.has(field.key) || hasOrder(from)
-    if (now === undefined || !named) continue
-    const anchor = anchorOf.get(field.key) as FieldAnchor
-    if (now !== field.key) {
-      add(subject, { kind: 'field-rekeyed', field: now, from: field.key, anchor, resolution: 'followed', message: `${field.key} is now ${now}: it stands for ${describeAnchor(anchor)}, and what you chose for it followed.` })
-    }
-    const to = sectionOf(after.sections, now)
-    if (from !== undefined && to !== undefined && told(from.anchor) && told(to.anchor) && !same(from.anchor, to.anchor)) {
-      add(subject, { kind: 'moved-section', field: now, from: from.anchor, to: to.anchor, resolution: 'followed', message: `${now} moved from section ${describeSection(from.anchor)} to ${describeSection(to.anchor)}, where the generator put it.` })
-    }
+  const rebase: Rebase = {
+    before: before.sections,
+    after: after.sections,
+    oldFields,
+    newFields,
+    anchorOf,
+    follow: (key) => newKeys.get(canonicalize(anchorOf.get(key))),
+    told: (anchor) => !unmatched.has(anchor.label),
+    subjectOf: (key) => oldFields.findIndex((field) => field.key === key),
+    add: (subject, conflict) => conflicts.push({ subject, rank: RANK[conflict.kind], conflict }),
   }
+  const ordered = new Map(published.presentation.sections.map((entry) => [canonicalize(entry.anchor), entry]))
 
-  // Labels and spans, by anchor.
-  const carried = new Map<string, { label?: Text; span?: 'all' | 'one' }>()
-  for (const entry of published.presentation.fields) {
-    const subject = subjectOf(entry.field)
-    const now = follow(entry.field)
-    if (now === undefined) {
-      for (const property of ['label', 'span'] as const) {
-        const yours = entry[property]
-        if (yours === undefined) continue
-        const shown = property === 'label' ? describeText(yours as Text) : `'${String(yours)}'`
-        add(subject, { kind: 'field-gone', field: entry.field, anchor: entry.anchor, property, yours, resolution: 'dropped', message: `The ${property} ${shown} you chose for ${entry.field} was dropped: ${describeAnchor(entry.anchor)} is not in the regenerated form.` })
-      }
-      continue
-    }
-    const kept: { label?: Text; span?: 'all' | 'one' } = {}
-    const generator = newFields.find((field) => field.key === now)?.label
-    if (entry.label !== undefined && !same(entry.label, generator)) {
-      kept.label = entry.label
-      const was = oldFields.find((field) => field.key === entry.field)?.label
-      if (!same(was, generator) && generator !== undefined) {
-        add(subject, { kind: 'both-changed', field: now, property: 'label', yours: entry.label, generator, resolution: 'kept-yours', message: `You labelled ${now} ${describeText(entry.label)}, and the generator now labels it ${describeText(generator)}; yours is kept.` })
-      }
-    }
-    if (entry.span !== undefined && (entry.span === 'all') !== (sectionOf(after.sections, now)?.wide.has(now) ?? false)) kept.span = entry.span
-    if (kept.label !== undefined || kept.span !== undefined) carried.set(now, kept)
-  }
-
-  // Sections, by anchor, and the orders they hold.
-  const sections: SectionPresentation[] = []
-  for (const section of after.sections) {
-    const entry = ordered.get(canonicalize(section.anchor))
-    if (entry === undefined || !told(section.anchor)) continue
-    const merged: { label?: Text; order?: string[] } = entry.label === undefined ? {} : { label: entry.label }
-    if (entry.order !== undefined) {
-      const order = carryOrder(entry.order.flatMap((key) => follow(key) ?? []), section)
-      if (!same(order, section.keys)) merged.order = order
-    }
-    if (merged.label !== undefined || merged.order !== undefined) sections.push({ anchor: { ...section.anchor }, ...merged })
-  }
-  for (const [index, section] of before.sections.entries()) {
-    const entry = ordered.get(canonicalize(section.anchor))
-    if (entry === undefined || (told(section.anchor) && after.sections.some((candidate) => same(candidate.anchor, section.anchor)))) continue
-    const subject = oldFields.length + index
-    const why = told(section.anchor)
-      ? 'is not in the regenerated form'
-      : `cannot be told apart in the regenerated form, where the number of sections labelled "${section.anchor.label}" changed`
-    const gone = (property: 'label' | 'order', yours: Text | string[]) =>
-      add(subject, { kind: 'section-gone', section: section.anchor, property, yours, resolution: 'dropped', message: `Section ${describeSection(section.anchor)} ${why}, so the ${property} you chose for it was dropped.` })
-    if (entry.label !== undefined) gone('label', entry.label)
-    if (entry.order !== undefined) gone('order', entry.order)
-  }
+  // Moves first, by anchor, before anything asks where a field is placed.
+  const order = newFields.map((field) => field.key)
+  const moved = carryMoves({ entries: published.presentation.fields, after: after.sections, order, follow: rebase.follow, told: rebase.told, report: (key, conflict) => rebase.add(rebase.subjectOf(key), conflict) })
+  reportFollowed(rebase, published.presentation, moved, (anchor) => ordered.get(canonicalize(anchor))?.order !== undefined)
+  const carried = carryFieldOverrides(rebase, published.presentation.fields)
+  const sections = carrySections(rebase, ordered, placements(after.sections, moved.moves, order))
 
   const fields: FieldPresentation[] = []
   for (const binding of regenerated.bindings.fields) {
     const entry = carried.get(binding.field)
-    if (entry !== undefined) fields.push({ field: binding.field, anchor: fieldAnchor(binding), ...entry })
+    const to = moved.moves.get(binding.field)
+    const section = to === undefined ? undefined : after.sections[to]?.anchor
+    if (entry === undefined && section === undefined) continue
+    fields.push({ field: binding.field, anchor: fieldAnchor(binding), ...entry, ...(section === undefined ? {} : { section: { ...section } }) })
   }
   const position = (key: string) => newFields.findIndex((field) => field.key === key)
   fields.sort((left, right) => position(left.field) - position(right.field))

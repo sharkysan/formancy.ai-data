@@ -87,14 +87,15 @@ export function carryDraft(from: { proposal: Proposal; edited: FormSchema }, to:
 /**
  * What a draft carries after "Generate again" (0030). The new rebase reports
  * what this proposal could not carry from the draft; what the draft had
- * already lost -- a label or section override dropped by the regeneration
- * or an earlier "Generate again" -- is no longer in it to report, so those
- * conflicts are kept, earlier first. The fields a dropped label may be
- * given to are the earlier ones, followed to their keys in the new
- * proposal by what they stand for, and those new in it.
+ * already lost -- whatever a regeneration or an earlier "Generate again"
+ * dropped: a label, a span, a move between sections (0075) or a section's
+ * override -- is no longer in it to report, so every conflict whose
+ * resolution was to drop something is kept, earlier first. The fields a
+ * dropped label may be given to are the earlier ones, followed to their
+ * keys in the new proposal by what they stand for, and those new in it.
  */
 export function carriedAgain(earlier: Carried | null, before: FormBindings, draft: { conflicts: PresentationConflict[]; fresh: string[] }, after: FormBindings): Carried {
-  const lost = (earlier?.conflicts ?? []).filter((conflict) => conflict.kind === 'field-gone' || conflict.kind === 'section-gone')
+  const lost = (earlier?.conflicts ?? []).filter((conflict) => conflict.resolution === 'dropped')
   const anchorOf = new Map(before.fields.map((binding) => [binding.field, canonicalize(fieldAnchor(binding))]))
   const followed = new Set((earlier?.fresh ?? []).flatMap((key) => anchorOf.get(key) ?? []))
   const fresh = after.fields.filter((binding) => draft.fresh.includes(binding.field) || followed.has(canonicalize(fieldAnchor(binding)))).map((binding) => binding.field)

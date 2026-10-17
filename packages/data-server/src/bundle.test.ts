@@ -430,6 +430,38 @@ describe('a format-2 bundle (0030)', () => {
     expect(validateBundle(unread)).toEqual({ ok: false, problems: ['presentation: version must be 1'] })
   })
 
+  // A field moved to another generated section (0075) is recorded in the
+  // presentation, and the check is the one above: the form is the base with
+  // the presentation applied. Watched failing with that comparison taken out
+  // of format2Problems. A reader that trusted the form's layout would serve a
+  // move the presentation does not record, which the next regeneration
+  // would undo without a word; one that ignored the move would refuse every
+  // version that has one.
+  test('a field moved to another section is served where the presentation puts it, and only there', () => {
+    const stamped = good(snapshot((columns) => columns.push(column('stamp', 5, INT32, { generated: 'computed' }))))
+    expect(stamped.base.layouts?.[0]?.nodes.map((node) => (node as { label: string }).label)).toEqual(['Employee', 'Record'])
+    const grids = (form: FormSchema) => (form.layouts?.[0]?.nodes ?? []).map((node) => (node as unknown as { children: Array<{ children: Array<{ path: string }> }> }).children[0]?.children ?? [])
+    const movedForm = copy(stamped).form
+    const [main, record] = grids(movedForm)
+    record?.push(...(main?.splice(main.findIndex((node) => node.path === 'name'), 1) ?? []))
+    const moving = (section: { label: string; occurrence: number }, field = 'name'): BundleV2['presentation'] => ({ version: 1, fields: [{ field, anchor: { kind: 'column', column: field }, section }], sections: [] })
+    const RECORD = { label: 'Record', occurrence: 0 }
+
+    const moved = { ...copy(stamped), presentation: moving(RECORD), form: movedForm }
+    expect(validateBundle(moved)).toMatchObject({ ok: true })
+    const mismatch = 'form: is not the base with its presentation applied; the form, the base or the presentation was edited'
+    expect(validateBundle({ ...copy(stamped), presentation: moving(RECORD) })).toEqual({ ok: false, problems: [mismatch] })
+    expect(validateBundle({ ...copy(stamped), form: movedForm })).toEqual({ ok: false, problems: [mismatch] })
+    expect(validateBundle({ ...copy(moved), presentation: moving({ label: 'Audit', occurrence: 0 }) })).toEqual({
+      ok: false,
+      problems: ['presentation: /fields/0/section: the base has no section labelled "Audit" at occurrence 0'],
+    })
+    expect(validateBundle({ ...copy(stamped), presentation: moving({ label: 'Employee', occurrence: 0 }, 'stamp') })).toEqual({
+      ok: false,
+      problems: ['presentation: /fields/0/section: moving stamp leaves section "Record" with no field'],
+    })
+  })
+
   // A request for another connection would regenerate the form from another
   // database; one in a spelling the proposal route never produces says the
   // file was written by something other than this server.

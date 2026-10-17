@@ -2,7 +2,7 @@ import type { FormSchema, LayoutNode } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
 import { validateSchema } from '@formancy/spec/validate'
 import { describe, expect, test } from 'vitest'
-import { addColumn, col, column, dropColumn, foreignKey, INT32, object, ORDER, retype, snapshot, table, text } from '../drift/fixture.js'
+import { addColumn, col, column, dropColumn, dropForeignKey, foreignKey, INT32, object, ORDER, retype, snapshot, table, text } from '../drift/fixture.js'
 import { generateForm } from '../generate/generate.js'
 import type { GenerationRequest } from '../generate/types.js'
 import type { ObjectMeta } from '../metadata.js'
@@ -40,6 +40,26 @@ const move = (at: number, key: string, to: number) => (form: FormSchema) => {
 }
 const both = (...edits: Array<(form: FormSchema) => void>) => (form: FormSchema) => {
   for (const edit of edits) edit(form)
+}
+/** `key` out of whichever section holds it, into section `to` at `index`, last by default, as the studio's Move to does. */
+const moveTo = (key: string, to: number, index?: number) => (form: FormSchema) => {
+  for (const [at] of sections(form).entries()) {
+    const children = grid(form, at)
+    const found = children.findIndex((entry) => entry.path === key)
+    if (found < 0) continue
+    const [moved] = children.splice(found, 1)
+    const target = grid(form, to)
+    target.splice(index ?? target.length, 0, moved as Child)
+    return
+  }
+  throw new Error(`no section places ${key}`)
+}
+const PAID = { kind: 'column', column: 'paid' } as const
+const MAIN = { label: 'Order', occurrence: 0 }
+const RECORD = { label: 'Record', occurrence: 0 }
+/** created_by computed: Record is (id, created_by). */
+const computedCreatedBy = (objects: ObjectMeta[]) => {
+  column(objects, 'order', 'created_by').generated = 'computed'
 }
 
 /** Generate, edit and derive, as the studio publishes. */
@@ -303,10 +323,154 @@ describe('rebasePresentation', () => {
     ])
   })
 
+  // A move between sections comes through an unchanged database as it went
+  // in, its place in the target's order included, and nobody is told
+  // anything (0075).
+  test('identical bases carry a move and the order it went into, with no conflict', () => {
+    const published = publish(moveTo('paid', 1, 0))
+    expect(published.presentation).toEqual({
+      version: 1,
+      fields: [{ field: 'paid', anchor: PAID, section: RECORD }],
+      sections: [{ anchor: RECORD, order: ['paid', 'id'] }],
+    })
+    const rebased = regenerate(published)
+    expect(rebased.conflicts).toEqual([])
+    expect(rebased.presentation).toEqual(published.presentation)
+    expect(canonicalize(rebased.form)).toBe(canonicalize(published.edited))
+  })
+
+  // Record goes when its last generated column does, and a field moved into
+  // it has nowhere to go. It goes back where the generator puts it, last of
+  // Order with no order there, and the person is told the move was dropped
+  // and where the field is now -- not that the field moved, which it did
+  // only because the move went.
+  test('a move into a section the regeneration drops is move-dropped, and the field goes where the generator puts it', () => {
+    const published = publish(moveTo('paid', 1))
+    const rebased = regenerate(published, (objects) => {
+      dropColumn(objects, 'order', 'id')
+      object(objects, 'order').primaryKey = null
+    })
+    expect(rebased.conflicts).toEqual([
+      {
+        kind: 'move-dropped',
+        field: 'paid',
+        anchor: PAID,
+        section: RECORD,
+        to: MAIN,
+        resolution: 'dropped',
+        message: 'The move of paid to section "Record" was dropped: "Record" is not in the regenerated form, so paid is in section "Order", where the generator put it.',
+      },
+    ])
+    expect(rebased.presentation).toEqual(EMPTY_PRESENTATION)
+    expect(keys(rebased.form, 0).at(-1)).toBe('paid')
+  })
+
+  // A move goes with its field's column, and is said with the section the
+  // person chose, as a dropped label is said with the label.
+  test('a moved field whose column is gone is field-gone for its section', () => {
+    const published = publish(moveTo('paid', 1))
+    const rebased = regenerate(published, (objects) => dropColumn(objects, 'order', 'paid'))
+    expect(rebased.conflicts).toEqual([
+      {
+        kind: 'field-gone',
+        field: 'paid',
+        anchor: PAID,
+        property: 'section',
+        yours: RECORD,
+        resolution: 'dropped',
+        message: 'The section "Record" you chose for paid was dropped: column paid is not in the regenerated form.',
+      },
+    ])
+    expect(rebased.presentation).toEqual(EMPTY_PRESENTATION)
+  })
+
+  // Watched failing against moved-section computed from the generated
+  // sections: created_by, moved to Record by the person, then made computed,
+  // is put in Record by the generator itself. The move is no longer an
+  // override and goes without a word, and the field is not said to have
+  // moved from Order, where the person never saw it after the move.
+  test('a field the generator now puts where the person moved it keeps no move, and is not said to have moved', () => {
+    const published = publish(moveTo('created_by', 1))
+    const rebased = regenerate(published, computedCreatedBy)
+    expect(rebased.conflicts).toEqual([])
+    expect(rebased.presentation).toEqual(EMPTY_PRESENTATION)
+    expect(keys(rebased.form, 1)).toEqual(['id', 'created_by'])
+  })
+
+  // A carried move may not empty the section it leaves, any more than an
+  // edit may: Record was id and created_by, and the person moved id to
+  // Order; created_by dropped, carrying the move would leave Record a
+  // heading over nothing. The move is dropped and said, and id stays.
+  test('a carried move that would leave its section with no field is move-dropped', () => {
+    const published = publish(moveTo('id', 0), computedCreatedBy)
+    expect(published.presentation.fields).toEqual([{ field: 'id', anchor: { kind: 'column', column: 'id' }, section: MAIN }])
+    const rebased = regenerate(published, (objects) => {
+      dropForeignKey(objects, 'fk_order_created_by')
+      dropColumn(objects, 'order', 'created_by')
+    })
+    expect(rebased.conflicts).toEqual([
+      expect.objectContaining({ kind: 'move-dropped', field: 'id', section: MAIN, to: RECORD, message: expect.stringContaining('would leave section "Record" with no field') }),
+    ])
+    expect(rebased.presentation).toEqual(EMPTY_PRESENTATION)
+    expect(keys(rebased.form, 1)).toEqual(['id'])
+  })
+
+  // A record root's two sections are both labelled Record, and when their
+  // number changes occurrence no longer says which is which: carried by
+  // occurrence, a move into the main section would reach the system one.
+  // The move is dropped and said, and no field is said to have moved
+  // between sections nobody can tell apart.
+  test('a record root whose sections change in number drops a move into one of them, and says no field moved', () => {
+    const request: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'record' }, formId: 'sales-record', title: 'Record', lookups: [] }
+    const records = (readable: boolean) => (objects: ObjectMeta[]) => {
+      objects.push(table('record', [
+        col('id', 'int', INT32, { generated: 'identity-always' }),
+        col('stamp', 'int', INT32, { generated: 'computed' }),
+        col('name', 'nvarchar(50)', text(50), { access: { select: readable, insert: readable, update: readable } }),
+      ], { primaryKey: { name: 'pk_record', columns: ['id'] } }))
+    }
+    const published = publish(moveTo('stamp', 0), records(true), request)
+    expect(published.presentation.fields).toEqual([{ field: 'stamp', anchor: { kind: 'column', column: 'stamp' }, section: { label: 'Record', occurrence: 0 } }])
+    const rebased = regenerate(published, records(false), request)
+    expect(sections(rebased.form).map((entry) => entry.label)).toEqual(['Record'])
+    expect(rebased.presentation).toEqual(EMPTY_PRESENTATION)
+    expect(rebased.conflicts).toEqual([
+      expect.objectContaining({ kind: 'move-dropped', field: 'stamp', section: { label: 'Record', occurrence: 0 }, message: expect.stringContaining('cannot be told apart') }),
+    ])
+  })
+
+  // Watched failing with key-only anchors in 0030's renumber case; a move is
+  // anchored as a label is. order_date_2 moved to Record, then the first
+  // order_date dropped: the move follows the column to its new key, and is
+  // not given to the key's new holder.
+  test("a renumbered key's move follows its column", () => {
+    const published = publish(moveTo('order_date_2', 1), orderDate2)
+    const rebased = regenerate(published, (objects) => {
+      orderDate2(objects)
+      dropColumn(objects, 'order', 'order_date')
+    })
+    expect(rebased.conflicts).toEqual([expect.objectContaining({ kind: 'field-rekeyed', field: 'order_date', from: 'order_date_2' })])
+    expect(rebased.presentation.fields).toEqual([{ field: 'order_date', anchor: { kind: 'column', column: 'order date' }, section: RECORD }])
+    expect(keys(rebased.form, 1)).toEqual(['id', 'order_date'])
+  })
+
+  // A new column whose generated predecessor moved away goes after the
+  // nearest predecessor still in its section, and the moved field keeps its
+  // place in the section it went to: an order carried over the generated
+  // section's keys would hand the moved field back to the section it left,
+  // and place it twice.
+  test('a column added after a moved field lands after its nearest predecessor still in the section, and the move keeps its place', () => {
+    const published = publish(both(moveTo('paid', 1, 0), move(0, 'notes', 3)))
+    const rebased = regenerate(published, reference)
+    expect(rebased.conflicts).toEqual([])
+    expect(keys(rebased.form, 0)).toEqual(['customer', 'order_date', 'status', 'notes', 'amount', 'created_by', 'reference'])
+    expect(keys(rebased.form, 1)).toEqual(['paid', 'id'])
+  })
+
   // A person reviews the result, and a regeneration of an unchanged input
   // must not show a different one: no clock, no map iteration order leaking.
   test('two runs are byte-identical', () => {
-    const published = publish(both(relabel('order_date', 'Ordered on'), relabel('order_date_2', 'Ship date'), move(0, 'paid', 0)), orderDate2)
+    const published = publish(both(relabel('order_date', 'Ordered on'), relabel('order_date_2', 'Ship date'), move(0, 'paid', 0), moveTo('order_date_2', 1, 0)), orderDate2)
     const after = (objects: ObjectMeta[]) => {
       orderDate2(objects)
       dropColumn(objects, 'order', 'order_date')

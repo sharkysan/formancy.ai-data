@@ -85,6 +85,7 @@ export function CarriedPanel({
       const label = conflict.yours as Text
       return <GiveLabel at={at} label={label} fresh={carried.fresh} named={(key) => labelOf(document, key)} give={(key) => relabel(key, label)} />
     }
+    // A dropped move (0075) offers nothing here: the field's own "Move to" button below is how it goes back.
     return null
   }
 

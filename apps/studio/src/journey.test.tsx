@@ -194,8 +194,12 @@ describe('the journey', () => {
     await user.clear(within(policy).getByLabelText('Roles that may delete'))
     await grantOrderDelete(user, policy)
     await record('Policy, with a reach')
-    await goTo(user, 'Presentation')
+    const presentation = await goTo(user, 'Presentation')
     await record('Presentation')
+    // A field in another section (0075), then taken back, so the rest of the journey is as before.
+    await user.click(within(presentation).getByRole('button', { name: 'Move to Record Customer' }))
+    await record('Presentation, a field in another section')
+    await user.click(within(presentation).getByRole('button', { name: 'Undo' }))
     await goTo(user, 'Preview')
     await record('Preview')
     const publish = await goTo(user, 'Publish')

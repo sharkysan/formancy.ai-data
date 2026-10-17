@@ -143,6 +143,26 @@ later.
   each start; an image outside the matrix, two for one engine, or the
   variable set to nothing is refused. turbo hashes it, so a cached run on
   one image is never replayed for another.
+- **A field may move to another generated section.** The generator puts
+  every column the database generates or fills in a section of its own,
+  Record, which for most tables leaves the identity alone, split off the
+  fields a person reads first; and a buyer judges the first form by how it
+  is arranged. In the studio's Presentation step each field now offers
+  "Move to Record" (or to the root's section), one button per other
+  section, which puts it last there and leaves the keyboard on the button
+  that takes it back. The move is presentation: kept on the field's own
+  entry as `section`, anchored by its column and the section's label, and
+  carried through a regeneration, which reports a move it had to drop as
+  `move-dropped` -- its section gone, or one it cannot tell apart, or one
+  the move would leave with no field. A section keeps at least one field,
+  so Record's only field stays, and a moved field lands last. The
+  presentation stays version 1, and one with no move is what 0.1.0 writes;
+  a 0.1.0 server refuses to read or import a version holding a move,
+  naming `/fields/N/section`. Help text is not offered: `@formancy/spec`
+  0.5.0 has no property for it. `@formancy/data-core`'s presentation types
+  gain the `section` property, the `move-dropped` conflict and a
+  `field-gone` for a section; no upstream version changes
+  ([0075](docs/decisions/0075-a-field-may-move-to-another-generated-section.md)).
 
 ### Changed
 

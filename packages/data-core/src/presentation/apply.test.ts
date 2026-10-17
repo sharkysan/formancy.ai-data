@@ -9,8 +9,8 @@ import { EMPTY_PRESENTATION } from './types.js'
  * applyPresentation is what the server runs on every read of a format-2
  * bundle: the stored form must be the base with its presentation applied.
  * So it refuses anything a hand edit could put in a presentation that the
- * studio's four edits could not, and anything that is not the one spelling
- * of what it says.
+ * studio's edits could not, and anything that is not the one spelling of
+ * what it says.
  */
 
 const { form: base, bindings } = generateForm(snapshot(), ORDER)
@@ -22,6 +22,17 @@ const problems = (value: PresentationOverrides) => {
   return outcome.ok ? [] : outcome.problems
 }
 const NOTES = { kind: 'column', column: 'notes' }
+const PAID = { kind: 'column', column: 'paid' }
+const MAIN = { label: 'Order', occurrence: 0 }
+const RECORD = { label: 'Record', occurrence: 0 }
+
+/** Each section's grid as the applied form places it: keys, a textarea's marked `*`. */
+function placed(value: PresentationOverrides): string[][] {
+  const outcome = applyPresentation(base, value, bindings)
+  if (!outcome.ok) throw new Error(outcome.problems.join('; '))
+  const sections = (outcome.form.layouts?.[0]?.nodes ?? []) as unknown as Array<{ children: Array<{ children: Array<{ path: string; span?: 'all' }> }> }>
+  return sections.map((section) => (section.children[0]?.children ?? []).map((node) => `${node.path}${node.span === 'all' ? '*' : ''}`))
+}
 
 describe('applyPresentation', () => {
   // The empty presentation is the base itself, which is what every bundle
@@ -47,13 +58,57 @@ describe('applyPresentation', () => {
 
   // An order is the section's own fields rearranged. One that drops a field
   // would publish a form that places it nowhere; one that adds a field from
-  // another section is a move between sections, which is not presentation.
+  // another section without a move for it would place that field twice.
   test('refuses an order that is not a permutation of its section', () => {
     const anchor = { label: 'Order', occurrence: 0 }
     expect(problems(presentation([], [{ anchor, order: ['customer', 'order_date'] }]))).toEqual([
       "/sections/0/order: not an order of that section's fields (customer, order_date, status, amount, notes, created_by, paid)",
     ])
     expect(problems(presentation([], [{ anchor, order: ['id', 'order_date', 'status', 'amount', 'notes', 'created_by', 'paid'] }]))).toHaveLength(1)
+  })
+
+  // A move lands at the end of the section it names, the field's width
+  // with it, and leaves its own section's other fields in their order. An
+  // entry holding a section and nothing else says something: a check that
+  // read only a label and a span for "says nothing" would refuse every move.
+  test('moves a field to the end of another generated section, keeping its width', () => {
+    expect(placed(presentation([{ field: 'notes', anchor: NOTES, section: RECORD }]))).toEqual([
+      ['customer', 'order_date', 'status', 'amount', 'created_by', 'paid'],
+      ['id', 'notes*'],
+    ])
+    // Two moved into one section land in the base's field order.
+    expect(placed(presentation([{ field: 'notes', anchor: NOTES, section: RECORD }, { field: 'paid', anchor: PAID, section: RECORD }]))).toEqual([
+      ['customer', 'order_date', 'status', 'amount', 'created_by'],
+      ['id', 'notes*', 'paid'],
+    ])
+  })
+
+  // An order is of the fields the section holds once the moves are made:
+  // the moved field is in its target's order and not in its source's. An
+  // order still listing a field that moved away would place it twice; one
+  // equal to where the moves put the fields is a second spelling of none.
+  test('holds an order to the fields its section holds after the moves', () => {
+    const moved = { field: 'paid', anchor: PAID, section: RECORD }
+    expect(problems(presentation([moved], [{ anchor: MAIN, order: ['paid', 'customer', 'order_date', 'status', 'amount', 'notes', 'created_by'] }]))).toEqual([
+      "/sections/0/order: not an order of that section's fields (customer, order_date, status, amount, notes, created_by)",
+    ])
+    expect(placed(presentation([moved], [{ anchor: RECORD, order: ['paid', 'id'] }]))[1]).toEqual(['paid', 'id'])
+    expect(problems(presentation([moved], [{ anchor: RECORD, order: ['id', 'paid'] }]))).toEqual(["/sections/0/order: equals the base's; leave it out"])
+  })
+
+  // A move is to another section the base generated, and never empties one.
+  // A move to the field's own section says what the base says; one to a
+  // section the base lacks has nowhere to go; one that takes a section's
+  // last field would draw a heading over nothing.
+  test('refuses a move to its own section, to a section the base lacks, and one that leaves a section with no field', () => {
+    expect(problems(presentation([{ field: 'paid', anchor: PAID, section: MAIN }]))).toEqual(["/fields/0/section: equals the base's; leave it out"])
+    expect(problems(presentation([{ field: 'paid', anchor: PAID, section: { label: 'Record', occurrence: 1 } }]))).toEqual([
+      '/fields/0/section: the base has no section labelled "Record" at occurrence 1',
+    ])
+    expect(problems(presentation([{ field: 'id', anchor: { kind: 'column', column: 'id' }, section: MAIN }]))).toEqual(['/fields/0/section: moving id leaves section "Record" with no field'])
+    expect(presentationShapeProblems(presentation([{ field: 'paid', anchor: PAID, section: { label: 'Record' } }]))).toEqual([
+      '/fields/0/section must be { label, occurrence } with a whole occurrence of at least 0',
+    ])
   })
 
   // A section the base does not have is an override with nowhere to go.

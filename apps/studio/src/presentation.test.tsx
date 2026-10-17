@@ -25,9 +25,9 @@ afterEach(async () => {
   await plane.close()
 })
 
-/** The labels of the order's main section, in the order the step lists them. */
-function placed(presentation: HTMLElement): string[] {
-  const section = within(presentation).getByRole('region', { name: 'Order' })
+/** The keys a section lists, the order's main one by default, in the order the step lists them. */
+function placed(presentation: HTMLElement, name = 'Order'): string[] {
+  const section = within(presentation).getByRole('region', { name })
   return within(section)
     .getAllByRole('textbox')
     .map((box) => computeAccessibleName(box))
@@ -85,6 +85,33 @@ describe('presentation', () => {
     expect(await audit()).toEqual([])
   })
 
+  // A field changes section by one press of a button per other section,
+  // named as Move up is: "Move to Record Customer" (0075). It lands last in
+  // the section it went to. The row is made again in the other section's
+  // list, so the keyboard is given back to the moved field's button for the
+  // way back -- watched failing without it, the focus on <body>. A section's
+  // only field cannot leave it, and Undo takes a move back as it takes any.
+  test('moves a field to another section by keyboard, and keeps the keyboard on it', async () => {
+    const user = await signIn(plane)
+    await generateOrder(user)
+    const presentation = await goTo(user, 'Presentation')
+    expect(placed(presentation, 'Record')).toEqual(['id'])
+    expect(within(presentation).getByRole('button', { name: 'Move to Order Id' })).toHaveProperty('disabled', true)
+    within(presentation).getByRole('button', { name: 'Move to Record Customer' }).focus()
+    await user.keyboard('{Enter}')
+    expect(placed(presentation, 'Record')).toEqual(['id', 'customer'])
+    expect(placed(presentation)).not.toContain('customer')
+    expect(computeAccessibleName(document.activeElement as Element)).toBe('Move to Order Customer')
+    expect(within(presentation).getByRole('status').textContent).toBe('Moved Customer to Record.')
+    // Id is no longer alone, so it may go.
+    expect(within(presentation).getByRole('button', { name: 'Move to Order Id' })).toHaveProperty('disabled', false)
+    expect(await audit()).toEqual([])
+
+    await user.click(within(presentation).getByRole('button', { name: 'Undo' }))
+    expect(placed(presentation, 'Record')).toEqual(['id'])
+    expect(placed(presentation)[0]).toBe('customer')
+  })
+
   // Undo is the session's own history: it restores the document, and the
   // boxes follow it.
   test('undoes and redoes through the session', async () => {
@@ -108,15 +135,28 @@ describe('presentation', () => {
 
   // The decision 0024 rests on: every control on this step is a label, a
   // move, a width, undo or redo -- nothing that adds, removes, renames or
-  // retypes a field, which the bindings would no longer match. And what the
+  // retypes a field, which the bindings would no longer match. Widened on
+  // purpose by 0075: a field may also move to another generated section, by
+  // exactly one button per field and other section, and by nothing else --
+  // no list of places to put it, no field from elsewhere. And what the
   // controls produce is a bundle the server publishes and serves back, its
-  // presentation kept apart from the generated base (0030).
+  // presentation kept apart from the generated base (0030), the move
+  // recorded on the field's entry.
   test('offers nothing that could break a binding, and what it edits publishes', async () => {
     const user = await signIn(plane)
     await generateOrder(user)
     const presentation = await goTo(user, 'Presentation')
     const named = (role: string) => within(presentation).queryAllByRole(role).map((element) => computeAccessibleName(element))
-    expect(named('button').filter((name) => !/^(Undo|Redo|Move (up|down) .+)$/.test(name))).toEqual([])
+    expect(named('button').filter((name) => !/^(Undo|Redo|Move (up|down|to) .+)$/.test(name))).toEqual([])
+    const regions = within(presentation).getAllByRole('region').map((region) => computeAccessibleName(region))
+    expect(regions).toEqual(['Order', 'Record'])
+    const labelled = (region: string) =>
+      within(within(presentation).getByRole('region', { name: region }))
+        .getAllByRole('textbox')
+        .filter((box) => computeAccessibleName(box).startsWith('Label of '))
+        .map((box) => (box as HTMLInputElement).value)
+    const offered = regions.flatMap((region) => labelled(region).flatMap((label) => regions.filter((other) => other !== region).map((other) => `Move to ${other} ${label}`)))
+    expect(named('button').filter((name) => name.startsWith('Move to ')).sort()).toEqual(offered.sort())
     expect(named('textbox').filter((name) => !/^(Section label|Label) of .+$/.test(name))).toEqual([])
     expect(named('checkbox').filter((name) => !/^Full width for .+$/.test(name))).toEqual([])
     for (const role of ['combobox', 'listbox', 'radio', 'spinbutton', 'link', 'menuitem']) expect(named(role), role).toEqual([])
@@ -125,6 +165,7 @@ describe('presentation', () => {
     await user.type(within(presentation).getByLabelText('Label of notes'), 'Remarks')
     await user.click(within(presentation).getByRole('checkbox', { name: 'Full width for Remarks' }))
     await user.click(within(presentation).getByRole('button', { name: 'Move up Amount' }))
+    await user.click(within(presentation).getByRole('button', { name: 'Move to Record Customer' }))
     await writeOrderPolicy(user)
     const publish = await goTo(user, 'Publish')
     await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
@@ -145,13 +186,19 @@ describe('presentation', () => {
     expect(bindings.fields.map((binding) => binding.field).filter((key) => !placedPaths.has(key))).toEqual([])
     const main = layoutChildrenAt(form, 'default', [0, 0])?.map((node) => (node.kind === 'field' ? node.path : node.kind))
     expect(main?.indexOf('amount')).toBe((main?.indexOf('status') ?? 0) - 1)
-    // Since 0030 the three edits are kept as what they are -- a label, a
-    // width, an order -- beside the generated base, so a regeneration can
-    // carry them. A studio that published the edited form alone would have
-    // nothing to carry, and every label would be lost at the next one.
+    expect(main).not.toContain('customer')
+    expect(layoutChildrenAt(form, 'default', [1, 0])?.map((node) => (node.kind === 'field' ? node.path : node.kind)).at(-1)).toBe('customer')
+    // Since 0030 the edits are kept as what they are -- a label, a width, an
+    // order, and since 0075 a section -- beside the generated base, so a
+    // regeneration can carry them. A studio that published the edited form
+    // alone would have nothing to carry, and every label would be lost at
+    // the next one.
     expect(bundle.presentation).toEqual({
       version: 1,
-      fields: [{ field: 'notes', anchor: { kind: 'column', column: 'notes' }, label: 'Remarks', span: 'one' }],
+      fields: [
+        { field: 'customer', anchor: { kind: 'lookup', foreignKey: 'fk_order_customer' }, section: { label: 'Record', occurrence: 0 } },
+        { field: 'notes', anchor: { kind: 'column', column: 'notes' }, label: 'Remarks', span: 'one' },
+      ],
       sections: [{ anchor: { label: 'Order', occurrence: 0 }, order: main }],
     })
     expect(bundle.base.model.fields.find((field) => field.key === 'notes')?.label).toBe('Notes')
