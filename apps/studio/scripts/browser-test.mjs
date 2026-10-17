@@ -38,7 +38,13 @@
 //     late family swapped in is not caught;
 //   - on each origin, the page asked no other origin for anything: every
 //     such request is refused, so the answer is the same with no network,
-//     and named (0072).
+//     and named (0072);
+//   - the page is sent with the Content-Security-Policy deploy/web/nginx.conf
+//     sends it, scripts/web-policies.mjs's, and at every step the browser
+//     refused nothing under it -- no event the document heard, no console
+//     line about the policy -- and at the end an inline script put in the
+//     page was refused and heard, so a pass under a policy nobody enforced,
+//     or with a listener that hears nothing, fails (0083).
 //
 // Against the page `vite build` produces, served over HTTP from the same
 // origin as the real data server -- createDataServer, in this process, with
@@ -62,14 +68,14 @@
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEveryPass, declaredFamilies, fontProblem, foreignProblem, fromTheTop, guardRequests, unlikeTheTable, webFonts } from '../../../scripts/browser-gate.mjs'
+import { afterEveryPass, canary, canaryProblem, declaredFamilies, fontProblem, foreignProblem, fromTheTop, guardRequests, hearPolicy, unlikeTheTable, webFonts } from '../../../scripts/browser-gate.mjs'
 import { FACTS } from '../../../scripts/browsers.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { journey } from './browser/journey.mjs'
 import { audit, describeFocus, measured } from './browser/measure.mjs'
 import { startPlane, TOKENS } from './browser/plane.mjs'
 import { review, signIn } from './browser/review.mjs'
-import { DIST, serve } from './browser/serve.mjs'
+import { DIST, POLICY, serve } from './browser/serve.mjs'
 import { widths } from './browser/styles.mjs'
 
 /** Playwright, for recordedPerBrowser to launch each browser with: the one import of playwright, here where the app declares it. */
@@ -157,7 +163,8 @@ async function underReview(gate, page, { refuseFonts, guard }) {
   try {
     const origin = `http://127.0.0.1:${String(port)}`
     guard.allow(origin)
-    await page.goto(`${origin}/`, { waitUntil: 'load' })
+    const response = await page.goto(`${origin}/`, { waitUntil: 'load' })
+    gate.check('under review, the studio is sent with the policy nginx.conf sends it', sentWith(response))
     await signIn(page, TOKENS.admin)
     for (const [state, act] of review(gate.check)) {
       await act(page)
@@ -166,10 +173,19 @@ async function underReview(gate, page, { refuseFonts, guard }) {
     gate.check('under review, the page asked no other origin for anything', foreignProblem(guard.foreign()))
     const problem = fontProblem({ families: declaredFamilies(DIST), ...(await webFonts(page)), refused: refuseFonts })
     gate.check(refuseFonts ? 'under review, with the web fonts refused, none loaded' : 'under review, every web font the page asks for loaded', problem)
+    // Last in the pass, since the console line of its refusal is the gate's
+    // own: every check of what the policy refused heard something.
+    gate.check('and the policy held: an inline script put in the page was refused, and the page heard the refusal', canaryProblem(await canary(page), POLICY))
   } finally {
     http.close()
     await plane.close()
   }
+}
+
+/** What a check that the page was sent with its policy fails with, or null. */
+function sentWith(response) {
+  const sent = response?.headers()['content-security-policy']
+  return sent === POLICY ? null : `it was sent with ${sent === undefined ? 'no policy' : `"${sent}"`}`
 }
 
 /** The gate in one browser, reporting through `gate` (scripts/release-report/gate-results.mjs), which keeps what it found for the release report. */
@@ -184,11 +200,15 @@ async function run(gate, browser) {
     const page = await browser.newPage({ viewport: { width, height: 900 } })
     const origin = `http://127.0.0.1:${String(port)}`
     // Every request to another origin refused and named at the end of the
-    // pass, and in the refusing pass every font file (0072).
+    // pass, and in the refusing pass every font file (0072); and what the
+    // page's policy refused, from before its first script, which each
+    // measured state reads (0083).
     const guard = await guardRequests(page, { origins: [origin], refuseFonts })
+    await hearPolicy(page)
     try {
-      await page.goto(`${origin}/`, { waitUntil: 'load' })
+      const response = await page.goto(`${origin}/`, { waitUntil: 'load' })
       console.log(`\n${label} -- ${String(width)}x900`)
+      gate.check('the studio is sent with the policy nginx.conf sends it', sentWith(response))
       await wayIn(gate, page)
       await measured(gate, page, 'Connect')
       for (const [state, act] of journey(plane, gate.check)) {

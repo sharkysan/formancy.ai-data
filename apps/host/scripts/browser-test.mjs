@@ -85,7 +85,16 @@
 //     refused, so the answer is the same with no network, and named (0072)
 //     -- AG Grid's own loader of Google's fonts among them, which in 36.2.0
 //     asks Google for a theme parameter given as `{ googleFont }`, and only
-//     for a grid given `loadThemeGoogleFonts`: the page does neither.
+//     for a grid given `loadThemeGoogleFonts`: the page does neither;
+//   - the page is sent with the Content-Security-Policy deploy/web/nginx.conf
+//     sends it, scripts/web-policies.mjs's, and in every state the browser
+//     refused nothing under it -- no event the document heard, no console
+//     line about the policy -- and at the end of each pass an inline script
+//     put in the page was refused and heard, so a pass under a policy nobody
+//     enforced, or with a listener that hears nothing, fails (0083); and the
+//     policy's one allowance, `'unsafe-inline'` in style-src, is needed:
+//     once a run, the page under the policy without it has the style
+//     elements AG Grid creates refused.
 //
 // Against the page `vite build` produces, served over HTTP from the same
 // origin as the real data server -- createDataServer, in this process, over
@@ -98,8 +107,8 @@
 //
 // One module per reason to change, under scripts/browser/: the plane, the
 // server of the built page, the stylesheet's reads, the measurements, the
-// workspace's states, the record's journey, a delete's states and Download
-// CSV's.
+// workspace's states, the record's journey, a delete's states, Download
+// CSV's, and the policy's allowance.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
 // scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
@@ -113,14 +122,15 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { startTcpHop } from '@formancy/data-fixtures'
-import { afterEveryPass, agGridRowProblem, environmentOf, focusScrollProblem, guardRequests, rowUnmeasured } from '../../../scripts/browser-gate.mjs'
+import { afterEveryPass, agGridRowProblem, canary, canaryProblem, environmentOf, focusScrollProblem, guardRequests, hearPolicy, policyRefused, rowUnmeasured } from '../../../scripts/browser-gate.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
+import { allowanceProblem } from './browser/allowance.mjs'
 import { deleteJourney } from './browser/deleting.mjs'
 import { exportJourney } from './browser/exporting.mjs'
 import { recordJourney } from './browser/journey.mjs'
 import { audit, decide, describeFocus, focusedOn, focusScroll, measureWidth } from './browser/measure.mjs'
 import { startPlane } from './browser/plane.mjs'
-import { DIST, serve } from './browser/serve.mjs'
+import { DIST, POLICY, serve } from './browser/serve.mjs'
 import { widths } from './browser/styles.mjs'
 import { workspaceJourney } from './browser/workspace.mjs'
 
@@ -160,6 +170,10 @@ async function run(gate, browser) {
     check(`${state}: the grids' text, decided on the pixels, at 4.5:1 or more`, decided.failing.length === 0 ? null : decided.failing.map((entry) => `${entry.name} ${String(entry.ratio)}:1`).join('; '))
     // What axe asked about and no screen shows in this state, said rather than counted: its grid has scrolled it out of view, or covers it.
     if (decided.hidden.length > 0) console.log(`  shown nowhere: ${decided.hidden.join('; ')}`)
+    // Everything the page did to reach this state, under the policy it was
+    // sent with (0083): what the browser refused, and what the console said
+    // of the policy.
+    check(`${state}: the browser refused nothing under the page’s policy`, await policyRefused(page))
   }
 
   const started = Date.now()
@@ -182,9 +196,14 @@ async function run(gate, browser) {
       // pass, and in the refusing pass every font file (0072). The page is
       // the hop's origin: the client speaks to the origin it was served from.
       const guard = await guardRequests(page, { origins: [`http://127.0.0.1:${String(hop.port)}`], refuseFonts })
+      // What the page's policy refused, from before its first script,
+      // which each measured state reads (0083).
+      await hearPolicy(page)
       try {
-        await page.goto(`http://127.0.0.1:${String(hop.port)}/`, { waitUntil: 'load' })
+        const response = await page.goto(`http://127.0.0.1:${String(hop.port)}/`, { waitUntil: 'load' })
         console.log(`\n${label} -- ${String(width)}x900`)
+        const sent = response?.headers()['content-security-policy']
+        check('the page is sent with the policy nginx.conf sends it', sent === POLICY ? null : `it was sent with ${sent === undefined ? 'no policy' : `"${sent}"`}`)
         // AG Grid's own tests, copied with its release into 0058's rows,
         // against what the page's browser says it is: they decide the code
         // paths the grids take.
@@ -220,6 +239,9 @@ async function run(gate, browser) {
         // every web font had loaded by the end of the pass, or, where it
         // refuses them, none had.
         await afterEveryPass(gate, page, { dist: DIST, refused: refuseFonts, guard })
+        // Last in the pass, since the console line of its refusal is the
+        // gate's own: every check of what the policy refused heard something.
+        check('and the policy held: an inline script put in the page was refused, and the page heard the refusal', canaryProblem(await canary(page), POLICY))
       } finally {
         await page.close()
       }
@@ -233,6 +255,8 @@ async function run(gate, browser) {
     // from before until its next rendering update -- which is why the
     // workspace waits for one between the keys that scroll its grid.
     check('a focus that scrolls the window or a scroller: the page says where to at once, as 0058’s table says of this browser', focusScrollProblem(gate.asked, await focusScroll(browser)))
+    // The policy's one allowance, watched being needed in this browser (0083).
+    check('without the policy’s allowance, the browser refuses the style elements AG Grid creates', await allowanceProblem(browser, `http://127.0.0.1:${String(port)}`))
   } finally {
     await hop.close()
     http.close()

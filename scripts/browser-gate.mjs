@@ -106,6 +106,126 @@ export async function guardRequests(page, { origins, refuseFonts = false }) {
   return { allow: (origin) => allowed.add(origin), refused, foreign: () => asked.splice(0) }
 }
 
+/**
+ * A console line about a Content-Security-Policy, in each browser's words:
+ * Chromium's "violates the following Content Security Policy directive",
+ * Firefox's "Content-Security-Policy: The page's settings blocked" and
+ * WebKit's "does not appear in the … directive of the Content Security
+ * Policy".
+ */
+const POLICY_LINE = /content[- ]security[- ]policy/i
+
+/**
+ * How long a policy's report of the canary's script may take. Measured on
+ * 2026-10-16, on Windows 11, by the examples page's gate, which records it
+ * in every pass since: it arrived 0.5 to 7.1 ms after the script was put in
+ * the page in Chromium 153, over 14 passes, and in 1 ms or less in Firefox
+ * 155, whose clock reads whole milliseconds, over 7. Two seconds is more
+ * than two hundred times the slowest, and runs out only on a pass that
+ * heard nothing, which then fails.
+ */
+export const CANARY_WAIT_MS = 2_000
+
+/**
+ * What the page's documents hear of their policy, from before each one's
+ * first script: every `securitypolicyviolation`, kept on the window for the
+ * gate to read. A violation is what the browser refused, and so something
+ * the page meant to do and could not under the headers it is served with.
+ * An init script is the browser's own, not an element of the page, so the
+ * policy does not refuse it -- the examples page's gate has run under its
+ * policy so in every browser since 0069.
+ */
+export function hearViolations(page) {
+  return page.addInitScript(() => {
+    const heard = []
+    Object.defineProperty(window, '__formancyGateViolations', { value: heard })
+    document.addEventListener(
+      'securitypolicyviolation',
+      (event) => heard.push(`${event.effectiveDirective} refused ${event.blockedURI || 'something inline'} (${event.sourceFile || 'the page'}:${String(event.lineNumber)})`),
+      true,
+    )
+  })
+}
+
+/** The violations the page's document has heard and not yet given, taken. */
+export const violationsHeard = (page) => page.evaluate(() => (window.__formancyGateViolations ?? []).splice(0))
+
+/**
+ * The guard on the violation check, at the end of a pass: an inline script
+ * put in the page, which a policy without `'unsafe-inline'` in script-src
+ * refuses. A pass in which it ran measured a page under no policy; one in
+ * which the browser refused it and the page heard nothing measured with a
+ * listener that hears nothing. Either way the violation checks before it
+ * proved nothing, so canaryProblem fails it.
+ *
+ * The report is queued as a task of its own, after the script is put in
+ * the page; `after` is how long after, and the probe waits CANARY_WAIT_MS
+ * for it before calling it unheard. What it heard is taken off the window,
+ * since the refusal is the gate's doing, not the page's; the console line
+ * the refusal writes is not, so the canary is the last thing a gate does
+ * in a document.
+ */
+export function canary(page) {
+  return page.evaluate(async (wait) => {
+    const heard = window.__formancyGateViolations ?? []
+    const before = heard.length
+    const arrived = new Promise((settle) => document.addEventListener('securitypolicyviolation', () => settle(performance.now()), { once: true, capture: true }))
+    const started = performance.now()
+    const script = document.createElement('script')
+    script.textContent = 'window.__formancyGateCanary = true'
+    document.head.append(script)
+    script.remove()
+    const at = await Promise.race([arrived, new Promise((settle) => setTimeout(() => settle(null), wait))])
+    const count = heard.length - before
+    heard.splice(before)
+    return { ran: window.__formancyGateCanary === true, heard: count, after: at === null ? null : at - started }
+  }, CANARY_WAIT_MS)
+}
+
+/** What the canary's check fails with, or null: `policy` is the header's value the page was meant to be sent with. */
+export function canaryProblem({ ran, heard }, policy) {
+  if (ran) return `it ran, so the page was measured under no policy, not ${policy.slice(0, 32)}…`
+  return heard === 0 ? 'refused, and heard by nothing, so the checks before it heard nothing either' : null
+}
+
+/** What a check that the browser refused nothing fails with, or null: what the document heard and the console said, each once, the first four. */
+export function refusedProblem(heard, said) {
+  const each = [...new Set([...heard, ...said])]
+  if (each.length === 0) return null
+  return `${each.slice(0, 4).join('; ')}${each.length > 4 ? `; and ${String(each.length - 4)} more` : ''}`
+}
+
+const hearers = new WeakMap()
+
+/**
+ * Hears `page`'s policy from its first document on: the violations each
+ * document reports (hearViolations) and every console line about the policy
+ * (POLICY_LINE), which is where a browser says what it refused when a
+ * report is not made, until policyRefused takes them. Before the first
+ * navigation.
+ */
+export async function hearPolicy(page) {
+  const said = []
+  page.on('console', (message) => {
+    const text = message.text()
+    if (POLICY_LINE.test(text)) said.push(`the console said: ${text.slice(0, 160)}`)
+  })
+  await hearViolations(page)
+  hearers.set(page, said)
+}
+
+/**
+ * What `page` was refused under its policy since this was last asked, as
+ * refusedProblem says it, or null. Read before a navigation, which starts a
+ * window that has heard nothing. Throws for a page hearPolicy was not given,
+ * which would otherwise pass having heard nothing.
+ */
+export async function policyRefused(page) {
+  const said = hearers.get(page)
+  if (said === undefined) throw new Error('policyRefused: hearPolicy was never given this page')
+  return refusedProblem(await violationsHeard(page), said.splice(0))
+}
+
 /** What the check that a pass asked no other origin for anything fails with, or null: each address once, the first four. */
 export function foreignProblem(asked) {
   if (asked.length === 0) return null

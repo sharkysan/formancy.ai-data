@@ -1,9 +1,11 @@
 // What the studio gate measures in the browser, as numbers and computed
-// results: sideways overflow, axe, and where the keyboard is.
+// results: sideways overflow, axe, where the keyboard is, and what the
+// page's policy refused.
 
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
+import { policyRefused } from '../../../../scripts/browser-gate.mjs'
 
 /** Sideways scroll, and every element with a box that is past either edge. */
 export function measureWidth(page) {
@@ -28,7 +30,10 @@ const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.mi
  * must have been decided.
  */
 export async function audit(page, target) {
-  if (!(await page.evaluate(() => 'axe' in window))) await page.addScriptTag({ content: AXE })
+  // Through Playwright's evaluate, not a script element: the page's policy
+  // refuses an inline script, as it should (0083), and what Playwright
+  // evaluates is not held to it, as 0069 measured.
+  if (!(await page.evaluate(() => 'axe' in window))) await page.evaluate(`${AXE}\n;undefined`)
   const subject = target ?? (await page.evaluateHandle(() => document))
   return subject.evaluate(async (context, tags) => {
     const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags } })
@@ -77,4 +82,8 @@ export async function measured(gate, page, state) {
   check(`${state}: axe finds nothing at WCAG 2.2 AA`, result.violations.length === 0 ? null : result.violations.join('; '))
   check(`${state}: contrast and target size measured, over something`, result.measured.length === 2 ? null : `only ${result.measured.join(', ') || 'nothing'}`)
   check(`${state}: the contrast of every text decided`, result.undecided.length === 0 ? null : `undecided: ${result.undecided.join('; ')}`)
+  // Everything the page did to reach this state, under the policy it was
+  // sent with (0083): what the browser refused, and what the console said
+  // of the policy.
+  check(`${state}: the browser refused nothing under the page’s policy`, await policyRefused(page))
 }

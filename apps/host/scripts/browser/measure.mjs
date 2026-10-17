@@ -54,7 +54,10 @@ const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.mi
  * the element is not found by it later.
  */
 export async function audit(page, target) {
-  if (!(await page.evaluate(() => 'axe' in window))) await page.addScriptTag({ content: AXE })
+  // Through Playwright's evaluate, not a script element: the page's policy
+  // refuses an inline script, as it should (0083), and what Playwright
+  // evaluates is not held to it, as 0069 measured.
+  if (!(await page.evaluate(() => 'axe' in window))) await page.evaluate(`${AXE}\n;undefined`)
   const subject = target ?? (await page.evaluateHandle(() => document))
   return subject.evaluate(async (context, tags) => {
     const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, elementRef: true })

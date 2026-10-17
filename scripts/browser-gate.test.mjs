@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
-import { agGridRowProblem, declaredFamilies, focusScrollProblem, fontProblem, foreignProblem, isFontFile, isForeign, lostCreate, rowUnmeasured, systemOf, unlikeTheTable } from './browser-gate.mjs'
+import { agGridRowProblem, canaryProblem, declaredFamilies, focusScrollProblem, fontProblem, foreignProblem, isFontFile, isForeign, lostCreate, refusedProblem, rowUnmeasured, systemOf, unlikeTheTable } from './browser-gate.mjs'
 
 /**
  * What every browser gate does to a page in every browser (0058), in the
@@ -139,6 +139,30 @@ describe('the requests a pass refuses (0072)', () => {
     expect(foreignProblem(['https://a.example/1', 'https://a.example/2', 'https://a.example/3', 'https://a.example/4', 'https://a.example/5'])).toBe(
       '5 addresses on another origin, each refused: https://a.example/1, https://a.example/2, https://a.example/3, https://a.example/4, …',
     )
+  })
+})
+
+describe('what a page is refused under its policy (0069, 0083)', () => {
+  // A state that reached the screen with a style or a fetch refused looks
+  // finished and is not: what the document heard and what the console
+  // said are both named, each once, so a red leg says which directive.
+  test('is named, each once, from the document and the console', () => {
+    expect(refusedProblem([], [])).toBeNull()
+    const heard = 'style-src-elem refused inline (http://127.0.0.1:4391/assets/workspace-a.js:16)'
+    const said = "the console said: Applying inline style violates the following Content Security Policy directive 'style-src 'self''"
+    expect(refusedProblem([heard, heard], [said])).toBe(`${heard}; ${said}`)
+    expect(refusedProblem(['a', 'b', 'c'], ['d', 'e', 'f'])).toBe('a; b; c; d; and 2 more')
+  })
+
+  // The guard on the guard: a page served under no policy runs the
+  // canary's inline script, and a listener that hears nothing hears no
+  // refusal either; either way every check that nothing was refused
+  // passed for the wrong reason.
+  test('is heard, by a canary the policy refuses and the page hears', () => {
+    const policy = "default-src 'none'; script-src 'self'; style-src 'self'"
+    expect(canaryProblem({ ran: false, heard: 1 }, policy)).toBeNull()
+    expect(canaryProblem({ ran: true, heard: 0 }, policy)).toBe("it ran, so the page was measured under no policy, not default-src 'none'; script-src '…")
+    expect(canaryProblem({ ran: false, heard: 0 }, policy)).toBe('refused, and heard by nothing, so the checks before it heard nothing either')
   })
 })
 
