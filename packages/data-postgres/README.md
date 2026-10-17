@@ -395,7 +395,9 @@ with it, in `lookups/cancel.ts`:
   request, which postgres.js marks only by clearing the query's
   `describeFirst`. The cost: when the first cancel also stopped the
   execute, the second can arrive after it and stop the next lookup on that
-  backend, which then runs once more (below).
+  backend, which then runs once more (below); and when both arrive after
+  the statement ended, the first stops the next lookup and the second its
+  one run more, and that lookup is refused.
 - **A cancel request that fails stops nothing, and is not an error.**
   postgres.js reports a cancel's own connection failing -- a database that
   stopped accepting while its open sessions still answer -- on a promise
@@ -690,8 +692,9 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   in the same tick and during the first round trip each stopping a 30 s
   sleep once its execute is sent; a cancel request the hop refuses, which no
   unhandled rejection follows; an already-aborted resolve or rejects with no
-  key still rejecting; a cancel held at the hop until it lands on the next
-  lookup, which runs once more; a statement stopped part-way through its
+  key still rejecting; one cancel request held at the hop until it lands on
+  the next lookup, which runs once more, and the two of a search aborted in
+  its parse, which stop the next lookup and its one run more; a statement stopped part-way through its
   answer, after which the next search, resolve and rejects on its
   connection answer as they would have (0078); a connection cut and a backend terminated
   under a lookup; and `connectPostgres`'s `applicationName`.

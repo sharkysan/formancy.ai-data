@@ -395,6 +395,15 @@ later.
   them (`forEach`), so what an earlier statement left behind never reaches
   them
   ([0078](docs/decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md)).
+- **For contributors**: the fixtures' `holdNewConnections()` says how many
+  connections it holds, `held()`, and the PostgreSQL suite's late-cancel
+  case now holds exactly one cancel request. It held both of the two a
+  search aborted in its parse is sent (0061), and so passed only while the
+  second reached the backend before the lookup it stopped ran again, which
+  under CPU load on PostgreSQL 18 it did not in 19 of 150 probe runs, nor
+  once in CI. That case -- the next lookup and its one run more both
+  stopped, and the lookup refused, as 0061 states -- is now a case of its
+  own, each request held at a gate of its own.
 
 What review costs, in 0065: every submit and approval asks the database, so
 one that cannot be reached refuses both; nothing deletes a draft; nobody is

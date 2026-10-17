@@ -93,7 +93,7 @@ function lookupClient(application: string): Sql {
   return client
 }
 
-function hold(): { release(): void } {
+function hold(): { release(): void; held(): number } {
   const gate = hop.holdNewConnections()
   gates.push(gate)
   return gate
@@ -144,7 +144,7 @@ async function backendOf(application: string): Promise<{ pid: number; state: str
  * a parameter so postgres.js has PostgreSQL describe it first, as it does
  * every lookup. Named by its column, so pg_stat_activity tells it apart.
  */
-const sleeping = (name: string) => ({ text: `select pg_catalog.pg_sleep($1::pg_catalog.text::pg_catalog.float8) as ${name}`, params: ['30'] })
+const sleeping = (name: string, seconds = '30') => ({ text: `select pg_catalog.pg_sleep($1::pg_catalog.text::pg_catalog.float8) as ${name}`, params: [seconds] })
 
 /**
  * A statement that sends tenant 2's customers, key and name as a search
@@ -335,23 +335,31 @@ describe('a cancel that arrives late', () => {
   // next lookup waits on the same backend, it is made to land late on
   // purpose. Without the one retry, another person's search fails because
   // someone else typed.
-  test("stops the next lookup on the backend, which runs once more and answers its page", async () => {
+  //
+  // Exactly one is held: the abandoned lookup is aborted past its execute,
+  // so it is sent one cancel request (cancel.ts), which the hop counts.
+  // Until 2026-10-17 this case abandoned a search waiting in its parse, which
+  // is sent a second request once its execute is written. Both were held,
+  // and the case passed only while the second reached the backend before the
+  // retry did: in a probe that day, every one of 150 runs held two, and
+  // under CPU load on PostgreSQL 18 the second stopped the retry too in 19,
+  // as it had in CI. That is the case below, made to happen.
+  test('stops the next lookup on the backend, which runs once more and answers its page', async () => {
     const application = 'limits-late-cancel'
     const sql = lookupClient(application)
     await ask(sql, 'search', NEVER)
     const muster: LookupQuery = { search: 'Muster', offset: 0, limit: 50 }
     const expected = await createPostgresLookups(sql).search(config, muster, TENANT_1, NEVER)
 
-    const first = await block()
     const controller = new AbortController()
-    const abandoned = failure(ask(sql, 'search', controller.signal))
-    await until(async () => (await first.waiting()) === 1, 'the first search waited behind the lock')
+    const abandoned = failure(runLookup(sql, sleeping('limits_late', '1'), controller.signal))
+    await until(() => asleep(application), 'the abandoned lookup was past its execute')
     const gate = hold()
     const reason = new Error('typed on')
     controller.abort(reason)
     expect(await abandoned).toBe(reason)
-    await release(first)
-    await until(async () => (await backendOf(application))?.state === 'idle', 'the first search finished, its cancel still held')
+    await until(() => finished(application, 'limits_late'), 'the abandoned lookup finished, its cancel still held')
+    expect(gate.held()).toBe(1)
 
     const second = await block()
     const sent = hop.countSent(Buffer.from(SEARCHES))
@@ -368,6 +376,52 @@ describe('a cancel that arrives late', () => {
     await until(async () => (await second.waiting()) === 1, 'the second search waited again')
     await release(second)
     expect(await pending).toEqual(expected)
+  })
+
+  // What 0061 states as a cost, made to happen rather than waited for: a
+  // search aborted while it waits in its parse is sent a cancel request at
+  // once and a second once its execute is written. When both arrive late,
+  // the first stops the next lookup and the second its one retry, and that
+  // lookup is refused with 57014, which the server answers `unavailable`.
+  // Each request is held at a gate of its own and released in turn, so each
+  // lands where the case says; a retry that ran a third time, or a second
+  // request sent where 0061 says none is, fails here by name.
+  test('two from one abandoned lookup stop the next lookup and its one retry, and it is refused', async () => {
+    const application = 'limits-late-cancels'
+    const sql = lookupClient(application)
+    await ask(sql, 'search', NEVER)
+    const muster: LookupQuery = { search: 'Muster', offset: 0, limit: 50 }
+
+    const first = await block()
+    const controller = new AbortController()
+    const abandoned = failure(ask(sql, 'search', controller.signal))
+    await until(async () => (await first.waiting()) === 1, 'the first search waited in its parse')
+    const early = hold()
+    const reason = new Error('typed on')
+    controller.abort(reason)
+    expect(await abandoned).toBe(reason)
+    await until(async () => early.held() === 1, 'the first cancel request was opened')
+    const late = hold()
+    await release(first)
+    await until(async () => late.held() === 1, 'the second cancel request was opened once the execute was written')
+    await until(async () => (await backendOf(application))?.state === 'idle', 'the first search finished, both cancels still held')
+    expect(early.held()).toBe(2)
+
+    const second = await block()
+    const sent = hop.countSent(Buffer.from(SEARCHES))
+    let refused: unknown
+    void createPostgresLookups(sql)
+      .search(config, muster, TENANT_1, NEVER)
+      .catch((error: unknown) => {
+        refused = error
+      })
+    await until(async () => (await second.waiting()) === 1, 'the second search waited on the same backend')
+    early.release()
+    await until(async () => sent() === 2 && (await second.waiting()) === 1, 'the first cancel stopped the second search, which was sent again and waits')
+    late.release()
+    await until(async () => refused !== undefined || sent() === 3, 'the retry was refused, or sent once more')
+    expect(sent()).toBe(2)
+    expect(refused).toMatchObject({ code: '57014' })
   })
 })
 
