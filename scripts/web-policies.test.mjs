@@ -119,7 +119,7 @@ describe('nginx.conf sends each page its policy (0083)', () => {
   test('fails a directive that moves a request under a page to a path outside it', () => {
     const inHost = (line) => conf.replace('    location /host/ {\n', `    location /host/ {\n        ${line}\n`)
     const moves = (name, target, prefix = '/host/') =>
-      expect.stringMatching(new RegExp(`^${name} \\(line \\d+\\) moves a request under ${prefix} to ${target.replaceAll(/[.$]/g, '\\$&')}, outside the page, where nginx sends the header that path is given, not the page's policy$`))
+      expect.stringMatching(new RegExp(`^${name} \\(line \\d+\\) moves a request under ${prefix} to ${target.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}, outside the page, where nginx sends the header that path is given, not the page's policy$`))
     expect(nginxPolicyProblems(inHost('error_page 404 /missing.html;'))).toEqual([moves('error_page', '/missing.html')])
     expect(nginxPolicyProblems(inHost('error_page 404 =200 /index.html;'))).toEqual([moves('error_page', '/index.html')])
     expect(nginxPolicyProblems(inHost('try_files $uri /index.html;'))).toEqual([moves('try_files', '/index.html')])
