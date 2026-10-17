@@ -21,7 +21,7 @@ Apache-2.0 `@formancy/spec` for types only.
 ## What it exports
 
 ```ts
-createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, create, update, delete, reconcile, query, resolve }
+createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, exportRecords, create, update, delete, reconcile, query, resolve }
 isUnknownWrite(outcome) // → whether a create, update or delete's outcome is an UnknownWrite
 lookupSources(client, formId, form, operation | () => operation) // → { [source]: { resolve } }
 sourceNames(form)       // → every optionsSource the document names, once each, in document order
@@ -41,6 +41,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 | `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting }` |
 | `read(formId, record)` | `POST /v1/forms/:id/records/read` |
 | `list(formId, query?, signal?)` | `POST /v1/forms/:id/records/list` → `{ rows, hasMore }` |
+| `exportRecords(formId, query?, signal?)` | `POST /v1/forms/:id/records/export` → `{ file, name }`, a `Blob` of CSV and `<form id>.csv` |
 | `create(formId, answers)` | `POST /v1/forms/:id/records/create` |
 | `update(formId, { record, version, answers })` | `POST /v1/forms/:id/records/update` |
 | `delete(formId, { record, version })` | `POST /v1/forms/:id/records/delete` → `{ record, deleted: true }` |
@@ -50,8 +51,9 @@ only for an abort the caller asked for, with the AbortError it raised.
 
 The reply types — `FormMenu`, `FormMenuEntry`, `FormMenuChild`,
 `PublishedForm`, `FormRecord`, `RecordList`, `RecordListQuery`,
-`ListSortTerm`, `ListColumns`, `LookupResult`, `LookupRow`, `FieldError` —
-and `LIST_PAGE_SIZE` are re-exported from
+`RecordExportQuery`, `ListSortTerm`, `ListColumns`, `LookupResult`,
+`LookupRow`, `FieldError` — and `LIST_PAGE_SIZE` and `EXPORT_MAX_BYTES`
+are re-exported from
 `@formancy/data-core`, where the server's handlers are checked against the
 same declarations. A form's `list`
 is `null` when the server would refuse this person a page, and otherwise
@@ -70,6 +72,23 @@ deletes, so a host upgrades its server first
 `delete` sends exactly `record` and `version`, with a write id of its own,
 and is done only on the server's `{ record, deleted: true }`, whose token
 is the row the statement deleted.
+
+`exportRecords` is the file of every record `list` would page through for
+the same `search`, `sort` and `parent`, the three keys it sends, in a POST
+body
+([0079](../../docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+It resolves to a `RecordFile`, `{ file, name }`: the server's bytes as a
+`Blob`, byte-order mark included, and `<form id>.csv`, taken from the form's
+id and not from `content-disposition`, which a page on another origin cannot
+read (0060). The server makes the file whole or refuses it with its own
+code -- `export-too-large` past `EXPORT_MAX_BYTES`, `export-timeout`,
+`export-busy`, `moved`, `unencodable` among them -- and the client adds two
+of its own: a 200 that is not `text/csv` is `unexpected`, and a body that
+did not arrive whole -- the connection cut, fewer bytes than the server
+announced, which `fetch` refuses -- is `incomplete`, never a shorter file.
+It asks for `text/csv, application/json`, an `accept` a browser sends
+across origins without asking first. An abort rejects with the AbortError.
+Saving the `Blob` is the host's: an object URL and an `<a download>`.
 
 `forms` is the menu
 ([0045](../../docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)):

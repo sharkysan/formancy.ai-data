@@ -228,6 +228,34 @@ existed would be documented and inert.
   says `list`, as the audit does. `routes/runtime-lists.test.ts` holds the
   route over fake ports.
 
+  `POST /v1/forms/:id/records/export` answers one CSV file of every record
+  the list would page through for the same `search`, `sort` and `parent`
+  ([0079](../../docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)),
+  under the read right a list has and no other: offered where `GET` sends
+  a `list`, and refused as a list is. Its body is those three keys and
+  nothing else (400 `malformed`). The server pages the list itself, the
+  list's own request at each offset, one guarded statement a page decided
+  as a list page is, with one resolve a page per lookup field under the
+  person's read filter for it, and builds the whole file before it sends
+  a byte: 200 with `content-type: text/csv; charset=utf-8`,
+  `content-disposition: attachment; filename="<form id>.csv"` and its
+  length, or a JSON refusal and nothing of the file -- 409 `drift`,
+  `moved` when a record would appear twice because the rows moved between
+  two pages, or `unencodable` for text UTF-8 cannot carry, which names the
+  column; 422 `export-too-large` past `EXPORT_MAX_BYTES`, 16 MiB; 503
+  `export-timeout` past `EXPORT_DEADLINE_MS`, 30 s, derived from nginx's
+  default read timeout and held below it by `export-limits.test.ts`; 503
+  `export-busy` while another file is being made from the same allowlisted
+  connection in this process; 503 `unavailable` when the labels cannot be
+  loaded; 499 `abandoned` when the client left, before the next statement.
+  The file is the readable fields in the form's order, each headed by its
+  label, a lookup as its label then its token under `<label> (key)`, each
+  value as a read holds it, NULL an empty cell and `''` as `""`, after a
+  byte-order mark, and a cell that starts as a formula behind one more
+  apostrophe. Audited as `export`, with `rows`, the records the file held.
+  `routes/runtime-exports.test.ts` holds the route over fake ports, and
+  `e2e.integration.test.ts` on both engines.
+
   `POST /v1/forms/:id/records/delete` deletes one record by its token and
   the version its person read, `{ record, version }` with a write id, under
   the policy's `operations.delete`
@@ -325,7 +353,10 @@ existed would be documented and inert.
   named by the record it would have made, when the insert names its key; one
   the database numbers names none. A write answered with an earlier
   sending's answer is audited as `repeated`, with the record that answer
-  names, so a resend is not counted as a second write (0031).
+  names, so a resend is not counted as a second write (0031). Every runtime
+  event carries `rows`: for an `export`, how many records its file held,
+  or held when it was refused, 0 before any statement; `null` for every
+  other operation -- a number, never which records (0079).
 
   On the administrator's plane
   ([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md))

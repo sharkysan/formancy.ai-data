@@ -82,7 +82,12 @@ server answered, which reports the difference and does not prevent it.
   changes to a form's own table in
   `packages/data-fixtures/src/drifting.ts`
   ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)),
-  lists, deletes, cascades and uuid keys beside them.
+  lists, deletes, cascades and uuid keys beside them, and a file of
+  records in `packages/data-fixtures/src/exports.ts`: `export: shipments`,
+  the bytes both adapters' lists must make through data-core's export, a
+  double, a real and a zoneless timestamp's fraction where the engines
+  spell a value their own way
+  ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
 
 `sharedCases()` derives every case id, and a test declares the ones it
 asserts with `covers()`. The release report keeps a matrix of every case on
@@ -206,6 +211,14 @@ and each of these fails on the change that breaks what it holds:
   check, and every file the measured product leaves out, the default
   deadline's among them, holds one exported integer and nothing else
   ([0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)).
+
+One guard of the composed stack's configuration runs in a package's suite
+instead, beside the number it holds:
+`packages/data-server/src/export-limits.test.ts` reads
+`deploy/web/nginx.conf` and fails when an export's deadline, with a
+statement still running after it, is not below every forwarding location's
+`proxy_read_timeout`, or nginx's default where none is set
+([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
 
 ## 10.5 The browser gates
 

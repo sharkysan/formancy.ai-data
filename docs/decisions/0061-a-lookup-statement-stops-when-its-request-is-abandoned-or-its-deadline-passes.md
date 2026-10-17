@@ -1,6 +1,6 @@
 # 0061 — A lookup statement stops when its request is abandoned or its deadline passes, and a search is not bounded before it scans
 
-- **Status:** accepted; extended by [0063](0063-the-default-lookup-deadline-is-outside-the-measured-product.md): the default lives alone in `lookup/default-deadline.ts`, which the measured product leaves out, so setting it to what a measurement derived no longer makes that measurement stale
+- **Status:** accepted; extended by [0063](0063-the-default-lookup-deadline-is-outside-the-measured-product.md): the default lives alone in `lookup/default-deadline.ts`, which the measured product leaves out, so setting it to what a measurement derived no longer makes that measurement stale; extended by [0079](0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md): a file of records stops before its next statement when its client leaves, and each resolve of its labels has the lookup deadline, cut to what is left of the export's 30 seconds
 - **Date:** 2026-10-14
 - **Deciders:** Daniel Bacher
 - **Verified by:**

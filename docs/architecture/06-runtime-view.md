@@ -403,3 +403,54 @@ and, once a request is refused for it, the server's log; the runtime is
 looser than review
 ([section 11.1](11-risks-and-debt.md#drift-between-a-published-form-and-its-database));
 and a publisher alone restores any version, unreviewed ones too (0065).
+
+## 6.10 Downloading a form's records
+
+1. A client asks `POST /v1/forms/:id/records/export` with the search, the
+   sort and the parent its grid shows -- `exportRecords` in
+   `packages/data-client/src/client.ts`, accepting `text/csv,
+   application/json` -- where the form's `list` is not `null`
+   ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+   The host page has no button for it yet.
+2. `routes/runtime-exports.ts` starts the export's clock, checks the body
+   (`validateExportQuery`), loads the bundle once and asks `planList` for
+   the first page, so every refusal of the policy comes before a
+   statement, as a list's does
+   ([0044](../decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)).
+   `exportColumns` (`packages/data-core/src/records/export.ts`) takes the
+   readable fields in the form's order and heads each; each lookup among
+   them is scoped by `lookupScope` (`routes/runtime-lookups.ts`) under the
+   person's read filter, and a filter the policy refuses refuses the file.
+3. The connection's gate: one export at a time per allowlisted connection
+   in this server, another meanwhile 503 `export-busy`, before any
+   statement.
+4. Page after page, each the first page's request at the next offset:
+   before each, the export stops for a client that left (499,
+   `routes/abandoned.ts`) or a deadline passed (503 `export-timeout`,
+   `export-limits.ts`); then the adapter's one list statement, decided over
+   its own description as a list page is
+   ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)),
+   and `recordPage`. Then one resolve per lookup field for the page's
+   tokens, its signal the lookup deadline cut to what is left of the
+   export's
+   ([0061](../decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)).
+5. Each record is written by `exportRecord` through `csv.ts` -- canonical
+   values, a lookup's label and token, the formula rule -- and counted:
+   a token already written is 409 `moved`, text UTF-8 cannot carry 409
+   `unencodable`, a byte past `EXPORT_MAX_BYTES` 422 `export-too-large`.
+   The trail's `rows` grows with each record written (0023).
+6. When a page says nothing follows, the whole file is sent: 200,
+   `text/csv; charset=utf-8`, `attachment; filename="<form id>.csv"`, its
+   length. Anything that stopped it was answered with a JSON refusal and
+   nothing of the file. The client keeps the body as a `Blob` only when it
+   is CSV and arrived whole.
+
+Held by `routes/runtime-exports.test.ts` and `export-limits.test.ts`;
+`csv.test.ts`, `export.test.ts` and `list-query.test.ts` in
+`packages/data-core/src/records`; each adapter's `list.integration.test.ts`,
+its shared case `export: shipments` in `EXPORT_PARITY`;
+`e2e.integration.test.ts` on both engines; `exports.integration.test.ts`
+and `transport.test.ts` in `packages/data-client/src`. What it costs: the
+file is not the table at one moment, each page reads every row before its
+offset, and the bounds are a budget and a derivation, not measurements
+([section 11.2](11-risks-and-debt.md#112-known-limitations-by-area)).

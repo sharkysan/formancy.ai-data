@@ -83,7 +83,7 @@
       ]
     },
     "0008": {
-      "reviewed": "sha256:0fca5d8ee9db87652c96c8acd1d0a9f5b5be6a095a438a81a61147a88037282b",
+      "reviewed": "sha256:6a8040fb14a3d9b3c1035aa11dbd62918e59a8babb4189cf92565e1567ad8d7d",
       "limitations": [
         {
           "area": "forms",
@@ -235,7 +235,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:1395048cd6b7e99e3447baad9ae1a9932f2583bbcb4ac0f6791933df473cc052",
+      "reviewed": "sha256:018c039a41a47c6326408eb617694d7bcf15799e19c48f4d7df0cad92e42d763",
       "limitations": [
         {
           "area": "databases",
@@ -417,7 +417,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:7f5fd4a7489a3e7bbec9abfd6e7539c8ef262e5a1c384652e61e737ee6f5c250",
+      "reviewed": "sha256:6009d8b76335f87e34d4b3f9a286c371aa0f9676fc69395da68de64f57657163",
       "limitations": [
         {
           "area": "operations",
@@ -551,7 +551,7 @@
       ]
     },
     "0028": {
-      "reviewed": "sha256:219693bbb3314e34e976de186eb1e2af71cac0e4b44f259f400ff916f565dc47",
+      "reviewed": "sha256:75c4a3963d4472c3fbbdf573bb63e48b0b2f541cd65a0e319cda239ba0f0acfb",
       "limitations": [
         {
           "area": "databases",
@@ -990,7 +990,7 @@
       ]
     },
     "0040": {
-      "reviewed": "sha256:a63b57243c8cadf468c792bba73e2f673f417a513c19c51a0483cd3480eff75e",
+      "reviewed": "sha256:7850b934bf929e4b629596c38b22d22141ea2159c5d6330671430dc248bb5908",
       "limitations": [
         {
           "area": "forms",
@@ -1152,7 +1152,7 @@
       ]
     },
     "0043": {
-      "reviewed": "sha256:f20487c3fe9308f65a8c16bd22531dbe250768792933d85e47f0c42bd72ac417",
+      "reviewed": "sha256:e591046f44912a3c34c9a680d1fcded0d3a5c38b3838ee2414a0577876f87ce3",
       "limitations": [
         {
           "area": "access",
@@ -1202,7 +1202,7 @@
       ]
     },
     "0044": {
-      "reviewed": "sha256:e24471b76e917da77b4a39d4df4be2492203aa5c7862c784c1f0394fb703ed0a",
+      "reviewed": "sha256:23113cd38d242d97a06e117163dfee0376ec4d33d988b5412557bce8318893f3",
       "limitations": [
         {
           "area": "forms",
@@ -1831,7 +1831,7 @@
       ]
     },
     "0060": {
-      "reviewed": "sha256:2d75ee787154826d339661c3e90b669919940d214c4c23fbeb303c16bb07b210",
+      "reviewed": "sha256:3b2d2e577a458da7415d0d332fa1c521735bf11a31e3c73b86dc2a13971c1b54",
       "limitations": [
         {
           "area": "host",
@@ -1891,7 +1891,7 @@
       ]
     },
     "0061": {
-      "reviewed": "sha256:bdd69926d43f5988dce9e755cbd7a57c9e2fe57455aa02e74a03fc630f58b3b9",
+      "reviewed": "sha256:9c7e0014ec4d19b34cbe55d3db710f105a1704b825934947f030b07589b6b70a",
       "limitations": [
         {
           "area": "server",
@@ -2529,6 +2529,67 @@
           "area": "databases",
           "says": "An integrator's own statements on a client it also hands the PostgreSQL adapter get their rows as postgres.js 3.4.9 gives them: after a statement on the same connection that ended part-way, behind one empty slot for each row it sent.",
           "heldBy": "packages/data-postgres/src/spike.integration.test.ts"
+        }
+      ]
+    },
+    "0079": {
+      "reviewed": "sha256:63cbe7e1d55aa857a869d3e8c17e3ba074752dbd1a8135620258617cdf5e45be",
+      "limitations": [
+        {
+          "area": "server",
+          "says": "A file of records is refused past 16 MiB of UTF-8 (`422 export-too-large`) or 30 seconds (`503 export-timeout`): a memory budget and a proxy's default less a driver's, neither a measurement of what an export of a given size finishes in.",
+          "heldBy": "packages/data-server/src/routes/runtime-exports.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "One file of records is made at a time per allowlisted connection in each server process; another meanwhile is refused `503 export-busy`, and each replica has a gate of its own.",
+          "heldBy": "packages/data-server/src/routes/runtime-exports.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A file of records is not the table at one moment: each page is its own statement, so a row deleted meanwhile before an offset is skipped unseen, and one inserted there refuses the file `409 moved`.",
+          "heldBy": "packages/data-server/src/routes/runtime-exports.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A text cell of a file that starts with `=`, `+`, `-`, `@`, TAB, CR or an apostrophe, and is not a number, carries one apostrophe more than the database holds, which a spreadsheet may show; one that starts with a space or a full-width `＝` carries none.",
+          "heldBy": "packages/data-core/src/records/csv.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A file holds an instant to the second and a time to the minute, as a read does, and its header can repeat a label, which some importers refuse."
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server an unpaired surrogate or a NUL in any text a file would hold refuses the whole file `409 unencodable`, though the JSON list carries both.",
+          "heldBy": "packages/data-server/src/e2e.integration.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "What a spreadsheet does with a file is not tried: by their documentation Excel shows `9007199254740993` to 15 significant digits, which the file does not, cannot tell `\"\"` from NULL, and in a locale whose list separator is `;` opens the file as one column; a reader that does not expect a byte-order mark glues it to the first header."
+        },
+        {
+          "area": "access",
+          "says": "No policy lets a person browse a form's records and not download them: whoever may list may download, and only a proxy can drop the route, for everybody."
+        },
+        {
+          "area": "access",
+          "says": "A lookup filter the policy refuses a person refuses their file of records, where the grid shows that lookup's tokens.",
+          "heldBy": "packages/data-server/src/routes/runtime-exports.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "On PostgreSQL nothing bounds a list statement, so an export page that runs past nginx's 60-second read timeout gets the person nginx's 504 while the server makes a file for nobody."
+        },
+        {
+          "area": "operations",
+          "says": "Every runtime audit event carries `rows`, `null` but for an export, which a deployment's own sink sees; an export's `ok` says the server sent the whole file, not that the browser kept it.",
+          "heldBy": "packages/data-server/src/routes/runtime-exports.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "A form that binds a column with no text -- which only a format-1 bundle edited where it is stored can -- answers its file 500, and no file.",
+          "heldBy": "packages/data-server/src/routes/runtime-exports.test.ts"
         }
       ]
     }

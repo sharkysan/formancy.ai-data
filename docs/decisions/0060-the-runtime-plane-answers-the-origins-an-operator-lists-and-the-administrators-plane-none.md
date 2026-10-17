@@ -1,6 +1,6 @@
 # 0060 — The runtime plane answers the origins an operator lists, exactly, and the administrator's plane answers no other origin
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0079](0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md): a file of records is named by the client from the form's id, since no response header is exposed to another origin
 - **Date:** 2026-10-13
 - **Deciders:** Daniel Bacher
 - **Verified by:**

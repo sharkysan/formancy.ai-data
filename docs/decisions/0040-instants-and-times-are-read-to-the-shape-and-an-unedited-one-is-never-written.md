@@ -1,6 +1,6 @@
 # 0040 — Instants and times are read to formancy's shape on both engines, and an unedited one is never written back
 
-- **Status:** accepted; narrowed by [0041](0041-the-runtime-refuses-what-drift-blocks.md): a create's plan and membership checks run inside its sending, so a create sent again with its write id gets the first sending's answer where a lookup could not vouch for a selection; extended by [0041](0041-the-runtime-refuses-what-drift-blocks.md): the echo read also carries the description the update is decided over
+- **Status:** accepted; narrowed by [0041](0041-the-runtime-refuses-what-drift-blocks.md): a create's plan and membership checks run inside its sending, so a create sent again with its write id gets the first sending's answer where a lookup could not vouch for a selection; extended by [0041](0041-the-runtime-refuses-what-drift-blocks.md): the echo read also carries the description the update is decided over; extended by [0079](0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md): a file of records holds an instant to the second and a time to the minute, as a read does, and a zoneless timestamp with the fraction a label drops
 - **Date:** 2026-10-10
 - **Deciders:** Daniel Bacher
 - **Verified by:**

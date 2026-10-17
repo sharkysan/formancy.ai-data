@@ -45,6 +45,17 @@ text converted in SQL, never through the driver's number or date handling
 [0016](../decisions/0016-postgres-operations.md),
 [0017](../decisions/0017-sqlserver-operations.md)).
 
+**A file of records holds the read's values as text.** Each cell is the
+canonical value a read returns, written by `exportText`
+(`packages/data-core/src/records/export.ts`): `displayText`'s spelling,
+one for both engines, except a time and a timestamp, written as read, so a
+zoneless timestamp keeps the fraction a label drops; 2^53 + 1 and the
+largest `numeric(18,4)` digit for digit; NULL an empty cell and `''` as
+`""`. A cell a spreadsheet would read as a formula carries one apostrophe
+in front, and so does one that starts with an apostrophe, so the rule is
+undone exactly; the shared case `export: shipments` holds the bytes on
+both engines ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+
 **Held by** `packages/data-core/src/codecs/codec.test.ts` -- the fixture's
 largest `numeric(18,4)` and an integer past 2^53 survive as strings, and a
 JSON number for a decimal is refused -- and by both adapters' record suites
@@ -78,6 +89,7 @@ person, is validation in that sense: a check that cannot answer refuses.
 | A grant whose key now names another column | 422 `keys-reassigned`, nothing written, until someone decides | [0039](../decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md) | `routes/admin-keys-reassigned.integration.test.ts`, `routes/admin-evolution.test.ts` |
 | A route with no audit name | its registration throws, or 500 `unaudited-route` | [0033](../decisions/0033-the-administrator-plane-is-audited.md) | `routes/admin-audit.test.ts` |
 | A write whose answer was lost | unknown, never refused, never replayed | [0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md) | `e2e-lost-answer.integration.test.ts` |
+| A file of records that cannot be made whole -- past its byte budget or its deadline, rows that moved between pages, text UTF-8 cannot carry, labels that cannot be loaded | a JSON refusal and nothing of the file, never a shorter file sent as whole | [0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md) | `routes/runtime-exports.test.ts`, `packages/data-client/src/transport.test.ts` |
 | A setting nobody could have meant | the process stops, naming it | [0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md), [0060](../decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md), [0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md) | each setting's test |
 
 Test paths without a package are under `packages/data-server/src/`.
@@ -247,7 +259,10 @@ under the audit key, and is `null` without one. A connection is recorded only
 when the allowlist knows it, and a form id only when it has the store's
 shape. A route registered without an audit name stops its registration, and
 one registered above the hooks is refused 500 `unaudited-route`. A sink that
-throws is logged and does not fail the request.
+throws is logged and does not fail the request. A runtime event carries
+`rows`: for an `export`, the records its file held, or held when it was
+refused, and `null` for every other operation -- a count, never which
+([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
 
 **It is operational, not evidence.** The event is written after the commit,
 by another system: a crash between the two loses it, and whoever runs the
