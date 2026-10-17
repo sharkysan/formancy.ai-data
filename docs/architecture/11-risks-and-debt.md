@@ -121,7 +121,12 @@ Nothing else refuses a server this release was not tested on: the runtime
 never discovers again, so a server upgraded in place is seen only by the
 next discovery, drift review lists `server-untested` until it changes, and
 a managed PostgreSQL whose `version()` begins "PostgreSQL " reads as tested
-(0068). PostgreSQL 14 and older and SQL Server 2017 and older are not
+(0068). No test runs on Azure SQL Database or Azure SQL Managed
+Instance, which a snapshot names and calls not tested, and every boxed SQL
+Server edition is called tested on the strength of the Developer edition
+on Linux in a container
+([0073](../decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md)).
+PostgreSQL 14 and older and SQL Server 2017 and older are not
 images of the matrix, and on PostgreSQL 18 a cascaded table's AFTER DELETE
 trigger runs with its owner's grants, so it does a delete 15 to 17 refuse
 ([0067](../decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)).
@@ -392,7 +397,6 @@ says what those entries say
 
 On 2026-10-17 these were on open branches or planned, and **none of it is
 described here as done**: a live master-detail demo running the real server
-and PostgreSQL in a Cloudflare Container; Azure SQL Database, which a
-snapshot already names and calls not tested (0068); and Microsoft Entra
+and PostgreSQL in a Cloudflare Container; and Microsoft Entra
 authentication to SQL Server. The numbers the decision index skips are
 taken by records on those branches, each placed here when it merges.
