@@ -96,6 +96,8 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   DELIVERIES: "the fixture's delivery keys, which UUID_PARITY's cases name",
   PARITY_CASCADES: "the keys CASCADE_PARITY's policy names; what a delete does through them is CASCADE_PARITY's",
   REACH_PRIVILEGE_LOSSES: "the grants reach-privilege takes away, each on both engines; what a delete answers then is CASCADE_PARITY's",
+  PRELOGIN_ENCRYPTION: "the ENCRYPTION values the PRELOGIN stand-in answers with (0081), [MS-TDS]'s and no engine's",
+  TDS_PACKET: "the packet types the PRELOGIN stand-in tells apart in what a client sends (0081), [MS-TDS]'s and no engine's",
 }
 
 /** What a call made while a file is collected gave: its options, or the sentence it threw. */

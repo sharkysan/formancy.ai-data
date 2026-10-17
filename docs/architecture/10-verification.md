@@ -429,6 +429,13 @@ and a number typed here would drift from the next run.
   is reached by a unit test alone. Nothing verifies that an Entra login
   succeeds
   ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
+- **A declined TLS is shown against a stand-in.** No real server answers
+  a client asking for TLS that it will not encrypt, so what the real
+  driver sends then -- its PRELOGIN and nothing after it -- is shown by
+  data-fixtures' stand-in, which answers that one message in the server's
+  place; that every server of the matrix encrypts, and its TLS passes the
+  adapter's guard, is shown on each image
+  ([0081](../decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)).
 - **No gate is required before a merge.** Every gate reports on every pull
   request and fails a release; what stops a red one from being merged is
   the maintainer reading it (`GOVERNANCE.md`, [§11.6](11-risks-and-debt.md#116-people-and-process)).

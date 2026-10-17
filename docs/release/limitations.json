@@ -2450,7 +2450,7 @@
       ]
     },
     "0074": {
-      "reviewed": "sha256:97ed6ddcbe90b485b5a0414d7db25108f9c04895aa7b10011545b857383438a7",
+      "reviewed": "sha256:6ef27e49c4de5d7e6627bd2278c797939d50d3c6666d6e2730eaf96a1c770a99",
       "limitations": [
         {
           "area": "databases",
@@ -2470,10 +2470,6 @@
           "area": "databases",
           "says": "An Entra connection refuses TLS turned off and a trusted server certificate, so a server whose certificate is self-signed, or re-signed by a proxy, cannot be reached as an Entra principal.",
           "heldBy": "packages/data-server/src/connections.test.ts"
-        },
-        {
-          "area": "databases",
-          "says": "A SQL login still goes over TDS 7, whose TLS whoever answers in the server's place can decline and be sent the LOGIN7, its password in it: 0074 moves only Entra logins to TDS 8.0."
         },
         {
           "area": "operations",
@@ -2672,6 +2668,42 @@
           "area": "server",
           "says": "A form that binds a column with no text -- which only a format-1 bundle edited where it is stored can -- answers its file 500, and no file.",
           "heldBy": "packages/data-server/src/routes/runtime-exports.test.ts"
+        }
+      ]
+    },
+    "0081": {
+      "reviewed": "sha256:d5447a83571e8927b4ba6e2b1d930a8763b8c428d98dc1c489e6e9167ebb3729",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "A SQL Server that cannot encrypt, answering NOT_SUP to a SQL login that asks for TLS, is refused on every connection, where 0.1.0 logged in to it unencrypted; reaching it takes `tls.enabled: false`, which sends the login unencrypted by that choice.",
+          "heldBy": "packages/data-sqlserver/src/encryption.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A SQL login with `tls.enabled: false`, the composed stack's among them, still sends its login unencrypted to whoever answers, by the operator's choice: only a connection that asks for TLS is guarded."
+        },
+        {
+          "area": "databases",
+          "says": "With `tls.trustServerCertificate` true, whoever answers in the server's place can still complete TLS with a certificate of its own and read a SQL login: the guard checks that TLS starts, not with whom."
+        },
+        {
+          "area": "operations",
+          "says": "A SQL login with TLS on connects through the adapter's own copy of tedious's `connectInSequence`, so a later fix tedious makes to how it connects does not reach those connections until it is copied, and nothing says one was made."
+        },
+        {
+          "area": "operations",
+          "says": "Every byte a SQL Server sends on a connection with TLS on passes through one more stream, the guard's, for the life of the connection, each chunk queued and emitted once more and only the reads carrying the server's first message copied; a measurement on a shared machine on 2026-10-17 could not tell what that costs from the spread between its own rounds, and none was made on a quiet one.",
+          "heldBy": "packages/data-sqlserver/src/encryption.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Only a pool's first connect says the refusal in the adapter's sentence alone: a connection the pool opens later and the guard refuses is `unavailable` on a record request, and discovery's log line says tedious's \"Connection lost - \" before the sentence, by the code and not tried."
+        },
+        {
+          "area": "testing",
+          "says": "The guard is written against what tedious 20.3.3 uses of its socket and how it reads the PRELOGIN answer: a release that changes either is caught as far as the suites through the guard reach, and nothing shows tedious refusing the downgrade itself, since the guard refuses first.",
+          "heldBy": "packages/data-sqlserver/src/adapter.integration.test.ts"
         }
       ]
     }

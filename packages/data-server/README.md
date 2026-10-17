@@ -512,6 +512,19 @@ dropped and the entry would have logged in some other way. A file with a
 stray key that an earlier release started with stops this one, with the
 key named.
 
+**`tls` is on, and the server's certificate checked, unless the entry
+says otherwise.** On SQL Server a SQL login with TLS on goes over TDS 7,
+whose first exchange crosses in the clear, and **is refused before its
+login is sent when the server answers that it will not encrypt**: the
+connection test and the runtime plane answer their 503, and the log line
+says "The server answered that it would not encrypt the connection, so the
+login was not sent." A 0.1.0 server sent such a server the login, its
+password in it. To reach a SQL Server that cannot encrypt at all, the
+entry sets `"enabled": false`, and the login then crosses unencrypted, as
+the entry says; with `"trustServerCertificate": true` the data server checks
+that TLS starts, not with whom
+([0081](../../docs/decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)).
+
 The host's identity is set by exactly one of three settings, beside
 `FORMANCY_DATA_ISSUER`, `FORMANCY_DATA_AUDIENCE` and
 `FORMANCY_DATA_ATTRIBUTES`
