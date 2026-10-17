@@ -126,8 +126,8 @@ describe('connectSqlServer, for a SQL login', () => {
  * 2022 on Linux, which takes no Entra login: asked with a FEDAUTH LOGIN7 it
  * answers at once with "Login failed for user ''." and sends no FEDAUTHINFO,
  * so tedious never asks for a token -- measured on 2026-10-17, 10 to 27 ms
- * over three attempts, encrypted or not, with a credential that counted no
- * call. A SQL login with an empty user is answered in the same words, and
+ * over four attempts in two runs, encrypted or not, with a credential that
+ * counted no call. A SQL login with an empty user is answered in the same words, and
  * the server's errorlog writes the same reason for both ("An attempt to
  * login using SQL authentication failed"), so nothing the server says tells
  * an Entra login from a fallback to a SQL login. So this holds what can be

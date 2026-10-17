@@ -124,7 +124,8 @@ lockfile installs, mssql 12.7.4, tedious 20.3.3 and @azure/identity 4.13.3:
   `mcr.microsoft.com/mssql/server:2022-latest` as installed here, 16.0.4295.3
   (`sha256:4402d880dd4c…`), on Docker Desktop 28.3.3: asked with a FEDAUTH
   LOGIN7 through mssql and tedious, over TLS and without, it answered
-  "Login failed for user ''." in 10 to 27 ms over three attempts and sent
+  "Login failed for user ''." in 10 to 27 ms over four attempts in two
+  runs, and sent
   no FEDAUTHINFO, so a credential that counted its calls counted none. A
   SQL login with an empty user is answered in the same words, and the
   server's errorlog gives both the same reason, "An attempt to login using
