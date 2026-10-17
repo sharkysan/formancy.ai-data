@@ -57,9 +57,13 @@
   100 ms at the hop, an abort while queued, in the same tick and during the
   first round trip each stop a 30 s sleep once its execute is sent; a cancel
   request the hop refuses leaves no unhandled rejection and the pool
-  answering; a cancel held at the hop until it lands on the next lookup,
-  which runs once more and answers its page; a connection cut and a backend
-  terminated under a lookup; and `connectPostgres`'s `applicationName`.
+  answering; one cancel request, of a lookup aborted past its execute and
+  counted at the hop, held until it lands on the next lookup, which runs
+  once more and answers its page; the two a search aborted in its parse is
+  sent, each held at a gate of its own and released in turn, stopping the
+  next lookup and then its one run more, which is refused with 57014; a
+  connection cut and a backend terminated under a lookup; and
+  `connectPostgres`'s `applicationName`.
   `packages/data-sqlserver/src/lookups-limits.integration.test.ts` — a
   search, a resolve and a rejects aborted while they wait reject before the
   event loop turns, with exactly the reason, and leave
@@ -78,7 +82,8 @@
   catalogue's operation; `render.test.ts`, the page's sentence and its
   absence for a result measured before this record. `packages/data-fixtures`'
   `tcp-hop.test.ts` (connections held until released, counted when
-  released; connections refused with a reset until released) and
+  released, and how many a hold holds; connections refused with a reset
+  until released) and
   `fixtures.integration.test.ts` (`blockTable` holds exactly one reader on
   each engine, and none after release). The gates' `container` job's step
   "A FORMANCY_DATA_LOOKUP_DEADLINE_MS that is not a number of milliseconds
@@ -130,7 +135,16 @@
   statement waited until the lock went). On Node 24 the
   pipelined case passes with the response's `close` alone; it fails without
   the socket's listener only on Node 22, which CI runs, as the probe below
-  shows.
+  shows. Watched failing on 2026-10-17: the late-cancel case as first
+  written abandoned a search waiting in its parse and held both of its
+  cancel requests -- every one of 150 runs of a probe did -- so it passed
+  only while the second reached the backend before the lookup it stopped
+  ran again; under CPU load on PostgreSQL 18 the second stopped that run
+  too in 19 of the 150, and once in CI (run 39025046412, its first
+  attempt). Rewritten, the one-request case failed without the retry
+  (57014) and with a second request sent once the execute was already
+  written (the hop held 2); the two-request case without the retry (the
+  lookup was never sent again) and with a third run (it was sent 3 times).
 
 ## Context
 
@@ -347,7 +361,9 @@ a measured number that moves when the figures do.
   stopped: a statement the database starts and a cancel request where none
   was needed. One aborted before PostgreSQL described it may be sent two
   cancel requests; when the first also stopped its execute, the second can
-  arrive after the statement ended and stop the next lookup on that backend.
+  arrive after the statement ended and stop the next lookup on that backend,
+  and when both arrive after it ended, the first stops the next lookup and
+  the second its one run more.
 - **PostgreSQL uses up to twice the connections** per allowlisted database:
   two postgres.js pools, each at the driver's default size.
 - **A PostgreSQL lookup stopped by another's late cancel runs twice**, and so

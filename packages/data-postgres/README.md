@@ -73,6 +73,17 @@ in short:
   so neither the driver's parsers nor its `transform` option (which renames
   columns and rewrites values, text included) is involved, and neither
   DateStyle, TimeZone nor `extra_float_digits` changes a value.
+- **A statement's rows are collected as the driver reads them**, with
+  postgres.js's `forEach`, never taken from the array it resolves with
+  ([0078](../../docs/decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md)).
+  postgres.js 3.4.9 places each row in that array at an index it counts per
+  connection and resets only when a statement completes, so after a
+  statement that ended part-way -- a lookup its cancel stopped while its
+  rows were on their way, or a statement failing in a later row -- the next
+  one's rows came after that many empty slots: a search or a resolve threw,
+  and a record read of one row counted more than one
+  (porsager/postgres#1119, #1253). The slots held nothing of the earlier
+  statement. Discovery's catalog reads still take the driver's array.
 - **An instant is read to the second and a time to the minute, as SQL Server
   reads them**
   ([0040](../../docs/decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).
@@ -384,7 +395,9 @@ with it, in `lookups/cancel.ts`:
   request, which postgres.js marks only by clearing the query's
   `describeFirst`. The cost: when the first cancel also stopped the
   execute, the second can arrive after it and stop the next lookup on that
-  backend, which then runs once more (below).
+  backend, which then runs once more (below); and when both arrive after
+  the statement ended, the first stops the next lookup and the second its
+  one run more, and that lookup is refused.
 - **A cancel request that fails stops nothing, and is not an error.**
   postgres.js reports a cancel's own connection failing -- a database that
   stopped accepting while its open sessions still answer -- on a promise
@@ -658,8 +671,9 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   validated (0077).
 - `discovery/columns.test.ts` — the generation codes, including one no server
   can produce yet, called directly.
-- `spike.integration.test.ts` — the driver's numbers, untyped parameters, and
-  the version column.
+- `spike.integration.test.ts` — the driver's numbers, untyped parameters, the
+  empty slots its array of rows keeps after a statement that failed
+  part-way (0078), and the version column.
 - `lookups.integration.test.ts` — the lookup port over the fixture: tenant
   filters, literal search, order, NULL and unrepresentable keys, membership,
   the restricted reader, a driver configured every way it can be, and
@@ -678,8 +692,11 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   in the same tick and during the first round trip each stopping a 30 s
   sleep once its execute is sent; a cancel request the hop refuses, which no
   unhandled rejection follows; an already-aborted resolve or rejects with no
-  key still rejecting; a cancel held at the hop until it lands on the next
-  lookup, which runs once more; a connection cut and a backend terminated
+  key still rejecting; one cancel request held at the hop until it lands on
+  the next lookup, which runs once more, and the two of a search aborted in
+  its parse, which stop the next lookup and its one run more; a statement stopped part-way through its
+  answer, after which the next search, resolve and rejects on its
+  connection answer as they would have (0078); a connection cut and a backend terminated
   under a lookup; and `connectPostgres`'s `applicationName`.
 - `parity.integration.test.ts` — the cases 0028 holds both engines to, from
   `@formancy/data-fixtures`, over its `parity` schema: every row filter in a
@@ -700,8 +717,9 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   instants and times read to the shape and what no shape names refused,
   concurrency between real
   connections, every refusal the fixture can provoke, writes a trigger or a
-  rule declines, objects planted on the search path, and a connection cut
-  through a TCP hop after a write was sent.
+  rule declines, objects planted on the search path, a connection cut
+  through a TCP hop after a write was sent, and a read after a statement
+  that failed part-way on its connection (0078).
 - `list.integration.test.ts` — a page of records (0044), each case
   `LIST_PARITY`'s: key order and paging, a literal search, NULLs last both
   ways, a NOT NULL sort spelled without a placement, a parent over an

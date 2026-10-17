@@ -98,8 +98,10 @@ export interface TcpHop {
    * server's answers to a held client flow too, and one opened after
    * `release()` is not held. Held bytes are counted -- as sent and as a turn
    * -- when they are released, which is when the server hears them.
+   * `held()` is how many connections this call has held: those opened
+   * after it and before its release.
    */
-  holdNewConnections(): { release(): void }
+  holdNewConnections(): { release(): void; held(): number }
   /**
    * Resets every connection a client opens after this call, before it
    * reaches the database, until `release()`: the client sees ECONNRESET.
@@ -464,6 +466,7 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
           gates.delete(gate)
           for (const pair of gate.pairs) unhold(pair)
         },
+        held: () => gate.pairs.size,
       }
     },
     refuseNewConnections() {

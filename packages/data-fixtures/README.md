@@ -182,7 +182,8 @@ dropped the key from the end of its order would show on both engines.
   `holdNewConnections()` holds what every connection opened after the call
   sends until `release()`, then forwards it in order, a close behind it, so
   a late cancel lands when a suite chooses; held bytes are counted when they
-  are released. `refuseNewConnections()` resets every connection opened
+  are released, and `held()` says how many connections the hold holds, so a
+  suite says how many cancel requests it made late. `refuseNewConnections()` resets every connection opened
   after the call before it reaches the database, until `release()`, as a
   database whose listener went away while its open sessions still answer;
   `refused()` counts them. Connections opened before either call flow as

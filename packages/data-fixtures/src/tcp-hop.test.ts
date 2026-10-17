@@ -669,6 +669,26 @@ describe('held connections', () => {
     expect(held.atServer().toString('latin1')).toBe('last words')
   })
 
+  // A lookup aborted while PostgreSQL parses it is sent a cancel request at
+  // once and another once its execute is written (0061): a proof that holds
+  // "the" late cancel must be able to say how many it holds, or it holds two
+  // and asserts what one does. A count that took in the connection opened
+  // before the call, or one opened after release, would say two where one
+  // is held.
+  test('says how many connections it holds: those opened after the call and before release', async () => {
+    const { hop, connect } = await setUp()
+    await connect()
+    const gate = hop.holdNewConnections()
+    expect(gate.held()).toBe(0)
+    await connect()
+    expect(gate.held()).toBe(1)
+    await connect()
+    expect(gate.held()).toBe(2)
+    gate.release()
+    await connect()
+    expect(gate.held()).toBe(2)
+  })
+
   // The proof counts the statement the late cancel lands on by how often its
   // text was sent (`countSent`), and the bytes a release forwards are sent
   // then, not when the client wrote them: a count taken at arrival would

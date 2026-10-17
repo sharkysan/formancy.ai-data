@@ -391,6 +391,24 @@ describe('reading', () => {
     expect(failed(await there('2')).code).toBe('not-found')
   })
 
+  // postgres.js 3.4.9 numbers a statement's rows on its connection and starts
+  // again from 0 only when a statement completes, so the rows of the next
+  // statement after one that failed part-way were placed after that many
+  // empty slots (porsager/postgres#1119), and a read of one row counted
+  // three and threw that the identity was no key. The statement that fails
+  // here is the driver's own, on the same pool of one: a division by zero in
+  // its third row, after two rows were sent.
+  test('a read after a statement that failed part-way on its connection reads the record', async () => {
+    const sql = postgres(fixture.admin, { max: 1, onnotice: () => {} })
+    try {
+      expect(await sql`select 1 / (x - 3) as n from pg_catalog.generate_series(1, 5) as x`.then(() => undefined, (error: unknown) => error)).toMatchObject({ code: '22012' })
+      const read = await defined(createPostgresRecords(sql)).read({ target: CUSTOMER, key: customerKey('1', '1001'), columns: [col('customer', 'name')], filters: TENANT_1, through: [] })
+      expect(succeeded(read).values).toEqual({ name: 'Muster AG' })
+    } finally {
+      await sql.end({ timeout: 1 })
+    }
+  })
+
   // The boolean serializer of postgres.js turns every value that is not the
   // JavaScript `true` into 'f', so an untyped filter of 'true' once selected
   // the FALSE rows. A boolean has no spelling both engines compare alike,

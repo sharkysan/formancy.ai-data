@@ -143,6 +143,10 @@ caps how long a search runs, not how much it reads
 [0061](../decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)).
 The PostgreSQL adapter cancels a lookup through private properties of its
 driver, so a driver upgrade that changes them fails its suite (0061).
+postgres.js 3.4.9 places a statement's rows after empty slots when the one
+before it on the connection ended part-way; the adapter collects its own
+rows, and its catalog reads still take the driver's array
+([0078](../decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md)).
 Triggers that run on a delete are not seen, shown or governed (0050), and
 on PostgreSQL a cascaded table's BEFORE DELETE triggers and rules run with
 that table's owner's grants (0051). A table outside the approved schemas

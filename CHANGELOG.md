@@ -378,6 +378,32 @@ later.
   PostgreSQL 15 to 17 cannot hold such a constraint, and SQL Server has
   none, so nothing else reads differently
   ([0077](docs/decisions/0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md)).
+- **A PostgreSQL lookup or record statement after one that ended part-way
+  on the same connection answers as it would have.** postgres.js 3.4.9
+  numbers a statement's rows per connection and starts again only when a
+  statement completes, so after one that ended in an error with rows
+  already sent -- a lookup its cancel request stopped as its rows were on
+  their way (0061), or a statement failing in a later row -- the next
+  statement's rows came after that many empty slots
+  (porsager/postgres#1119, #1253). A search or a resolve then threw, which
+  answered whoever's lookup came next 503 `unavailable`, and a record read
+  of one row threw that its identity was no key. CI met it on 2026-10-17,
+  and a probe the same day 6 and 7 times in 1,000 same-tick aborts on
+  PostgreSQL 17 and 18. The slots held nothing: in 3,000 probes no row read
+  under the aborted lookup's row filter reached the next one's answer. The
+  adapter now collects each statement's rows itself, as the driver reads
+  them (`forEach`), so what an earlier statement left behind never reaches
+  them
+  ([0078](docs/decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md)).
+- **For contributors**: the fixtures' `holdNewConnections()` says how many
+  connections it holds, `held()`, and the PostgreSQL suite's late-cancel
+  case now holds exactly one cancel request. It held both of the two a
+  search aborted in its parse is sent (0061), and so passed only while the
+  second reached the backend before the lookup it stopped ran again, which
+  under CPU load on PostgreSQL 18 it did not in 19 of 150 probe runs, nor
+  once in CI. That case -- the next lookup and its one run more both
+  stopped, and the lookup refused, as 0061 states -- is now a case of its
+  own, each request held at a gate of its own.
 
 What review costs, in 0065: every submit and approval asks the database, so
 one that cannot be reached refuses both; nothing deletes a draft; nobody is
@@ -487,6 +513,14 @@ until then, and one whose control cannot hold NULL -- a boolean shown as
 a checkbox -- has its writes of the column blocked until it is reviewed;
 and the check's expression is spelled by the adapter as the server spells
 the hand-written check on 18, and on no other version.
+
+What collecting the rows costs, in 0078: the PostgreSQL adapter's catalog
+reads -- discovery's, and the server's version read -- still take
+postgres.js's array, so one that failed part-way would leave the next on
+its connection behind empty slots, and no test shows what discovery then
+does; an integrator's own statements on a client it also hands the adapter
+meet the driver as it is; and the workaround stays when postgres.js fixes
+it, which only the spike suite's characterisation will say.
 
 ## 0.1.0 — 2026-10-16
 

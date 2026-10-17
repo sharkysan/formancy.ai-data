@@ -93,7 +93,7 @@ function lookupClient(application: string): Sql {
   return client
 }
 
-function hold(): { release(): void } {
+function hold(): { release(): void; held(): number } {
   const gate = hop.holdNewConnections()
   gates.push(gate)
   return gate
@@ -137,6 +137,45 @@ const failure = (pending: Promise<unknown>): Promise<unknown> => pending.then(
 async function backendOf(application: string): Promise<{ pid: number; state: string } | undefined> {
   const [row] = await owner<Array<{ pid: number; state: string }>>`select pid, state from pg_catalog.pg_stat_activity where application_name = ${application}`
   return row
+}
+
+/**
+ * A statement that runs long in its execute, not in its parse: a sleep, with
+ * a parameter so postgres.js has PostgreSQL describe it first, as it does
+ * every lookup. Named by its column, so pg_stat_activity tells it apart.
+ */
+const sleeping = (name: string, seconds = '30') => ({ text: `select pg_catalog.pg_sleep($1::pg_catalog.text::pg_catalog.float8) as ${name}`, params: [seconds] })
+
+/**
+ * A statement that sends tenant 2's customers, key and name as a search
+ * reads them, and then sleeps in its execute: a lookup stopped part-way
+ * through its answer. Appended after the rows, so PostgreSQL has put them in
+ * its answer before it sleeps; a cancel then ends the statement with an
+ * error after them. Named by its column, so pg_stat_activity tells it apart.
+ */
+const PART_WAY = {
+  text: `select r.tenant_id::pg_catalog.text, r.customer_no::pg_catalog.text, r.name::pg_catalog.text as limits_part_way
+    from sales.customer as r where r.tenant_id = $1::pg_catalog.text::pg_catalog.int4
+    union all select null, null, pg_catalog.pg_sleep(30)::pg_catalog.text`,
+  params: ['2'],
+}
+
+/** Whether the backend `application` holds is inside a pg_sleep: past its parse, its describe and the start of its execute. */
+async function asleep(application: string): Promise<boolean> {
+  const [row] = await owner<Array<{ wait_event: string | null }>>`select wait_event from pg_catalog.pg_stat_activity where application_name = ${application}`
+  return row?.wait_event === 'PgSleep'
+}
+
+/**
+ * Whether the backend `application` holds has finished the sleep named
+ * `name`: idle, with that statement as its last. Before the sleep is parsed
+ * the last statement is another; while it sleeps it is active; and from its
+ * parse until its execute arrives it is active too, since PostgreSQL reports
+ * idle only once a statement's Sync is done.
+ */
+async function finished(application: string, name: string): Promise<boolean> {
+  const [row] = await owner<Array<{ state: string; query: string }>>`select state, query from pg_catalog.pg_stat_activity where application_name = ${application}`
+  return row?.state === 'idle' && row.query.includes(name)
 }
 
 type Operation = 'search' | 'resolve' | 'rejects'
@@ -296,23 +335,31 @@ describe('a cancel that arrives late', () => {
   // next lookup waits on the same backend, it is made to land late on
   // purpose. Without the one retry, another person's search fails because
   // someone else typed.
-  test("stops the next lookup on the backend, which runs once more and answers its page", async () => {
+  //
+  // Exactly one is held: the abandoned lookup is aborted past its execute,
+  // so it is sent one cancel request (cancel.ts), which the hop counts.
+  // Until 2026-10-17 this case abandoned a search waiting in its parse, which
+  // is sent a second request once its execute is written. Both were held,
+  // and the case passed only while the second reached the backend before the
+  // retry did: in a probe that day, every one of 150 runs held two, and
+  // under CPU load on PostgreSQL 18 the second stopped the retry too in 19,
+  // as it had in CI. That is the case below, made to happen.
+  test('stops the next lookup on the backend, which runs once more and answers its page', async () => {
     const application = 'limits-late-cancel'
     const sql = lookupClient(application)
     await ask(sql, 'search', NEVER)
     const muster: LookupQuery = { search: 'Muster', offset: 0, limit: 50 }
     const expected = await createPostgresLookups(sql).search(config, muster, TENANT_1, NEVER)
 
-    const first = await block()
     const controller = new AbortController()
-    const abandoned = failure(ask(sql, 'search', controller.signal))
-    await until(async () => (await first.waiting()) === 1, 'the first search waited behind the lock')
+    const abandoned = failure(runLookup(sql, sleeping('limits_late', '1'), controller.signal))
+    await until(() => asleep(application), 'the abandoned lookup was past its execute')
     const gate = hold()
     const reason = new Error('typed on')
     controller.abort(reason)
     expect(await abandoned).toBe(reason)
-    await release(first)
-    await until(async () => (await backendOf(application))?.state === 'idle', 'the first search finished, its cancel still held')
+    await until(() => finished(application, 'limits_late'), 'the abandoned lookup finished, its cancel still held')
+    expect(gate.held()).toBe(1)
 
     const second = await block()
     const sent = hop.countSent(Buffer.from(SEARCHES))
@@ -329,6 +376,52 @@ describe('a cancel that arrives late', () => {
     await until(async () => (await second.waiting()) === 1, 'the second search waited again')
     await release(second)
     expect(await pending).toEqual(expected)
+  })
+
+  // What 0061 states as a cost, made to happen rather than waited for: a
+  // search aborted while it waits in its parse is sent a cancel request at
+  // once and a second once its execute is written. When both arrive late,
+  // the first stops the next lookup and the second its one retry, and that
+  // lookup is refused with 57014, which the server answers `unavailable`.
+  // Each request is held at a gate of its own and released in turn, so each
+  // lands where the case says; a retry that ran a third time, or a second
+  // request sent where 0061 says none is, fails here by name.
+  test('two from one abandoned lookup stop the next lookup and its one retry, and it is refused', async () => {
+    const application = 'limits-late-cancels'
+    const sql = lookupClient(application)
+    await ask(sql, 'search', NEVER)
+    const muster: LookupQuery = { search: 'Muster', offset: 0, limit: 50 }
+
+    const first = await block()
+    const controller = new AbortController()
+    const abandoned = failure(ask(sql, 'search', controller.signal))
+    await until(async () => (await first.waiting()) === 1, 'the first search waited in its parse')
+    const early = hold()
+    const reason = new Error('typed on')
+    controller.abort(reason)
+    expect(await abandoned).toBe(reason)
+    await until(async () => early.held() === 1, 'the first cancel request was opened')
+    const late = hold()
+    await release(first)
+    await until(async () => late.held() === 1, 'the second cancel request was opened once the execute was written')
+    await until(async () => (await backendOf(application))?.state === 'idle', 'the first search finished, both cancels still held')
+    expect(early.held()).toBe(2)
+
+    const second = await block()
+    const sent = hop.countSent(Buffer.from(SEARCHES))
+    let refused: unknown
+    void createPostgresLookups(sql)
+      .search(config, muster, TENANT_1, NEVER)
+      .catch((error: unknown) => {
+        refused = error
+      })
+    await until(async () => (await second.waiting()) === 1, 'the second search waited on the same backend')
+    early.release()
+    await until(async () => sent() === 2 && (await second.waiting()) === 1, 'the first cancel stopped the second search, which was sent again and waits')
+    late.release()
+    await until(async () => refused !== undefined || sent() === 3, 'the retry was refused, or sent once more')
+    expect(sent()).toBe(2)
+    expect(refused).toMatchObject({ code: '57014' })
   })
 })
 
@@ -377,25 +470,6 @@ describe('a connection that goes while a lookup runs on it', () => {
     expect(await ask(sql, 'search', AbortSignal.timeout(ANSWERS_WITHIN))).toEqual(expected)
   })
 })
-
-/**
- * A statement that runs long in its execute, not in its parse: a sleep, with
- * a parameter so postgres.js has PostgreSQL describe it first, as it does
- * every lookup. Named by its column, so pg_stat_activity tells it apart.
- */
-const sleeping = (name: string) => ({ text: `select pg_catalog.pg_sleep($1::pg_catalog.text::pg_catalog.float8) as ${name}`, params: ['30'] })
-
-/**
- * Whether the backend `application` holds has finished the sleep named
- * `name`: idle, with that statement as its last. Before the sleep is parsed
- * the last statement is another; while it sleeps it is active; and from its
- * parse until its execute arrives it is active too, since PostgreSQL reports
- * idle only once a statement's Sync is done.
- */
-async function finished(application: string, name: string): Promise<boolean> {
-  const [row] = await owner<Array<{ state: string; query: string }>>`select state, query from pg_catalog.pg_stat_activity where application_name = ${application}`
-  return row?.state === 'idle' && row.query.includes(name)
-}
 
 describe('an abort before PostgreSQL has described the statement', () => {
   // postgres.js has PostgreSQL parse and describe a statement with
@@ -459,6 +533,34 @@ describe('an abort before PostgreSQL has described the statement', () => {
     expect(await pending).toBe(reason)
     await until(() => finished(application, 'limits_first_trip'), 'the sleep was stopped')
     expect(await ask(sql, 'search', AbortSignal.timeout(ANSWERS_WITHIN))).toEqual(expected)
+  })
+})
+
+describe('a lookup stopped part-way through its answer', () => {
+  // postgres.js 3.4.9 numbers the rows of a statement on its connection and
+  // starts again from 0 only when a statement completes. One stopped after
+  // some of its rows were sent left the count where it stopped, and the next
+  // statement's rows were placed after that many empty slots (0078). A
+  // search and a resolve read them as rows and threw a TypeError; a rejects
+  // read them as no key and answered rightly. CI's "same tick" case met it
+  // on 2026-10-17, and a probe the same day 6 and 7 times in 1,000 same-tick
+  // aborts on PostgreSQL 17 and 18 (porsager/postgres#1253). The slots held
+  // nothing: the next statement's own rows followed them. Here the stopped
+  // statement has sent tenant 2's customer when its cancel lands, and the
+  // next lookup, under tenant 1's filter, must answer as it would have --
+  // no TypeError, and none of tenant 2's rows.
+  test.each(OPERATIONS)("the next lookup on its connection, a %s, answers as it would have, and nothing of the stopped one's", async (operation) => {
+    const application = `limits-part-way-${operation}`
+    const sql = lookupClient(application)
+    const expected = await ask(sql, operation, NEVER)
+    const controller = new AbortController()
+    const pending = failure(runLookup(sql, PART_WAY, controller.signal))
+    await until(() => asleep(application), 'the statement sent its rows and slept')
+    const reason = new Error('typed on')
+    controller.abort(reason)
+    expect(await pending).toBe(reason)
+    await until(() => finished(application, 'limits_part_way'), 'the statement was stopped')
+    expect(await ask(sql, operation, AbortSignal.timeout(ANSWERS_WITHIN))).toEqual(expected)
   })
 })
 
