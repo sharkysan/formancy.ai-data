@@ -125,6 +125,62 @@ export async function painted(page, points) {
   )
 }
 
+/** Two animation frames: a rendering update has run since the call, by which WebKit has said where a focus scrolled the page (0058's reportsFocusScroll). */
+export function settled(page) {
+  return page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+}
+
+/** The probe's page: a column of buttons taller than the window, which a focus scrolls, and a row of buttons wider than its scroller, fixed at the top, which a focus scrolls sideways. */
+const PROBE_PAGE = `<!doctype html><style>body{margin:0}button{appearance:none;margin:0;padding:0;border:0;outline:none}#column button{display:block;width:100%;height:10px}#row{position:fixed;top:0;left:0;width:280px;height:60px;overflow:auto;white-space:nowrap;background:#fff}#row button{display:inline-block;width:200px;height:40px}</style><div id="row">${'<button></button>'.repeat(40)}</div><div id="column">${'<button></button>'.repeat(400)}</div>`
+
+/** What each trial focuses, out of view after the trial before it: a button of the column, which scrolls the window, or of the row, which scrolls its scroller. */
+const FOCUSED = [
+  ['column', 360],
+  ['row', 30],
+  ['column', 30],
+  ['row', 2],
+  ['column', 340],
+  ['row', 35],
+  ['column', 50],
+  ['row', 5],
+]
+
+/**
+ * 0058's reportsFocusScroll, on a page of its own in `browser`: each of
+ * FOCUSED focused, out of view, and the scroll the page says in the task
+ * that focused it -- the window's `scrollY`, the row's `scrollLeft` --
+ * against the one it says once `settled`. A trial is a focus that scrolled;
+ * `late` counts those whose first answer was still the scroll before it,
+ * for the window and for the scroller apart.
+ */
+export async function focusScroll(browser) {
+  const page = await browser.newPage({ viewport: { width: 320, height: 900 } })
+  try {
+    await page.setContent(PROBE_PAGE)
+    const counts = { window: { trials: 0, late: 0 }, scroller: { trials: 0, late: 0 } }
+    for (const [where, at] of FOCUSED) {
+      const before = await page.evaluate(
+        ({ where, at }) => {
+          const position = () => (where === 'row' ? document.getElementById('row').scrollLeft : window.scrollY)
+          const was = position()
+          document.querySelectorAll(`#${where} button`)[at].focus()
+          return { was, inTask: position() }
+        },
+        { where, at },
+      )
+      await settled(page)
+      const now = await page.evaluate((where) => (where === 'row' ? document.getElementById('row').scrollLeft : window.scrollY), where)
+      if (now === before.was) continue
+      const kind = counts[where === 'row' ? 'scroller' : 'window']
+      kind.trials += 1
+      if (before.inTask !== now) kind.late += 1
+    }
+    return counts
+  } finally {
+    await page.close()
+  }
+}
+
 /**
  * The colours painted at the points `locate()` finds in the page -- `{
  * points, ...what else it read }`, or null when what it looks for is not

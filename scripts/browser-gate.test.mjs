@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
-import { agGridRowProblem, declaredFamilies, fontProblem, lostCreate, rowUnmeasured, systemOf, unlikeTheTable } from './browser-gate.mjs'
+import { agGridRowProblem, declaredFamilies, focusScrollProblem, fontProblem, lostCreate, rowUnmeasured, systemOf, unlikeTheTable } from './browser-gate.mjs'
 
 /**
  * What every browser gate does to a page in every browser (0058), in the
@@ -221,5 +221,46 @@ describe('agGridRowProblem', () => {
       `Chromium names itself Safari to AG Grid 36.2.0 (${SAID.webkit.userAgent}); 0058’s table says it does not: a Playwright release changed this, measure it again`,
     )
     expect(agGridRowProblem('webkit', 'claimsSafari', SAID.chromium)).toMatch(/^WebKit does not name itself Safari to AG Grid 36\.2\.0/)
+  })
+})
+
+describe('focusScrollProblem', () => {
+  // The host gate's probe (focusScroll in apps/host/scripts/browser/
+  // measure.mjs), as each browser answered it on 2026-10-16: after every
+  // focus that scrolled the window or a scroller, WebKit still said the
+  // scroll from before it in the focusing task; Chromium and Firefox said
+  // the new one.
+  const answered = (window, scroller) => ({ window: { trials: 4, late: window }, scroller: { trials: 4, late: scroller } })
+  const MEASURED = { chromium: answered(0, 0), firefox: answered(0, 0), webkit: answered(4, 4) }
+
+  test('passes each browser as it answered', () => {
+    for (const [browser, counts] of Object.entries(MEASURED)) expect(focusScrollProblem(browser, counts), browser).toBeNull()
+  })
+
+  // One late answer of each kind is enough to say a browser does not say
+  // at once: the gate waits for a rendering update in it either way.
+  test('passes WebKit late in some trials of each kind and not in all', () => {
+    expect(focusScrollProblem('webkit', answered(1, 2))).toBeNull()
+  })
+
+  // A WebKit release that said a scroller's scroll at once, or a Chromium
+  // that stopped saying the window's, is a row that no longer holds: the
+  // host gate waits for a rendering update between the keys that scroll its
+  // grid because of it, and the table must say why.
+  test('fails a browser that answered other than the table says, for either kind of scroll', () => {
+    expect(focusScrollProblem('webkit', answered(4, 0))).toBe(
+      'WebKit said where every one of 4 focuses scrolled a scroller, in the task that focused; 0058’s table says it says so only after a rendering update: a WebKit release changed this, measure it again',
+    )
+    expect(focusScrollProblem('chromium', answered(2, 0))).toBe(
+      'Chromium went on saying where the window was before 2 of 4 focuses scrolled it, in the task that focused; 0058’s table says it says so at once: a Chromium release changed this, measure it again',
+    )
+  })
+
+  // A probe whose focuses scrolled nothing of one kind measured nothing of
+  // it, and would pass Chromium and Firefox while saying nothing of them.
+  test('fails a probe whose focuses scrolled nothing of one kind', () => {
+    expect(focusScrollProblem('firefox', { window: { trials: 4, late: 0 }, scroller: { trials: 0, late: 0 } })).toBe(
+      'no focus of the probe scrolled a scroller, so 0058’s reportsFocusScroll was measured by nothing there',
+    )
   })
 })

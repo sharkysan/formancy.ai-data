@@ -1711,7 +1711,7 @@
       ]
     },
     "0058": {
-      "reviewed": "sha256:6f07fbf55f0acc02f615770b48e83b1a6c74557820c5144b7e5ecf6235566eff",
+      "reviewed": "sha256:3f364c93d33fe27effb66a8f3ce916f0fe4abfbe6f95b29d570001a72b3bf470",
       "limitations": [
         {
           "area": "testing",
@@ -1756,6 +1756,10 @@
         {
           "area": "testing",
           "says": "The host gate reads a grid cell's background only where the window shows the cell, scrolling the window to one outside it, which moves what is under the pointer, so a cell can be read under another hover than its state had; a text its grid has scrolled wholly out of view, or covers, is named in the gate's output and not decided."
+        },
+        {
+          "area": "host",
+          "says": "In WebKit, AG Grid can leave the host page's grid scrolled to the side when the keys that scroll it come faster than WebKit's rendering updates, as a test's do and a person's do not; the host gate waits for a rendering update between such keys, so that case is measured by no gate."
         }
       ]
     },
