@@ -9,7 +9,7 @@ const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const config = JSON.parse(readFileSync(join(repo, 'apps', 'live-demo', 'wrangler.json'), 'utf8'))
 const files = new Set(['/data/demo/index.html', '/data/demo/assets/index-abc123.js', '/data/demo/THIRD-PARTY-NOTICES.txt'])
 // Files at the paths the Worker answers too: run_worker_first must win over a file, not only over a miss.
-const shadowed = new Set([...files, '/data/demo/session', ...config.assets.run_worker_first.map((pattern) => pattern.replace('*', 'forms/order/records/list'))])
+const shadowed = new Set([...files, '/data/demo/session', ...config.assets.run_worker_first.map((pattern) => pattern.replaceAll('*', 'forms/order/records/list'))])
 const route = (pathname, held = files) => routeOf(pathname, { prefix: PREFIX, assets: config.assets, exists: (path) => held.has(path) })
 
 describe('the local origin, as wrangler.json has Cloudflare route the demo', () => {
@@ -19,7 +19,7 @@ describe('the local origin, as wrangler.json has Cloudflare route the demo', () 
   // reach a visitor's server.
   test("sends every path run_worker_first names to the Worker first, read from the config", () => {
     expect(config.assets.run_worker_first.length).toBeGreaterThan(0)
-    for (const pattern of config.assets.run_worker_first) expect(route(pattern.replace('*', 'forms/order/records/list'), shadowed), pattern).toEqual({ kind: 'worker' })
+    for (const pattern of config.assets.run_worker_first) expect(route(pattern.replaceAll('*', 'forms/order/records/list'), shadowed), pattern).toEqual({ kind: 'worker' })
     expect(route('/data/demo/session', shadowed)).toEqual({ kind: 'worker' })
     expect(route('/data/demo/v1/forms')).toEqual({ kind: 'worker' })
   })
