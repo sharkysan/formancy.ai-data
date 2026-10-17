@@ -367,7 +367,9 @@ single maintainer, who is the final decision-maker on direction, releases,
 licensing and roadmap and the rightsholder `LICENSE.md` names. Everything a
 second person would otherwise carry in their head is meant to be in the
 decision records, the register and this documentation; nothing makes that
-true but the habit of writing them.
+true but the habit of writing them, and the architecture's guard holds its
+names, links and paths, not its sentences
+([0076](../decisions/0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md)).
 
 **No check is mechanically required.** Every gate runs on every pull request
 and fails a release, but `main` requires no status check, so what stops a

@@ -128,3 +128,4 @@ only enforcement is "we remember" says so plainly.
 | [0072](0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md) | The apps serve their own fonts, from Fontsource's packages at the release formancy.ai installs, and no page asks another host for anything | accepted |
 | [0073](0073-azure-sql-is-not-tested-and-the-release-says-so.md) | Azure SQL Database and Azure SQL Managed Instance are not tested, and the release says so where it said nothing | accepted |
 | [0075](0075-a-field-may-move-to-another-generated-section.md) | A field may move to another generated section, recorded on its own entry and carried by what it stands for | accepted |
+| [0076](0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md) | The architecture is documented as arc42 in docs/architecture, and every change updates the section it touches | accepted |

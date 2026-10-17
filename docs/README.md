@@ -28,7 +28,8 @@ How work is done here, and the bar a change meets, is
 
 Structured as [arc42](https://arc42.org), as formancy.ai's is, because it is
 a recognised shape and a reader who knows it can find things without being
-told.
+told
+([0076](decisions/0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md)).
 
 | | |
 |---|---|

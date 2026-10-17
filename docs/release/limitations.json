@@ -2416,6 +2416,10 @@
           "says": "A field's help text is not offered: `@formancy/spec` 0.5.0 has no property to hold it."
         }
       ]
+    },
+    "0076": {
+      "reviewed": "sha256:b602f3bde111e5dbb347710869d0c8781fbc4ca205b09c954a661c6c678ac3a5",
+      "none": "A rule for this repository's documentation: the architecture sections and the guard that holds them are read by contributors, reviewers and evaluators, and nobody who installs, integrates or operates the module meets their costs."
     }
   }
 }

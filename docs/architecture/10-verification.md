@@ -149,6 +149,14 @@ and each of these fails on the change that breaks what it holds:
 - **Size and look.** `scripts/source-size.test.mjs`: no source file past
   the budget `CLAUDE.md` sets. `scripts/palette.test.mjs`: every stylesheet
   that copies `admin.css`'s variables says the same value for each.
+- **This documentation.** `scripts/architecture.test.mjs`: `docs/README.md`
+  and these twelve sections exist; the building blocks name every workspace
+  package and app; every decision record is linked from a section; every
+  relative link reaches a file and every fragment a heading; and every
+  repository path written in backticks names something git would commit
+  ([0076](../decisions/0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md)).
+  It holds names, links and paths, never whether a sentence is still true,
+  which is review's.
 - **Derived files.** `scripts/codecov-config.test.mjs`: `codecov.yml` is
   what its generator makes of the workspace.
   `scripts/generated-block.test.mjs`: every generated region of the

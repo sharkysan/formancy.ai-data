@@ -179,6 +179,18 @@ later.
   ([0073](docs/decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md)).
   New exports of `@formancy/data-core`: `UNTESTED_PRODUCTS`, and the type
   `NamedProduct`.
+- **The architecture is documented as arc42**, in `docs/architecture/`,
+  entered from [`docs/README.md`](docs/README.md), in the twelve sections
+  and under the file names formancy.ai's has, so that an integrator, an
+  evaluator or a reviewer finds where each piece lives, what a request
+  does, what holds each quality and what was accepted rather than fixed,
+  each with the record that decided it, without reading every record in
+  order. `scripts/architecture.test.mjs`, in `pnpm test:repo`, fails when a
+  section is missing, a workspace package or app is not in the building
+  blocks, a decision record is linked from no section, a link or the
+  heading it points at is gone, or a path a section names in backticks does
+  not exist; whether a sentence is still true is review's
+  ([0076](docs/decisions/0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md)).
 
 ### Changed
 
