@@ -144,7 +144,10 @@ step). They run at every capture and every `--check`.
 
 All of them need `pnpm build` first, Chromium
 (`pnpm --filter @formancy/data-examples exec playwright install chromium`),
-and Docker for the host page. The fonts are files of the build.
+and Docker for the host page. The fonts are files of the build. In
+Playwright's own image, whose browsers are where `PLAYWRIGHT_BROWSERS_PATH`
+says, `pnpm test:pictures` finds them: `turbo.json` passes the variable
+through.
 
 | Command | What it does |
 | --- | --- |

@@ -23,11 +23,12 @@
     },
     "test:browser": {
       "dependsOn": ["build"],
-      "passThroughEnv": ["FORMANCY_BROWSERS"],
+      "passThroughEnv": ["FORMANCY_BROWSERS", "PLAYWRIGHT_BROWSERS_PATH"],
       "cache": false
     },
     "test:pictures": {
       "dependsOn": ["build"],
+      "passThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH"],
       "cache": false
     }
   }

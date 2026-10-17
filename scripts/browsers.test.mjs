@@ -159,6 +159,15 @@ describe('FORMANCY_BROWSERS through turbo', () => {
     const turbo = JSON.parse(readFileSync(join(repo, 'turbo.json'), 'utf8'))
     expect(turbo.tasks['test:browser'].passThroughEnv ?? []).toContain(VARIABLE)
   })
+
+  // Playwright finds its browsers through PLAYWRIGHT_BROWSERS_PATH where they
+  // are not in the user's cache, as in Playwright's own image, which sets it
+  // to /ms-playwright. Strict mode dropped it, so `pnpm test:pictures` there
+  // failed to launch Chromium while each app's script run directly passed.
+  test('lets Playwright find its browsers: turbo.json passes PLAYWRIGHT_BROWSERS_PATH to test:browser and test:pictures', () => {
+    const turbo = JSON.parse(readFileSync(join(repo, 'turbo.json'), 'utf8'))
+    for (const task of ['test:browser', 'test:pictures']) expect(turbo.tasks[task].passThroughEnv ?? [], task).toContain('PLAYWRIGHT_BROWSERS_PATH')
+  })
 })
 
 describe('launchedBuild', () => {
