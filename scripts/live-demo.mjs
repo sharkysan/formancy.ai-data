@@ -39,8 +39,8 @@
 // names the commit it is. GitHub's workflows hold no Cloudflare token and
 // never run it.
 
-import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { cpSync, existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { IDLE_MINUTES, MAX_INSTANCES, PREFIX, SESSION_PATH } from '../apps/live-demo/dist/worker/pure.mjs'
 import { buildProblems, run, WRANGLER } from './demo.mjs'
@@ -197,7 +197,11 @@ async function main(args) {
   )
 }
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Run as a program, and only as one, compared by real path as
+// scripts/demo.mjs's guard is, and for its reason: through a linked
+// directory a guard that compared the paths as given did nothing and
+// exited 0.
+if (process.argv[1] !== undefined && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try {
     await main(process.argv.slice(2))
   } catch (error) {

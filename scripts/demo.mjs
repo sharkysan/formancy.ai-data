@@ -39,9 +39,9 @@
 // run it.
 
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { references, resolved } from './addresses.mjs'
 import { HASHED, headerRules, headersFile, POLICY, policyProblems } from './demo-headers.mjs'
@@ -310,8 +310,11 @@ async function main(args) {
 }
 
 // Run as a program, and only as one: scripts/live-demo.mjs imports this
-// file, and its name ends in demo.mjs too.
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// file, and its name ends in demo.mjs too. Compared by real path: Node
+// gives the main module its real path and the program the path it was
+// typed with, so through a linked directory the two differ, and compared
+// as given this did nothing and exited 0, a deploy reported that never ran.
+if (process.argv[1] !== undefined && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try {
     await main(process.argv.slice(2))
   } catch (error) {

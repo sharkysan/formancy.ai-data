@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -193,6 +194,41 @@ describe('the demo on formancy.ai (0069)', () => {
     expect(root.scripts['demo:deploy']).toBe('pnpm build && node scripts/demo.mjs')
     expect(WRANGLER).toMatch(/^wrangler@\d+\.\d+\.\d+$/)
   })
+
+  // Each deploy runs its main only when it is the program Node was asked to
+  // run, since scripts/live-demo.mjs imports this one. Reached through a
+  // directory that is a link -- a junction on Windows, a symbolic link
+  // elsewhere -- Node gives the module its real path and the program the
+  // path as typed; a guard that compared the two as they came did nothing
+  // there and exited 0, so a deploy by hand from such a checkout said
+  // nothing and reported success without building, checking or deploying.
+  // Each is asked for an option it does not have, which fails before
+  // anything is built: by its absolute path, through the link, and by a
+  // relative path from inside the link.
+  test.each([
+    ['scripts/demo.mjs', 'usage: node scripts/demo.mjs [--dry-run]'],
+    ['scripts/live-demo.mjs', 'usage: node scripts/live-demo.mjs [--dry-run]'],
+  ])('%s runs as the program it is, however its path reaches it', (script, usage) => {
+    const place = mkdtempSync(join(tmpdir(), 'formancy-deploy-link-'))
+    const linked = join(place, 'checkout')
+    symlinkSync(repo, linked, 'junction')
+    try {
+      for (const [path, cwd] of [
+        [join(repo, script), repo],
+        [join(linked, script), repo],
+        [script, linked],
+      ]) {
+        const result = spawnSync(process.execPath, [path, '--not-an-option'], { cwd, encoding: 'utf8' })
+        expect(result.status, `${path} from ${cwd}`).toBe(1)
+        expect(result.stderr, `${path} from ${cwd}`).toContain(usage)
+      }
+    } finally {
+      // The link alone, then the empty directory: nothing that could reach
+      // through the link into the checkout.
+      unlinkSync(linked)
+      rmdirSync(place)
+    }
+  }, 30_000)
 
   // Cloudflare's Workers Builds runs the commands its dashboard holds, which
   // nothing here can read; REPO-METADATA.md records them. Recorded apart

@@ -469,9 +469,12 @@ later.
   and `scripts/demo-headers.mjs`, take the page, its mode, the policy and
   one named allowance, so the live demo's deploy holds the host page's
   demo build to them; and `scripts/demo.mjs` deploys only when it is run as
-  itself. Why: it deployed whenever the program's name ended in
+  itself, which it and `scripts/live-demo.mjs` judge by the program's real
+  path. Why: it deployed whenever the program's name ended in
   `demo.mjs`, which `scripts/live-demo.mjs`'s does, so the live deploy
-  would have deployed the examples page first.
+  would have deployed the examples page first; and a comparison of the
+  paths as given did nothing and exited 0 when the checkout was reached
+  through a link, a deploy by hand reported that never ran.
 
 What review costs, in 0065: every submit and approval asks the database, so
 one that cannot be reached refuses both; nothing deletes a draft; nobody is

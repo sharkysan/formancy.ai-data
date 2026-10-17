@@ -84,7 +84,12 @@
     holds of the examples page, which its checks still pass. It reads the
     examples' settings from their own section of REPO-METADATA.md; with the
     live demo's section placed first it read the live Worker's name, and
-    failed.
+    failed. It runs both deploys, `scripts/demo.mjs` and
+    `scripts/live-demo.mjs`, with an option neither has, by their path,
+    through a directory linked to the checkout and by a relative path from
+    inside the link, and expects each one's own usage and status 1: watched
+    failing against the guard that compared the paths as given, which
+    exited 0 having done nothing through the link ("expected +0 to be 1").
   - **`scripts/live-demo-docs.test.mjs`, in `pnpm test:repo`.** README's
     *Try it* and *Live demo* name the address the Worker is routed at; *Live
     demo* lists exactly the people the Worker offers, states the Worker's
