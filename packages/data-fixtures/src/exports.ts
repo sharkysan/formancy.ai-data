@@ -47,19 +47,21 @@ export type ExportCase = keyof typeof EXPORT_PARITY
 
 /**
  * Customers of tenant 1 an export suite inserts as the fixture's owner,
- * beside the fixture's 1001 and LIST_ROWS' 2001 to 2006, with no credit
- * limit: names a file has to quote, neutralise or tell from NULL, each with
- * the cell a file writes for it, spelled here by hand. A formula, which gets
- * an apostrophe and its quotes doubled; a comma and quotes; the empty
- * string, which is `""` and not NULL's empty cell; and a name that starts
- * with an apostrophe, which gets another, so taking one off every cell that
- * has one gives each name back.
+ * beside the fixture's 1001 and LIST_ROWS' 2001 to 2006: names a file has
+ * to quote, neutralise or tell from NULL, each with the cell a file writes
+ * for it, spelled here by hand. A formula, which gets an apostrophe and its
+ * quotes doubled; a comma and quotes; the empty string, which is `""` and
+ * not NULL's empty cell; and a name that starts with an apostrophe, which
+ * gets another, so taking one off every cell that has one gives each name
+ * back. The formula's customer has a negative credit limit, a number that
+ * starts with `-` and is written as it is; the others have none, NULL's
+ * empty cell.
  */
 export const EXPORT_ROWS = {
   customers: [
-    { number: '3001', name: '=HYPERLINK("http://x","y")', cell: `"'=HYPERLINK(""http://x"",""y"")"` },
-    { number: '3002', name: 'Muster "Zug", AG', cell: '"Muster ""Zug"", AG"' },
-    { number: '3003', name: '', cell: '""' },
-    { number: '3004', name: "'s-Hertogenbosch Handel", cell: "''s-Hertogenbosch Handel" },
+    { number: '3001', name: '=HYPERLINK("http://x","y")', cell: `"'=HYPERLINK(""http://x"",""y"")"`, creditLimit: '-1.00' },
+    { number: '3002', name: 'Muster "Zug", AG', cell: '"Muster ""Zug"", AG"', creditLimit: null },
+    { number: '3003', name: '', cell: '""', creditLimit: null },
+    { number: '3004', name: "'s-Hertogenbosch Handel", cell: "''s-Hertogenbosch Handel", creditLimit: null },
   ],
 } as const

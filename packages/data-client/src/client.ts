@@ -1,5 +1,5 @@
-import { WRITE_ID_HEADER } from '@formancy/data-core'
-import type { FieldError, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordList, RecordListQuery } from '@formancy/data-core'
+import { exportFileName, WRITE_ID_HEADER } from '@formancy/data-core'
+import type { FieldError, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordExportQuery, RecordList, RecordListQuery } from '@formancy/data-core'
 import { reconcile } from './reconcile.js'
 import type { Reconciliation } from './reconcile.js'
 import { isFormMenu, isFormRecord, isLookupResult, isPublishedForm, isRecordList, isResolved, refusalOf, UNEXPECTED } from './shapes.js'
@@ -122,6 +122,20 @@ function newWriteId(): string {
 /** What one request came to: a name that is no segment (nothing sent), nothing answered, or a status and its JSON body. */
 type Exchange = { sent: false } | WriteAnswer
 
+/** What one request came to before its body is read: nothing sent, nothing answered, or the response. */
+type Dispatched = { sent: false } | { answered: false } | { answered: true; response: Response }
+
+/** A CSV file's media type, whatever its parameters: what the export route answers with (0079). */
+const CSV = /^text\/csv\s*(?:;|$)/i
+
+const INCOMPLETE = 'The file did not arrive whole, so it was not kept. Try again.'
+
+/** A file of a form's records (0079): its bytes, and the name to save it under, `<form id>.csv`. */
+export interface RecordFile {
+  file: Blob
+  name: string
+}
+
 /**
  * A client of one data server's runtime plane. Every function resolves to an
  * outcome and never rejects for an answer -- only for an abort the caller
@@ -131,15 +145,14 @@ export function createDataClient(options: DataClientOptions) {
   const base = withoutTrailingSlashes(options.base ?? '')
   const send = options.fetch ?? globalThis.fetch.bind(globalThis)
 
-  /** The transport: the request sent once, and what came back. Classifying it is the caller's. */
-  async function exchange(request: Request): Promise<Exchange> {
+  /** The request sent once, and the response it came to, its body unread. `accept` is JSON's unless the caller asks for a file. */
+  async function dispatch(request: Request, accept = 'application/json'): Promise<Dispatched> {
     const segments = request.names.map(pathSegment)
     if (segments.some((segment) => segment === undefined)) return { sent: false }
-    const headers: Record<string, string> = { ...request.headers, authorization: `Bearer ${await options.token()}`, accept: 'application/json' }
+    const headers: Record<string, string> = { ...request.headers, authorization: `Bearer ${await options.token()}`, accept }
     if (request.body !== undefined) headers['content-type'] = 'application/json'
-    let response: Response
     try {
-      response = await send(`${base}${request.route(segments as string[])}`, {
+      const response = await send(`${base}${request.route(segments as string[])}`, {
         method: request.method,
         headers,
         // The runtime plane never redirects; following one would carry the token to another route, or another host.
@@ -147,14 +160,49 @@ export function createDataClient(options: DataClientOptions) {
         ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
         ...(request.signal === undefined ? {} : { signal: request.signal }),
       })
+      return { answered: true, response }
     } catch (error) {
       if (request.signal?.aborted === true) throw error
       return { answered: false }
     }
-    return { answered: true, status: response.status, body: await bodyOf(response, request.signal) }
+  }
+
+  /** The transport: the request sent once, and what came back, its body read as JSON. Classifying it is the caller's. */
+  async function exchange(request: Request): Promise<Exchange> {
+    const answer = await dispatch(request)
+    if ('sent' in answer || !answer.answered) return answer
+    return { answered: true, status: answer.response.status, body: await bodyOf(answer.response, request.signal) }
   }
 
   const invalidName: Refusal = { ok: false, status: 0, code: 'invalid-name', message: INVALID_NAME }
+
+  /**
+   * A file (0079): the transport's other branch, for an answer that is
+   * bytes. A refusal is read as `call` reads one. A 2xx is the file only
+   * when it says it is CSV, and only when its body arrived whole: a read
+   * that fails -- the connection cut, fewer bytes than the length the
+   * server announced, which `fetch` itself refuses -- is `incomplete`,
+   * never a shorter file a person would take for every record. The length
+   * is not compared here: where a proxy compresses, `content-length`
+   * counts the compressed bytes.
+   */
+  async function download(request: Request): Promise<Outcome<Blob>> {
+    const answer = await dispatch(request, 'text/csv, application/json')
+    if ('sent' in answer) return invalidName
+    if (!answer.answered) return { ok: false, status: 0, code: 'unreachable', message: UNREACHABLE }
+    const { response } = answer
+    if (response.status < 200 || response.status > 299) return refusalOf(response.status, await bodyOf(response, request.signal))
+    if (!CSV.test(response.headers.get('content-type') ?? '')) {
+      await response.body?.cancel().catch(() => undefined)
+      return { ok: false, status: response.status, code: 'unexpected', message: UNEXPECTED }
+    }
+    try {
+      return { ok: true, value: await response.blob() }
+    } catch (error) {
+      if (request.signal?.aborted === true) throw error
+      return { ok: false, status: response.status, code: 'incomplete', message: INCOMPLETE }
+    }
+  }
 
   /** A read: changes nothing, so an answer that went wrong is a refusal, and asking again is safe (0029). */
   async function call<T>(request: Request & { read: (body: unknown) => T | undefined }): Promise<Outcome<T>> {
@@ -223,6 +271,22 @@ export function createDataClient(options: DataClientOptions) {
         read: (body) => (isRecordList(body) ? body : undefined),
         signal,
       }),
+
+    /**
+     * `POST …/records/export` (0079): one CSV file of every record `list`
+     * would page through for the same search, sort and parent, made whole
+     * by the server or refused -- `export-too-large`, `export-timeout`,
+     * `export-busy`, `moved`, `unencodable` among the server's codes -- and
+     * the name to save it under, `<form id>.csv`, from the form's id and
+     * not from a header another origin cannot read (0060). Exactly the
+     * three keys are sent, in a POST body, so the search is in no URL. A
+     * 200 that is not CSV is `unexpected`; a body that did not arrive
+     * whole is `incomplete`, never a file.
+     */
+    exportRecords: async (formId: string, query: Partial<RecordExportQuery> = {}, signal?: AbortSignal): Promise<Outcome<RecordFile>> => {
+      const file = await download({ method: 'POST', names: [formId], route: ([form]) => `/v1/forms/${String(form)}/records/export`, body: { search: query.search, sort: query.sort, parent: query.parent }, signal })
+      return file.ok ? { ok: true, value: { file: file.value, name: exportFileName(formId) } } : file
+    },
 
     /**
      * `POST …/records/create`: a new record from the answers; the reply is what

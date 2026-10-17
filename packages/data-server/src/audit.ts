@@ -17,7 +17,7 @@ interface AuditEventBase {
   outcome: string
 }
 
-export type RuntimeOperation = 'form-list' | 'form' | 'read' | 'list' | 'create' | 'update' | 'delete' | 'lookup-query' | 'lookup-resolve'
+export type RuntimeOperation = 'form-list' | 'form' | 'read' | 'list' | 'export' | 'create' | 'update' | 'delete' | 'lookup-query' | 'lookup-resolve'
 
 export type AdminOperation =
   | 'connection-list'
@@ -62,6 +62,15 @@ export interface RuntimeAuditEvent extends AuditEventBase {
    * reference that only looks redacted.
    */
   record: string | null
+  /**
+   * `export` only (0079): how many records the file holds -- the whole
+   * file's on `ok`, and on a refusal those written into it before it was
+   * refused, 0 when it was refused before any statement. `null` for every
+   * other operation. A number, never which records: an operator can see
+   * that somebody took ten thousand rows, and the trail is still no copy
+   * of them.
+   */
+  rows: number | null
 }
 
 /**

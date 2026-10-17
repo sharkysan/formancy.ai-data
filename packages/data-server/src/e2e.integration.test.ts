@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION, presentationOf } from '@formancy/data-core'
 import type { FieldBinding, FieldWrites, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, PresentationOverrides } from '@formancy/data-core'
-import { EDGE_VALUES, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, WRITER } from '@formancy/data-fixtures'
+import { EDGE_VALUES, EXPORT_ROWS, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, WRITER } from '@formancy/data-fixtures'
 import type { PostgresFixture, SqlServerFixture } from '@formancy/data-fixtures'
 import { connectPostgres } from '@formancy/data-postgres'
 import { connectSqlServer } from '@formancy/data-sqlserver'
@@ -31,6 +31,11 @@ import { createIdentityVerifier } from './identity.js'
  * host's token names, finds a customer, creates an order, reads it back
  * exactly, saves a change, has a stale save refused, and cannot see another
  * tenant's order at all.
+ *
+ * Then a file of a form's records (0079): what a tenant's list pages
+ * through and nothing of another tenant's, each value as the read holds it
+ * and as data a spreadsheet does not run; and on SQL Server, text UTF-8
+ * cannot carry refused.
  *
  * Then again through the order form's own account, formancy_writer (0027):
  * what it may not UPDATE is written on create only, and the policy on
@@ -325,6 +330,211 @@ describe.each([
   test('drift against the database as it is now reports nothing', async () => {
     const drift = await call('POST', `/v1/forms/${formId}/drift`, admin)
     expect(drift.json()).toMatchObject({ version: 1, changes: [], blocking: false })
+  })
+})
+
+/**
+ * A file's records as it spells them (0079): each a list of cells exactly
+ * as written -- quotes kept, so `""` is told from NULL's empty cell --
+ * split at the commas and CRLFs outside quotes, after the byte-order mark.
+ */
+function csvCells(text: string): string[][] {
+  expect([text.startsWith('﻿'), text.endsWith('\r\n')]).toEqual([true, true])
+  const records: string[][] = []
+  let cells: string[] = []
+  let cell = ''
+  let quoted = false
+  for (let at = 1; at < text.length; at += 1) {
+    const char = text[at] as string
+    if (char === '"') quoted = !quoted
+    if (!quoted && char === ',') {
+      cells.push(cell)
+      cell = ''
+    } else if (!quoted && char === '\r' && text[at + 1] === '\n') {
+      records.push([...cells, cell])
+      cells = []
+      cell = ''
+      at += 1
+    } else cell += char
+  }
+  return records
+}
+
+/** A cell as RFC 4180 reads it: its quotes taken off and a doubled quote made one. */
+const unquoted = (cell: string | undefined): string | undefined => (cell?.startsWith('"') === true ? cell.slice(1, -1).replaceAll('""', '"') : cell)
+
+/** The cells under `header`, as written. */
+function cellsUnder(records: string[][], header: string): Array<string | undefined> {
+  const at = (records[0] ?? []).indexOf(header)
+  expect(at, `${header} in ${JSON.stringify(records[0])}`).toBeGreaterThanOrEqual(0)
+  return records.slice(1).map((record) => record[at])
+}
+
+/** A file of `form`'s records as `bearer`, asked for as a browser does: answered whole, or the refusal. */
+async function exported(form: string, bearer: string, payload: Record<string, unknown> = {}) {
+  const response = await app.inject({ method: 'POST', url: `/v1/forms/${form}/records/export`, headers: { authorization: `Bearer ${bearer}`, accept: 'text/csv, application/json' }, payload })
+  return { status: response.statusCode, type: response.headers['content-type'], text: response.body, json: () => response.json() as { code: string; message: string } }
+}
+
+/** Every record token `bearer`'s list of `form` pages through, from the first page to the last, in the list's order. */
+async function everyListed(form: string, bearer: string, body: Record<string, unknown> = {}): Promise<Array<{ record: string; answers: Record<string, unknown> }>> {
+  const rows: Array<{ record: string; answers: Record<string, unknown> }> = []
+  for (let offset = 0; ; offset += 50) {
+    const page = await call('POST', `/v1/forms/${form}/records/list`, bearer, { ...body, offset })
+    expect(page.statusCode, page.body).toBe(200)
+    rows.push(...(page.json().rows as typeof rows))
+    if (page.json().hasMore !== true) return rows
+  }
+}
+
+/** Proposes `root` on `connection` as `formId` and publishes it with the policy `policyOf` gives, as proposed. */
+async function published(connection: string, formId: string, request: Record<string, unknown>, policyOf: (fields: readonly FieldBinding[]) => FormPolicy): Promise<void> {
+  const proposal = await call('POST', '/v1/form-proposals', admin, { connection, formId, title: formId, ...request })
+  expect(proposal.statusCode, proposal.body).toBe(200)
+  const proposed = proposal.json() as Proposal
+  const answer = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, policyOf(proposed.bindings.fields)) })
+  expect(answer.statusCode, answer.body).toBe(201)
+}
+
+/** Customers a clerk may read, and nothing else, within their tenant, each country's label shared by every tenant: the form a file of customers is made from. */
+const customerPolicy = (fields: readonly FieldBinding[]): FormPolicy => ({
+  ...clerkPolicy(fields),
+  operations: { read: ['clerk'], create: [], update: [] },
+  fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: [] }])),
+  lookups: { country: [] },
+})
+const CUSTOMERS = { root: { schema: 'sales', name: 'customer' }, lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }] }
+
+describe.each([
+  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'SQL Server', connection: 'ms' as const, versionColumn: undefined },
+])("a file of a form's records on $engine (0079)", ({ connection, versionColumn }) => {
+  const orders = `${connection}-export-order`
+  const lines = `${connection}-export-line`
+  const customers = `${connection}-export-customer`
+  const order = connection === 'pg' ? 'sales."order"' : 'sales.[order]'
+  const literal = (text: string) => `${connection === 'ms' ? 'N' : ''}'${text.replaceAll("'", "''")}'`
+  let ddl: Awaited<ReturnType<typeof owner>> | undefined
+  /** Tenant 2's order and its line, made through the API for this file and removed after it. */
+  let theirOrder = ''
+
+  beforeAll(async () => {
+    ddl = await owner(connection)
+    const versioned = versionColumn === undefined ? {} : { versionColumn }
+    await published(connection, orders, { root: { schema: 'sales', name: 'order' }, lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }], ...versioned }, clerkPolicy)
+    await published(connection, lines, { root: { schema: 'sales', name: 'order_line' }, lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }], ...versioned }, (fields) => ({
+      ...clerkPolicy(fields),
+      rowFilters: [],
+      lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      through: ['order'],
+    }))
+    await published(connection, customers, CUSTOMERS, customerPolicy)
+    const source = ((await call('GET', `/v1/forms/${orders}`, otherClerk)).json().form.model.fields as Array<{ key: string; optionsSource?: string }>).find((field) => field.key === 'customer')?.optionsSource as string
+    const customer = (await call('POST', `/v1/forms/${orders}/lookups/${source}/query`, otherClerk, { operation: 'create', search: '' })).json().rows[0].token as string
+    const created = await call('POST', `/v1/forms/${orders}/records/create`, otherClerk, { answers: { customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '1' } })
+    expect(created.statusCode, created.body).toBe(201)
+    theirOrder = created.json().record as string
+    const line = await call('POST', `/v1/forms/${lines}/records/create`, otherClerk, { answers: { order: theirOrder, line_no: 1, quantity: 1, unit_price: '1.00' } })
+    expect(line.statusCode, line.body).toBe(201)
+    await ddl.run(
+      EXPORT_ROWS.customers.map((row) => `insert into sales.customer (tenant_id, customer_no, name, credit_limit) values (1, ${row.number}, ${literal(row.name)}, ${row.creditLimit ?? 'null'})`),
+    )
+  })
+
+  afterAll(async () => {
+    const id = theirOrder.slice('k1:'.length)
+    await ddl?.run([
+      ...(id === '' ? [] : [`delete from sales.order_line where order_id = ${id}`, `delete from ${order} where id = ${id}`]),
+      `delete from sales.customer where tenant_id = 1 and customer_no in (${EXPORT_ROWS.customers.map((row) => row.number).join(', ')})`,
+    ])
+    await ddl?.close()
+  })
+
+  // A file is every record the list pages through for the same request,
+  // in its order, under the same row filter: tenant 1's file of orders is
+  // tenant 1's list of them, and holds none of tenant 2's, whose own file
+  // is theirs. Each value is the read's, digit for digit: 2^53 + 1 and the
+  // largest numeric(18,4), and the customer as its label beside its key.
+  // Watched failing with the export's pages planned without the row
+  // filter: tenant 2's order was in tenant 1's file.
+  test("a tenant's file of orders is its list of them, exactly, and holds none of another tenant's", async () => {
+    const file = await exported(orders, clerk)
+    expect([file.status, file.type]).toEqual([200, 'text/csv; charset=utf-8'])
+    const records = csvCells(file.text)
+    const ids = cellsUnder(records, 'Id')
+    expect(ids).toEqual((await everyListed(orders, clerk)).map((row) => String(row.answers['id'])))
+    expect(ids).not.toContain(theirOrder.slice('k1:'.length))
+    const theirs = csvCells((await exported(orders, otherClerk)).text)
+    expect(cellsUnder(theirs, 'Id')).toEqual((await everyListed(orders, otherClerk)).map((row) => String(row.answers['id'])))
+    expect(cellsUnder(theirs, 'Id')).not.toContain(EDGE_VALUES.beyondSafeInteger)
+
+    const ours = records[ids.indexOf(EDGE_VALUES.beyondSafeInteger) + 1] as string[]
+    const header = records[0] as string[]
+    const cell = (name: string) => unquoted(ours[header.indexOf(name)])
+    expect([cell('Amount'), cell('Customer'), cell('Customer (key)')]).toEqual([EDGE_VALUES.largestAmount, 'Muster AG', 'k1:1,1001'])
+  })
+
+  // A line has no tenant of its own (0043): its file holds the lines of
+  // tenant 1's orders and none of tenant 2's -- with or without tenant 2's
+  // order named as the parent, which narrows and never permits. Watched
+  // failing with the throughs dropped from the export's pages.
+  test("a tenant's file of lines holds no line of another tenant's order, with or without it as the parent", async () => {
+    const keys = (records: string[][]) => cellsUnder(records, 'Order (key)').map(unquoted)
+    const ours = csvCells((await exported(lines, clerk)).text)
+    expect(keys(ours)).toContain(`k1:${EDGE_VALUES.beyondSafeInteger}`)
+    expect(keys(ours)).not.toContain(theirOrder)
+    expect(csvCells((await exported(lines, clerk, { parent: { field: 'order', record: theirOrder } })).text)).toHaveLength(1)
+    expect(keys(csvCells((await exported(lines, otherClerk, { parent: { field: 'order', record: theirOrder } })).text))).toEqual([theirOrder])
+  })
+
+  // What the database holds is written as data on both engines: a formula
+  // behind its apostrophe, quoted, its quotes doubled; quotes and a comma
+  // quoted; the empty string as `""` beside NULL's empty cell; a leading
+  // apostrophe doubled; a negative credit limit as it is, and the largest
+  // numeric(14,2) digit for digit; a country as its label beside its key.
+  test('writes each customer’s values as data a spreadsheet does not run and a reader can take back', async () => {
+    const records = csvCells((await exported(customers, clerk)).text)
+    const header = records[0] as string[]
+    const of = (number: string) => {
+      const record = records.find((cells) => cells[header.indexOf('Customer no')] === number)
+      expect(record, number).toBeDefined()
+      return (name: string) => (record as string[])[header.indexOf(name)]
+    }
+    for (const row of EXPORT_ROWS.customers) {
+      const cell = of(row.number)
+      expect([row.number, cell('Name'), cell('Credit limit'), cell('Country'), cell('Country (key)')]).toEqual([row.number, row.cell, row.creditLimit ?? '', '', ''])
+    }
+    const muster = of('1001')
+    expect([muster('Name'), muster('Credit limit'), muster('Country'), muster('Country (key)')]).toEqual(['Muster AG', EDGE_VALUES.largestCreditLimit, 'Switzerland', 'k1:CH'])
+  })
+})
+
+describe('a file of text UTF-8 cannot carry, on SQL Server alone (0079)', () => {
+  // SQL Server's nvarchar keeps an unpaired surrogate and a NUL written by
+  // another application (0026); PostgreSQL stores neither. UTF-8 has no
+  // spelling for the one, and a reader built on C strings ends a cell at
+  // the other, so the file is refused, naming the column and never the
+  // value, rather than written with U+FFFD in silence. The text is cast
+  // from its UTF-16 bytes, so no collation decides what is stored.
+  test('an nvarchar holding an unpaired surrogate or a NUL refuses the file 409 unencodable', async () => {
+    const formId = 'ms-export-odd-customer'
+    await published('ms', formId, CUSTOMERS, customerPolicy)
+    const ddl = await owner('ms')
+    try {
+      for (const bytes of ['0x5A007500670000D841004700', '0x610000006200']) {
+        await ddl.run([`insert into sales.customer (tenant_id, customer_no, name) values (1, 3005, cast(${bytes} as nvarchar(6)))`])
+        const refused = await exported(formId, clerk)
+        expect({ bytes, status: refused.status, body: refused.json() }).toEqual({
+          bytes,
+          status: 409,
+          body: { code: 'unencodable', message: 'Name holds text a CSV file cannot carry: an unpaired surrogate or a NUL character.' },
+        })
+        await ddl.run(['delete from sales.customer where tenant_id = 1 and customer_no = 3005'])
+      }
+    } finally {
+      await ddl.run(['delete from sales.customer where tenant_id = 1 and customer_no = 3005'])
+      await ddl.close()
+    }
   })
 })
 

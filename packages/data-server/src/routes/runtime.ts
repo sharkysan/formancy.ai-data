@@ -41,6 +41,7 @@ import { lookupDeadline } from '../lookup-deadline.js'
 import { loadPublished } from '../published.js'
 import { registerDeleteRoute } from './runtime-deletes.js'
 import { planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
+import { registerExportRoute } from './runtime-exports.js'
 import { registerListRoute } from './runtime-lists.js'
 import { registerLookupRoutes } from './runtime-lookups.js'
 import { registerMenuRoute } from './runtime-menu.js'
@@ -65,8 +66,12 @@ export interface RuntimeOptions {
 
 declare module 'fastify' {
   interface FastifyRequest {
-    /** `repeated`: answered with an earlier sending's answer, and nothing asked of the database (0031). */
-    auditTrail?: { formVersion: number | null; record?: string; repeated?: boolean }
+    /**
+     * `repeated`: answered with an earlier sending's answer, and nothing
+     * asked of the database (0031). `rows`: the records an export wrote
+     * into its file so far (0079).
+     */
+    auditTrail?: { formVersion: number | null; record?: string; repeated?: boolean; rows?: number }
   }
 }
 
@@ -82,6 +87,7 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'GET /v1/forms/:id': 'form',
   'POST /v1/forms/:id/records/read': 'read',
   'POST /v1/forms/:id/records/list': 'list',
+  'POST /v1/forms/:id/records/export': 'export',
   'POST /v1/forms/:id/records/create': 'create',
   'POST /v1/forms/:id/records/update': 'update',
   'POST /v1/forms/:id/records/delete': 'delete',
@@ -173,6 +179,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
         status: base.status,
         outcome: trail.repeated === true ? 'repeated' : base.outcome,
         record: recordReference(key, trail.record),
+        rows: base.operation === 'export' ? (trail.rows ?? 0) : null,
       }
     },
   })
@@ -483,6 +490,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
 
   // A page of records is a read of many (0044): its steps are the read's, and so is every decision between them.
   registerListRoute(app, { published, connection, context, unread, undecided, answered })
+
+  // A file of every page a list would show (0079): the list's steps, page after page, and a lookup's for the labels.
+  registerExportRoute(app, { published, connection, context, unread, undecided, answered, lookupDeadlineMs: options.lookupDeadlineMs })
 
   app.post<{ Params: { id: string } }>('/v1/forms/:id/records/create', async (request, reply) => {
     const body = request.body

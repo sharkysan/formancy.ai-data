@@ -264,12 +264,67 @@ async function use(base, tokens, form, journey) {
   // Another tenant: the order does not exist for them, and the writer's
   // row-level security on customer shows that account tenant 1's rows only.
   if ((await listed(tokens.clerk2)).includes(record)) throw new Error(`${at} tenant 2's list of orders holds tenant 1's order`)
+  await exportOrders(base, tokens, form.formId, record, definition.json.form.model.fields.find((candidate) => candidate.key === 'id')?.label, at)
   const hidden = await call(base, 'POST', path('records/read'), { token: tokens.clerk2, body: { record } })
   expectStatus(`${at} tenant 2 reading tenant 1's order`, hidden, 404)
   const theirs = await call(base, 'POST', path(`lookups/${source}/query`), { token: tokens.clerk2, body: { operation: 'create', search: '' } })
   expectStatus(`${at} tenant 2's customer lookup`, theirs, 200)
   expectEqual(`${at} the customers tenant 2 is offered`, theirs.json.rows, [])
   return record
+}
+
+/**
+ * The cells under `header` in a CSV file's text, quotes taken off and a
+ * doubled quote made one: RFC 4180, each record ended by CRLF, after a
+ * byte-order mark -- or with none, since `fetch`'s text() takes it off.
+ * Exported for journey.test.mjs.
+ */
+export function csvColumn(text, header) {
+  const body = text.startsWith('﻿') ? text.slice(1) : text
+  const records = []
+  let cells = []
+  let cell = ''
+  let quoted = false
+  for (let at = 0; at < body.length; at += 1) {
+    const char = body[at]
+    if (quoted && char === '"' && body[at + 1] === '"') {
+      cell += '"'
+      at += 1
+    } else if (char === '"') quoted = !quoted
+    else if (!quoted && char === ',') {
+      cells.push(cell)
+      cell = ''
+    } else if (!quoted && char === '\r' && body[at + 1] === '\n') {
+      records.push([...cells, cell])
+      cells = []
+      cell = ''
+      at += 1
+    } else cell += char
+  }
+  const index = (records[0] ?? []).indexOf(header)
+  if (index < 0) throw new Error(`the file has no column headed ${header}`)
+  return records.slice(1).map((record) => record[index])
+}
+
+/**
+ * The orders as one CSV file each tenant's clerk downloads (0079), over
+ * HTTP through the proxy: tenant 1's file holds the order tenant 1 created,
+ * in the column the form's id field heads, and tenant 2's does not -- the
+ * row filter a list has, on a route that reads every page. Exported for
+ * journey.test.mjs.
+ */
+export async function exportOrders(base, tokens, formId, record, idHeader, at) {
+  if (typeof idHeader !== 'string') throw new Error(`${at} the published form's id field has no label to head its column`)
+  const id = record.slice(record.indexOf(':') + 1)
+  const ids = async (token, who) => {
+    const file = await call(base, 'POST', `/v1/forms/${formId}/records/export`, { token, body: {}, headers: { accept: 'text/csv, application/json' } })
+    expectStatus(`${at} records/export as ${who}`, file, 200)
+    const type = file.headers.get('content-type') ?? 'none'
+    if (!type.startsWith('text/csv')) throw new Error(`${at} records/export as ${who} answered ${type}, not text/csv`)
+    return csvColumn(file.text, idHeader)
+  }
+  if (!(await ids(tokens.clerk1, 'tenant 1')).includes(id)) throw new Error(`${at} tenant 1's file of orders does not hold the order tenant 1 created`)
+  if ((await ids(tokens.clerk2, 'tenant 2')).includes(id)) throw new Error(`${at} tenant 2's file of orders holds tenant 1's order`)
 }
 
 /**

@@ -704,7 +704,7 @@ describe('the operational audit trail', () => {
     const response = await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: NEW } })
     expect(response.statusCode).toBe(201)
     expect(events).toEqual([
-      { at: '2026-10-09T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'create', form: 'customer', formVersion: 1, status: 201, outcome: 'ok', record: recordReference(KEY, 'k1:1,7') },
+      { at: '2026-10-09T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'create', form: 'customer', formVersion: 1, status: 201, outcome: 'ok', record: recordReference(KEY, 'k1:1,7'), rows: null },
     ])
     expect(JSON.stringify(events)).not.toContain('Neu GmbH')
     expect(JSON.stringify(events)).not.toContain('k1:')

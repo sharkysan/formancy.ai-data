@@ -6,8 +6,8 @@
  * is on trial is that the published entry points resolve, with the types that
  * shipped. Connecting to a database is the integration suites' business.
  */
-import { createDataClient, fieldProblems, LIST_PAGE_SIZE, lookupSources, sourceNames } from '@formancy/data-client'
-import type { DeleteOutcome, FormMenu, Outcome, PublishedForm, RecordList, Refusal } from '@formancy/data-client'
+import { createDataClient, EXPORT_MAX_BYTES, fieldProblems, LIST_PAGE_SIZE, lookupSources, sourceNames } from '@formancy/data-client'
+import type { DeleteOutcome, FormMenu, Outcome, PublishedForm, RecordFile, RecordList, Refusal } from '@formancy/data-client'
 import { DATABASE_KINDS, isDatabaseKind, reachesPast } from '@formancy/data-core'
 import type { CascadeRule, DatabaseAdapter, DatabaseKind, FormPolicy } from '@formancy/data-core'
 import { connectPostgres, createPostgresAdapter } from '@formancy/data-postgres'
@@ -67,7 +67,7 @@ const sink: AuditSink = (event: AuditEvent) => {
     heard.push(`admin ${admin.connection ?? 'no connection'}`)
   }
 }
-await sink({ at: 't', plane: 'runtime', actor: null, operation: 'read', form: 'order', formVersion: null, status: 401, outcome: 'unauthenticated', record: null })
+await sink({ at: 't', plane: 'runtime', actor: null, operation: 'read', form: 'order', formVersion: null, status: 401, outcome: 'unauthenticated', record: null, rows: null })
 await sink({ at: 't', plane: 'admin', actor: 'a', operation: 'publish', connection: 'erp', form: 'order', formVersion: 1, expectedBase: null, restoredFrom: null, draft: null, status: 201, outcome: 'ok' })
 if (heard.join() !== 'runtime no record,admin erp') throw new Error('an audit sink did not tell the planes apart')
 
@@ -117,6 +117,21 @@ const deleteClient = createDataClient({
 const deleted: DeleteOutcome = await deleteClient.delete('order', { record: 'k1:7', version: '1' })
 if (!deleted.ok || deleted.value.record !== 'k1:7' || deleted.value.deleted !== true) throw new Error('delete() did not read the deletion')
 
+// A file of records (0079): the client's exportRecords, its answer's type
+// and the size budget it re-exports, through the published entry points --
+// read from a stub that answers as the server does, so the published code's
+// own check of the content type, and the name it saves under, are on trial.
+// The bytes are compared, not Blob.text(), which takes the byte-order mark off.
+const csv = '\uFEFFId,Name\r\n7,Muster AG\r\n'
+const exportClient = createDataClient({
+  token: () => 'unused',
+  base: 'http://127.0.0.1:9',
+  fetch: async () => new Response(csv, { status: 200, headers: { 'content-type': 'text/csv; charset=utf-8' } }),
+})
+const file: Outcome<RecordFile> = await exportClient.exportRecords('order', { search: 'Muster' })
+const bytes = file.ok ? Buffer.from(await file.value.file.arrayBuffer()) : Buffer.alloc(0)
+if (!file.ok || file.value.name !== 'order.csv' || !bytes.equals(Buffer.from(csv, 'utf8')) || !Number.isSafeInteger(EXPORT_MAX_BYTES)) throw new Error('exportRecords() did not read the file')
+
 // What a delete may act through (0051): a policy that names a key with its
 // action, typed by what the published core declares, and the core's own
 // reading of a reach that goes past its root.
@@ -124,4 +139,4 @@ const lines: CascadeRule = { table: { schema: 'sales', name: 'order_line' }, for
 const cascading: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] }, fields: {}, rowFilters: [], lookups: {}, cascades: [lines] }
 if (!reachesPast({ removed: [{ schema: 'sales', name: 'order' }, lines.table], cleared: [] }) || cascading.cascades?.length !== 1) throw new Error('reachesPast() did not read a reach past its root')
 
-console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists, the menu, deletion and cascades included; audit events`)
+console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists, exports, the menu, deletion and cascades included; audit events`)
