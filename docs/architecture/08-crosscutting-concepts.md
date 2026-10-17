@@ -146,7 +146,10 @@ repeating the reference's value. Section 7 has the settings. A service
 principal's client secret is such a reference, and an Entra login's
 failure is a sentence with at most Entra's AADSTS code: the credential's
 guard keeps nothing of what Entra answered, so no error in the chain
-holds a tenant, a client, a trace id or a secret
+holds a tenant, a client, a trace id or a secret. A secret file that
+cannot be read is named in the log line that says its connection could
+not be opened, as a password's is: the path is the allowlist's, and what
+the operator fixes
 ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 
 **What stays out of logs and answers**: a token, since errors carry jose's

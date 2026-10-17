@@ -418,15 +418,22 @@ default and spelling, `PORT`'s included, is in
 Entra managed identity or service principal under `login`, whose client
 secret is a reference too. An Entra entry keeps TLS on and the server's
 certificate checked, names its tenant and client by id, and reaches the
-public cloud alone; the token is asked for Azure SQL's resource only. **No
+public cloud alone; the token is asked for Azure SQL's resource only. An
+Entra login goes over TDS 8.0, TLS before the first TDS message, so the
+database must take it: of the images measured, SQL Server 2025 with a
+certificate configured does, and 2019 and 2022 on Linux do not. **No
 test of this release logs in as an Entra principal**, and the server says
 so at start, once for each such connection. A managed identity finds its
 host's endpoint from the environment, which is how the platform offers
 it: off Azure it failed to get a token in 0.00 to 0.02 s on a Windows 11
 host and in 4.53 to 6.37 s in the server image's base under Docker
 Desktop (measured on 2026-10-17, the token alone), inside the driver's
-15 s connect timeout. Every entry refuses a key it does not read, so a
-file with a stray key stops the process, naming the key ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
+15 s connect timeout. In a pod where AKS workload identity sets
+`AZURE_FEDERATED_TOKEN_FILE`, the library would log in as the
+environment's tenant, client and authority instead, so the server does not
+start with a managed identity entry there, and a service principal is the
+way in. Every entry refuses a key it does not read, so a file with a stray
+key stops the process, naming the key ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 
 **Without the store and the allowlist the server verifies tokens and
 nothing else**, which is how a host is wired in before any form exists. The

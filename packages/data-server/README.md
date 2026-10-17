@@ -449,9 +449,9 @@ no user or password:
 
 **No test of this release logs in as an Entra principal.** No container
 takes an Entra login and no test asks Entra: the tests show that a SQL
-Server 2022 container refuses one, that nothing is tried again as a SQL
-login, and that no secret, tenant or client reaches the log, an answer or
-an audit event. The server logs at start, once for each such connection,
+Server 2025 container started with a certificate refuses one over TDS 8.0,
+that nothing is tried again as a SQL login, and that no secret, tenant or
+client reaches the log, an answer or an audit event. The server logs at start, once for each such connection,
 "No test of this release logs in as an Entra principal; connection erp
 logs in as one.", and the README's *What it is tested on* says so too
 ([0074](../../docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
@@ -463,10 +463,19 @@ logs in as one.", and the README's *What it is tested on* says so too
   user-assigned identity; without it the host's own logs in.
 - **The secret is a reference**, `env:NAME` or `file:/absolute/path`, read
   where the connection is first opened, as a password is. A managed
-  identity has none.
-- **TLS stays on and checked.** An Entra entry refuses `tls.enabled: false`
-  and `tls.trustServerCertificate: true`: its token is a bearer token for
-  every database the principal reaches. A server whose certificate is
+  identity has none. A secret file that cannot be read is named in the log
+  line that says the connection could not be opened, as a password's is;
+  a resolved secret's path is written nowhere.
+- **TDS 8.0, and the certificate checked.** An Entra login opens the
+  connection with TLS, before the first TDS message, so there is no
+  unencrypted exchange for whoever answers in the server's place to
+  decline TLS in; the server's certificate is checked. An Entra entry
+  refuses `tls.enabled: false` and `tls.trustServerCertificate: true`:
+  its token is a bearer token for every database the principal reaches.
+  The database must take TDS 8.0: Microsoft documents it for Azure SQL and
+  SQL Server 2022 and later, and of the images measured on 2026-10-17
+  SQL Server 2025 with a certificate configured took it, and 2019 and 2022
+  on Linux reset the connection. A server whose certificate is
   self-signed, or re-signed by a proxy, cannot be reached as one.
 - **The public cloud.** The token is asked for Azure SQL's resource,
   `https://database.windows.net/.default`, and no other, whatever the
@@ -477,7 +486,17 @@ logs in as one.", and the README's *What it is tested on* says so too
   `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` or
   `AZURE_AUTHORITY_HOST`. @azure/identity and MSAL still read the region,
   the proxy and `AZURE_LOG_LEVEL` for any credential, and a managed
-  identity finds its platform's endpoint there.
+  identity finds its platform's endpoint there. **The server does not
+  start with a managed identity entry while `AZURE_FEDERATED_TOKEN_FILE`
+  is set**, naming the connection and the variable: in a pod where AKS
+  workload identity sets it, the library would log in by workload
+  identity, as the tenant, client and authority the environment names,
+  which this release does not take. A service principal is the way in
+  there.
+- **One credential for each connection**, built when it is first opened
+  and kept, with the token it caches, while its secret is the same: a
+  connection opened again after a failed open asks Entra for no new token
+  until that one is due to be refreshed.
 - **A failed login says why** in one sentence, with Entra's AADSTS code
   when it gave one, and nothing of the principal; the connection test
   answers 503 and the log line says the sentence. A managed identity off

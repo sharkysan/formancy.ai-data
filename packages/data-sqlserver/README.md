@@ -30,14 +30,22 @@ const pool = await connectSqlServer({ host, port, database, encrypt: true, trust
 
 **No test of this release logs in as either**, which `SQLSERVER_LOGINS`
 says and the README's tested-on table derives from it: no container takes
-an Entra login, and no test asks Entra. The pool is given one credential,
-built when it is opened, which asks Entra for Azure SQL's token,
-`https://database.windows.net/.default`, and refuses any other resource a
-server names. A service principal's authority is the public cloud's,
-written down, so `AZURE_AUTHORITY_HOST` is never read. An Entra principal
-without `encrypt` is refused before anything is opened, and a failed login
-rejects with a sentence, with Entra's AADSTS code when it gave one, that
-names no tenant, client or secret. The options are plain strings, so no
+an Entra login, and no test asks Entra. **An Entra pool is TDS 8.0**,
+`encrypt: 'strict'` whatever `encrypt: true` would otherwise mean: TLS
+before the first TDS message, with the server's certificate checked, so
+nothing of the login crosses before a handshake with a server the host
+trusts. The server must take TDS 8.0; of the images measured on
+2026-10-17, SQL Server 2025 with a certificate configured did, and 2019
+and 2022 on Linux reset the connection. An Entra principal without
+`encrypt`, or with `trustServerCertificate`, is refused before anything
+is opened. The pool is given one credential for the `entra` object it was
+opened with -- open another pool with the same object and it gets the
+same credential and the token it caches -- which asks Entra for Azure
+SQL's token, `https://database.windows.net/.default`, and refuses any
+other resource a server names. A service principal's authority is the
+public cloud's, written down, so `AZURE_AUTHORITY_HOST` is never read. A
+failed login rejects with a sentence, with Entra's AADSTS code when it
+gave one, that names no tenant, client or secret. The options are plain strings, so no
 `@azure` type is in this package's declarations; `@azure/identity` is its
 dependency at exactly 4.13.3, the copy tedious already installs
 ([0074](../../docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).

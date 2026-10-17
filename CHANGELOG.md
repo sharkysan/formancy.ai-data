@@ -269,17 +269,29 @@ later.
   Why: an Azure SQL database set to Entra-only authentication has no SQL
   login to give, so the allowlist could not name it at all. **No test of
   this release logs in as either**: no container takes an Entra login and
-  no test asks Entra, so the tests show only that a SQL Server 2022
-  container refuses one, that nothing is tried again as a SQL login and
-  that no secret, tenant or client reaches a log, an answer or an audit
-  event. The server says so at start, once for each such connection, and
-  the README's *What it is tested on* says so in a row of its own,
-  derived from the adapter. The credential is built once for each pool
-  and asked for Azure SQL's token alone, whatever resource the server
-  names; an Entra entry refuses TLS turned off, a trusted server
-  certificate, a tenant named by its domain and a secret that is not a
-  reference; and a failed login says why in a sentence, with Entra's
-  AADSTS code when it gave one, and nothing of the principal
+  no test asks Entra, so the tests show only that a SQL Server 2025
+  container started with a certificate refuses one, that nothing is tried
+  again as a SQL login and that no secret, tenant or client reaches a log,
+  an answer or an audit event. The server says so at start, once for each
+  such connection, and the README's *What it is tested on* says so in a
+  row of its own, derived from the adapter. **An Entra login goes over TDS
+  8.0** (`encrypt: 'strict'`): TLS before the first TDS message, with the
+  server's certificate checked. Why: with TDS 7's `encrypt: true`, TLS
+  starts only if the server's first answer asks for it, so whoever
+  answered in the server's place could decline it and be sent the token,
+  as review showed. The database must take TDS 8.0, which Microsoft
+  documents for Azure SQL and SQL Server 2022 and later, and of the images
+  measured SQL Server 2025 with a certificate configured did and 2019 and
+  2022 on Linux did not. The credential is built once for each connection,
+  kept with the token it caches across a failed open, and asked for Azure
+  SQL's token alone, whatever resource the server names; an Entra entry
+  refuses TLS turned off, a trusted server certificate, a tenant named by
+  its domain and a secret that is not a reference; the server does not
+  start with a managed identity entry while `AZURE_FEDERATED_TOKEN_FILE`
+  is set, under which the library would log in by AKS workload identity as
+  the environment's tenant, client and authority; and a failed login says
+  why in a sentence, with Entra's AADSTS code when it gave one, and
+  nothing of the principal
   ([0074](docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md);
   the data server's README has the entry's shape).
   New exports of `@formancy/data-sqlserver`: `SQLSERVER_LOGINS`, and the
@@ -408,7 +420,8 @@ later.
   string no longer compiles, and a `ConnectionFactory` of your own is
   given its secret as `string | undefined`: a password, a client secret,
   or none for a managed identity. `connectSqlServer` takes `user` and
-  `password` or `entra`, and refuses `entra` without `encrypt` (0074).
+  `password` or `entra`, refuses `entra` without `encrypt` or with
+  `trustServerCertificate`, and opens an Entra pool over TDS 8.0 (0074).
 - **For embedders**: `ServerIdentity` now extends `ServerFacts`, so a
   `DatabaseAdapter` of your own must report `product` and `major`, and for
   SQL Server `compatibility`, from `ping` -- a breaking change for an
@@ -726,8 +739,15 @@ the file; and what Excel shows of it -- the byte-order mark, a `;` locale,
 What logging in as an Entra principal costs, in 0074: no test logs in as
 one, so a partner makes the first successful login, and nothing shows a
 token refreshed, a pool outliving its token, Azure SQL's resource passing
-the guard or a managed identity's endpoint on any host; a new dependency,
+the guard, Azure SQL taking TDS 8.0 or a managed identity's endpoint on
+any host; only a server that takes TDS 8.0 can be reached as one, so SQL
+Server 2019 and 2022 on Linux, as measured, cannot; a new dependency,
 moved by hand; an allowlist with a stray key no longer starts the server;
+a managed identity cannot log in where AKS workload identity sets
+`AZURE_FEDERATED_TOKEN_FILE`, and the check is the runnable server's, not
+an embedder's; a connection's cached token outlives a change to the
+principal in Entra until it is refreshed; a secret file that cannot be read is
+named in the log, as a password's is;
 an embedder's `ConnectionConfig.user` is no longer always a string; what
 @azure/identity and MSAL read from the environment -- the region, the
 proxy, the log level, a managed identity's platform -- is outside the
@@ -741,7 +761,10 @@ connect timeout, and a host that drops packets to the metadata address
 was not measured; only the public cloud, and only a tenant's id; no
 Entra login to a server whose certificate the operator must trust; and
 the README's row calls the SQL login tested from a value typed in the
-adapter, since no server record says which login a test made.
+adapter, since no server record says which login a test made. A SQL
+login still goes over TDS 7, whose TLS whoever answers in the server's
+place can decline and be sent the LOGIN7, its password in it, as before
+this release.
 
 ## 0.1.0 — 2026-10-16
 

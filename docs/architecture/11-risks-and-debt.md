@@ -135,12 +135,17 @@ A SQL Server connection may log in as an Entra managed identity or
 service principal, and no test logs in as either: a partner makes the
 first successful login, and nothing shows a token refreshed, a pool
 outliving its token or Azure SQL's resource passing the guard. Only the
-public cloud is reached, an Entra entry refuses a certificate the operator
-must trust, a login refused after its pool opened is `unavailable` with
+public cloud is reached, only over TDS 8.0, which SQL Server 2019 and 2022
+on Linux do not take, an Entra entry refuses a certificate the operator
+must trust, a managed identity cannot log in where AKS workload identity
+is turned on, a login refused after its pool opened is `unavailable` with
 no reason in discovery's log line, and what @azure/identity reads from the
 environment -- the region, the proxy, the log level, a managed identity's
 platform -- is outside the reviewed allowlist
-([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
+([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)). A SQL login still goes over TDS 7, whose TLS whoever
+answers in the server's place can decline and be sent the LOGIN7, its
+password in it, as review showed on 2026-10-17; 0074 does not change
+that.
 PostgreSQL 14 and older and SQL Server 2017 and older are not
 images of the matrix, and on PostgreSQL 18 a cascaded table's AFTER DELETE
 trigger runs with its owner's grants, so it does a delete 15 to 17 refuse

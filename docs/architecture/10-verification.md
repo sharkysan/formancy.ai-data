@@ -201,7 +201,10 @@ and each of these fails on the change that breaks what it holds:
   `scripts/live-demo.test.mjs` for the live demo's Worker config, deploy
   and headers, `scripts/live-demo-docs.test.mjs` for what the README says
   of it, and `scripts/live-demo-gate/*.test.mjs` for its gate's pure parts
-  ([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
+  ([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md));
+  `scripts/server-start.test.mjs` for what the built server says and
+  refuses at start about the Entra connections in its allowlist
+  ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 - **The release.** `scripts/release-report/*.test.mjs`: the report, the
   registers and what a publish refuses;
   `scripts/release-notes.test.mjs`: each changelog section a release could
@@ -418,10 +421,13 @@ and a number typed here would drift from the next run.
   another.
 - **No test logs in as an Entra principal.** A SQL Server connection may
   log in as an Entra managed identity or service principal, and the tests
-  show only that a SQL Server 2022 container refuses one, that nothing is
-  tried again as a SQL login and that nothing of the principal is
-  written; the token's path is reached by a unit test alone. Nothing
-  verifies that an Entra login succeeds
+  show only that a SQL Server 2025 container started with a certificate
+  refuses one over TDS 8.0, that the run's image of the matrix resets the
+  connection before any login, that nothing is tried again as a SQL login
+  and that nothing of the principal is written; what the driver sends
+  first is shown by a listener that answers nothing, and the token's path
+  is reached by a unit test alone. Nothing verifies that an Entra login
+  succeeds
   ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 - **No gate is required before a merge.** Every gate reports on every pull
   request and fails a release; what stops a red one from being merged is

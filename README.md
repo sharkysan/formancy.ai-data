@@ -151,11 +151,12 @@ until then the address is formancy.ai's 404
   tested on its strength
   ([0073](./docs/decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md)).
   A SQL Server connection may log in as an Entra managed identity or
-  service principal instead of a SQL login, its credential built once for
-  each pool and asked for Azure SQL's token alone. No test logs in as
-  either: the server says so at start for each such connection, and
-  [*What it is tested on*](#what-it-is-tested-on) says so in a row of its
-  own ([0074](./docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
+  service principal instead of a SQL login, over TDS 8.0 with the server's
+  certificate checked, which SQL Server 2019 and 2022 on Linux do not take,
+  its credential built once for each connection and asked for Azure SQL's
+  token alone. No test logs in as either: the server says so at start for
+  each such connection, and [*What it is tested on*](#what-it-is-tested-on)
+  says so in a row of its own ([0074](./docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 - **Generates a form deterministically**, and says what it inferred, made
   read-only, excluded and blocked, and why
   ([0009](./docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)).
