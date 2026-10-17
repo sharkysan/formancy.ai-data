@@ -3,7 +3,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription as computeDescription } from 'dom-accessibility-api'
 import { createDataClient } from '@formancy/data-client'
 import { focusedName } from './test-accessible.js'
-import { answer, answeredOnce, chooseForm, chooseRenderer, formLink, gridSection, mount, newRecord, rendered, searchRecords, shows, signIn, stamp, unsavedNotice } from './test-host.js'
+import { answer, answeredOnce, chooseForm, chooseRenderer, formLink, gridSection, gridStatus, mount, newRecord, rendered, searchRecords, shows, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
@@ -205,7 +205,7 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     await user.clear(within(search).getByRole('textbox', { name: 'Search' }))
     await user.type(within(search).getByRole('textbox', { name: 'Search' }), `${stamp}nothing`)
     await user.keyboard('{Enter}')
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe(`No records match “${stamp}nothing”.`), { timeout: 15_000 })
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`No records match “${stamp}nothing”.`), { timeout: 15_000 })
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Clear search' }))
     expect(focusedName()).toBe('Search')
     expect((within(search).getByRole('textbox', { name: 'Search' }) as HTMLInputElement).value).toBe('')
@@ -243,16 +243,16 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     const search = screen.getByRole('search', { name: 'Search records' })
     await user.type(within(search).getByRole('textbox', { name: 'Search' }), stamp)
     await user.click(within(search).getByRole('button', { name: 'Search' }))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe('Rows 1–50; more follow.'), { timeout: 15_000 })
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 1–50; more follow.'), { timeout: 15_000 })
     const previous = within(gridSection('Records')).getByRole('button', { name: 'Previous rows' })
     expect(previous.getAttribute('aria-disabled')).toBe('true')
     const lists = (): Array<Record<string, unknown>> => plane.sent.filter((request) => request.path === `/v1/forms/${engine.formId}/records/list`).map((request) => JSON.parse(request.body ?? '{}') as Record<string, unknown>)
     const before = lists().length
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Next rows' }))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe('Rows 51–53.'), { timeout: 15_000 })
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 51–53.'), { timeout: 15_000 })
     expect(within(gridSection('Records')).getByRole('button', { name: 'Next rows' }).getAttribute('aria-disabled')).toBe('true')
     await user.click(previous)
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe('Rows 1–50; more follow.'), { timeout: 15_000 })
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 1–50; more follow.'), { timeout: 15_000 })
     expect(lists().slice(before).map((body) => body['offset'])).toEqual([50, 0])
   })
 
@@ -276,10 +276,10 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     const user = mount(fetch)
     await signIn(user, TOKENS.clerk)
     await user.click(await formLink(engine.formId))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe('The database cannot be reached. Nothing was saved.'), { timeout: 15_000 })
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('The database cannot be reached. Nothing was saved.'), { timeout: 15_000 })
     expect(gridSection('Records').textContent).not.toMatch(/Row data is loading|ERR|No Rows To Show|Loading\.\.\./)
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Ask again' }))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toMatch(/^Rows 1–/), { timeout: 15_000 })
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toMatch(/^Rows 1–/), { timeout: 15_000 })
   })
 
   // Separate views: Enter opens the record view, the address says so, and
@@ -314,6 +314,6 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     await user.click(screen.getByRole('radio', { name: 'Side by side' }))
     await user.click(screen.getByRole('button', { name: 'Go to its row' }))
     await waitFor(() => expect(focusedName()).toBe('Records'))
-    expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe(`Record ${record} is not on this page.`)
+    expect(gridStatus('Records')?.textContent).toBe(`Record ${record} is not on this page.`)
   })
 })

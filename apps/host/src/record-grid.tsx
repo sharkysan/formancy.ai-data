@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import type { ReactElement, ReactNode } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import type { GridApi, IRowNode } from 'ag-grid-community'
-import type { DataClient, PublishedForm, RecordListQuery } from '@formancy/data-client'
+import type { DataClient, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { answered, CANNOT_OPEN, createDatasource, loading } from './grid-datasource.js'
 import type { DatasourceHooks, GridColumn, GridRow } from './grid-datasource.js'
@@ -52,6 +52,8 @@ export interface RecordGridHandle {
   say(line: Said): void
   /** A record gone from the grid: the page asked for again, and `line` said once, before its sentence. */
   removed(line: Said): void
+  /** The sort the grid last asked for a page in: what a file of its records is sorted by, so the file is in the order the grid shows (0080). */
+  sort(): ListSortTerm[]
 }
 
 export interface RecordGridProps {
@@ -125,6 +127,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   const [status, setStatus] = useState<Status>({ kind: 'loading', text: [quiet ? '' : loading(0, LIST_PAGE_SIZE, props.noun)], help: null, clear: false, retry: false })
   const [pager, setPager] = useState({ page: 0, hasMore: false })
   const shown = useRef({ rows: 0, loaded: false, sized: false, quiet, retrying: false })
+  /** The sort of the last page asked for: AG Grid's, as the datasource sent it. */
+  const sorted = useRef<ListSortTerm[]>([])
   /** What a record gone from the grid says before the next page's sentence, once. */
   const removedLine = useRef<Said | null>(null)
   /** The sentence of a page, after the removal said first if there is one -- which it then is not again. */
@@ -181,7 +185,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
 
   const hooks = useMemo<DatasourceHooks>(
     () => ({
-      loading: (start, end) => {
+      loading: (start, end, sort) => {
+        sorted.current = sort
         shown.current.loaded = false
         api.current?.setGridAriaProperty('busy', 'true')
         const words = shown.current.quiet ? '' : loading(start, end - start, latest.current.noun)
@@ -257,6 +262,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         removedLine.current = line
         api.current?.purgeInfiniteCache()
       },
+      sort: () => sorted.current,
     }),
     [firstColumn],
   )

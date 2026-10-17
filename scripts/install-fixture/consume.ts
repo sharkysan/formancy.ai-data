@@ -6,7 +6,7 @@
  * is on trial is that the published entry points resolve, with the types that
  * shipped. Connecting to a database is the integration suites' business.
  */
-import { createDataClient, EXPORT_MAX_BYTES, fieldProblems, LIST_PAGE_SIZE, lookupSources, sourceNames } from '@formancy/data-client'
+import { createDataClient, EXPORT_MAX_BYTES, exportFileName, fieldProblems, LIST_PAGE_SIZE, lookupSources, sourceNames } from '@formancy/data-client'
 import type { DeleteOutcome, FormMenu, Outcome, PublishedForm, RecordFile, RecordList, Refusal } from '@formancy/data-client'
 import { DATABASE_KINDS, isDatabaseKind, reachesPast } from '@formancy/data-core'
 import type { CascadeRule, DatabaseAdapter, DatabaseKind, FormPolicy } from '@formancy/data-core'
@@ -118,7 +118,8 @@ const deleted: DeleteOutcome = await deleteClient.delete('order', { record: 'k1:
 if (!deleted.ok || deleted.value.record !== 'k1:7' || deleted.value.deleted !== true) throw new Error('delete() did not read the deletion')
 
 // A file of records (0079): the client's exportRecords, its answer's type
-// and the size budget it re-exports, through the published entry points --
+// and the size budget and file name it re-exports -- the name a page says
+// before the file arrives (0080) -- through the published entry points --
 // read from a stub that answers as the server does, so the published code's
 // own check of the content type, and the name it saves under, are on trial.
 // The bytes are compared, not Blob.text(), which takes the byte-order mark off.
@@ -131,6 +132,7 @@ const exportClient = createDataClient({
 const file: Outcome<RecordFile> = await exportClient.exportRecords('order', { search: 'Muster' })
 const bytes = file.ok ? Buffer.from(await file.value.file.arrayBuffer()) : Buffer.alloc(0)
 if (!file.ok || file.value.name !== 'order.csv' || !bytes.equals(Buffer.from(csv, 'utf8')) || !Number.isSafeInteger(EXPORT_MAX_BYTES)) throw new Error('exportRecords() did not read the file')
+if (exportFileName('order') !== file.value.name) throw new Error('exportFileName() is not the name exportRecords() saves under')
 
 // What a delete may act through (0051): a policy that names a key with its
 // action, typed by what the published core declares, and the core's own

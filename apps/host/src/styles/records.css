@@ -22,6 +22,7 @@
    section has its own New. */
 .section-head {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
@@ -32,6 +33,25 @@
 .section-head > :first-child {
   flex: 1 1 8rem;
   min-width: 0;
+}
+
+/* Download CSV's line (0080): a row of its own under the head, its words
+   under the button, so a sentence arriving moves no button. Empty, it is
+   out of the flow and still in the tree: a live region is there before it
+   speaks, and an empty one takes no room. A head that wraps keeps its
+   height (`flex: none` above) where a panel shrinks its grid instead. */
+.export-line {
+  flex: 1 0 100%;
+  text-align: end;
+}
+
+.export-line:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* Search at the start, where the range is said and the pages turned at the

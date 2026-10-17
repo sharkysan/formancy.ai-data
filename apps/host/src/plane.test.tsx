@@ -4,7 +4,7 @@ import { PREFIX } from '@formancy/data-live-demo/worker'
 import { ROUTE_OPERATIONS } from '@formancy/data-server'
 import { demoSession } from './demo.js'
 import { demoDoor } from './test-demo.js'
-import { answer, answeredOnce, chooseCustomer, chooseForm, chooseRenderer, gridSection, load, loaded, mount, newRecord, rendered, said, save, searchRecords, shows, signIn, signInAs, stamp } from './test-host.js'
+import { answer, answeredOnce, chooseCustomer, chooseForm, chooseRenderer, exportButton, exportLine, gridSection, keeping, load, loaded, mount, newRecord, rendered, said, save, searchRecords, shows, signIn, signInAs, stamp } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane, Sent } from './test-plane.js'
 
@@ -19,7 +19,7 @@ import type { Plane, Sent } from './test-plane.js'
  * package rather than listed here: a route the server adds is one the page
  * may send, and one the page sends that the table does not have fails --
  * the delete route included, which the page sends since 0053, from its
- * confirmation in place.
+ * confirmation in place, and the export, since 0080, from Download CSV.
  *
  * And through both doors the page has: its own origin, as a host serves
  * it, and the live demo's path, behind the demo's Worker (0070), where the
@@ -51,15 +51,6 @@ function pattern(route: string): RegExp {
 
 const ROUTES = Object.entries(ROUTE_OPERATIONS).map(([route, operation]) => ({ route, operation, matches: pattern(route) }))
 
-/**
- * Operations the server has and the page has no control for yet, so the
- * journey cannot send them: the export (0079), whose button is the next pull
- * request's, as the delete route was 0050's until 0053 gave the page one.
- * The journey is held to send none of them, so the exception fails the
- * moment the page sends one and has to go.
- */
-const NOT_YET_SENT = new Set(['export'])
-
 /** Every key anywhere in a parsed body, nested ones included. */
 function keys(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(keys)
@@ -89,10 +80,12 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     const words = stamp('plane')
     const door = demo ? demoDoor(plane) : undefined
     const base = door === undefined ? '' : PREFIX
-    const user = door === undefined ? mount(plane.fetch) : mount(door.fetch, { base, session: demoSession(door.fetch, base) })
+    const { save: keep, saved } = keeping()
+    const user = door === undefined ? mount(plane.fetch, { save: keep }) : mount(door.fetch, { base, session: demoSession(door.fetch, base), save: keep })
     // The whole journey: the menu, a form and its list, a create through a
-    // lookup's search, an update, a search for what the create typed, and
-    // its row opened -- its lines listed, a label resolved -- and deleted.
+    // lookup's search, an update, a search for what the create typed, the
+    // file of what it found, and its row opened -- its lines listed, a label
+    // resolved -- and deleted.
     if (door === undefined) await signIn(user, TOKENS.clerk)
     else await signInAs(user, 'Clara')
     await chooseForm(user, formId)
@@ -114,6 +107,9 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // Its own row, found by the words typed into it -- the grid shows a
     // page, and the database holds every file's orders -- and opened.
     await searchRecords(user, words, [record.slice(3)])
+    await user.click(exportButton('Records'))
+    await waitFor(() => expect(exportLine('Records').textContent).toBe(`Made ${formId}.csv; your browser saves it.`), { timeout: 15_000 })
+    expect(saved.map((file) => file.name)).toEqual([`${formId}.csv`])
     const created = recordRows().find((row) => within(row).getAllByRole('gridcell')[0]?.textContent === record.slice(3)) as HTMLElement
     await user.click(within(created).getAllByRole('gridcell')[1] as HTMLElement)
     await waitFor(() => expect(screen.getByRole('region', { name: 'Order line' })).toBeTruthy(), { timeout: 15_000 })
@@ -146,9 +142,10 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     expect(sent.map(line).filter((said) => !ROUTES.some(({ matches }) => matches.test(said)))).toEqual([])
     // And the journey used every one of them, so the table is not satisfied
     // by a page that did less (watched failing with 0050's exception for the
-    // delete route removed before the page had a control: delete unused).
-    expect(ROUTES.filter(({ operation, matches }) => !NOT_YET_SENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
-    expect(ROUTES.filter(({ operation, matches }) => NOT_YET_SENT.has(operation) && sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
+    // delete route removed before the page had a control: delete unused;
+    // and with 0079's for the export removed before Download CSV: export
+    // unused).
+    expect(ROUTES.filter(({ matches }) => !sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
 
     // Only the forms the menu named: a form is asked for by the id the
     // server listed, never one the page made up.
