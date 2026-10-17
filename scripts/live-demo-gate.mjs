@@ -33,8 +33,8 @@
 //     answer, the Durable Object's alarm forgets the key, and two sign-ins
 //     at once start one new container, with a new key: the old token
 //     refused, the created order gone, the generated data there.
-//  8. The page in Chromium (live-demo-gate/browser.mjs), under the demo's
-//     path with its headers, against the same Worker and image.
+//  8. The page in Chromium (apps/host/scripts/browser/demo.mjs), under the
+//     demo's path with its headers, against the same Worker and image.
 //
 // It prints the measurements as Markdown, and on GitHub appends them to the
 // job summary. It removes every container it started and the image it
@@ -57,8 +57,17 @@ const repo = join(dirname(fileURLToPath(import.meta.url)), '..')
 const pure = await import('../apps/live-demo/dist/worker/pure.mjs')
 const { IDENTITY_SECRET_VARIABLE, NOT_RUNNING, PER_TENANT, PREFIX, SERVER_PORT } = pure
 
-/** The image's build, uncached, took 53-56 s on 2026-10-16; the limit is about ten times that, for a machine with nothing cached. */
-const BUILD_LIMIT = 10 * 60_000
+/**
+ * How long a build may take before the gate ends it: about three times
+ * (2.9) the slowest the image's build was measured, 313,851 ms, by this
+ * gate with the install's layer not cached, on the Windows workstation with
+ * Docker Desktop on 2026-10-17; built with --no-cache and the base images
+ * already pulled it took 53.1 and 56.4 s on 2026-10-16
+ * (deploy/demo/Dockerfile's header). Not measured on CI, where it stays
+ * under the live-demo job's 20 minutes so that a slow build ends with this
+ * gate's report rather than the job's.
+ */
+const BUILD_LIMIT = 15 * 60_000
 
 /** A command of the gate's own, its output shown as it comes; resolves when it ends, rejects when it fails or outlives `limit`. */
 function command(file, args, { limit = BUILD_LIMIT, cwd = repo } = {}) {
