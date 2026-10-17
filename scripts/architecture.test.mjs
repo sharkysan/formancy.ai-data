@@ -23,9 +23,9 @@ import YAML from 'yaml'
  *   package is placed in section 5 by the pull request that adds it;
  * - a decision record that no section links to, so that a new record is
  *   placed in the architecture by the pull request that writes it;
- * - a relative link in the entry or a section that names no file git would
- *   commit, or a fragment that names no heading of the Markdown file it
- *   points into, as GitHub anchors headings;
+ * - a relative link in the entry, a section or docs/setup.md that names no
+ *   file git would commit, or a fragment that names no heading of the
+ *   Markdown file it points into, as GitHub anchors headings;
  * - a repository path written in backticks that names nothing git would
  *   commit. What counts as a path is `isRepositoryPath`, tested below: a
  *   code span with no space in it, holding a slash, whose first segment is a
@@ -339,6 +339,14 @@ function pathProblems(file, markdown, files) {
 /** The entry and every Markdown file in docs/architecture/, by path. */
 const documents = () => [ENTRY, ...listing(ARCHITECTURE).filter((entry) => entry.isFile() && entry.name.endsWith('.md')).map((entry) => `${ARCHITECTURE}/${entry.name}`)]
 
+/**
+ * Pages beside the architecture whose links and paths these rules hold too:
+ * the setup guide, which sends a maintainer to settings by heading, once,
+ * where a link that leads nowhere is found by nobody. What else it names is
+ * scripts/setup.test.mjs's.
+ */
+const ALSO_HELD = ['docs/setup.md']
+
 describe('the architecture', () => {
   // A reader told the architecture is arc42 looks for a section by its
   // number. One missing, renamed, or never linked from the entry is a
@@ -381,7 +389,7 @@ describe('the architecture', () => {
   // and reads as true in the source.
   test('links only to files git would commit, and to headings they have', () => {
     const files = committable()
-    expect(documents().flatMap((file) => linkProblems(file, textOf(file) ?? '', files, textOf))).toEqual([])
+    expect([...documents(), ...ALSO_HELD].flatMap((file) => linkProblems(file, textOf(file) ?? '', files, textOf))).toEqual([])
   })
 
   // The sections name the module a step happens in, by its path, far more
@@ -389,7 +397,7 @@ describe('the architecture', () => {
   // pointing at nothing, and the sentence around it reads as true.
   test('names in backticks only repository paths git would commit', () => {
     const files = committable()
-    expect(documents().flatMap((file) => pathProblems(file, textOf(file) ?? '', files))).toEqual([])
+    expect([...documents(), ...ALSO_HELD].flatMap((file) => pathProblems(file, textOf(file) ?? '', files))).toEqual([])
   })
 
   // A guard on the guard: each check above is about absence, so a walk that

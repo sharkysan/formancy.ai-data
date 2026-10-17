@@ -19,6 +19,11 @@ deployment of it.
 | The examples page, `apps/examples` | Workers Builds, from `main` | served at formancy.ai/data/examples/ | `scripts/demo.test.mjs`; `scripts/demo.mjs` refuses before it deploys |
 | The live demo: the Worker of `apps/live-demo`, the image of `deploy/demo/Dockerfile` and the host page's demo build | Workers Builds, from `main`; the image also by the `live-demo` job on every pull request | served at formancy.ai/data/demo/, the image pushed to the Cloudflare account's registry | `scripts/live-demo.test.mjs`; `pnpm test:live-demo`; `scripts/live-demo.mjs` refuses before it deploys |
 
+What each of these needs set up outside the repository's files -- the
+release's secrets and environment, the image's visibility, Cloudflare's
+plan and the two Workers -- is [the setup guide](../setup.md): in order,
+who does each step, and what was found done when it was last read.
+
 **The server image** has two stages on Node's alpine image. The build stage
 installs the server's workspace dependencies against the lockfile with
 `--ignore-scripts`, builds them, copies `LICENSE.md` and `NOTICE` into each

@@ -49,8 +49,9 @@ told
 `scripts/architecture.test.mjs`, in `pnpm test:repo`, fails when a section
 file or this entry is missing, when a workspace package or app is not named
 in [the building blocks](architecture/05-building-blocks.md), when a
-decision record is cited by no section, when a relative link here or in a
-section does not reach a file or a heading GitHub would give it, and when
+decision record is cited by no section, when a relative link here, in a
+section or in [the setup guide](setup.md) does not reach a file or a
+heading GitHub would give it, and when
 a repository path a section writes in backticks names nothing in the
 repository. Whether a sentence is still true of what it names is held by
 review.
@@ -70,6 +71,7 @@ with a link, and does not restate it. These documents do the same.
 | | |
 |---|---|
 | [Getting started](getting-started.md) | From an empty machine with Docker and git to a published form on both engines; CI runs it as written |
+| [Setting it up](setup.md) | What is set up outside the repository's files -- GitHub's settings and secrets, the image's visibility, Cloudflare's plan and Workers -- in order, who does each step, and what was found done |
 | [Deploying behind Cloudflare](deploy/cloudflare.md) | The composed stack behind a Cloudflare Tunnel and Access, what Cloudflare cannot do here, and what nobody has measured |
 | [Performance](performance.md) | What each measured request costs through the shipped server on both engines, rendered from [the committed results](performance/results.json) with the machine, the size and the date |
 | [The release report](release/README.md) | What every run of the gates reports about itself, what fails it, and what a release does with it |

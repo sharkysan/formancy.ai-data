@@ -440,6 +440,15 @@ later.
   once in CI. That case -- the next lookup and its one run more both
   stopped, and the lookup refused, as 0061 states -- is now a case of its
   own, each request held at a gate of its own.
+- **For maintainers**: [`docs/setup.md`](docs/setup.md) says, on one page and
+  in order, what is set up outside the repository's files -- GitHub's
+  settings and secrets, the image's visibility, Cloudflare's plan and both
+  demos' Workers -- who does each step, what was found done on 2026-10-17,
+  and why billing, the Wrangler login and connecting Cloudflare to GitHub
+  need a person. Until now it was spread over `.github/REPO-METADATA.md`
+  and `RELEASING.md`, which it links rather than repeats.
+  `scripts/setup.test.mjs` holds the Workers, scripts and Wrangler it names
+  to the code, and `scripts/architecture.test.mjs` its links and paths.
 - **For contributors**: `pnpm test:pictures` and `pnpm test:browser` find
   Playwright's browsers where `PLAYWRIGHT_BROWSERS_PATH` puts them, as
   Playwright's own image does at `/ms-playwright`. turbo runs both in strict
