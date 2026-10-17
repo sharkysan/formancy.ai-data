@@ -15,6 +15,7 @@ import { createSession } from './session.js'
 import type { SaveResult } from './session.js'
 import { useAfterRender } from './after-render.js'
 import { DeleteRegion } from './delete-confirm.js'
+import { DownloadCsv } from './download.js'
 import { useDeleteFlow } from './delete-flow.js'
 import { detailTarget, gone, rowTarget, SAVE_OUT } from './deletion.js'
 import type { DeleteTarget } from './deletion.js'
@@ -53,6 +54,13 @@ type ChildOpen = null | { kind: 'new' } | { kind: 'record'; token: string }
  * Where the child form offers delete, a child row is deleted from its own
  * detail's header or from its row, after a confirmation in place, as the
  * record is (0053); then the keyboard goes to this section's heading.
+ *
+ * Under a saved parent its head offers Download CSV (0080): the child form's
+ * file of that parent's rows, in the grid's sort, the parent's column kept,
+ * so the file says whose rows they are. A new parent has no rows to give.
+ * The section is drawn only for a child whose `list` this person is offered
+ * -- the workspace leaves any other out when the form is chosen -- so the
+ * button asks nothing more of the definition.
  */
 export function ChildSection({
   client,
@@ -250,6 +258,7 @@ export function ChildSection({
             New {title}
           </button>
         ) : null}
+        {parent.kind === 'record' ? <DownloadCsv client={client} formId={child.form} idBase={`${headingId}-export`} query={() => ({ search: '', sort: grid.current?.sort() ?? [], parent: { field: child.field, record: parent.token } })} /> : null}
       </div>
       {waiting ? (
         <p role="status" id={`${headingId}-waiting`} className="status" data-kind="loading">

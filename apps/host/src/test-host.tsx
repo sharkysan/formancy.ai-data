@@ -7,6 +7,7 @@ import { userEvent } from '@testing-library/user-event'
 import { getRole, isInaccessible } from 'dom-accessibility-api'
 import type { DemoSession } from './demo.js'
 import { Host } from './host.js'
+import type { SaveFile } from './save-file.js'
 import type { Plane } from './test-plane.js'
 import { TOKENS } from './test-plane.js'
 
@@ -35,17 +36,35 @@ export function servedDocument(): void {
   document.title = served.title
 }
 
+/** A file the page handed over to be saved: what Download CSV gives the browser (0080). */
+export interface Saved {
+  file: Blob
+  name: string
+}
+
 /**
  * The page, mounted where index.html mounts it, in a `#root`, as the studio's
  * suite does and for its reason. With `page`, as main.tsx mounts the live
  * demo's build (0070): its routes under `base`, and its people to sign in as.
+ *
+ * And `save`, what the page does with a file it made: jsdom has no
+ * `URL.createObjectURL`, so the browser's own download is the browser
+ * gate's, and here every file is handed to `save` instead -- by default
+ * kept nowhere, for a suite that does not look at it.
  */
-export function mount(fetch: typeof globalThis.fetch, page: { base?: string; session?: DemoSession } = {}): User {
+export function mount(fetch: typeof globalThis.fetch, page: { base?: string; session?: DemoSession; save?: SaveFile } = {}): User {
   servedDocument()
   const root = document.createElement('div')
   root.id = 'root'
-  render(<Host fetch={fetch} {...page} />, { container: document.body.appendChild(root) })
+  const { save = () => {}, ...rest } = page
+  render(<Host fetch={fetch} {...rest} save={save} />, { container: document.body.appendChild(root) })
   return userEvent.setup()
+}
+
+/** A `save` for `mount` that keeps every file the page saves, in order. */
+export function keeping(): { save: SaveFile; saved: Saved[] } {
+  const saved: Saved[] = []
+  return { saved, save: (file, name) => void saved.push({ file, name }) }
 }
 
 const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -74,11 +93,30 @@ export async function chooseForm(user: User, formId: string): Promise<void> {
   await answeredOnce('Records')
 }
 
+/**
+ * The status line of the grid `heading` names: the first status in its
+ * section with no name of its own. Download CSV's line comes before it, in
+ * the section's head, and is named by its button (0080).
+ */
+export function gridStatus(heading: string): HTMLElement | undefined {
+  return within(gridSection(heading)).getAllByRole('status', { name: '' })[0]
+}
+
+/** Download CSV's line in the section `heading` names: the status its button names. */
+export function exportLine(heading: string): HTMLElement {
+  return within(gridSection(heading)).getByRole('status', { name: 'Download CSV' })
+}
+
+/** Download CSV in the section `heading` names. */
+export function exportButton(heading: string): HTMLElement {
+  return within(gridSection(heading)).getByRole('button', { name: 'Download CSV' })
+}
+
 /** Wait until the status line of the grid named `heading` says something other than that it is loading. */
 export async function answeredOnce(heading: string): Promise<string> {
   let said = ''
   await waitFor(() => {
-    const status = within(gridSection(heading)).getAllByRole('status')[0]
+    const status = gridStatus(heading)
     said = status?.textContent ?? ''
     expect(said === '' || /^Loading/.test(said), `the ${heading} grid still says "${said}"`).toBe(false)
   }, ARRIVES_WITHIN)

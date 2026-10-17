@@ -77,16 +77,19 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > a 0.1.0 server ignores those keys and refuses an Entra entry for want of
 > a user and a password
 > ([0074](./docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md));
-> and a SQL login that asks for TLS refused, before its login is sent,
+> a SQL login that asks for TLS refused, before its login is sent,
 > when whoever answers in the server's place says it will not encrypt,
 > where a 0.1.0 server sends that login, its password in it, unencrypted
-> ([0081](./docs/decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)),
+> ([0081](./docs/decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md));
+> and the host page's Download CSV, in the head of the Records panel and
+> of each child section, which saves the CSV file of what the grid lists
+> through the browser and needs a server that makes it
+> ([0080](./docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
-> page of records, a file of them, the menu of forms or a delete, a button
-> on the host page that downloads a file, a host page that draws a
-> field an update may not write as read-only
+> page of records, a file of them, the menu of forms or a delete, a host
+> page that draws a field an update may not write as read-only
 > ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
 > a host page on another origin run in a browser, a run through a real
 > Cloudflare tunnel, anything that reads what Cloudflare sends at the
@@ -299,9 +302,10 @@ until then the address is formancy.ai's 404
   beside its key, and a cell a spreadsheet would read as a formula carries
   one apostrophe in front, which taking one off every cell that has one
   undoes. It is not the table at one moment: a record two pages would both
-  show refuses the file, and a row deleted meanwhile can be missing. The
-  host page has no button for it yet
+  show refuses the file, and a row deleted meanwhile can be missing
   ([0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+  The host page saves it from the grid that lists the records, with
+  Download CSV ([0080](./docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)).
 - **A record can be deleted, one at a time, by its token and the version its
   person read**, under the policy's `operations.delete`, granted only to
   roles that may read and scoped as an update is, in one guarded statement
@@ -572,6 +576,21 @@ records and the record are side by side, stacked, or separate views, and
 the address says which form and layout, never which record. Open by record
 token loads one by its token.
 
+Download CSV, beside New record in the Records panel and beside each child
+section's New, saves one file of the records that grid lists, as the server
+makes it: the search you submitted, not what the box holds, the grid's
+sort and, in a child section, its record, whose column the file keeps
+([0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md),
+[0080](./docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)). It is there wherever the form's records can be listed,
+and not under a record not saved yet. While the file is made its line says
+so and a press sends nothing; once it is made the line names it and the
+browser saves it as `<form id>.csv`; a refusal is the server's sentence,
+and pressing again asks again. Leaving the form or signing out stops a
+file in the making without a word, and so does opening another record for
+its child sections' files. The line names the file, not how many
+records it holds, and says the page handed it over, not that the browser
+kept it.
+
 Where the server offers you delete, the open record's header has Delete
 record, a child row's its own Delete, and each grid row a Delete button
 named for its record, which the arrow keys reach without making the grid
@@ -617,7 +636,8 @@ Of the host page's suites and checks, only that picture's check below holds
 the page to it, and on PostgreSQL alone
 ([0038](./docs/decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 
-What it does not do yet: no bulk delete and no undo; and on a loaded
+What it does not do yet: no bulk delete and no undo, no file of a record
+and all its children at once; and on a loaded
 record it draws the fields an update may not write --
 Customer, Order date, Amount and Created by for the order form's own
 account -- as editable, and the server refuses a changed one, which is
@@ -677,7 +697,8 @@ real drivers, with literal tokens and a `fetch` that goes through
 `FORMANCY_BROWSERS=all` in Firefox and WebKit too, as CI's legs do, against
 the real server on PostgreSQL, which needs Docker: the workspace in every
 layout down to 320 pixels, the grids' keyboard and colours, the record's
-journey, and a delete's confirmations and answers.
+journey, a delete's confirmations and answers, and a file downloaded, its
+bytes the server's.
 
 The page has a second build, for the [live demo](#live-demo):
 `pnpm --filter @formancy/data-host build:demo` writes it to

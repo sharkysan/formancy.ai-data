@@ -3,7 +3,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { getRole } from 'dom-accessibility-api'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { focusedName, paragraphs } from './test-accessible.js'
-import { answer, answeredOnce, chooseForm, chooseRenderer, gridSection, mount, rendered, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
+import { answer, answeredOnce, chooseForm, chooseRenderer, gridSection, gridStatus, mount, rendered, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, holdingRequests, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -158,7 +158,7 @@ describe.each(ENGINES)("a row's Delete on $engine", (engine) => {
     await waitFor(() => expect(focusedName()).toBe(`Delete Order ${other}?`))
     await user.click(within(screen.getByRole('region', { name: `Delete Order ${other}?` })).getByRole('button', { name: 'Delete it' }))
     await waitFor(() => expect(focusedName()).toBe('Records'), ARRIVES)
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe(`Deleted Order ${other}. Rows 1–1.`), ARRIVES)
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`Deleted Order ${other}. Rows 1–1.`), ARRIVES)
     const deletes = plane.sent.slice(sent).filter((request) => request.path.endsWith('/records/delete'))
     expect(deletes.map((request) => JSON.parse(request.body ?? '{}'))).toEqual([{ record: other, version }])
     expect(screen.getByRole('heading', { level: 3, name: `Order ${open}` })).toBeTruthy()
@@ -201,15 +201,15 @@ describe.each(ENGINES)("a row's Delete on $engine", (engine) => {
     const user = await workspace(engine.formId)
     await user.type(screen.getByRole('textbox', { name: 'Search' }), notes)
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Search' }))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe(`Rows 1–${String(LIST_PAGE_SIZE)}; more follow.`), ARRIVES)
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`Rows 1–${String(LIST_PAGE_SIZE)}; more follow.`), ARRIVES)
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Next rows' }))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe(`Rows ${String(LIST_PAGE_SIZE + 1)}–${String(LIST_PAGE_SIZE + 1)}.`), ARRIVES)
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`Rows ${String(LIST_PAGE_SIZE + 1)}–${String(LIST_PAGE_SIZE + 1)}.`), ARRIVES)
     const last = within(gridSection('Records')).getAllByRole('button', { name: /^Delete Order k1:/ })
     expect(last).toHaveLength(1)
     const record = (last[0]?.getAttribute('aria-label') ?? '').slice('Delete Order '.length)
     await user.click(last[0] as HTMLElement)
     await user.click(within(screen.getByRole('region', { name: `Delete Order ${record}?` })).getByRole('button', { name: 'Delete it' }))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe(`Deleted Order ${record}. Rows 1–${String(LIST_PAGE_SIZE)}.`), ARRIVES)
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`Deleted Order ${record}. Rows 1–${String(LIST_PAGE_SIZE)}.`), ARRIVES)
     expect(within(gridSection('Records')).getByRole('button', { name: 'Previous rows' }).getAttribute('aria-disabled')).toBe('true')
     expect(await plane.db.countOrders(engine.connection, `${notes} ${String(LIST_PAGE_SIZE + 1)}`)).toBe(0)
   })
@@ -264,7 +264,7 @@ describe.each(ENGINES)("a row's Delete on $engine", (engine) => {
     await waitFor(() => expect(screen.queryByRole('heading', { level: 3, name: `Order ${first}` }) ?? unsavedNotice()).not.toBeNull(), ARRIVES)
     expect(unsavedNotice()).toBeNull()
     await held.pass()
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe(`Deleted Order ${other}. Rows 1–1.`), ARRIVES)
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`Deleted Order ${other}. Rows 1–1.`), ARRIVES)
     expect(await stored(engine.formId, other)).toBe(false)
   })
 
@@ -368,6 +368,6 @@ test("a child grid's row Delete asks under that grid, and the keyboard goes to i
   expect(within(region).getByRole('heading', { level: 5 }).textContent).toBe(`Delete Order line ${record},2?`)
   await user.click(within(region).getByRole('button', { name: 'Delete it' }))
   await waitFor(() => expect(focusedName()).toBe('Order line'), ARRIVES)
-  await waitFor(() => expect(within(gridSection('Order line')).getAllByRole('status')[0]?.textContent).toBe(`Deleted Order line ${record},2. Order line rows 1–1.`), ARRIVES)
+  await waitFor(() => expect(gridStatus('Order line')?.textContent).toBe(`Deleted Order line ${record},2. Order line rows 1–1.`), ARRIVES)
   expect(await stored(engine.lines, `${record},2`)).toBe(false)
 })

@@ -1,6 +1,7 @@
-import { forwardRef, useState } from 'react'
+import { useState } from 'react'
 import type { ReactElement, ReactNode, RefObject } from 'react'
 import type { DataClient, PublishedForm } from '@formancy/data-client'
+import { DownloadCsv } from './download.js'
 import type { GridColumn } from './grid-datasource.js'
 import { RecordGrid } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt, RowDelete } from './record-grid.js'
@@ -12,36 +13,56 @@ function listed(words: readonly string[]): string {
 
 /**
  * The Records panel (UX-SPEC §5.8): its heading, New record when the person
- * may create, the search, and the grid with its pager. A search is
+ * may create and Download CSV where the definition says the records can be
+ * listed (0080), the search, and the grid with its pager. A search is
  * submitted with the Search button or Enter, never per keystroke, and the
  * hint names the fields it looks in -- the server's `list.searchable`, by
- * their labels. No search form when nothing is searchable.
+ * their labels. No search form when nothing is searchable. A file is of
+ * what the grid lists: the search submitted, never what the box holds, and
+ * the grid's sort.
  */
-export const Records = forwardRef<
-  RecordGridHandle,
-  {
-    client: DataClient
-    formId: string
-    definition: PublishedForm
-    columns: readonly GridColumn[]
-    hidden: boolean
-    openToken: string | null
-    canCreate: boolean
-    headingRef: RefObject<HTMLHeadingElement | null>
-    newRef: RefObject<HTMLButtonElement | null>
-    searchRef: RefObject<HTMLInputElement | null>
-    search: string
-    /** How many times the separator has been let go: the grid's columns fit again each time. */
-    refit: number
-    onSearch: (search: string) => void
-    onNew: () => void
-    onOpen: (token: string, how: OpenHow, at: RowAt) => void
-    /** Where the form offers delete: each row's Delete (0053). */
-    remove: RowDelete | undefined
-    /** A row's delete confirmation, in place under the grid. */
-    after: ReactNode
-  }
->(function Records({ client, formId, definition, columns, hidden, openToken, canCreate, headingRef, newRef, searchRef, search, refit, onSearch, onNew, onOpen, remove, after }, grid): ReactElement {
+export function Records({
+  client,
+  formId,
+  definition,
+  columns,
+  hidden,
+  openToken,
+  canCreate,
+  gridRef: grid,
+  headingRef,
+  newRef,
+  searchRef,
+  search,
+  refit,
+  onSearch,
+  onNew,
+  onOpen,
+  remove,
+  after,
+}: {
+  client: DataClient
+  formId: string
+  definition: PublishedForm
+  columns: readonly GridColumn[]
+  hidden: boolean
+  openToken: string | null
+  canCreate: boolean
+  gridRef: RefObject<RecordGridHandle | null>
+  headingRef: RefObject<HTMLHeadingElement | null>
+  newRef: RefObject<HTMLButtonElement | null>
+  searchRef: RefObject<HTMLInputElement | null>
+  search: string
+  /** How many times the separator has been let go: the grid's columns fit again each time. */
+  refit: number
+  onSearch: (search: string) => void
+  onNew: () => void
+  onOpen: (token: string, how: OpenHow, at: RowAt) => void
+  /** Where the form offers delete: each row's Delete (0053). */
+  remove: RowDelete | undefined
+  /** A row's delete confirmation, in place under the grid. */
+  after: ReactNode
+}): ReactElement {
   const [typed, setTyped] = useState(search)
   const labels = new Map(columns.map((column) => [column.key, column.label]))
   const searchable = (definition.list?.searchable ?? []).map((key) => labels.get(key) ?? key)
@@ -81,6 +102,7 @@ export const Records = forwardRef<
             New record
           </button>
         ) : null}
+        {definition.list === null ? null : <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort: grid.current?.sort() ?? [], parent: null })} />}
       </div>
       <RecordGrid
         ref={grid}
@@ -107,4 +129,4 @@ export const Records = forwardRef<
       />
     </section>
   )
-})
+}

@@ -14,7 +14,8 @@ import { rulesReaching } from './styles.mjs'
 
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
 const grid = (page, name) => page.getByRole('grid', { name, exact: true })
-const status = (region) => region.getByRole('status').first()
+/** The grid's line: the region's first status with no name -- Download CSV's, before it, is named by its button (0080). */
+const status = (region) => region.getByRole('status', { name: /^$/ }).first()
 /** The order line form's paper in a renderer's pane. */
 const linePaper = (page, name) => page.getByRole('region', { name, exact: true }).getByRole('form', { name: `Order line, ${name}` })
 

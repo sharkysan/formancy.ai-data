@@ -61,6 +61,13 @@
 //     deleted", a record the delete could not find, "It may have been
 //     deleted" before and after its check, and the keyboard on the Records
 //     heading once the record is gone, the grid saying so;
+//   - Download CSV (0080): while the file is made the button is
+//     aria-disabled with the keyboard on it and pressing it again sends
+//     nothing; once it is made, Playwright's download event gives the file
+//     as <form id>.csv, the byte-order mark first and every byte what the
+//     server answers for the request the page sent, with no anchor of it
+//     left in the document -- the Records' file and an order's lines' --
+//     and a refusal is the server's sentence on the button's line;
 //   - the separator between the records and the record: a pointer drags it
 //     within its limits and the share is kept, and letting it go fits the
 //     grids' columns to the rows shown then -- a column a search filled
@@ -91,7 +98,8 @@
 //
 // One module per reason to change, under scripts/browser/: the plane, the
 // server of the built page, the stylesheet's reads, the measurements, the
-// workspace's states, the record's journey and a delete's states.
+// workspace's states, the record's journey, a delete's states and Download
+// CSV's.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
 // scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
@@ -108,6 +116,7 @@ import { startTcpHop } from '@formancy/data-fixtures'
 import { afterEveryPass, agGridRowProblem, environmentOf, focusScrollProblem, guardRequests, rowUnmeasured } from '../../../scripts/browser-gate.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { deleteJourney } from './browser/deleting.mjs'
+import { exportJourney } from './browser/exporting.mjs'
 import { recordJourney } from './browser/journey.mjs'
 import { audit, decide, describeFocus, focusedOn, focusScroll, measureWidth } from './browser/measure.mjs'
 import { startPlane } from './browser/plane.mjs'
@@ -203,7 +212,7 @@ async function run(gate, browser) {
         await measured(page, 'Signed out')
 
         const run = { record: await plane.order(2), customer: 9000 + pass, reached }
-        for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run)]) {
+        for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run), ...exportJourney(plane, gate, run)]) {
           await act(page)
           await measured(page, state)
         }
@@ -234,7 +243,7 @@ async function run(gate, browser) {
   // A failed check fails the run in recordedPerBrowser, which says so.
   if (gate.failures().length > 0) return
   console.log(
-    `browser checks passed: the host page's workspace, journey and deletes at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
+    `browser checks passed: the host page's workspace, journey, deletes and downloads at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
   )
 }
 

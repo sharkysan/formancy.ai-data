@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { focusedName } from './test-accessible.js'
-import { answer, formLink, gridSection, load, newRecord, openForm, shows, unsavedNotice } from './test-host.js'
+import { answer, formLink, gridSection, gridStatus, load, newRecord, openForm, shows, unsavedNotice } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane } from './test-plane.js'
 import type { Plane } from './test-plane.js'
@@ -150,7 +150,7 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
     const user = await openForm(plane, engine.formId)
     await load(user, EDGES.seededOrder)
     // The lines of the loaded order: the section is drawn again for each parent, so it is found again.
-    await waitFor(() => expect(within(gridSection('Order line')).getAllByRole('status')[0]?.textContent).toMatch(/^Order line rows 1–/), ARRIVES)
+    await waitFor(() => expect(gridStatus('Order line')?.textContent).toMatch(/^Order line rows 1–/), ARRIVES)
     const lines = gridSection('Order line')
     await user.click(within(lines).getByRole('button', { name: 'New Order line' }))
     const pane = await waitFor(() => screen.getByRole('region', { name: 'New Order line React' }), ARRIVES)

@@ -17,7 +17,8 @@ import { contrast, describeFocus, focusedOn, paintedWhere, parseColor, until, WI
 
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
 const grid = (page) => page.getByRole('grid', { name: 'Records', exact: true })
-const status = (page) => records(page).getByRole('status').first()
+/** The Records grid's line: the first status with no name -- Download CSV's, before it, is named by its button (0080). */
+const status = (page) => records(page).getByRole('status', { name: /^$/ }).first()
 const question = (page, record) => page.getByRole('region', { name: `Delete Order ${record}?`, exact: true })
 
 /** The row of the Records grid whose first cell says `first`. */

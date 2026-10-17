@@ -2,8 +2,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleName } from 'dom-accessibility-api'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
-import { answer, answerable, chooseCustomer, chooseForm, chooseRenderer, gridSection, load, mount, newRecord, notice, openForm, openWith, pane, paper, RENDERERS, said, save, shows, signIn, unknownNotice, unsavedNotice } from './test-host.js'
-import { EDGES, ENGINES, holdingWrites, losingWrites, startPlane, TOKENS } from './test-plane.js'
+import { answer, answerable, chooseCustomer, chooseForm, chooseRenderer, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, newRecord, notice, openForm, openWith, pane, paper, RENDERERS, said, save, shows, signIn, unknownNotice, unsavedNotice } from './test-host.js'
+import { EDGES, ENGINES, holdingRequests, holdingWrites, losingWrites, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 import { PREFERENCES } from './prefs.js'
 import { CHANGED_SINCE_UNKNOWN } from './session.js'
@@ -147,7 +147,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
 
     await load(user, EDGES.seededOrder)
     await shows('Angular', 'Customer', 'Muster AG')
-    await waitFor(() => expect(within(gridSection('Order line')).getAllByRole('status')[0]?.textContent).toMatch(/^Order line rows 1–/), { timeout: 15_000 })
+    await waitFor(() => expect(gridStatus('Order line')?.textContent).toMatch(/^Order line rows 1–/), { timeout: 15_000 })
     expect(await floor('a record and its lines')).toEqual(CLEAN('a record and its lines'))
 
     const lines = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
@@ -167,7 +167,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     refuse = true
     await user.type(screen.getByRole('textbox', { name: 'Search' }), 'placed')
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Search' }))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe('The database cannot be reached. Nothing was saved.'), { timeout: 15_000 })
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('The database cannot be reached. Nothing was saved.'), { timeout: 15_000 })
     expect(await floor('a refused list')).toEqual(CLEAN('a refused list'))
   })
 
@@ -196,7 +196,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await chooseRenderer(user)
     await user.type(screen.getByRole('textbox', { name: 'Search' }), notes)
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Search' }))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toBe('Rows 1–2.'), { timeout: 15_000 })
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 1–2.'), { timeout: 15_000 })
     const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
     await user.click(within(grid).getAllByRole('gridcell')[0] as HTMLElement)
     await screen.findByRole('heading', { level: 3, name: `Order ${kept}` }, { timeout: 15_000 })
@@ -241,7 +241,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await screen.findByRole('region', { name: `Cannot find Order ${other}` }, { timeout: 15_000 })
     expect(await floor('cannot find it')).toEqual(CLEAN('cannot find it'))
     await user.click(screen.getByRole('button', { name: 'Close the record' }))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toMatch(/^Closed Order /), { timeout: 15_000 })
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toMatch(/^Closed Order /), { timeout: 15_000 })
     expect(await floor('closed')).toEqual(CLEAN('closed'))
 
     const read = await plane.clerk.read(formId, kept)
@@ -265,8 +265,45 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     expect(await floor('may have been deleted, checked')).toEqual(CLEAN('may have been deleted, checked'))
     await user.click(screen.getByRole('button', { name: 'Delete it again' }))
     await user.click(within(screen.getByRole('region', { name: `Delete Order ${kept}?` })).getByRole('button', { name: 'Delete it' }))
-    await waitFor(() => expect(within(gridSection('Records')).getAllByRole('status')[0]?.textContent).toMatch(/^Deleted Order /), { timeout: 15_000 })
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toMatch(/^Deleted Order /), { timeout: 15_000 })
     expect(await floor('deleted')).toEqual(CLEAN('deleted'))
+  })
+
+  // Download CSV's states, each held to the floor (0080): a file in the
+  // making, its button aria-disabled and described by its line; made;
+  // refused in the server's words; and a line's file, under its order --
+  // where a busy button that lost its words, or a line named by nothing,
+  // turns up (watched failing with the words swapped for an ellipsis while
+  // the file is made: button-name, and the button unnamed).
+  test("passes the floor in a download's states", async () => {
+    let hold = true
+    const held = holdingRequests(plane.fetch, ({ path }) => hold && path.endsWith('/records/export'))
+    const user = mount(held.fetch, { save: keeping().save })
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, formId)
+    await chooseRenderer(user)
+    await user.click(exportButton('Records'))
+    await waitFor(() => expect(held.held).toHaveLength(1), { timeout: 15_000 })
+    expect(await floor('a file in the making')).toEqual(CLEAN('a file in the making'))
+    hold = false
+    await held.pass()
+    await waitFor(() => expect(exportLine('Records').textContent).toBe(`Made ${formId}.csv; your browser saves it.`), { timeout: 15_000 })
+    expect(await floor('a file made')).toEqual(CLEAN('a file made'))
+
+    plane.unreachable.add(connection)
+    try {
+      await user.click(exportButton('Records'))
+      await waitFor(() => expect(exportLine('Records').textContent).toBe('The database cannot be reached. Nothing was saved.'), { timeout: 15_000 })
+    } finally {
+      plane.unreachable.delete(connection)
+    }
+    expect(await floor('a file refused')).toEqual(CLEAN('a file refused'))
+
+    await load(user, EDGES.seededOrder)
+    await waitFor(() => expect(gridStatus('Order line')?.textContent).toMatch(/^Order line rows 1–/), { timeout: 15_000 })
+    await user.click(exportButton('Order line'))
+    await waitFor(() => expect(exportLine('Order line').textContent).toBe(`Made ${lines}.csv; your browser saves it.`), { timeout: 15_000 })
+    expect(await floor("a line's file made")).toEqual(CLEAN("a line's file made"))
   })
 
   // The server's refusal, in its words, where the person asked: a page that

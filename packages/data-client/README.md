@@ -52,8 +52,8 @@ only for an abort the caller asked for, with the AbortError it raised.
 The reply types — `FormMenu`, `FormMenuEntry`, `FormMenuChild`,
 `PublishedForm`, `FormRecord`, `RecordList`, `RecordListQuery`,
 `RecordExportQuery`, `ListSortTerm`, `ListColumns`, `LookupResult`,
-`LookupRow`, `FieldError` — and `LIST_PAGE_SIZE` and `EXPORT_MAX_BYTES`
-are re-exported from
+`LookupRow`, `FieldError` — and `LIST_PAGE_SIZE`, `EXPORT_MAX_BYTES` and
+`exportFileName` are re-exported from
 `@formancy/data-core`, where the server's handlers are checked against the
 same declarations. A form's `list`
 is `null` when the server would refuse this person a page, and otherwise
@@ -80,7 +80,10 @@ body
 It resolves to a `RecordFile`, `{ file, name }`: the server's bytes as a
 `Blob`, byte-order mark included, and `<form id>.csv`, taken from the form's
 id and not from `content-disposition`, which a page on another origin cannot
-read (0060). The server makes the file whole or refuses it with its own
+read (0060); `exportFileName(formId)` is that name, for a page that says it
+before the file arrives, as the host page's Download CSV does
+([0080](../../docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)).
+The server makes the file whole or refuses it with its own
 code -- `export-too-large` past `EXPORT_MAX_BYTES`, `export-timeout`,
 `export-busy`, `moved`, `unencodable` among them -- and the client adds two
 of its own: a 200 that is not `text/csv` is `unexpected`, and a body that

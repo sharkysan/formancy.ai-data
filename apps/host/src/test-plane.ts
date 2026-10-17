@@ -181,7 +181,8 @@ function injectingFetch(app: Awaited<ReturnType<typeof createDataServer>>, pendi
     for (const [name, value] of Object.entries(reply.headers)) {
       if (value !== undefined) answered.set(name, Array.isArray(value) ? value.join(', ') : String(value))
     }
-    return new Response(reply.statusCode === 204 ? null : reply.body, { status: reply.statusCode, headers: answered })
+    // The bytes as the server sent them: a file is compared byte for byte (0080).
+    return new Response(reply.statusCode === 204 ? null : new Uint8Array(reply.rawPayload), { status: reply.statusCode, headers: answered })
   }
 }
 
