@@ -40,7 +40,7 @@ told
 | [5. Building blocks](architecture/05-building-blocks.md) | Every package and app, what each may import, and what is inside each |
 | [6. Runtime view](architecture/06-runtime-view.md) | Discovery, generation, publication alone and under review, the menu, a page of records, a save, a delete, a lookup, drift |
 | [7. Deployment view](architecture/07-deployment-view.md) | What is built and released, the composed stack, Cloudflare as the edge, the examples page, the live demo, every setting, and what an operator needs to know |
-| [8. Cross-cutting concepts](architecture/08-crosscutting-concepts.md) | Exact values, fail closed, identifiers and bound values, secrets, identity and policy, concurrency, audit, errors, the user interface, licences, upstream |
+| [8. Cross-cutting concepts](architecture/08-crosscutting-concepts.md) | Exact values, fail closed, identifiers and bound values, secrets, identity and policy, concurrency, audit, errors, the user interface, licences, upstream, the pages' Content-Security-Policy |
 | [9. Quality requirements](architecture/09-quality-requirements.md) | Scenarios stated so that each can fail, each naming what fails |
 | [10. Verification](architecture/10-verification.md) | Real servers on both engines, the gates, what each proves, and what none of them sees |
 | [11. Risks and technical debt](architecture/11-risks-and-debt.md) | The riskiest pieces, the known limitations by area, the open release gates, and the accepted risks |

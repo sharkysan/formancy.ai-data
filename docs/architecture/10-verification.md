@@ -216,7 +216,14 @@ and each of these fails on the change that breaks what it holds:
   ([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md));
   `scripts/server-start.test.mjs` for what the built server says and
   refuses at start about the Entra connections in its allowlist
-  ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
+  ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md));
+  `scripts/web-policies.test.mjs` for the studio's and the host page's
+  Content-Security-Policies: each is 0069's with its named allowances and
+  holds exactly what its built page loads, `deploy/web/nginx.conf`'s map is
+  what the module writes, every location that serves files has a policy,
+  and nothing in the file keeps the header from a page -- read as nginx
+  reads it, not run in nginx
+  ([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 - **The release.** `scripts/release-report/*.test.mjs`: the report, the
   registers and what a publish refuses;
   `scripts/release-notes.test.mjs`: each changelog section a release could
@@ -271,8 +278,19 @@ such an address before any request exists, and its check names it
 ([0072](../decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
 A request only an interaction the gates do not perform makes is seen by
 nothing.
-It starts PostgreSQL alone, because layout, focus and colour do not depend on
-the engine.
+Each page is served with the Content-Security-Policy it is sent in
+production -- the examples page with the demo's headers, the studio and
+the host page with the policy `deploy/web/nginx.conf` sends them -- and the
+studio's and the host page's gates fail every state in which the browser
+refused anything under it, an event the document heard or a console line
+about the policy; each gate ends a pass with an inline script put in the
+page, which must be refused and heard, so a page served under no policy,
+or a listener that hears nothing, fails; and the host page's gate fails,
+once a run, when the page without its one allowance no longer has AG
+Grid's style elements refused
+([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
+The host page's gate starts PostgreSQL alone, because layout, focus and
+colour do not depend on the engine.
 
 Every check runs in Chromium, Firefox and WebKit, headless, in Playwright's
 builds, none skipped or loosened for a browser
@@ -331,6 +349,9 @@ runner's Compose and with the oldest release the guide names, so the
 guide's claim about that release fails here the day `compose.yaml` needs a
 newer one
 ([0032](../decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
+Its page check fails when nginx sends the studio or the host page another
+Content-Security-Policy than `scripts/web-policies.mjs` gives it, or none
+([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 `scripts/getting-started/steps.test.mjs` holds the guide's generated tables
 and Compose pin without Docker, and `apps/studio/src/guide.test.tsx` and
 `apps/host/src/guide.test.tsx` hold the controls it names. Not covered:

@@ -322,6 +322,14 @@ only on SIGHUP, which Windows cannot send
 A change to the default lookup deadline alone does not mark the published
 figures stale
 ([0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)).
+The studio's and the host page's Content-Security-Policies are sent by the
+composed stack's nginx; a deployment's own proxy sends them only if it
+copies them, nothing reads what it sends, and a host page on an origin of
+its own needs a `connect-src` the composed policy refuses. The host page's
+allows inline styles, for AG Grid's style elements, until a nonce per
+response takes their place; and a script an extension or a proxy injects
+into either page is refused, which only the console says
+([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 
 **What the tests do not reach.** The published figures describe one
 machine, with no TLS and warm caches, and leave out tails under an arrival

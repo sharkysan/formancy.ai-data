@@ -115,9 +115,17 @@ whose answer was lost is the client's to send again, with its own write id,
 never the proxy's
 ([0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md)). It
 sends no-sniff, no-referrer and no-framing headers, and its body limit is the
-server's own. It sends no Content-Security-Policy: React and Angular add
-inline styles at run time, and a policy no gate has seen working in a browser
-would be a claim nobody checked.
+server's own. It sends the studio and the host page, and every file under
+each, a Content-Security-Policy of the page's own: the examples page's, with
+inline styles allowed on the host page for the style elements AG Grid
+creates, from a map `node scripts/web-policies.mjs --write` writes and one
+`add_header` beside the others, so no location drops them; `/v1/`,
+`/health`, the redirects and the 404 carry none, and neither does the
+runtime door's server, which serves no file
+([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
+`scripts/web-policies.test.mjs` holds the file to the module, the browser
+gates hold the pages to the policies, and the getting-started gate holds
+nginx to sending them.
 
 **Secrets in a volume, generated.** `deploy/secrets.sh`, run by the one-shot
 `secrets` service, writes each password and key once, keeps what is there
@@ -510,6 +518,11 @@ the server's log says why
   by its documentation, not tried. An operator who wants no exports drops
   `POST /v1/forms/:id/records/export` at the proxy
   ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+- **A proxy of the operator's own copies each page's policy** from
+  `deploy/web/nginx.conf`, or the page has none; nothing reads what a
+  deployment sends. `'self'` there is its whole origin, and a host page on
+  an origin of its own (0060) needs a `connect-src` that names the
+  server's (0083).
 - **One export at a time per allowlisted connection in each replica**:
   each holds at most one of its pool's connections while a page runs,
   and up to about twice 16 MiB of memory while it is made; a file on its
