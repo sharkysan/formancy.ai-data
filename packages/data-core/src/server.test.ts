@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { serverName, serverStanding, SQLSERVER_RELEASES, TESTED_SERVERS } from './server.js'
+import { serverName, serverStanding, SQLSERVER_RELEASES, TESTED_SERVERS, UNTESTED_PRODUCTS } from './server.js'
 import type { ServerFacts } from './server.js'
 
 /**
@@ -80,9 +80,12 @@ describe('serverStanding on SQL Server', () => {
     })
   })
 
-  // Managed Instance answers ProductMajorVersion 16 on its current update
-  // policy, and no container answers its EngineEdition: read by the major
-  // alone it would be SQL Server 2022, tested, which no test ever ran.
+  // Managed Instance's update policy aligns it with SQL Server 2022 (16) or
+  // 2025 (17), both majors the release was tested on, and no container
+  // answers its EngineEdition: had it answered either major -- which
+  // ProductMajorVersion's documentation, for SQL Server alone, does not
+  // say -- a reading by the major alone would call it a tested SQL Server,
+  // which no test ever ran. The sweep under UNTESTED_PRODUCTS holds 17 too.
   test('calls Azure SQL Managed Instance not tested, though it answers a tested major', () => {
     expect(serverStanding('sqlserver', sqlserver(16, 160, 'azure-sql-managed-instance'))).toEqual({
       tested: false,
@@ -141,6 +144,47 @@ describe('serverName', () => {
     expect(serverName('sqlserver', sqlserver(12, 160, 'azure-sql-database'))).toBe('Azure SQL Database')
     expect(serverName('sqlserver', sqlserver(16, 160, 'azure-sql-managed-instance'))).toBe('Azure SQL Managed Instance')
     expect(serverName('sqlserver', sqlserver(16, 160, 'other'))).toBe('a server that speaks SQL Server’s protocol and is no SQL Server product Formancy Data knows')
+  })
+})
+
+describe('UNTESTED_PRODUCTS', () => {
+  // No test runs on Azure SQL Database or Managed Instance (0073), and the
+  // README's "Recognised, not tested" row is derived from this list. A
+  // product dropped from it -- an Azure product added to TESTED_SERVERS, a
+  // filter turned round -- would leave the README silent where 0073 says
+  // it speaks; a tested product in it would tell a buyer that PostgreSQL 17
+  // was not tested. `other` names no product, so it is never listed.
+  test('names Azure SQL Database and Azure SQL Managed Instance, and no product the release was tested on', () => {
+    expect(UNTESTED_PRODUCTS).toEqual([
+      { product: 'azure-sql-database', name: 'Azure SQL Database' },
+      { product: 'azure-sql-managed-instance', name: 'Azure SQL Managed Instance' },
+    ])
+  })
+
+  // The list and serverStanding must never disagree: the row says "not
+  // tested" from the list, the connection test and drift review from the
+  // standing. The cases above hold each Azure product at one major and
+  // level; this holds every listed product, on both engines, at every major
+  // SQLSERVER_RELEASES names -- Azure SQL Database's 12 among them -- and
+  // every major either engine was tested at, at none, and at every
+  // compatibility level from 100, the lowest Microsoft documents for
+  // Managed Instance, to 180, past 2025's 170, and at none. A standing that
+  // called an Azure product tested at any one of them -- Azure SQL Database
+  // at 12 and level 170, say, which the release was tested at neither of --
+  // would tell an Azure estate it was tested while the README says not.
+  test('lists only products serverStanding calls not tested at every major a SQL Server release or a tested engine names, at none, and at every compatibility level from 100 to 180 or none', () => {
+    const majors = [...new Set([...Object.keys(SQLSERVER_RELEASES).map(Number), ...TESTED_SERVERS.postgres.majors, ...TESTED_SERVERS.sqlserver.majors]), null]
+    const levels = [undefined, ...Array.from({ length: 9 }, (_, at) => 100 + at * 10)]
+    for (const { product } of UNTESTED_PRODUCTS) {
+      for (const kind of ['postgres', 'sqlserver'] as const) {
+        for (const major of majors) {
+          for (const compatibility of levels) {
+            const facts: ServerFacts = compatibility === undefined ? { product, major } : { product, major, compatibility }
+            expect(serverStanding(kind, facts).tested, `${product} ${String(major)} at ${String(compatibility)} on ${kind}`).toBe(false)
+          }
+        }
+      }
+    }
   })
 })
 

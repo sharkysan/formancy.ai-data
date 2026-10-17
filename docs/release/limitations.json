@@ -20,8 +20,8 @@
       ]
     },
     "0003": {
-      "reviewed": "sha256:c17e2c6e68afcf10009b7ee6f5d4adf9f355df8b6a4c82e960905e43d3bd1d70",
-      "none": "Its user-facing cost, that what is tested is the images of each engine's matrix and no other, is the report's tested-on section, derived from each run, and 0067's limitations."
+      "reviewed": "sha256:4800c48de296f1cc38f1f032c2f75c4f4aa58f1307a67f872d6cee248b195c65",
+      "none": "Its user-facing cost, that what is tested is the images of each engine's matrix and no other, is the report's tested-on section, derived from each run, and 0067's and 0073's limitations."
     },
     "0004": {
       "reviewed": "sha256:ca98cd0ed9328133061f0515d273f1173a03c6742880ed018581a29a6ba28a7d",
@@ -2352,6 +2352,36 @@
         {
           "area": "testing",
           "says": "That no page asks another host for anything is held by the browser gates for the states they reach and by a static read of each index.html and built stylesheet, not of the JavaScript, where the host page's bundle holds AG Grid's loader of Google's fonts, unused: a request only an interaction the gates do not perform makes, or a connection with no request, is seen by nothing."
+        }
+      ]
+    },
+    "0073": {
+      "reviewed": "sha256:ddac04a48a77c90e65d67fe71d558f39e788ce82ae85561e4ca5d92961b96b0c",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "Neither Azure SQL Database nor Azure SQL Managed Instance answered any test: SQL Server is tested in containers only, so discovery, the record operations, `rowversion`, triggers, row-level security and a lookup's cancellation are proved on neither."
+        },
+        {
+          "area": "databases",
+          "says": "Azure SQL Database and Azure SQL Managed Instance are called not tested at the major of every SQL Server release this release can name and every major either engine was tested at, at none, and at every compatibility level from 100 to 180, so an estate on either is told so by every connection test and, as `server-untested`, on every drift review of every form published from it.",
+          "heldBy": "packages/data-core/src/server.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "What Azure SQL answers -- `EngineEdition` 5 for Azure SQL Database and 8 for Managed Instance, and Azure SQL Database's `ProductVersion` 12.0 -- is taken from Microsoft's documentation and not measured here, so a service that answered otherwise would be read wrongly and nothing here would know; what either answers for `ProductMajorVersion`, which Microsoft documents for SQL Server alone, is not documented at all."
+        },
+        {
+          "area": "databases",
+          "says": "Every boxed SQL Server -- `EngineEdition` 2, 3 or 4, on any host, Windows or Linux, in any edition, SQL Server on Azure Virtual Machines among them -- is called tested when its release and its database's compatibility level are, though every test ran the Developer edition on Linux in a container."
+        },
+        {
+          "area": "operations",
+          "says": "Under Azure SQL's Redirect connection policy a client goes on from port 1433 to a port from 11000 to 11999, and a paused serverless database answers error 40613 while it resumes, both as Microsoft documents them; no test meets either, so what a connection test, a discovery or a record request answers then is not known."
+        },
+        {
+          "area": "databases",
+          "says": "An Azure database that accepts Entra logins only cannot be connected to: the allowlist takes a SQL login alone."
         }
       ]
     },

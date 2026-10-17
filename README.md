@@ -43,13 +43,18 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > nginx and the Cloudflare overlay's cloudflared, where a 0.1.0 server
 > counts everybody behind a proxy as one
 > ([0071](./docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md));
-> and the studio, the host page and the examples page serving their fonts
+> the studio, the host page and the examples page serving their fonts
 > from their own build, so that no page asks Google or any other host for
 > anything, where 0.1.0's pages ask Google for theirs
-> ([0072](./docs/decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)),
-> and a field moved to another generated section in the studio, which a
+> ([0072](./docs/decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md));
+> a field moved to another generated section in the studio, which a
 > 0.1.0 server refuses to read or import
-> ([0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md)),
+> ([0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md));
+> and saying, where 0.1.0 said nothing, that no test runs on Azure SQL
+> Database or Azure SQL Managed Instance, which
+> [*What it is tested on*](#what-it-is-tested-on) and the release's
+> register both name as not tested
+> ([0073](./docs/decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
@@ -104,6 +109,13 @@ and `pnpm demo` runs the same build from a clone
   being untested; a SQL Server older than 2019, whose catalog lacks a view
   discovery reads, is refused with its release named
   ([0068](./docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
+  No test runs on Azure SQL Database or Azure SQL Managed Instance:
+  neither has an image a test can start, and a snapshot of either is
+  called not tested. Every SQL Server test runs the Developer edition on
+  Linux in a container, and another edition or platform of a release the
+  matrix runs, SQL Server on Azure Virtual Machines among them, is called
+  tested on its strength
+  ([0073](./docs/decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md)).
 - **Generates a form deterministically**, and says what it inferred, made
   read-only, excluded and blocked, and why
   ([0009](./docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)).
@@ -816,6 +828,7 @@ says what an author and a publisher may each do, and what it costs).
 | --- | --- | --- |
 | **PostgreSQL** | `postgres:17-alpine`; `@formancy/data-fixtures` and `@formancy/data-postgres` also on `postgres:15-alpine`, `postgres:16-alpine` and `postgres:18-alpine`; an image outside the matrix that one file names shows only what that file shows |  |
 | **SQL Server** | `mcr.microsoft.com/mssql/server:2022-latest`; `@formancy/data-fixtures` and `@formancy/data-sqlserver` also on `mcr.microsoft.com/mssql/server:2019-latest` and `mcr.microsoft.com/mssql/server:2025-latest`; an image outside the matrix that one file names shows only what that file shows |  |
+| **Recognised, not tested** | None: Azure SQL Database and Azure SQL Managed Instance are recognised by a snapshot and called not tested |  |
 | `postgres`, by `@formancy/data-postgres` | 3.4.9 | `^3.4.9` |
 | `@fastify/rate-limit`, by `@formancy/data-server` | 11.2.0 | `^11.2.0` |
 | `fastify`, by `@formancy/data-server` | 5.12.5 | `^5.12.5` |

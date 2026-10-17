@@ -93,6 +93,35 @@ describe('the README blocks', () => {
     const unled = { ...facts, legs: facts.legs.filter((leg) => leg.image !== facts.matrix.postgres[1]) }
     expect(() => readmeTable(unled)).toThrow(`${facts.matrix.postgres[1]} is an image of the matrix that no leg of the test-images job runs`)
   })
+
+  // No test runs on Azure SQL Database or Managed Instance (0073). Before
+  // it the README named the images it was tested on and said nothing of
+  // them, which a buyer on Azure reads as a question answered; and a row
+  // typed by hand would go on saying "not tested" after a later record
+  // tested one. The row is data-core's UNTESTED_PRODUCTS, so it fails here
+  // the day either Azure product is called tested, and it never names a
+  // product an engine of TESTED_SERVERS was tested on. The row sits under
+  // the "Tested with" column, so its cell opens with "None": one that
+  // opened with the products' names would read, down that column, as
+  // products the release was tested with.
+  test('name Azure SQL Database and Azure SQL Managed Instance as recognised and not tested, from data-core, under "Tested with" as none', async () => {
+    const { TESTED_SERVERS, UNTESTED_PRODUCTS } = await import(pathToFileURL(join(repo, 'packages', 'data-core', 'dist', 'index.mjs')).href)
+    expect(facts.untested).toEqual(UNTESTED_PRODUCTS)
+    const table = readmeTable(facts).split('\n')
+    expect(table[0]).toBe('| | Tested with | Declared as |')
+    const row = table.find((line) => line.startsWith('| **Recognised, not tested** |'))
+    expect(row, 'the README table has no "Recognised, not tested" row').toBeDefined()
+    const [, testedWith, declaredAs] = row.slice(1, -1).split('|').map((text) => text.trim())
+    expect(testedWith).toMatch(/^None: /)
+    expect(declaredAs).toBe('')
+    expect(testedWith).toContain('Azure SQL Database')
+    expect(testedWith).toContain('Azure SQL Managed Instance')
+    const tested = new Set(Object.values(TESTED_SERVERS).map((entry) => entry.product))
+    expect(facts.untested.filter(({ product }) => tested.has(product))).toEqual([])
+    for (const { name } of facts.untested) expect(testedWith).toContain(name)
+    // A release tested on every product it recognises has nothing to say here, and says nothing rather than an empty row.
+    expect(readmeTable({ ...facts, untested: [] })).not.toContain('Recognised, not tested')
+  })
 })
 
 describe('the images', () => {

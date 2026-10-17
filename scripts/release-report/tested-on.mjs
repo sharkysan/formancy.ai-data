@@ -1,7 +1,8 @@
 // What this checkout is tested on, as far as the tree itself can say (0035):
 // the images the suites start unless a file names another, the matrix of
 // images the adapter suites and data-fixtures run on and the CI legs that
-// run them (0067), every runtime dependency a published package declares and
+// run them (0067), the products a snapshot recognises that no test runs on
+// (0073), every runtime dependency a published package declares and
 // the version the suites load, the upstream packages, Node, the build of each
 // browser the gates launch, and the tools.
 //
@@ -11,8 +12,9 @@
 // launched -- comes from that run's results, in the report; this is what the
 // README's generated table and the report's "range -> loaded" columns read.
 //
-// Run after `pnpm install` and `pnpm build`: the images and the engines come
-// from data-fixtures' and data-core's built output, the code that uses them.
+// Run after `pnpm install` and `pnpm build`: the images, the engines and the
+// untested products come from data-fixtures' and data-core's built output,
+// the code that uses them.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
@@ -205,7 +207,7 @@ export async function testedOn(root = repo) {
   const packages = workspace(root)
   const local = new Set(packages.map(({ manifest }) => manifest.name))
   const { DEFAULT_IMAGES, IMAGES_VARIABLE, MATRIX_IMAGES } = await built(root, 'packages/data-fixtures')
-  const { DATABASE_KINDS } = await built(root, 'packages/data-core')
+  const { DATABASE_KINDS, UNTESTED_PRODUCTS } = await built(root, 'packages/data-core')
   const rootManifest = readJson(join(root, 'package.json'))
   return {
     engines: [...DATABASE_KINDS],
@@ -215,6 +217,10 @@ export async function testedOn(root = repo) {
     matrix: Object.fromEntries(Object.entries(MATRIX_IMAGES).map(([engine, images]) => [engine, [...images]])),
     legs: imageMatrix(readWorkflow(root)),
     imagesVariable: IMAGES_VARIABLE,
+    // What a snapshot names a server as and serverStanding never calls
+    // tested, `{ product, name }`: Azure SQL Database and Managed Instance
+    // today (0073).
+    untested: UNTESTED_PRODUCTS.map(({ product, name }) => ({ product, name })),
     runtime: runtime(root, published(root), local),
     upstream: upstream(root, packages, local),
     node: {
