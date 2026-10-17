@@ -60,7 +60,7 @@
 //     more, and its two answers one under the other on a phone; "Not
 //     deleted", a record the delete could not find, "It may have been
 //     deleted" before and after its check, and the keyboard on the Records
-///     heading once the record is gone, the grid saying so;
+//     heading once the record is gone, the grid saying so;
 //   - Download CSV (0080): while the file is made the button is
 //     aria-disabled with the keyboard on it and pressing it again sends
 //     nothing; once it is made, Playwright's download event gives the file
