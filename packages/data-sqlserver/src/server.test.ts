@@ -28,10 +28,13 @@ describe('sqlServerRead', () => {
     for (const engineEdition of [2, 3, 4]) expect(sqlServerRead(answer({ engineEdition })).identity.product, String(engineEdition)).toBe('sqlserver')
   })
 
-  // EngineEdition before the major: Azure SQL Database answers 12, which is
-  // 2014 on a boxed server, and Managed Instance 16, which is 2022. A reader
-  // that went by the major would call Managed Instance tested 2022, and no
-  // container can answer either edition to catch it.
+  // EngineEdition before the major: Azure SQL Database's version is 12,
+  // which is 2014 on a boxed server, and Managed Instance's update policy
+  // aligns it with 2022 (16) or 2025 (17). The majors fed here are this
+  // file's, since Microsoft documents ProductMajorVersion for SQL Server
+  // alone. A reader that went by the major would call a Managed Instance
+  // answering 16 a tested 2022, and no container can answer either edition
+  // to catch it.
   test('reads Azure SQL Database and Managed Instance by EngineEdition, whatever major they answer', () => {
     expect(sqlServerRead(answer({ engineEdition: 5, version: '12.0.2000.8', majorVersion: '12' })).identity).toMatchObject({ product: 'azure-sql-database', major: 12 })
     expect(sqlServerRead(answer({ engineEdition: 8, version: '16.0.1135.2', majorVersion: '16' })).identity).toMatchObject({ product: 'azure-sql-managed-instance', major: 16 })

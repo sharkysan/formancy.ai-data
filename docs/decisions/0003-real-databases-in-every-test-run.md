@@ -1,6 +1,6 @@
 # 0003 — Database behaviour is proved against real servers, on both engines, in every run
 
-- **Status:** accepted; narrowed by [0067](0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md): the supported matrix is `MATRIX_IMAGES`, each engine's default first, and an image outside it that one file names is what that file showed, not a version a release was tested on; extended by [0073](0073-azure-sql-is-not-tested-and-the-release-says-so.md): Azure SQL Database, Azure SQL Managed Instance and SQL Server on an Azure VM, which no image here starts, are named as not tested in the README and the register
+- **Status:** accepted; narrowed by [0067](0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md): the supported matrix is `MATRIX_IMAGES`, each engine's default first, and an image outside it that one file names is what that file showed, not a version a release was tested on; extended by [0073](0073-azure-sql-is-not-tested-and-the-release-says-so.md): Azure SQL Database and Azure SQL Managed Instance, which no image here starts, are named as not tested in the README and the register
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-postgres/src/adapter.integration.test.ts`

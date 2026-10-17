@@ -100,19 +100,25 @@ describe('the README blocks', () => {
   // typed by hand would go on saying "not tested" after a later record
   // tested one. The row is data-core's UNTESTED_PRODUCTS, so it fails here
   // the day either Azure product is called tested, and it never names a
-  // product an engine of TESTED_SERVERS was tested on.
-  test('name Azure SQL Database and Azure SQL Managed Instance as recognised and not tested, from data-core', async () => {
+  // product an engine of TESTED_SERVERS was tested on. The row sits under
+  // the "Tested with" column, so its cell opens with "None": one that
+  // opened with the products' names would read, down that column, as
+  // products the release was tested with.
+  test('name Azure SQL Database and Azure SQL Managed Instance as recognised and not tested, from data-core, under "Tested with" as none', async () => {
     const { TESTED_SERVERS, UNTESTED_PRODUCTS } = await import(pathToFileURL(join(repo, 'packages', 'data-core', 'dist', 'index.mjs')).href)
     expect(facts.untested).toEqual(UNTESTED_PRODUCTS)
-    const row = readmeTable(facts)
-      .split('\n')
-      .find((line) => line.startsWith('| **Recognised, not tested** |'))
+    const table = readmeTable(facts).split('\n')
+    expect(table[0]).toBe('| | Tested with | Declared as |')
+    const row = table.find((line) => line.startsWith('| **Recognised, not tested** |'))
     expect(row, 'the README table has no "Recognised, not tested" row').toBeDefined()
-    expect(row).toContain('Azure SQL Database')
-    expect(row).toContain('Azure SQL Managed Instance')
+    const [, testedWith, declaredAs] = row.slice(1, -1).split('|').map((text) => text.trim())
+    expect(testedWith).toMatch(/^None: /)
+    expect(declaredAs).toBe('')
+    expect(testedWith).toContain('Azure SQL Database')
+    expect(testedWith).toContain('Azure SQL Managed Instance')
     const tested = new Set(Object.values(TESTED_SERVERS).map((entry) => entry.product))
     expect(facts.untested.filter(({ product }) => tested.has(product))).toEqual([])
-    for (const { name } of facts.untested) expect(row).toContain(name)
+    for (const { name } of facts.untested) expect(testedWith).toContain(name)
     // A release tested on every product it recognises has nothing to say here, and says nothing rather than an empty row.
     expect(readmeTable({ ...facts, untested: [] })).not.toContain('Recognised, not tested')
   })

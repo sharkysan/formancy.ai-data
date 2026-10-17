@@ -16,9 +16,10 @@ import type { DatabaseKind } from './adapter.js'
 /**
  * What a server is, as its adapter reads it: PostgreSQL by whether
  * `version()` calls it PostgreSQL, SQL Server by `EngineEdition`, which is
- * read before the major because Azure SQL Database answers 12 -- 2014 on a
- * boxed server -- and Managed Instance 16. `other` is a server that speaks
- * the engine's protocol and is none of these.
+ * read before the major because Azure SQL Database's version is 12 -- 2014
+ * on a boxed server -- and Managed Instance's update policy aligns it with
+ * 2022 or 2025, both tested. `other` is a server that speaks the engine's
+ * protocol and is none of these.
  */
 export type ServerProduct = 'postgresql' | 'sqlserver' | 'azure-sql-database' | 'azure-sql-managed-instance' | 'other'
 

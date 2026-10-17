@@ -35,9 +35,11 @@ const EDITIONS: Readonly<Record<number, ServerProduct>> = { 2: 'sqlserver', 3: '
  * decides from it whether this release was tested on the server.
  *
  * EngineEdition is read first, because the major means a release only on a
- * boxed server: Azure SQL Database answers 12, which a boxed server answers
- * as 2014, and Managed Instance 16. The major is `ProductMajorVersion`, the
- * server's own number, and none when it states none. The compatibility
+ * boxed server: Azure SQL Database's version is 12, which a boxed server
+ * answers as 2014, and Managed Instance's update policy aligns it with 2022
+ * or 2025. The major is `ProductMajorVersion`, the server's own number,
+ * which Microsoft documents for SQL Server alone, and none when it states
+ * none. The compatibility
  * level is the connected database's, which a database restored from an
  * older server keeps, and is left out when the server answered none.
  */

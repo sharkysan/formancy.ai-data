@@ -20,7 +20,7 @@
       ]
     },
     "0003": {
-      "reviewed": "sha256:ce5acafdeaeea90c73363625581f8a76d11243ea46c13cbd46cab94c7f933853",
+      "reviewed": "sha256:4800c48de296f1cc38f1f032c2f75c4f4aa58f1307a67f872d6cee248b195c65",
       "none": "Its user-facing cost, that what is tested is the images of each engine's matrix and no other, is the report's tested-on section, derived from each run, and 0067's and 0073's limitations."
     },
     "0004": {
@@ -2356,24 +2356,24 @@
       ]
     },
     "0073": {
-      "reviewed": "sha256:accb8dfe96a6d01920ff66a43099661f30bc51ae684a63bd1a4ef5d3a508db04",
+      "reviewed": "sha256:ddac04a48a77c90e65d67fe71d558f39e788ce82ae85561e4ca5d92961b96b0c",
       "limitations": [
         {
           "area": "databases",
-          "says": "No Azure SQL Database, Azure SQL Managed Instance or SQL Server on an Azure VM answered any test: SQL Server is tested in containers only, so discovery, the record operations, `rowversion`, triggers, row-level security and a lookup's cancellation are proved on none of them."
+          "says": "Neither Azure SQL Database nor Azure SQL Managed Instance answered any test: SQL Server is tested in containers only, so discovery, the record operations, `rowversion`, triggers, row-level security and a lookup's cancellation are proved on neither."
         },
         {
           "area": "databases",
-          "says": "Azure SQL Database and Azure SQL Managed Instance are called not tested at every major and compatibility level, so an estate on either is told so by every connection test and, as `server-untested`, on every drift review of every form published from it.",
+          "says": "Azure SQL Database and Azure SQL Managed Instance are called not tested at the major of every SQL Server release this release can name and every major either engine was tested at, at none, and at every compatibility level from 100 to 180, so an estate on either is told so by every connection test and, as `server-untested`, on every drift review of every form published from it.",
           "heldBy": "packages/data-core/src/server.test.ts"
         },
         {
           "area": "databases",
-          "says": "What Azure SQL answers -- `EngineEdition` 5 for Azure SQL Database and 8 for Managed Instance, and Azure SQL Database's `ProductVersion` 12.0 -- is taken from Microsoft's documentation and not measured here, so a service that answered otherwise would be read wrongly and nothing here would know."
+          "says": "What Azure SQL answers -- `EngineEdition` 5 for Azure SQL Database and 8 for Managed Instance, and Azure SQL Database's `ProductVersion` 12.0 -- is taken from Microsoft's documentation and not measured here, so a service that answered otherwise would be read wrongly and nothing here would know; what either answers for `ProductMajorVersion`, which Microsoft documents for SQL Server alone, is not documented at all."
         },
         {
           "area": "databases",
-          "says": "SQL Server on an Azure VM is called tested when its release and its database's compatibility level are, as SQL Server on any host is, though every test ran SQL Server on Linux in a container."
+          "says": "Every boxed SQL Server -- `EngineEdition` 2, 3 or 4, on any host, Windows or Linux, in any edition, SQL Server on Azure Virtual Machines among them -- is called tested when its release and its database's compatibility level are, though every test ran the Developer edition on Linux in a container."
         },
         {
           "area": "operations",
