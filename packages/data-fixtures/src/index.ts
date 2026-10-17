@@ -7,6 +7,7 @@ export {
   displayCase,
   driftingCase,
   edgeCase,
+  exportCase,
   filterCase,
   listCase,
   MODEL_CASES,
@@ -34,6 +35,8 @@ export { connectDocker } from './docker.js'
 export type { DockerContainer, DockerContainerFacts, DockerDaemon, DockerReader } from './docker.js'
 export { DRIFTING, driftingOn, runtimeOf, sharedDrifting } from './drifting.js'
 export type { DriftingCase, DriftSend, DriftVerdict } from './drifting.js'
+export { EXPORT_PARITY, EXPORT_ROWS } from './exports.js'
+export type { ExportCase } from './exports.js'
 export { LIST_PARITY, LIST_ROWS } from './lists.js'
 export type { ListCase } from './lists.js'
 export { readFixture, splitBatches } from './load.js'

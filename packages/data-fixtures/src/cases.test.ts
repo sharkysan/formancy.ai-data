@@ -9,6 +9,7 @@ import {
   displayCase,
   driftingCase,
   edgeCase,
+  exportCase,
   filterCase,
   listCase,
   MODEL_CASES,
@@ -24,6 +25,8 @@ import {
 import { DELETE_PARITY, UPDATE_RECREATED } from './deletes.js'
 import type { DeleteCase } from './deletes.js'
 import { sharedDrifting } from './drifting.js'
+import { EXPORT_PARITY } from './exports.js'
+import type { ExportCase } from './exports.js'
 import * as fixtures from './index.js'
 import { LIST_PARITY } from './lists.js'
 import type { ListCase } from './lists.js'
@@ -62,6 +65,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   UPDATE_RECREATED: [UPDATE_RECREATED_CASE],
   CASCADE_PARITY: (Object.keys(CASCADE_PARITY) as CascadeCase[]).map(cascadeCase),
   UUID_PARITY: (Object.keys(UUID_PARITY) as UuidCase[]).map(uuidCase),
+  EXPORT_PARITY: (Object.keys(EXPORT_PARITY) as ExportCase[]).map(exportCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
@@ -88,6 +92,7 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   SIZED_CHUNK_ROWS: 'how many rows one statement of the sized load carries',
   LIST_ROWS: "the rows the list suites insert; what a list shows of them is LIST_PARITY's",
   UUID_ROWS: "the rows the uuid suites insert; what the suites show of them is UUID_PARITY's",
+  EXPORT_ROWS: "the customers the server's export suite inserts, each with the cell a file writes for its name; a file's text is data-core's, the same on both engines once EXPORT_PARITY's values are",
   DELIVERIES: "the fixture's delivery keys, which UUID_PARITY's cases name",
   PARITY_CASCADES: "the keys CASCADE_PARITY's policy names; what a delete does through them is CASCADE_PARITY's",
   REACH_PRIVILEGE_LOSSES: "the grants reach-privilege takes away, each on both engines; what a delete answers then is CASCADE_PARITY's",

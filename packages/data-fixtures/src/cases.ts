@@ -7,6 +7,8 @@ import type { CascadeCase } from './cascades.js'
 import { DELETE_PARITY } from './deletes.js'
 import type { DeleteCase } from './deletes.js'
 import { sharedDrifting } from './drifting.js'
+import { EXPORT_PARITY } from './exports.js'
+import type { ExportCase } from './exports.js'
 import { LIST_PARITY } from './lists.js'
 import type { ListCase } from './lists.js'
 import type { FilterParityCase, RefusalParityCase } from './parity.js'
@@ -86,13 +88,17 @@ export const UPDATE_RECREATED_CASE = 'update: recreated'
 /** What a uuid key does end to end on each engine (0056), by the name of its entry in UUID_PARITY. */
 export const uuidCase = (name: UuidCase): string => `uuid: ${name}`
 
+/** What a file of a form's records holds on each engine (0079), by the name of its entry in EXPORT_PARITY. */
+export const exportCase = (name: ExportCase): string => `export: ${name}`
+
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
  * every filter, label, temporal read, refusal and edge value, then the two
  * shipments, then every change to a form's own table both engines run (0041),
  * then what a form scoped through a parent shows (0043), then what a list of
  * a form's records shows (0044), then what a delete does (0050) and what it
- * does past its record (0051), then what a uuid key does (0056).
+ * does past its record (0051), then what a uuid key does (0056), then what a
+ * file of a form's records holds (0079).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -113,6 +119,7 @@ export function sharedCases(): string[] {
     UPDATE_RECREATED_CASE,
     ...(Object.keys(CASCADE_PARITY) as CascadeCase[]).map(cascadeCase),
     ...(Object.keys(UUID_PARITY) as UuidCase[]).map(uuidCase),
+    ...(Object.keys(EXPORT_PARITY) as ExportCase[]).map(exportCase),
   ]
   const seen = new Set<string>()
   for (const id of ids) {

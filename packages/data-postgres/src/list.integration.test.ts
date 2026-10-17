@@ -1,6 +1,6 @@
-import { driftRefusal, generateForm, listTerms, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
+import { driftRefusal, exportColumns, exportHeader, exportRecord, generateForm, listTerms, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
 import type { FormBindings, FormPolicy, FormRecord, ListOutcome, MetadataSnapshot, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
-import { covers, FIXTURE_SCOPE, LIST_PARITY, LIST_ROWS, listCase, startPostgresFixture } from '@formancy/data-fixtures'
+import { covers, EXPORT_PARITY, exportCase, FIXTURE_SCOPE, LIST_PARITY, LIST_ROWS, listCase, startPostgresFixture } from '@formancy/data-fixtures'
 import type { PostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
@@ -253,5 +253,36 @@ describe('a key the table no longer holds', covers('postgres', listCase('key')),
     const dropped = await page()
     expect({ list: dropped.list?.code, read: dropped.read }).toEqual({ list: LIST_PARITY.key.refused, read: undefined })
     expect(() => recordPage(bindings, dropped.fields, dropped.outcome.rows, EVERY.limit)).toThrow('A record appears twice in one page')
+  })
+})
+
+describe('a file of shipments', covers('postgres', exportCase('shipments')), () => {
+  // A file is text, so where the engines spell a value their own way -- a
+  // double, a real, a zoneless timestamp's fraction (0026) -- a file from
+  // one would differ from the other's though their lists read alike. Built
+  // as the server builds one (0079), from the list and data-core's export,
+  // the bytes are EXPORT_PARITY's here and in the SQL Server suite.
+  // Watched failing with the timestamp written through displayText, which
+  // cuts its half second.
+  test("is the shipments' values as read, the same text on both engines", async () => {
+    const shipments = generateForm(snapshot, { connection: 'test', root: { schema: 'sales', name: 'shipment' }, formId: 'shipments', title: 'Shipments', lookups: [], pinned: ['tenant_id'] })
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: [], update: [] },
+      fields: { id: READ, tenant_id: READ, tracking_no: READ, carrier_code: READ, reference: READ, pickup_time: READ, dispatched_at: READ, weight_kg: READ, temperature_c: READ },
+      rowFilters: TENANT,
+      lookups: {},
+    }
+    const plan = planList(snapshot, shipments.bindings, policy, CLARA, EVERY)
+    if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
+    const outcome = await records.list(plan.request)
+    if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
+    const page = recordPage(shipments.bindings, plan.fields, outcome.rows, EVERY.limit)
+    expect(page.hasMore).toBe(false)
+    const columns = exportColumns(shipments.form, shipments.bindings, plan.fields)
+    const lines = [exportHeader(columns), ...page.rows.map((row) => exportRecord(columns, row, new Map()))]
+    const file = lines.map((line) => (line.ok ? line.text : line.message)).join('')
+    expect(file).toBe(EXPORT_PARITY.shipments)
+    expect(Buffer.from(file, 'utf8').equals(Buffer.from(EXPORT_PARITY.shipments, 'utf8'))).toBe(true)
   })
 })
