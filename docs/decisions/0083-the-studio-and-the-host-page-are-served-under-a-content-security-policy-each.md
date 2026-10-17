@@ -33,7 +33,26 @@
     91), which drops every add_header of its server there, the policy
     among them". Its cases plant the rest in a copy: a policy edited in
     the map by hand, a third location that serves files, a page's
-    location gone, `always` left out.
+    location gone, `always` left out. Since a review of this record, it
+    also fails a directive that moves a request under a page out of it --
+    an `error_page`, `try_files`, `rewrite` or `index` whose target is
+    outside the page's prefix, in the page's location, at its server's
+    level or at the file's -- and a location that answers neither with a
+    page's files, nor by forwarding to the data server, nor with a
+    redirect or an error. nginx chooses the header's value by the path an
+    answer is sent for: the review found that with `error_page 404
+    /missing.html;` in `location /host/` the web image's base answered
+    `/host/nope` with a 404 page and no policy while the guard passed it,
+    and the same image, run with this file on 2026-10-17, sent `/host/`
+    itself with none under `try_files $uri /index.html;`, `/studio/nope`
+    and `/host/nope` with none under a server-level `error_page 404
+    /404.html;`, and served a location with no handler from its own
+    `/etc/nginx/html`, while `error_page 404 /host/404.html;` kept the
+    policy. Each case failed before the guard read it -- "expected [] to
+    deeply equal" the sentence it names -- and each branch of the guard
+    has a case that fails when it is taken out. It reads those directives
+    of nginx.conf and nothing else: a module or an included file that
+    changes headers another way is not read.
   - **The studio's and the host page's browser gates, in every browser.**
     `apps/studio/scripts/browser/serve.mjs` and
     `apps/host/scripts/browser/serve.mjs` send every file with the
@@ -43,15 +62,18 @@
     fails any measured state -- every step of the studio's journey and of
     its states under review, every state of the host page's workspace,
     journey, deletes and downloads -- in which the browser refused
-    anything; and at the end of each pass puts an inline script in the
-    page, which must be refused and heard, so a pass under no policy, or
-    with a listener that hears nothing, fails. The host page's gate also
-    loads the page once a run under 0069's policy -- its own without the
-    allowance -- signs in, draws a form's records, and fails unless the
-    browser refused a style element: the allowance goes with the need for
-    it. The listener, the canary and the sentences they fail with are
-    `scripts/browser-gate.mjs`'s, which the examples page's gate now
-    uses too; `scripts/browser-gate.test.mjs` holds the sentences. Watched
+    anything, and fails what a document was refused after its last
+    measured state, read before the studio's review moves to its own
+    origin and before the end of each pass; and at the end of each pass
+    puts an inline script in the page, which must be refused and heard,
+    with nothing on the window before it that no check read, so a pass
+    under no policy, or with a listener that hears nothing, fails. The
+    host page's gate also loads the page once a run under 0069's policy --
+    its own without the allowance -- signs in, draws a form's records,
+    and fails unless the browser refused a style element: the allowance
+    goes with the need for it. The listener, the canary and the
+    sentences they fail with are `scripts/browser-gate.mjs`'s, which the
+    examples page's gate now uses too; `scripts/browser-gate.test.mjs` holds the sentences. Watched
     failing in Chromium 153.0.8010.12 on Windows 11 on 2026-10-17: with
     `<script>window.plantedByHand = true</script>` put in the studio's
     built `index.html`, every pass at its first state on each origin --
@@ -75,7 +97,32 @@
     studio's gate passed all 1,212 checks of a run and the host page's all
     2,249, in Chromium 153 and Firefox 155 on Windows 11 on 2026-10-17;
     the examples page's, on the shared listener and canary, its 175 in
-    each.
+    each. A review then found that what a document heard after its last
+    measured state was read by nothing: an inline style put in the
+    studio's page after its journey's last state was blamed, by its
+    console line alone, on "Submit, a draft submitted", the first state
+    on the review's origin, and one put there just before the canary
+    failed nothing. With the same two planted after the change, in
+    Chromium 153 on 2026-10-17, every pass failed "after the journey's
+    last state, the browser refused nothing under the page's policy:
+    style-src-elem refused inline (the page:1); the console said:
+    Applying inline style violates the following Content Security Policy
+    directive 'style-src 'self''" and "under review, after its last
+    state, ..." with the same words, 12 checks, and "Submit, a draft
+    submitted" passed; with those two checks taken out, the canary failed
+    "refused and heard, but before it the document had heard what no
+    check read: style-src-elem refused inline (the page:1)" in every
+    pass; and the host page's, with an inline
+    script put in its page after its last state, failed "after the last
+    state, the browser refused nothing under the page's policy:
+    script-src-elem refused inline (the page:1); the console said:
+    Executing inline script violates ..." in all 7 passes, in Chromium
+    153 on 2026-10-18. With those checks, the studio's gate passed all
+    1,224 checks of a run and the host page's all 2,256, in Chromium 153
+    and Firefox 155 on Windows 11 on 2026-10-18. A report still on its
+    way when a document's last read is made is heard by nothing: the
+    canary's took 0.5 to 7.1 ms in Chromium, measured by the examples
+    page's gate on 2026-10-16.
   - **The getting-started gate's page check** (`pageProblems` in
     `scripts/getting-started/stack.mjs`, for each page the module names):
     through the nginx the guide starts, each page is sent with exactly the
@@ -172,23 +219,30 @@ it.**
   `node scripts/web-policies.mjs --write` rewrites it, and the guard fails
   until it is.
 - **The runtime door's server, 8081, sends none:** it serves no file
-  (0037), and the guard holds every location that serves one.
+  (0037), and the guard holds every location of either server to a page's
+  files, the data server, a redirect or an error.
+- **Nothing moves a request out of its page.** nginx chooses the header's
+  value by the path an answer is sent for, so an `error_page`,
+  `try_files`, `rewrite` or `index` that sent a request under a page to a
+  path outside it would send that answer with another value or none; the
+  guard refuses one.
 
 ## Consequences
 
-**What it buys.** No script runs in the studio or the host page but one
-served from the stack's origin: one written into a page inline, whether by
-a flaw in the page, a proxy or an extension that writes a script element,
-is refused, and so is a load from any other host, a form sent elsewhere,
-and the pages framed. The studio holds an administrator's token, which
-publishes forms (0024); the host page a host's, which writes records
+**What it buys.** No script element runs in the studio or the host page
+but one served from the stack's origin: one written into a page inline,
+whether by a flaw in the page, a proxy or an extension, is refused, and
+so is a load from any other host, a form sent elsewhere, and the pages
+framed. The studio holds an administrator's token, which publishes forms
+(0024); the host page a host's, which writes records
 (0029): both are in memory, and in memory is where an injected script
 would read them. And the claim is the gates', in every browser: the policy
 the web image sends is the one every state of both journeys ran under.
 
 **What it costs.**
 
-- **An extension or a page wrapper that injects a script is refused.** An
+- **An extension or a page wrapper that writes a script element into the
+  page is refused.** An
   extension that puts a script element into the page, a proxy that adds
   an inline script on its way through -- Cloudflare's bot detection, as
   0069 read on formancy.ai -- or a host application that wraps the host
@@ -233,9 +287,13 @@ the web image sends is the one every state of both journeys ran under.
   of 0058's `FACTS` names a difference. From here on only CI's WebKit
   leg holds it, since WebKit runs on Linux alone.
 
-**What it does not do.** No policy for the server's own answers, which are
-JSON and never a document; no `Permissions-Policy` on the composed stack,
-where 0069's examples page sends one; no reporting endpoint; nothing that
+**What it does not do.** No hold on a script the browser runs in the page
+itself rather than as one of the page's elements: Playwright's evaluate and
+init scripts, through which the gates run axe and their listener, run
+unrefused, and what an extension runs as its own was not measured. No
+policy for the server's own answers, which are JSON and never a document;
+no `Permissions-Policy` on the composed stack, where 0069's examples page
+sends one; no reporting endpoint; nothing that
 reads what a deployment's proxy sends.
 
 **What it forecloses.** Nothing that cannot be undone: the map is one line
@@ -263,8 +321,24 @@ and theme parameter. A nonce needs a fresh value in every page's
 response and header -- nginx can write one with `sub_filter` and
 `$request_id` -- and the page to hand it to every grid as `styleNonce`;
 the live demo's static assets cannot (0070), and a deployment's proxy
-would need the same machinery. It is the way to drop the allowance, and
-not taken yet.
+would need the same machinery. It is one way to drop the allowance, and
+not taken yet; AG Grid's legacy stylesheets, below, are another.
+
+**AG Grid's legacy themes, served as a stylesheet.** AG Grid 36.2.0 still
+ships its v32 themes as CSS files (`ag-grid-community/styles/ag-grid.css`,
+`ag-theme-quartz.css` and the others), and a grid given `theme: 'legacy'`
+creates no style element: in `ag-stack` 36.2.0's
+`dist/package/main.esm.mjs`, read on 2026-10-17, `handleThemeChange`
+injects the core and module CSS only for a theme object, and
+`addGlobalCSS` only queues CSS while there is none. Served from `'self'`
+like the build's own stylesheet, they would let the host page's
+`style-src` drop `'unsafe-inline'`. But they are the styling AG Grid's
+Theming API replaced as the default in v33, as its own console warning
+says, and the host page's grid is the Quartz theme recoloured through its
+parameters, each a variable of the room's or a mix AG Grid computes, which
+`apps/host/src/grid-theme.test.ts` holds: under the legacy themes those
+would become CSS of the page's own, which nothing holds yet. Not measured:
+whether the host page passes its gate under `style-src 'self'` with them.
 
 **`'unsafe-inline'` in `style-src-elem` alone, refusing style
 attributes.** Measured, the host page needs no style attribute. But an

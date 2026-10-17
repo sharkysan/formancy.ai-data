@@ -220,9 +220,11 @@ and each of these fails on the change that breaks what it holds:
   `scripts/web-policies.test.mjs` for the studio's and the host page's
   Content-Security-Policies: each is 0069's with its named allowances and
   holds exactly what its built page loads, `deploy/web/nginx.conf`'s map is
-  what the module writes, every location that serves files has a policy,
-  and nothing in the file keeps the header from a page -- read as nginx
-  reads it, not run in nginx
+  what the module writes, every location that serves files has a policy
+  and every other answers with no page, and nothing in the file keeps the
+  header from a page in the ways it names -- a location's own
+  `add_header`, the header sent without `always`, a request moved out of
+  the page -- read as nginx reads it, not run in nginx
   ([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 - **The release.** `scripts/release-report/*.test.mjs`: the report, the
   registers and what a publish refuses;
@@ -283,9 +285,12 @@ production -- the examples page with the demo's headers, the studio and
 the host page with the policy `deploy/web/nginx.conf` sends them -- and the
 studio's and the host page's gates fail every state in which the browser
 refused anything under it, an event the document heard or a console line
-about the policy; each gate ends a pass with an inline script put in the
-page, which must be refused and heard, so a page served under no policy,
-or a listener that hears nothing, fails; and the host page's gate fails,
+about the policy, and fail on what it refused after a document's last
+state; each gate ends a pass with an inline script put in the page, which
+must be refused and heard with nothing heard before it that no check
+read, so a page served under no policy, or a listener that hears nothing,
+fails; a refusal whose report is still on its way when a document's last
+read is made is heard by nothing; and the host page's gate fails,
 once a run, when the page without its one allowance no longer has AG
 Grid's style elements refused
 ([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).

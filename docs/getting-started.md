@@ -328,9 +328,9 @@ This is an evaluation stack on your own machine, not a production deployment:
 - **A Content-Security-Policy for each page, and nothing for the rest.**
   nginx sends no-sniff, no-referrer and no-framing headers, and the studio
   and the host page each their own policy: nothing inline or evaluated,
-  and nothing from another host. A browser extension that injects a script
-  into either page is refused, and the browser's console says so; the
-  host page's policy allows inline styles, for AG Grid's
+  and nothing from another host. A script element a browser extension
+  writes into either page is refused, and the browser's console says so;
+  the host page's policy allows inline styles, for AG Grid's
   ([0083](./decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
   No Permissions-Policy, and no policy on `/v1`'s answers.
 

@@ -956,14 +956,16 @@ form target, and no framing; the host page's allows inline styles too, for
 the style elements AG Grid creates, which its browser gate shows refused
 without it. `nginx.conf` sends them from a map that
 `node scripts/web-policies.mjs --write` writes from the module that
-defines them; `pnpm test:repo` fails when the map is not the module's or a
-location that serves files has no policy, the studio's and the host page's
+defines them; `pnpm test:repo` fails when the map is not the module's, a
+location that serves files has no policy, another location could answer
+with a page, or a location's own `add_header` or a redirect inside nginx
+would send a page without it, the studio's and the host page's
 browser gates serve each page under its policy and fail on anything a
 browser refuses under it, and the getting-started gate fails when nginx
 does not send it. A deployment's own proxy copies the header with the
 page, and nothing here reads what it sends; an extension or a proxy that
-injects a script into a page is refused, and a host page moved to an
-origin of its own (0060) needs a `connect-src` that names the server's
+writes a script element into a page is refused, and a host page moved to
+an origin of its own (0060) needs a `connect-src` that names the server's
 ([0083](./docs/decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 
 [`docs/deploy/cloudflare.md`](./docs/deploy/cloudflare.md) puts that stack

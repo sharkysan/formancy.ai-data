@@ -317,11 +317,12 @@ later.
   a new dependency** of `@formancy/data-sqlserver`, at that exact version;
   tedious already installed it.
 - **The composed stack's studio and host page are sent with a
-  Content-Security-Policy each**, so a script injected into either does
-  not run: the studio holds an administrator's token in memory, the host
-  page a host's, and memory is where such a script would read them. Each
-  is the examples page's policy -- scripts, styles, fonts and fetches from
-  the stack's origin alone, nothing inline, nothing evaluated, `data:`
+  Content-Security-Policy each**, so a script element written into
+  either, by a flaw, an extension or a proxy, does not run: the studio
+  holds an administrator's token in memory, the host page a host's, and
+  memory is where such a script would read them. Each is the examples
+  page's policy -- scripts, styles, fonts and fetches from the stack's
+  origin alone, nothing inline, nothing evaluated, `data:`
   images only, no plugin, `<base>`, form target or framing -- and the host
   page's allows inline styles as well, for the style elements AG Grid
   creates, as the live demo's does. Why now: 0032 sent none because React
@@ -332,15 +333,18 @@ later.
   every file under `/studio/` and `/host/` and for nothing else, which
   `node scripts/web-policies.mjs --write` writes from the module that
   defines them; `pnpm test:repo` fails when the map is not the module's,
-  when a location that serves files has no policy, or when a location's
-  own `add_header` would drop it; the browser gates serve each page under
-  its policy and fail on anything a browser refuses under it; and the
-  getting-started gate fails when nginx does not send it. **Noticed by
-  operators:** rebuild the web image. A browser extension or a proxy that
-  injects a script into either page is refused, and the browser's console
-  says so; a deployment's own proxy sends the policies only if it copies
-  the header; and a host page moved to an origin of its own, as 0060
-  allows, needs a `connect-src` that names the server's origin
+  when a location that serves files has no policy, when another location
+  could answer with a page, or when a location's own `add_header` or a
+  redirect inside nginx -- an `error_page`, `try_files`, `rewrite` or
+  `index` out of the page -- would drop it; the browser gates serve each
+  page under its policy and fail on anything a browser refuses under it;
+  and the getting-started gate fails when nginx does not send it.
+  **Noticed by operators:** rebuild the web image. A browser extension or
+  a proxy that writes a script element into either page is refused, and
+  the browser's console says so; a deployment's own proxy sends the
+  policies only if it copies the header; and a host page moved to an
+  origin of its own, as 0060 allows, needs a `connect-src` that names the
+  server's origin
   ([0083](docs/decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 
 ### Changed

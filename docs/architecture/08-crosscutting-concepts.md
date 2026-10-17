@@ -474,8 +474,8 @@ shows its allowance needed too. In
 and `scripts/web-policies.test.mjs` hold each policy to what its built
 page loads and to what its deploy or nginx.conf sends.
 
-**What it costs.** A script injected into a page by an extension, a proxy
-or a wrapping page does not run, and only the console says so; a
+**What it costs.** A script element an extension, a proxy or a wrapping
+page writes into a page does not run, and only the console says so; a
 dependency that needs `eval` or an inline script fails the gates before it
 ships. `'self'` is the whole origin, not the page's path. A deployment's
 own proxy sends the studio's and the host page's policies only if it
