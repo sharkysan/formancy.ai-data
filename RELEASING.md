@@ -29,6 +29,7 @@ pnpm build && pnpm typecheck && pnpm test:coverage && pnpm check:pkg && pnpm tes
 node scripts/verify-licenses.mjs
 pnpm test:getting-started   # docs/getting-started.md as written; needs Docker, not the build
 pnpm test:cloudflare        # docs/deploy/cloudflare.md's overlay, offline; needs Docker and the server's build
+pnpm test:live-demo         # the live demo's image behind its Worker's own code, and a visitor's journey; needs Docker and the build
 
 # 4. Get the release commit onto main, through a pull request like any other.
 
@@ -63,7 +64,9 @@ cannot be taken back:
    licences and the repository guards; each package's suite on a runner of
    its own, against both databases; the browser gates; the install gate,
    which packs, installs and runs the tarballs and keeps them; the server
-   image; and [`docs/getting-started.md`](docs/getting-started.md) as written,
+   image; the live demo's image behind its Worker's own code
+   ([0070](docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)),
+   which a release does not deploy; and [`docs/getting-started.md`](docs/getting-started.md) as written,
    from a clean checkout, once with the runner's Compose and once with the
    oldest the guide names
    ([0032](docs/decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).
@@ -229,7 +232,8 @@ or by a first `pnpm live-demo:deploy`, by the steps in
 on an account with the Workers Paid plan; until then
 https://formancy.ai/data/demo/ is formancy.ai's 404. From then on
 Cloudflare deploys the live demo there on every push to `main`, through
-Workers Builds (0070): the host page's demo build as static assets, the
+Workers Builds
+([0070](docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)): the host page's demo build as static assets, the
 Worker, and the image of `deploy/demo/Dockerfile` that each visitor's
 container runs. The Worker builds with `pnpm build` and deploys with
 `node scripts/live-demo.mjs`, the two halves of `pnpm live-demo:deploy`.

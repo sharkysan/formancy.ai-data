@@ -46,7 +46,8 @@ formancy.ai's site; nothing is live there, and the *About* field stays empty
 until something is. The examples page's demo at
 https://formancy.ai/data/examples/
 ([0069](../docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md))
-and the live master-detail demo at https://formancy.ai/data/demo/ (0070)
+and the live master-detail demo at https://formancy.ai/data/demo/
+([0070](../docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md))
 are pages below it, not the website.
 
 ## The demo's Worker on Cloudflare
@@ -112,7 +113,8 @@ demo was live and read by hand on 2026-10-16; nothing here reads it.
 
 ## The live demo's Worker on Cloudflare
 
-The live master-detail demo at https://formancy.ai/data/demo/ (0070) is a
+The live master-detail demo at https://formancy.ai/data/demo/
+([0070](../docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)) is a
 second Worker connected to this repository by Workers Builds, and unlike
 the examples' it runs code: a Worker with a Durable Object per visitor,
 each starting a Cloudflare Container built from `deploy/demo/Dockerfile`.
