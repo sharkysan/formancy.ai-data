@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { createDataServer } from './app.js'
 import type { DataServerOptions } from './app.js'
 import { createFileConfigurationStore } from './config-store.js'
-import { createConnectionRegistry, parseConnections } from './connections.js'
+import { createConnectionRegistry, parseConnections, untestedLogins } from './connections.js'
 import type { ConnectionRegistry } from './connections.js'
 import { corsOriginsSetting } from './cors.js'
 import { DRIVER_FACTORIES } from './drivers.js'
@@ -158,6 +158,7 @@ const { verifyIdentity, file: keyFile } = opened
  * how a host is wired in before any form exists.
  */
 let registry: ConnectionRegistry | undefined
+let untested: string[] = []
 let planes: Pick<DataServerOptions, 'admin' | 'runtime'> = {}
 if ((storeDirectory === undefined) !== (connectionsFile === undefined)) {
   console.error('Set both FORMANCY_DATA_STORE_DIR and FORMANCY_DATA_CONNECTIONS, or neither.')
@@ -170,6 +171,7 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
     process.exit(1)
   }
   registry = createConnectionRegistry(parsed.connections, DRIVER_FACTORIES)
+  untested = untestedLogins(parsed.connections)
   const store = createFileConfigurationStore(storeDirectory)
   const auditReference = process.env['FORMANCY_DATA_AUDIT_KEY']
   const auditKey = auditReference === undefined ? undefined : await resolveSecret(auditReference)
@@ -180,6 +182,10 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
 const app = await createDataServer({ verifyIdentity, logger: true, rateLimit: limit.rateLimit, trustedProxies: proxies.trustedProxies, ...planes })
 const identityKeys = keyFile === undefined ? {} : { identityKeys: { kids: keyFile.current().kids, leftOut: keyFile.current().leftOut } }
 app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, review: planes.admin?.publisherRoles !== undefined, connections: registry?.ids() ?? [], trustedProxies: proxies.trustedProxies, ...identityKeys }, 'planes')
+// Once for each connection that logs in as an Entra principal, naming the
+// connection and nothing of the principal: no test of this release logs
+// in as one (0074).
+for (const sentence of untested) app.log.warn(sentence)
 
 // SIGHUP reads the key set file again, and with a one-key setting says it
 // read nothing; either way it no longer stops the server, which is Node's
