@@ -142,10 +142,17 @@ is turned on, a login refused after its pool opened is `unavailable` with
 no reason in discovery's log line, and what @azure/identity reads from the
 environment -- the region, the proxy, the log level, a managed identity's
 platform -- is outside the reviewed allowlist
-([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)). A SQL login still goes over TDS 7, whose TLS whoever
-answers in the server's place can decline and be sent the LOGIN7, its
-password in it, as review showed on 2026-10-17; 0074 does not change
-that.
+([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
+A SQL login still goes over TDS 7. One that asks for TLS is refused before
+its login is sent when the server's first answer says it will not
+encrypt, by a stream of the adapter's own in front of tedious, written
+against what tedious 20.3.3 uses of its socket: a tedious release could
+break it, which the suites through it would show, and nothing would show
+tedious fixing the downgrade itself. With the server's certificate
+trusted, whoever answers can still complete TLS with a certificate of
+its own, and a connection with TLS off sends its login unencrypted, by
+the operator's choice
+([0081](../decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)).
 PostgreSQL 14 and older and SQL Server 2017 and older are not
 images of the matrix, and on PostgreSQL 18 a cascaded table's AFTER DELETE
 trigger runs with its owner's grants, so it does a delete 15 to 17 refuse

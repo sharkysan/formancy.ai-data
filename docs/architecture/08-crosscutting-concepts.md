@@ -89,6 +89,7 @@ person, is validation in that sense: a check that cannot answer refuses.
 | A grant whose key now names another column | 422 `keys-reassigned`, nothing written, until someone decides | [0039](../decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md) | `routes/admin-keys-reassigned.integration.test.ts`, `routes/admin-evolution.test.ts` |
 | A route with no audit name | its registration throws, or 500 `unaudited-route` | [0033](../decisions/0033-the-administrator-plane-is-audited.md) | `routes/admin-audit.test.ts` |
 | A write whose answer was lost | unknown, never refused, never replayed | [0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md) | `e2e-lost-answer.integration.test.ts` |
+| A SQL Server that answers a SQL login asking for TLS that it will not encrypt, or with an answer that is not a PRELOGIN response | the connection ends before the login is sent, 503 | [0081](../decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md) | `packages/data-sqlserver/src/encryption.test.ts`, `routes/unencrypted.integration.test.ts` |
 | A file of records that cannot be made whole -- past its byte budget or its deadline, rows that moved between pages, text UTF-8 cannot carry, labels that cannot be loaded | a JSON refusal and nothing of the file, never a shorter file sent as whole | [0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md) | `routes/runtime-exports.test.ts`, `packages/data-client/src/transport.test.ts` |
 | A setting nobody could have meant | the process stops, naming it | [0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md), [0060](../decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md), [0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md) | each setting's test |
 
@@ -152,6 +153,20 @@ not be opened, as a password's is: the path is the allowlist's, and what
 the operator fixes
 ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 
+**A password crosses the network only as its entry says.** A SQL login to
+SQL Server with TLS on goes over TDS 7, whose PRELOGIN and its answer cross
+in the clear, and tedious starts TLS only when the answer says ON or REQ.
+So the adapter opens those connections itself (`encryption.ts`) and puts
+a stream in front of each that withholds the server's first answer until
+it has read it: OFF or NOT_SUP, or an answer it cannot read, ends the
+connection before the LOGIN7, the password in it, is sent, in a fixed
+sentence naming nothing of the login, and whoever answered in the
+server's place hears nothing more. An Entra login is TDS 8.0, TLS first
+(0074). A connection the operator set unencrypted sends its login
+unencrypted, and one whose certificate the operator trusts is checked for
+TLS, not for whom it is with
+([0081](../decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)).
+
 **What stays out of logs and answers**: a token, since errors carry jose's
 code and never the token
 ([0014](../decisions/0014-host-identity-is-verified-offline.md)); a driver's
@@ -163,8 +178,9 @@ routes, never the path, query or Host header as sent
 ([0033](../decisions/0033-the-administrator-plane-is-audited.md)).
 
 **Held by** `secrets.test.ts`, `connections.test.ts`, `routes/admin.test.ts`,
-`routes/entra.integration.test.ts` and `server-log.test.ts` in
-`packages/data-server/src/`, by `packages/data-sqlserver/src/entra.test.ts`, and by the
+`routes/entra.integration.test.ts`, `routes/unencrypted.integration.test.ts`
+and `server-log.test.ts` in `packages/data-server/src/`, by
+`packages/data-sqlserver/src/entra.test.ts` and `encryption.test.ts`, and by the
 getting-started gate, which fails when a secret or a token reaches any log
 of the composed stack
 ([0032](../decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).

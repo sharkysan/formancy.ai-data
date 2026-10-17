@@ -768,9 +768,59 @@ was not measured; only the public cloud, and only a tenant's id; no
 Entra login to a server whose certificate the operator must trust; and
 the README's row calls the SQL login tested from a value typed in the
 adapter, since no server record says which login a test made. A SQL
-login still goes over TDS 7, whose TLS whoever answers in the server's
-place can decline and be sent the LOGIN7, its password in it, as before
-this release.
+login still goes over TDS 7; one whose server answers that it will not
+encrypt is now refused before its login is sent (0081, under *Fixed*).
+
+### Fixed
+
+- **A SQL login that asks for TLS is no longer sent to a server that
+  answers it will not encrypt.** A SQL Server connection with TLS on --
+  every allowlist entry whose `tls.enabled` is not false -- goes over TDS
+  7: the data server's first message, PRELOGIN, and SQL Server's answer
+  cross in the clear, and the driver, tedious 20.3.3, starts TLS only if
+  the answer says ON or REQ. Answered OFF or NOT_SUP, it went on and sent
+  the login unencrypted, the user and the password under TDS's reversible
+  obfuscation. So anyone on the network path between the data server and
+  SQL Server who could answer in SQL Server's place could strip the
+  encryption the operator asked for and read the password. **This was
+  true of 0.1.0**, on every connection with TLS on; the composed stack's
+  connections turn TLS off, so they never asked for it, and are
+  unchanged. Now the adapter withholds the server's first answer from
+  the driver until it has read it whole, and on OFF or NOT_SUP ends the
+  connection before the login is sent, as MS-TDS says a client that asked
+  for encryption does: the connection test and the runtime plane answer
+  their 503, and the log says "The server answered that it would not
+  encrypt the connection, so the login was not sent." An answer it cannot
+  read is refused in a sentence of its own. Every SQL Server image of the
+  test matrix encrypts, and logs in as before
+  ([0081](docs/decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)).
+  **Until you upgrade**: a 0.1.0 server has no setting that logs a SQL
+  login in over TDS 8.0, so keep the traffic between the data server and
+  SQL Server on a network nobody else can answer on, or carry it through
+  an encrypted tunnel of your own; once upgraded, an Entra login goes over
+  TDS 8.0 where the server takes it (0074), and a SQL login that asks for
+  TLS is refused rather than downgraded. A login whose password may have
+  crossed so is one to change.
+- **For contributors**: data-fixtures' `startPreloginStandIn` answers a
+  client's PRELOGIN in a SQL Server's place with the answer it is given
+  and keeps the type of every packet the client sends after it, so a test
+  reads what the real driver puts on the wire.
+
+What refusing costs, in 0081: a stream of the adapter's own in front of
+tedious, written against what tedious 20.3.3 uses of its socket and how it
+reads the answer, which a tedious release can break -- the suites through
+the guard would show it -- and nothing shows tedious fixing the downgrade
+itself; the adapter's own copy of tedious's `connectInSequence` for these
+connections, so a later fix to it does not reach them until copied; every
+byte the server sends copied once more, which a measurement on a shared
+machine could not tell from its own spread; a server
+that cannot encrypt at all, NOT_SUP, refused where 0.1.0 logged in to it,
+and reached only with `tls.enabled: false`, the login then unencrypted by
+that choice; with the server's certificate trusted, whoever answers can
+still complete TLS with one of its own, as before; a connection with TLS
+off still sends its login unencrypted; and only a pool's first connect
+says the sentence alone, a later one's refusal reaching discovery's log
+after tedious's "Connection lost - ".
 
 ## 0.1.0 — 2026-10-16
 

@@ -1,6 +1,6 @@
 # 0074 — A SQL Server connection may log in as an Entra managed identity or service principal, over TDS 8.0 with one credential per connection asked for Azure SQL's token alone, and no test logs in as either
 
-- **Status:** accepted
+- **Status:** accepted; extended by 0081
 - **Date:** 2026-10-17
 - **Deciders:** Daniel Bacher
 - **Verified by:**
@@ -367,8 +367,9 @@ setting in an allowlist this one reads is refused rather than dropped.
 through the same credential; `default`, `password` and `access-token`,
 which this record refuses (below); an Entra login to PostgreSQL; Azure
 Government or Azure China; a tenant by its domain name. **A SQL login's
-TLS**: its LOGIN7, the password in it, still goes over TDS 7, which
-whoever answers in the server's place can decline, as before this record;
+TLS**, which stays TDS 7: a server that answers it will not encrypt is
+refused before the LOGIN7 is sent, since
+[0081](0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md);
 moving SQL logins to TDS 8.0 is a decision of its own.
 
 **What it forecloses.** An Entra login whose LOGIN7 or token crosses the

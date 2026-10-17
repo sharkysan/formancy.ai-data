@@ -171,7 +171,7 @@ operations in `records/` and `lookups/`.
 
 | Concern | `data-postgres` | `data-sqlserver` |
 |---|---|---|
-| Connecting | `connect.ts`, `connectPostgres`, over postgres.js | `connect.ts`, `connectSqlServer`, over mssql; no native module, no ODBC. A SQL login, or an Entra principal through `entra.ts`, over TDS 8.0: one credential for each login it is given, kept across pools, asked for Azure SQL's token alone, and a failed login said in a sentence naming nothing of the principal ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)) |
+| Connecting | `connect.ts`, `connectPostgres`, over postgres.js | `connect.ts`, `connectSqlServer`, over mssql; no native module, no ODBC. A SQL login, over TDS 7 through `encryption.ts`'s connector when it asks for TLS, which refuses a server that answers it will not encrypt before the login is sent ([0081](../decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)); or an Entra principal through `entra.ts`, over TDS 8.0: one credential for each login it is given, kept across pools, asked for Azure SQL's token alone, and a failed login said in a sentence naming nothing of the principal ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)) |
 | `DatabaseAdapter` | `adapter.ts`, and `server.ts`, the one query ping and discovery share for what the server is (0068) | `adapter.ts`, and `server.ts`, the same query, and the refusal of a catalog without `sys.edge_constraints`, every release before 2019 (0068) |
 | `discovery/` | `pg_catalog`, one query per concern, all in one `REPEATABLE READ` read-only transaction ([0006](../decisions/0006-postgres-discovery-reads-pg-catalog.md)): `objects`, `columns`, `types`, `keys`, `foreign-keys`, `checks`, `comments`, `access`, `account`, `referenced-by`, assembled by `discover.ts` | the catalog views, one concern per query, side by side and not one consistent read ([0007](../decisions/0007-sqlserver-discovery-and-what-it-hides.md)): `objects`, `columns`, `types`, `keys`, `foreign-keys`, `checks`, `access`, `account`, `referenced-by`, and besides them `visibility.ts` and `row-security.ts` for what a permission-filtered catalog hides, and `catalog.ts` for a gap found before its object has a name |
 | `sql/` | `identifiers.ts` quotes one part at a time; `statement.ts` sends every value as text the server casts, and collects a statement's rows as the driver reads them ([0078](../decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md)); `values.ts` reads each column back as canonical text; `catalog.ts` names every function, operator, type and collation in `pg_catalog` ([0016](../decisions/0016-postgres-operations.md)); `filters.ts`, `order.ts`, `search.ts` | `quote.ts` bracket-quotes as QUOTENAME does; `statement.ts` binds each value under a generated name; `values.ts` ([0017](../decisions/0017-sqlserver-operations.md)); `filters.ts`, `order.ts`, `search.ts` |
@@ -275,7 +275,9 @@ answers to (`conformance.ts`) (0005); the `parity` schema and the one
 expectation per case both adapters' parity suites share (`parity.ts`, 0028);
 the shared cases by id, which a test declares with `covers()` (`cases.ts`,
 0035); the containers (`containers.ts`); a TCP hop that can lose an answer
-after the database sent it (`tcp-hop.ts`, 0031); the sized customer table
+after the database sent it (`tcp-hop.ts`, 0031); a stand-in that answers a
+client's PRELOGIN in a SQL Server's place and keeps the type of every
+packet the client sends after (`prelogin.ts`, 0081); the sized customer table
 the measurements read ([0034](../decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md));
 the images the suites start (`images.ts`): `DEFAULT_IMAGES`, one per
 engine, and `MATRIX_IMAGES`, each engine's default first, of which
