@@ -30,25 +30,36 @@ interface CheckRow {
  * On PostgreSQL 15 to 17 a NOT NULL is a column property (`attnotnull`),
  * not a pg_constraint row, so none is reported as a check. PostgreSQL 18
  * files each as a constraint of type `n` too (VERSION_FACTS.notNullConstraints),
- * which `contype = 'c'` leaves out: NOT NULL is read from `attnotnull` on
- * every version (columns.ts), and the shared model's cases hold the checks
- * to the same list on every leg. A NOT NULL added NOT VALID, which only 18
- * has, sets `attnotnull` though older rows may hold NULL, and is read as
- * NOT NULL (discovery-pg18.integration.test.ts).
+ * which is not read as a check once it is validated: such a NOT NULL is the
+ * column's (columns.ts), and the shared model's cases hold the checks to the
+ * same list on every leg. One added NOT VALID, which only 18 has, has proved
+ * nothing of the rows that were already there, and is read as the same rule
+ * spelled CHECK (column IS NOT NULL) NOT VALID is on every version (0077):
+ * the column nullable (`NOT_NULL`), and a check, not validated, whose
+ * expression is the one the server deparses that check to, the column's
+ * name quoted as `pg_get_expr` quotes it (`format`'s `%I` is the same
+ * `quote_identifier`). A type-`n` row has no `conbin`, so the expression is
+ * spelled here; `pg_get_constraintdef` would give DDL, `NOT NULL amount NOT
+ * VALID`. Its `enforced` is read as a check's is, from `conenforced`
+ * (discovery-pg18.integration.test.ts).
  */
 export async function readChecks(sql: TransactionSql, schemas: readonly string[]): Promise<Map<number, CheckMeta[]>> {
   const rows = await sql<CheckRow[]>`
     select
       k.conrelid as oid,
       k.conname as name,
-      pg_catalog.pg_get_expr(k.conbin, k.conrelid) as expression,
+      case
+        when k.contype = 'n' then pg_catalog.format('(%I IS NOT NULL)', a.attname)
+        else pg_catalog.pg_get_expr(k.conbin, k.conrelid)
+      end as expression,
       coalesce((pg_catalog.to_jsonb(k) operator(pg_catalog.->>) 'conenforced')::pg_catalog.bool, true) as enforced,
       k.convalidated as validated
     from pg_catalog.pg_constraint k
     join pg_catalog.pg_class c on c.oid = k.conrelid
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    left join pg_catalog.pg_attribute a on k.contype = 'n' and a.attrelid = k.conrelid and a.attnum = k.conkey[1]
     where n.nspname = any(${schemas})
-      and k.contype = 'c'`
+      and (k.contype = 'c' or (k.contype = 'n' and not k.convalidated))`
 
   const byObject = new Map<number, CheckMeta[]>()
   for (const row of rows) {

@@ -559,11 +559,16 @@ default; one that computes with `nextval()` is an ordinary default. An
 A check's `enforced` is `pg_constraint.conenforced` where the server has it
 (PostgreSQL 18's `NOT ENFORCED`) and true where it does not (17, which checks
 every new row against each one); `validated` is `convalidated`: NOT VALID
-skips only the rows already there. NOT NULL is read from `attnotnull` on
-every version: 18 files each NOT NULL in `pg_constraint` too, as type `n`
-(`VERSION_FACTS.notNullConstraints`), and none is read as a check. A NOT
-NULL added NOT VALID, which only 18 has, sets `attnotnull`, so its column
-is reported not nullable though rows older than it may hold NULL. A stored
+skips only the rows already there. NOT NULL is read from `attnotnull`: 18
+files each NOT NULL in `pg_constraint` too, as type `n`
+(`VERSION_FACTS.notNullConstraints`), and a validated one is not read as a
+check. A NOT NULL added NOT VALID, which only 18 has, sets `attnotnull`
+though rows older than it may hold NULL, so it is read as the same rule
+spelled `CHECK (column IS NOT NULL) NOT VALID` is on every version: the
+column nullable, and a check by the constraint's name, `(column IS NOT
+NULL)`, enforced and not validated, until `VALIDATE CONSTRAINT` makes it the
+column's NOT NULL (0077). A request's description of a table (0041) reads
+it the same way. A stored
 generated column is `computed`
 and has no default, though PostgreSQL files its expression where defaults
 live.
@@ -643,8 +648,9 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   counts in a SQL_ASCII and a LATIN1 database, each made for the test.
 - `discovery-pg18.integration.test.ts` — the two catalog states only 18
   can hold, on `postgres:18-alpine` in every leg: a `NOT ENFORCED` check,
-  reported as not enforced, and a NOT NULL added NOT VALID, read as NOT
-  NULL though a row older than it holds NULL (characterised, not decided).
+  reported as not enforced, and a NOT NULL added NOT VALID, read as the
+  same rule spelled as a check added NOT VALID is, column, quoting and
+  description included, and as NOT NULL once it is validated (0077).
 - `discovery/columns.test.ts` — the generation codes, including one no server
   can produce yet, called directly.
 - `spike.integration.test.ts` — the driver's numbers, untyped parameters, and

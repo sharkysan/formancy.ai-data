@@ -1,6 +1,6 @@
 # 0067 — The adapter suites run on every image of a per-engine matrix, and what the versions disagree on is named
 
-- **Status:** accepted
+- **Status:** accepted; the NOT NULL added NOT VALID it characterised and left undecided is read as a nullable column and an enforced, unvalidated check, and `notNullConstraints` says discovery reads such a row of type `n`, extended by [0077](0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md)
 - **Date:** 2026-10-16
 - **Deciders:** Daniel Bacher
 - **Verified by:**

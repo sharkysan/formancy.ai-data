@@ -50,11 +50,15 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > a field moved to another generated section in the studio, which a
 > 0.1.0 server refuses to read or import
 > ([0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md));
-> and saying, where 0.1.0 said nothing, that no test runs on Azure SQL
+> the release saying, where 0.1.0 said nothing, that no test runs on Azure SQL
 > Database or Azure SQL Managed Instance, which
 > [*What it is tested on*](#what-it-is-tested-on) and the release's
 > register both name as not tested
-> ([0073](./docs/decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md)),
+> ([0073](./docs/decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md));
+> and, on PostgreSQL 18, a NOT NULL added NOT VALID read as a nullable
+> column with an unvalidated check, which a 0.1.0 server reads as NOT NULL
+> though rows older than it may hold NULL
+> ([0077](./docs/decisions/0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a

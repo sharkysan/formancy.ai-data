@@ -60,7 +60,7 @@ only enforcement is "we remember" says so plainly.
 | [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted; narrowed by 0067; extended by 0073 |
 | [0004](0004-a-snapshot-says-what-it-could-not-see.md) | A metadata snapshot says what it could not see, and is made in one place | accepted; narrowed by 0027; extended by 0049 |
 | [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026, 0027, 0034, 0043, 0049, 0056 |
-| [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057, 0067 |
+| [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057, 0067, 0077 |
 | [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted; narrowed by 0026, 0027, 0067; extended by 0049, 0068 |
 | [0008](0008-exact-values-travel-as-strings.md) | Exact values travel as strings, are canonical, and are never rounded | accepted; narrowed by 0026, 0028 |
 | [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042, 0056; extended by 0066 |
@@ -121,7 +121,7 @@ only enforcement is "we remember" says so plainly.
 | [0064](0064-the-first-releases-notes-summarise-the-development-before-it.md) | The first release's notes summarise the development before it | accepted |
 | [0065](0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md) | With publisher roles set, a draft is published only when a publisher who did not submit it approves it, and a restore is one publisher's alone | accepted |
 | [0066](0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md) | A lookup a person can search is generated as a typeahead, and a host draws the control it is given | accepted |
-| [0067](0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md) | The adapter suites run on every image of a per-engine matrix, and what the versions disagree on is named | accepted |
+| [0067](0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md) | The adapter suites run on every image of a per-engine matrix, and what the versions disagree on is named | accepted; extended by 0077 |
 | [0068](0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md) | A snapshot records the server it was read from, data-core says whether this release was tested on it, and nothing refuses a server discovery can read | accepted |
 | [0069](0069-the-examples-page-is-served-at-formancy-ai-data-examples.md) | The examples page is served at formancy.ai/data/examples/, by a Worker of its own that Cloudflare deploys from main, under a policy that refuses anything inline | accepted; narrowed by 0072 |
 | [0071](0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md) | The server believes a forwarded client address only from the proxies an operator names, each by its address, and the composed stack names its nginx and cloudflared alone | accepted |
@@ -129,3 +129,4 @@ only enforcement is "we remember" says so plainly.
 | [0073](0073-azure-sql-is-not-tested-and-the-release-says-so.md) | Azure SQL Database and Azure SQL Managed Instance are not tested, and the release says so where it said nothing | accepted |
 | [0075](0075-a-field-may-move-to-another-generated-section.md) | A field may move to another generated section, recorded on its own entry and carried by what it stands for | accepted |
 | [0076](0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md) | The architecture is documented as arc42 in docs/architecture, and every change updates the section it touches | accepted |
+| [0077](0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md) | A NOT NULL that PostgreSQL 18 added NOT VALID is read as the check it is: the column nullable, the constraint enforced and not validated | accepted |

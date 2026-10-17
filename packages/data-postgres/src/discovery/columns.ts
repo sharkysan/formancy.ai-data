@@ -51,6 +51,27 @@ export const DECLARED_COLUMN = `a.attnum ${op('>')} 0 and not a.attisdropped`
  */
 export const DEFAULT_EXPRESSION = `case when a.attgenerated ${op('=')} '' then pg_catalog.pg_get_expr(d.adbin, d.adrelid) end`
 
+/**
+ * Whether column `a` of pg_attribute holds no NULL: `attnotnull`, unless a
+ * NOT NULL constraint over it was added NOT VALID (0077).
+ *
+ * PostgreSQL 18 files each NOT NULL in pg_constraint as type `n`
+ * (VERSION_FACTS.notNullConstraints) and lets one be added NOT VALID, which
+ * sets `attnotnull` from that moment, while the rows that were already there
+ * are never checked and may hold NULL; `convalidated` is false until
+ * VALIDATE CONSTRAINT has checked them. Such a column is read as nullable, as
+ * the same rule spelled CHECK (column IS NOT NULL) NOT VALID is on every
+ * version, and the constraint is reported as that check (checks.ts): a NOT
+ * NULL nothing has proved is not claimed. On 15 to 17 pg_constraint has no
+ * row of type `n` for a column, so this is `attnotnull` there, and one query
+ * runs on every version. A NOT NULL constraint names exactly one column.
+ * Shared with the root's definition (0041), so a request reads the column as
+ * discovery does.
+ */
+export const NOT_NULL = `(a.attnotnull and not exists (
+  select from pg_catalog.pg_constraint nn
+  where nn.conrelid ${op('=')} a.attrelid and nn.contype ${op('=')} 'n' and not nn.convalidated and nn.conkey[1] ${op('=')} a.attnum))`
+
 export async function readColumns(sql: TransactionSql, schemas: readonly string[], textUnit: TextLengthUnit): Promise<Map<number, UncommentedColumn[]>> {
   const rows = await sql<ColumnRow[]>`
     select
@@ -61,7 +82,7 @@ export async function readColumns(sql: TransactionSql, schemas: readonly string[
       t.typname as type_name,
       tn.nspname as type_schema,
       a.atttypmod as type_modifier,
-      a.attnotnull as not_null,
+      ${sql.unsafe(NOT_NULL)} as not_null,
       a.attidentity as identity,
       a.attgenerated as generated,
       ${sql.unsafe(DEFAULT_EXPRESSION)} as default_expression
