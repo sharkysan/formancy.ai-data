@@ -359,6 +359,25 @@ later.
   from static instances, so its edges are anti-aliased differently from
   Google's variable file and the README's pictures are retaken. Nothing
   moves: the advances and line heights are the same.
+- **On PostgreSQL 18 a NOT NULL added NOT VALID is read as nullable, with
+  an unvalidated check**, where it was read as NOT NULL. PostgreSQL 18 lets
+  `ALTER TABLE … ADD CONSTRAINT … NOT NULL column NOT VALID` hold new rows
+  to it without checking the old ones, and sets the flag discovery read NOT
+  NULL from all the same, so a row older than the constraint could hold
+  NULL in a column the snapshot called NOT NULL: its field was generated
+  required, a record holding that NULL opened with a required field empty,
+  and a key or a version column could rest on it. It now reads exactly as
+  the same rule spelled `CHECK (column IS NOT NULL) NOT VALID` does on every
+  version: the column nullable, and a check by the constraint's name,
+  `(column IS NOT NULL)`, enforced and not validated, until `VALIDATE
+  CONSTRAINT` makes it the column's NOT NULL. Over a composite type, or a
+  domain over one, the check is `(column IS DISTINCT FROM NULL)`, the rule
+  the NOT NULL keeps there, since `IS NOT NULL` would refuse a value whose
+  every field is NULL, which the column takes. A request's description of
+  the table reads it the same way, so the runtime agrees with review.
+  PostgreSQL 15 to 17 cannot hold such a constraint, and SQL Server has
+  none, so nothing else reads differently
+  ([0077](docs/decisions/0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md)).
 
 What review costs, in 0065: every submit and approval asks the database, so
 one that cannot be reached refuses both; nothing deletes a draft; nobody is
@@ -405,8 +424,8 @@ the table's owner may is done, where 15 to 17 refuse it,
 `permission-denied`; a delete an ON DELETE RESTRICT key forbids is answered
 `referenced` on every version, though 18 sends another SQLSTATE; and
 discovery describes a table the same on 18 as on 17, though 18 files its
-NOT NULLs in `pg_constraint` -- but a NOT NULL added NOT VALID, which only
-18 has, is read as NOT NULL though rows older than it may hold NULL. What
+NOT NULLs in `pg_constraint` -- and a NOT NULL added NOT VALID, which only
+18 has, is read as 0077 says. What
 0068 does not do: refuse a server this release was not tested on, which is
 generated, published and served on as before; tell a managed PostgreSQL
 from PostgreSQL; or call a SQL Server database untested at a level between
@@ -450,6 +469,24 @@ SQL Server on Azure Virtual Machines among them, is called tested when its
 release and its database's level are, though every test ran the Developer
 edition on Linux in a container; and an Azure database that accepts Entra
 logins only cannot be connected to.
+What reading a NOT NULL added NOT VALID as nullable costs, in 0077: on
+PostgreSQL 18 its column is generated optional until the constraint is
+validated, so a create or an update that leaves it empty is refused by the
+database, `not-null-violation`, where the form would have said a value is
+required, and a key over it lists no page and it is not offered as a
+version column; where no field writes it on create and it has no default
+-- a type no codec reads, say -- create is offered and the database refuses
+every one, where it was not offered; validating it tightens the column,
+which drift review reports and which blocks the writes of a form that
+writes it, and the create of a form that does not, until the form is
+reviewed; a form published on 18 before this over such a column reads it
+as loosened and a check as new, so one keyed by a unique key over it lists
+no page until the constraint is validated, one whose version column it is
+has update and delete blocked and a review cannot confirm the column again
+until then, and one whose control cannot hold NULL -- a boolean shown as
+a checkbox -- has its writes of the column blocked until it is reviewed;
+and the check's expression is spelled by the adapter as the server spells
+the hand-written check on 18, and on no other version.
 
 ## 0.1.0 — 2026-10-16
 

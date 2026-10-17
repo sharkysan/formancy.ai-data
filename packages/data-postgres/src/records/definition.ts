@@ -1,6 +1,6 @@
 import { inSnapshotOrder } from '@formancy/data-core'
 import type { DescribedTable, ForeignKeyMeta, ObjectRef } from '@formancy/data-core'
-import { columnOf, DECLARED_COLUMN, DEFAULT_EXPRESSION, textUnitOf } from '../discovery/columns.js'
+import { columnOf, DECLARED_COLUMN, DEFAULT_EXPRESSION, NOT_NULL, textUnitOf } from '../discovery/columns.js'
 import { action, DECLARED_FOREIGN_KEY, TRIGGERS_ENABLED } from '../discovery/foreign-keys.js'
 import { addKeyColumn, INDEX_KEY_COLUMN, KEY_CONSTRAINT, UNIQUE_INDEX_KEY } from '../discovery/keys.js'
 import type { ObjectKeys } from '../discovery/keys.js'
@@ -14,10 +14,13 @@ import type { Statement } from '../sql/statement.js'
  * by.
  *
  * The facts hold only what no session setting changes: oids, typmods, names,
- * flags, and a default's stored node tree (`adbin`), which carries oids and
- * raw constants, never a spelling. The relation's own oid is one of them: no
- * ALTER changes it, a rewrite included, and a table dropped and created again
- * under the same definition has another, as SQL Server's object_id does --
+ * flags -- whether a column holds no NULL is discovery's `NOT_NULL`, so a
+ * NOT NULL added NOT VALID reads as discovery reads it and the digest moves
+ * when it is validated (0077) -- and a default's stored node tree (`adbin`),
+ * which carries oids and raw constants, never a spelling. The relation's own
+ * oid is one of them: no ALTER changes it, a rewrite included, and a table
+ * dropped and created again under the same definition has another, as SQL
+ * Server's object_id does --
  * without it, attnums, constraint names and defaults all start again alike,
  * and a write decided before the drop was sent to the new table (the
  * `recreated-same-definition` case). Measured on postgres:17-alpine
@@ -48,7 +51,7 @@ const FACTS = `pg_catalog.jsonb_build_object(
   'relation', c.oid,
   'columns', coalesce((
     select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
-      a.attnum, a.attname, a.atttypid, a.atttypmod, t.typname, tn.nspname, a.attnotnull, a.attidentity, a.attgenerated,
+      a.attnum, a.attname, a.atttypid, a.atttypmod, t.typname, tn.nspname, ${NOT_NULL}, a.attidentity, a.attgenerated,
       case when a.attgenerated ${op('=')} '' then d.adbin::pg_catalog.text end
     ) order by a.attnum)
     from pg_catalog.pg_attribute a

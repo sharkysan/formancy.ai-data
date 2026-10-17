@@ -255,7 +255,9 @@ describe('discovery as the restricted reader', () => {
   // holds NOT NULL, and the reader sees those as it sees the rest; 15 to 17
   // file none (VERSION_FACTS.notNullConstraints; watched failing on 18 while
   // this counted every row as one of the five, and with 18's value given to
-  // 17). Discovery reads NOT NULL from attnotnull and checks of type c alone,
+  // 17). Discovery reads NOT NULL from attnotnull, and a row of type n only
+  // when it is not validated, which only a NOT NULL added NOT VALID is and
+  // which it reads as a check (0077); no table of the shared model has one,
   // so its snapshot of the table is the same on each: the shared model's
   // cases above hold that on every leg.
   test('information_schema hides every constraint on sales.order from the reader; pg_catalog hides none', async () => {

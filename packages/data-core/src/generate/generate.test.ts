@@ -493,10 +493,16 @@ describe('generateForm', () => {
 
   // A type with no codec is reported, never silently dropped; and a NOT NULL
   // column nobody can fill makes create impossible, which is said out loud.
+  // A nullable one leaves create offered, the database's to refuse when a rule
+  // the generator does not read asks for a value -- a check (0026), or a NOT
+  // NULL PostgreSQL 18 added NOT VALID, read as one (0077): refused here
+  // instead, every table with a nullable column of a type no codec reads
+  // would lose create.
   test('excluded columns are noted, and create is refused when a required column cannot be filled', () => {
-    const { notes } = generateForm(fixtureLike('postgres'), { ...ORDER, root: { schema: 'sales', name: 'country' }, lookups: [] })
+    const { notes, bindings } = generateForm(fixtureLike('postgres'), { ...ORDER, root: { schema: 'sales', name: 'country' }, lookups: [] })
     expect(notes).toContainEqual({ subject: 'shape', kind: 'excluded', message: 'point: no tested codec exists for this type.' })
     expect(notes).toContainEqual(expect.objectContaining({ subject: 'flag', kind: 'excluded' }))
+    expect(bindings.operations.create).toBe(true)
 
     const blocked = generateForm(
       fixtureLike('postgres', (objects) => {

@@ -37,7 +37,7 @@
       "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
     },
     "0006": {
-      "reviewed": "sha256:cede534c64dc36ab5acd95680303d104be0404bc97d0560601ecd2b21a5e6a4d",
+      "reviewed": "sha256:c775617ada36bd72678ad88d87892c6d61815d37c3a7bcaee905b29ce09ef55a",
       "limitations": [
         {
           "area": "databases",
@@ -2154,7 +2154,7 @@
       ]
     },
     "0067": {
-      "reviewed": "sha256:58071cd9e5be80d40a18da1fe9f003ea7dc6bc68b3f5d05d43c25750b2dfdeea",
+      "reviewed": "sha256:a28dc7dcb38f30aee715cdf8e0dc4d719f213942114bc1715041a524497b54e4",
       "limitations": [
         {
           "area": "testing",
@@ -2172,11 +2172,6 @@
           "area": "access",
           "says": "On PostgreSQL 18 a cascaded table's AFTER DELETE trigger runs with its owner's grants, so a delete that 15 to 17 refuse, `permission-denied`, because the trigger writes where the deleting account may not, is done.",
           "heldBy": "packages/data-postgres/src/cascade.integration.test.ts"
-        },
-        {
-          "area": "databases",
-          "says": "On PostgreSQL 18 a `NOT NULL` added `NOT VALID` is read as NOT NULL, though rows older than it may hold NULL.",
-          "heldBy": "packages/data-postgres/src/discovery-pg18.integration.test.ts"
         }
       ]
     },
@@ -2420,6 +2415,35 @@
     "0076": {
       "reviewed": "sha256:a37d99e570d9690172c18c129cf0df66884ca8dc650ccb5eca51ae2c9931c31c",
       "none": "A rule for this repository's documentation: the architecture sections and the guard that holds them are read by contributors, reviewers and evaluators, and nobody who installs, integrates or operates the module meets their costs."
+    },
+    "0077": {
+      "reviewed": "sha256:82ed3111ef554f9fd51b7ed6803bb1867063366771368138ac2a415317782a6f",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "On PostgreSQL 18 a column with a `NOT NULL` added `NOT VALID` is generated optional until `VALIDATE CONSTRAINT` runs, so a create or an update that leaves it empty is refused by the database, `not-null-violation`, where the form would have said a value is required, and a key over it lists no page and it is not offered as a version column."
+        },
+        {
+          "area": "forms",
+          "says": "On PostgreSQL 18 create is offered over a table with a `NOT NULL` added `NOT VALID` over a column no field writes on create -- of a type no codec reads, unreadable or not insertable -- and with no default, and the database refuses every create, `not-null-violation`, unless a trigger fills the column, where the column read `NOT NULL` kept create from being offered; the same holds on every version for the rule spelled as a check, which the generator does not read.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "Validating a `NOT NULL` added `NOT VALID` on PostgreSQL 18 tightens its column, which drift review reports and which blocks the writes of a form that writes it, and the create of a form no field of which writes it on create, until the form is reviewed.",
+          "heldBy": "packages/data-core/src/drift/columns.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A form published on PostgreSQL 18 before 0077 over a column with a `NOT NULL` added `NOT VALID` reads that column as loosened and a check as new: keyed by a unique key over the column, it lists no page until the constraint is validated, though a record is still read by its token; with the column as its version column, it has update and delete blocked, and a review cannot confirm the column again until the constraint is validated; and where its control cannot hold NULL -- a boolean shown as a checkbox -- its writes of the column are blocked until it is reviewed.",
+          "heldBy": "packages/data-core/src/records/drift.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "The expression of a `NOT NULL` added `NOT VALID` is spelled by the PostgreSQL adapter as `pg_get_expr` spells the same check on 18, and a later version that deparsed it otherwise would differ from the hand-written check unseen until a test ran on it.",
+          "heldBy": "packages/data-postgres/src/discovery-pg18.integration.test.ts"
+        }
+      ]
     }
   }
 }

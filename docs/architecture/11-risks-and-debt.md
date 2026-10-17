@@ -130,6 +130,12 @@ PostgreSQL 14 and older and SQL Server 2017 and older are not
 images of the matrix, and on PostgreSQL 18 a cascaded table's AFTER DELETE
 trigger runs with its owner's grants, so it does a delete 15 to 17 refuse
 ([0067](../decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)).
+A NOT NULL that PostgreSQL 18 added NOT VALID is read as a nullable column
+until it is validated, so a form generated over it may offer a create every
+insert then refuses, and one published before the reading changed has its
+page refused when its unique key covers such a column, and its update and
+delete when its version column is one, until review
+([0077](../decisions/0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md)).
 Every lookup search reads every row its form's row filter admits: no
 trigram index, prefix mode or minimum length ships, and the lookup deadline
 caps how long a search runs, not how much it reads

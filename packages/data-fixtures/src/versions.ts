@@ -123,7 +123,7 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
   notNullConstraints: {
     engine: 'postgres',
     says:
-      'PostgreSQL files each column’s NOT NULL in pg_constraint, a row of type n for every column pg_attribute holds NOT NULL, which every role reads as it reads the rest of pg_catalog; a server without it keeps NOT NULL in pg_attribute.attnotnull alone, and pg_constraint has no row for it. Discovery reads NOT NULL from attnotnull and checks of type c alone, so its snapshot of one table is the same on both',
+      'PostgreSQL files each column’s NOT NULL in pg_constraint, a row of type n for every column pg_attribute holds NOT NULL, which every role reads as it reads the rest of pg_catalog; a server without it keeps NOT NULL in pg_attribute.attnotnull alone, and pg_constraint has no row for it. Discovery reads NOT NULL from attnotnull, and a row of type n only when it is not validated, which only a NOT NULL added NOT VALID is and which it reads as a check (0077); no table of the shared model has one, so its snapshot of one table is the same on both',
     values: { 15: false, 16: false, 17: false, 18: true },
     source: 'PostgreSQL 18’s release notes, under constraints: "Store column NOT NULL specifications in pg_constraint"',
     measured: {
