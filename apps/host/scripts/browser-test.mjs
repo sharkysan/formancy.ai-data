@@ -87,14 +87,15 @@
 //     asks Google for a theme parameter given as `{ googleFont }`, and only
 //     for a grid given `loadThemeGoogleFonts`: the page does neither;
 //   - the page is sent with the Content-Security-Policy deploy/web/nginx.conf
-//     sends it, scripts/web-policies.mjs's, and in every state the browser
-//     refused nothing under it -- no event the document heard, no console
-//     line about the policy -- and at the end of each pass an inline script
-//     put in the page was refused and heard, so a pass under a policy nobody
-//     enforced, or with a listener that hears nothing, fails (0083); and the
-//     policy's one allowance, `'unsafe-inline'` in style-src, is needed:
-//     once a run, the page under the policy without it has the style
-//     elements AG Grid creates refused.
+//     sends it, scripts/web-policies.mjs's, and in every state, and after
+//     the last, the browser refused nothing under it -- no event the
+//     document heard, no console line about the policy -- and at the end of
+//     each pass an inline script put in the page was refused and heard, with
+//     nothing heard before it that no check read, so a pass under a policy
+//     nobody enforced, or with a listener that hears nothing, fails (0083);
+//     and the policy's one allowance, `'unsafe-inline'` in style-src, is
+//     needed: once a run, the page under the policy without it has the
+//     style elements AG Grid creates refused.
 //
 // Against the page `vite build` produces, served over HTTP from the same
 // origin as the real data server -- createDataServer, in this process, over
@@ -239,6 +240,9 @@ async function run(gate, browser) {
         // every web font had loaded by the end of the pass, or, where it
         // refuses them, none had.
         await afterEveryPass(gate, page, { dist: DIST, refused: refuseFonts, guard })
+        // What the document was refused after the last state measured, which
+        // no state's check reads (0083).
+        check('after the last state, the browser refused nothing under the page’s policy', await policyRefused(page))
         // Last in the pass, since the console line of its refusal is the
         // gate's own: every check of what the policy refused heard something.
         check('and the policy held: an inline script put in the page was refused, and the page heard the refusal', canaryProblem(await canary(page), POLICY))

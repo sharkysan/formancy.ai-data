@@ -164,11 +164,18 @@ export const violationsHeard = (page) => page.evaluate(() => (window.__formancyG
  * since the refusal is the gate's doing, not the page's; the console line
  * the refusal writes is not, so the canary is the last thing a gate does
  * in a document.
+ *
+ * What the window held when it started -- heard after the gate's last read
+ * and read by no check -- is taken off too, as `unread`, and fails the
+ * canary's check: a gate reads what its document was refused after its
+ * last measured state (policyRefused) just before it, which leaves
+ * nothing there. That read is the gate's, since the console lines are
+ * read there too.
  */
 export function canary(page) {
   return page.evaluate(async (wait) => {
     const heard = window.__formancyGateViolations ?? []
-    const before = heard.length
+    const unread = heard.splice(0)
     const arrived = new Promise((settle) => document.addEventListener('securitypolicyviolation', () => settle(performance.now()), { once: true, capture: true }))
     const started = performance.now()
     const script = document.createElement('script')
@@ -176,16 +183,15 @@ export function canary(page) {
     document.head.append(script)
     script.remove()
     const at = await Promise.race([arrived, new Promise((settle) => setTimeout(() => settle(null), wait))])
-    const count = heard.length - before
-    heard.splice(before)
-    return { ran: window.__formancyGateCanary === true, heard: count, after: at === null ? null : at - started }
+    return { ran: window.__formancyGateCanary === true, heard: heard.splice(0).length, unread, after: at === null ? null : at - started }
   }, CANARY_WAIT_MS)
 }
 
 /** What the canary's check fails with, or null: `policy` is the header's value the page was meant to be sent with. */
-export function canaryProblem({ ran, heard }, policy) {
+export function canaryProblem({ ran, heard, unread = [] }, policy) {
   if (ran) return `it ran, so the page was measured under no policy, not ${policy.slice(0, 32)}…`
-  return heard === 0 ? 'refused, and heard by nothing, so the checks before it heard nothing either' : null
+  if (heard === 0) return 'refused, and heard by nothing, so the checks before it heard nothing either'
+  return unread.length === 0 ? null : `refused and heard, but before it the document had heard what no check read: ${refusedProblem(unread, [])}`
 }
 
 /** What a check that the browser refused nothing fails with, or null: what the document heard and the console said, each once, the first four. */

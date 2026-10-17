@@ -164,6 +164,18 @@ describe('what a page is refused under its policy (0069, 0083)', () => {
     expect(canaryProblem({ ran: true, heard: 0 }, policy)).toBe("it ran, so the page was measured under no policy, not default-src 'none'; script-src '…")
     expect(canaryProblem({ ran: false, heard: 0 }, policy)).toBe('refused, and heard by nothing, so the checks before it heard nothing either')
   })
+
+  // What the document heard after its last measured state is on the window
+  // when the canary starts. A canary that took it off with its own refusal
+  // passed a pass in which the page was refused something no check read --
+  // an inline style put in the studio just before it failed nothing -- so
+  // whatever was there before it fails the canary, named.
+  test('fails what the document heard before the canary and no check read', () => {
+    const policy = "default-src 'none'; script-src 'self'"
+    const left = 'style-src-elem refused inline (http://127.0.0.1:4391/:1)'
+    expect(canaryProblem({ ran: false, heard: 1, unread: [] }, policy)).toBeNull()
+    expect(canaryProblem({ ran: false, heard: 1, unread: [left, left] }, policy)).toBe(`refused and heard, but before it the document had heard what no check read: ${left}`)
+  })
 })
 
 describe('systemOf', () => {
