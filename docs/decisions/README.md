@@ -136,3 +136,4 @@ only enforcement is "we remember" says so plainly.
 | [0079](0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md) | A person downloads the records a list shows them as one CSV file, made whole or not at all | accepted; extended by 0080 |
 | [0080](0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md) | A host downloads the records its grid lists, and the browser saves the server's file | accepted |
 | [0081](0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md) | A SQL login that asks for TLS is refused when the server answers that it will not encrypt, before its login is sent | accepted |
+| [0082](0082-a-sql-server-container-that-never-becomes-ready-says-how-it-ended-and-is-given-no-memory-bound.md) | A SQL Server container that never becomes ready fails its start with how Docker says it ended, and is given no memory bound | accepted |

@@ -823,6 +823,22 @@ encrypt is now refused before its login is sent (0081, under *Fixed*).
   client's PRELOGIN in a SQL Server's place with the answer it is given
   and keeps the type of every packet the client sends after it, so a test
   reads what the real driver puts on the wire.
+- **For contributors**: a SQL Server container that never says it is
+  ready now fails its start with how Docker says it ended -- its exit
+  code, whether the OOM killer stopped it, when -- and the last 40 lines
+  it wrote, after testcontainers' "Log stream ended and message ... was
+  not received", which was all two failed starts of SQL Server 2025 on CI
+  said on 2026-10-17 before the runner took the container away; every
+  container data-fixtures starts carries the label
+  `ai.formancy.data.caller`, the file that asked for it. Why not a memory
+  bound, the suspected cause: measured, SQL Server 2025 starts in about
+  1 GiB on 20 CPUs and 0.6 GiB on four, less than 2022, data-server's
+  suite at CI's three workers peaked at 4,138 MiB of containers, and the
+  first failure ran one SQL Server on a 16 GB runner. The cause is not
+  established, a start that fails so still fails its job, and data-fixtures'
+  suite starts one more SQL Server, killed while it starts, on every
+  image
+  ([0082](docs/decisions/0082-a-sql-server-container-that-never-becomes-ready-says-how-it-ended-and-is-given-no-memory-bound.md)).
 
 What refusing costs, in 0081: a stream of the adapter's own in front of
 tedious, written against what tedious 20.3.3 uses of its socket and how it

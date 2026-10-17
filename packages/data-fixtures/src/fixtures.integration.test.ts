@@ -7,7 +7,7 @@ import { getContainerRuntimeClient } from 'testcontainers'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { blockTable } from './blocking.js'
 import type { PostgresFixture, SqlServerFixture } from './containers.js'
-import { SQLSERVER_DATABASE, startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
+import { CALLER_LABEL, SQLSERVER_DATABASE, startPostgresFixture, startSqlServerFixture, WRITER } from './containers.js'
 import { connectDocker } from './docker.js'
 import { selectedImage } from './images.js'
 import { FILTER_PARITY } from './parity.js'
@@ -531,6 +531,23 @@ describe("the fixtures' containers", () => {
     ] as const) {
       const inspected = await client.container.inspect(client.container.getById(fixture.containerId))
       expect({ image: inspected.Config.Image, running: inspected.State.Running }).toEqual({ image, running: true })
+    }
+  })
+
+  // Every process on one daemon that finds the same Ryuk shares its session
+  // label, another worktree's suite on a workstation included, so the label
+  // naming the file that asked is what tells a run's containers from
+  // another's: what unready.integration.test.ts finds the container it kills
+  // by (0082). A label naming data-fixtures' own file, as a caller read from
+  // the wrong stack frame would, would let that file kill a SQL Server any
+  // other suite of the checkout started beside it; no label, and `docker ps`
+  // cannot say which test left a container running.
+  test('are labelled with the file that started them', async () => {
+    const client = await getContainerRuntimeClient()
+    const here = fileURLToPath(import.meta.url)
+    for (const fixture of [pg, ms]) {
+      const inspected = await client.container.inspect(client.container.getById(fixture.containerId))
+      expect(inspected.Config.Labels[CALLER_LABEL]).toBe(here)
     }
   })
 

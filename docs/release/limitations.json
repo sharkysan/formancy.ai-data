@@ -2732,6 +2732,10 @@
           "heldBy": "packages/data-sqlserver/src/adapter.integration.test.ts"
         }
       ]
+    },
+    "0082": {
+      "reviewed": "sha256:c1d299a7d1bc4733e39bc91a21f955f3b8e17505ad10cda2b39ccb6d2b36c7f2",
+      "none": "Test support for this repository's suites: data-fixtures is never published, and nobody who installs, integrates or operates the module starts its containers or reads how one that failed to start is reported."
     }
   }
 }

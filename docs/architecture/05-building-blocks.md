@@ -274,7 +274,10 @@ Test support, private. One business model written for each engine
 answers to (`conformance.ts`) (0005); the `parity` schema and the one
 expectation per case both adapters' parity suites share (`parity.ts`, 0028);
 the shared cases by id, which a test declares with `covers()` (`cases.ts`,
-0035); the containers (`containers.ts`); a TCP hop that can lose an answer
+0035); the containers (`containers.ts`), each labelled with the file that
+started it, and the report a SQL Server container that never became ready
+fails its start with, Docker's account of how it ended and its last lines
+(`unready.ts`, [0082](../decisions/0082-a-sql-server-container-that-never-becomes-ready-says-how-it-ended-and-is-given-no-memory-bound.md)); a TCP hop that can lose an answer
 after the database sent it (`tcp-hop.ts`, 0031); a stand-in that answers a
 client's PRELOGIN in a SQL Server's place and keeps the type of every
 packet the client sends after (`prelogin.ts`, 0081); the sized customer table
