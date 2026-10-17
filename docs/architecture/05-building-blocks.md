@@ -30,6 +30,10 @@ beside them, private, for tests and measurement:
              data-fixtures         data-core, both drivers, testcontainers
              data-performance      data-server, data-client, both adapters,
                                    data-fixtures
+
+and the live demo's own code, private, which nothing installs:
+             live-demo             data-core; the demo's data, people, forms
+                                   and Worker, which forwards the runtime plane
 ```
 
 What each manifest lets it import:
@@ -45,7 +49,8 @@ What each manifest lets it import:
 | `@formancy/data-performance` | no | data-core, data-client, data-server, both adapters, data-fixtures, both drivers, `jose` | — |
 | `@formancy/data-examples` | no | data-core; formancy's renderers, engine, spec and themes; Fontsource's faces; React, Angular | data-fixtures, data-postgres and `postgres` for the snapshot capture; `@formancy/conformance` |
 | `@formancy/data-studio` | no | data-core, `@formancy/builder-core`; formancy's React renderer, engine, spec and themes; Fontsource's faces; React | data-server, both adapters, data-fixtures, `@formancy/conformance` |
-| `@formancy/data-host` | no | data-client; formancy's renderers, engine, spec and themes; Fontsource's faces; AG Grid Community; React, Angular | data-core, data-server, data-fixtures, both drivers, `@formancy/conformance` |
+| `@formancy/data-host` | no | data-client; formancy's renderers, engine, spec and themes; Fontsource's faces; AG Grid Community; React, Angular | data-core, data-server, data-fixtures, both drivers, `@formancy/conformance`; data-live-demo, for the Worker's answer types in the demo build and its code in the tests |
+| `@formancy/data-live-demo` | no | data-core, in the Worker and the image's programs | data-server and data-fixtures in its tests and the image's build; `postgres`; `@cloudflare/workers-types`, for the Worker's types alone |
 
 **What holds it.** The manifests, and pnpm's isolated linker
 (`node-linker=isolated` in `.npmrc`), which links into a package's
@@ -292,7 +297,8 @@ that product on purpose (0063).
 
 ### The applications
 
-Every app is private, built by Vite, and carries the licence and notice
+Every app with a page -- the examples page, the studio and the host page --
+is private, built by Vite, and carries the licence and notice
 texts of everything it bundles in `THIRD-PARTY-NOTICES.txt` (0046). Each
 is formancy.ai's admin applied: `admin.css`'s variables copied into the
 app's stylesheet, which `scripts/palette.test.mjs` holds to the other
@@ -354,7 +360,34 @@ form, layout and view, never the record (`src/layout.ts`). `src/host.tsx`
 loads the workspace, AG Grid with it, only after sign-in.
 `src/plane.test.tsx` reads every request off the wire against the server's
 own `ROUTE_OPERATIONS` and fails on any other; the suites run against the
-real server on both engines.
+real server on both engines. Its demo build, `build:demo`, is the live
+demo's page: `src/main.tsx` takes the demo's wiring only in Vite's `demo`
+mode, which the ordinary build drops; `src/demo.ts` asks the path the page
+was served from for the demo's people and a sign-in, and
+`src/persona-sign-in.tsx` offers each person as a button where the token
+form would be, then asks for the menu through a client made as the token
+form makes it, at that path
+([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
+
+**`apps/live-demo`** is the live demo's own code, and has no page: the host
+page's demo build is its page. It is built by tsdown, like a package, and
+nothing installs it. `src/data/` generates the sample sales data from a
+fixed seed, with no dependency and no clock, holds it to its invariants
+and writes it as SQL for the image; `src/personas.ts` says once what each
+person's role may do on each form, which the forms' policies and the page's
+sentences are both derived from; `src/token.ts` signs their tokens with
+WebCrypto; `src/image/` generates and publishes the four forms during the
+image's build, through the real administrator's plane. `src/worker/` is
+everything the Worker decides with -- the routes, the cookie, the
+sign-in's refusals, the answers and the headers it forwards, the key and
+the wait for a start -- tested in Node; `src/worker.ts`, its `fetch` and
+the `DemoServer` Durable Object, is the one file that imports
+`cloudflare:workers`, which no suite runs. The image it starts is
+`deploy/demo/Dockerfile`, beside `deploy/demo/build.sh`, which loads and
+publishes at build time, and `deploy/demo/start.sh`, which starts each
+container; `apps/live-demo/wrangler.json` is the Worker's config, which
+`scripts/live-demo.mjs` refuses to deploy unless it is exactly the demo's
+(0070).
 
 In a deployment the studio and the host page are served by one nginx
 (`deploy/web/nginx.conf`) at `/studio/` and `/host/`, beside `/v1` on the

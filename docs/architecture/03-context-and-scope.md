@@ -56,6 +56,7 @@ tables below.
 | formancy → this repository | npm, exact versions | `scripts/upstream-deps.mjs` refuses anything else (0002); an upstream release is adopted the day it is published ([0055](../decisions/0055-an-upstream-release-is-adopted-the-day-it-is-published.md)) |
 | This repository → integrators | npm packages, ESM only, with provenance; the server image | `@formancy/data-core`, the two adapters, `@formancy/data-server` and `@formancy/data-client`. `pnpm test:e2e:install` installs the packed tarballs into a plain project and type-checks it with `skipLibCheck` off |
 | Cloudflare → the examples page | Static files from a Worker with no code, at `formancy.ai/data/examples/` | No server, database or plane behind it; generation runs in the browser over a captured snapshot ([0021](../decisions/0021-generated-forms-preview-in-both-frameworks.md), [0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)) |
+| A visitor → the live demo | The host page's demo build from static files at `formancy.ai/data/demo/`; a sign-in and the runtime plane through a Worker, a Durable Object per visitor and a Cloudflare Container of their own | The real server and PostgreSQL in each visitor's container, started only by a sign-in from the page and gone, with every change, when it sleeps; not a deployment of the product ([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)) |
 
 ## What is deliberately outside the boundary
 
@@ -91,7 +92,8 @@ tables below.
 - **More than one server process.** One process and one volume, for the
   reasons [section 9](09-quality-requirements.md#94-qualities-deliberately-not-pursued)
   gives. Running the product at Cloudflare is left to a later record
-  (0037).
+  (0037); the live demo runs a server per visitor there, for itself alone
+  (0070).
 - **Markup and styling of a form.** A published form is drawn by formancy's
   renderers and themes; nothing this repository adds to a form carries
   styling

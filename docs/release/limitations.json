@@ -902,7 +902,7 @@
       "none": "A rule for this repository's branches; nobody who installs, integrates or operates the module meets it."
     },
     "0037": {
-      "reviewed": "sha256:06428a4b9a685b5db17abe07cbfe3c9d4e0a102350e359e3df4d9ba63138ac97",
+      "reviewed": "sha256:ded3cae1878e11d104759e2aa14ed272adf4234c2566119a3bc5e99f3948bf42",
       "limitations": [
         {
           "area": "operations",
@@ -1325,7 +1325,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:148f0698114ec6abd35784f9cf69ec186d096e47756511470b8b1ca19c225f28",
+      "reviewed": "sha256:4fcb9d088f6d0f89f6a37abbdb2fe0aa5b0a403dce1f538ae227321564e804dc",
       "limitations": [
         {
           "area": "host",
@@ -2224,7 +2224,7 @@
       ]
     },
     "0069": {
-      "reviewed": "sha256:515f7f10cfe67f03d52f68407f49605db2ff858742b7a817b1d433938a3843df",
+      "reviewed": "sha256:54a1cbef6b2d6c2c3cf178ab53dbf2fb6e2fd11e7c0c10bccf06b1c6bf3de449",
       "limitations": [
         {
           "area": "operations",
@@ -2277,6 +2277,71 @@
         {
           "area": "testing",
           "says": "The examples gate's check of what the browser refused holds the page's code and not axe's: what Playwright evaluates, axe included, was measured to run outside the page's Content-Security-Policy in Chromium and Firefox."
+        }
+      ]
+    },
+    "0070": {
+      "reviewed": "sha256:bf5aed0da800286bbde9a1110d0a25849ac5fe6a00e584e05dae5cb3579ba659",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The live demo at formancy.ai/data/demo/ needs the rightsholder's Cloudflare account on the Workers Paid plan, $5 a month, and is billed while anybody uses it: at the prices read on 2026-10-16 a visit of ten minutes' use costs about $0.0037 once the plan's included amounts, about 67 such visits a month, are spent, and ten servers running a whole 30-day month cost at most $201.66 with every CPU busy, beside the Worker's and the Durable Objects' requests, which were not computed."
+        },
+        {
+          "area": "operations",
+          "says": "Anybody can start a live demo server and one visitor can take every one of the ten places, after which every other sign-in is refused, with the one sentence every failed start gets, until a server stops; a rate limiting rule of the zone on the sign-in is the operator's to add, and nothing here sets or reads it."
+        },
+        {
+          "area": "operations",
+          "says": "Everything a visitor changes in the live demo is gone when their server stops, 10 minutes after its Durable Object goes inactive, which Cloudflare documents as 10 s to 140 s after their last request and nobody has measured, and on every deploy whose image changed, which restarts every running demo server at once."
+        },
+        {
+          "area": "operations",
+          "says": "The live demo runs PostgreSQL alone: nothing of SQL Server is on it."
+        },
+        {
+          "area": "operations",
+          "says": "A live demo visitor's first sign-in waits for their own server to start, 5.7 and 6.8 s through the Worker at basic's CPU and memory share on a workstation on 2026-10-17, and is refused past 30 s, which a start took there on a busy Docker engine; on Cloudflare neither a start nor a request's way through the Worker and the Durable Object has been measured."
+        },
+        {
+          "area": "operations",
+          "says": "Cloudflare runs the live demo's Worker, a Durable Object per visitor and their containers on formancy.ai's zone, decrypts every request at its edge, and holds whatever a visitor types, personal data included, in their container until it stops."
+        },
+        {
+          "area": "access",
+          "says": "The live demo's one cookie, `__Secure-formancy-data-demo`, is the only credential of a visitor's server: whoever holds it while that browser keeps it can sign in to that server and read and change what the visitor changed."
+        },
+        {
+          "area": "operations",
+          "says": "With observability off, Cloudflare keeps no log of the live demo's Worker or containers, so a failed start is diagnosed by reproducing it."
+        },
+        {
+          "area": "operations",
+          "says": "The live demo's Content-Security-Policy allows inline styles, for the style elements AG Grid injects, where the examples page's allows none."
+        },
+        {
+          "area": "operations",
+          "says": "Each deploy whose live demo image changed pushes another image of about 198 MB compressed, as `gzip -1` of `docker save` measured it on 2026-10-16, into the account's 50 GB, and old ones are deleted by hand."
+        },
+        {
+          "area": "operations",
+          "says": "The live demo's server stops a lookup after 3,568 ms, four times the product's default, because its container has a quarter of a CPU."
+        },
+        {
+          "area": "operations",
+          "says": "The live demo is main's server, image and page, which Workers Builds builds whole and deploys on every push without waiting for CI, beside the examples page's build and against the same build minutes, and whether its build fits Workers Builds' 20-minute limit is first read in the first build's log."
+        },
+        {
+          "area": "testing",
+          "says": "The live demo's Durable Object code is held by review: its gate runs the Worker's module over a stand-in for Cloudflare's runtime whose containers are `docker run`s under CPU and memory quotas, which takes no network away, stops nothing when idle and caps nothing, and what Cloudflare answers at the cap and how long a server outlives its visitor are read once, by hand, after the first deploy."
+        },
+        {
+          "area": "testing",
+          "says": "The live demo's page is measured in Chromium alone, by its gate, and that the ordinary host build carries none of the demo's code was read once, on 2026-10-16, and nothing checks it."
+        },
+        {
+          "area": "testing",
+          "says": "The live demo's PostgreSQL is not among the servers the release report says the run was tested on."
         }
       ]
     },
