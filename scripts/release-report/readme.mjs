@@ -75,10 +75,23 @@ function engineCell(facts, engine) {
   return `${code(facts.images[engine])}${also.join('')}; an image outside the matrix that one file names shows only what that file shows`
 }
 
+/**
+ * README.md's row for the products a snapshot recognises and no test runs
+ * on (0073), from data-core's UNTESTED_PRODUCTS: Azure SQL Database and
+ * Managed Instance, which before it the README did not name at all. None
+ * when every product is tested, rather than an empty row.
+ */
+function untestedRows(facts) {
+  if (facts.untested.length === 0) return []
+  const them = facts.untested.length === 1 ? 'it' : 'them'
+  return [['**Recognised, not tested**', `${prose(facts.untested.map(({ name }) => name))}: a snapshot names ${them} and says this release was not tested on ${them}`, '']]
+}
+
 /** README.md's block: one table, every row derived. */
 export function readmeTable(facts) {
   const rows = [
     ...facts.engines.map((engine) => [`**${engineName(engine)}**`, engineCell(facts, engine), '']),
+    ...untestedRows(facts),
     ...facts.runtime.map((entry) => [
       entry.under === undefined ? `${code(entry.name)}, by ${code(entry.package)}` : `${code(entry.name)}, under ${code(entry.under)}`,
       entry.loaded,

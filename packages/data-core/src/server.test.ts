@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { serverName, serverStanding, SQLSERVER_RELEASES, TESTED_SERVERS } from './server.js'
-import type { ServerFacts } from './server.js'
+import { serverName, serverStanding, SQLSERVER_RELEASES, TESTED_SERVERS, UNTESTED_PRODUCTS } from './server.js'
+import type { ServerFacts, TestedServer } from './server.js'
 
 /**
  * Whether a server is one this release was tested on (0068): pure, over
@@ -141,6 +141,42 @@ describe('serverName', () => {
     expect(serverName('sqlserver', sqlserver(12, 160, 'azure-sql-database'))).toBe('Azure SQL Database')
     expect(serverName('sqlserver', sqlserver(16, 160, 'azure-sql-managed-instance'))).toBe('Azure SQL Managed Instance')
     expect(serverName('sqlserver', sqlserver(16, 160, 'other'))).toBe('a server that speaks SQL Server’s protocol and is no SQL Server product Formancy Data knows')
+  })
+})
+
+describe('UNTESTED_PRODUCTS', () => {
+  // No test runs on Azure SQL Database or Managed Instance (0073), and the
+  // README's "Recognised, not tested" row is derived from this list. A
+  // product dropped from it -- an Azure product added to TESTED_SERVERS, a
+  // filter turned round -- would leave the README silent where 0073 says
+  // it speaks; a tested product in it would tell a buyer that PostgreSQL 17
+  // was not tested. `other` names no product, so it is never listed.
+  test('names Azure SQL Database and Azure SQL Managed Instance, and no product the release was tested on', () => {
+    expect(UNTESTED_PRODUCTS).toEqual([
+      { product: 'azure-sql-database', name: 'Azure SQL Database' },
+      { product: 'azure-sql-managed-instance', name: 'Azure SQL Managed Instance' },
+    ])
+  })
+
+  // The list and serverStanding must never disagree: the row says "not
+  // tested" from the list, the connection test and drift review from the
+  // standing. The cases above hold each Azure product at one major and
+  // level; this holds every listed product at every major and compatibility
+  // level the release was tested at, on both engines, so an Azure product
+  // answering another tested major, or a standing that read the major
+  // before the product, is still never called tested.
+  test('lists only products serverStanding calls not tested at every major and level the release was tested at', () => {
+    for (const { product } of UNTESTED_PRODUCTS) {
+      for (const kind of ['postgres', 'sqlserver'] as const) {
+        const tested: TestedServer = TESTED_SERVERS[kind]
+        for (const major of tested.majors) {
+          for (const compatibility of [tested.compatibilityFloor, major * 10]) {
+            const facts: ServerFacts = compatibility === undefined ? { product, major } : { product, major, compatibility }
+            expect(serverStanding(kind, facts).tested, `${product} ${String(major)} at ${String(compatibility)} on ${kind}`).toBe(false)
+          }
+        }
+      }
+    }
   })
 })
 

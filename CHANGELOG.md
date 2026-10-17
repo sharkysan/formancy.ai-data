@@ -163,6 +163,19 @@ later.
   gain the `section` property, the `move-dropped` conflict and a
   `field-gone` for a section; no upstream version changes
   ([0075](docs/decisions/0075-a-field-may-move-to-another-generated-section.md)).
+- **The release says that no test runs on Azure SQL**, where it said
+  nothing: not on Azure SQL Database, Azure SQL Managed Instance or SQL
+  Server on an Azure VM. Why: the product told an administrator so once an
+  Azure database was connected (0068), but the README named only the
+  images the release is tested on, and a buyer on Azure read that silence
+  as a question answered. The two Azure SQL services have no image a test
+  can start, so under 0003 they cannot be tested here. *What it is tested
+  on* gains a row, "Recognised, not tested", derived from
+  `@formancy/data-core`'s new `UNTESTED_PRODUCTS` -- Azure SQL Database and
+  Azure SQL Managed Instance -- and the release's register names all three
+  ([0073](docs/decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md)).
+  New exports of `@formancy/data-core`: `UNTESTED_PRODUCTS`, and the type
+  `NamedProduct`.
 
 ### Changed
 
@@ -404,6 +417,19 @@ normal width, which the static guard refuses first; a machine with a font
 installed under the name Archivo draws the headings in it; and the gates
 see only the requests the states they reach make, and the static guard
 reads no JavaScript.
+
+What saying so costs, in 0073: an estate on Azure SQL is told this release
+was not tested on it in the README, the register, every connection test
+and every drift review; on Azure SQL nothing proves discovery, the record
+operations, `rowversion`, triggers, row-level security, a lookup's
+cancellation, the Redirect connection policy's ports 11000 to 11999 or the
+error 40613 a paused serverless database answers while it resumes, the
+last two as Microsoft documents them; what Azure answers for its
+`ProductVersion` and its editions is Microsoft's documentation too, not
+measured here; SQL Server on an Azure VM is called tested when its release
+and its database's level are, though every test ran SQL Server on Linux in
+a container; and an Azure database that accepts Entra logins only cannot
+be connected to.
 
 ## 0.1.0 — 2026-10-16
 

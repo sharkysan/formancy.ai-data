@@ -57,7 +57,7 @@ only enforcement is "we remember" says so plainly.
 |---|---|---|
 | [0001](0001-a-paid-module-in-its-own-repository.md) | A paid module lives in its own repository, under its own licence | accepted; extended by 0048 |
 | [0002](0002-depend-on-upstream-never-copy-it.md) | Depend on released upstream packages at exact versions; never copy them | accepted; spec 4 window closed, 0042; extended by 0055 |
-| [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted; narrowed by 0067 |
+| [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted; narrowed by 0067; extended by 0073 |
 | [0004](0004-a-snapshot-says-what-it-could-not-see.md) | A metadata snapshot says what it could not see, and is made in one place | accepted; narrowed by 0027; extended by 0049 |
 | [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026, 0027, 0034, 0043, 0049, 0056 |
 | [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057, 0067 |
@@ -126,4 +126,5 @@ only enforcement is "we remember" says so plainly.
 | [0069](0069-the-examples-page-is-served-at-formancy-ai-data-examples.md) | The examples page is served at formancy.ai/data/examples/, by a Worker of its own that Cloudflare deploys from main, under a policy that refuses anything inline | accepted; narrowed by 0072 |
 | [0071](0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md) | The server believes a forwarded client address only from the proxies an operator names, each by its address, and the composed stack names its nginx and cloudflared alone | accepted |
 | [0072](0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md) | The apps serve their own fonts, from Fontsource's packages at the release formancy.ai installs, and no page asks another host for anything | accepted |
+| [0073](0073-azure-sql-is-not-tested-and-the-release-says-so.md) | Azure SQL Database, Azure SQL Managed Instance and SQL Server on an Azure VM are not tested, and the release says so where it said nothing | accepted |
 | [0075](0075-a-field-may-move-to-another-generated-section.md) | A field may move to another generated section, recorded on its own entry and carried by what it stands for | accepted |

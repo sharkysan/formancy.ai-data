@@ -84,6 +84,25 @@ export const TESTED_SERVERS = {
   sqlserver: { product: 'sqlserver', majors: [15, 16, 17], compatibilityFloor: 150 },
 } as const satisfies Readonly<Record<DatabaseKind, TestedServer>>
 
+/** A product a server is recognised as, and the name a person reads for it. */
+export interface NamedProduct {
+  product: ServerProduct
+  name: string
+}
+
+/**
+ * The products a server is recognised as that this release was tested on
+ * none of (0073): every `ServerProduct` that no engine of TESTED_SERVERS
+ * names, but `other`, which names no product. Derived from the two, so an
+ * Azure product a later record tests leaves this list without an edit here;
+ * the README's "Recognised, not tested" row is derived from it, and
+ * serverStanding calls none of them tested, since it compares the product
+ * first.
+ */
+export const UNTESTED_PRODUCTS: readonly NamedProduct[] = (Object.keys(PRODUCT_NAMES) as ServerProduct[])
+  .filter((product) => product !== 'other' && !Object.values(TESTED_SERVERS).some((tested: TestedServer) => tested.product === product))
+  .map((product) => ({ product, name: PRODUCT_NAMES[product] }))
+
 /** Whether a server is one this release was tested on, and a sentence a person reads that says so. */
 export interface ServerStanding {
   tested: boolean
