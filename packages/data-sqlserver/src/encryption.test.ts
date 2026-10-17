@@ -328,6 +328,32 @@ describe('the guard', () => {
     expect(Buffer.concat(heard)).toEqual(Buffer.from([TDS_PACKET.PRELOGIN, 0x17, 0x02]))
   })
 
+  // What every connection with TLS on pays for the guard (0081): after the
+  // answer, each chunk the socket reads is passed on as that same memory,
+  // queued and emitted once more, and only the first message, withheld
+  // until it is read, is copied. A guard that copied each chunk would
+  // allocate and copy everything the server sends a second time, a cost
+  // 0081 says it does not have. Watched failing with each chunk after the
+  // answer passed on as a copy.
+  test("passes on each chunk after the answer as the socket's own memory, not a copy", async () => {
+    const { guarded, raw, server } = await loopback()
+    const fromSocket: Buffer[] = []
+    raw.on('data', (chunk: Buffer) => fromSocket.push(chunk))
+    const passed: Buffer[] = []
+    guarded.on('data', (chunk: Buffer) => passed.push(chunk))
+    guarded.write(Buffer.from([TDS_PACKET.PRELOGIN]))
+    server.write(preloginAnswer(PRELOGIN_ENCRYPTION.ON))
+    await turn()
+    for (const fill of [1, 2, 3, 4, 5]) {
+      server.write(Buffer.alloc(30_000, fill))
+      await turn()
+    }
+    const after = passed.slice(1)
+    expect(Buffer.concat(after)).toEqual(Buffer.concat([1, 2, 3, 4, 5].map((fill) => Buffer.alloc(30_000, fill))))
+    const own = (chunk: Buffer): boolean => fromSocket.some((read) => read.buffer === chunk.buffer && read.byteOffset === chunk.byteOffset && read.length === chunk.length)
+    expect(after.filter((chunk) => !own(chunk))).toEqual([])
+  })
+
   // A refusal ends the TCP connection, so nothing tedious might write
   // after it reaches the server, and passes nothing of the answer on.
   test('ends the connection on an answer of NOT_SUP, with the sentence, and passes nothing', async () => {

@@ -24,10 +24,11 @@
   a loopback socket: nothing of an answer split across two reads and two
   packets passes until it is whole, then all of it; an answer with bytes
   after it in one read passes whole, and everything after passes both
-  ways; NOT_SUP ends the connection with the sentence and passes nothing;
-  an answer that came before the client wrote is decided on only once it
-  has; and a server that ends before its answer is whole ends the stream
-  without an error.
+  ways; each chunk after the answer is passed on as the socket's own
+  memory, not a copy; NOT_SUP ends the connection with the sentence and
+  passes nothing; an answer that came before the client wrote is decided
+  on only once it has; and a server that ends before its answer is whole
+  ends the stream without an error.
   `packages/data-sqlserver/src/adapter.integration.test.ts`, on the run's
   image of the matrix (0067) -- a SQL login with `encrypt: true` and the
   container's certificate trusted logs in through the guard, its pool's
@@ -43,9 +44,9 @@
   opened says the adapter's sentence; and neither the password nor the
   user reaches the log, an answer or an audit event.
   `packages/data-fixtures/src/prelogin.test.ts` -- the stand-in answers
-  only after a PRELOGIN, keeps each packet's type in order, closes at a
-  LOGIN7 and at a TLS record, and settles only once every connection it
-  accepted has closed.
+  only after a PRELOGIN, keeps each packet's type in order, keeps a LOGIN7
+  a close cuts short, closes at a LOGIN7 and at a TLS record, and settles
+  only once every connection it accepted has closed.
   Each was watched failing on 2026-10-17 with what it holds removed: the
   refusal (the stand-in heard `[PRELOGIN, LOGIN7]` from mssql answered
   NOT_SUP, OFF or no ENCRYPTION option, the stream passed the answer on and
@@ -63,8 +64,12 @@
   login with `encrypt: true` in `adapter.integration.test.ts` failed
   with the unreadable sentence); nothing passed after the answer (on 2022
   the TLS handshake never finished, and the connect timed out at 15 s); the refusal naming
-  the user and password (both leak checks); and in the stand-in, an
-  answer on accept, `settled()` resolving at once, and LOGIN7 not kept.
+  the user and password (both leak checks); each chunk after the answer
+  passed on as a copy (five chunks of 30,000 bytes, none the socket's
+  own memory); and in the stand-in, an answer on accept, `settled()`
+  resolving at once, LOGIN7 not kept, and a packet's type kept only once
+  the packet was whole (part of a LOGIN7 and then a close was kept as
+  `[PRELOGIN]`, which review found).
 
 ## Context
 
@@ -198,8 +203,12 @@ shared the machine, passed alone, its 2 tests, when run again.
   tedious's `connectInSequence` -- its DNS handling, an order of
   addresses -- does not reach a SQL login with `encrypt: true` until it
   is copied here, and nothing says one was made.
-- **Every byte the server sends is copied once more**, through the guard's
-  stream, for the life of each connection. Measured on 2026-10-17 on the
+- **Every byte the server sends passes through one more stream**, the
+  guard's, for the life of each connection: each chunk the socket reads
+  is queued and emitted once more, the same memory and not a copy, and
+  only the reads that carry the server's first message are copied, into
+  the buffer it is withheld in (`encryption.test.ts` fails when a chunk
+  after the answer is passed on as a copy). Measured on 2026-10-17 on the
   default image, on the machine above while other suites shared it, seven
   rounds each, alternating, after one warm-up: reading 200,000 rows of 100
   bytes over TLS took 1,097 to 3,340 ms through `connectSqlServer`'s

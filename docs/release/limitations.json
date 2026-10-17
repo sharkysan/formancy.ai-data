@@ -2672,7 +2672,7 @@
       ]
     },
     "0081": {
-      "reviewed": "sha256:186613187be1d89c2a01f28c181f65b66e8fbce7e1dba7a1b507ed5a1407b0d5",
+      "reviewed": "sha256:d5447a83571e8927b4ba6e2b1d930a8763b8c428d98dc1c489e6e9167ebb3729",
       "limitations": [
         {
           "area": "databases",
@@ -2693,7 +2693,8 @@
         },
         {
           "area": "operations",
-          "says": "Every byte a SQL Server sends on a connection with TLS on is copied once more, through the guard's stream, for the life of the connection; a measurement on a shared machine on 2026-10-17 could not tell what that costs from the spread between its own rounds, and none was made on a quiet one."
+          "says": "Every byte a SQL Server sends on a connection with TLS on passes through one more stream, the guard's, for the life of the connection, each chunk queued and emitted once more and only the reads carrying the server's first message copied; a measurement on a shared machine on 2026-10-17 could not tell what that costs from the spread between its own rounds, and none was made on a quiet one.",
+          "heldBy": "packages/data-sqlserver/src/encryption.test.ts"
         },
         {
           "area": "operations",

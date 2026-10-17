@@ -812,8 +812,9 @@ reads the answer, which a tedious release can break -- the suites through
 the guard would show it -- and nothing shows tedious fixing the downgrade
 itself; the adapter's own copy of tedious's `connectInSequence` for these
 connections, so a later fix to it does not reach them until copied; every
-byte the server sends copied once more, which a measurement on a shared
-machine could not tell from its own spread; a server
+byte the server sends passed through one more stream, each chunk emitted
+once more and only the reads carrying its first message copied, which a
+measurement on a shared machine could not tell from its own spread; a server
 that cannot encrypt at all, NOT_SUP, refused where 0.1.0 logged in to it,
 and reached only with `tls.enabled: false`, the login then unencrypted by
 that choice; with the server's certificate trusted, whoever answers can
