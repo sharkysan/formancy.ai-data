@@ -534,6 +534,12 @@ later.
   and `RELEASING.md`, which it links rather than repeats.
   `scripts/setup.test.mjs` holds the Workers, scripts and Wrangler it names
   to the code, and `scripts/architecture.test.mjs` its links and paths.
+- **For contributors**: `scripts/release-report/tested-on.mjs` names the
+  packages whose built output it reads, `BUILT_INPUTS`, and refuses to read
+  another; `scripts/release-report/workflows.test.mjs` fails when the
+  report job's build, with what turbo builds before it, leaves one out.
+  Why: the report read data-sqlserver's logins (0074) from a build the job
+  never made, and stopped on every pull request with "is not built".
 - **For contributors**: `pnpm test:pictures` and `pnpm test:browser` find
   Playwright's browsers where `PLAYWRIGHT_BROWSERS_PATH` puts them, as
   Playwright's own image does at `/ms-playwright`. turbo runs both in strict
