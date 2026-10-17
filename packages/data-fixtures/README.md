@@ -141,7 +141,8 @@ dropped the key from the end of its order would show on both engines.
   is one packet saying `PRELOGIN_ENCRYPTION.OFF`, `NOT_SUP`, `ON` or
   `REQ`, and `tdsPacket` and `preloginPayload` build others -- and keeps,
   in `sent`, the type of every packet the client sends, one list per
-  connection, closing it at the first that is not a PRELOGIN or at a TLS
+  connection, from the packet's first byte, so one a close cuts short is
+  kept too, closing it at the first that is not a PRELOGIN or at a TLS
   record. `settled()` resolves once every connection it accepted has
   closed, so a suite reads `sent` when nothing more can arrive. It speaks
   no more TDS than that and no TLS, and keeps no packet's bytes, so no

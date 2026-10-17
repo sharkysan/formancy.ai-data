@@ -6,7 +6,8 @@ import type { AddressInfo } from 'node:net'
  * network path between a client and its server can (0081). It reads the
  * client's PRELOGIN, writes the answer it was given -- a PRELOGIN response
  * whose ENCRYPTION option says OFF or NOT_SUP, say -- and from then on only
- * listens: it keeps the type of every TDS packet the client sends, and
+ * listens: it keeps the type of every TDS packet the client sends, from
+ * the packet's first byte, so one a close cuts short is kept too, and
  * closes the connection at the first that is not a PRELOGIN, or at a TLS
  * record, since it speaks no more TDS than that and no TLS at all.
  *
@@ -84,20 +85,23 @@ export async function startPreloginStandIn(answer: Uint8Array): Promise<Prelogin
     socket.once('close', () => sockets.delete(socket))
     socket.on('error', () => {})
     let buffered = Buffer.alloc(0)
+    /** Whether the packet `buffered` starts with has had its type kept: at its first byte, before it is whole. */
+    let kept = false
     socket.on('data', (chunk: Buffer) => {
       buffered = Buffer.concat([buffered, chunk])
       while (buffered.length > 0) {
         const type = buffered[0] ?? 0
+        if (!kept) types.push(type)
+        kept = true
         if (type === TDS_PACKET.TLS_HANDSHAKE) {
-          types.push(type)
           socket.destroy()
           return
         }
         if (buffered.length < HEADER) return
         const length = buffered.readUInt16BE(2)
         if (buffered.length < length) return
-        types.push(type)
         buffered = buffered.subarray(Math.max(length, HEADER))
+        kept = false
         if (type !== TDS_PACKET.PRELOGIN || types.length > 1) {
           socket.destroy()
           return

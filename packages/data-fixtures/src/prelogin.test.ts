@@ -59,6 +59,24 @@ test('answers a PRELOGIN with what it was given, keeps the type of what follows,
   expect(listener.sent).toEqual([[TDS_PACKET.PRELOGIN, TDS_PACKET.LOGIN7]])
 })
 
+// A packet is kept from its first byte, not once it is whole: a client
+// that sent part of a LOGIN7 -- its header and the first of its payload,
+// where the user and password sit -- and then closed has put a login on
+// the wire, and a stand-in that waited for the whole packet would read
+// `[PRELOGIN]`, what the suites call "LOGIN7 is never sent". Watched
+// failing with the type kept only once the packet was whole: `[[0x12]]`.
+test('keeps a LOGIN7 a close cuts short', async () => {
+  const answer = preloginAnswer(PRELOGIN_ENCRYPTION.NOT_SUP)
+  const listener = await standIn(answer)
+  const { socket, received, closed } = await client(listener.port)
+  socket.write(tdsPacket(TDS_PACKET.PRELOGIN, Buffer.from([0xff])))
+  await until(received, answer.length)
+  socket.end(tdsPacket(TDS_PACKET.LOGIN7, Buffer.alloc(200, 0x61)).subarray(0, 120))
+  await closed
+  await listener.settled()
+  expect(listener.sent).toEqual([[TDS_PACKET.PRELOGIN, TDS_PACKET.LOGIN7]])
+})
+
 // A client that opens with TLS, as an Entra pool does over TDS 8.0, is
 // kept as the TLS record's first byte and closed: the stand-in speaks no
 // TLS, and a client that waited on it would hang its suite.
