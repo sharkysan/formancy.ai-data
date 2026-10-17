@@ -235,6 +235,30 @@ export function agGridRowProblem(browser, id, said) {
 }
 
 /**
+ * Null when `browser`, in `counts` -- the host gate's focusScroll: for the
+ * window and for a scroller, the trials in which a focus scrolled it, and in
+ * how many of them the page went on saying the scroll from before, in the
+ * task that focused -- answered as 0058's reportsFocusScroll says, for each:
+ * in none where the row says it says so at once, in some where it says it
+ * does not. A kind of scroll no focus of the probe made was measured by
+ * nothing.
+ */
+export function focusScrollProblem(browser, counts) {
+  const says = FACTS.reportsFocusScroll.values[browser]
+  for (const [kind, { trials, late }] of Object.entries(counts)) {
+    const what = kind === 'window' ? 'the window' : 'a scroller'
+    if (trials === 0) return `no focus of the probe scrolled ${what}, so 0058’s reportsFocusScroll was measured by nothing there`
+    if ((late === 0) === says) continue
+    const did =
+      late === 0
+        ? `said where every one of ${String(trials)} focuses scrolled ${what}, in the task that focused`
+        : `went on saying where ${what} was before ${String(late)} of ${String(trials)} focuses scrolled it, in the task that focused`
+    return unlikeTheTable(browser, { did, says: says ? 'it says so at once' : 'it says so only after a rendering update' })
+  }
+  return null
+}
+
+/**
  * What every gate does at the end of every pass, on the page the pass drew,
  * in every browser: records once per run what the browser said it was and
  * the system it ran on; checks the web fonts against what `dist` asks for --

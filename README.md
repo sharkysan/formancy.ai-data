@@ -870,7 +870,8 @@ WebKit, the browsers [*What it is tested on*](#what-it-is-tested-on) names —
 with every check in every one, and the report fails a run in which an app's
 gate left no results in one of them, or made a check in one browser it did
 not make in another. Where the browsers differ — Firefox's Tab after a click,
-whether a lost save is sent again, what AG Grid takes WebKit for — the
+whether a lost save is sent again, what AG Grid takes WebKit for, when WebKit
+says where a focus scrolled the page — the
 difference is a named fact in that file, held by the checks it names, and
 the report fails a run in which a gate did not make one of them in a browser
 ([0058](./docs/decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).

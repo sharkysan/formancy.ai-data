@@ -3,12 +3,13 @@
 // notice, a refused list and an order line opened alone, whose Order is a
 // plain select (0066) -- each measured by the gate's `measured` on the
 // way -- and what only a real browser shows about the grids: one Tab stop
-// each, End reaching the last column, the focused cell's teal border and the
+// each, Home showing a row's first cell whole and End reaching the last
+// column, the focused cell's teal border and the
 // open row's bar against the row, the columns fitted again when the
 // separator is let go, and no host rule reaching into a grid.
 
 import { FORM, LINES, TOKENS } from './plane.mjs'
-import { contrast, describeFocus, focusedOn, paintedWhere, parseColor, until, WITHIN } from './measure.mjs'
+import { contrast, describeFocus, focusedOn, paintedWhere, parseColor, settled, until, WITHIN } from './measure.mjs'
 import { rulesReaching } from './styles.mjs'
 
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
@@ -61,7 +62,15 @@ async function focusRing(page) {
   return { ratio: contrast(border.rgb, inside) }
 }
 
-/** The open row's bar -- the rect in the first cell's SVG, at its centre -- against the tint around it, as painted. */
+/**
+ * The open row's bar -- the rect in the first cell's SVG, at its centre --
+ * against the tint around it, as painted, where the window shows them: a
+ * point the window cuts off is black in a screenshot, so a bar out of view
+ * is said, not read. Until 2026-10-16 it was read: in five of CI's WebKit
+ * runs the Records grid had stayed 40 px to the side after Home (in
+ * 'Records, side by side'), the bar's points lay left of the window, and
+ * black against black read 1:1.
+ */
 async function bar(page) {
   const at = await paintedWhere(page, () =>
     page.evaluate(() => {
@@ -71,10 +80,15 @@ async function bar(page) {
       if (cell === undefined || cell === null || rect === null || rect === undefined) return null
       const mark = rect.getBoundingClientRect()
       const box = cell.getBoundingClientRect()
-      return { points: [{ x: mark.left + mark.width / 2, y: mark.top + mark.height / 2 }, { x: box.left + 4, y: box.top + 4 }] }
+      const points = [{ x: mark.left + mark.width / 2, y: mark.top + mark.height / 2 }, { x: box.left + 4, y: box.top + 4 }]
+      // What the window shows there: the bar at the first point, its cell at the second.
+      const [onBar, onCell] = points.map(({ x, y }) => document.elementFromPoint(x, y))
+      const named = (hit) => (hit === null ? 'nothing, outside the window' : `${hit.tagName.toLowerCase()} "${(hit.textContent ?? '').trim().slice(0, 30)}"`)
+      return { points, hidden: onBar === rect && cell.contains(onCell) ? null : `the window shows ${named(onBar)} where it is drawn, ${named(onCell)} beside it` }
     }),
   )
   if (at === null) return { problem: 'no open row with its bar is drawn' }
+  if (at.hidden !== null) return { problem: `the open row's bar is out of view: ${at.hidden}` }
   const [mark, tint] = at.colours
   return { ratio: contrast(mark, tint) }
 }
@@ -106,9 +120,27 @@ export function workspaceJourney(plane, { check }, run) {
       check('Shift and an arrow on a header moves no column', !onHeader ? `the keyboard is on ${await describeFocus(page)}, not a header` : moved.join('|') === order.join('|') ? null : `${order.join(', ')} became ${moved.join(', ')}`)
       // AG Grid scrolls the header into view even when it does not move it:
       // Home on the row below scrolls the grid back to its first column,
-      // where the open row's bar is measured later.
+      // where the open row's bar is measured later. A rendering update
+      // before Home and after it: in WebKit the page hears of a scroll a
+      // focus made only at the next one (0058's reportsFocusScroll), and AG
+      // Grid keeps its scrollbar in step with its grid by what it hears.
+      // Pressed at once, Home's scroll back was undone by the echo of the
+      // header's, and the grid stayed 40 px to the side, its first column
+      // cut, in 3 of 130 WebKit runs of the state on 2026-10-16 and in none
+      // of Chromium's or Firefox's; a person's keys are frames apart.
       await page.keyboard.press('ArrowDown')
+      await settled(page)
       await page.keyboard.press('Home')
+      await settled(page)
+      const first = await page.evaluate(() => {
+        const cell = document.activeElement?.closest('[role="gridcell"]')
+        const well = cell?.closest('.grid-bench')
+        if (cell === null || cell === undefined || well === null || well === undefined) return { problem: 'the focus left the grid' }
+        const box = cell.getBoundingClientRect()
+        const edge = well.getBoundingClientRect()
+        return { first: cell.getAttribute('aria-colindex') === '1', cut: Math.round(Math.max(edge.left - box.left, box.right - edge.right, 0)) }
+      })
+      check('Home on a row: the keyboard is on its first cell, shown whole', first.problem ?? (first.first && first.cut === 0 ? null : `on the first cell: ${String(first.first)}; ${String(first.cut)} px of it outside the grid's well`))
       // A phone arrives in Separate views (UX-SPEC D14); the journey starts side by side, which a narrow window draws stacked.
       await page.getByRole('radio', { name: 'Side by side', exact: true }).check()
       // Where the separator is drawn, a pointer moves it, within its limits, and the share is kept for the viewer.

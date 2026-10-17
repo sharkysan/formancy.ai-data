@@ -105,6 +105,20 @@ later.
   writes `THIRD-PARTY-NOTICES.txt` as the studio and the host page do,
   because it is now served to anyone (0046). Its header says that no server
   and no database are behind it, and links this repository.
+- **The host browser gate waits for a rendering update between the keys
+  that scroll the Records grid, checks that Home shows a row's first cell
+  whole, and says a bar it cannot see rather than reading it**, and 0058's
+  table names why (`reportsFocusScroll`). In WebKit the page hears of a
+  scroll a focus made only at the next rendering update, and AG Grid keeps
+  its scrollbar in step with its grid by what it hears: Home, pressed in
+  the same moment as the scroll that put a header in view, was undone by
+  that scroll's echo, the grid stayed 40 px to the side, and the open row's
+  bar, out of view, was read as black against black. That was CI's 1:1 in
+  five of its 35 WebKit runs from 2026-10-14 to 2026-10-16. A person's keys
+  are frames apart, and nothing a person sees changes; an integrator's own
+  browser tests pressing keys that fast in WebKit can meet it. The gate
+  also measures the row in every browser, once a run, and fails when a
+  browser release changes it.
 - **The examples browser gate serves the page where the demo is**, under
   `/data/examples/` with the demo's headers over the types Cloudflare
   gives each file, and fails on anything the browser refuses under the

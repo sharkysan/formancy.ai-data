@@ -182,6 +182,12 @@ const SANDBOX = Object.freeze({
 /** Nothing in the browser's code was read for this row: it is what the gates measured. */
 const NOT_READ = 'nothing read in its code: the row is what the gates measured'
 
+/** The committed host gate on a machine, one browser at a time, and the probe that found the row: what reportsFocusScroll was measured by until CI's runs replace it. */
+const FOCUS_PROBE = Object.freeze({
+  on: '2026-10-16',
+  by: 'the committed host gate, FORMANCY_BROWSERS naming one browser at a time, in WSL 2: Ubuntu 24.04.1, x86_64, 20 CPUs, Node v22.23.3, Playwright 1.63.0; and before it, each in one task, 299 focuses that scrolled a 320x900 window and 199 that scrolled a 280-px scroller sideways: WebKit said the scroll from before in the focusing task after every one and the new one an animation frame later after every one, and a read from another task said the new one 2 ms after the focus at the median and 6 ms at most; Chromium and Firefox said the new one at once after every one',
+})
+
 /**
  * What the browsers disagree on, each row held by the checks `heldBy` names,
  * which its gate makes in every browser under one name (0058). `values` is
@@ -282,5 +288,12 @@ export const FACTS = Object.freeze({
         'ag-stack 36.2.0, dist/package/main.esm.mjs:2664-2675; Playwright’s Linux WebKit names a Mac in its user agent and Linux in navigator.platform, with no touch points, so ag-grid-community 36.2.0’s macOS and iOS branches (dist/package/main.esm.mjs:9084 ag-apple-scrollbar, 9630, 29527, 29549, 29614, 29975, 47865) stay off',
     }),
     measured: Object.freeze({ chromium: SANDBOX, firefox: SANDBOX, webkit: SANDBOX }),
+  }),
+  reportsFocusScroll: Object.freeze({
+    says: 'after `focus()` scrolls the window or an element’s scroller to show an element, the page says the new scroll -- `scrollY`, `scrollLeft`, every box -- in the task that focused; where it says it only at its next rendering update, a script that reads the scroll before then reads the one from before, as AG Grid’s keeping its scrollbar in step with its grid did',
+    heldBy: Object.freeze({ gate: 'apps/host', checks: Object.freeze(['a focus that scrolls the window or a scroller: the page says where to at once, as 0058’s table says of this browser']) }),
+    values: Object.freeze({ chromium: true, firefox: true, webkit: false }),
+    source: Object.freeze({ chromium: NOT_READ, firefox: NOT_READ, webkit: NOT_READ }),
+    measured: Object.freeze({ chromium: FOCUS_PROBE, firefox: FOCUS_PROBE, webkit: FOCUS_PROBE }),
   }),
 })

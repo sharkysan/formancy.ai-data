@@ -1,6 +1,6 @@
 # 0058 — The browser gates run in Chromium, Firefox and WebKit, and each fact the browsers disagree on is named and held
 
-- **Status:** accepted
+- **Status:** accepted; its table extended on 2026-10-16 by `reportsFocusScroll`: after a focus scrolls the window or a scroller, WebKit says the new scroll only at its next rendering update, and the host gate waits for one between the keys that scroll its grid
 - **Date:** 2026-10-13
 - **Deciders:** Daniel Bacher
 - **Verified by:**
@@ -253,6 +253,15 @@ record's; what follows is the committed gates' own.
     release, against the page's user agent, platform and touch points in
     every pass, and a repository test fails when the host pins another AG
     Grid until the rows are read again.
+  - `reportsFocusScroll`, added on 2026-10-16: after `focus()` scrolls the
+    window or an element's scroller to show an element, Chromium and
+    Firefox say the new scroll -- `scrollY`, `scrollLeft`, every box -- in
+    the task that focused, and WebKit only at its next rendering update.
+    The host gate holds it once per run, on a page of its own ("a focus
+    that scrolls the window or a scroller: the page says where to at once,
+    as 0058's table says of this browser"), and its workspace waits for a
+    rendering update before and after the Home that scrolls the Records
+    grid back to its first column, and checks that it did.
   - **Each row names the checks that hold it**, `heldBy`, and the report
     fails a run in which that gate did not make one of them in a browser:
     the comparison below holds the browsers to each other, so a check
@@ -456,6 +465,12 @@ stack: in the probe, a WebKit that loaded no font passed every check.
 - **The WebKit leg's fonts** include Playwright's tools group, which
   `install-deps` adds and the other legs lack; each leg records its
   fallback family.
+- **The host gate presses Home a rendering update after the keys before
+  it**, and waits for another after it (`reportsFocusScroll`), in every
+  browser: what AG Grid does with keys that come faster than WebKit's
+  rendering updates -- which left its grid to the side -- is measured by
+  no gate, and an integrator's own browser tests, pressing keys that fast
+  in WebKit, can meet it.
 - **What is not covered.** WebKit here is the WPE port with the runner's
   libsoup, not Safari: it moves Tab to links, which Safari does by default
   only with Option-Tab, AG Grid's Safari paths run on it, and how Safari's

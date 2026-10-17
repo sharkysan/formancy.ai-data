@@ -46,6 +46,12 @@
 //     FACTS.claimsSafari and claimsMacOs say, which decide the code paths
 //     the grids take: Playwright's Linux WebKit names itself Safari on a
 //     Mac, and its platform Linux;
+//   - after a focus scrolls the window or a scroller, the page says the new
+//     scroll in the task that focused, as FACTS.reportsFocusScroll says of
+//     this browser: Chromium and Firefox do, WebKit only at its next
+//     rendering update, which the workspace waits for between the keys
+//     that scroll the Records grid, so that Home leaves it at its first
+//     column, which is checked;
 //   - a delete (0053): a row's Delete reached by the arrow keys as a real
 //     button named for its record, from which Tab leaves the grid in one
 //     stop; the confirmation under the grid that asked, or under the
@@ -94,11 +100,11 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { startTcpHop } from '@formancy/data-fixtures'
-import { afterEveryPass, agGridRowProblem, environmentOf, rowUnmeasured } from '../../../scripts/browser-gate.mjs'
+import { afterEveryPass, agGridRowProblem, environmentOf, focusScrollProblem, rowUnmeasured } from '../../../scripts/browser-gate.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { deleteJourney } from './browser/deleting.mjs'
 import { recordJourney } from './browser/journey.mjs'
-import { audit, decide, describeFocus, focusedOn, measureWidth } from './browser/measure.mjs'
+import { audit, decide, describeFocus, focusedOn, focusScroll, measureWidth } from './browser/measure.mjs'
 import { startPlane } from './browser/plane.mjs'
 import { DIST, serve } from './browser/serve.mjs'
 import { widths } from './browser/styles.mjs'
@@ -203,6 +209,11 @@ async function run(gate, browser) {
     // browser takes when it can choose, which for Chromium and Firefox is
     // the resend 0031 rests on.
     check('the run measured 0058’s row for the connection this browser takes when it can choose', rowUnmeasured(gate.asked, reached))
+    // 0058's reportsFocusScroll, on a page of its own: after a focus that
+    // scrolls the window or a scroller, WebKit goes on saying the scroll
+    // from before until its next rendering update -- which is why the
+    // workspace waits for one between the keys that scroll its grid.
+    check('a focus that scrolls the window or a scroller: the page says where to at once, as 0058’s table says of this browser', focusScrollProblem(gate.asked, await focusScroll(browser)))
   } finally {
     await hop.close()
     http.close()
