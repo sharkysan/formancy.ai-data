@@ -50,6 +50,18 @@ runs over HTTP into the real server and through the real drivers on both
 engines in `packages/data-server/src/e2e.integration.test.ts`
 ([0025](../decisions/0025-each-adapter-owns-its-driver.md)).
 
+A SQL Server container that never says it is ready fails its start with
+testcontainers' sentence and, after it, how Docker says the container
+ended -- running or not, its exit code, whether the OOM killer stopped it
+-- and the last 40 lines it wrote, asked before testcontainers removes it;
+every container a starter starts is labelled with the file that asked for
+it. `packages/data-fixtures/src/unready.integration.test.ts` kills one with
+SIGKILL while it starts and holds the report to what Docker and the
+container said. Two starts of SQL Server 2025 on CI stopped before they
+were ready, on 2026-10-17, and said nothing more; memory, measured, does
+not explain them, and their cause is not established
+([0082](../decisions/0082-a-sql-server-container-that-never-becomes-ready-says-how-it-ended-and-is-given-no-memory-bound.md)).
+
 What it costs: a developer without Docker cannot run the adapter suites, and
 the first run pulls SQL Server's image, which is large. Only the adapter
 suites and data-fixtures run per image: the server's, the client's, the

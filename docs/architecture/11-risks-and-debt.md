@@ -333,7 +333,12 @@ tunnel (0037). That a host on `@formancy/*` 0.3.0 reads the generated forms
 was measured by hand (0042). Most transient error codes are allowlisted from
 documentation and provoked by no test (0028). The images are moving tags
 (0035), and only the adapter suites and data-fixtures run on every image of
-the matrix; every other suite runs the defaults alone (0067).
+the matrix; every other suite runs the defaults alone (0067). Why two
+SQL Server 2025 containers stopped before they were ready on CI on
+2026-10-17 is not known: a start that fails so now says how Docker says
+it ended, no container's memory is bounded, and the job still fails until
+it is rerun
+([0082](../decisions/0082-a-sql-server-container-that-never-becomes-ready-says-how-it-ended-and-is-given-no-memory-bound.md)).
 
 **Licence and notices.** See [§11.4](#114-the-release-gates-still-open) for
 the licence itself. The `@formancy` scope mixes upstream's Apache-2.0

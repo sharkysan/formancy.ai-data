@@ -310,6 +310,20 @@ fails when something does; a package that only reads Docker, as the
 performance harness does, uses `connectDocker()`. The adapters' own typed variables take
 `StartedPostgreSqlContainer` and `StartedMSSQLServerContainer` from here.
 
+Every container a starter starts carries the label `ai.formancy.data.caller`,
+the absolute path of the file that asked for it, so `docker ps --filter
+label=ai.formancy.data.caller` names the test behind each one; testcontainers'
+session label cannot, since every process on one daemon that finds the same
+Ryuk shares it. A SQL Server container that never logs "Recovery is
+complete" within the module's 120 s fails its start with testcontainers'
+sentence -- "Log stream ended and message ... was not received", or "not
+received after 120000ms" -- and after it how Docker says the container
+ended, asked before testcontainers removes it: still running, or stopped
+with its exit code, whether the OOM killer stopped it, Docker's error and
+when it started and finished; then its last 40 log lines. A 404 there is a
+container removed while it started
+([0082](../../docs/decisions/0082-a-sql-server-container-that-never-becomes-ready-says-how-it-ended-and-is-given-no-memory-bound.md)).
+
 ## Shared cases
 
 `sharedCases()` is every case both adapters are held to, by id: the model's

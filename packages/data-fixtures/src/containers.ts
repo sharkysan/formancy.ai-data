@@ -5,10 +5,12 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import mssql from 'mssql'
 import postgres from 'postgres'
+import { Wait } from 'testcontainers'
 import { selectedImage } from './images.js'
 import { readFixture, splitBatches } from './load.js'
 import type { ServerAnswer, ServerRecord } from './servers.js'
 import { captureCaller, recordServer } from './servers.js'
+import { reportingUnready } from './unready.js'
 
 /** The restricted principal both fixture files create. */
 export const READER = {
@@ -29,6 +31,16 @@ export const WRITER = {
   postgresPassword: 'writer-fixture-password',
   sqlServerPassword: 'Writer-Fixture-Password-1',
 } as const
+
+/**
+ * The label every container a starter here starts carries, naming the file
+ * that asked for it: the session label testcontainers sets is shared by
+ * every process on the daemon that found the same Ryuk (0082).
+ */
+export const CALLER_LABEL = 'ai.formancy.data.caller'
+
+/** The labels a container started for `caller` carries: none when no frame named a file. */
+const labelled = (caller: string | null): Record<string, string> => (caller === null ? {} : { [CALLER_LABEL]: caller })
 
 /** The database the SQL Server fixture is loaded into, rather than `master`. */
 export const SQLSERVER_DATABASE = 'formancy_fixture'
@@ -94,7 +106,7 @@ async function askPostgres(uri: string): Promise<ServerAnswer> {
 export async function startPostgresContainer(image: string = selectedImage('postgres')): Promise<StartedServer<StartedPostgreSqlContainer>> {
   // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
   const caller = captureCaller()
-  const container = await new PostgreSqlContainer(image).start()
+  const container = await new PostgreSqlContainer(image).withLabels(labelled(caller)).start()
   try {
     const answer = await askPostgres(container.getConnectionUri())
     return { container, server: recordServer({ engine: 'postgres', image, caller, compatibility: null, ...answer }) }
@@ -255,9 +267,17 @@ const WITH_CERTIFICATE = [
  * recorded by whoever started it, who knows what it loaded. Accepting the
  * EULA is the operator's act; in a test it is this call, the decision
  * compose.yaml makes a developer spell out.
+ *
+ * Ready is the module's own sign, "Recovery is complete" logged once, under
+ * the module's 120-second timeout; a start that never logs it fails with
+ * how Docker says the container ended and the last lines it wrote (0082).
  */
-async function launchSqlServer(image: string, start: SqlServerStart): Promise<{ container: StartedMSSQLServerContainer; answer: ServerAnswer; certificate: string | undefined }> {
-  const container = await (start.certificate === true ? new MSSQLServerContainer(image).withCommand(WITH_CERTIFICATE) : new MSSQLServerContainer(image)).acceptLicense().start()
+async function launchSqlServer(image: string, start: SqlServerStart, caller: string | null): Promise<{ container: StartedMSSQLServerContainer; answer: ServerAnswer; certificate: string | undefined }> {
+  const container = await (start.certificate === true ? new MSSQLServerContainer(image).withCommand(WITH_CERTIFICATE) : new MSSQLServerContainer(image))
+    .withWaitStrategy(reportingUnready(Wait.forLogMessage(/.*Recovery is complete.*/, 1)))
+    .withLabels(labelled(caller))
+    .acceptLicense()
+    .start()
   try {
     const answer = await askSqlServer(ownerOf(container, 'master'))
     if (start.certificate !== true) return { container, answer, certificate: undefined }
@@ -282,7 +302,7 @@ export async function startSqlServerContainer(
 ): Promise<StartedServer<StartedMSSQLServerContainer> & { certificate: string | undefined }> {
   // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
   const caller = captureCaller()
-  const { container, answer, certificate } = await launchSqlServer(image, start)
+  const { container, answer, certificate } = await launchSqlServer(image, start, caller)
   return { container, server: recordServer({ engine: 'sqlserver', image, caller, compatibility: null, ...answer }), certificate }
 }
 
@@ -329,7 +349,7 @@ async function loadSqlServerFixture(owner: mssql.config): Promise<number> {
 export async function startSqlServerFixture(image: string = selectedImage('sqlserver'), start: SqlServerStart = {}): Promise<SqlServerFixture> {
   // Before the first await, while whoever asked is on the synchronous stack (servers.ts, callerOf).
   const caller = captureCaller()
-  const { container, answer, certificate } = await launchSqlServer(image, start)
+  const { container, answer, certificate } = await launchSqlServer(image, start, caller)
   const owner = ownerOf(container, 'master')
   const base = { server: owner.server, port: owner.port, options: owner.options }
 
