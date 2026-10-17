@@ -967,6 +967,7 @@ other container runs.
 
 ## Documents
 
+- [`docs/README.md`](./docs/README.md) — where to start: the architecture, in arc42's twelve sections, and every other document below.
 - [`docs/getting-started.md`](./docs/getting-started.md) — from an empty machine with Docker and git to a published form on both engines; CI runs it as written.
 - [`docs/deploy/cloudflare.md`](./docs/deploy/cloudflare.md) — the composed stack behind a Cloudflare Tunnel and Access: every setting, what Cloudflare cannot do here, and what nobody has measured.
 - [`docs/performance.md`](./docs/performance.md) — what each runtime request but a page of records and the menu of forms costs through the shipped server on both engines, with the database's size, the machine, the network path and the date, and what holds each claim.

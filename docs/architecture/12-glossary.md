@@ -1,0 +1,104 @@
+# 12. Glossary
+
+Terms that mean something specific here, each as the code defines it, and
+that a reader will otherwise reasonably misread. Where a type names the
+term, the type is given; it is the definition, and this table follows it.
+
+| Term | Meaning in Formancy Data |
+|---|---|
+| **Actor** | Who is asking: `PolicyContext.actor`, an id and roles, which the server derives from a host token it verified and never from a request body ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md)) |
+| **Adapter** | One engine's implementation of the three ports -- `DatabaseAdapter`, `RecordAdapter`, `LookupAdapter` -- that owns its driver: `@formancy/data-postgres` and `@formancy/data-sqlserver` ([0025](../decisions/0025-each-adapter-owns-its-driver.md)) |
+| **Administrator plane** | The server's routes for connections, discovery, generation, publication, drafts and drift (`packages/data-server/src/routes/admin.ts` and its siblings), held by a role in the host's token ([0020](../decisions/0020-administration-is-a-separate-plane.md)) |
+| **Allowlist**, **connection** | `ConnectionConfig`: a database the deployment allows forms to bind to, by id, with its approved schemas and its password as a secret reference. A form reaches no other ([0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)) |
+| **Anchor** | `FieldAnchor`: what a field stands for -- a column, or a foreign key for a lookup -- which outlives the field's key ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)) |
+| **Attribute** | `PolicyContext.attributes`: one trusted string per name, such as `tenant`, that row filters compare with, so an actor acts in one tenant at a time ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md)) |
+| **Audit event** | One per request of either plane: actor, operation, form, version, status and outcome, never a value; a record is named by a keyed hash when the server has an audit key, and otherwise not at all ([0023](../decisions/0023-the-audit-trail-is-operational-not-evidence.md), [0033](../decisions/0033-the-administrator-plane-is-audited.md)) |
+| **Base** | The form exactly as the generator made it from a snapshot and a generation request, before any presentation ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)) |
+| **Bindings** | `FormBindings`: everything that is not the form -- where each field goes, which columns identify a record, how a stale update is detected, which operations are offered -- with the fingerprint of the snapshot they came from ([0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)) |
+| **Bundle** | `PublishedBundle`: one published version as one immutable document -- connection, form, bindings, policy and snapshot, and since format 2 the generation request, the base and the presentation -- checked on publish and on every read ([0013](../decisions/0013-published-configuration-is-files-with-link-based-swap.md), [0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)) |
+| **Canonical value** | A value as its column's codec spells it on the API: an exact number as a string, one spelling per value, never rounded ([0008](../decisions/0008-exact-values-travel-as-strings.md)) |
+| **Cascades** | `FormPolicy.cascades`: each foreign key a delete may act through, by table, name and action. A key that acts on delete and is not named refuses the delete ([0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)) |
+| **Child form** | A form with a lookup onto another form's identity, column for column, whose rows the menu offers under that form's records ([0045](../decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)) |
+| **Composed stack** | `compose.yaml`: both databases, the server, and one nginx serving the studio and the host page on the origin of `/v1`. A clean install to try the module on, not a production deployment ([0032](../decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)) |
+| **Concurrency token** | `ConcurrencyBinding`: SQL Server's `rowversion`, or a version column an administrator confirmed. An inferred one is never used ([0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md), [0015](../decisions/0015-a-record-operation-is-one-guarded-statement.md)) |
+| **Coverage gap** | `CoverageGap`: something a connection could not establish, as a subject, an aspect and a sentence, so that "there is none" and "this connection cannot tell" are different answers ([0004](../decisions/0004-a-snapshot-says-what-it-could-not-see.md)) |
+| **Deadline** | How long a lookup statement may run, `FORMANCY_DATA_LOOKUP_DEADLINE_MS`; its default is held to the slowest lookup the published figures hold ([0061](../decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md), [0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)) |
+| **Discovery** | `DatabaseAdapter.discover(scope)`: reading the catalog as the connected account, inside the approved schemas, into a snapshot made by `createSnapshot` ([0006](../decisions/0006-postgres-discovery-reads-pg-catalog.md), [0007](../decisions/0007-sqlserver-discovery-and-what-it-hides.md)) |
+| **Door** | One of the Cloudflare tunnel's two entrances, the administrator's behind Access and the runtime's, decided by path from the routes the built server registers, in `deploy/cloudflare/doors.json` ([0037](../decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)) |
+| **Draft** | Under review, a proposed version kept beside the published ones until a publisher who did not submit it approves it: `pending`, `rejected`, `published` or `stale` ([0065](../decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)) |
+| **Drift** | A difference between a fresh snapshot and the one a published form rests on, classified against that form's bindings and lookups as `blocking`, `review` or `info` ([0010](../decisions/0010-drift-is-classified-against-the-bindings.md)). The runtime refuses what blocks in the form's own table ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)) |
+| **Echo** | A submitted value for a field the actor may not write that is provably unchanged -- empty on create, equal to the stored value on update -- and so removed rather than refused ([0022](../decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)) |
+| **Engine** | PostgreSQL or SQL Server: `DatabaseKind` |
+| **Examples page** | `apps/examples`: forms generated in the browser from a captured snapshot and drawn by both renderers, with no server; served at formancy.ai/data/examples/ ([0021](../decisions/0021-generated-forms-preview-in-both-frameworks.md), [0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)) |
+| **Fact** (of a browser) | A row of `FACTS` in `scripts/browsers.mjs`: something Chromium, Firefox and WebKit disagree on, with each one's value, held by a check with one name in every browser ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)) |
+| **Fingerprint** | A hash of everything a binding depends on -- the engine, the account's user, the objects with their privileges and row security, the gaps -- and not the server version, the server's facts or the login ([0004](../decisions/0004-a-snapshot-says-what-it-could-not-see.md), [0027](../decisions/0027-a-snapshot-says-what-its-account-may-do.md)) |
+| **Generation request** | `GenerationRequest`: the connection, the root table, the form id and title, the lookups chosen, a confirmed version column and the pinned columns ([0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)) |
+| **Host** | The customer's application, which holds the identity and renders a published form through `@formancy/data-client`; `apps/host` is the reference host page ([0029](../decisions/0029-a-host-renders-a-published-form-through-one-client.md), [0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)) |
+| **Host token** | The token a host sends in `Authorization`, verified offline with a pinned algorithm against the keys in force ([0014](../decisions/0014-host-identity-is-verified-offline.md)) |
+| **Key set** | The host identity keys in force, each selected by `kid`, read from a key set file at start and again on SIGHUP; nothing is fetched ([0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)) |
+| **Limitations register** | `docs/release/limitations.json`: the costs each record states that a user, integrator or operator meets, held to the record by its hash ([0035](../decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)) |
+| **Lookup** | A foreign key of the form's table offered as a choice, with the target columns a person recognises a row by; answered by `LookupAdapter`'s `search`, `resolve` and `rejects`, and generated as a typeahead where a person can search it ([0012](../decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md), [0066](../decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)) |
+| **Lookup token**, **key token** | The one string a select stores for a referenced key: `k1:`, then each value in the key's column order, separated by commas, with every character but letters, digits, `-`, `.` and `_` escaped, so it is printable ASCII and has one spelling per key. A reference, never a permission ([0012](../decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md)) |
+| **Matrix** | `MATRIX_IMAGES`: for each engine the images the adapter suites and data-fixtures run on, the default first. A release is tested on these and no other server versions ([0067](../decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)) |
+| **Measured product** | The source files, installed runtime dependencies and build inputs the published performance figures were measured on; a release whose product differs is refused ([0034](../decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)) |
+| **Membership check** | `rejects`: of the tokens a save carries, those that are not members -- invented, malformed, another tenant's -- asked of the database before any write. One that cannot be answered refuses the save ([0022](../decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)) |
+| **Menu of forms** | `GET /v1/forms`: the forms a person may read and their children, from the published bundles, asking no database ([0045](../decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)) |
+| **Notes** | `GenerationNote`: what the generator inferred, excluded, made read-only or blocked, and what the database itself limits ([0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)) |
+| **Numbered key** | A key the database fills -- an identity, or a one-column key filled by `gen_random_uuid()` or `newsequentialid()` that no foreign key includes -- which a generated form never writes ([0056](../decisions/0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md), [0057](../decisions/0057-a-key-of-one-column-filled-by-a-never-repeating-default-counts-as-numbered.md)) |
+| **Option source** | The name a published form carries for a lookup's options, which the server resolves. A name it does not know fails closed ([0029](../decisions/0029-a-host-renders-a-published-form-through-one-client.md)) |
+| **Paper**, **room** | The paper is a form as a renderer draws it with a shipped theme; the room is the dark bench around it, in `admin.css`'s variables, whose rules never reach the paper ([0024](../decisions/0024-the-studio-speaks-only-the-admin-plane.md)) |
+| **Pinned column** | A column of the form's table the policy fills from the trusted context, typically the tenant: shown, never written from a request ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md)) |
+| **Plane** | One of the server's two sets of routes, the runtime plane and the administrator plane, audited through one set of hooks ([0020](../decisions/0020-administration-is-a-separate-plane.md), [0033](../decisions/0033-the-administrator-plane-is-audited.md)) |
+| **Planner** | `packages/data-core/src/records/plan.ts`, and `packages/data-core/src/records/list.ts` for a page: where a request meets the policy, the codecs, the tokens and the bindings and becomes a typed request to an adapter ([0018](../decisions/0018-one-planner-turns-answers-into-requests.md)) |
+| **Policy** | `FormPolicy`: who may read, create, update and delete; which roles may read and write each field; row filters, lookup filters, `through` and `cascades`. Deny by default, and no wildcard role ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md)) |
+| **Presentation** | `PresentationOverrides`: what a person chose over the base -- a field's label, a section's label, a field's place in its own section, full width -- and nothing else ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)) |
+| **Publisher** | Under review, a role named in `FORMANCY_DATA_PUBLISHER_ROLES`, which may approve another's draft and restore a version ([0065](../decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)) |
+| **Reassigned key** | A field key that names another column or foreign key than it did in the version being replaced, whose grants a publish must keep or remove by name ([0039](../decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md)) |
+| **Rebase** | Carrying a presentation onto a regenerated base by anchor, with each conflict reported ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)) |
+| **Reconcile** | `reconcile` in `@formancy/data-client`: one read that says what an unknown write's record shows now -- `unchanged`, `changed`, `present`, `absent` or `unverifiable` -- and never a resend ([0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md)) |
+| **Record token** | The key token of a record's identity values: how the API names one record. A reference, never a permission ([0018](../decisions/0018-one-planner-turns-answers-into-requests.md)) |
+| **Release report** | The report the last gate builds from what every job of its run found, never committed ([0035](../decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)) |
+| **Restore** | Publishing an earlier version again as a new one. It brings back that version's policy, and is not a database rollback ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)) |
+| **Row filter** | `RowFilterRule`: a column of the form's table that must equal a trusted attribute -- equality and nothing more -- the filter on read, update and delete and the value written on create. At run time a `RowFilterTerm`, typed from the snapshot and compared exactly, whatever the collation ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md), [0028](../decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)) |
+| **Runtime plane** | The routes a host's browser calls for the menu, a form, its records and its lookups, asking the policy on every request ([0022](../decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)) |
+| **Scope** | `DiscoveryScope`: the schemas an administrator approved. An adapter reads nothing outside them ([0004](../decisions/0004-a-snapshot-says-what-it-could-not-see.md)) |
+| **Shared case** | A case with one expectation in `@formancy/data-fixtures`, asserted through both adapters and declared with `covers()`; the release report fails a run in which it passed on one engine only ([0005](../decisions/0005-one-fixture-written-twice.md), [0035](../decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)) |
+| **Snapshot** | `MetadataSnapshot`: the catalog as one account saw it -- engine, server version, the server it was read from, account, scope, objects, gaps and fingerprint -- including what the account may do and what refers to each table ([0027](../decisions/0027-a-snapshot-says-what-its-account-may-do.md), [0049](../decisions/0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md), [0068](../decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)) |
+| **Standing** | `serverStanding`: whether this release was tested on a server -- the engine's product, a major of the matrix, and for SQL Server a compatibility level at the floor or above -- with a sentence a person reads. An unknown is never tested, and nothing refuses an untested server ([0068](../decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)) |
+| **Stale** | A write refused because the record's version is no longer the one its person read ([0015](../decisions/0015-a-record-operation-is-one-guarded-statement.md)) |
+| **Studio** | `apps/studio`, the administrator's application, speaking only the administrator plane ([0024](../decisions/0024-the-studio-speaks-only-the-admin-plane.md)) |
+| **Through** | `FormPolicy.through`: lookup fields whose target's filter also scopes the form's rows, which is how a child table with no tenant column of its own is kept to its parent's tenant, one hop at most ([0043](../decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)) |
+| **Unknown outcome** | `unknown-outcome`: the connection failed after a write was sent and before its result arrived. It may have committed, and nothing here retries it ([0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md)) |
+| **Version fact** | A row of `VERSION_FACTS` in `packages/data-fixtures/src/versions.ts`: something the versions of one engine disagree on, with a value per major, asserted on each leg of the matrix by the major its server answered ([0067](../decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)) |
+| **Version file** | One published version's file in the store, which moves between deployments and is imported as a publish the target's database must be able to serve ([0062](../decisions/0062-a-published-version-moves-between-deployments-as-its-version-file.md)) |
+| **Write id** | The random id the client sends with each write in the `formancy-write-id` header, so a copy the browser sends again is answered with the first answer rather than applied, within one server process ([0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md)) |
+
+## Collisions worth flagging
+
+**"Token"** means four things, and the documents say which. A *host token*
+is the identity a host sends in `Authorization`. A *lookup token* and a
+*record token* are references to a row, in one encoding. A *version token*
+is the value a read returns as a record's version and an update or a delete
+sends back. None of the last three is a permission.
+
+**"Version"** means a record's version, its concurrency token; a form's
+published version, a number in the store; a version file; the version of a
+stored format, such as the bindings' or a presentation's; a database
+server's version, whose major the matrix and the standing read; formancy's
+spec version, which generated forms keep at 3
+([0042](../decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md));
+and the licence's version line. A "stale version" is always the first.
+
+**"Snapshot"** here is a metadata snapshot of a database's catalog.
+Upstream formancy uses the same word for a field's frozen observable state;
+a reader moving between the two repositories should not carry one meaning
+into the other.
+
+**"Gate"** is a job of `.github/workflows/gates.yml`; an app's browser gate,
+one check script per app; or a release gate, numbered by the delivery plan
+and listed in `docs/release/gates.json`. [§10](10-verification.md) uses the
+first two, and [§11](11-risks-and-debt.md) the third.
+
+**"Drift"** is a change in the database against what a published form rests
+on. It is not the client and server disagreeing about a rule, which is what
+upstream's documents mean by the word.
