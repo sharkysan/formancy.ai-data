@@ -18,6 +18,7 @@
     "test:pictures": "turbo run test:pictures",
     "test:getting-started": "node scripts/getting-started.mjs",
     "test:cloudflare": "node scripts/cloudflare.mjs",
+    "test:live-demo": "node scripts/live-demo-gate.mjs",
     "pictures": "node scripts/pictures.mjs",
     "typecheck": "turbo run typecheck",
     "check:pkg": "turbo run check:pkg",

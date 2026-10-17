@@ -5,15 +5,20 @@
  * with a key of its own, signs their tokens with it, forwards their
  * requests to it, and forgets the key a day after no container runs.
  *
- * The only file that imports `cloudflare:workers`, and the only one no gate
- * runs: wrangler@4.146.0 refused to run a local container on Windows, and in
- * WSL against Docker Desktop its container never answered (measured on
- * 2026-10-16). So this file is held by review and by the first deploy's
- * reading (RELEASING.md), as 0069's Cloudflare behaviour was, and is
- * excluded from coverage for that reason. Everything it decides with --
- * the routes, the cookie, the refusals, the forwarded headers, the key and
- * the deadline -- is in worker/, tested in Node, and type-checked against
- * the Workers runtime's types by tsconfig.worker.json.
+ * The only file that imports `cloudflare:workers`, and the only one no
+ * suite runs: wrangler@4.146.0 refused to run a local container on Windows,
+ * and in WSL against Docker Desktop the sidecar it reaches containers
+ * through failed at its first iptables rule, so the container never
+ * answered (measured on 2026-10-16 and 2026-10-17). `pnpm test:live-demo`
+ * runs this module, built to dist/worker/cloudflare.mjs, in front of the
+ * real image over a stand-in for Cloudflare's runtime written from its
+ * documentation (scripts/live-demo-gate/cloudflare.mjs says what it is and
+ * is not); that workerd and Cloudflare's containers behave as documented is
+ * the first deploy's to read (RELEASING.md), as 0069's Cloudflare behaviour
+ * was. It is excluded from the suite's coverage for that reason. Everything
+ * it decides with -- the routes, the cookie, the refusals, the forwarded
+ * headers, the key and the deadline -- is in worker/, tested in Node, and
+ * type-checked against the Workers runtime's types by tsconfig.worker.json.
  *
  * It uses the Durable Object Container API (`ctx.container`), which
  * Cloudflare's documentation recommends for new applications, rather than
