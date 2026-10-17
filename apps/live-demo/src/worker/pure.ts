@@ -14,7 +14,7 @@ export { COOKIE_NAME, instanceCookie, instanceNameOf, newInstanceName } from './
 export { handle } from './handle.js'
 export type { DemoInstance, InstanceNamed } from './handle.js'
 export { IDLE_MINUTES, KEY_LIFETIME_MS, MAX_INSTANCES, POLL_MS, PREFIX, SIGN_IN_BYTES, START_DEADLINE_MS } from './limits.js'
-export { routeOf, RUNTIME_PATH, SESSION_PATH } from './routes.js'
+export { routeOf, RUNTIME_ROUTES, SESSION_PATH } from './routes.js'
 export type { Route } from './routes.js'
 export { claimsFor, personaById, readSignIn, sessionIndex, signInAnswer } from './session.js'
 export type { PersonaCard, SessionIndex, SignInRequest, SignInResult } from './session.js'

@@ -6,8 +6,9 @@
 // are held by journey.test.mjs.
 
 import { randomBytes } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { LIST_PAGE_SIZE, WRITE_ID_HEADER } from '../../packages/data-core/dist/index.mjs'
-import { COOKIE_NAME, IDLE_MINUTES, KEY_LIFETIME_MS, NOT_RUNNING, PAGE_SAFE_HEADERS, PER_TENANT, PERSONAS, PREFIX, ROLE_GRANTS, WORKER_HEADERS } from '../../apps/live-demo/dist/worker/pure.mjs'
+import { COOKIE_NAME, IDLE_MINUTES, KEY_LIFETIME_MS, NOT_RUNNING, PAGE_SAFE_HEADERS, PER_TENANT, PERSONAS, PREFIX, ROLE_GRANTS, SERVER_PORT, WORKER_HEADERS } from '../../apps/live-demo/dist/worker/pure.mjs'
 
 /** How the image publishes its forms' parents: customers' orders, and an order's deliveries and lines (apps/live-demo/src/image/forms.ts). */
 const CHILDREN = {
@@ -28,6 +29,21 @@ export function expectedMenu(role) {
   return Object.keys(CHILDREN)
     .filter((id) => grants.may[id].includes('read'))
     .map((id) => ({ id, title: TITLES[id], operations: grants.may[id], children: CHILDREN[id] }))
+}
+
+/**
+ * The routes the built server registers that 0037's runtime door does not
+ * forward, from deploy/cloudflare/doors.json (scripts/cloudflare/doors.mjs
+ * writes it from the server's router): `worker`, every one of them, which
+ * the Worker must answer itself; and `server`, the administrator's plane's,
+ * which the image, run without administrator roles, must not register at
+ * all. Each as `{ method, path, sample }`.
+ */
+export function closedRoutes(doors = JSON.parse(readFileSync(new URL('../../deploy/cloudflare/doors.json', import.meta.url), 'utf8'))) {
+  const shape = ({ method, path, sample }) => ({ method, path, sample })
+  const worker = doors.routes.filter((route) => route.runtimeDoor !== 'forwarded').map(shape)
+  const server = doors.routes.filter((route) => route.plane === 'administrator').map(shape)
+  return { worker, server }
 }
 
 /** How many pages `count` rows fill, `size` to a page. */
@@ -259,18 +275,43 @@ export async function apiJourney({ origin, stand, check, timed }) {
   const gone = await Promise.all([['order', doomed], ['order-line', doomedLine], ['delivery', doomedDelivery]].map(async ([form, made]) => (await a.api('POST', `/v1/forms/${form}/records/read`, { token: tokens.clara, body: { record: made.json?.record } })).status))
   check('deleting an order takes its line and its delivery with it', [doomed, doomedLine, doomedDelivery].some((made) => made.status !== 201) ? 'the order, its line or its delivery was not created' : (expectStatus('delete the order', deleted, 200) ?? (gone.every((status) => status === 404) ? null : `reads after the delete answered ${gone.join(', ')}`)))
 
-  // What only the Worker answers, and what nothing past it may.
-  const notPlain = await a.api('GET', '/v1/forms/a/versions/..%2F..%2Fb', { token: tokens.clara })
+  // What only the Worker answers, and what nothing past it may. A segment
+  // that a proxy decoding the path would read as climbing out of the form
+  // is one segment of GET /v1/forms/:id to the Worker, and the server's.
+  const notPlain = await a.api('GET', '/v1/forms/..%2F..%2Fb', { token: tokens.clara })
   check("a path that is not plain reaches the server as written and is its 400 path-not-plain", notPlain.status === 400 && notPlain.json?.code === 'path-not-plain' ? null : `answered ${String(notPlain.status)} ${notPlain.text.slice(0, 120)}`)
-  for (const path of ['/v1/connections', '/v1/whoami', '/v1/form-proposals']) {
-    const answer = await a.api('GET', path, { token: tokens.clara })
-    check(`${PREFIX}${path} is the Worker's own 404, never forwarded`, answer.status === 404 && answer.headers.get('content-security-policy') === WORKER_HEADERS['Content-Security-Policy'] ? null : `answered ${String(answer.status)}`)
-  }
-  const put = await a.api('PUT', '/v1/forms/order', { token: tokens.clara, body: {} })
-  check('another method is refused 405', put.status === 405 ? null : `answered ${String(put.status)}`)
-  const forwarded = answers.filter((answer) => answer.path.startsWith(`${PREFIX}/v1/forms`) && answer.status !== 405 && answer.status !== 503)
+  const forwarded = answers.filter((answer) => answer.path.startsWith(`${PREFIX}/v1/forms`) && answer.status !== 503)
   const unsafe = forwarded.filter((answer) => answer.headers.get('cache-control') !== 'no-store' || Object.entries(PAGE_SAFE_HEADERS).some(([name, value]) => answer.headers.get(name) !== value))
   check("every forwarded answer says no-store and carries nginx's three headers", forwarded.length > 20 && unsafe.length === 0 ? null : `${String(unsafe.length)} of ${String(forwarded.length)}: ${unsafe.slice(0, 2).map((answer) => `${answer.method} ${answer.path} ${String(answer.status)}`).join(', ')}`)
+
+  // Every route of the server's that 0037's runtime door does not forward
+  // -- the administrator's under /v1/forms/:id among them, POST
+  // /v1/forms/order/versions publishing -- is the Worker's own 404 and
+  // reaches no container.
+  const closed = closedRoutes()
+  const sent = (route) => ({ token: tokens.clara, ...(route.method === 'POST' ? { body: {} } : {}) })
+  const opened = []
+  for (const route of closed.worker) {
+    const answer = await a.api(route.method, route.sample, sent(route))
+    if (answer.status !== 404 || answer.headers.get('content-security-policy') !== WORKER_HEADERS['Content-Security-Policy']) opened.push(`${route.method} ${route.sample} answered ${String(answer.status)}`)
+  }
+  check(`each of the ${String(closed.worker.length)} routes 0037's runtime door does not forward is the Worker's own 404 under ${PREFIX}`, closed.worker.some((route) => route.method === 'POST' && route.sample === '/v1/forms/order/versions') && opened.length === 0 ? null : opened.join('; ') || 'POST /v1/forms/order/versions is not among them')
+
+  // And the running image has no administrator's plane: each of its
+  // routes, sent straight to the container's port past the Worker, is the
+  // server's own 404, so the image's settings -- not the Worker alone --
+  // keep publishing, importing and approving out of a visitor's reach.
+  const port = container.getTcpPort(SERVER_PORT)
+  const registered = []
+  for (const route of closed.server) {
+    const answer = await port.fetch(`http://container${route.sample}`, { method: route.method, headers: { authorization: `Bearer ${String(tokens.clara)}`, ...(route.method === 'POST' ? { 'content-type': 'application/json' } : {}) }, ...(route.method === 'POST' ? { body: '{}' } : {}) })
+    const said = await answer.text()
+    if (answer.status !== 404) registered.push(`${route.method} ${route.sample} answered ${String(answer.status)} ${said.slice(0, 80)}`)
+  }
+  check(`the running image registers none of the administrator's ${String(closed.server.length)} routes: each, sent straight to its port, is the server's own 404`, closed.server.length > 0 && registered.length === 0 ? null : registered.join('; ') || 'doors.json names no administrator route')
+
+  const put = await a.api('PUT', '/v1/forms/order', { token: tokens.clara, body: {} })
+  check('another method is refused 405', put.status === 405 ? null : `answered ${String(put.status)}`)
 
   return { a, tokens, record, touched: { record: touched.record, before }, objectOf }
 }

@@ -210,7 +210,9 @@ later.
   request. The
   Worker starts a container only on a sign-in from the page, at most ten
   at once, each with a key made for that start, and forwards the runtime
-  plane to it and nothing else; it sets one cookie, a random name for the
+  plane's routes to it, exactly those 0037's runtime door forwards, and
+  nothing else, none of the administrator's beside them under `/v1/forms`;
+  it sets one cookie, a random name for the
   visitor's container, which is that container's only credential.
   Workers Builds deploys it from `main` on every push, as the examples
   page; `pnpm live-demo:deploy` deploys it by hand, and GitHub holds no

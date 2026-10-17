@@ -314,7 +314,7 @@ is meant to go when their container sleeps.
 ```
  browser ─TLS─▶ Cloudflare's edge
                     │ /data/demo/ and its files: static assets, no code runs
-                    │ /data/demo/session and /data/demo/v1/forms…: the Worker
+                    │ /data/demo/session and /data/demo/v1/…: the Worker
                     ▼
                 Worker              one cookie, a random name, picks the
                 formancy-data-demo  visitor's Durable Object; forwards the

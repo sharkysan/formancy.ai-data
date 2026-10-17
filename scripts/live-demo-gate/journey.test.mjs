@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { PER_TENANT, ROLE_GRANTS } from '../../apps/live-demo/dist/worker/pure.mjs'
-import { cookieProblems, expectedMenu, lineTotal, pagesOf, units } from './journey.mjs'
+import { closedRoutes, cookieProblems, expectedMenu, lineTotal, pagesOf, units } from './journey.mjs'
 
 describe('what the journey expects', () => {
   // The menu a persona sees is a claim the page makes in their sentence;
@@ -54,5 +54,21 @@ describe('the cookie', () => {
     expect(cookieProblems([`${good}; Max-Age=3600`])).toEqual(['the cookie has a lifetime (Max-Age=3600), so it outlives the browser'])
     expect(cookieProblems([good.replace('Path=/data/demo/', 'Path=/')])).toEqual(['the cookie’s Path is /, not /data/demo/'])
     expect(cookieProblems([good.replace('0123456789abcdef0123456789abcdef', 'x')])).toEqual(['the cookie’s value is not 32 lowercase hex characters'])
+  })
+})
+
+describe('the routes the Worker keeps closed', () => {
+  // The gate asks the Worker, and the image past it, for every route 0037's
+  // runtime door does not forward, from doors.json: a list typed here would
+  // miss the next administrator's route the server adds under /v1/forms.
+  test("are every route doors.json does not forward, and the administrator's plane among them for the image", () => {
+    const { worker, server } = closedRoutes()
+    expect(worker.some((route) => route.method === 'POST' && route.sample === '/v1/forms/order/versions')).toBe(true)
+    expect(worker.some((route) => route.sample === '/v1/forms/order/records/list')).toBe(false)
+    expect(server.length).toBeGreaterThan(10)
+    for (const route of server) expect(worker, `${route.method} ${route.path}`).toContainEqual(route)
+    expect(server.some((route) => route.path === '/health' || route.path === '/v1/whoami')).toBe(false)
+    const doors = { routes: [{ method: 'GET', path: '/v1/forms', sample: '/v1/forms', plane: 'runtime', runtimeDoor: 'forwarded' }, { method: 'GET', path: '/v1/whoami', sample: '/v1/whoami', plane: 'shared', runtimeDoor: 'not forwarded' }, { method: 'POST', path: '/v1/x', sample: '/v1/x', plane: 'administrator', runtimeDoor: 'not forwarded' }] }
+    expect(closedRoutes(doors)).toEqual({ worker: [doors.routes[1], doors.routes[2]].map(({ method, path, sample }) => ({ method, path, sample })), server: [{ method: 'POST', path: '/v1/x', sample: '/v1/x' }] })
   })
 })

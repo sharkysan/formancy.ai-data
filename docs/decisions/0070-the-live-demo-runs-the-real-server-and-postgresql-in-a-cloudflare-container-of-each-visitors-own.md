@@ -66,15 +66,20 @@
   - **`scripts/live-demo.test.mjs`, in `pnpm test:repo`.** The Worker's
     config is the demo's and nothing more, the deploy refuses every config
     that is not, `PREFIX` and `MAX_INSTANCES` are what the config routes
-    and caps, the `_headers` file reads back as the live policy and fits
-    Cloudflare's limits, `.github/REPO-METADATA.md`'s settings are
-    `pnpm live-demo:deploy`'s two halves for this Worker and this
-    repository, and no workflow names a Cloudflare token or runs the
+    and caps, the Worker's `RUNTIME_ROUTES` are exactly the routes
+    `deploy/cloudflare/doors.json` says 0037's runtime door forwards, each
+    by its method, and every other route the server registers, by its
+    sample path, is not forwarded, the `_headers` file reads back as the
+    live policy and fits Cloudflare's limits, `.github/REPO-METADATA.md`'s
+    settings are `pnpm live-demo:deploy`'s two halves for this Worker and
+    this repository, and no workflow names a Cloudflare token or runs the
     deploy. Watched failing against a deploy script that accepted every
     config, a policy with a second allowance, the examples' main-module
     guard, the ignore lines removed, settings copied from the examples'
-    section, a workflow running the deploy, and build checks that ignored
-    the policy or the allowance they were given.
+    section, a workflow running the deploy, build checks that ignored the
+    policy or the allowance they were given, a Worker that forwarded all of
+    `/v1/forms` ("POST /v1/forms/:id/drafts: expected 'forward' not to be
+    'forward'") and one with the update route left out.
   - **`scripts/demo.test.mjs`, in `pnpm test:repo`,** unchanged in what it
     holds of the examples page, which its checks still pass. It reads the
     examples' settings from their own section of REPO-METADATA.md; with the
@@ -119,7 +124,10 @@
     from another site refused, the cold start and the one cookie, each
     persona's menu, nine pages of each tenant's orders, a search, the
     typeahead keeping to a tenant, the data's invariants through the
-    product, writes, refusals, the same create answered once, a second
+    product, writes, refusals, the same create answered once, every route
+    of the server's that 0037's runtime door does not forward answered by
+    the Worker's own 404, each administrator's route sent straight to a
+    container's port the server's own 404, a second
     visitor never seeing the first one's changes, neither secret in what
     the container wrote, and the reset -- and then the page in Chromium,
     under the live headers, with axe, at 320 pixels, by keyboard. Its pure
@@ -276,12 +284,21 @@ runtime plane, and answers four things and nothing else:
 |---|---|
 | `GET /data/demo/session` | the people a visitor can be and the idle minutes, from constants; no Durable Object, no container |
 | `POST /data/demo/session`, `{ "persona": … }` | starts the visitor's container if none runs, and a token for that person |
-| `GET` or `POST` `/data/demo/v1/forms` and below | forwarded once to the visitor's container, `/data/demo` taken off and the query kept; 503 `unavailable` when none runs; a bare 502 when the forward fails, since it may have reached the server |
-| anything else | the Worker's own 404, or 405 for another method |
+| a route of the runtime plane under `/data/demo/v1/forms`, by its one method: the menu, a form, a lookup's query and resolve, and a record's create, read, list, update and delete | forwarded once to the visitor's container, `/data/demo` taken off and the query kept; 503 `unavailable` when none runs; a bare 502 when the forward fails, since it may have reached the server |
+| anything else | the Worker's own 404, or 405 for another method on one of those routes |
 
-A path that is not plain is sent as written, for the server's own `400
-path-not-plain` (0037). The headers forwarded are an allowlist --
-`authorization`, `content-type`, `accept`, data-core's write-id header,
+The routes forwarded are exactly 0037's runtime door, as
+`deploy/cloudflare/doors.json` derives it from the routes the built server
+registers, and not the prefix `/v1/forms`: the administrator's plane shares
+`/v1/forms/:id` -- its versions, imports, restorations, regenerations,
+drift and drafts -- and none of that is forwarded. The administrator's
+plane is kept out twice: the Worker forwards none of its routes, and the
+image runs the server without administrator roles, so it registers none,
+which the gate shows by sending each straight to a container's port. A
+segment of a forwarded route that is not plain is sent as written, for the
+server's own `400 path-not-plain` (0037). The headers forwarded are an
+allowlist -- `authorization`, `content-type`, `accept`, data-core's
+write-id header,
 `origin` and the three `sec-fetch-` headers -- so neither the cookie nor a
 visitor's address reaches the container. A forwarded answer keeps the
 server's headers and gains the three nginx gives `/v1/` (0032); the

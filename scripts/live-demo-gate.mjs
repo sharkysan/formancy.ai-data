@@ -19,7 +19,10 @@
 //     invariants through the product, a create, the same create sent again
 //     answered once, a line, another tenant's 404, the auditor's 403, a
 //     change, a delete with its cascade, a path that is not plain, the
-//     Worker's own 404 and 405, and the headers on every forwarded answer.
+//     headers on every forwarded answer, every route 0037's runtime door
+//     does not forward answered by the Worker's own 404, the
+//     administrator's routes sent straight to the container answered by
+//     the server's own 404, and the Worker's 405.
 //  4. The container's peak memory, and whether it was killed for memory.
 //  5. A second visitor: their own container, which never sees the first
 //     visitor's changes.

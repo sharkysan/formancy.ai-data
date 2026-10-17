@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
-import { MAX_INSTANCES, PREFIX, RUNTIME_PATH, SESSION_PATH } from '../apps/live-demo/dist/worker/pure.mjs'
+import { MAX_INSTANCES, PREFIX, routeOf, RUNTIME_ROUTES, SESSION_PATH } from '../apps/live-demo/dist/worker/pure.mjs'
+import { DOORS, readJson, runtimePattern } from './cloudflare/doors.mjs'
 import { buildProblems, namingProblems, viteBuild, WRANGLER } from './demo.mjs'
 import { contentSecurityPolicy, headersFor, parseHeadersFile, policyProblems, POLICY } from './demo-headers.mjs'
 import { DEMO_BUILD, deployArguments, LIVE_CONFIG, LIVE_WORKER, liveConfigProblems, liveDemoBase, liveDemoUrl, readLiveDemoConfig } from './live-demo.mjs'
@@ -53,7 +54,26 @@ describe('the live demo on formancy.ai (0070)', () => {
     expect(config.routes.map((route) => route.pattern).sort()).toEqual([`formancy.ai${PREFIX}`, `formancy.ai${PREFIX}/*`])
     expect(config.containers[0].max_instances).toBe(MAX_INSTANCES)
     expect(config.assets.run_worker_first).toEqual([SESSION_PATH, `${PREFIX}/v1/*`])
-    expect(RUNTIME_PATH.startsWith(`${PREFIX}/v1/`)).toBe(true)
+    for (const route of RUNTIME_ROUTES) expect(route.path.startsWith('/v1/'), route.path).toBe(true)
+  })
+
+  // The Worker sends a visitor's server exactly what 0037's runtime door
+  // forwards: the runtime plane's routes, each by its method, and none of
+  // the administrator's, which shares the prefix /v1/forms/:id. Held to
+  // doors.json, the routes the built server registers (doors.test.mjs holds
+  // it to the server), so a route the server adds is decided in the Worker
+  // too, rather than forwarded by a prefix nobody looked at again.
+  test("forwards exactly the routes 0037's runtime door does, each by its method", () => {
+    const doors = readJson(DOORS)
+    expect(runtimePattern(RUNTIME_ROUTES.map((route) => ({ ...route, plane: 'runtime' })))).toBe(doors.runtimePattern)
+    const forwarded = doors.routes.filter((route) => route.runtimeDoor === 'forwarded')
+    expect(RUNTIME_ROUTES.map((route) => `${route.method} ${route.path}`).sort()).toEqual(forwarded.map((route) => `${route.method} ${route.path}`).sort())
+    expect(doors.routes.length).toBeGreaterThan(forwarded.length)
+    for (const route of doors.routes) {
+      const decided = routeOf(route.method, new URL(`https://formancy.ai${PREFIX}${route.sample}`))
+      if (route.runtimeDoor === 'forwarded') expect(decided, `${route.method} ${route.path}`).toEqual({ kind: 'forward', path: route.sample })
+      else expect(decided.kind, `${route.method} ${route.path}`).not.toBe('forward')
+    }
   })
 
   // Wrangler resolves these relative to the config: a Worker whose code or

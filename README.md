@@ -801,8 +801,10 @@ cost.
 **How it runs.** One Worker, `formancy-data-demo`, routed at `/data/demo/`
 of formancy.ai and nowhere else, serves the host page's demo build as static
 files and answers two things itself: the people and a sign-in, at
-`/data/demo/session`, and the runtime plane, `/data/demo/v1/forms` and
-below, which it forwards to your server through a Durable Object of yours.
+`/data/demo/session`, and the runtime plane's routes under
+`/data/demo/v1/forms`, exactly those 0037's runtime door forwards and none
+of the administrator's beside them, which it forwards to your server
+through a Durable Object of yours.
 Only a sign-in from the page starts a server: no link, crawler or form on
 another site does. Each start makes a new key, so a token from before a
 restart is refused. The image, `deploy/demo/Dockerfile`, is PostgreSQL 17
