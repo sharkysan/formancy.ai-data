@@ -1268,9 +1268,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # DATABASE_KINDS, DEFAULT_IMAGES, MATRIX_IMAGES and sharedCases(), from the
-      # built code that uses them.
-      - run: pnpm exec turbo run build --filter=@formancy/data-fixtures
+      # DATABASE_KINDS, DEFAULT_IMAGES, MATRIX_IMAGES, sharedCases() and
+      # SQLSERVER_LOGINS, from the built code that uses them: every package
+      # tested-on.mjs's BUILT_INPUTS names, which workflows.test.mjs holds.
+      - run: pnpm exec turbo run build --filter=@formancy/data-fixtures --filter=@formancy/data-sqlserver
 
       # One directory per artefact, never merged: two jobs that wrote one key
       # stay two, and the report says so.

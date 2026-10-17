@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import { namedPackages } from './collect.mjs'
+import { BUILT_INPUTS, workspace } from './tested-on.mjs'
 import { collectStep, expectedKeys, gateJobs, imageMatrix, readWorkflow } from './workflows.mjs'
 
 /**
@@ -185,6 +186,29 @@ describe('release.yml', () => {
 })
 
 describe('gates.yml', () => {
+  // The report reads what each environment was tested on from built code
+  // (tested-on.mjs's BUILT_INPUTS). A package it reads that the job never
+  // built stops the report with "is not built" on every pull request, which
+  // is how data-sqlserver's logins first reached it. What a filter builds is
+  // derived as turbo derives it: the package, and every workspace package
+  // it depends on, since build depends on ^build.
+  test('builds every package the report reads built', () => {
+    const packages = workspace(repo)
+    const dirOf = new Map(packages.map(({ dir, manifest }) => [manifest.name, dir]))
+    const dependsOn = new Map(packages.map(({ dir, manifest }) => [dir, Object.keys({ ...manifest.dependencies, ...manifest.devDependencies }).filter((name) => dirOf.has(name)).map((name) => dirOf.get(name))]))
+    const build = gates.jobs.report.steps.map((step) => String(step.run ?? '')).find((run) => run.startsWith('pnpm exec turbo run build'))
+    const filtered = [...String(build).matchAll(/--filter=(\S+)/g)].map((found) => dirOf.get(found[1]))
+    const built = new Set()
+    const visit = (dir) => {
+      if (dir === undefined || built.has(dir)) return
+      built.add(dir)
+      for (const next of dependsOn.get(dir) ?? []) visit(next)
+    }
+    filtered.forEach(visit)
+    expect(BUILT_INPUTS.filter((dir) => !built.has(dir))).toEqual([])
+    expect(filtered).not.toContain(undefined)
+  })
+
   // A job whose results the report never waits for is a job whose failure
   // it cannot see; one that is cancelled must still leave the report to run.
   test('ends in a report that waits for every other job and runs unless cancelled', () => {

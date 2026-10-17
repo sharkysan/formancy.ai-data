@@ -70,8 +70,17 @@ export function published(root = repo) {
   return workspace(root).filter(({ dir, manifest }) => dir.startsWith('packages/') && manifest.private !== true)
 }
 
-/** The built module of a workspace package, imported: what the suites and gates run. */
+/**
+ * The packages whose built output `testedOn` reads. Whatever runs it builds
+ * these first: the report job in gates.yml builds them, which
+ * workflows.test.mjs holds to this list, so a package read here and not built
+ * there fails that test rather than the report's run.
+ */
+export const BUILT_INPUTS = ['packages/data-core', 'packages/data-fixtures', 'packages/data-sqlserver']
+
+/** The built module of a workspace package, imported: what the suites and gates run. One `BUILT_INPUTS` does not name is refused, so the list cannot fall behind what is read. */
 async function built(root, dir) {
+  if (!BUILT_INPUTS.includes(dir)) throw new Error(`${dir} is read built but not in BUILT_INPUTS, so the report job would not build it: add it there`)
   const file = join(root, dir, 'dist', 'index.mjs')
   if (!existsSync(file)) throw new Error(`${dir} is not built: run pnpm build`)
   return import(pathToFileURL(file).href)
