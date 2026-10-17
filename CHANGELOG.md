@@ -404,6 +404,13 @@ later.
   once in CI. That case -- the next lookup and its one run more both
   stopped, and the lookup refused, as 0061 states -- is now a case of its
   own, each request held at a gate of its own.
+- **For contributors**: `pnpm test:pictures` and `pnpm test:browser` find
+  Playwright's browsers where `PLAYWRIGHT_BROWSERS_PATH` puts them, as
+  Playwright's own image does at `/ms-playwright`. turbo runs both in strict
+  mode, which dropped the variable, so through turbo the pictures check
+  failed to launch Chromium in that image while each app's script run
+  directly passed; `turbo.json` now passes it to both, and
+  `scripts/browsers.test.mjs` fails when it does not.
 
 What review costs, in 0065: every submit and approval asks the database, so
 one that cannot be reached refuses both; nothing deletes a draft; nobody is
