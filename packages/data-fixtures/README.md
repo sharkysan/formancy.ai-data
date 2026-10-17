@@ -135,6 +135,18 @@ dropped the key from the end of its order would show on both engines.
   from the cleared table with UPDATE kept -- PostgreSQL's lock is taken with
   either.
 
+- `startPreloginStandIn(answer)` listens on a loopback port in a SQL
+  Server's place, as whoever is on the network path can (0081): it answers
+  each connection's PRELOGIN with `answer` -- `preloginAnswer(encryption)`
+  is one packet saying `PRELOGIN_ENCRYPTION.OFF`, `NOT_SUP`, `ON` or
+  `REQ`, and `tdsPacket` and `preloginPayload` build others -- and keeps,
+  in `sent`, the type of every packet the client sends, one list per
+  connection, closing it at the first that is not a PRELOGIN or at a TLS
+  record. `settled()` resolves once every connection it accepted has
+  closed, so a suite reads `sent` when nothing more can arrive. It speaks
+  no more TDS than that and no TLS, and keeps no packet's bytes, so no
+  test holds a login's password: the real mssql and tedious run against
+  it, which makes it a network fixture, not a mocked driver (0003).
 - `startTcpHop({ kind, host, port })` puts a TCP hop in front of a database that
   can lose an answer after the database has sent it (0031). `kind` is what
   crosses it -- `'postgres'`, `'sqlserver'`, or `'http'` for the browser
