@@ -38,12 +38,15 @@ function nginxTime(text: string): number {
 /**
  * Each location that forwards to the server (`proxy_pass`), and the read
  * timeout it waits by: its own `proxy_read_timeout`, else its server
- * block's, else nginx's default. Blocks are read by their braces; a
- * directive is what precedes a `;`.
+ * block's, else the http block's, else nginx's default. The file is
+ * included inside the http block, so what stands outside every block of it
+ * is the http block's: the reading starts inside it. Blocks are read by
+ * their braces; a directive is what precedes a `;`.
  */
 function proxiedReadTimeouts(conf: string): Array<{ location: string; ms: number }> {
   const found: Array<{ location: string; ms: number }> = []
-  const blocks: Array<{ name: string; timeout?: number; proxied: boolean }> = []
+  const http: { name: string; timeout?: number; proxied: boolean } = { name: 'http', proxied: false }
+  const blocks: Array<{ name: string; timeout?: number; proxied: boolean }> = [http]
   let text = ''
   for (const char of conf.replace(/#[^\n]*/g, '')) {
     if (char !== '{' && char !== '}' && char !== ';') {
@@ -63,10 +66,11 @@ function proxiedReadTimeouts(conf: string): Array<{ location: string; ms: number
       if (statement.startsWith('proxy_read_timeout ')) current.timeout = nginxTime(statement.slice('proxy_read_timeout '.length))
       continue
     }
+    if (current === http) throw new Error('nginx.conf closes a block it never opened')
     blocks.pop()
     if (current?.name.startsWith('location ') === true && current.proxied) {
       const server = blocks.findLast((block) => block.name === 'server')
-      found.push({ location: current.name.slice('location '.length), ms: current.timeout ?? server?.timeout ?? NGINX_DEFAULT_READ_TIMEOUT_MS })
+      found.push({ location: current.name.slice('location '.length), ms: current.timeout ?? server?.timeout ?? http.timeout ?? NGINX_DEFAULT_READ_TIMEOUT_MS })
     }
   }
   return found
@@ -75,7 +79,9 @@ function proxiedReadTimeouts(conf: string): Array<{ location: string; ms: number
 describe('the export deadline', () => {
   // Watched failing with `proxy_read_timeout 30s;` written into the /v1/
   // location of deploy/web/nginx.conf: the deadline and an overrunning
-  // statement, 45 s, are past it.
+  // statement, 45 s, are past it; and with it written above the map,
+  // outside every server, the http block's: all four forwarding locations
+  // at 30 s.
   test('ends, with a statement in flight, before the proxy stops waiting', () => {
     const timeouts = proxiedReadTimeouts(readFileSync(NGINX_CONF, 'utf8'))
     // A guard on the guard: a reading that found no location would hold nothing.
@@ -106,6 +112,31 @@ describe('the export deadline', () => {
       { location: '= /b', ms: 90_000 },
       { location: '/c/', ms: NGINX_DEFAULT_READ_TIMEOUT_MS },
       { location: '/d/', ms: 2_500 },
+    ])
+  })
+
+  // nginx.conf is installed as the image's conf.d/default.conf, inside
+  // nginx's http block, so a directive outside every block of the file is
+  // the http block's, and every server and location that sets none of its
+  // own waits by it. Watched failing with what is outside a block skipped:
+  // /a/ read as nginx's 60 s default where 20 s was set, so a 30 s
+  // timeout written above the map passed the case above it.
+  test('reads a timeout set outside every block as the http block’s, below a server’s own', () => {
+    const conf = `
+      proxy_read_timeout 20s;
+      map $uri $formancy_cache_control { default ""; }
+      server {
+        location /a/ { proxy_pass http://server:4390; }
+      }
+      server {
+        proxy_read_timeout 50s;
+        location /b/ { proxy_pass http://server:4390; }
+        location /c/ { proxy_pass http://server:4390; proxy_read_timeout 70s; }
+      }`
+    expect(proxiedReadTimeouts(conf)).toEqual([
+      { location: '/a/', ms: 20_000 },
+      { location: '/b/', ms: 50_000 },
+      { location: '/c/', ms: 70_000 },
     ])
   })
 })
