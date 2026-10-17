@@ -22,6 +22,10 @@
   Entra ones called tested; the registry resolves a service principal's
   secret and nothing for a managed identity, and refuses a secret that
   cannot be resolved without repeating it.
+  `packages/data-server/src/drivers.test.ts` — for a configuration built
+  without the allowlist's checks, the factories refuse, before any driver
+  is asked, a connection that names no login, an Entra principal on
+  PostgreSQL and a service principal given no secret.
   `packages/data-sqlserver/src/entra.test.ts`, which constructs the real
   classes and asks Entra nothing — a service principal is a
   `ClientSecretCredential` of the allowlist's tenant, client and secret at
@@ -65,8 +69,9 @@
   for each connection, `failureFor`'s first branch removed (the write was
   `unknown-outcome`), the principal named in the error `drivers.ts`
   rethrows, the runtime plane's connection step rethrowing (500), and the
-  README row left out or rendered as tested. **Nothing verifies that an
-  Entra login succeeds.**
+  README row left out or rendered as tested, and each of the factories'
+  three checks removed. **Nothing verifies that an Entra login
+  succeeds.**
 
 ## Context
 
