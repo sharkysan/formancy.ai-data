@@ -26,7 +26,10 @@ every leg by the major its server answered and never skipped. The README's
 *What it is tested on* block is generated from what is installed and names
 the matrix. A file that needs an image of its own names it:
 `packages/data-postgres/src/discovery-pg18.integration.test.ts` names
-PostgreSQL 18 for one catalog fact, and
+PostgreSQL 18 for one catalog fact, a NOT NULL added NOT VALID, which it
+holds to read as the nullable column and unvalidated check that the same
+rule spelled as a check reads as
+([0077](../decisions/0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md)), and
 `packages/data-server/src/routes/admin-untested.integration.test.ts` names
 PostgreSQL 14, outside the matrix, to show that a server this release was
 not tested on is said to be untested and is served ([0068](../decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)); the report names
