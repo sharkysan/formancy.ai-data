@@ -164,8 +164,11 @@ export type { ChildLookup, ParentKey, PublishedTable } from './records/children.
 export { formMenu, grantedOperations, menuForm } from './records/menu.js'
 export type { MenuBundle, MenuForm } from './records/menu.js'
 export type { Listable } from './records/list.js'
-export { validateListQuery } from './records/list-query.js'
-export type { ListQueryCheck, ListQueryErrorCode, ListQueryRefusal } from './records/list-query.js'
+export { validateExportQuery, validateListQuery } from './records/list-query.js'
+export type { ExportQueryCheck, ExportQueryRefusal, ListQueryCheck, ListQueryErrorCode, ListQueryRefusal } from './records/list-query.js'
+export { exportColumns, exportHeader, exportRecord, exportText } from './records/export.js'
+export type { ExportColumns, ExportField, ExportLabels } from './records/export.js'
+export type { CsvCell, CsvRefusal, CsvText } from './records/csv.js'
 export { listTerms } from './records/list-terms.js'
 export type { ListTerms } from './records/list-terms.js'
 export { throughTerms } from './records/through.js'
@@ -196,10 +199,11 @@ export type {
   ListSortTerm,
   PublishedForm,
   RecordDeleted,
+  RecordExportQuery,
   RecordList,
   RecordListQuery,
   ResolvedLookup,
   RuntimeRefusal,
   UnknownOutcome,
 } from './runtime.js'
-export { CROSS_ORIGIN_REQUEST_HEADERS, LIST_PAGE_SIZE, WRITE_ID_HEADER } from './runtime.js'
+export { CROSS_ORIGIN_REQUEST_HEADERS, EXPORT_MAX_BYTES, exportFileName, LIST_PAGE_SIZE, WRITE_ID_HEADER } from './runtime.js'

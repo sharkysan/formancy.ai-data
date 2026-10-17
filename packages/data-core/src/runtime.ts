@@ -140,6 +140,45 @@ export interface RecordListQuery {
 }
 
 /**
+ * `POST /v1/forms/:id/records/export`: one CSV file of every record a list
+ * would page through for the same search, sort and parent (0079), as
+ * `validateExportQuery` returns it from a body. No offset and no limit: the
+ * server pages the list itself, from the first record to the last, under
+ * the read right a list has and no other. A POST, so the search never
+ * appears in a URL, as a list's does not. In a body every property may be
+ * left out, as in a list's.
+ */
+export type RecordExportQuery = Pick<RecordListQuery, 'search' | 'sort' | 'parent'>
+
+/**
+ * The most bytes an exported file may have (0079): 16 MiB of UTF-8, the
+ * byte-order mark included. A file that would be larger is refused whole,
+ * never cut short. Declared here so the server that counts and the client
+ * that receives compile against one number.
+ *
+ * A budget, not a measurement: what one export may hold in the server's
+ * memory -- the text being built, then the bytes sent, about twice this --
+ * and in a browser's, which holds the whole file before it saves it. A
+ * round number, chosen 2026-10-17 so that the server's worst case, one
+ * export at a time per allowlisted connection, stays at tens of megabytes
+ * for a deployment of a few connections; nothing has measured an export.
+ * Not a row cap, which would bound neither memory, since a row can be wide,
+ * nor time, since a page's cost grows with its offset.
+ */
+export const EXPORT_MAX_BYTES = 16 * 1024 * 1024
+
+/**
+ * The name an exported file is saved under: the form's id and `.csv`. The
+ * server's `content-disposition` and the client's saved file both take it
+ * from here; a form id is `[a-z0-9][a-z0-9._-]*`, so it needs no escaping.
+ * No date: it would be the server's clock in one place and the browser's in
+ * the other.
+ */
+export function exportFileName(formId: string): string {
+  return `${formId}.csv`
+}
+
+/**
  * One page of records: each row exactly what `records/read` returns for its
  * token, in the requested order, and whether more rows follow. No total: a
  * COUNT would read every admitted row on every page. A row whose key does
