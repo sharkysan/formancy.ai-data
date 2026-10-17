@@ -141,6 +141,20 @@
     examples page's policy the same page reports `style-src-elem` refusing
     AG Grid's style elements. All 61 of the gate's checks passed on
     2026-10-17 on the Windows workstation; the job has not yet run in CI.
+  - **`scripts/live-demo-gate/worker.test.mjs`, in `pnpm test:repo`,** runs
+    the Worker's own module over the gate's stand-in, without Docker, with
+    containers that fail as the documentation says a start may: a start
+    that throws, as at the cap, an inactivity timeout that throws after a
+    start, and a container that stops before it answers. Each sign-in is
+    refused with no cookie, its container is not left running, and its
+    Durable Object keeps no key and no alarm, nor the key of a start
+    before it; a start that answers keeps its key and an alarm a day on.
+    Watched failing against the Durable Object as it was, which stored the
+    key and set the alarm before starting and kept both after a refusal
+    ("expected [ { stored: [ 'key' ], …(2) }, …(2) ] to deeply equal [ {
+    stored: [], …(2) }, …(2) ]") and left a container running whose
+    timeout threw, then with the alarm's deletion and the destroy each
+    taken out of the cleanup.
   - **Review alone** holds `apps/live-demo/src/worker.ts` as Cloudflare runs
     it -- the Durable Object's glue to `ctx.container`, its inactivity
     timeout, its alarm -- because no gate here runs workerd with a
@@ -323,21 +337,23 @@ nothing. Starts in flight share one promise, so two tabs pressing at once
 start one container with one key; not `blockConcurrencyWhile`, because a
 start may take up to its deadline of 30 s, and a callback that runs past
 30 s resets the Durable Object. The Durable Object then:
-- makes a new key, 32 random bytes as base64url, keeps it in its own
-  storage, and starts the container with it as
-  `FORMANCY_DATA_DEMO_IDENTITY_SECRET`, `enableInternet: false`;
+- makes a new key, 32 random bytes as base64url, and starts the container
+  with it as `FORMANCY_DATA_DEMO_IDENTITY_SECRET`, `enableInternet: false`;
 - sets the inactivity timeout to **10 minutes**, after the start and again
   in its constructor when a container already runs;
 - asks `/health` every 250 ms for at most 30 s -- about six times the
   starts measured at `basic`'s share, plus Cloudflare's documented 1 to
   3 s -- and gives up when a container it saw running stops;
+- once the server answers, keeps the key in its own storage and sets an
+  alarm a day on, which deletes the key when no container runs, so
+  nothing about a visitor outlives a day;
 - answers every failed start alike, a throw or no answer in time, with 503
   `unavailable`: "No demo server could be started just now. At most 10 run
   at once, and Cloudflare may have had none to give; nothing was started
-  for you. Try again in a few minutes.", destroying the container so it
-  keeps no place;
-- sets an alarm a day after the start, which deletes the key when no
-  container runs, so nothing about a visitor outlives a day.
+  for you. Try again in a few minutes.", and forgets the start: the
+  container destroyed if it runs, so it keeps no place, and the alarm and
+  every stored value deleted, the key of an earlier start included, so a
+  refused sign-in leaves nothing behind.
 
 **`max_instances` is 10,** in the config and in the Worker's
 `MAX_INSTANCES`, which the sentence above is made from: a budget, not a
@@ -470,7 +486,15 @@ Builds does not wait for it and a deploy is not one transaction.
   CPUs and $201.66 with busy ones, less at most $0.73 of included use, plus
   the plan, Worker and Durable Object requests, which were not computed,
   and egress past the included allotment. `max_instances` is the bound;
-  lowering it lowers that.
+  lowering it lowers that. Beside the containers, Cloudflare bills Durable
+  Objects as usual, which was not computed either: a Durable Object
+  request for every sign-in and every forwarded request, the object's
+  compute while it runs, a storage write of the key and of its alarm for
+  every start that answers, and that alarm's one invocation a day later,
+  again each day while its container still runs. A refused sign-in leaves
+  no stored key and no alarm, but its storage deletes are still asked, and
+  it is still a Durable Object request -- for a new object, under a name
+  of the Worker's making, whenever the request carries no cookie.
 - **Anybody can start one, and one visitor can take all ten.** Starts are
   bounded by the cap alone; when it is reached, every other sign-in is
   refused until a container stops. A rate limiting rule of the zone on

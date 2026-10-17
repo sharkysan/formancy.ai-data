@@ -5,20 +5,23 @@
  * with a key of its own, signs their tokens with it, forwards their
  * requests to it, and forgets the key a day after no container runs.
  *
- * The only file that imports `cloudflare:workers`, and the only one no
- * suite runs: wrangler@4.146.0 refused to run a local container on Windows,
- * and in WSL against Docker Desktop the sidecar it reaches containers
- * through failed at its first iptables rule, so the container never
- * answered (measured on 2026-10-16 and 2026-10-17). `pnpm test:live-demo`
- * runs this module, built to dist/worker/cloudflare.mjs, in front of the
- * real image over a stand-in for Cloudflare's runtime written from its
- * documentation (scripts/live-demo-gate/cloudflare.mjs says what it is and
- * is not); that workerd and Cloudflare's containers behave as documented is
- * the first deploy's to read (RELEASING.md), as 0069's Cloudflare behaviour
- * was. It is excluded from the suite's coverage for that reason. Everything
- * it decides with -- the routes, the cookie, the refusals, the forwarded
- * headers, the key and the deadline -- is in worker/, tested in Node, and
- * type-checked against the Workers runtime's types by tsconfig.worker.json.
+ * The only file that imports `cloudflare:workers`, and the only one this
+ * package's suite does not run: wrangler@4.146.0 refused to run a local
+ * container on Windows, and in WSL against Docker Desktop the sidecar it
+ * reaches containers through failed at its first iptables rule, so the
+ * container never answered (measured on 2026-10-16 and 2026-10-17).
+ * `pnpm test:live-demo` runs this module, built to
+ * dist/worker/cloudflare.mjs, in front of the real image over a stand-in
+ * for Cloudflare's runtime written from its documentation
+ * (scripts/live-demo-gate/cloudflare.mjs says what it is and is not), and
+ * scripts/live-demo-gate/worker.test.mjs, in `pnpm test:repo`, runs it over
+ * the same stand-in with containers that fail to start; that workerd and
+ * Cloudflare's containers behave as documented is the first deploy's to
+ * read (RELEASING.md), as 0069's Cloudflare behaviour was. It is excluded
+ * from the suite's coverage for that reason. Everything it decides with --
+ * the routes, the cookie, the refusals, the forwarded headers, the key and
+ * the deadline -- is in worker/, tested in Node, and type-checked against
+ * the Workers runtime's types by tsconfig.worker.json.
  *
  * It uses the Durable Object Container API (`ctx.container`), which
  * Cloudflare's documentation recommends for new applications, rather than
@@ -96,34 +99,41 @@ export class DemoServer extends DurableObject<Env> {
     if (container === undefined) return Promise.resolve(undefined)
     const held = this.ctx.storage.kv.get<string>(KEY)
     if (container.running && held !== undefined) return Promise.resolve(held)
-    // A start that threw -- destroying a stale container, setting the alarm
-    // -- started nothing the visitor can use, as one that timed out.
-    this.#starting = this.#start(container)
-      .catch(() => undefined)
-      .finally(() => {
-        this.#starting = undefined
-      })
+    this.#starting = this.#startOrForget(container).finally(() => {
+      this.#starting = undefined
+    })
     return this.#starting
   }
 
   /**
+   * A start, and after one that failed -- whatever threw, or no answer in
+   * time -- everything it might have left forgotten, so that a refused
+   * sign-in leaves nothing behind.
+   */
+  async #startOrForget(container: Container): Promise<string | undefined> {
+    let key: string | undefined
+    try {
+      key = await this.#start(container)
+    } catch {
+      key = undefined
+    }
+    if (key === undefined) await this.#forget(container)
+    return key
+  }
+
+  /**
    * Starts the container with a new key and waits for its server to answer
-   * /health: the key, or undefined when it did not start in time. A failed
-   * start is destroyed, so it does not keep one of max_instances' places.
+   * /health: the key, kept in storage with an alarm a day on only once the
+   * server answers, or undefined when it did not start in time. Throws when
+   * the container could not be started or its inactivity timeout set.
    */
   async #start(container: Container): Promise<string | undefined> {
     // A container running with a key this object no longer holds would
     // refuse every token signed here.
     if (container.running) await container.destroy()
     const key = newKey()
-    this.ctx.storage.kv.put(KEY, key)
-    await this.ctx.storage.setAlarm(Date.now() + KEY_LIFETIME_MS)
-    try {
-      container.start({ env: { [IDENTITY_SECRET_VARIABLE]: key }, enableInternet: false })
-      await container.setInactivityTimeout(IDLE_MS)
-    } catch {
-      return undefined
-    }
+    container.start({ env: { [IDENTITY_SECRET_VARIABLE]: key }, enableInternet: false })
+    await container.setInactivityTimeout(IDLE_MS)
     const port = container.getTcpPort(SERVER_PORT)
     const healthy = await waitUntilHealthy(
       async (remaining) => {
@@ -133,13 +143,30 @@ export class DemoServer extends DurableObject<Env> {
       },
       { alive: untilStopped(() => container.running) },
     )
-    if (healthy) return key
+    if (!healthy) return undefined
+    this.ctx.storage.kv.put(KEY, key)
+    await this.ctx.storage.setAlarm(Date.now() + KEY_LIFETIME_MS)
+    return key
+  }
+
+  /**
+   * After a failed start: the container destroyed if it runs, so it keeps
+   * none of max_instances' places, and the key and the alarm of any start
+   * before it deleted, so this object keeps nothing and wakes for nothing.
+   * The alarm is deleted by itself, not left to deleteAll().
+   */
+  async #forget(container: Container): Promise<void> {
     try {
-      await container.destroy()
+      if (container.running) await container.destroy()
     } catch {
       // Already stopped.
     }
-    return undefined
+    try {
+      await this.ctx.storage.deleteAlarm()
+      await this.ctx.storage.deleteAll()
+    } catch {
+      // Storage refused: an alarm left behind deletes the key a day on.
+    }
   }
 
   /**

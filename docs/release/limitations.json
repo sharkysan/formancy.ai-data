@@ -2281,11 +2281,11 @@
       ]
     },
     "0070": {
-      "reviewed": "sha256:4d436b75f2d3c9bcc019b8728ef5b931b3da62a5675079be04ede70b8f00132d",
+      "reviewed": "sha256:9fef562d94a41cbb89f7cd605410b84f5ec1f3384304982bf6ab38a4bd993f09",
       "limitations": [
         {
           "area": "operations",
-          "says": "The live demo at formancy.ai/data/demo/ needs the rightsholder's Cloudflare account on the Workers Paid plan, $5 a month, and is billed while anybody uses it: at the prices read on 2026-10-16 a visit of ten minutes' use costs about $0.0037 once the plan's included amounts, about 67 such visits a month, are spent, and ten servers running a whole 30-day month cost at most $201.66 with every CPU busy, beside the Worker's and the Durable Objects' requests, which were not computed."
+          "says": "The live demo at formancy.ai/data/demo/ needs the rightsholder's Cloudflare account on the Workers Paid plan, $5 a month, and is billed while anybody uses it: at the prices read on 2026-10-16 a visit of ten minutes' use costs about $0.0037 once the plan's included amounts, about 67 such visits a month, are spent, and ten servers running a whole 30-day month cost at most $201.66 with every CPU busy, beside the Worker's requests and the Durable Objects' requests, storage writes and alarms -- a key and an alarm for every start that answers, the alarm run a day later -- which were not computed."
         },
         {
           "area": "operations",

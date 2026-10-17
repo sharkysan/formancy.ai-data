@@ -21,8 +21,9 @@
 //
 // - the Durable Object namespace: one object per name, kept for the run,
 //   its RPC arguments and answers structured clones, as RPC sends them;
-// - its state: the synchronous `storage.kv`, `setAlarm` and `deleteAll`,
-//   and `blockConcurrencyWhile`, which here only runs its callback;
+// - its state: the synchronous `storage.kv`, `setAlarm`, `deleteAlarm` and
+//   `deleteAll`, and `blockConcurrencyWhile`, which here only runs its
+//   callback;
 // - `ctx.container` (durable-object-container.mdx): `start()` returns before
 //   the server is ready and throws when already running; `running` is true
 //   from start() until the container stops; `getTcpPort(port).fetch()`
@@ -193,9 +194,14 @@ function stateFor(container) {
       setAlarm: async (at) => {
         state.alarm = at
       },
+      deleteAlarm: async () => {
+        state.alarm = undefined
+      },
+      // The stored values alone. Whether Cloudflare's deleteAll() takes an
+      // alarm with them was not read for 0070, so here it does not: a test
+      // that finds no alarm has seen the Worker delete it with deleteAlarm().
       deleteAll: async () => {
         kv.clear()
-        state.alarm = undefined
       },
     },
     blockConcurrencyWhile: async (callback) => callback(),

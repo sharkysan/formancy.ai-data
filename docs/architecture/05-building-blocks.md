@@ -382,7 +382,10 @@ everything the Worker decides with -- the routes, the cookie, the
 sign-in's refusals, the answers and the headers it forwards, the key and
 the wait for a start -- tested in Node; `src/worker.ts`, its `fetch` and
 the `DemoServer` Durable Object, is the one file that imports
-`cloudflare:workers`, which no suite runs. The image it starts is
+`cloudflare:workers`, which the package's own suite does not run:
+`scripts/live-demo-gate/worker.test.mjs` runs it over the gate's stand-in
+for Cloudflare's runtime with containers that fail to start, and `pnpm
+test:live-demo` in front of the image. The image it starts is
 `deploy/demo/Dockerfile`, beside `deploy/demo/build.sh`, which loads and
 publishes at build time, and `deploy/demo/start.sh`, which starts each
 container; `apps/live-demo/wrangler.json` is the Worker's config, which
