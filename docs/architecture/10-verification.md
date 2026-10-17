@@ -237,14 +237,21 @@ clean and after a failed submit
 the studio at every step of its journey against the real server
 ([0024](../decisions/0024-the-studio-speaks-only-the-admin-plane.md)), the
 host page at every state of a load, a save, a stale save, a lost answer, a
-refused selection and a delete
+refused selection, a delete and a download
 ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md),
-[0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md))
+[0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md),
+[0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md))
 -- they check that nothing scrolls sideways down to 320 CSS pixels, WCAG's
 reflow width; that the first Tab lands on the skip link and the next in the
 content; axe's colour-contrast and target-size rules; and that no rule of
 the app's own stylesheet reaches the form's paper. The host page's gate also
-fails when Enter on the skip link leaves the keyboard anywhere but `<main>`.
+fails when Enter on the skip link leaves the keyboard anywhere but `<main>`,
+and when a file Download CSV saves, through Playwright's download event, is
+not `<form id>.csv`, does not start with the byte-order mark, or differs by
+a byte from what the server answers for the request the page sent -- the
+browser's save of an object URL, which jsdom cannot make, so the host's
+`export.test.tsx` takes the file where the page hands it over and
+`save-file.test.ts` holds the anchor and the revoke (0080).
 `guardRequests` in the harness refuses and names every request to an origin
 the gate does not serve, and the pass that measures the fallback stack
 refuses every font file; on the examples page the demo's policy refuses

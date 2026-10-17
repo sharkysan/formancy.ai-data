@@ -1,6 +1,6 @@
 # 0079 — A person downloads the records a list shows them as one CSV file, made whole or not at all
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0080](0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md): the host page's Records panel and each child section under a saved parent download the file with Download CSV, the page sends the export route, and `@formancy/data-client` re-exports `exportFileName`
 - **Date:** 2026-10-17
 - **Deciders:** Daniel Bacher
 - **Verified by:**

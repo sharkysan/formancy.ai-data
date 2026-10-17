@@ -411,7 +411,13 @@ and a publisher alone restores any version, unreviewed ones too (0065).
    `packages/data-client/src/client.ts`, accepting `text/csv,
    application/json` -- where the form's `list` is not `null`
    ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
-   The host page has no button for it yet.
+   On the host page it is Download CSV, in the head of the Records panel
+   or of a child section (`apps/host/src/download.tsx`): the panel's
+   submitted search, the sort `RecordGrid`'s handle says its datasource
+   last asked with, and a child section's record as the parent
+   ([0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)). Its line says "Making <form id>.csv."; the button is
+   `aria-disabled` and sends nothing more; the section leaving the page
+   aborts the request.
 2. `routes/runtime-exports.ts` starts the export's clock, checks the body
    (`validateExportQuery`), loads the bundle once and asks `planList` for
    the first page, so every refusal of the policy comes before a
@@ -446,13 +452,23 @@ and a publisher alone restores any version, unreviewed ones too (0065).
    length. Anything that stopped it was answered with a JSON refusal and
    nothing of the file. The client keeps the body as a `Blob` only when it
    is CSV and arrived whole.
+7. On the host page, a refusal is the server's sentence on the button's
+   line, and pressing again is the retry. A file is handed to the browser
+   by `saveFile` (`apps/host/src/save-file.ts`): an object URL of the
+   `Blob`, an `<a download="<form id>.csv">` put in the document, clicked
+   and taken out, the URL revoked in the task after; the line says "Made
+   <form id>.csv; your browser saves it.", which is the page's side and not
+   the browser's.
 
 Held by `routes/runtime-exports.test.ts` and `export-limits.test.ts`;
 `csv.test.ts`, `export.test.ts` and `list-query.test.ts` in
 `packages/data-core/src/records`; each adapter's `list.integration.test.ts`,
 its shared case `export: shipments` in `EXPORT_PARITY`;
 `e2e.integration.test.ts` on both engines; `exports.integration.test.ts`
-and `transport.test.ts` in `packages/data-client/src`. What it costs: the
+and `transport.test.ts` in `packages/data-client/src`; the host's
+`export.test.tsx`, `save-file.test.ts` and `page.test.tsx`, and the
+browser gate's `apps/host/scripts/browser/exporting.mjs`, whose download event
+compares every byte with the server's (0080). What it costs: the
 file is not the table at one moment, each page reads every row before its
 offset, and the bounds are a budget and a derivation, not measurements
 ([section 11.2](11-risks-and-debt.md#112-known-limitations-by-area)).
