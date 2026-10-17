@@ -294,7 +294,11 @@ format 1 with one is served as stored, and its column is headed by the key
 (`export.test.ts`); and a format-1 bundle edited where it is stored can bind
 a binary column, which `validateBundle` accepts, and its file is then a 500
 with nothing of it (`runtime-exports.test.ts`). The host page's button is
-not here: it is the next pull request's, with a record of its own.
+not here: it is the next pull request's, with a record of its own. Until
+it is, `apps/host/src/plane.test.tsx`, which holds the host's journey to
+send every runtime route, names the export as one the page cannot send
+yet, and fails the moment the page sends one, so the exception goes with
+the button, as 0050's for the delete route went with 0053's.
 
 ## Consequences
 

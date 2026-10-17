@@ -51,6 +51,15 @@ function pattern(route: string): RegExp {
 
 const ROUTES = Object.entries(ROUTE_OPERATIONS).map(([route, operation]) => ({ route, operation, matches: pattern(route) }))
 
+/**
+ * Operations the server has and the page has no control for yet, so the
+ * journey cannot send them: the export (0079), whose button is the next pull
+ * request's, as the delete route was 0050's until 0053 gave the page one.
+ * The journey is held to send none of them, so the exception fails the
+ * moment the page sends one and has to go.
+ */
+const NOT_YET_SENT = new Set(['export'])
+
 /** Every key anywhere in a parsed body, nested ones included. */
 function keys(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(keys)
@@ -138,7 +147,8 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // And the journey used every one of them, so the table is not satisfied
     // by a page that did less (watched failing with 0050's exception for the
     // delete route removed before the page had a control: delete unused).
-    expect(ROUTES.filter(({ matches }) => !sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
+    expect(ROUTES.filter(({ operation, matches }) => !NOT_YET_SENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
+    expect(ROUTES.filter(({ operation, matches }) => NOT_YET_SENT.has(operation) && sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
 
     // Only the forms the menu named: a form is asked for by the id the
     // server listed, never one the page made up.
