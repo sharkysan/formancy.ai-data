@@ -339,7 +339,12 @@ What a real deployment changes:
   an origin of its own is listed in `FORMANCY_DATA_CORS_ORIGINS` instead
   ([0060](./decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md));
 - its own database accounts, granted what each form needs, in
-  `connections.json`, with TLS to the database;
+  `connections.json`, with TLS to the database -- or, on Azure SQL, an
+  Entra managed identity or service principal in place of a SQL login,
+  which no test of this release logs in as
+  ([0074](./decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md);
+  [the data server's README](../packages/data-server/README.md#the-allowlist)
+  has the entry's shape);
 - its own secret store, mounted as files the settings name with `file:`.
 
 [`docs/deploy/cloudflare.md`](./deploy/cloudflare.md) puts this stack behind

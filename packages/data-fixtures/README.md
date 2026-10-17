@@ -274,7 +274,13 @@ Every container a suite or a gate starts goes through here:
 an empty server -- the image `FORMANCY_IMAGES` chooses for its engine, which
 unset is the default, unless its caller names another -- and the two fixtures,
 `startPostgresFixture(image?)` and `startSqlServerFixture(image?)`, start
-theirs the same way. Each asks the
+theirs the same way. A SQL Server container or fixture started with
+`{ certificate: true }` presents a certificate for `localhost` and
+127.0.0.1 that the image's own openssl makes as the container starts, and
+answers it, PEM, for the test to trust: a connection that opens with TLS,
+TDS 8.0, needs one, and SQL Server 2025 resets such a connection on its
+self-signed fallback
+([0074](../../docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)). Each asks the
 server what it is (`server_version`, or `ProductVersion` -- what the adapters'
 pings read, and both adapters' ping tests hold them to it -- with
 `ProductUpdateLevel` and `Edition`) and writes that, the image and the file

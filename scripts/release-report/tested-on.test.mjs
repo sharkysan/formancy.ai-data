@@ -122,6 +122,33 @@ describe('the README blocks', () => {
     // A release tested on every product it recognises has nothing to say here, and says nothing rather than an empty row.
     expect(readmeTable({ ...facts, untested: [] })).not.toContain('Recognised, not tested')
   })
+
+  // A SQL Server connection may log in as an Entra managed identity or
+  // service principal, and no test logs in as either (0074): a buyer on
+  // Azure SQL reads this table for what was tested, and a README naming
+  // the images alone would let "SQL Server, tested" stand for a login no
+  // test made. The row is data-sqlserver's SQLSERVER_LOGINS, the list the
+  // allowlist's login types are held to, so a login added there without
+  // the README, or one later tested, changes the row. Under "Tested with"
+  // the tested logins come first and the others follow, said as accepted
+  // and not tested. Watched failing with the row left out, and with every
+  // login rendered as tested.
+  test('name every SQL Server login the adapter opens, and the ones no test logs in with as accepted and not tested, from data-sqlserver', async () => {
+    const { SQLSERVER_LOGINS } = await import(pathToFileURL(join(repo, 'packages', 'data-sqlserver', 'dist', 'index.mjs')).href)
+    expect(facts.logins).toEqual(SQLSERVER_LOGINS.map(({ login, name, tested }) => ({ login, name, tested })))
+    const row = readmeTable(facts)
+      .split('\n')
+      .find((line) => line.startsWith('| **SQL Server logins** |'))
+    expect(row, 'the README table has no "SQL Server logins" row').toBeDefined()
+    const [, testedWith, declaredAs] = row.slice(1, -1).split('|').map((text) => text.trim())
+    expect(testedWith).toBe('SQL login; Entra managed identity and Entra service principal are accepted and not tested')
+    expect(declaredAs).toBe('')
+    const [tested, untested = ''] = testedWith.split('; ')
+    for (const { name, tested: wasTested } of facts.logins) expect(wasTested ? tested : untested, name).toContain(name)
+    // Were every login tested, the row would name them all and say nothing more.
+    const all = readmeTable({ ...facts, logins: facts.logins.map((login) => ({ ...login, tested: true })) })
+    expect(all).toContain('| **SQL Server logins** | SQL login, Entra managed identity and Entra service principal |  |')
+  })
 })
 
 describe('the images', () => {

@@ -131,6 +131,21 @@ Instance, which a snapshot names and calls not tested, and every boxed SQL
 Server edition is called tested on the strength of the Developer edition
 on Linux in a container
 ([0073](../decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md)).
+A SQL Server connection may log in as an Entra managed identity or
+service principal, and no test logs in as either: a partner makes the
+first successful login, and nothing shows a token refreshed, a pool
+outliving its token or Azure SQL's resource passing the guard. Only the
+public cloud is reached, only over TDS 8.0, which SQL Server 2019 and 2022
+on Linux do not take, an Entra entry refuses a certificate the operator
+must trust, a managed identity cannot log in where AKS workload identity
+is turned on, a login refused after its pool opened is `unavailable` with
+no reason in discovery's log line, and what @azure/identity reads from the
+environment -- the region, the proxy, the log level, a managed identity's
+platform -- is outside the reviewed allowlist
+([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)). A SQL login still goes over TDS 7, whose TLS whoever
+answers in the server's place can decline and be sent the LOGIN7, its
+password in it, as review showed on 2026-10-17; 0074 does not change
+that.
 PostgreSQL 14 and older and SQL Server 2017 and older are not
 images of the matrix, and on PostgreSQL 18 a cascaded table's AFTER DELETE
 trigger runs with its owner's grants, so it does a delete 15 to 17 refuse
@@ -449,7 +464,8 @@ says what those entries say
 
 ## 11.7 Work in progress, not on main
 
-On 2026-10-17 this was on an open branch or planned, and **none of it is
-described here as done**: Microsoft Entra authentication to SQL Server. The
-numbers the decision index skips are taken by records on open branches,
-each placed here when it merges.
+On 2026-10-17 nothing this documentation describes was on an open branch:
+the live master-detail demo and Microsoft Entra authentication to SQL
+Server, which this section named, have merged and are described where
+they belong, and the decision index skips no number. Work on an open
+branch is named here while it is open, and taken out when it merges.

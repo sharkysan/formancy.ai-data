@@ -1,5 +1,6 @@
+import { ManagedIdentityCredential } from '@azure/identity'
 import mssql from 'mssql'
-import { afterAll, beforeAll, describe, expect, test } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import type { DatabaseAdapter } from '@formancy/data-core'
 import { selectedImage, startSqlServerContainer } from '@formancy/data-fixtures'
 import type { ServerRecord, StartedMSSQLServerContainer } from '@formancy/data-fixtures'
@@ -95,3 +96,86 @@ describe('connectSqlServer', () => {
     }
   })
 })
+
+describe('connectSqlServer, for a SQL login', () => {
+  // tedious's debug output prints a login's password (login7-payload.js
+  // writes it into the payload's text), and mssql turns tedious's on with
+  // its own `debug`. Neither is ever set: a pool a SQL login opens has
+  // both unset, as mssql hands them to tedious. Watched failing with
+  // `debug: true` in sqlServerConfig.
+  test('opens a pool with no debug output', async () => {
+    const pool = await connectSqlServer({ ...address(), user: container.getUsername(), password: container.getPassword() })
+    try {
+      // mssql keeps the config it was given as `config`, which its types do not declare.
+      const { config } = pool as unknown as { config: { debug?: unknown; options?: { debug?: unknown } } }
+      expect(config.debug).toBeUndefined()
+      expect(config.options?.debug).toBeUndefined()
+      expect(tediousConfigOf(pool).options.debug).toBeUndefined()
+    } finally {
+      await pool.close()
+    }
+  })
+})
+
+/*
+ * An Entra login logs in over TDS 8.0 alone, TLS before the first TDS
+ * message and the certificate checked (0074). The run's image, whichever
+ * of the matrix it is, has no certificate configured, and none of the three
+ * takes such a connection then: measured on 2026-10-17, SQL Server 2019 and
+ * 2022 on Linux reset it with a certificate or without, and 2025 without
+ * one. So on every leg an Entra pool is refused before anything reaches
+ * the server's login: the downgrade a server that does not speak TLS first
+ * could otherwise offer is never taken. What a server that takes TDS 8.0
+ * answers is entra.integration.test.ts's, on 2025 with a certificate.
+ */
+describe('connectSqlServer, for an Entra principal', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /** The server's own count of failed logins, from its errorlog: what was tried, whatever the driver said. */
+  async function failedLogins(): Promise<number> {
+    const sa = await connectSqlServer({ ...address(), user: container.getUsername(), password: container.getPassword() })
+    try {
+      // With no line to match, the procedure returns no result set at all.
+      const found = await sa.request().query<{ Text: string }>(`exec xp_readerrorlog 0, 1, N'Login failed'`)
+      return found.recordset?.length ?? 0
+    } finally {
+      await sa.close()
+    }
+  }
+
+  // Before 0074 took TDS 8.0, this server was sent the PRELOGIN, offered
+  // TLS, and refused the login in one failed login; a server that offered
+  // none would have been sent the token in the clear. Now the server ends
+  // the connection during the TLS handshake it does not expect, so it logs
+  // no login and no token is asked for. The error is tedious's, passed on
+  // as it came: it says where it failed and carries no credential.
+  // Watched failing on 2026-10-17 on 2022 with the pool given TDS 7,
+  // `encrypt: true`: with the certificate trusted, the server refused the
+  // login in one failed login; with it checked, TDS 7's TLS failed on the
+  // self-signed certificate, which a server that offered no TLS would not
+  // have asked it to check.
+  test('is refused at TLS on the run’s image, before any login reaches the server', async () => {
+    const asked = vi.spyOn(ManagedIdentityCredential.prototype, 'getToken').mockRejectedValue(new Error('a test asks Entra nothing'))
+    const before = await failedLogins()
+    const error = await connectSqlServer({ ...address(), trustServerCertificate: false, entra: { type: 'managed-identity', clientId: '0f9e8d7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f' } }).then(
+      () => undefined,
+      (rejected: unknown) => rejected,
+    )
+    expect(error).toMatchObject({ code: 'ESOCKET' })
+    expect((error as Error).message).toContain('disconnected before secure TLS connection was established')
+    expect(await failedLogins()).toBe(before)
+    expect(asked).not.toHaveBeenCalled()
+  })
+})
+
+/** Where the container is, over TLS with its self-signed certificate trusted, as the harness's own SQL logins are. */
+function address(): { host: string; port: number; database: string; encrypt: boolean; trustServerCertificate: boolean } {
+  return { host: container.getHost(), port: container.getPort(), database: 'master', encrypt: true, trustServerCertificate: true }
+}
+
+/** What mssql hands tedious for each connection it opens: the pool's private `_config()`. */
+function tediousConfigOf(pool: mssql.ConnectionPool): { authentication: { type: string; options: Record<string, unknown> }; options: { debug?: unknown } } {
+  return (pool as unknown as { _config(): ReturnType<typeof tediousConfigOf> })._config()
+}

@@ -76,8 +76,12 @@ existed would be documented and inert.
   embedding the server never builds a pool from another copy of a driver
   ([0025](../../docs/decisions/0025-each-adapter-owns-its-driver.md)).
 - **`parseConnections` and `createConnectionRegistry`** — the allowlist of
-  databases a form may bind to, with secret references for passwords, opened
-  lazily through driver factories the composition root supplies.
+  databases a form may bind to, with secret references for passwords and
+  client secrets, opened lazily through driver factories the composition
+  root supplies. A SQL Server entry may log in as an Entra principal,
+  which no test does, and every entry refuses a key it does not read
+  (*The allowlist*, below;
+  [0074](../../docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 - **`ROUTE_OPERATIONS`** and the type **`RuntimeOperation`** — the runtime
   plane's routes, `METHOD url`, each with the name its audit event gives it:
   what a host is allowed to send, which the host page's suite holds every
@@ -416,13 +420,97 @@ are turned on by configuration:
 
 | Variable | Turns on |
 | --- | --- |
-| `FORMANCY_DATA_STORE_DIR` and `FORMANCY_DATA_CONNECTIONS` | The runtime plane: published forms, records, lookups. The connections file is the allowlist (JSON); passwords in it are `env:` or `file:` references. |
+| `FORMANCY_DATA_STORE_DIR` and `FORMANCY_DATA_CONNECTIONS` | The runtime plane: published forms, records, lookups. The connections file is the allowlist (JSON); passwords and client secrets in it are `env:` or `file:` references. See *The allowlist*, below. |
 | `FORMANCY_DATA_ADMIN_ROLES` | The administrator's plane, for tokens holding one of these comma-separated roles. Needs the two above. Its requests are audited to the same log as the runtime's, one `audit` line per event, told apart by `audit.plane`. |
 | `FORMANCY_DATA_PUBLISHER_ROLES` | Review of publication, for tokens holding one of these comma-separated roles, each also one of the administrator roles: nobody publishes alone, and a publisher approves another administrator's draft. Needs the administrator's plane. Unset, no review. See *Publication under review*, below ([0065](../../docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)). |
 | `FORMANCY_DATA_AUDIT_KEY` | Records named in the audit trail by a keyed hash. A secret reference. Without it, no record is named. |
 
 Without the store and the allowlist the server verifies tokens and nothing
 else, which is how a host is wired in before any form exists.
+
+### The allowlist
+
+`FORMANCY_DATA_CONNECTIONS` names a JSON list, one entry per database a
+form may bind to: `id`, `kind` (`postgres` or `sqlserver`), `host`,
+`port`, `database`, the approved `schemas`, optionally `tls`, and one way
+in. A SQL login is `user` and `password`, a secret reference; this is how
+every test logs in, and `deploy/connections.json` is one. A SQL Server
+entry may instead log in as a Microsoft Entra principal, with `login` and
+no user or password:
+
+```json
+[
+  { "id": "erp", "kind": "sqlserver", "host": "erp.database.windows.net", "port": 1433, "database": "erp", "schemas": ["sales"],
+    "login": { "type": "entra-managed-identity", "client": "<the identity's client id; left out for the host's own>" } },
+  { "id": "crm", "kind": "sqlserver", "host": "crm.database.windows.net", "port": 1433, "database": "crm", "schemas": ["sales"],
+    "login": { "type": "entra-service-principal", "tenant": "<tenant id>", "client": "<client id>", "secret": "file:/run/secrets/crm-client-secret" } }
+]
+```
+
+**No test of this release logs in as an Entra principal.** No container
+takes an Entra login and no test asks Entra: the tests show that a SQL
+Server 2025 container started with a certificate refuses one over TDS 8.0,
+that nothing is tried again as a SQL login, and that no secret, tenant or
+client reaches the log, an answer or an audit event. The server logs at start, once for each such connection,
+"No test of this release logs in as an Entra principal; connection erp
+logs in as one.", and the README's *What it is tested on* says so too
+([0074](../../docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
+
+- **One way in.** `user` and `password`, or `login`, never both;
+  `login` on a PostgreSQL entry is refused.
+- **Ids, not names.** `tenant` and `client` are UUIDs; a tenant written as
+  a domain name is refused. A managed identity's `client` chooses a
+  user-assigned identity; without it the host's own logs in.
+- **The secret is a reference**, `env:NAME` or `file:/absolute/path`, read
+  where the connection is first opened, as a password is. A managed
+  identity has none. A secret file that cannot be read is named in the log
+  line that says the connection could not be opened, as a password's is;
+  a resolved secret's path is written nowhere.
+- **TDS 8.0, and the certificate checked.** An Entra login opens the
+  connection with TLS, before the first TDS message, so there is no
+  unencrypted exchange for whoever answers in the server's place to
+  decline TLS in; the server's certificate is checked. An Entra entry
+  refuses `tls.enabled: false` and `tls.trustServerCertificate: true`:
+  its token is a bearer token for every database the principal reaches.
+  The database must take TDS 8.0: Microsoft documents it for Azure SQL and
+  SQL Server 2022 and later, and of the images measured on 2026-10-17
+  SQL Server 2025 with a certificate configured took it, and 2019 and 2022
+  on Linux reset the connection. A server whose certificate is
+  self-signed, or re-signed by a proxy, cannot be reached as one.
+- **The public cloud.** The token is asked for Azure SQL's resource,
+  `https://database.windows.net/.default`, and no other, whatever the
+  server names; there is no authority setting, and Azure Government and
+  Azure China are refused.
+- **What the environment still sets.** The service principal's tenant,
+  client, secret and authority come from the entry, never from
+  `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` or
+  `AZURE_AUTHORITY_HOST`. @azure/identity and MSAL still read the region,
+  the proxy and `AZURE_LOG_LEVEL` for any credential, and a managed
+  identity finds its platform's endpoint there. **The server does not
+  start with a managed identity entry while `AZURE_FEDERATED_TOKEN_FILE`
+  is set**, naming the connection and the variable: in a pod where AKS
+  workload identity sets it, the library would log in by workload
+  identity, as the tenant, client and authority the environment names,
+  which this release does not take. A service principal is the way in
+  there.
+- **One credential for each connection**, built when it is first opened
+  and kept, with the token it caches, while its secret is the same: a
+  connection opened again after a failed open asks Entra for no new token
+  until that one is due to be refreshed.
+- **A failed login says why** in one sentence, with Entra's AADSTS code
+  when it gave one, and nothing of the principal; the connection test
+  answers 503 and the log line says the sentence. A managed identity off
+  Azure failed to get a token in 0.00 to 0.02 s on a Windows 11 host and in
+  4.53 to 6.37 s in the server image's base under Docker Desktop (measured
+  2026-10-17, getToken alone), inside the driver's 15 s connect timeout.
+
+**Every entry refuses a key it does not read**, at its top level, in `tls`
+and in `login`, naming the key and never its value, and a `tls` setting
+that is not `true` or `false`. Before 0074 an entry was kept whole once
+its known fields passed, so a key a later release reads would have been
+dropped and the entry would have logged in some other way. A file with a
+stray key that an earlier release started with stops this one, with the
+key named.
 
 The host's identity is set by exactly one of three settings, beside
 `FORMANCY_DATA_ISSUER`, `FORMANCY_DATA_AUDIENCE` and

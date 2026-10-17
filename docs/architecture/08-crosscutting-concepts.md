@@ -142,7 +142,15 @@ copy of its driver ([0025](../decisions/0025-each-adapter-owns-its-driver.md)).
 The composition root, `packages/data-server/src/main.ts`, reads every
 setting, and names a secret by a reference, `env:NAME` or
 `file:/absolute/path`, which `secrets.ts` beside it resolves without ever
-repeating the reference's value. Section 7 has the settings.
+repeating the reference's value. Section 7 has the settings. A service
+principal's client secret is such a reference, and an Entra login's
+failure is a sentence with at most Entra's AADSTS code: the credential's
+guard keeps nothing of what Entra answered, so no error in the chain
+holds a tenant, a client, a trace id or a secret. A secret file that
+cannot be read is named in the log line that says its connection could
+not be opened, as a password's is: the path is the allowlist's, and what
+the operator fixes
+([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 
 **What stays out of logs and answers**: a token, since errors carry jose's
 code and never the token
@@ -154,8 +162,9 @@ connection string pasted where a name goes, since the request log names
 routes, never the path, query or Host header as sent
 ([0033](../decisions/0033-the-administrator-plane-is-audited.md)).
 
-**Held by** `secrets.test.ts`, `connections.test.ts`, `routes/admin.test.ts`
-and `server-log.test.ts` in `packages/data-server/src/`, and by the
+**Held by** `secrets.test.ts`, `connections.test.ts`, `routes/admin.test.ts`,
+`routes/entra.integration.test.ts` and `server-log.test.ts` in
+`packages/data-server/src/`, by `packages/data-sqlserver/src/entra.test.ts`, and by the
 getting-started gate, which fails when a secret or a token reaches any log
 of the composed stack
 ([0032](../decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)).

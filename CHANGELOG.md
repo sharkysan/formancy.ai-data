@@ -263,6 +263,41 @@ later.
   `ExportQueryRefusal`, `CsvCell`, `CsvRefusal` and `CsvText`; of
   `@formancy/data-client`: `exportRecords`, `EXPORT_MAX_BYTES`, and the
   types `RecordFile` and `RecordExportQuery`.
+- **A SQL Server connection may log in as a Microsoft Entra principal**: a
+  managed identity, user-assigned by its client id or the host's own, or a
+  service principal whose client secret is a reference, as a password is.
+  Why: an Azure SQL database set to Entra-only authentication has no SQL
+  login to give, so the allowlist could not name it at all. **No test of
+  this release logs in as either**: no container takes an Entra login and
+  no test asks Entra, so the tests show only that a SQL Server 2025
+  container started with a certificate refuses one, that nothing is tried
+  again as a SQL login and that no secret, tenant or client reaches a log,
+  an answer or an audit event. The server says so at start, once for each
+  such connection, and the README's *What it is tested on* says so in a
+  row of its own, derived from the adapter. **An Entra login goes over TDS
+  8.0** (`encrypt: 'strict'`): TLS before the first TDS message, with the
+  server's certificate checked. Why: with TDS 7's `encrypt: true`, TLS
+  starts only if the server's first answer asks for it, so whoever
+  answered in the server's place could decline it and be sent the token,
+  as review showed. The database must take TDS 8.0, which Microsoft
+  documents for Azure SQL and SQL Server 2022 and later, and of the images
+  measured SQL Server 2025 with a certificate configured did and 2019 and
+  2022 on Linux did not. The credential is built once for each connection,
+  kept with the token it caches across a failed open, and asked for Azure
+  SQL's token alone, whatever resource the server names; an Entra entry
+  refuses TLS turned off, a trusted server certificate, a tenant named by
+  its domain and a secret that is not a reference; the server does not
+  start with a managed identity entry while `AZURE_FEDERATED_TOKEN_FILE`
+  is set, under which the library would log in by AKS workload identity as
+  the environment's tenant, client and authority; and a failed login says
+  why in a sentence, with Entra's AADSTS code when it gave one, and
+  nothing of the principal
+  ([0074](docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md);
+  the data server's README has the entry's shape).
+  New exports of `@formancy/data-sqlserver`: `SQLSERVER_LOGINS`, and the
+  types `EntraLogin` and `SqlServerLogin`. **`@azure/identity` 4.13.3 is
+  a new dependency** of `@formancy/data-sqlserver`, at that exact version;
+  tedious already installed it.
 
 ### Changed
 
@@ -370,6 +405,23 @@ later.
   its `standing`, `{ tested, says }`: whether this release was tested on
   that server, in data-core's sentence. A server it was not tested on is
   answered 200 as before.
+- **The allowlist refuses a key it does not read**, on every entry and
+  inside `tls` and `login`, naming the key and never its value, and a
+  `tls` setting that is not true or false. Why: an entry was kept whole
+  once its known fields passed, so a key a later release reads -- `login`
+  among them -- would have been dropped by this one and the entry would
+  have logged in some other way; and `"enabled": "false"`, a string, did
+  not turn TLS off. **Breaking for a file with a stray key**: the server no
+  longer starts, and says which key (0074). `deploy/connections.json`,
+  which the getting-started guide runs, and the allowlist the performance
+  stack writes hold only keys it reads.
+- **For embedders**: `ConnectionConfig`'s `user` and `password` are
+  optional beside the new `login`, so code that reads `config.user` as a
+  string no longer compiles, and a `ConnectionFactory` of your own is
+  given its secret as `string | undefined`: a password, a client secret,
+  or none for a managed identity. `connectSqlServer` takes `user` and
+  `password` or `entra`, refuses `entra` without `encrypt` or with
+  `trustServerCertificate`, and opens an Entra pool over TDS 8.0 (0074).
 - **For embedders**: `ServerIdentity` now extends `ServerFacts`, so a
   `DatabaseAdapter` of your own must report `product` and `major`, and for
   SQL Server `compatibility`, from `ping` -- a breaking change for an
@@ -482,6 +534,12 @@ later.
   and `RELEASING.md`, which it links rather than repeats.
   `scripts/setup.test.mjs` holds the Workers, scripts and Wrangler it names
   to the code, and `scripts/architecture.test.mjs` its links and paths.
+- **For contributors**: `scripts/release-report/tested-on.mjs` names the
+  packages whose built output it reads, `BUILT_INPUTS`, and refuses to read
+  another; `scripts/release-report/workflows.test.mjs` fails when the
+  report job's build, with what turbo builds before it, leaves one out.
+  Why: the report read data-sqlserver's logins (0074) from a build the job
+  never made, and stopped on every pull request with "is not built".
 - **For contributors**: `pnpm test:pictures` and `pnpm test:browser` find
   Playwright's browsers where `PLAYWRIGHT_BROWSERS_PATH` puts them, as
   Playwright's own image does at `/ms-playwright`. turbo runs both in strict
@@ -643,7 +701,9 @@ documented at all; every boxed SQL Server, on any host and in any edition,
 SQL Server on Azure Virtual Machines among them, is called tested when its
 release and its database's level are, though every test ran the Developer
 edition on Linux in a container; and an Azure database that accepts Entra
-logins only cannot be connected to.
+logins only is reached only as an Entra principal no test logs in as
+(0074).
+
 What reading a NOT NULL added NOT VALID as nullable costs, in 0077: on
 PostgreSQL 18 its column is generated optional until the constraint is
 validated, so a create or an update that leaves it empty is refused by the
@@ -682,6 +742,35 @@ database does not hold; instants to the second and times to the minute,
 as a read holds them; on SQL Server an unpaired surrogate or a NUL refuses
 the file; and what Excel shows of it -- the byte-order mark, a `;` locale,
 17 digits -- was not tried.
+What logging in as an Entra principal costs, in 0074: no test logs in as
+one, so a partner makes the first successful login, and nothing shows a
+token refreshed, a pool outliving its token, Azure SQL's resource passing
+the guard, Azure SQL taking TDS 8.0 or a managed identity's endpoint on
+any host; only a server that takes TDS 8.0 can be reached as one, so SQL
+Server 2019 and 2022 on Linux, as measured, cannot; a new dependency,
+moved by hand; an allowlist with a stray key no longer starts the server;
+a managed identity cannot log in where AKS workload identity sets
+`AZURE_FEDERATED_TOKEN_FILE`, and the check is the runnable server's, not
+an embedder's; a connection's cached token outlives a change to the
+principal in Entra until it is refreshed; a secret file that cannot be read is
+named in the log, as a password's is;
+an embedder's `ConnectionConfig.user` is no longer always a string; what
+@azure/identity and MSAL read from the environment -- the region, the
+proxy, the log level, a managed identity's platform -- is outside the
+reviewed allowlist, and `AZURE_LOG_LEVEL` writes outside the server's
+log; only the first connection of an Entra pool says why its login
+failed, and a later one is `unavailable` with no reason in discovery's
+log line; a managed identity off Azure failed to get a token in 0.00 to
+0.02 s on a Windows 11 host and in 4.53 to 6.37 s in the server image's
+base under Docker Desktop, measured on 2026-10-17, inside mssql's 15 s
+connect timeout, and a host that drops packets to the metadata address
+was not measured; only the public cloud, and only a tenant's id; no
+Entra login to a server whose certificate the operator must trust; and
+the README's row calls the SQL login tested from a value typed in the
+adapter, since no server record says which login a test made. A SQL
+login still goes over TDS 7, whose TLS whoever answers in the server's
+place can decline and be sent the LOGIN7, its password in it, as before
+this release.
 
 ## 0.1.0 — 2026-10-16
 

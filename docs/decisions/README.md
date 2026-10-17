@@ -57,7 +57,7 @@ only enforcement is "we remember" says so plainly.
 |---|---|---|
 | [0001](0001-a-paid-module-in-its-own-repository.md) | A paid module lives in its own repository, under its own licence | accepted; extended by 0048 |
 | [0002](0002-depend-on-upstream-never-copy-it.md) | Depend on released upstream packages at exact versions; never copy them | accepted; spec 4 window closed, 0042; extended by 0055 |
-| [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted; narrowed by 0067; extended by 0073 |
+| [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted; narrowed by 0067, 0074; extended by 0073 |
 | [0004](0004-a-snapshot-says-what-it-could-not-see.md) | A metadata snapshot says what it could not see, and is made in one place | accepted; narrowed by 0027; extended by 0049 |
 | [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026, 0027, 0034, 0043, 0049, 0056 |
 | [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057, 0067, 0077 |
@@ -73,13 +73,13 @@ only enforcement is "we remember" says so plainly.
 | [0016](0016-postgres-operations.md) | PostgreSQL operations: canonical text in and out, every name from pg_catalog | accepted; narrowed by 0028, 0040, 0041; extended by 0031, 0043, 0044, 0050, 0051, 0061, 0078 |
 | [0017](0017-sqlserver-operations.md) | SQL Server operations: one guarded batch, and a write reported done only when the table holds it | accepted; narrowed by 0026, 0028, 0031, 0040, 0041; extended by 0027, 0031, 0043, 0044, 0050, 0051, 0061 |
 | [0018](0018-one-planner-turns-answers-into-requests.md) | One planner turns answers into requests, and leaves membership to the database | accepted; narrowed by 0028, 0041; extended by 0040, 0043, 0044, 0050 |
-| [0019](0019-a-published-form-is-checked-every-time-it-is-read.md) | A published form is one bundle, checked every time it is read; a form reaches only allowlisted databases | accepted; extended by 0030, 0041, 0042, 0045, 0062 |
+| [0019](0019-a-published-form-is-checked-every-time-it-is-read.md) | A published form is one bundle, checked every time it is read; a form reaches only allowlisted databases | accepted; extended by 0030, 0041, 0042, 0045, 0062, 0074 |
 | [0020](0020-administration-is-a-separate-plane.md) | Administration is a separate plane, held by a role in the host's token | accepted; extended by 0033, 0065 |
 | [0021](0021-generated-forms-preview-in-both-frameworks.md) | Generated forms are previewed in both frameworks, generated in the browser from a captured snapshot | accepted; narrowed by 0029; extended by 0058, 0069 |
 | [0022](0022-the-runtime-plane-asks-the-policy-every-time.md) | The runtime plane asks the policy on every request, and removes only the echo it can prove | accepted; narrowed by 0031, 0040; extended by 0041, 0044, 0045, 0050 |
 | [0023](0023-the-audit-trail-is-operational-not-evidence.md) | The audit trail is operational, never holds a value, and is not evidence | accepted; extended by 0031, 0033, 0044, 0045, 0050, 0079 |
 | [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032, 0052, 0058, 0060, 0062, 0065, 0075 |
-| [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted; extended by 0061 |
+| [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted; extended by 0061, 0074 |
 | [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted; narrowed by 0040 |
 | [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted; extended by 0049 |
 | [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md) | Row filters, labels and refusals mean the same on both engines | accepted; narrowed by 0067; extended by 0079 |
@@ -127,7 +127,8 @@ only enforcement is "we remember" says so plainly.
 | [0070](0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md) | The live demo at formancy.ai/data/demo/ runs the real data server and PostgreSQL in a Cloudflare Container of each visitor's own, started only by a sign-in and gone when it sleeps | accepted |
 | [0071](0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md) | The server believes a forwarded client address only from the proxies an operator names, each by its address, and the composed stack names its nginx and cloudflared alone | accepted |
 | [0072](0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md) | The apps serve their own fonts, from Fontsource's packages at the release formancy.ai installs, and no page asks another host for anything | accepted |
-| [0073](0073-azure-sql-is-not-tested-and-the-release-says-so.md) | Azure SQL Database and Azure SQL Managed Instance are not tested, and the release says so where it said nothing | accepted |
+| [0073](0073-azure-sql-is-not-tested-and-the-release-says-so.md) | Azure SQL Database and Azure SQL Managed Instance are not tested, and the release says so where it said nothing | accepted; narrowed by 0074 |
+| [0074](0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md) | A SQL Server connection may log in as an Entra managed identity or service principal, over TDS 8.0 with one credential per connection asked for Azure SQL's token alone, and no test logs in as either | accepted |
 | [0075](0075-a-field-may-move-to-another-generated-section.md) | A field may move to another generated section, recorded on its own entry and carried by what it stands for | accepted |
 | [0076](0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md) | The architecture is documented as arc42 in docs/architecture, and every change updates the section it touches | accepted |
 | [0077](0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md) | A NOT NULL that PostgreSQL 18 added NOT VALID is read as the check it is: the column nullable, the constraint enforced and not validated | accepted |

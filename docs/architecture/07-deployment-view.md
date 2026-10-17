@@ -387,8 +387,8 @@ sentence naming it. The identity key's settings are parsed by
 `identity-keys-cli.ts`, shares. A secret is never a value in configuration:
 it is a reference, `env:NAME` or `file:/absolute/path`, resolved by
 `secrets.ts`, whose errors name the reference's form and never its value
-(`secrets.test.ts`). A database password is resolved where its connection is
-first opened, by the registry in `connections.ts`
+(`secrets.test.ts`). A database password, or a service principal's client
+secret, is resolved where its connection is first opened, by the registry in `connections.ts`
 ([0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)),
 so a reference that cannot be resolved is found at that connection's first
 use rather than at start, and the open is tried again on the next call. That
@@ -399,7 +399,7 @@ an adapter or `data-core` reads the environment.
 |---|---|---|---|
 | `FORMANCY_DATA_ISSUER`, `_AUDIENCE`, `_ATTRIBUTES` | what the host's tokens must say, and which claim each attribute comes from | [0014](../decisions/0014-host-identity-is-verified-offline.md) | `identity.test.ts` |
 | `FORMANCY_DATA_IDENTITY_SECRET`, or `_PUBLIC_KEY_FILE`, or `_KEYS_FILE`, with `_ALGORITHM` | exactly one key source, its algorithm pinned | [0014](../decisions/0014-host-identity-is-verified-offline.md), [0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md) | `identity-settings.test.ts`, `identity-keys.test.ts`, `identity-file.test.ts`; the `container` job |
-| `FORMANCY_DATA_STORE_DIR`, `FORMANCY_DATA_CONNECTIONS` | the store's directory and the allowlist; together, the runtime plane | [0013](../decisions/0013-published-configuration-is-files-with-link-based-swap.md), [0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md) | `config-store.test.ts`, `connections.test.ts` |
+| `FORMANCY_DATA_STORE_DIR`, `FORMANCY_DATA_CONNECTIONS` | the store's directory and the allowlist; together, the runtime plane | [0013](../decisions/0013-published-configuration-is-files-with-link-based-swap.md), [0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md), [0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md) | `config-store.test.ts`, `connections.test.ts`, `routes/entra.integration.test.ts` |
 | `FORMANCY_DATA_ADMIN_ROLES` | the administrator's plane | [0020](../decisions/0020-administration-is-a-separate-plane.md) | `routes/admin.test.ts` |
 | `FORMANCY_DATA_PUBLISHER_ROLES` | publication under review | [0065](../decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md) | `publisher-roles.test.ts` |
 | `FORMANCY_DATA_AUDIT_KEY` | a secret reference; records named in the trail by keyed hash | [0023](../decisions/0023-the-audit-trail-is-operational-not-evidence.md) | `routes/runtime.test.ts` |
@@ -412,6 +412,28 @@ The files named are under `packages/data-server/src/`. Each setting's
 default and spelling, `PORT`'s included, is in
 [the data server's README](../../packages/data-server/README.md) and in
 `main.ts`'s own comment, and not repeated here.
+
+**An allowlist entry logs in one way**: a SQL login, `user` and a
+`password` reference, as the composed stack's do, or, on SQL Server, an
+Entra managed identity or service principal under `login`, whose client
+secret is a reference too. An Entra entry keeps TLS on and the server's
+certificate checked, names its tenant and client by id, and reaches the
+public cloud alone; the token is asked for Azure SQL's resource only. An
+Entra login goes over TDS 8.0, TLS before the first TDS message, so the
+database must take it: of the images measured, SQL Server 2025 with a
+certificate configured does, and 2019 and 2022 on Linux do not. **No
+test of this release logs in as an Entra principal**, and the server says
+so at start, once for each such connection. A managed identity finds its
+host's endpoint from the environment, which is how the platform offers
+it: off Azure it failed to get a token in 0.00 to 0.02 s on a Windows 11
+host and in 4.53 to 6.37 s in the server image's base under Docker
+Desktop (measured on 2026-10-17, the token alone), inside the driver's
+15 s connect timeout. In a pod where AKS workload identity sets
+`AZURE_FEDERATED_TOKEN_FILE`, the library would log in as the
+environment's tenant, client and authority instead, so the server does not
+start with a managed identity entry there, and a service principal is the
+way in. Every entry refuses a key it does not read, so a file with a stray
+key stops the process, naming the key ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 
 **Without the store and the allowlist the server verifies tokens and
 nothing else**, which is how a host is wired in before any form exists. The

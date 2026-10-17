@@ -147,8 +147,8 @@ async function ownersDefinition(table: ObjectRef): Promise<string> {
   return described.described.definition
 }
 
-/** A login and a user of its own, granted exactly `grants` (constants of this file, so spliced), and a pool connected as it. */
-async function account(name: string, grants: string): Promise<mssql.ConnectionPool> {
+/** A login and a user of its own, granted exactly `grants` (constants of this file, so spliced), and a pool connected as it, sized by `pool`. */
+async function account(name: string, grants: string, pool?: mssql.config['pool']): Promise<mssql.ConnectionPool> {
   const password = 'Probe-Account-Password-1'
   const master = await new mssql.ConnectionPool({ ...fixture.admin, database: 'master' }).connect()
   try {
@@ -158,7 +158,7 @@ async function account(name: string, grants: string): Promise<mssql.ConnectionPo
   }
   await owner.request().batch(`create user ${name} for login ${name}`)
   await owner.request().batch(grants)
-  return new mssql.ConnectionPool({ ...fixture.reader, user: name, password }).connect()
+  return new mssql.ConnectionPool({ ...fixture.reader, user: name, password, ...(pool === undefined ? {} : { pool }) }).connect()
 }
 
 describe('each constraint the fixture can be made to break', () => {
@@ -708,6 +708,36 @@ describe('when the connection fails', () => {
     expect(
       await records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', FIXTURE_ORDER)], columns: [columnOf(ORDER, 'status')], filters: tenant('1'), through: [] }),
     ).toMatchObject({ ok: false, code: 'unavailable' })
+  })
+
+  // A login that fails later: the pool opened, its connection was idle and
+  // closed, and the next connection's login is refused -- here because the
+  // login was disabled, as an Entra principal's would be refused once its
+  // grant or its token is gone (0074). mssql rejects the request with the
+  // ConnectionError the pool's create step met, and nothing was sent, so a
+  // write is `unavailable` as a read is, not the unknown outcome of a write
+  // that may have committed. The closed pool above never logs in again;
+  // this one does, and is refused. Watched failing with failureFor's first
+  // branch removed (the write was unknown-outcome).
+  test('a login refused after the pool opened is unavailable, for a write too', async () => {
+    const later = await account('probe_later', 'grant select on sales.country to probe_later', { min: 0, max: 1, idleTimeoutMillis: 100, reapIntervalMillis: 50 })
+    try {
+      const records = defined(createSqlServerRecords(later))
+      const read = () => records.read({ target: target(COUNTRY), key: [valueOf(COUNTRY, 'id', '1')], columns: [columnOf(COUNTRY, 'name')], filters: EVERY_ROW, through: [] })
+      expect(await read()).toMatchObject({ ok: true })
+      await owner.request().batch('alter login probe_later disable')
+      // An open session outlives the login's disabling; the pool's idle one is closed first.
+      for (let attempt = 0; later.size > 0; attempt += 1) {
+        if (attempt === 200) throw new Error('the pool never closed its idle connection')
+        await new Promise((resolve) => setTimeout(resolve, 25))
+      }
+      const definition = await ownersDefinition(COUNTRY)
+      expect(await records.insert({ ...countryInsert('Refused later'), definition })).toMatchObject({ ok: false, code: 'unavailable' })
+      expect(await read()).toMatchObject({ ok: false, code: 'unavailable' })
+    } finally {
+      await later.close()
+    }
+    expect(await countries('Refused later')).toBe(0)
   })
 
   /** Holds sales.country exclusively on its own connection until released, so a write to it waits inside the server. */
