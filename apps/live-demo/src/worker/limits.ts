@@ -27,14 +27,15 @@ export const MAX_INSTANCES = 10
 
 /**
  * How long a start may take before it counts as failed: from start() to the
- * server's /health answering 200. About three times the slowest of eight
+ * server's /health answering 200. About twice the slowest of sixteen
  * starts `pnpm test:live-demo` measured at basic's share under Docker
- * quotas on the workstation on 2026-10-17, 9,787 ms (5,456 ms the
- * fastest), and about six times the 4.8-5.3 s of the image's own
- * measurements of 2026-10-16 (deploy/demo/Dockerfile's header); Cloudflare
- * documents 1-3 s more for a cold start. A start on a Docker engine busy
- * with other containers took about 31 s, past it (0070). Not measured on
- * Cloudflare.
+ * quotas on the workstation on 2026-10-17, 14,176 ms (5,456 ms the
+ * fastest; the eight slower ones with another session's SQL Server
+ * container on the same engine), and about six times the 4.8-5.3 s of the
+ * image's own measurements of 2026-10-16 (deploy/demo/Dockerfile's
+ * header); Cloudflare documents 1-3 s more for a cold start. A start on a
+ * Docker engine busy with other suites' containers took about 31 s, past
+ * it (0070). Not measured on Cloudflare.
  */
 export const START_DEADLINE_MS = 30_000
 

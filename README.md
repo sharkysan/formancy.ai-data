@@ -776,9 +776,9 @@ the customer form offers no change or delete and the order line no
 delete, for the reasons the generator's notes give.
 
 **What you meet.**
-- Your first sign-in waits while your server starts: 5.7 and 6.8 s through
-  the Worker at the instance's share of a CPU on a workstation, measured on
-  2026-10-17, and not yet measured on Cloudflare.
+- Your first sign-in waits while your server starts: 5.7 to 11.7 s through
+  the Worker at the instance's share of a CPU on a workstation, over four
+  runs on 2026-10-17, and not yet measured on Cloudflare.
 - Everything you change is gone when your server stops, a little over 10
   minutes after your last request, and on every deploy. Sign in again and the data is as
   generated.

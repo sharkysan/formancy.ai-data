@@ -521,7 +521,7 @@ anybody can start a container, one visitor can take all ten, and a rate
 limiting rule on the sign-in is the operator's to add; every change
 is gone when a container sleeps and on every deploy whose image changed,
 which restarts every running demo at once; PostgreSQL alone; a first
-sign-in that waits for a start, 5.7 and 6.8 s through the Worker at the
+sign-in that waits for a start, 5.7 to 11.7 s through the Worker at the
 instance type's share on a workstation and not measured on Cloudflare, and
 refused past 30 s; Cloudflare runs code on formancy.ai's zone, decrypts
 every request and holds what a visitor types until their container stops;

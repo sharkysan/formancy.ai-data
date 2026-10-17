@@ -2281,7 +2281,7 @@
       ]
     },
     "0070": {
-      "reviewed": "sha256:8bc6f6ca0c7c30330990c938f9c5a1286f0f18a9017fa852829c178a7eead69b",
+      "reviewed": "sha256:bb2fab65be6e5e5a72c5807b9539884b51ec7b1d42f825dac8ab47ce9bfb4f26",
       "limitations": [
         {
           "area": "operations",
@@ -2301,7 +2301,7 @@
         },
         {
           "area": "operations",
-          "says": "A live demo visitor's first sign-in waits for their own server to start, 5.7 and 6.8 s through the Worker at basic's CPU and memory share on a workstation on 2026-10-17, and is refused past 30 s, which a start took there on a busy Docker engine; on Cloudflare neither a start nor a request's way through the Worker and the Durable Object has been measured."
+          "says": "A live demo visitor's first sign-in waits for their own server to start, 5.7 to 11.7 s through the Worker at basic's CPU and memory share on a workstation over four runs on 2026-10-17, and is refused past 30 s, which a start took there on a busy Docker engine; on Cloudflare neither a start nor a request's way through the Worker and the Durable Object has been measured."
         },
         {
           "area": "operations",

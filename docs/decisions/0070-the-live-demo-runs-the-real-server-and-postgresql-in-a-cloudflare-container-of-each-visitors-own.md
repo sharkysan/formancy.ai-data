@@ -150,8 +150,13 @@
     instance type, and failed with the Dockerfile's line absent. The reason
     for the policy's one allowance was watched in Chromium: under the
     examples page's policy the same page reports `style-src-elem` refusing
-    AG Grid's style elements. All 61 of the gate's checks passed on
-    2026-10-17 on the Windows workstation; the job has not yet run in CI.
+    AG Grid's style elements. With the Worker forwarding all of
+    `/v1/forms`, the routes check failed naming the twelve administrator's
+    routes under `/v1/forms/:id` ("POST /v1/forms/order/drafts answered
+    404; …"), the server's 404 and not the Worker's, while the image's own
+    check passed: it registers none of them. All 60 of the gate's checks
+    passed on 2026-10-17 on the Windows workstation; the job has not yet
+    run in CI.
   - **`scripts/live-demo-gate/worker.test.mjs`, in `pnpm test:repo`,** runs
     the Worker's own module over the gate's stand-in, without Docker, with
     containers that fail as the documentation says a start may: a start
@@ -280,7 +285,14 @@ emulate an instance type's share and are not Cloudflare's scheduler:
   install cached, the image's build 313,851 ms with it not. While another
   session's PostgreSQL and SQL Server test containers ran on the same
   engine, a start took about 31 s, Node's first line 28.6 s after
-  PostgreSQL was ready, in two runs.
+  PostgreSQL was ready, in two runs. Two runs later that day, after
+  review, with another session's SQL Server container on the same engine:
+  the image 532,038,618 and 532,038,161 bytes; `/health` 8,831 to 14,176
+  ms after `docker run` over eight starts; a cold sign-in through the
+  Worker 11,663 and 9,293 ms; Enter on a person to the menu 11,589 and
+  10,241 ms; peak memory 118,931,456 and 117,358,592 bytes; the image's
+  build, its install cached and its source changed, 308,700 and 119,560
+  ms; the whole gate 417,794 and 206,424 ms.
 - **The lookup deadline:** three cold visitors at once beside a type-check,
   each container at `basic`'s share, had a new order's three lookups
   answer 503 `lookup-timeout` at the server's default of 892 ms in two of
@@ -359,11 +371,11 @@ start may take up to its deadline of 30 s, and a callback that runs past
   with it as `FORMANCY_DATA_DEMO_IDENTITY_SECRET`, `enableInternet: false`;
 - sets the inactivity timeout to **10 minutes**, after the start and again
   in its constructor when a container already runs;
-- asks `/health` every 250 ms for at most 30 s -- about three times the
-  slowest of the gate's eight starts at `basic`'s share, 9,787 ms, and
-  Cloudflare documents 1 to 3 s more for a cold start; a start on a busy
-  Docker engine, about 31 s, was past it -- and gives up when a container
-  it saw running stops;
+- asks `/health` every 250 ms for at most 30 s -- about twice the slowest
+  of the gate's sixteen starts at `basic`'s share, 14,176 ms, and
+  Cloudflare documents 1 to 3 s more for a cold start; a start on a Docker
+  engine busy with other suites' containers, about 31 s, was past it --
+  and gives up when a container it saw running stops;
 - once the server answers, keeps the key in its own storage and sets an
   alarm a day on, which deletes the key when no container runs, so
   nothing about a visitor outlives a day;
@@ -551,10 +563,11 @@ Builds does not wait for it and a deploy is not one transaction.
   production use. The demo shows one engine, as the examples page does,
   and the page says which.
 - **A wait for the first sign-in:** the start measured at `basic`'s share on
-  a workstation, 5.7 to 6.8 s through the Worker and 7.0 to 7.8 s to the
-  menu in Chromium, plus Cloudflare's documented 1 to 3 s; on Cloudflare
-  not measured. On a busy Docker engine a start took about 31 s, past the
-  30 s deadline, and a visitor is then refused; Cloudflare's microVMs have
+  a workstation, 5.7 to 11.7 s through the Worker and 7.0 to 11.6 s to the
+  menu in Chromium in the gate's runs of 2026-10-17, plus Cloudflare's
+  documented 1 to 3 s; on Cloudflare not measured. On a busy Docker
+  engine a start took about 31 s, past the 30 s deadline, and a visitor is
+  then refused; Cloudflare's microVMs have
   no such neighbour, which is also unmeasured. Every request then crosses
   the Worker, the Durable Object, which may be elsewhere, and the
   container, whose latency nobody has measured.
