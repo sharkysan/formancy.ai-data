@@ -102,7 +102,11 @@ deploys from `main` through `scripts/demo.mjs`; no workflow here holds a
 Cloudflare token (0069).
 
 Nothing fails when this map goes stale. It names files rather than counting
-them, so a rename is the edit to make here.
+them, so a rename is the edit to make here. The full map, every package and
+app with what it may import and what is inside it, is
+[the building blocks](docs/architecture/05-building-blocks.md);
+`scripts/architecture.test.mjs` fails when they leave out a workspace
+package or app, and nothing checks what they say a package may import.
 
 ## Every change keeps the documentation true
 
@@ -121,6 +125,13 @@ in the same pull request as the code, not in a follow-up:
   Add it to the index. A decision that changes an old one marks the old record
   `superseded by NNNN` or `reversed` rather than editing it away. A decision
   that depends on a formancy.ai record cites it as `formancy.ai 0003`.
+- **Architecture** (`docs/architecture/`, arc42, entered from
+  `docs/README.md`) — the section the change touches: building blocks for a
+  new package or module, the runtime view for a new flow, cross-cutting
+  concepts, quality requirements, verification, and risks and debt for
+  anything accepted rather than fixed. A new decision record is linked from
+  the section it changes
+  ([0076](docs/decisions/0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md)).
 
 Keep the voice of the existing documents: say what it costs and what it does
 not do, and never claim more than a test shows.
@@ -136,8 +147,14 @@ and the document says what. Three shapes, in order of preference:
 2. **Check it.** `scripts/codecov-config.test.mjs` fails when the committed
    file is not what the generator produces; `scripts/check-cla.test.mjs` fails
    when `CLA.md` changes under a signature; `scripts/upstream-deps.test.mjs`
-   fails on an inexact upstream version. All of them run as `pnpm test:repo`,
-   and CI runs that — **a guard that is not a gate is a comment.**
+   fails on an inexact upstream version; `scripts/architecture.test.mjs`
+   fails when a relative link in the architecture, or the heading it points
+   at, names nothing, when a path from the repository's root written there
+   in backticks names nothing, when the building blocks leave out a
+   workspace package and when no section links a decision record -- it
+   never reads whether a sentence is still true. All of them run as
+   `pnpm test:repo`, and CI runs that — **a guard that is not a gate is a
+   comment.**
 3. **Measure it.** Below.
 
 Counts written into prose go stale. **Prefer wording without a number.** Where a
