@@ -52,9 +52,10 @@
   page sent, with no `<a download>` left in the document; a refusal is the
   server's sentence; and each state passes axe's colour-contrast and
   target-size rules with nothing past either edge. Run in Chromium
-  153.0.8010.12 and Firefox 155.0 on Windows 11 on 2026-10-17, every check
-  of the gate passing in each; WebKit runs
-  on Linux only, so its leg is CI's (watched failing in Chromium with the
+  153.0.8010.12 and Firefox 155.0 on Windows 11, and in WebKit 26.6 inside
+  `mcr.microsoft.com/playwright:v1.63.0-noble` on Docker Desktop's Linux,
+  on 2026-10-17, every check of the gate passing in each (watched failing
+  in Chromium with the
   page saving `new Blob([await file.text()])`, which takes the byte-order
   mark off: "its bytes start with the byte-order mark" and "every byte the
   server's").
@@ -130,9 +131,9 @@ happening.**
   ways the probe found whole in Chromium and Firefox, the one that needs
   least of a browser -- the anchor where a click on it is a click in the
   document, the URL outliving the click's task -- because WebKit was not
-  probed. The browser gate holds it in every browser, WebKit on CI's leg. So
-  no browser does anything another does not, and no row of `FACTS` names a
-  difference. The page is mounted with another `save` where it has no
+  probed. The browser gate holds it in every browser, and it passed in all
+  three, so no browser does anything another does not, and no row of
+  `FACTS` names a difference. The page is mounted with another `save` where it has no
   object URLs: the suites, in jsdom.
 
 ## Consequences
@@ -169,10 +170,11 @@ exception.
   before the grid's own in the section, named by its button; the suites
   and the browser gates now find the grid's line as the section's first
   status with no name.
-- **WebKit's save is CI's to see.** The way chosen was measured in
-  Chromium and Firefox on Windows; Playwright's WebKit, which is not Safari,
-  runs on Linux only, so a pull request built on Windows learns of a
-  WebKit that needs another way from its WebKit leg.
+- **WebKit's save was measured once, off CI.** The gate passed in
+  Playwright's WebKit, which is not Safari, inside Playwright's own image on
+  2026-10-17 -- libsoup 3.4.4, where CI's pinned runner supplies its own
+  (0058) -- and only CI's WebKit leg holds it from here on, since WebKit
+  runs on Linux alone.
 
 **What it does not do.** No Stop button -- leaving stops it -- no choice of
 columns or format, no file of every child section at once, no progress,

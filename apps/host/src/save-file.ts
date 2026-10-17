@@ -18,9 +18,10 @@ export type SaveFile = (file: Blob, name: string) => void
  * click's own task: every combination of the two -- anchor in or out,
  * revoked at once or a task later -- saved the file whole ten times in ten
  * in Chromium 153.0.8010.12 and Firefox 155.0 on Windows 11 on 2026-10-17,
- * so this is the combination that needs the least of a browser. The browser
- * gate holds it in each browser it runs, WebKit among them on Linux
- * (scripts/browser/exporting.mjs).
+ * and WebKit was not probed, so this is the combination that needs the
+ * least of a browser. The browser gate holds it in each browser it runs
+ * (scripts/browser/exporting.mjs); the same day it passed there in all
+ * three, WebKit 26.6 in Playwright's own Linux image.
  */
 export function saveFile(file: Blob, name: string): void {
   const url = URL.createObjectURL(file)
