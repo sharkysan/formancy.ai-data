@@ -50,8 +50,10 @@ export function sourceNames(form: FormSchema): string[] {
  * not see is left out, not an error. A refusal rejects with the server's
  * sentence, which the renderer shows as "could not be loaded"; an abort
  * rejects with the AbortError. `hasMore` and `omitted` do not reach the
- * renderer, whose contract, at 0.5.0 as at 0.3.0, has nowhere to put them
- * (0029).
+ * renderer. Until formancy 0.6.0 its contract had nowhere to put them; from
+ * 0.6.0 a source may answer a page, `{ options, more, withheld }`, and this
+ * one still answers a bare list, so a list of exactly one page looks
+ * complete (0029).
  */
 export function lookupSources(
   client: DataClient,

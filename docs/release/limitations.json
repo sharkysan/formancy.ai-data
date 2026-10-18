@@ -2111,7 +2111,7 @@
       ]
     },
     "0066": {
-      "reviewed": "sha256:460de376ea6e489449b80944fd1792d25a3d0b66ac1db15991222d8e7a46a351",
+      "reviewed": "sha256:e404377d29d10d43c3fcbfa1f1162a6941508e1580f5f0014338ccf2317a9859",
       "limitations": [
         {
           "area": "forms",
@@ -2130,7 +2130,7 @@
         },
         {
           "area": "host",
-          "says": "When a plain select's one search fails, the database out of reach for one, it says the renderer's \"Type to try again.\" under a control nobody can type into, and asks again when the form is drawn again.",
+          "says": "When a plain select's search fails, the database out of reach for one, it says the renderer's own sentence that its options could not be loaded and are asked for again each time the person moves to the field, and it asks again only then: a person who stays on the select sees the failure until they leave it and come back.",
           "heldBy": "apps/host/src/lookup-controls.test.tsx"
         },
         {

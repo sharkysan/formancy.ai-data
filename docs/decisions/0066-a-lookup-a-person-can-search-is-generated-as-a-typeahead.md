@@ -1,6 +1,6 @@
 # 0066 — A lookup a person can search is generated as a typeahead, and a host draws the control it is given
 
-- **Status:** accepted
+- **Status:** accepted; the failed plain select its costs and **Verified by** describe is formancy 0.5.0's: from 0.6.0 each renderer says "The options could not be loaded. They are asked for again each time you move to this field." under it, and moving to the select asks again, which `apps/host/src/lookup-controls.test.tsx` now holds
 - **Date:** 2026-10-16
 - **Deciders:** Daniel Bacher
 - **Verified by:**

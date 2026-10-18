@@ -1,5 +1,6 @@
 import { decodeKeyToken } from '@formancy/data-core'
 import type { FieldBinding } from '@formancy/data-core'
+import type { RemoteOption, RemoteOptionsAnswer } from '@formancy/spec'
 import { describe, expect, test } from 'vitest'
 import { generateExamples } from './examples.js'
 import { CAPTURED, capturedRows, inMemorySource, lookupSources } from './lookup-source.js'
@@ -24,6 +25,19 @@ function customerRows(): readonly CapturedRow[] {
   return found
 }
 
+/**
+ * The rows the in-memory source answered. Since formancy 0.6.0 a source may
+ * answer a page that says whether its list goes on; this one holds every
+ * captured row, so it answers a list, whose length is the true total. A
+ * page here would tell the control that more rows match than it was given
+ * when the source has handed over all of them.
+ */
+async function listed(answer: Promise<RemoteOptionsAnswer>): Promise<readonly RemoteOption[]> {
+  const resolved = await answer
+  if (!Array.isArray(resolved)) throw new Error(`the in-memory source answered a page: ${JSON.stringify(resolved)}`)
+  return resolved
+}
+
 const request = {
   source: customerLookup().source,
   path: 'customer',
@@ -41,12 +55,14 @@ describe('the in-memory customer source', () => {
     const binding = customerLookup()
     expect(binding.target.columns).toEqual(['tenant_id', 'customer_no'])
 
-    const options = await inMemorySource(binding, customerRows()).resolve({
-      ...request,
-      kind: 'search',
-      query: '',
-      values: [],
-    })
+    const options = await listed(
+      inMemorySource(binding, customerRows()).resolve({
+        ...request,
+        kind: 'search',
+        query: '',
+        values: [],
+      }),
+    )
 
     expect(options.map((option) => ({ label: option.label, key: decodeKeyToken(option.value) }))).toEqual([
       { label: 'Muster AG', key: { ok: true, values: ['1', '1001'] } },
@@ -58,12 +74,14 @@ describe('the in-memory customer source', () => {
   // why the key is composite. A source that keyed on customer_no alone would
   // give both rows one value and a select could not tell them apart.
   test('gives the two tenants’ customer 1001 two different values', async () => {
-    const options = await inMemorySource(customerLookup(), customerRows()).resolve({
-      ...request,
-      kind: 'search',
-      query: '',
-      values: [],
-    })
+    const options = await listed(
+      inMemorySource(customerLookup(), customerRows()).resolve({
+        ...request,
+        kind: 'search',
+        query: '',
+        values: [],
+      }),
+    )
     expect(new Set(options.map((option) => option.value)).size).toBe(2)
   })
 
@@ -71,9 +89,9 @@ describe('the in-memory customer source', () => {
   // Answering with every row would show a label for a value nobody chose.
   test('names only the stored values a labels request asks about', async () => {
     const source = inMemorySource(customerLookup(), customerRows())
-    const all = await source.resolve({ ...request, kind: 'search', query: '', values: [] })
+    const all = await listed(source.resolve({ ...request, kind: 'search', query: '', values: [] }))
     const second = all[1]?.value ?? ''
-    const named = await source.resolve({ ...request, kind: 'labels', query: '', values: [second, 'k1:9,9'] })
+    const named = await listed(source.resolve({ ...request, kind: 'labels', query: '', values: [second, 'k1:9,9'] }))
     expect(named).toEqual([{ value: second, label: 'Other Tenant GmbH' }])
   })
 
@@ -81,9 +99,9 @@ describe('the in-memory customer source', () => {
   // re-filtered would drop rows the source matched on something not shown.
   test('narrows a search by what was typed, ignoring case, and honours the limit', async () => {
     const source = inMemorySource(customerLookup(), customerRows())
-    const narrowed = await source.resolve({ ...request, kind: 'search', query: '  gmbh ', values: [] })
+    const narrowed = await listed(source.resolve({ ...request, kind: 'search', query: '  gmbh ', values: [] }))
     expect(narrowed.map((option) => option.label)).toEqual(['Other Tenant GmbH'])
-    const limited = await source.resolve({ ...request, kind: 'search', query: '', values: [], limit: 1 })
+    const limited = await listed(source.resolve({ ...request, kind: 'search', query: '', values: [], limit: 1 }))
     expect(limited).toHaveLength(1)
   })
 

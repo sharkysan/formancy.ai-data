@@ -655,8 +655,10 @@ and roles are still read only from the token's `roles` claim.
 What the typeahead costs, in 0066: a short list is a typeahead too, and
 nobody can choose a plain list for it; a lookup that shows no text or whole
 number still lists only its first page; when that list's one search fails,
-the renderer says "Type to try again." under a control nobody can type
-into, and asks again only when the form is drawn again; a version
+the renderer says that its options could not be loaded and are asked for
+again each time the person moves to the field, and asks again only then,
+not while they stay on it (formancy 0.6.0's words; 0.5.0 said "Type to try
+again." under a control nobody can type into); a version
 published before it with a lookup no label can spell still cannot list
 it until regenerated; and the regeneration report does not say that a
 control changed.
@@ -846,6 +848,46 @@ encrypt is now refused before its login is sent (0081, under *Fixed*).
   default lookup deadline, derived from those figures (0063), stays what
   they derived. Rows read and round trips are still pinned on both
   engines in CI.
+- **Every `@formancy/*` dependency moves from 0.5.0 to 0.6.0, upstream's
+  release of 2026-10-18, adopted the day it was published, and generated
+  forms stay on spec 3** (0055, 0042). Why: 0.6.0 is upstream's newest
+  release, its spec version 4 is unchanged and still the newest, and it is
+  the release in which a source may say its list goes on, which a lookup
+  here waits for (formancy.ai#253). The 23 exact pins in six manifests and
+  the eight release-age exemptions move together; the lockfile changes only
+  in the eight `@formancy` entries, and nothing new is installed. What you
+  notice:
+  - **A plain select whose list could not be loaded** says so in the
+    renderer's new words, "The options could not be loaded. They are asked
+    for again each time you move to this field.", and moving to it asks
+    again. 0.5.0 said "Type to try again." under a control nobody can type
+    into, and asked again only when the form was drawn again (0066, whose
+    test now holds the new behaviour). A typeahead still says "Type to try
+    again.".
+  - **A lookup a rule disables no longer searches.** It asks only for the
+    label of what it holds, so a record the person may only read, or a
+    field the host page fixes, sends no lookup search; `lookupSources`
+    answers labels, and a token the person may not see shows as the stored
+    value.
+  - **A source's `resolve` may answer a page.** `@formancy/data-client`'s
+    `LookupSource` still answers a list and stays assignable to both
+    renderers' `OptionsSource`; code of yours that calls `resolve` itself
+    narrows the answer, as the examples page's test now does, or reads it
+    through `acceptRemoteAnswer`.
+  - **Nothing generated meets 0.6.0's other breaking changes.** No generated
+    form has a repeater, a `computed` rule or a group a rule hides: the
+    generator writes `disabled` rules only. The two forms the examples page
+    generates hash and canonicalize byte for byte as under 0.5.0, and the
+    validator's errors are unchanged, so the administrator plane's
+    `invalid-bundle` sentences are too (both compared on 2026-10-18).
+  - **The studio's bundle** is 805.2 kB minified, 219.4 kB gzipped, 8.1 kB
+    more than main at 0.5.0, both measured on 2026-10-18; its warning limit
+    moves from 760 kB, which the studio's own code had already passed, to
+    810 kB.
+  - **The themes' stylesheets are byte-identical**, so the README's pictures
+    keep their stylesheet digests. 0.6.0 adds `@formancy/themes/room.css`,
+    the admin's palette as a file (formancy.ai 0178), which none of the
+    three copies here imports yet.
 
 ### Fixed
 
