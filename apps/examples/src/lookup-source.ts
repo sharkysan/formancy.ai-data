@@ -49,6 +49,11 @@ function keyOf(binding: LookupBinding, row: CapturedRow): string[] {
  *
  * The narrowing is the source's job, not the control's (formancy.ai 0077), so
  * a search filters by label here and the control shows what it is given.
+ * And a search answers one page and whether the list goes on past it, as
+ * the runtime plane's source does (0085): this source could count every
+ * match and the server does not, so it says that there are more, never how
+ * many, and the page shows what a host's control says over a database. A
+ * label request answers the rows it names, as a list.
  */
 export function inMemorySource(binding: LookupBinding, rows: readonly CapturedRow[]): OptionsSource {
   const options: RemoteOption[] = rows.map((row) => {
@@ -63,7 +68,8 @@ export function inMemorySource(binding: LookupBinding, rows: readonly CapturedRo
       if (signal.aborted) return Promise.reject(new DOMException('The request was abandoned before it was answered.', 'AbortError'))
       if (kind === 'labels') return Promise.resolve(options.filter((option) => values.includes(option.value)))
       const folded = query.trim().toLowerCase()
-      return Promise.resolve(options.filter((option) => option.label.toLowerCase().includes(folded)).slice(0, limit))
+      const matches = options.filter((option) => option.label.toLowerCase().includes(folded))
+      return Promise.resolve({ options: matches.slice(0, limit), more: matches.length > limit })
     },
   }
 }
