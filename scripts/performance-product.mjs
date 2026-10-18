@@ -2,11 +2,12 @@
 // the source files the measurement runs, the installed runtime dependencies of
 // the server and the client, and the build inputs that turn one into the
 // other. `compareProduct` names how it differs from what results.json
-// recorded, `performance-stale.mjs` is the command that runs it, and the
-// release refuses while they differ.
+// recorded, and `performance-stale.mjs` is the command that runs it, which
+// RELEASING.md's step 2b runs before a release and nothing refuses for
+// (0084).
 //
-// Node built-ins only, so it runs in the release's `check` job without a
-// build and is tested on a temporary tree with no pnpm.
+// Node built-ins only, so it runs on a fresh install without a build and is
+// tested on a temporary tree with no pnpm.
 //
 // **Files** are found by following imports, not by listing directories:
 // from the server's composition root and the measurement's entry, relative

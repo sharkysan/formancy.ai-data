@@ -322,6 +322,11 @@ only on SIGHUP, which Windows cannot send
 A change to the default lookup deadline alone does not mark the published
 figures stale
 ([0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)).
+Nothing refuses a release whose figures were measured on an earlier
+product: the performance page names the commit it measured, the version's
+changelog section says so by review alone, and the default lookup deadline
+stays what the older figures derived until somebody measures again
+([0084](../decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)).
 The studio's and the host page's Content-Security-Policies are sent by the
 composed stack's nginx; a deployment's own proxy sends them only if it
 copies them, nothing reads what it sends, and a host page on an origin of

@@ -263,10 +263,15 @@ Formancy Data
   slowest lookup answer the committed results hold
   ([0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)).
 - **Q33. A release is cut from a product the published figures no longer
-  describe.** Refused by `scripts/performance-stale.mjs` in the release's
-  `check` job; CI does not run it, so a pull request is never held for a
-  re-measurement. Held by `scripts/performance-stale.test.mjs`
-  ([0034](../decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
+  describe.** Not refused. `RELEASING.md`'s step 2b names each difference
+  with `scripts/performance-stale.mjs`, and the version's changelog
+  section says the figures are an earlier product's, which review alone
+  holds; no workflow runs the check, so neither a release nor a pull
+  request is held for a re-measurement. `scripts/performance-stale.test.mjs`
+  fails when a workflow runs it, and when the command passes a product that
+  changed
+  ([0034](../decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md),
+  [0084](../decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)).
 
 ### Operability
 

@@ -139,10 +139,11 @@ any commit author with no signature in `.github/cla/signatories.json`;
 `.github/workflows/security.yml` runs CodeQL over the code and the
 workflows; and the release's `check` job, before anything is published,
 verifies the report, the tarballs, the SBOM and the body
-(`scripts/release-report/verify-publish.mjs`) and refuses a product the
-published performance figures no longer describe
-(`scripts/performance-stale.mjs`,
-[0034](../decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
+(`scripts/release-report/verify-publish.mjs`). It does not ask whether the
+published performance figures describe the product: `RELEASING.md` asks
+that, with `scripts/performance-stale.mjs`, and nothing refuses a release
+for the answer
+([0084](../decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)).
 `RELEASING.md` says the rest of a release.
 
 ## 10.4 The repository's own guards
@@ -231,9 +232,10 @@ and each of these fails on the change that breaks what it holds:
   `scripts/release-notes.test.mjs`: each changelog section a release could
   be cut with fits the release body
   ([0064](../decisions/0064-the-first-releases-notes-summarise-the-development-before-it.md));
-  `scripts/performance-stale.test.mjs`: publishing waits for the staleness
-  check, and every file the measured product leaves out, the default
-  deadline's among them, holds one exported integer and nothing else
+  `scripts/performance-stale.test.mjs`: no workflow runs the staleness
+  check ([0084](../decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)), and every file the measured
+  product leaves out, the default deadline's among them, holds one exported
+  integer and nothing else
   ([0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)).
 
 One guard of the composed stack's configuration runs in a package's suite

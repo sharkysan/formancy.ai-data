@@ -302,8 +302,10 @@ through its environment, sends the requests a host sends through
 `data-client` against both fixtures with the sized table loaded, and
 renders `docs/performance.md` from `docs/performance/results.json` (0034).
 Rows read and round trips are pinned on both engines in CI; timing never
-is. `scripts/performance-stale.mjs` stops a release whose measured product
-changed since the results, and the default lookup deadline is left out of
+is. `scripts/performance-stale.mjs` names what changed in the measured
+product since the results; `RELEASING.md` runs it before a release and no
+workflow does, so nothing refuses a release for it
+([0084](../decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)), and the default lookup deadline is left out of
 that product on purpose (0063).
 
 ### The applications

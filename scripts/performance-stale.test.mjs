@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -132,7 +132,7 @@ describe('the stale check on a repository in miniature', () => {
   })
 })
 
-/** `node <scripts>/performance-stale.mjs` in the miniature, as the release and RELEASING's step 2b run it: its exit code and what it said. */
+/** `node <scripts>/performance-stale.mjs` in the miniature, as RELEASING's step 2b runs it: its exit code and what it said. */
 function staleCommand(scripts = join(root, 'scripts')) {
   const run = spawnSync(process.execPath, [join(scripts, 'performance-stale.mjs')], { cwd: root, encoding: 'utf8' })
   return { status: run.status, said: `${run.stdout}${run.stderr}` }
@@ -250,47 +250,21 @@ const steps = (workflow) => Object.entries(workflow.jobs).flatMap(([job, definit
 /** The jobs a job's `needs` names: one, a list, or none. */
 const needs = (job) => (job?.needs === undefined ? [] : [job.needs].flat().map(String))
 
-/** The comparison as the release and RELEASING's step 2b run it: the command and nothing else. */
-const COMPARES = (step) => String(step.run ?? '').trim() === 'node scripts/performance-stale.mjs'
-
 describe('the release', () => {
-  // RELEASING.md, the CHANGELOG and 0034 say a release is refused while the
-  // figures describe another product. That holds only while the job that
-  // publishes waits, through `needs`, on a job that runs the comparison --
-  // not `--describe`, which prints the product and passes whatever it finds,
-  // and not a step allowed to fail, nor one skipped by an `if:` on the job or
-  // on the step, which passes the job green without running it. Without
-  // this, a reshuffle of the workflow that dropped the job from `needs`
-  // would publish over stale figures with nothing red.
-  test('publishes only after the stale check has passed', () => {
-    const release = readWorkflow(repo, '.github/workflows/release.yml')
-    const checking = steps(release).filter(({ step }) => COMPARES(step))
-    const publishing = Object.entries(release.jobs).filter(([, job]) => (job.steps ?? []).some((step) => /\bscripts\/release-report\/publish\.mjs\b/.test(String(step.run ?? '')))).map(([id]) => id)
-    expect(checking.map(({ job }) => job)).toHaveLength(1)
-    expect(publishing).toHaveLength(1)
-    const waitedOn = new Set()
-    const queue = needs(release.jobs[publishing[0]])
-    while (queue.length > 0) {
-      const name = queue.shift()
-      if (waitedOn.has(name)) continue
-      waitedOn.add(name)
-      queue.push(...needs(release.jobs[name]))
-    }
-    const [{ job, step }] = checking
-    expect([...waitedOn]).toContain(job)
-    expect(Object.keys(release.jobs[job]).filter((key) => key === 'if' || key === 'continue-on-error'), `the ${job} job`).toEqual([])
-    expect(Object.keys(step).filter((key) => key === 'if' || key === 'continue-on-error'), 'the step that compares').toEqual([])
-  })
-
-  // The comparison holds a release, never a pull request: run in the gates,
-  // it would block every product change until somebody re-measured on a
-  // quiet machine, which 0034 rejects. So CI's workflows do not run it at
-  // all, `--describe` included, and the release's one step is the only one.
-  test('is not run by the gates or by CI', () => {
-    for (const file of ['.github/workflows/gates.yml', '.github/workflows/ci.yml']) {
-      const named = steps(readWorkflow(repo, file)).filter(({ step }) => String(step.run ?? '').includes('performance-stale'))
-      expect(named.map(({ job }) => `${file}: ${job}`)).toEqual([])
-    }
+  // The comparison holds nothing a workflow runs. Run in the gates, it would
+  // block every product change until somebody re-measured on a quiet
+  // machine, which 0034 rejects; run in the release, it held 0.2.0 for a
+  // measurement nobody could make while the machine worked, which 0084
+  // rejects. RELEASING.md's step 2b runs it, and the version's changelog
+  // section says when the figures describe an earlier product. So no
+  // workflow runs it, `--describe` included: a step that came back would
+  // refuse a release, or a pull request, that RELEASING.md says goes ahead.
+  // Every workflow file is read, so a new one is held as the release is.
+  test('is run by no workflow', () => {
+    const files = readdirSync(join(repo, '.github/workflows')).filter((name) => /\.ya?ml$/.test(name))
+    expect(files).toEqual(expect.arrayContaining(['ci.yml', 'gates.yml', 'release.yml']))
+    const named = files.flatMap((name) => steps(readWorkflow(repo, `.github/workflows/${name}`)).filter(({ step }) => String(step.run ?? '').includes('performance-stale')).map(({ job }) => `${name}: ${job}`))
+    expect(named).toEqual([])
   })
 
   // A guard on the guard: a reader that found no jobs, or no `needs`, would

@@ -20,7 +20,7 @@ import type { WriterEndpoint } from './stack.js'
 
 const run = promisify(execFile)
 
-/** `node scripts/performance-stale.mjs --describe`: the files, packages and build inputs the release check compares. */
+/** `node scripts/performance-stale.mjs --describe`: the files, packages and build inputs the stale check compares. */
 export async function describeProduct(root: string): Promise<ProductDescription> {
   const { stdout } = await run(process.execPath, [join(root, 'scripts', 'performance-stale.mjs'), '--describe'], { cwd: root, maxBuffer: 16 * 1024 * 1024 })
   return JSON.parse(stdout) as ProductDescription
