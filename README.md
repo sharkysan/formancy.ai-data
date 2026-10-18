@@ -85,10 +85,14 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > of each child section, which saves the CSV file of what the grid lists
 > through the browser and needs a server that makes it
 > ([0080](./docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md));
-> and the composed stack's studio and host page served under a
+> the composed stack's studio and host page served under a
 > Content-Security-Policy each, which their browser gates hold in every
 > browser, where 0.1.0's nginx sends none
-> ([0083](./docs/decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)),
+> ([0083](./docs/decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md));
+> and a release no longer held until the performance figures are measured
+> again, so the performance page may describe an earlier version, which
+> its *When and on what* and that version's changelog section name
+> ([0084](./docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
@@ -1182,7 +1186,9 @@ needs, how to retake one, and what nothing checks.
 
 `pnpm performance` measures the shipped server on a quiet Linux machine and
 rewrites [`docs/performance.md`](./docs/performance.md); it refuses while any
-other container runs.
+other container runs. `node scripts/performance-stale.mjs` names what
+changed since the figures were measured, and a release does not wait for it
+([0084](./docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)).
 
 ## Documents
 

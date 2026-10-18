@@ -831,6 +831,21 @@ the README's row calls the SQL login tested from a value typed in the
 adapter, since no server record says which login a test made. A SQL
 login still goes over TDS 7; one whose server answers that it will not
 encrypt is now refused before its login is sent (0081, under *Fixed*).
+- **A release no longer waits for the performance figures to be measured
+  again** (0084). The release workflow refused a release whose code,
+  runtime dependencies or build inputs differed from what
+  `docs/performance.md` was measured on, until somebody measured again:
+  `pnpm performance` on a machine with nothing else running, which took
+  9,756 s for 0.1.0's figures on 2026-10-15. By 2026-10-18 71 measured
+  files and tedious's version had changed, and 0.2.0, with tedious 20.3.7
+  in it, waited on that machine standing still. `RELEASING.md` still runs
+  the check before a release, and a version cut without measuring again
+  says so here, in its own section. What it costs you: the performance
+  page may describe an earlier version than the one you run -- its *When
+  and on what* names the commit and the drivers it measured -- and the
+  default lookup deadline, derived from those figures (0063), stays what
+  they derived. Rows read and round trips are still pinned on both
+  engines in CI.
 
 ### Fixed
 

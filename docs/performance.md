@@ -91,13 +91,17 @@ differs from what the results render.
   `node scripts/performance-stale.mjs` compares the source files the
   measurement runs (found by following its imports), the installed runtime
   dependencies of the server and the client, and the build inputs with what
-  `results.json` recorded, and names every difference. The release
-  workflow runs it in its `check` job, which publishing waits for, so a
-  release, and a rehearsal before it, is refused while it names one; CI does
-  not run it, so a pull request is never held for want of a re-measurement.
-  `scripts/performance-stale.test.mjs` fails when publishing stops waiting
-  for it, when the step is skipped or allowed to fail, when the gates run it,
-  and when the command itself passes a product that changed.
+  `results.json` recorded, and names every difference. No workflow runs
+  it: a release is not refused while it names one, nor is a pull request.
+  [`RELEASING.md`](../RELEASING.md)'s step 2b runs it before a release,
+  and a release cut without measuring again says in its changelog section
+  that these figures are an earlier product's
+  ([0084](./decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)).
+  So the figures below may describe an earlier version than the one you
+  run: *When and on what* names the commit they were measured at and the
+  driver versions installed. `scripts/performance-stale.test.mjs` fails
+  when a workflow runs the check, and when the command itself passes a
+  product that changed.
 - **In the release report.** Release gate 11 names this page as its
   evidence ([`docs/release/gates.json`](./release/gates.json)), so every
   report shows the gate as stated by it, with its last change, and never as

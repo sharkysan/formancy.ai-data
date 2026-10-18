@@ -19,9 +19,12 @@ node scripts/bump.mjs 0.1.0
 #    a section that would not fit (0064).
 
 # 2b. Whether docs/performance.md still describes what ships (0034). If this
-#     names a difference, stop everything else on the machine -- the demo,
-#     other containers -- run `pnpm performance`, and commit
-#     docs/performance/results.json and the page it rendered
+#     names a difference, either stop everything else on the machine -- the
+#     demo, other containers -- run `pnpm performance`, and commit
+#     docs/performance/results.json and the page it rendered; or say in the
+#     version's section that the figures were measured on an earlier
+#     product, naming the version they were measured on. Nothing refuses a
+#     release for it (0084); this step and that sentence are all there is
 node scripts/performance-stale.mjs
 
 # 3. Verify locally — the workflow runs these again, but finding out here is cheaper
@@ -77,14 +80,7 @@ cannot be taken back:
    report's summary — and fails when the body has no section or is longer
    than the 125,000 characters GitHub accepts.
 4. **`check`, in a job that holds `contents: read` and no secret:** first
-   **refuses a release whose measured code, runtime dependencies or build
-   inputs differ from what the published performance figures were measured
-   on**: it runs `node scripts/performance-stale.mjs` after the install and
-   without a build, and fails naming each difference
-   ([0034](docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md));
-   step 2b above is the same check, run where the re-measurement can happen,
-   and `scripts/performance-stale.test.mjs` fails when `publish` stops
-   waiting for it. Then it refuses a report with any problem, a partial or local one, or one of another
+   refuses a report with any problem, a partial or local one, or one of another
    commit, run, release or version; tarballs that are not, byte for byte, the
    install gate's, one per published package, each at the release's version;
    a tarball without `LICENSE.md` and `NOTICE` or with the wrong licence
@@ -96,7 +92,11 @@ cannot be taken back:
    that too. It is not a job that can write nothing: every job of a run can
    write to the run's artefacts, this one uploads the SBOM, and cdxgen's own
    dependencies are not locked; the pins are what tie what is published to
-   what was checked.
+   what was checked. It does not ask whether the published performance
+   figures were measured on this product: step 2b asks that, and nothing
+   refuses a release for the answer
+   ([0084](docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md));
+   `scripts/performance-stale.test.mjs` fails when a workflow runs the check.
 5. **`publish`, only on a tag, the one job with write permissions and an OIDC
    identity:** first refuses any file it downloaded that `check` did not pin
    or pinned otherwise, and a report that is not this run's, green and whole

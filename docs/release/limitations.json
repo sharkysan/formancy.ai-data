@@ -817,7 +817,7 @@
       ]
     },
     "0034": {
-      "reviewed": "sha256:554f3a23776b5a7a2ac3fb9f56511775276e33c03660074844dbec02c349fbb8",
+      "reviewed": "sha256:8ade373ff5e10aff9e7d63d1117579e8a6ee8d3f515c98f0e949b191cc9ed1da",
       "limitations": [
         {
           "area": "databases",
@@ -2763,6 +2763,19 @@
         {
           "area": "testing",
           "says": "The studio's and the host page's gates read what each document was refused after its last measured state, just before the canary, and the canary fails on anything left before it; a refusal whose report is still on its way when that last read is made -- the canary's own took 0.5 to 7.1 ms in Chromium -- is heard by nothing."
+        }
+      ]
+    },
+    "0084": {
+      "reviewed": "sha256:0afc3dfb24b7e3e98e107f7c47493310a1271ad99772f2416edbc731782c790b",
+      "limitations": [
+        {
+          "area": "testing",
+          "says": "A release may be published with docs/performance.md measured on an earlier product: nothing refuses it, and only the page's When and on what -- the commit and the drivers it measured -- and the version's changelog section, which review alone holds, say so."
+        },
+        {
+          "area": "operations",
+          "says": "The default lookup deadline is derived from the committed figures (0063), so in a release whose figures are an earlier product's it is what those figures derived, not what this release's lookups were measured taking."
         }
       ]
     }
