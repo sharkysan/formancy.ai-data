@@ -5,20 +5,22 @@
 // everything they offer -- delete of an order included, its policy naming
 // every key a delete of an order acts through (0051, 0053) -- and an order's
 // lines reached through their order (0043), whose typed key offers no
-// delete on PostgreSQL (0050). The identity verifier takes two literal
-// tokens, as the studio's gate does.
+// delete on PostgreSQL (0050). The identity verifier takes literal tokens,
+// as the studio's gate does: the administrator's, and a clerk's of tenant 1
+// and of tenant 3, whose customers are the paged ones, one lookup page and
+// ten more, inserted beside the fixture's (0085).
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION } from '@formancy/data-core'
-import { POSTGRES_IMAGE, startPostgresFixture } from '@formancy/data-fixtures'
+import { insertPaged, POSTGRES_IMAGE, startPostgresFixture } from '@formancy/data-fixtures'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, DRIVER_FACTORIES } from '@formancy/data-server'
 import postgres from 'postgres'
 
 export const FORM = 'pg-order'
 export const LINES = 'pg-order-line'
-export const TOKENS = { admin: 'browser-gate-administrator', clerk: 'browser-gate-clerk' }
+export const TOKENS = { admin: 'browser-gate-administrator', clerk: 'browser-gate-clerk', thirdClerk: 'browser-gate-clerk-tenant-3' }
 
 /** The keys a delete of an order acts through on the fixture, with their actions: its lines and deliveries, and the deliveries' parcels. */
 const ORDER_CASCADES = [
@@ -41,6 +43,7 @@ function clerkPolicy(bindings, extra = {}) {
 
 export async function startPlane() {
   const fixture = await startPostgresFixture(POSTGRES_IMAGE)
+  await insertPaged({ kind: 'postgres', admin: fixture.admin })
   const url = new URL(fixture.admin)
   const real = createConnectionRegistry(
     [{ id: 'pg', kind: 'postgres', host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } }],
@@ -65,6 +68,7 @@ export async function startPlane() {
   const verifyIdentity = async (token) => {
     if (token === TOKENS.admin) return { ok: true, identity: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } }
     if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-1', roles: ['clerk'] }, attributes: { tenant: '1' } } }
+    if (token === TOKENS.thirdClerk) return { ok: true, identity: { actor: { id: 'clerk-3', roles: ['clerk'] }, attributes: { tenant: '3' } } }
     return { ok: false, reason: 'ERR_JWS_INVALID' }
   }
   // The administrator's trail is the server's suites' subject; here it is required and discarded.

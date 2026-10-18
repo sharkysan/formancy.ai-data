@@ -1,8 +1,10 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleName } from 'dom-accessibility-api'
+import { createFormText } from '@formancy/core/words'
+import { DEFAULT_MAX_PAGE_SIZE } from '@formancy/data-core'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
-import { answer, answerable, chooseCustomer, chooseForm, chooseRenderer, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, newRecord, notice, openForm, openWith, pane, paper, RENDERERS, said, save, shows, signIn, unknownNotice, unsavedNotice } from './test-host.js'
+import { answer, answerable, chooseCustomer, chooseForm, chooseRenderer, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, newRecord, notice, openForm, openWith, pane, paper, RENDERERS, said, save, shows, signIn, statuses, unknownNotice, unsavedNotice } from './test-host.js'
 import { EDGES, ENGINES, holdingRequests, holdingWrites, losingWrites, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 import { PREFERENCES } from './prefs.js'
@@ -304,6 +306,22 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await user.click(exportButton('Order line'))
     await waitFor(() => expect(exportLine('Order line').textContent).toBe(`Made ${lines}.csv; your browser saves it.`), { timeout: 15_000 })
     expect(await floor("a line's file made")).toEqual(CLEAN("a line's file made"))
+  })
+
+  // A customer list that goes on (0085): as tenant 3's clerk, whose
+  // customers are a lookup page and more, each renderer's open list says so
+  // in a status line under it, markup no other state draws. The floor is
+  // held with the list open and the sentence said -- waited for, so axe
+  // runs on that state (watched failing with the client's source answering
+  // a search with a list, as it did before 0085: the sentence never came).
+  test('passes the floor with a customer list open that says there are more', async () => {
+    const more = createFormText({ locale: '' })('options.more', { count: DEFAULT_MAX_PAGE_SIZE })
+    const user = await openForm(plane, formId, TOKENS.thirdClerk)
+    for (const renderer of RENDERERS) {
+      await user.click(within(paper(renderer)).getByRole('combobox', { name: 'Customer' }))
+      await waitFor(() => expect({ renderer, statuses: statuses(renderer) }).toEqual({ renderer, statuses: expect.arrayContaining([more]) as unknown }), { timeout: 15_000 })
+      expect(await floor(`${renderer}'s customer list, saying there are more`)).toEqual(CLEAN(`${renderer}'s customer list, saying there are more`))
+    }
   })
 
   // The server's refusal, in its words, where the person asked: a page that

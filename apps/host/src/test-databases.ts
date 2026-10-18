@@ -1,4 +1,5 @@
-import { EDGE_VALUES, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
+import { EDGE_VALUES, insertPaged, pagedCustomers, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
+import type { PagedCustomer } from '@formancy/data-fixtures'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import type { TestProject } from 'vitest/node'
@@ -16,7 +17,9 @@ import { SECOND_CUSTOMER } from './test-values.js'
  * One row is added to the fixture on both engines: a second customer of
  * tenant 1, so a person can change an order's customer to another one they
  * may pick. Added here, in the host's run, rather than to the shared fixture,
- * whose two customers every other suite counts.
+ * whose two customers every other suite counts. And tenant 3's paged
+ * customers and orders (`insertPaged`, 0085): a lookup page of each and
+ * more, which only tenant 3's clerk sees.
  *
  * What is provided is how to connect, not a connection: a worker cannot be
  * handed a socket.
@@ -44,10 +47,17 @@ export interface Edges {
   seededOrder: string
 }
 
+/** Tenant 3's paged customers, in key order, and the first of its orders on each engine, by its record token: provided, for `Edges`' reason. */
+export interface Paged {
+  customers: PagedCustomer[]
+  orders: { pg: string; ms: string }
+}
+
 declare module 'vitest' {
   export interface ProvidedContext {
     databases: { pg: DatabaseDetails; ms: DatabaseDetails }
     edges: Edges
+    paged: Paged
   }
 }
 
@@ -89,7 +99,10 @@ export default async function setup(project: TestProject): Promise<() => Promise
     await pool.close()
   }
 
+  const [pgPaged, msPaged] = await Promise.all([insertPaged({ kind: 'postgres', admin: pg.admin }), insertPaged({ kind: 'sqlserver', admin: ms.admin })])
+
   project.provide('databases', details)
+  project.provide('paged', { customers: pagedCustomers(), orders: { pg: pgPaged.order, ms: msPaged.order } })
   project.provide('edges', { orderDate: EDGE_VALUES.orderDate, largestAmount: EDGE_VALUES.largestAmount, seededOrder: `k1:${EDGE_VALUES.beyondSafeInteger}` })
   return async () => {
     await Promise.all([pg.stop(), ms.stop()])
