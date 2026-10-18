@@ -119,12 +119,17 @@ describe('a proxy the operator names', () => {
   // per request, and whatever the client typed in the log. Such a request
   // is counted and logged as its peer's, as without the setting. Watched
   // failing with request.ip used as it came: the limit was never reached,
-  // and the typed text was logged.
+  // and the typed text was logged. The log is searched for each value whole,
+  // as the client typed it: a bare `4711` was found on CI inside a line's
+  // `responseTime`, 0.3447110000000748, which no client typed. Watched
+  // failing so on 2026-10-18 with `request.ip` logged as the address alone:
+  // each of the three was found in its request's line.
   test('counts a forwarded value that is no address as the peer, and logs none of it', async () => {
     const app = await server({ trustedProxies: [PROXY] })
-    expect(await statuses(app, [{ peer: PROXY, forwardedFor: 'S3cret-pw-e81' }, { peer: PROXY, forwardedFor: `${ALICE}:4711` }, { peer: PROXY, forwardedFor: 'unknown' }])).toEqual([401, 401, 429])
+    const typed = ['S3cret-pw-e81', `${ALICE}:4711`, 'unknown']
+    expect(await statuses(app, typed.map((forwardedFor) => ({ peer: PROXY, forwardedFor })))).toEqual([401, 401, 429])
     expect(logged()).toEqual([PROXY, PROXY, PROXY])
-    expect(written.filter((line) => line.includes('S3cret') || line.includes('4711') || line.includes('unknown'))).toEqual([])
+    expect(written.filter((line) => typed.some((value) => line.includes(value)))).toEqual([])
   })
 
   // The limiter counts an IPv6 client by its /64, which @fastify/rate-limit
