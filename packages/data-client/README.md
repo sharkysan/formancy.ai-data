@@ -181,9 +181,9 @@ a title, operations or children is `unexpected`.
   ([0058](../../docs/decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)). The client itself still never sends anything again.
 - **Field problems are sentences.** The renderers print an error entry as
   it is, beside the field and in the error summary, as observed at 0.3.0 on
-  2026-10-09, at 0.4.0 on 2026-10-10 and at 0.5.0 on 2026-10-11, so
-  `fieldProblems` hands them the server's sentence, which never echoes a
-  value. The code stays on the
+  2026-10-09, at 0.4.0 on 2026-10-10 and at 0.5.0 on 2026-10-11, and read
+  in 0.6.0's code on 2026-10-18, so `fieldProblems` hands them the server's
+  sentence, which never echoes a value. The code stays on the
   refusal for a program.
 
 ## In React
@@ -247,17 +247,20 @@ to update asks under update's filter without a new application.
   What the browser sends again on its own is answered by the server once per
   write id, in its process only: a copy that reaches another replica is
   applied again.
-- **`hasMore` and `omitted` do not reach the person.** A renderer's option
-  contract, as read at 0.3.0 on 2026-10-09 and unchanged at 0.4.0 and 0.5.0,
-  is a list of `{ value, label }`, so a list of exactly one page looks
+- **`hasMore` and `omitted` do not reach the person.** Until formancy
+  0.6.0 a renderer's option contract was a list of `{ value, label }`, as
+  read at 0.3.0 on 2026-10-09 and unchanged at 0.4.0 and 0.5.0. From 0.6.0
+  a source may answer a page, `{ options, more, withheld }`, and
+  `lookupSources` still answers a list, so a list of exactly one page looks
   complete. A typeahead keeps narrowing; a plain select does not.
-- **Its types are `@formancy/spec` 0.5.0's.** `PublishedForm.form` is the
+- **Its types are `@formancy/spec` 0.6.0's.** `PublishedForm.form` is the
   `FormSchema` of the `@formancy/spec` this package pins exactly (0002), and
   there `specVersion` may be `"4"`, so a host whose engine is
   `@formancy/core` 0.3.0 does not compile the React snippet above: TS2322 at
   `createFormEngine`, measured with TypeScript 6.0.3 and `skipLibCheck` off
   on 2026-10-10, and again against 0.5.0's types on 2026-10-11, when a host
-  whose engine is at 0.4.0 compiled it. The document itself is spec 3
+  whose engine is at 0.4.0 compiled it; 0.6.0's `FormSchema` declaration is
+  byte-identical to 0.5.0's, compared on 2026-10-18. The document itself is spec 3
   ([0042](../../docs/decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)),
   so such a host casts it to its own `@formancy/spec`'s `FormSchema`, or
   moves its renderer to 0.4.0 or later. Nothing here type-checks a 0.3.0 or

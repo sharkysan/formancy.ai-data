@@ -84,7 +84,7 @@ function aborted(signal: AbortSignal, ms: number): Promise<void> {
 const body = JSON.stringify({ operation: 'create', search: 'Muster' })
 
 describe('abandonment', () => {
-  // The renderers abort a superseded search's fetch (formancy 0.5.0). If the
+  // The renderers abort a superseded search's fetch (formancy 0.5.0, 0.6.0). If the
   // server never noticed, the database would finish every scan it started for
   // nobody: what 0061 removes. And the reason is an AbortError, which the
   // route tells apart from a database's failure by identity.

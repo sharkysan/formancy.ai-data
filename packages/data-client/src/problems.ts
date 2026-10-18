@@ -6,7 +6,7 @@ import type { Refusal } from './client.js'
  * each once. `{}` when the refusal concerns no field.
  *
  * Sentences and not codes, because the renderers print an entry verbatim, at
- * 0.3.0, 0.4.0 and 0.5.0, beside the field and in the error summary: a code would
+ * 0.3.0 to 0.6.0, beside the field and in the error summary: a code would
  * put `not-an-option` in front of a person. The server promises its sentence is
  * showable and never echoes a value (0011); the code stays on the Refusal for a
  * program to read.

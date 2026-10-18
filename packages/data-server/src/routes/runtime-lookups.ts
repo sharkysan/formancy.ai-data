@@ -106,8 +106,9 @@ const UNAVAILABLE: Record<'search' | 'resolve', string> = {
  * log names the deadline. A client that left is answered `499 abandoned`:
  * nobody reads it, and it exists so the audit trail's event for the request
  * says what happened (0023, 0033). The person reads the renderer's own
- * sentence, "could not be loaded"; at formancy 0.5.0 a source's message has
- * nowhere else to go.
+ * sentence, "could not be loaded"; at formancy 0.6.0, as at 0.5.0, a
+ * source's message has nowhere else to go: the renderers drop a rejection's
+ * reason, and a page that carried one would be refused whole.
  */
 async function answer<T>(steps: LookupRouteSteps, request: LookupRequest, reply: FastifyReply, kind: 'search' | 'resolve', run: (open: OpenConnection, config: LookupConfig, filters: RowFilters, signal: AbortSignal) => Promise<T>, operation: unknown): Promise<T | FastifyReply> {
   const abandoned = abandonment(request, reply)

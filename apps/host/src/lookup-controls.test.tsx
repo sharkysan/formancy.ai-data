@@ -44,8 +44,8 @@ afterEach(() => {
 
 const ARRIVES = { timeout: 15_000 }
 
-/** What a renderer says under a control whose list could not be loaded, in its own words: upstream's, never typed here. */
-const FAILED = FORM_WORDS['options.failed']
+/** What a renderer says under a plain select whose list could not be loaded, in its own words: upstream's, never typed here. */
+const FAILED = FORM_WORDS['options.failedListed']
 
 /** The order line form's paper in a pane. */
 const linePaper = (renderer: RendererName): HTMLElement => within(pane(renderer)).getByRole('form', { name: `Order line, ${renderer}` })
@@ -171,18 +171,22 @@ describe.each(ENGINES)('the control a lookup is drawn as on $engine', (engine) =
     expect(await floor('the order line, created')).toEqual(CLEAN('the order line, created'))
   })
 
-  // A plain select asks its source once, with the empty search, and cannot
-  // be typed into. When that one search fails -- the database out of reach,
-  // which the real server answers 503 -- each renderer says its own words
-  // for a list that failed, "Type to try again.", under a control nobody can
-  // type into: 0066's cost, held here, so that a change upstream to what a
-  // select says when its list fails is seen. It asks again only when the
-  // form is drawn again: New record opens a new engine (`session.open`),
-  // which React's search depends on and over which the Angular pane starts a
-  // new application (angular-mount.tsx), and that search lists the orders
-  // (watched failing with the page's rewrite kept: the words were under an
-  // INPUT).
-  test("says a plain select's failed search in the renderer's words, and asks again when the form is drawn again", async () => {
+  // A plain select asks its source with the empty search and cannot be
+  // typed into. When that search fails -- the database out of reach, which
+  // the real server answers 503 -- each renderer says its own words for a
+  // list that failed: since formancy 0.6.0 a select's own,
+  // `options.failedListed`, "They are asked for again each time you move to
+  // this field.", where 0.5.0 said the typeahead's "Type to try again."
+  // under a control nobody could type into, 0066's cost until then. Held
+  // here, so that a change upstream to what a select says is seen, and so is
+  // what the sentence promises: with the database back, moving to the select
+  // asks again and lists the orders. The panes are moved to one at a time,
+  // and the second still says its list failed once the first lists its
+  // orders, so the move asks, not a timer (watched failing with the page's
+  // rewrite kept: the words were under an INPUT; and on 2026-10-18 with the
+  // move to the first select left out: React's said its list failed and
+  // offered nothing for the whole wait).
+  test("says a plain select's failed search in the renderer's words, and asks again when the person moves to it", async () => {
     const user = await workspace(engine.lines)
     plane.unreachable.add(engine.connection)
     try {
@@ -197,10 +201,12 @@ describe.each(ENGINES)('the control a lookup is drawn as on $engine', (engine) =
       plane.unreachable.delete(engine.connection)
     }
 
-    await newRecord(user)
-    for (const renderer of RENDERERS) {
-      await waitFor(() => expect({ renderer, offers: offered(orderIn(renderer)).includes(EDGES.orderDate), failed: statuses(renderer).includes(FAILED) }).toEqual({ renderer, offers: true, failed: false }), ARRIVES)
-    }
+    const [first, second] = RENDERERS
+    await user.click(orderIn(first))
+    await waitFor(() => expect({ renderer: first, offers: offered(orderIn(first)).includes(EDGES.orderDate), failed: statuses(first).includes(FAILED) }).toEqual({ renderer: first, offers: true, failed: false }), ARRIVES)
+    expect({ renderer: second, failed: statuses(second).includes(FAILED) }).toEqual({ renderer: second, failed: true })
+    await user.click(orderIn(second))
+    await waitFor(() => expect({ renderer: second, offers: offered(orderIn(second)).includes(EDGES.orderDate), failed: statuses(second).includes(FAILED) }).toEqual({ renderer: second, offers: true, failed: false }), ARRIVES)
     expect(await floor('the plain select, asked again')).toEqual(CLEAN('the plain select, asked again'))
   })
 

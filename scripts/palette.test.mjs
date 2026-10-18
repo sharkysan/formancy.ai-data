@@ -7,12 +7,15 @@ import { describe, expect, test } from 'vitest'
  * The admin's palette, copied by hand into every app here, held to one value
  * per variable.
  *
- * CLAUDE.md asks each UI to wear formancy.ai's admin.css variables, and an
- * application's stylesheet is not a package this repository can depend on, so
- * each app copies them. Three copies now -- the examples page, the studio and
- * the host page -- and nothing failed when one moved without the others. This
- * narrows "copied by hand" to one gap, upstream's: when admin.css changes
- * there, these still agree with each other, and with it only by review.
+ * CLAUDE.md asks each UI to wear formancy.ai's admin.css variables, and until
+ * formancy 0.6.0 an application's stylesheet was not a package this
+ * repository could depend on, so each app copies them. Three copies now --
+ * the examples page, the studio and the host page -- and nothing failed when
+ * one moved without the others. This narrows "copied by hand" to one gap,
+ * upstream's: when admin.css changes there, these still agree with each
+ * other, and with it only by review. 0.6.0 publishes the palette as
+ * `@formancy/themes/room.css` (formancy.ai 0178), which no app here imports
+ * yet.
  *
  * Which files are copies is derived, never listed: every stylesheet under
  * apps/ whose `:root` block carries the comment naming admin.css. A fourth

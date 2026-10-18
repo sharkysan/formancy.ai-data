@@ -337,7 +337,9 @@ user interface is the rule, and this is what each part of it rests on.
   loads no `workbench.css`
   ([0024](../decisions/0024-the-studio-speaks-only-the-admin-plane.md)).
   `scripts/palette.test.mjs` holds every copy to the same values; nothing
-  fails when upstream's `admin.css` moves.
+  fails when upstream's `admin.css` moves. Since formancy 0.6.0 upstream
+  publishes the palette as `@formancy/themes/room.css` (formancy.ai 0178),
+  which no app here imports yet.
 - **The room's own faces**: Fontsource's packages at the release
   formancy.ai installs, bundled into each app, so no page asks another
   host for anything

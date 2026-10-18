@@ -4,7 +4,7 @@ import { fieldProblems } from './problems.js'
 
 /*
  * What a host hands `engine.applyServerErrors`. The renderers print an error
- * entry verbatim, at 0.3.0, 0.4.0 and 0.5.0 -- beside the field and in the summary
+ * entry verbatim, at 0.3.0 to 0.6.0 -- beside the field and in the summary
  * -- so an entry has to be a sentence a person can read, and the server's is
  * the one that promises never to echo a value (0029).
  */
