@@ -69,7 +69,8 @@ export interface Lossy {
 export interface Plane {
   /** `http://127.0.0.1:<port>`: the server, across real HTTP. */
   base: string
-  tokens: { admin: string; clerk: string; otherClerk: string }
+  /** The administrator, and a clerk of each tenant: 1 and 2 hold the fixture's rows, 3 the paged customers (0085). */
+  tokens: { admin: string; clerk: string; otherClerk: string; thirdClerk: string }
   /** Every request the spied fetch carried, in order. Cleared by `clear()`. */
   sent: Sent[]
   /** Node's own fetch, recording what it is asked to send. */
@@ -151,6 +152,7 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean; rem
     admin: await sign('admin-1', { roles: ['data-admin'] }),
     clerk: await sign('clerk-1', { roles: ['clerk'], tid: 1 }),
     otherClerk: await sign('clerk-2', { roles: ['clerk'], tid: 2 }),
+    thirdClerk: await sign('clerk-3', { roles: ['clerk'], tid: 3 }),
   }
 
   const admin = async (path: string, body: unknown): Promise<Record<string, unknown>> => {

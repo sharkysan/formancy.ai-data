@@ -1,4 +1,6 @@
-import type { FieldDef, FormSchema, RemoteOption } from '@formancy/spec'
+import { DEFAULT_MAX_PAGE_SIZE } from '@formancy/data-core'
+import type { LookupResult } from '@formancy/data-core'
+import type { FieldDef, FormSchema, RemoteOptionsAnswer, RemoteOptionsPage } from '@formancy/spec'
 import type { DataClient, LookupOperation } from './client.js'
 
 export type { LookupOperation } from './client.js'
@@ -20,8 +22,25 @@ export type { LookupOperation } from './client.js'
 /** What a source reads of a renderer's request: the kind, the query or the stored values, the limit, and the signal. */
 export type LookupRequest = { kind: 'search' | 'labels'; query: string; values: readonly string[]; limit: number; signal: AbortSignal }
 
-/** One named list, answering through the runtime plane. */
-export type LookupSource = { resolve(request: LookupRequest): Promise<readonly RemoteOption[]> }
+/**
+ * One named list, answering through the runtime plane: a search with a page
+ * that says whether the list goes on, a label request with the rows named.
+ * `maxRows` is the largest page the runtime plane answers a lookup,
+ * `DEFAULT_MAX_PAGE_SIZE`, which it builds every lookup's config with: the
+ * renderer asks for that page and shows that many, said here rather than
+ * left to agree with the renderers' own default by chance (0085).
+ */
+export type LookupSource = { resolve(request: LookupRequest): Promise<RemoteOptionsAnswer>; readonly maxRows: number }
+
+/**
+ * A search's page as a renderer reads it (0085): the rows as value and
+ * label, `more` exactly when the server read a row past the page, and
+ * `withheld` the rows it matched and could not offer (0012). Never a total:
+ * the server counts none. The one place `hasMore` and `omitted` are read.
+ */
+export function optionsPage(result: LookupResult): RemoteOptionsPage {
+  return { options: result.rows.map((row) => ({ value: row.token, label: row.label })), more: result.hasMore, withheld: result.omitted }
+}
 
 function collect(fields: readonly FieldDef[], into: Set<string>): void {
   for (const field of fields) {
@@ -45,15 +64,14 @@ export function sourceNames(form: FormSchema): string[] {
  * moves from create to update after its first save asks under update's filter
  * without a new map -- which, in Angular, would mean a new application.
  *
- * A search sends the renderer's query and limit; a label request resolves the
- * stored tokens, and asks nothing when there are none. A token the person may
- * not see is left out, not an error. A refusal rejects with the server's
- * sentence, which the renderer shows as "could not be loaded"; an abort
- * rejects with the AbortError. `hasMore` and `omitted` do not reach the
- * renderer. Until formancy 0.6.0 its contract had nowhere to put them; from
- * 0.6.0 a source may answer a page, `{ options, more, withheld }`, and this
- * one still answers a bare list, so a list of exactly one page looks
- * complete (0029).
+ * A search sends the renderer's query and limit, and answers a page that
+ * says whether the list goes on and how many matching rows could not be
+ * offered, never how many match (`optionsPage`, 0085); a label request
+ * resolves the stored tokens, answers the rows it named as a list, and asks
+ * nothing when there are none. A token the person may not see is left out,
+ * not an error. A refusal rejects with the server's sentence, which the
+ * renderer shows as "could not be loaded"; an abort rejects with the
+ * AbortError.
  */
 export function lookupSources(
   client: DataClient,
@@ -63,15 +81,17 @@ export function lookupSources(
 ): Readonly<Record<string, LookupSource>> {
   const current = typeof operation === 'function' ? operation : () => operation
   const source = (name: string): LookupSource => ({
+    maxRows: DEFAULT_MAX_PAGE_SIZE,
     async resolve(request) {
-      if (request.kind === 'labels' && request.values.length === 0) return []
-      const outcome =
-        request.kind === 'search'
-          ? await client.query(formId, name, { operation: current(), search: request.query, limit: request.limit }, request.signal)
-          : await client.resolve(formId, name, { operation: current(), tokens: request.values }, request.signal)
-      if (!outcome.ok) throw new Error(outcome.message)
-      const rows = Array.isArray(outcome.value) ? outcome.value : outcome.value.rows
-      return rows.map((row) => ({ value: row.token, label: row.label }))
+      if (request.kind === 'search') {
+        const page = await client.query(formId, name, { operation: current(), search: request.query, limit: request.limit }, request.signal)
+        if (!page.ok) throw new Error(page.message)
+        return optionsPage(page.value)
+      }
+      if (request.values.length === 0) return []
+      const named = await client.resolve(formId, name, { operation: current(), tokens: request.values }, request.signal)
+      if (!named.ok) throw new Error(named.message)
+      return named.value.map((row) => ({ value: row.token, label: row.label }))
     },
   })
   return Object.fromEntries(sourceNames(form).map((name) => [name, source(name)]))

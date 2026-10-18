@@ -1,4 +1,4 @@
-import { POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
+import { insertPaged, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { TestProject } from 'vitest/node'
 
 /*
@@ -9,6 +9,10 @@ import type { TestProject } from 'vitest/node'
  * file builds its own server over them, so a file is a fresh server and a
  * fresh configuration store, and only the database -- which is the thing
  * under test -- is shared.
+ *
+ * Beside the fixture's own rows, tenant 3's paged customers on both engines
+ * (`insertPaged`, 0085): one lookup page and ten more, which no other
+ * tenant's lookup or list sees.
  *
  * What is provided is how to connect, not a connection: a worker cannot be
  * handed a socket, and the server under test opens its own through the real
@@ -32,6 +36,7 @@ declare module 'vitest' {
 
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const [pg, ms] = await Promise.all([startPostgresFixture(POSTGRES_IMAGE), startSqlServerFixture(SQLSERVER_IMAGE)])
+  await Promise.all([insertPaged({ kind: 'postgres', admin: pg.admin }), insertPaged({ kind: 'sqlserver', admin: ms.admin })])
   const pgUrl = new URL(pg.admin)
   project.provide('databases', {
     pg: {

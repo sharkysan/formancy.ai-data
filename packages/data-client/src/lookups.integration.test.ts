@@ -1,6 +1,7 @@
-import { blockTable } from '@formancy/data-fixtures'
+import { DEFAULT_MAX_PAGE_SIZE } from '@formancy/data-core'
+import { blockTable, pagedCustomers } from '@formancy/data-fixtures'
 import type { BlockedTable } from '@formancy/data-fixtures'
-import type { FormSchema } from '@formancy/spec'
+import type { FormSchema, RemoteOptionsAnswer, RemoteOptionsPage } from '@formancy/spec'
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, test } from 'vitest'
 import type { Refusal } from './client.js'
 import { lookupSources, sourceNames } from './lookups.js'
@@ -68,6 +69,15 @@ async function until(condition: () => Promise<boolean>, what: string): Promise<v
   }
 }
 
+/** A search's answer as a page: what `lookupSources` answers for a search; fails on a list, which says nothing of what follows. */
+function pageOf(answer: RemoteOptionsAnswer | undefined): RemoteOptionsPage {
+  if (answer === undefined || Array.isArray(answer)) throw new Error(`a search answered ${JSON.stringify(answer)}, not a page`)
+  return answer as RemoteOptionsPage
+}
+
+/** The labels a search's page offers, in order. */
+const labelsOf = (answer: RemoteOptionsAnswer | undefined): string[] => pageOf(answer).options.map((option) => option.label)
+
 /** The body of the n-th request sent, parsed. */
 function body(index: number): Record<string, unknown> {
   return JSON.parse(plane.sent[index]?.body ?? 'null') as Record<string, unknown>
@@ -101,8 +111,8 @@ describe.each(ENGINES)('lookups on $engine', ({ connection }) => {
   test('a search returns only the tenant’s customers, as value and label', async () => {
     const { form, source } = await published()
     const sources = lookupSources(plane.client(), formId, form, 'create')
-    const options = await sources[source]?.resolve(request('search', { query: 'Muster', limit: 20 }))
-    expect(options).toEqual([{ value: expect.stringMatching(/^k1:/) as unknown, label: 'Muster AG' }])
+    const answer = await sources[source]?.resolve(request('search', { query: 'Muster', limit: 20 }))
+    expect(answer).toEqual({ options: [{ value: expect.stringMatching(/^k1:/) as unknown, label: 'Muster AG' }], more: false, withheld: 0 })
     expect(plane.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([`POST ${plane.base}/v1/forms/${formId}/lookups/${encodeURIComponent(source)}/query`])
     expect(body(0)).toEqual({ operation: 'create', search: 'Muster', limit: 20 })
     expect(plane.sent[0]?.headers['authorization']).toBe(`Bearer ${plane.tokens.clerk}`)
@@ -113,9 +123,48 @@ describe.each(ENGINES)('lookups on $engine', ({ connection }) => {
   // that refused it would leave every such lookup empty.
   test('an empty search lists the tenant’s customers', async () => {
     const { form, source } = await published()
-    const options = await lookupSources(plane.client(), formId, form, 'create')[source]?.resolve(request('search'))
-    expect(options?.map((option) => option.label)).toEqual(['Muster AG'])
+    expect(labelsOf(await lookupSources(plane.client(), formId, form, 'create')[source]?.resolve(request('search')))).toEqual(['Muster AG'])
     expect(body(0)).toEqual({ operation: 'create', search: '', limit: 50 })
+  })
+
+  // A search says whether its list goes on, never how long it is
+  // (0085), from the server's own extra row: as tenant 3's clerk, over the
+  // paged customers, the empty search answers a page of the First rows, in
+  // order on both engines, and more; `First` answers exactly one page, and
+  // no more, 0029's list that looked complete; `Later 07`, past the first
+  // page, one row, found by typing. Watched failing on both engines with
+  // the source answering a list, as it did: "a search answered [...], not a
+  // page"; with `more` guessed from a full page: `First`, exactly one page,
+  // said more; and with `maxRows` 49: "expected 49 to be 50".
+  test('a search answers a page that says whether the list goes on, and no total', async () => {
+    const { form, source } = await published()
+    const sources = lookupSources(plane.client(plane.tokens.thirdClerk), formId, form, 'create')
+    const lookup = sources[source]
+    if (lookup === undefined) throw new Error('no source for the customer')
+    expect(lookup.maxRows).toBe(DEFAULT_MAX_PAGE_SIZE)
+    const first = pagedCustomers().slice(0, DEFAULT_MAX_PAGE_SIZE).map((customer) => customer.name)
+    const empty = await lookup.resolve(request('search', { limit: lookup.maxRows }))
+    expect({ labels: labelsOf(empty), more: pageOf(empty).more, withheld: pageOf(empty).withheld }).toEqual({ labels: first, more: true, withheld: 0 })
+    expect(body(0)).toEqual({ operation: 'create', search: '', limit: DEFAULT_MAX_PAGE_SIZE })
+    const page = await lookup.resolve(request('search', { query: 'First', limit: lookup.maxRows }))
+    expect({ labels: labelsOf(page), more: pageOf(page).more }).toEqual({ labels: first, more: false })
+    const later = await lookup.resolve(request('search', { query: 'Later 07', limit: lookup.maxRows }))
+    expect({ labels: labelsOf(later), more: pageOf(later).more }).toEqual({ labels: ['Later 07'], more: false })
+  })
+
+  // The page is the server's: a query naming no limit is answered the
+  // source's `maxRows` rows, and one past it is refused, so a renderer that
+  // asks for `maxRows` is never refused and is never handed a page larger
+  // than it shows. A source whose `maxRows` disagreed with the server's
+  // bound would cut the server's page or be refused (watched failing on
+  // both engines with `maxRows` 49: the server answered 50 rows unasked).
+  test('the server answers the source’s maxRows unasked, and refuses one more', async () => {
+    const { form, source } = await published()
+    const maxRows = lookupSources(plane.client(), formId, form, 'create')[source]?.maxRows ?? 0
+    const unasked = expectOk(await plane.client(plane.tokens.thirdClerk).query(formId, source, { operation: 'create', search: '' }))
+    expect({ rows: unasked.rows.length, hasMore: unasked.hasMore }).toEqual({ rows: maxRows, hasMore: true })
+    const over = await plane.client(plane.tokens.thirdClerk).query(formId, source, { operation: 'create', search: '', limit: maxRows + 1 })
+    expect(over.ok ? 'answered' : { status: over.status, code: over.code }).toEqual({ status: 400, code: 'limit-out-of-range' })
   })
 
   // (f) A loaded record holds a token; the renderer asks for its label. A

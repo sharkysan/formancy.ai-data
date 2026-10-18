@@ -38,7 +38,9 @@ async function definition(formId: string, from: DataClient = client()): Promise<
 async function customer(session: Session, search: string): Promise<string> {
   const source = session.sources[session.definition.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? '']
   if (source === undefined) throw new Error('the order form has no customer source')
-  const [first] = await source.resolve({ kind: 'search', query: search, values: [], limit: 10, signal: new AbortController().signal })
+  // A search answers a page that says whether the list goes on (0085); its options are what is offered.
+  const answer = await source.resolve({ kind: 'search', query: search, values: [], limit: 10, signal: new AbortController().signal })
+  const [first] = 'options' in answer ? answer.options : answer
   if (first === undefined) throw new Error(`no customer matches ${search}`)
   return first.value
 }
