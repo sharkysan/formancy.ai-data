@@ -10,9 +10,9 @@ import type { TestProject } from 'vitest/node'
  * fresh configuration store, and only the database -- which is the thing
  * under test -- is shared.
  *
- * Beside the fixture's own rows, tenant 3's paged customers on both engines
- * (`insertPaged`, 0085): one lookup page and ten more, which no other
- * tenant's lookup or list sees.
+ * Beside the fixture's own rows, tenant 3's paged customers and orders on
+ * both engines (`insertPaged`, 0085): one lookup page of each and more,
+ * which no other tenant's lookup or list sees.
  *
  * What is provided is how to connect, not a connection: a worker cannot be
  * handed a socket, and the server under test opens its own through the real

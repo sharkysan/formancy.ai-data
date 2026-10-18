@@ -1,12 +1,12 @@
 import { DEFAULT_MAX_PAGE_SIZE } from '@formancy/data-core'
 import { describe, expect, test } from 'vitest'
-import { PAGED_LATER, PAGED_ORDER, pagedCustomers } from './paged.js'
+import { PAGED_LATER, PAGED_ORDERS, pagedCustomers, pagedOrderNotes } from './paged.js'
 
 /*
- * Tenant 3's customers (0085) as a pure function: one lookup page of them
- * and a few more, from which the suites that load them into both engines
- * compute what a search answers. Nothing here touches a database; the
- * client's integration suite holds both engines to it.
+ * Tenant 3's customers and orders (0085) as pure functions: one lookup
+ * page of each and more, from which the suites that load them into both
+ * engines compute what a search answers. Nothing here touches a database;
+ * the client's and the host page's suites hold both engines to it.
  */
 
 const names = (): string[] => pagedCustomers().map((customer) => customer.name)
@@ -57,9 +57,15 @@ describe('the paged customers', () => {
     expect(matching('Later 07')).toEqual(['Later 07'])
   })
 
-  // The tenant's one order is for its first customer, so a record of it
-  // shows a label from the first page whatever the page size.
-  test("hold the tenant's order for First 01", () => {
-    expect(pagedCustomers().find((customer) => customer.customerNo === PAGED_ORDER.customerNo)?.name).toBe('First 01')
+  // The tenant's orders are for its first customer, so a record of one
+  // shows a label from the first page whatever the page size; they are a
+  // page and one more, so the order line's lookup over them goes on; and
+  // their notes number them, so the first is found among what an insert
+  // returns.
+  test("hold a page of the tenant's orders and one more, each for First 01, noted in order", () => {
+    expect(pagedCustomers().find((customer) => customer.customerNo === PAGED_ORDERS.customerNo)?.name).toBe('First 01')
+    expect(PAGED_ORDERS.count).toBe(DEFAULT_MAX_PAGE_SIZE + 1)
+    const notes = pagedOrderNotes()
+    expect({ count: notes.length, unique: new Set(notes).size, first: notes[0], sorted: [...notes].sort() }).toEqual({ count: PAGED_ORDERS.count, unique: PAGED_ORDERS.count, first: 'paged 01', sorted: notes })
   })
 })
