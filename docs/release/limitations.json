@@ -167,7 +167,7 @@
       ]
     },
     "0012": {
-      "reviewed": "sha256:fef81d7f5f797af427891f9642407891828643b7db87b49ed87c142f784556be",
+      "reviewed": "sha256:50e9d153e516e3f8940ec7fe90c2767069e7ab5cd8b9f305411327808ca1ff96",
       "limitations": [
         {
           "area": "forms",
@@ -599,12 +599,8 @@
       ]
     },
     "0029": {
-      "reviewed": "sha256:9efe033f428279545443558c18cc617affd23c988e0c792da00f942e46b9dd81",
+      "reviewed": "sha256:8c78955f57d16e6787a3900675377baa29497f4bd6d9954959c0463048b32d33",
       "limitations": [
-        {
-          "area": "host",
-          "says": "`hasMore` and `omitted` do not reach the person, so a lookup list of exactly one page looks complete."
-        },
         {
           "area": "host",
           "says": "Every name a published form carries gets a server-backed option source, and a name the server does not know fails closed."
@@ -2111,7 +2107,7 @@
       ]
     },
     "0066": {
-      "reviewed": "sha256:e404377d29d10d43c3fcbfa1f1162a6941508e1580f5f0014338ccf2317a9859",
+      "reviewed": "sha256:928e1fa7a19bb72e9e18164f41c4986626686f944c86f6762ab1dd04f9c0db85",
       "limitations": [
         {
           "area": "forms",
@@ -2776,6 +2772,39 @@
         {
           "area": "operations",
           "says": "The default lookup deadline is derived from the committed figures (0063), so in a release whose figures are an earlier product's it is what those figures derived, not what this release's lookups were measured taking."
+        }
+      ]
+    },
+    "0085": {
+      "reviewed": "sha256:7343de08bbdc37e556b27681efdd570f824f8f29a03cfd718e14beb8273d16ac",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A lookup says that more rows match than its page shows, never how many.",
+          "heldBy": "packages/data-client/src/lookups.integration.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A typeahead says that more rows match only while its list is open, and every reference theme of formancy 0.6.0 draws the open list over that sentence, so a sighted person does not read it; a screen reader hears it from the field’s status line, and a plain select’s sentence is seen."
+        },
+        {
+          "area": "forms",
+          "says": "Rows whose labels agree beyond one page are reached by typing only through a display column that tells them apart."
+        },
+        {
+          "area": "forms",
+          "says": "A row whose key does not fit a token is said to the person, with a count only when no more rows match, and never offered.",
+          "heldBy": "packages/data-client/src/lookups.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "`@formancy/data-client` states the lookup page its own release’s server answers, so a host whose client and server are of releases with different page sizes would have its searches refused or cut short; no release has changed the page size.",
+          "heldBy": "packages/data-client/src/lookups.integration.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The examples page’s source says that more rows match, as a database’s does, though it holds every row and could count them.",
+          "heldBy": "apps/examples/src/lookup-source.test.ts"
         }
       ]
     },

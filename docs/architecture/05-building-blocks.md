@@ -261,7 +261,9 @@ instead of sending it again (0031). `lookups.ts` turns a form's lookups into
 option sources both renderers take, a document naming a source and nothing
 else
 ([formancy.ai 0077](https://github.com/sharkysan/formancy.ai/blob/main/docs/decisions/0077-options-may-come-from-a-named-source.md),
-0012). `problems.ts` gives a refusal's field problems as sentences a
+0012), each answering a search with a page that says whether its list goes
+on and stating the server's page as its `maxRows`
+([0085](../decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)). `problems.ts` gives a refusal's field problems as sentences a
 renderer prints; `shapes.ts` tells the server's answer from a proxy's page.
 Nothing is cached and nothing is retried (0022). Its integration suites run
 over real HTTP into the real server on both engines.
@@ -290,7 +292,9 @@ and asserted by the major its server answered
 ([0067](../decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md));
 and the shared cases for drift, deletes, cascades and uuid keys
 (`drifting.ts`, `deletes.ts`, `cascades.ts`, `uuid.ts`; 0041, 0050, 0051,
-0056), and for a file of records, `exports.ts`: `EXPORT_PARITY`, the bytes
+0056); tenant 3's paged customers and orders, a lookup page of each and
+more, which the client's and the host page's suites insert beside the
+model (`paged.ts`, 0085); and for a file of records, `exports.ts`: `EXPORT_PARITY`, the bytes
 both adapters' lists must make through data-core, and `EXPORT_ROWS`, the
 customers whose names a file must quote or neutralise ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)). `load.test.ts` holds both SQL files to the same constraint names.
 

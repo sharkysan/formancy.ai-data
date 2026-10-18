@@ -429,6 +429,27 @@ later.
   version file exported from 0.1.0 is refused by this release's import as
   not what this server generates: upgrade the source deployment and
   regenerate there first, or propose the form again in the target.
+- **A lookup says when its list goes on, never how long it is**
+  ([0085](docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)).
+  `@formancy/data-client`'s `lookupSources` answers a search with one page,
+  `{ options, more, withheld }`: `more` exactly when the server read a row
+  past the page, `withheld` the matching rows whose key does not fit a
+  token. Each source states `maxRows`, the page the server answers. Why:
+  the server has always known both, and the client dropped them because a
+  renderer took only a list until formancy 0.6.0, so a list of exactly one
+  page looked complete and a row that could not be offered was a row that
+  silently was not there. What you notice: a plain select of a lookup's
+  first page says "Showing the first 50; there are more than this list can
+  show." when it has more; an open typeahead says "Showing the first 50;
+  there are more — keep typing to narrow." from its status line, which
+  every reference theme of formancy 0.6.0 draws the open list over, so a
+  screen reader hears it and a sighted person does not see it; nothing is
+  said under a closed typeahead or a field nobody can change. For
+  integrators: `LookupSource.resolve` resolves to a page for a search and
+  a list for labels, and a `LookupSource` has `maxRows`; code that calls
+  `resolve` itself reads `options`, or narrows the answer with `'options'
+  in answer`. The examples page's source answers a page too. No
+  `@formancy/*` version changes.
 - **Unset, nobody is believed about their address**, as before: a server
   that upgrades without the setting counts and logs every request by the
   peer that connected (0071).
@@ -663,6 +684,15 @@ published before it with a lookup no label can spell still cannot list
 it until regenerated; and the regeneration report does not say that a
 control changed.
 
+What saying more costs, in 0085: no total; a typeahead's sentence is said
+only while its list is open, under that list in every reference theme, so
+the eye does not read it; rows whose labels agree beyond one page are
+reached by typing only through a display column that tells them apart; a
+withheld row is said, never offered, and counted only when nothing more
+matches; the page is one unmeasured constant, which the client states as
+its server's; and a search refused for its deadline still reads "could
+not be loaded".
+
 What the demo costs, in 0069: it is main's page, deployed without waiting
 for that commit's CI; its build settings are in Cloudflare's dashboard,
 and Workers Builds reads this repository through the Cloudflare Workers
@@ -870,10 +900,10 @@ encrypt is now refused before its login is sent (0081, under *Fixed*).
     answers labels, and a token the person may not see shows as the stored
     value.
   - **A source's `resolve` may answer a page.** `@formancy/data-client`'s
-    `LookupSource` still answers a list and stays assignable to both
-    renderers' `OptionsSource`; code of yours that calls `resolve` itself
-    narrows the answer, as the examples page's test now does, or reads it
-    through `acceptRemoteAnswer`.
+    `LookupSource` answers a search with one (0085, above) and stays
+    assignable to both renderers' `OptionsSource`; code of yours that calls
+    `resolve` itself narrows the answer, as the examples page's test does,
+    or reads it through `acceptRemoteAnswer`.
   - **Nothing generated meets 0.6.0's other breaking changes.** No generated
     form has a repeater, a `computed` rule or a group a rule hides: the
     generator writes `disabled` rules only. The two forms the examples page

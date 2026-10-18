@@ -341,6 +341,15 @@ Delete is as old as its page, stale for a record changed since (0053).
    the figures in `docs/performance/results.json` and kept alone in
    `packages/data-core/src/lookup/default-deadline.ts`, outside the
    measured product ([0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)).
+5. The source answers the renderer that page as `{ options, more,
+   withheld }` (`optionsPage`): `more` from `hasMore`, `withheld` from
+   `omitted`, never a total, and the page it asked for is the source's
+   `maxRows`, the server's own bound. The renderer's `optionsStatus` says
+   what the control shows: under a plain select that there are more than
+   it can show; in an open typeahead to keep typing, on the status line
+   the open list is drawn over; nothing under a closed typeahead or a
+   field nobody can change
+   ([0085](../decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)).
 
 Held by `routes/runtime-lookup-limits.integration.test.ts`, where on both
 engines an abandoned search and one past its deadline stop waiting in the
@@ -360,6 +369,13 @@ connection after empty slots; the adapter collects each statement's rows
 itself, so the next lookup answers as it would have, and nothing of the
 stopped statement reaches it
 ([0078](../decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md)).
+That a search says when its list goes on is held by
+`packages/data-client/src/lookups.integration.test.ts` on both engines,
+over tenant 3's paged customers, and by `apps/host/src/lookup-more.test.tsx`
+in both renderers; where the sentence is drawn, by the host's browser gate
+(`apps/host/scripts/browser/more.mjs`). What it costs: no total, and a
+typeahead's sentence is under its own open list, so the eye does not read
+it (0085).
 
 ## 6.9 Reviewing drift, regenerating and restoring
 

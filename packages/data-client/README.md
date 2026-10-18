@@ -150,7 +150,8 @@ a title, operations or children is `unexpected`.
   `unavailable`, since trying again helps a read by key. A source rejects
   with either, and a renderer shows "could not be loaded". The 499 `abandoned` the server
   answers an abandoned lookup reaches nobody: it is the audit trail's.
-- **A search says whether its list goes on, never how long it is.**
+- **A search says whether its list goes on, never how long it is**
+  ([0085](../../docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)).
   A source answers a search with one page, `{ options, more, withheld }`:
   `more` exactly when the server read a row past the page, `withheld` the
   matching rows whose key does not fit a token, which the server counts as
