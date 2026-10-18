@@ -1054,7 +1054,7 @@ says what an author and a publisher may each do, and what it costs).
 | `@azure/identity`, by `@formancy/data-sqlserver` | 4.13.3 | `4.13.3` |
 | `@types/mssql`, by `@formancy/data-sqlserver` | 12.3.0 | `^12.3.0` |
 | `mssql`, by `@formancy/data-sqlserver` | 12.7.4 | `^12.0.0` |
-| `tedious`, under `mssql` | 20.3.3 | `^19.2.2 \|\| ^20.0.0`, by `mssql` |
+| `tedious`, under `mssql` | 20.3.7 | `^19.2.2 \|\| ^20.0.0`, by `mssql` |
 | `@formancy/angular` | 0.5.0 | `0.5.0` |
 | `@formancy/builder-core` | 0.5.0 | `0.5.0` |
 | `@formancy/conformance` | 0.5.0 | `0.5.0` |

@@ -1,6 +1,6 @@
 # 0081 — A SQL login that asks for TLS is refused when the server answers that it will not encrypt, before its login is sent
 
-- **Status:** accepted
+- **Status:** accepted; tedious 20.3.7 refuses the same answer itself, and the guard stays, see *Since tedious 20.3.7*
 - **Date:** 2026-10-17
 - **Deciders:** Daniel Bacher
 - **Verified by:**
@@ -27,7 +27,10 @@
   ways; each chunk after the answer is passed on as the socket's own
   memory, not a copy; NOT_SUP ends the connection with the sentence and
   passes nothing; an answer that came before the client wrote is decided
-  on only once it has; and a server that ends before its answer is whole
+  on only once it has; a SQL login sent part of an answer and then closed
+  fails at once with `ESOCKET` and sends no LOGIN7, where tedious 20.3.7
+  alone leaves it pending (watched failing with the guard left out of the
+  config); and a server that ends before its answer is whole
   ends the stream without an error.
   `packages/data-sqlserver/src/adapter.integration.test.ts`, on the run's
   image of the matrix (0067) -- a SQL login with `encrypt: true` and the
@@ -238,12 +241,37 @@ shared the machine, passed alone, its 2 tests, when run again.
 
 **What it does not do.** Move SQL logins to TDS 8.0; check the server's
 certificate where the operator trusts it; protect a connection the
-operator set unencrypted; or report the defect to tedious, which is still
-to be done and is the maintainer's.
+operator set unencrypted; or report the defect to tedious, which needed
+no report: tedious 20.3.7 fixed it, below.
 
 **What it forecloses.** A SQL login whose LOGIN7 crosses the network
 unencrypted after the operator asked for TLS, for as long as this record
 stands.
+
+**Since tedious 20.3.7.** tedious 20.3.7, published 2026-10-11 and the
+first release that has it (20.3.4 to 20.3.6 do not), refuses a connection
+with `encrypt: true` whose answer is neither ON nor REQ itself, with
+`EENCRYPT`, before LOGIN7; the lockfile installs it since 2026-10-18. The
+guard stays, for two reasons a test or a range shows:
+
+- **A connect the driver leaves pending.** A server that sends part of
+  its first message -- a packet not marked last -- and then closes leaves
+  tedious 20.3.7's connect pending without end, past its own connect
+  timeout: `readPreloginResponse`, abandoned, awaits its iterator's
+  `return()`, which waits on the read it abandoned (`connection.js`;
+  measured on 2026-10-17: not settled 40 s after the close, nor 40 s with
+  the server holding the connection open). The server's registry then
+  holds that connection's open as pending until the process is killed.
+  The guard withholds the part and ends with the socket, so the connect
+  fails at once with `ESOCKET`: `encryption.test.ts`, watched failing with
+  the guard left out of the config, still pending 2 s after the close.
+- **An embedder's tedious.** mssql accepts tedious `^19.2.2 || ^20.0.0`,
+  so an integrator's own lockfile can hold a tedious without the fix; the
+  guard refuses the answer whichever tedious is installed.
+
+Removing it was built and measured, and stopped on the first: the
+stand-in cases held tedious 20.3.7's own refusal in 22 cases, and the
+partial answer above was the one they could only record as a cost.
 
 ## Alternatives considered
 

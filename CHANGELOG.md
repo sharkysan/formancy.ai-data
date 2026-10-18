@@ -855,13 +855,12 @@ encrypt is now refused before its login is sent (0081, under *Fixed*).
   read is refused in a sentence of its own. Every SQL Server image of the
   test matrix encrypts, and logs in as before
   ([0081](docs/decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)).
-  **Until you upgrade**: a 0.1.0 server has no setting that logs a SQL
-  login in over TDS 8.0, so keep the traffic between the data server and
-  SQL Server on a network nobody else can answer on, or carry it through
-  an encrypted tunnel of your own; once upgraded, an Entra login goes over
-  TDS 8.0 where the server takes it (0074), and a SQL login that asks for
-  TLS is refused rather than downgraded. A login whose password may have
-  crossed so is one to change.
+  tedious 20.3.7, published 2026-10-11, refuses the same answer itself,
+  and the lockfile now installs it where 0.1.0's had 20.3.3. The guard
+  stays: tedious left alone never settles a connect whose server sent
+  part of its first answer and closed, which the guard fails at once, and
+  mssql accepts tedious `^19.2.2 || ^20.0.0`, so an embedder's own
+  lockfile can hold a tedious without the fix.
 - **For contributors**: data-fixtures' `startPreloginStandIn` answers a
   client's PRELOGIN in a SQL Server's place with the answer it is given
   and keeps the type of every packet the client sends after it, so a test
