@@ -98,6 +98,9 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   REACH_PRIVILEGE_LOSSES: "the grants reach-privilege takes away, each on both engines; what a delete answers then is CASCADE_PARITY's",
   PRELOGIN_ENCRYPTION: "the ENCRYPTION values the PRELOGIN stand-in answers with (0081), [MS-TDS]'s and no engine's",
   TDS_PACKET: "the packet types the PRELOGIN stand-in tells apart in what a client sends (0081), [MS-TDS]'s and no engine's",
+  PAGED_TENANT: "the tenant the paged rows belong to (0085), which no shared case reads",
+  PAGED_LATER: "how many customers lie past the paged lookup's first page (0085); what a search answers over them is lookups.integration.test.ts's, on both engines",
+  PAGED_ORDERS: "the page of orders and one more the paged suites insert (0085); what the order line's select says over them is lookup-more.test.tsx's",
 }
 
 /** What a call made while a file is collected gave: its options, or the sentence it threw. */
