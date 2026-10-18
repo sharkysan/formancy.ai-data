@@ -11,16 +11,18 @@
 // so each state also audits the paper itself while the list is open and
 // saying so. Every check has one name in every browser (0058).
 //
-// Where the sentence is drawn, said rather than checked: every reference
-// theme of formancy 0.6.0 places the open list at the foot of the box
-// (`top: 100%`, `z-index: 20`, up to 14rem tall), over the line under it,
-// which is where the status is. Measured on 2026-10-18 in Chromium and
-// Firefox on Windows at 1280 and 320 px: the window showed the option
-// "First 01" at the sentence's middle, so a sighted person does not read
-// it while the list is open, and axe cannot decide its contrast. Each state
-// prints what the window shows there, and checks that every text axe could
-// not decide lies under the open list, so a text left undecided for any
-// other reason still fails.
+// Where the sentence is drawn, held as 0085's cost: every reference theme of
+// formancy 0.6.0 places the open list at the foot of the box (`top: 100%`,
+// `z-index: 20`, up to 14rem tall), over the line under it, which is where
+// the status is. Measured on 2026-10-18 in Chromium 153 and Firefox 155 on
+// Windows at 1280 and 320 px: the window showed the option "First 01" at
+// the sentence's middle, so a sighted person does not read it while the
+// list is open, and axe cannot decide its contrast. Each state checks that
+// the open list's box covers the sentence's -- which fails the day a
+// release draws them apart, and the cost is to be read again -- and that
+// every text axe could not decide lies under the open list, so a text left
+// undecided for any other reason still fails; and it prints what the
+// window shows there, nothing when the sentence is below the window.
 //
 // In Separate views, where the record is drawn alone: the third clerk's
 // orders fit the Records grid's columns to other widths than the first
@@ -71,8 +73,10 @@ function listSaysMore(name, { check }) {
       const elsewhere = (window.formancyGateUndecided ?? []).filter((element) => !covered(element.getBoundingClientRect())).map((element) => element.outerHTML.slice(0, 60))
       const status = [...document.querySelectorAll('[role="status"]')].find((candidate) => (candidate.textContent ?? '').includes('there are more'))?.getBoundingClientRect()
       const hit = status === undefined ? null : document.elementFromPoint(status.left + Math.min(20, status.width / 2), status.top + status.height / 2)
-      return { elsewhere, shown: hit === null ? 'nothing' : `${hit.getAttribute('role') ?? hit.tagName.toLowerCase()} "${(hit.textContent ?? '').trim().slice(0, 30)}"` }
+      const within = status !== undefined && list !== undefined && status.top >= list.top - 1 && status.bottom <= list.bottom + 1 && status.left >= list.left - 1 && status.right <= list.right + 1
+      return { elsewhere, within, shown: hit === null ? 'nothing' : `${hit.getAttribute('role') ?? hit.tagName.toLowerCase()} "${(hit.textContent ?? '').trim().slice(0, 30)}"` }
     })
+    check(`a list that goes on (${name}): the open list covers the sentence, as 0085 says formancy 0.6.0 draws it`, under.within ? null : 'the sentence lies outside the open list: read 0085’s cost again')
     check(`a list that goes on (${name}): every text on the paper whose contrast axe left undecided lies under the open list`, under.elsewhere.length === 0 ? null : `undecided elsewhere: ${under.elsewhere.slice(0, 4).join('; ')}`)
     console.log(`  where the sentence is, the window shows ${under.shown}; ${String(open.undecided.length)} texts lie under the open list`)
   }
