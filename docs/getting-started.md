@@ -325,8 +325,14 @@ This is an evaluation stack on your own machine, not a production deployment:
   A deployment sends it to a store it keeps.
 - **Nothing restarts on its own.** After a reboot, or a restart of Docker, run
   section 2's command again.
-- **No Content-Security-Policy.** nginx sends no-sniff, no-referrer and
-  no-framing headers, and no CSP.
+- **A Content-Security-Policy for each page, and nothing for the rest.**
+  nginx sends no-sniff, no-referrer and no-framing headers, and the studio
+  and the host page each their own policy: nothing inline or evaluated,
+  and nothing from another host. A script element a browser extension
+  writes into either page is refused, and the browser's console says so;
+  the host page's policy allows inline styles, for AG Grid's
+  ([0083](./decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
+  No Permissions-Policy, and no policy on `/v1`'s answers.
 
 What a real deployment changes:
 
@@ -338,6 +344,10 @@ What a real deployment changes:
   keeps the studio and `/v1` on one origin, as 0024 requires; a host page on
   an origin of its own is listed in `FORMANCY_DATA_CORS_ORIGINS` instead
   ([0060](./decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md));
+- each page's Content-Security-Policy, copied into that proxy from
+  `deploy/web/nginx.conf`, and for a host page on an origin of its own a
+  `connect-src` that names the server's
+  ([0083](./decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md));
 - its own database accounts, granted what each form needs, in
   `connections.json`, with TLS to the database -- or, on Azure SQL, an
   Entra managed identity or service principal in place of a SQL login,

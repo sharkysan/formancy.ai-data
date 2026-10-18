@@ -53,7 +53,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
-import { afterEveryPass, guardRequests } from '../../../scripts/browser-gate.mjs'
+import { afterEveryPass, canary, canaryProblem, guardRequests, hearViolations, violationsHeard } from '../../../scripts/browser-gate.mjs'
 import { contentSecurityPolicy, headerRules, headersFile, headersFor, parseHeadersFile } from '../../../scripts/demo-headers.mjs'
 import { serveDemo } from '../../../scripts/demo-serve.mjs'
 import { noticesProblem } from '../../../scripts/getting-started/stack.mjs'
@@ -96,16 +96,6 @@ function widths() {
 
 /** How long Angular may take to arrive: the suite's own wait, doubled for a real network stack. */
 const MOUNTED_WITHIN_MS = 20_000
-
-/**
- * How long the canary's report may take. Measured on 2026-10-16, on Windows
- * 11, and recorded by every pass since: it arrived 0.5 to 7.1 ms after the
- * script was put in the page in Chromium 153, over 14 passes, and in 1 ms
- * or less in Firefox 155, whose clock reads whole milliseconds, over 7. Two
- * seconds is more than two hundred times the slowest, and runs out only on
- * a pass that heard nothing, which then fails.
- */
-const CANARY_WAIT_MS = 2_000
 
 /**
  * Wait until every preview has its Validate button: half of them are Angular, which loads on demand.
@@ -259,50 +249,6 @@ async function failSubmit(page) {
   )
 }
 
-/**
- * What the page's document hears of its policy, from before its first
- * script: every `securitypolicyviolation`, kept on the window for the gate
- * to read. A violation is what the browser refused, and so something the
- * page meant to do and could not under the headers formancy.ai sends.
- */
-function hearViolations(page) {
-  return page.addInitScript(() => {
-    const heard = []
-    Object.defineProperty(window, '__formancyGateViolations', { value: heard })
-    document.addEventListener(
-      'securitypolicyviolation',
-      (event) => heard.push(`${event.effectiveDirective} refused ${event.blockedURI || 'something inline'} (${event.sourceFile || 'the page'}:${String(event.lineNumber)})`),
-      true,
-    )
-  })
-}
-
-/**
- * The guard on that guard, at the end of a pass: an inline script put in
- * the page, which the policy refuses. A pass in which it ran measured a page
- * under no policy; one in which the browser refused it and the page heard
- * nothing measured with a listener that hears nothing. Either way the
- * violation check before it proved nothing, so this fails.
- *
- * The report is queued as a task of its own, after the script is put in
- * the page; each pass records how long after, and waits CANARY_WAIT_MS for
- * it before calling it unheard.
- */
-async function canary(page) {
-  return page.evaluate(async (wait) => {
-    const heard = window.__formancyGateViolations ?? []
-    const before = heard.length
-    const arrived = new Promise((settle) => document.addEventListener('securitypolicyviolation', () => settle(performance.now()), { once: true, capture: true }))
-    const started = performance.now()
-    const script = document.createElement('script')
-    script.textContent = 'window.__formancyGateCanary = true'
-    document.head.append(script)
-    script.remove()
-    const at = await Promise.race([arrived, new Promise((settle) => setTimeout(() => settle(null), wait))])
-    return { ran: window.__formancyGateCanary === true, heard: heard.length - before, after: at === null ? null : at - started }
-  }, CANARY_WAIT_MS)
-}
-
 /** Playwright, for recordedPerBrowser to launch each browser with: the one import of playwright, here where the app declares it. */
 async function load() {
   try {
@@ -414,15 +360,12 @@ async function run(gate, browser) {
 
       // Everything the page did in this pass, under the headers it was sent:
       // what the policy refused, what the console said, what it fetched.
-      const violations = await page.evaluate(() => [...(window.__formancyGateViolations ?? [])])
+      const violations = await violationsHeard(page)
       check('the browser refused nothing under the page’s Content-Security-Policy', violations.length === 0 ? null : violations.slice(0, 4).join('; '))
       check('the console reported no error and the page threw none', said.length === 0 ? null : said.slice(0, 4).join('; '))
       check(`the page fetched nothing of its origin but its own files under ${BASE}`, elsewhere.size === 0 ? null : [...elsewhere].slice(0, 4).join(', '))
       const probe = await canary(page)
-      check(
-        'and the policy held: an inline script put in the page was refused, and the page heard the refusal',
-        probe.ran ? `it ran, so the page was measured under no policy, not ${contentSecurityPolicy().slice(0, 32)}…` : probe.heard === 0 ? 'refused, and heard by nothing, so the check above heard nothing either' : null,
-      )
+      check('and the policy held: an inline script put in the page was refused, and the page heard the refusal', canaryProblem(probe, contentSecurityPolicy()))
       if (probe.after !== null) gate.measure({ name: 'the policy’s report of the inline script, after the script was put in the page', value: probe.after, unit: 'ms' })
 
       // Whether the page asked another origin for anything, and whether

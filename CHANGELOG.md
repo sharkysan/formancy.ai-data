@@ -316,6 +316,36 @@ later.
   types `EntraLogin` and `SqlServerLogin`. **`@azure/identity` 4.13.3 is
   a new dependency** of `@formancy/data-sqlserver`, at that exact version;
   tedious already installed it.
+- **The composed stack's studio and host page are sent with a
+  Content-Security-Policy each**, so a script element written into
+  either, by a flaw, an extension or a proxy, does not run: the studio
+  holds an administrator's token in memory, the host page a host's, and
+  memory is where such a script would read them. Each is the examples
+  page's policy -- scripts, styles, fonts and fetches from the stack's
+  origin alone, nothing inline, nothing evaluated, `data:`
+  images only, no plugin, `<base>`, form target or framing -- and the host
+  page's allows inline styles as well, for the style elements AG Grid
+  creates, as the live demo's does. Why now: 0032 sent none because React
+  and Angular add styles at run time and nothing had seen a policy
+  working; measured in each page's browser gate under the examples page's
+  policy, the studio was refused nothing and the host page only AG Grid's
+  style elements. `deploy/web/nginx.conf` sends them from one map, for
+  every file under `/studio/` and `/host/` and for nothing else, which
+  `node scripts/web-policies.mjs --write` writes from the module that
+  defines them; `pnpm test:repo` fails when the map is not the module's,
+  when a location that serves files has no policy, when another location
+  could answer with a page, or when a location's own `add_header` or a
+  redirect inside nginx -- an `error_page`, `try_files`, `rewrite` or
+  `index` out of the page -- would drop it; the browser gates serve each
+  page under its policy and fail on anything a browser refuses under it;
+  and the getting-started gate fails when nginx does not send it.
+  **Noticed by operators:** rebuild the web image. A browser extension or
+  a proxy that writes a script element into either page is refused, and
+  the browser's console says so; a deployment's own proxy sends the
+  policies only if it copies the header; and a host page moved to an
+  origin of its own, as 0060 allows, needs a `connect-src` that names the
+  server's origin
+  ([0083](docs/decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 
 ### Changed
 
@@ -358,6 +388,19 @@ later.
   without axe's preload, which was measured to change no rule's outcome on
   the page; a stylesheet from another origin is the policy check's failure,
   not axe's.
+- **The studio's and the host page's browser gates serve each page under
+  the policy nginx.conf sends it**, and fail in every browser on a state in
+  which the browser refused anything under it -- an event the document
+  heard or a console line about the policy -- when the page was sent
+  another policy or none, and when an inline script put in the page at the
+  end of a pass runs or goes unheard; the host page's also fails, once a
+  run, when the page under the examples page's policy no longer has AG
+  Grid's style elements refused, so its allowance goes with the need for
+  it. Both now load axe through Playwright's evaluate rather than a script
+  element, which the policy refuses. The listener and the inline-script
+  canary are `scripts/browser-gate.mjs`'s, and the examples page's gate
+  uses them too, its checks unchanged
+  ([0083](docs/decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 - **A lookup a person can search is generated as a typeahead, and the host
   page draws the control the published form names**
   ([0066](docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).

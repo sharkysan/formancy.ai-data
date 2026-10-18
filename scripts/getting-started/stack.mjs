@@ -18,6 +18,7 @@ import { connect } from 'node:net'
 import { dirname, join } from 'node:path'
 import { styleReferences } from '../addresses.mjs'
 import { NOTICES_FILE } from '../third-party-notices.mjs'
+import { pagePolicy, WEB_PAGES } from '../web-policies.mjs'
 
 /** Every profile, so compose describes, logs and tears down every service the guide can start. */
 const PROFILES = ['--profile', 'stack', '--profile', 'tools']
@@ -398,12 +399,14 @@ async function get(url) {
 
 /**
  * The web front as a browser meets it: `/` sends the browser to the studio,
- * anything else unknown is 404, both pages are HTML, and every script and
- * stylesheet they name -- and every file those stylesheets name -- is
- * served from this origin with its type, or inline -- no page asks another
- * host for anything (0072) -- and beside each page, its third-party
- * notices as UTF-8 text.
- * A build without its base, or a proxy rule that lost a path, fails here.
+ * anything else unknown is 404, both pages are HTML sent with the
+ * Content-Security-Policy scripts/web-policies.mjs gives each (0083), and
+ * every script and stylesheet they name -- and every file those
+ * stylesheets name -- is served from this origin with its type, or inline
+ * -- no page asks another host for anything (0072) -- and beside each
+ * page, its third-party notices as UTF-8 text.
+ * A build without its base, a proxy rule that lost a path, or one that
+ * lost a page's policy, fails here.
  * Returns problems, checking everything rather than stopping at the first.
  */
 export async function pageProblems(base) {
@@ -416,7 +419,7 @@ export async function pageProblems(base) {
   const unknown = await get(new URL('/nope', base))
   if (unknown.status !== 404) problems.push(`/nope answered ${String(unknown.status)}, not 404`)
 
-  for (const path of ['/studio/', '/host/']) {
+  for (const path of Object.keys(WEB_PAGES)) {
     const pageUrl = new URL(path, base)
     const noticesUrl = new URL(NOTICES_FILE, pageUrl)
     const notices = await get(noticesUrl)
@@ -429,6 +432,9 @@ export async function pageProblems(base) {
       problems.push(`${path} answered ${String(page.status)} ${type}, not 200 text/html`)
       continue
     }
+    const sent = page.headers.get('content-security-policy')
+    const wanted = pagePolicy(path)
+    if (sent !== wanted) problems.push(`${path} was sent with ${sent === null ? 'no Content-Security-Policy' : `Content-Security-Policy "${sent}"`}, not scripts/web-policies.mjs's "${wanted}"`)
     for (const reference of pageReferences(page.text)) {
       if (reference.url.startsWith('data:')) continue
       const url = new URL(reference.url, pageUrl)

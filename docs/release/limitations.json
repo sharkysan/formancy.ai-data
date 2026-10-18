@@ -734,7 +734,7 @@
       ]
     },
     "0032": {
-      "reviewed": "sha256:95be055f7eaa0bd546ca41675eb8b01f1623a9757a034860ebe7bf4d3cf6a2c2",
+      "reviewed": "sha256:08d642eac3f12580a5d806d7afbcc0b6f766abc648d44c4a347e389082201cf6",
       "limitations": [
         {
           "area": "operations",
@@ -1711,7 +1711,7 @@
       ]
     },
     "0058": {
-      "reviewed": "sha256:30b72f70ea4400c02e4b4c73fb9aefde4ad85b0553230b77c6cac08db4c65bd2",
+      "reviewed": "sha256:96b08a2fc7178a0c4ababbc94ccee98bc427d0d8a52f2411c7b237dfcd525059",
       "limitations": [
         {
           "area": "testing",
@@ -2224,7 +2224,7 @@
       ]
     },
     "0069": {
-      "reviewed": "sha256:54a1cbef6b2d6c2c3cf178ab53dbf2fb6e2fd11e7c0c10bccf06b1c6bf3de449",
+      "reviewed": "sha256:9fb38cedb4ee8d2ba8476542c5493cd8e100d8621219edde02da0222c564c9d2",
       "limitations": [
         {
           "area": "operations",
@@ -2736,6 +2736,35 @@
     "0082": {
       "reviewed": "sha256:c1d299a7d1bc4733e39bc91a21f955f3b8e17505ad10cda2b39ccb6d2b36c7f2",
       "none": "Test support for this repository's suites: data-fixtures is never published, and nobody who installs, integrates or operates the module starts its containers or reads how one that failed to start is reported."
+    },
+    "0083": {
+      "reviewed": "sha256:5a2ddb659402d93b83aa9cdfe4d0a0426f52bbc56294f5abfda5d4df129cbc44",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A script injected into the composed stack's studio or host page -- by a browser extension that writes a script element, a proxy in front that adds an inline one, or a page that wraps the host page -- does not run under the page's Content-Security-Policy, and only the browser's console says so."
+        },
+        {
+          "area": "host",
+          "says": "The host page's policy allows inline styles, for the style elements AG Grid creates, where the studio's allows none: a style injected into the host page can restyle it, though it can load nothing from another host."
+        },
+        {
+          "area": "host",
+          "says": "A host page served on an origin of its own, as 0060 allows, needs a policy whose connect-src names the server's origin; the composed stack's refuses that call, and no gate runs it."
+        },
+        {
+          "area": "operations",
+          "says": "A deployment's own proxy sends the pages their policies only if it copies the header from deploy/web/nginx.conf, and nothing here reads what a deployment sends; 'self' there is its whole origin, so other files it serves on that origin are scripts the pages may load."
+        },
+        {
+          "area": "testing",
+          "says": "WebKit ran the studio's and the host page's gates under their policies once off CI, in Playwright's own Linux image on 2026-10-17, before CI's WebKit leg; and what the composed stack's nginx sends is read by the getting-started gate in CI, which was not run where the change was made."
+        },
+        {
+          "area": "testing",
+          "says": "The studio's and the host page's gates read what each document was refused after its last measured state, just before the canary, and the canary fails on anything left before it; a refusal whose report is still on its way when that last read is made -- the canary's own took 0.5 to 7.1 ms in Chromium -- is heard by nothing."
+        }
+      ]
     }
   }
 }

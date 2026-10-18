@@ -440,3 +440,43 @@ installs each fail. That no upstream source is copied is held by review.
 **What it costs.** A generic improvement waits for another repository's
 release. For an adopted release's first day, only the bump's own review
 stands between this repository and a compromised publish.
+
+## 8.12 Every page under a Content-Security-Policy
+
+Every page this repository serves is sent with a Content-Security-Policy
+built from one: the examples page's, `POLICY` in
+`scripts/demo-headers.mjs`
+([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)),
+which allows nothing a directive does not name, nothing inline and nothing
+evaluated, and scripts, styles, fonts and fetches from the page's own
+origin alone, where the build's files and faces are (0072). A page that
+needs more names it as an allowance, one source in one directive with
+why, which `policyProblems` refuses unless it is named. Two pages need
+one, the same: `'unsafe-inline'` in `style-src` for the style elements AG
+Grid creates, in the live demo
+([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md))
+and in the composed stack's host page; the studio needs none
+([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
+The examples page and the live demo are sent their policies by the
+`_headers` file their deploys write; the studio and the host page by
+`deploy/web/nginx.conf`, from the map `scripts/web-policies.mjs` writes.
+
+**Held by** the browser gates, which serve each page with the policy it
+is sent in production and fail on anything the browser refuses under it:
+the examples page's, the studio's and the host page's in every browser,
+each also putting an inline script in the page at the end of a pass that
+must be refused and heard (`scripts/browser-gate.mjs`'s listener and
+`canary`), and the host page's failing once a run when, without its
+allowance, AG Grid's style elements are no longer refused; the live
+demo's in Chromium alone (`apps/host/scripts/browser/demo.mjs`), which
+shows its allowance needed too. In
+`pnpm test:repo`, `scripts/demo.test.mjs`, `scripts/live-demo.test.mjs`
+and `scripts/web-policies.test.mjs` hold each policy to what its built
+page loads and to what its deploy or nginx.conf sends.
+
+**What it costs.** A script element an extension, a proxy or a wrapping
+page writes into a page does not run, and only the console says so; a
+dependency that needs `eval` or an inline script fails the gates before it
+ships. `'self'` is the whole origin, not the page's path. A deployment's
+own proxy sends the studio's and the host page's policies only if it
+copies them, and nothing reads what it sends.

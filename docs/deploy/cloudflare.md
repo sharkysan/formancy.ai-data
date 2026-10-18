@@ -499,6 +499,11 @@ rename or move it.
     Loader** and **Fonts** off, and **Disable Zaraz** and **Disable Real
     User Monitoring (RUM)** on. Each answers, injects into or rewrites what
     the web front sends, and nothing re-checks the pages behind Access.
+    Each page's Content-Security-Policy, which nginx sends
+    ([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)),
+    refuses a script injected inline and one from another host, and the
+    browser's console says so; a script served under `/cdn-cgi/` on the
+    page's own hostname it allows. Neither is measured behind the tunnel.
     There is no Security Level among them any more: in the new dashboard it
     is I'm Under Attack, on or off (`docs/waf/tools/security-level.mdx`).
   - No challenge -- Under Attack, Managed Challenge, Non-Interactive
