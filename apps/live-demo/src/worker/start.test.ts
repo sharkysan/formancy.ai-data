@@ -2,7 +2,7 @@ import { createIdentityVerifier } from '@formancy/data-server'
 import { describe, expect, test } from 'vitest'
 import { AUDIENCE, ISSUER, MIN_KEY_BYTES, TENANT_CLAIM } from '../token.js'
 import { POLL_MS, START_DEADLINE_MS } from './limits.js'
-import { failedStartLine, newKey, untilStopped, waitUntilHealthy } from './start.js'
+import { failedStartLine, newKey, noInstance, startedLine, untilStopped, waitUntilHealthy } from './start.js'
 
 /**
  * How the Durable Object starts a visitor's server (0070): with a key made
@@ -192,5 +192,35 @@ describe("a failed start's log line (0086)", () => {
     const line = failedStartLine({ step: 'start', error: new Error(`refused env {"FORMANCY_DATA_IDENTITY_SECRET":"${key}"} and again ${key}`) }, key)
     expect(line).not.toContain(key)
     expect(line).toContain('<key>')
+  })
+})
+
+describe('a start Cloudflare has no instance for (0087)', () => {
+  // Cloudflare says it had no instance for a start only by rejecting
+  // monitor() with this sentence, which its own Container class meets by
+  // starting again; any other rejection is a container that failed, which
+  // starting again would not mend.
+  test("is told by monitor()'s words, and nothing else is", () => {
+    expect(noInstance(new Error('There is no container instance that can be provided to this Durable Object, try again later'))).toBe(true)
+    expect(noInstance(new Error('the image failed'))).toBe(false)
+    expect(noInstance('There is no container instance that can be provided to this Durable Object')).toBe(false)
+    expect(noInstance(undefined)).toBe(false)
+  })
+
+  // A start that answered says how long it took on Cloudflare, which no
+  // gate measures, and how often it was started again; the deadline is to
+  // be set from these lines.
+  test('a start that answered says how long it took, and how often it was started again', () => {
+    const wait = { healthy: true, ended: 'answered', probes: 30, elapsedMs: 21_400, lastError: undefined } as const
+    expect(startedLine(wait, 0)).toBe('live demo: a start answered after 21400 ms, after 30 probes')
+    expect(startedLine(wait, 2)).toBe('live demo: a start answered after 21400 ms, after 30 probes, started again 2 times after Cloudflare had no instance')
+    expect(startedLine(wait, 1)).toBe('live demo: a start answered after 21400 ms, after 30 probes, started again once after Cloudflare had no instance')
+  })
+
+  // A start that still failed says how often it was started again.
+  test('a failed wait says how often it was started again', () => {
+    expect(failedStartLine({ step: 'health', wait: { healthy: false, ended: 'deadline', probes: 240, elapsedMs: 60_000, lastError: 'Error: Cloudflare had no container instance; started again' }, restarts: 3 }, newKey())).toBe(
+      'live demo: a start failed: /health did not answer within 60000 ms, after 240 probes; the last threw Error: Cloudflare had no container instance; started again; started again 3 times after Cloudflare had no instance',
+    )
   })
 })

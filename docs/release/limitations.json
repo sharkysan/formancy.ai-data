@@ -2281,7 +2281,7 @@
       ]
     },
     "0070": {
-      "reviewed": "sha256:49880cccf5ba1549ee5d1d1a74a6beed11d3fa34d9cde6a3def8891f906d8561",
+      "reviewed": "sha256:2477a5865e258db779555fcc2666648984dd38c7f28fef7f35a547380d13546c",
       "limitations": [
         {
           "area": "operations",
@@ -2301,7 +2301,7 @@
         },
         {
           "area": "operations",
-          "says": "A live demo visitor's first sign-in waits for their own server to start, 5.7 to 11.7 s through the Worker at basic's CPU and memory share on a workstation over four runs on 2026-10-17, and is refused past 30 s, which a start took there on a busy Docker engine; on Cloudflare neither a start nor a request's way through the Worker and the Durable Object has been measured."
+          "says": "A live demo visitor's first sign-in waits for their own server to start, 5.7 to 11.7 s through the Worker at basic's CPU and memory share on a workstation over four runs on 2026-10-17, and is refused past 60 s (0087), which a start took there on a busy Docker engine; on Cloudflare neither a start nor a request's way through the Worker and the Durable Object has been measured."
         },
         {
           "area": "operations",
@@ -2780,7 +2780,7 @@
       ]
     },
     "0086": {
-      "reviewed": "sha256:fb8b0dc13e7e57266d1e8a0dd376bd5ac41f1d3352ea848bbf6c828c672c6360",
+      "reviewed": "sha256:3978954cf7a4601081d624f202f6ecd8b79ca8929e9cab9272101cd3dd300f2e",
       "limitations": [
         {
           "area": "operations",
@@ -2789,6 +2789,23 @@
         {
           "area": "operations",
           "says": "Whoever can tail the live demo's Worker reads Cloudflare's error for a failed start as Cloudflare wrote it, with the start's key cut out of it."
+        }
+      ]
+    },
+    "0087": {
+      "reviewed": "sha256:f5a5626307572a99d860c8edb3490873b7c6aab89494dfa2886f65ba393d4847",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "A live demo sign-in whose start fails is answered after up to 60 s, and the page still says a first start takes a few seconds."
+        },
+        {
+          "area": "operations",
+          "says": "A running live demo visitor's Durable Object is held from eviction while its container runs, up to 15 minutes, by the monitor() it waits on, and Cloudflare bills that as Durable Object duration."
+        },
+        {
+          "area": "operations",
+          "says": "A live demo start Cloudflare has no instance for is told by an undocumented sentence of Cloudflare's; reworded, such a start is said as a failed container and not started again."
         }
       ]
     }

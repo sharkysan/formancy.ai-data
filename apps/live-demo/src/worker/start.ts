@@ -81,7 +81,7 @@ export async function waitUntilHealthy(probe: (remainingMs: number) => Promise<b
 }
 
 /** A start that failed, at the step it failed: one that threw, or the wait for /health. */
-export type FailedStart = { step: 'start' | 'inactivity-timeout' | 'other'; error: unknown } | { step: 'health'; wait: HealthWait }
+export type FailedStart = { step: 'start' | 'inactivity-timeout' | 'other'; error: unknown } | { step: 'health'; wait: HealthWait; restarts?: number }
 
 /**
  * The line the Durable Object writes when a start fails (0086), which
@@ -98,8 +98,36 @@ export function failedStartLine(failure: FailedStart, key: string | undefined): 
         ? `the container stopped after ${String(failure.wait.elapsedMs)} ms, before /health answered, after ${probes(failure.wait.probes)}`
         : `/health did not answer within ${String(failure.wait.elapsedMs)} ms, after ${probes(failure.wait.probes)}`
   const last = failure.step === 'health' && failure.wait.lastError !== undefined ? `; the last threw ${failure.wait.lastError}` : ''
-  const line = `live demo: a start failed: ${what}${last}`
+  const again = failure.step === 'health' && (failure.restarts ?? 0) > 0 ? `; ${startedAgain(failure.restarts ?? 0)}` : ''
+  const line = `live demo: a start failed: ${what}${last}${again}`
   return key === undefined || key === '' ? line : line.replaceAll(key, '<key>')
+}
+
+/**
+ * Whether `error`, as `ctx.container.monitor()` rejected, is Cloudflare
+ * having no instance to give this start (0087): "There is no container
+ * instance that can be provided to this Durable Object, try again later",
+ * which Cloudflare's own Container class meets by starting again. Told by
+ * its words, which nothing documents but cloudflare/containers#262; any
+ * other rejection is a container that failed, which a new start would not
+ * mend.
+ */
+export function noInstance(error: unknown): boolean {
+  return error instanceof Error && /no container instance/i.test(error.message)
+}
+
+/**
+ * The line a start that answered writes (0087): how long it took, which no
+ * gate measures on Cloudflare, and how often it was started again; the
+ * deadline is to be set from these lines.
+ */
+export function startedLine(wait: HealthWait, restarts: number): string {
+  return `live demo: a start answered after ${String(wait.elapsedMs)} ms, after ${probes(wait.probes)}${restarts > 0 ? `, ${startedAgain(restarts)}` : ''}`
+}
+
+/** How often a start was started again for want of an instance. */
+function startedAgain(restarts: number): string {
+  return `started again ${restarts === 1 ? 'once' : `${String(restarts)} times`} after Cloudflare had no instance`
 }
 
 /** A count of probes, in the singular for one. */

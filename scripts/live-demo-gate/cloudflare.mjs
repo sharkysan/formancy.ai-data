@@ -131,6 +131,11 @@ export class DockerContainer {
     this.inactivityTimeouts.push(ms)
   }
 
+  /** Settles when the container exits, as Cloudflare's does; a `docker run` never reports no instance. */
+  monitor() {
+    return this.#exited
+  }
+
   getTcpPort(port) {
     if (port !== this.#port) throw new Error(`the gate publishes the image's port ${String(this.#port)}, not ${String(port)}`)
     return { fetch: (input, init) => this.#fetch(input, init) }

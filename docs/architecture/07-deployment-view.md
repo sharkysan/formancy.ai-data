@@ -387,7 +387,11 @@ read by hand after the first deploy. The Worker was created on
 2026-10-19, and every start it made that day failed; a failed start says
 which step failed and what the platform said in the Worker's live log,
 which `wrangler tail` shows and nothing keeps
-([0086](../decisions/0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md)). 0070 does the sums and names the rest.
+([0086](../decisions/0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md)).
+The Durable Object listens to `monitor()` after each start, starts again
+a start Cloudflare has no instance for, and gives a start 60 s; a start
+that answers says how long it took
+([0087](../decisions/0087-a-live-demo-start-cloudflare-has-no-instance-for-is-started-again-within-a-minute.md)). 0070 does the sums and names the rest.
 
 ## Configuration
 

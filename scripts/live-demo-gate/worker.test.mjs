@@ -27,21 +27,38 @@ const { default: worker, DemoServer } = await import('../../apps/live-demo/dist/
  * `refuse` makes start() throw before anything runs, `quotes` makes it
  * throw quoting the environment it was given, `timeout` makes
  * setInactivityTimeout() throw, `stops` stops it at its first /health,
- * which otherwise answers 200.
+ * which otherwise answers 200; `noInstance` is how many starts Cloudflare
+ * has no instance for, which monitor() rejects with its sentence and which
+ * never run, and `fails` makes monitor() reject a start that never runs.
  */
 class Container {
   running = false
   starts = 0
+  attempts = 0
   destroyed = 0
-  constructor({ refuse = false, quotes = false, timeout = false, stops = false } = {}) {
-    this.options = { refuse, quotes, timeout, stops }
+  #monitor = new Promise(() => {})
+  constructor({ refuse = false, quotes = false, timeout = false, stops = false, noInstance = 0, fails = false } = {}) {
+    this.options = { refuse, quotes, timeout, stops, noInstance, fails }
   }
   start(options) {
     if (this.running) throw new Error('start() was called while the container is running')
     if (this.options.refuse) throw new Error('the start was refused')
     if (this.options.quotes) throw new Error(`refused the environment ${JSON.stringify(options?.env)}`)
+    this.attempts += 1
+    if (this.attempts <= this.options.noInstance) {
+      this.#monitor = Promise.reject(new Error('There is no container instance that can be provided to this Durable Object, try again later'))
+      return
+    }
+    if (this.options.fails) {
+      this.#monitor = Promise.reject(new Error('the image failed'))
+      return
+    }
+    this.#monitor = new Promise(() => {})
     this.starts += 1
     this.running = true
+  }
+  monitor() {
+    return this.#monitor
   }
   async setInactivityTimeout() {
     if (this.options.timeout) throw new Error('the inactivity timeout was refused')
@@ -182,6 +199,44 @@ describe('a failed start says why in the live log (0086)', () => {
       const [[line]] = said.mock.calls
       expect(line).toContain(':"<key>"')
       expect(line).not.toMatch(/[A-Za-z0-9_-]{43}/)
+    } finally {
+      said.mockRestore()
+    }
+  })
+})
+
+describe('a start Cloudflare has no instance for is started again (0087)', () => {
+  // On Cloudflare every start of the first deploy waited out its deadline
+  // with nothing running: Cloudflare says a start it has no instance for
+  // only by rejecting monitor(), which the Durable Object never asked, so
+  // it waited for a container that would never run. It now starts again,
+  // and the start that answers says how long it took and how often.
+  test('a start with no instance the first two times is started again and answers', async () => {
+    const said = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      const container = new Container({ noInstance: 2 })
+      const stand = durableObjects(DemoServer, () => container)
+      const answer = await signIn(stand)
+      expect(answer.status).toBe(200)
+      expect({ attempts: container.attempts, starts: container.starts }).toEqual({ attempts: 3, starts: 1 })
+      expect(said.mock.calls).toEqual([[expect.stringMatching(/^live demo: a start answered after \d+ ms, after \d+ probes?, started again 2 times after Cloudflare had no instance$/)]])
+    } finally {
+      said.mockRestore()
+    }
+  })
+
+  // Any other rejection is a container that failed: not started again,
+  // and said at once rather than after the deadline.
+  test("a container that failed is said with monitor()'s words, at once, and not started again", async () => {
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const container = new Container({ fails: true })
+      const stand = durableObjects(DemoServer, () => container)
+      const started = Date.now()
+      expect((await signIn(stand)).status).toBe(503)
+      expect(Date.now() - started).toBeLessThan(5_000)
+      expect(container.attempts).toBe(1)
+      expect(said.mock.calls).toEqual([[expect.stringMatching(/^live demo: a start failed: the container stopped after \d+ ms, before \/health answered, after 1 probe; the last threw Error: monitor\(\) rejected: the image failed$/)]])
     } finally {
       said.mockRestore()
     }

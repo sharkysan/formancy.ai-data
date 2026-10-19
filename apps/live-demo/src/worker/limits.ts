@@ -35,9 +35,14 @@ export const MAX_INSTANCES = 10
  * image's own measurements of 2026-10-16 (deploy/demo/Dockerfile's
  * header); Cloudflare documents 1-3 s more for a cold start. A start on a
  * Docker engine busy with other suites' containers took about 31 s, past
- * it (0070). Not measured on Cloudflare.
+ * it (0070). Doubled to 60 s for Cloudflare (0087): on the first deploy,
+ * 2026-10-19, no container ran within 30 s in six sign-ins out of six, and
+ * a start Cloudflare has no instance for is started again, which a
+ * reporter of cloudflare/containers#262 saw succeed after about 20 s.
+ * Every start now says in the live log how long it took, which is what
+ * this is to be set from.
  */
-export const START_DEADLINE_MS = 30_000
+export const START_DEADLINE_MS = 60_000
 
 /** How often a start asks /health whether the server answers yet. */
 export const POLL_MS = 250
