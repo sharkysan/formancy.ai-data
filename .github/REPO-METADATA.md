@@ -67,7 +67,7 @@ the rest.
 | Worker | `formancy-data-examples` | The name `apps/examples/wrangler.json` gives it, and the only one `scripts/demo.mjs` deploys to |
 | Git repository | `sharkysan/formancy.ai-data` | |
 | Production branch | `main` | The demo is main's examples page |
-| Builds for non-production branches | off | A branch's build would upload a version of the Worker from code no review has merged |
+| Builds for non-production branches (the dashboard's **Enable Preview Builds**) | off | A branch's build would upload a version of the Worker from code no review has merged |
 | Root directory | `/` | The workspace's root, where its lockfile is and `pnpm build` builds every package the page imports |
 | Build command | `pnpm build` | |
 | Deploy command | `node scripts/demo.mjs` | It stages the build under `/data/examples/` beside its `_headers`, and runs the pinned Wrangler with `apps/examples/wrangler.json` |
@@ -93,8 +93,9 @@ deploys `main`, so it also shows that the deploy on a push works:
    command `pnpm build`, deploy command `node scripts/demo.mjs`, root
    directory `/`, production branch `main`, no variables.
 4. *Create and deploy*.
-5. Afterwards, on the Worker, *Settings › Build › Branch control*: builds
-   for non-production branches off.
+5. Afterwards, on the Worker, *Settings › Build › Branch control*: clear
+   **Enable Preview Builds**, which is what the dashboard calls builds for
+   non-production branches.
 
 Or with Wrangler first, then connected:
 
@@ -130,7 +131,7 @@ names to the same. Review holds the rest.
 | Worker | `formancy-data-demo` | The name `apps/live-demo/wrangler.json` gives it, and the only one `scripts/live-demo.mjs` deploys to |
 | Git repository | `sharkysan/formancy.ai-data` | |
 | Production branch | `main` | The demo is main's server, image and host page |
-| Builds for non-production branches | off | A branch's build would upload a version of the Worker from code no review has merged; and Cloudflare makes no version address for a Worker with Durable Objects (its Containers deploy guide) |
+| Builds for non-production branches (the dashboard's **Enable Preview Builds**) | off | A branch's build would upload a version of the Worker from code no review has merged; and Cloudflare makes no version address for a Worker with Durable Objects (its Containers deploy guide) |
 | Root directory | `/` | The workspace's root: its lockfile, and the image's build context |
 | Build command | `pnpm build` | |
 | Deploy command | `node scripts/live-demo.mjs` | It builds the host page's demo build, stages it under `/data/demo/` beside its `_headers`, and runs the pinned Wrangler with `apps/live-demo/wrangler.json`, which builds the image and pushes it when it changed |
@@ -159,8 +160,9 @@ deploys `main`:
    command `pnpm build`, deploy command `node scripts/live-demo.mjs`, root
    directory `/`, production branch `main`, no variables.
 3. *Create and deploy*.
-4. Afterwards, on the Worker, *Settings › Build › Branch control*: builds
-   for non-production branches off.
+4. Afterwards, on the Worker, *Settings › Build › Branch control*: clear
+   **Enable Preview Builds**, which is what the dashboard calls builds for
+   non-production branches.
 
 Or with Wrangler first, then connected:
 

@@ -36,7 +36,8 @@ import { handle } from './worker/handle.js'
 import { IDLE_MINUTES, KEY_LIFETIME_MS } from './worker/limits.js'
 import { claimsFor, personaById } from './worker/session.js'
 import type { SignInResult } from './worker/session.js'
-import { newKey, untilStopped, waitUntilHealthy } from './worker/start.js'
+import { failedStartLine, newKey, untilStopped, waitUntilHealthy } from './worker/start.js'
+import type { FailedStart } from './worker/start.js'
 
 interface Env {
   DEMO: DurableObjectNamespace<DemoServer>
@@ -96,7 +97,10 @@ export class DemoServer extends DurableObject<Env> {
   #key(): Promise<string | undefined> {
     if (this.#starting !== undefined) return this.#starting
     const container = this.ctx.container
-    if (container === undefined) return Promise.resolve(undefined)
+    if (container === undefined) {
+      console.error(failedStartLine({ step: 'other', error: 'no container is attached to this Durable Object' }, undefined))
+      return Promise.resolve(undefined)
+    }
     const held = this.ctx.storage.kv.get<string>(KEY)
     if (container.running && held !== undefined) return Promise.resolve(held)
     this.#starting = this.#startOrForget(container).finally(() => {
@@ -111,39 +115,50 @@ export class DemoServer extends DurableObject<Env> {
    * sign-in leaves nothing behind.
    */
   async #startOrForget(container: Container): Promise<string | undefined> {
+    const made = newKey()
     let key: string | undefined
     try {
-      key = await this.#start(container)
-    } catch {
-      key = undefined
+      key = await this.#start(container, made)
+    } catch (error) {
+      key = failed({ step: 'other', error }, made)
     }
     if (key === undefined) await this.#forget(container)
     return key
   }
 
   /**
-   * Starts the container with a new key and waits for its server to answer
+   * Starts the container with `key` and waits for its server to answer
    * /health: the key, kept in storage with an alarm a day on only once the
-   * server answers, or undefined when it did not start in time. Throws when
-   * the container could not be started or its inactivity timeout set.
+   * server answers, or undefined when the container could not be started,
+   * its inactivity timeout could not be set or it did not answer in time,
+   * each said in the live log by the step that failed (0086).
    */
-  async #start(container: Container): Promise<string | undefined> {
+  async #start(container: Container, key: string): Promise<string | undefined> {
     // A container running with a key this object no longer holds would
     // refuse every token signed here.
     if (container.running) await container.destroy()
-    const key = newKey()
-    container.start({ env: { [IDENTITY_SECRET_VARIABLE]: key }, enableInternet: false })
-    await container.setInactivityTimeout(IDLE_MS)
+    try {
+      container.start({ env: { [IDENTITY_SECRET_VARIABLE]: key }, enableInternet: false })
+    } catch (error) {
+      return failed({ step: 'start', error }, key)
+    }
+    try {
+      await container.setInactivityTimeout(IDLE_MS)
+    } catch (error) {
+      return failed({ step: 'inactivity-timeout', error }, key)
+    }
     const port = container.getTcpPort(SERVER_PORT)
-    const healthy = await waitUntilHealthy(
+    const wait = await waitUntilHealthy(
       async (remaining) => {
         const answer = await port.fetch('http://container/health', { signal: AbortSignal.timeout(remaining) })
         await answer.body?.cancel()
-        return answer.status === 200
+        // Said, so that a wait that gives up names what /health answered.
+        if (answer.status !== 200) throw new Error(`/health answered ${String(answer.status)}`)
+        return true
       },
       { alive: untilStopped(() => container.running) },
     )
-    if (!healthy) return undefined
+    if (!wait.healthy) return failed({ step: 'health', wait }, key)
     this.ctx.storage.kv.put(KEY, key)
     await this.ctx.storage.setAlarm(Date.now() + KEY_LIFETIME_MS)
     return key
@@ -194,6 +209,12 @@ export class DemoServer extends DurableObject<Env> {
     }
     await this.ctx.storage.deleteAll()
   }
+}
+
+/** A failed start, said in the Worker's live log, which `wrangler tail` shows and nothing keeps (0086): undefined, the start's outcome. */
+function failed(failure: FailedStart, key: string): undefined {
+  console.error(failedStartLine(failure, key))
+  return undefined
 }
 
 export default {

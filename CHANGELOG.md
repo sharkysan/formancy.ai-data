@@ -888,6 +888,17 @@ encrypt is now refused before its login is sent (0081, under *Fixed*).
     keep their stylesheet digests. 0.6.0 adds `@formancy/themes/room.css`,
     the admin's palette as a file (formancy.ai 0178), which none of the
     three copies here imports yet.
+- **The live demo says why a start failed, in its Worker's live log**
+  ([0086](docs/decisions/0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md)).
+  The Worker was created on Cloudflare on 2026-10-19, and every sign-in
+  failed after 32 s, the start deadline, with nothing to say why: the
+  Durable Object turned each failure into the visitor's 503 and wrote no
+  line, and observability is off. Each failed start now writes one line,
+  which `wrangler tail formancy-data-demo` shows and nothing keeps: the
+  step that failed and what Cloudflare said, or whether the wait for the
+  server's `/health` ran out or the container stopped, after how many
+  probes, and what the last one was told. The start's key is cut out of
+  it, and nothing a visitor sent is in it. Observability stays off.
 
 ### Fixed
 

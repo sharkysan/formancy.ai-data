@@ -383,8 +383,11 @@ under Docker quotas on a workstation. Cloudflare runs code on formancy.ai's
 zone and decrypts and holds what a visitor types. The Durable Object's
 code is held by review, since `wrangler dev` runs no container here, and
 what the cap answers and how long a container outlives its visitor are
-read by hand after the first deploy; until the Worker is created, the
-address is formancy.ai's 404. 0070 does the sums and names the rest.
+read by hand after the first deploy. The Worker was created on
+2026-10-19, and every start it made that day failed; a failed start says
+which step failed and what the platform said in the Worker's live log,
+which `wrangler tail` shows and nothing keeps
+([0086](../decisions/0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md)). 0070 does the sums and names the rest.
 
 ## Configuration
 
