@@ -2281,7 +2281,7 @@
       ]
     },
     "0070": {
-      "reviewed": "sha256:bb2fab65be6e5e5a72c5807b9539884b51ec7b1d42f825dac8ab47ce9bfb4f26",
+      "reviewed": "sha256:49880cccf5ba1549ee5d1d1a74a6beed11d3fa34d9cde6a3def8891f906d8561",
       "limitations": [
         {
           "area": "operations",
@@ -2321,7 +2321,7 @@
         },
         {
           "area": "operations",
-          "says": "With observability off, Cloudflare keeps no log of the live demo's Worker or containers, so a failed start is diagnosed by reproducing it."
+          "says": "With observability off, Cloudflare keeps no log of the live demo's Worker or containers, so a failed start is diagnosed by reproducing it, with the line it writes to the Worker's live log (0086)."
         },
         {
           "area": "operations",
@@ -2776,6 +2776,19 @@
         {
           "area": "operations",
           "says": "The default lookup deadline is derived from the committed figures (0063), so in a release whose figures are an earlier product's it is what those figures derived, not what this release's lookups were measured taking."
+        }
+      ]
+    },
+    "0086": {
+      "reviewed": "sha256:fb8b0dc13e7e57266d1e8a0dd376bd5ac41f1d3352ea848bbf6c828c672c6360",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "A failed start of the live demo is said only in the Worker's live log, to whoever runs wrangler tail while it happens; nothing keeps it, and the container's own output is still nobody's."
+        },
+        {
+          "area": "operations",
+          "says": "Whoever can tail the live demo's Worker reads Cloudflare's error for a failed start as Cloudflare wrote it, with the start's key cut out of it."
         }
       ]
     }

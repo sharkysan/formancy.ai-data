@@ -287,6 +287,16 @@ builds the image in a dry run too and pushes nothing, and asks for no login
 for one, as its published code reads; that was read, not run, on
 2026-10-16.
 
+A start that fails says why in the Worker's live log -- the step that
+failed and what Cloudflare said, or how the wait for its server ended --
+which nothing keeps; watch it while a sign-in is made, after the Wrangler
+login
+([0086](docs/decisions/0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md)):
+
+```bash
+npx --yes wrangler@4.146.0 tail formancy-data-demo
+```
+
 What nothing here can measure, read by hand once after the first deploy,
 and the result recorded in 0070, as 0069's were:
 

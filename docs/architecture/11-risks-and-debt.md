@@ -377,7 +377,10 @@ every change goes when a visitor's container sleeps or a deploy changes the
 image; it shows PostgreSQL alone; Cloudflare runs its code on formancy.ai's
 zone and holds what a visitor types until their container stops; the
 cookie is the container's credential; with observability off a failed start
-leaves no log; its page allows inline styles for AG Grid; and its lookup
+leaves no kept log, only a line in the Worker's live log for whoever tails
+it then
+([0086](../decisions/0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md));
+its page allows inline styles for AG Grid; and its lookup
 deadline is four times the product's default, for a quarter of a CPU. What
 no gate reaches: the Durable Object's code on Cloudflare, what the cap
 answers, how long a container outlives its visitor, a start's time there,

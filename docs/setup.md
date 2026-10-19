@@ -25,9 +25,9 @@ again.
 | 4 | The `npm` environment, its policy of `v*` tags, and its secret `NPM_TOKEN` | the maintainer | done: 0.1.0 was published through it on 2026-10-16 | `gh api repos/sharkysan/formancy.ai-data/environments` and `gh secret list -e npm` |
 | 5 | The server's image public on GHCR | the first release | done | `docker manifest inspect ghcr.io/sharkysan/formancy-data-server:v0.1.0` with no login |
 | 6 | The examples page's Worker, `formancy-data-examples` | the maintainer, once | done: live since 2026-10-16 | read by hand on 2026-10-16 ([0069](decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)) |
-| 7 | The Workers Paid plan on formancy.ai's Cloudflare account | the maintainer: it is billing | to do, as far as anything here knows | nothing here can read the account |
-| 8 | The live demo's Worker, `formancy-data-demo` | the maintainer, once | to do: the pull request that adds it merged on 2026-10-17 | |
-| 9 | That Worker connected to this repository, so that a push to `main` deploys it | the maintainer, once | to do | |
+| 7 | The Workers Paid plan on formancy.ai's Cloudflare account | the maintainer: it is billing | done by 2026-10-19: the demo's container application was deployed, which the free plan cannot hold | `npx --yes wrangler@4.146.0 containers list`, after the Wrangler login |
+| 8 | The live demo's Worker, `formancy-data-demo` | the maintainer, once | done on 2026-10-19; its pages answer, and every sign-in failed that day ([0086](decisions/0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md)) | `npx --yes wrangler@4.146.0 deployments list --name formancy-data-demo` |
+| 9 | That Worker connected to this repository, so that a push to `main` deploys it | the maintainer, once | done on 2026-10-19, in the dashboard | the Worker's *Builds* tab, which nothing here reads |
 | 10 | A rate limit on starting a demo server | the maintainer, if wanted | not set | |
 
 ## GitHub: rows 1 to 5
@@ -72,8 +72,9 @@ Until these are done, https://formancy.ai/data/demo/ is formancy.ai's 404.
      deploys `main` in one go: *Workers & Pages › Create › Import a
      repository › GitHub*, the repository `sharkysan/formancy.ai-data`, and
      [the settings in the table](../.github/REPO-METADATA.md#the-live-demos-worker-on-cloudflare).
-     Then, on the Worker, *Settings › Build › Branch control*: turn off
-     builds for non-production branches.
+     Then, on the Worker, *Settings › Build › Branch control*: clear
+     **Enable Preview Builds**, Cloudflare's name for builds of branches
+     other than the production branch.
    - **Or from a clean checkout of `main`**, with Docker running, then
      connected:
 

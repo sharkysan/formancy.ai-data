@@ -24,7 +24,8 @@ const { default: worker, DemoServer } = await import('../../apps/live-demo/dist/
 
 /**
  * A visitor's container as `ctx.container` gives it, which fails as told:
- * `refuse` makes start() throw before anything runs, `timeout` makes
+ * `refuse` makes start() throw before anything runs, `quotes` makes it
+ * throw quoting the environment it was given, `timeout` makes
  * setInactivityTimeout() throw, `stops` stops it at its first /health,
  * which otherwise answers 200.
  */
@@ -32,12 +33,13 @@ class Container {
   running = false
   starts = 0
   destroyed = 0
-  constructor({ refuse = false, timeout = false, stops = false } = {}) {
-    this.options = { refuse, timeout, stops }
+  constructor({ refuse = false, quotes = false, timeout = false, stops = false } = {}) {
+    this.options = { refuse, quotes, timeout, stops }
   }
-  start() {
+  start(options) {
     if (this.running) throw new Error('start() was called while the container is running')
     if (this.options.refuse) throw new Error('the start was refused')
+    if (this.options.quotes) throw new Error(`refused the environment ${JSON.stringify(options?.env)}`)
     this.starts += 1
     this.running = true
   }
@@ -146,5 +148,42 @@ describe("a refused sign-in leaves nothing behind (0070's costs)", () => {
     expect(kept.running).toBe(true)
     expect(kept.alarm).toBeGreaterThanOrEqual(before + KEY_LIFETIME_MS)
     expect(kept.alarm).toBeLessThanOrEqual(Date.now() + KEY_LIFETIME_MS)
+  })
+})
+
+describe('a failed start says why in the live log (0086)', () => {
+  // On Cloudflare every start of the first deploy failed, on 2026-10-19, and
+  // the Worker said nothing: the Durable Object turned each failure into the
+  // visitor's 503 and kept no trace of the step that failed. Each way the
+  // stand-in fails is said once, with its step and what it threw.
+  test.each([
+    ['refuse', /^live demo: a start failed: start threw Error: the start was refused$/],
+    ['timeout', /^live demo: a start failed: inactivity-timeout threw Error: the inactivity timeout was refused$/],
+    ['stops', /^live demo: a start failed: the container stopped after \d+ ms, before \/health answered, after 1 probe; the last threw Error: Container is not listening to port 4390$/],
+  ])('a container that fails with %s', async (way, line) => {
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const stand = durableObjects(DemoServer, () => new Container({ [way]: true }))
+      expect((await signIn(stand)).status).toBe(503)
+      expect(said.mock.calls).toEqual([[expect.stringMatching(line)]])
+    } finally {
+      said.mockRestore()
+    }
+  })
+
+  // The start's key signs every token of the visitor's server. A platform
+  // error that quoted the container's environment would put it in the
+  // line, which the live log shows to whoever tails it: cut out.
+  test("never says the start's key, even when the platform's error quoted it", async () => {
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const stand = durableObjects(DemoServer, () => new Container({ quotes: true }))
+      expect((await signIn(stand)).status).toBe(503)
+      const [[line]] = said.mock.calls
+      expect(line).toContain(':"<key>"')
+      expect(line).not.toMatch(/[A-Za-z0-9_-]{43}/)
+    } finally {
+      said.mockRestore()
+    }
   })
 })

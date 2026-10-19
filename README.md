@@ -102,8 +102,11 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > a host page on another origin run in a browser, a run through a real
 > Cloudflare tunnel, anything that reads what Cloudflare sends at the
 > examples page's address, which was read by hand once, on 2026-10-16,
-> the live demo's Worker, which nobody has created, and so anything read
-> of the demo on Cloudflare, and a licence a lawyer has reviewed.
+> a sign-in to the live demo on Cloudflare, whose Worker answers since
+> 2026-10-19 and whose every start failed that day, now said in its live
+> log
+> ([0086](./docs/decisions/0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md)),
+> and a licence a lawyer has reviewed.
 > [`CHANGELOG.md`](./CHANGELOG.md) says what the release contains and what
 > each step before it found.
 
