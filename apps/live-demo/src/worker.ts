@@ -36,7 +36,7 @@ import { handle } from './worker/handle.js'
 import { IDLE_MINUTES, KEY_LIFETIME_MS } from './worker/limits.js'
 import { claimsFor, personaById } from './worker/session.js'
 import type { SignInResult } from './worker/session.js'
-import { failedStartLine, newKey, untilStopped, waitUntilHealthy } from './worker/start.js'
+import { failedStartLine, newKey, noInstance, startedLine, untilStopped, waitUntilHealthy } from './worker/start.js'
 import type { FailedStart } from './worker/start.js'
 
 interface Env {
@@ -132,13 +132,30 @@ export class DemoServer extends DurableObject<Env> {
    * server answers, or undefined when the container could not be started,
    * its inactivity timeout could not be set or it did not answer in time,
    * each said in the live log by the step that failed (0086).
+   *
+   * Cloudflare says a start it had no instance for, and a container that
+   * failed, only by rejecting `monitor()`: a start with no instance is
+   * started again within the deadline, as Cloudflare's own Container class
+   * does, and any other rejection ends the wait with what it said (0087).
    */
   async #start(container: Container, key: string): Promise<string | undefined> {
     // A container running with a key this object no longer holds would
     // refuse every token signed here.
     if (container.running) await container.destroy()
-    try {
+    let refused: unknown
+    let restarts = 0
+    const launch = (): void => {
+      refused = undefined
       container.start({ env: { [IDENTITY_SECRET_VARIABLE]: key }, enableInternet: false })
+      container.monitor().then(
+        () => {},
+        (error: unknown) => {
+          refused = error
+        },
+      )
+    }
+    try {
+      launch()
     } catch (error) {
       return failed({ step: 'start', error }, key)
     }
@@ -148,17 +165,29 @@ export class DemoServer extends DurableObject<Env> {
       return failed({ step: 'inactivity-timeout', error }, key)
     }
     const port = container.getTcpPort(SERVER_PORT)
+    const running = untilStopped(() => container.running)
+    let failure: unknown
     const wait = await waitUntilHealthy(
       async (remaining) => {
+        if (refused !== undefined) {
+          if (!noInstance(refused) || container.running) {
+            failure = refused
+            throw new Error(`monitor() rejected: ${refused instanceof Error ? refused.message : String(refused)}`)
+          }
+          restarts += 1
+          launch()
+          throw new Error('Cloudflare had no container instance; started again')
+        }
         const answer = await port.fetch('http://container/health', { signal: AbortSignal.timeout(remaining) })
         await answer.body?.cancel()
         // Said, so that a wait that gives up names what /health answered.
         if (answer.status !== 200) throw new Error(`/health answered ${String(answer.status)}`)
         return true
       },
-      { alive: untilStopped(() => container.running) },
+      { alive: () => failure === undefined && running() },
     )
-    if (!wait.healthy) return failed({ step: 'health', wait }, key)
+    if (!wait.healthy) return failed({ step: 'health', wait, restarts }, key)
+    console.log(startedLine(wait, restarts))
     this.ctx.storage.kv.put(KEY, key)
     await this.ctx.storage.setAlarm(Date.now() + KEY_LIFETIME_MS)
     return key

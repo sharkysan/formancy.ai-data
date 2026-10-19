@@ -289,8 +289,9 @@ for one, as its published code reads; that was read, not run, on
 
 A start that fails says why in the Worker's live log -- the step that
 failed and what Cloudflare said, or how the wait for its server ended --
-which nothing keeps; watch it while a sign-in is made, after the Wrangler
-login
+and a start that answers how long it took and how often Cloudflare had no
+instance for it (0087), which nothing keeps; watch it while a sign-in is
+made, after the Wrangler login
 ([0086](docs/decisions/0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md)):
 
 ```bash

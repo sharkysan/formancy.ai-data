@@ -899,6 +899,21 @@ encrypt is now refused before its login is sent (0081, under *Fixed*).
   server's `/health` ran out or the container stopped, after how many
   probes, and what the last one was told. The start's key is cut out of
   it, and nothing a visitor sent is in it. Observability stays off.
+- **The live demo starts again when Cloudflare has no instance, and gives
+  a start a minute**
+  ([0087](docs/decisions/0087-a-live-demo-start-cloudflare-has-no-instance-for-is-started-again-within-a-minute.md)).
+  With 0086's line deployed, a sign-in said the container never ran in
+  its 30 s: "The container is not running, consider calling start()".
+  Cloudflare says a start it has no instance for only by rejecting
+  `monitor()`, which the Durable Object never asked; Cloudflare's own
+  Container class starts again then. The Durable Object now listens to
+  `monitor()` after every start, starts again on that answer within the
+  deadline, now 60 s, and says any other rejection at once. A start that
+  answers says in the live log how long it took, which nothing measured
+  on Cloudflare before. What it costs: a visitor may wait up to a minute,
+  and a running visitor's Durable Object is held from eviction while its
+  container runs, up to 15 minutes. Whether no instance was the cause the
+  next sign-in's line says.
 
 ### Fixed
 

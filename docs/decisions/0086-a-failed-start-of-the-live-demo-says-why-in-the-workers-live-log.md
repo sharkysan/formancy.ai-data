@@ -1,6 +1,6 @@
 # 0086 — A failed start of the live demo says why in the Worker's live log
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0087](0087-a-live-demo-start-cloudflare-has-no-instance-for-is-started-again-within-a-minute.md): a start that answers says how long it took, and a failed one how often it was started again
 - **Date:** 2026-10-19
 - **Deciders:** Daniel Bacher
 - **Verified by:**
