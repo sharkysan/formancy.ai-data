@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient } from '@formancy/data-client'
-import { applyPresentation, EMPTY_PRESENTATION } from '@formancy/data-core'
+import { applyPresentation, EMPTY_PRESENTATION, MAX_LOOKUP_DEADLINE_MS } from '@formancy/data-core'
 import type { FieldBinding, FormBindings, FormPolicy, PresentationOverrides } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, createIdentityVerifier, DRIVER_FACTORIES } from '@formancy/data-server'
@@ -29,13 +29,14 @@ import { inject } from 'vitest'
  * of a socket.
  */
 
-/** The tokens the fake verifier accepts. Literal, and meaningless anywhere but this suite. */
-export const TOKENS = { admin: 'host-test-administrator', clerk: 'host-test-clerk-tenant-1', otherClerk: 'host-test-clerk-tenant-2' } as const
+/** The tokens the fake verifier accepts. Literal, and meaningless anywhere but this suite. Tenant 3's clerk sees the paged customers alone (0085). */
+export const TOKENS = { admin: 'host-test-administrator', clerk: 'host-test-clerk-tenant-1', otherClerk: 'host-test-clerk-tenant-2', thirdClerk: 'host-test-clerk-tenant-3' } as const
 
 const verifyIdentity: IdentityVerifier = async (token) => {
   if (token === TOKENS.admin) return { ok: true, identity: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-1', roles: ['clerk'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.otherClerk) return { ok: true, identity: { actor: { id: 'clerk-2', roles: ['clerk'] }, attributes: { tenant: '2' } } }
+  if (token === TOKENS.thirdClerk) return { ok: true, identity: { actor: { id: 'clerk-3', roles: ['clerk'] }, attributes: { tenant: '3' } } }
   return { ok: false, reason: 'ERR_JWS_INVALID' }
 }
 
@@ -57,17 +58,22 @@ async function verifierFor(demoKey: string | undefined): Promise<IdentityVerifie
 /** The fixture's values, from the run's setup: see `Edges`. */
 export const EDGES = inject('edges')
 
+/** Tenant 3's paged customers and its first order on each engine, from the run's setup: see `Paged`. */
+export const PAGED = inject('paged')
+
 /**
  * The engines every runtime behaviour is proved on (0003), with what each
  * needs to offer update, and the ids of the forms `startPlane({ children: true })`
  * publishes beside the order form: an order's lines, reached through their
  * order (0043); employees, each managed by an employee -- a form that is its
  * own child; and orders by who created and who approved them -- one form
- * twice under one parent, which this clerk may only read.
+ * twice under one parent, which this clerk may only read. `read` is the
+ * order form again, which `startPlane({ paged: true })` publishes for the
+ * clerk to read only (0085).
  */
 export const ENGINES = [
-  { engine: 'PostgreSQL', connection: 'pg', formId: 'pg-order', versionColumn: 'row_version' as string | undefined, lines: 'pg-order-line', employees: 'pg-employee', staff: 'pg-order-staff', parity: 'pg-parity', removable: 'pg-removable' },
-  { engine: 'SQL Server', connection: 'ms', formId: 'ms-order', versionColumn: undefined, lines: 'ms-order-line', employees: 'ms-employee', staff: 'ms-order-staff', parity: 'ms-parity', removable: 'ms-removable' },
+  { engine: 'PostgreSQL', connection: 'pg', formId: 'pg-order', versionColumn: 'row_version' as string | undefined, lines: 'pg-order-line', employees: 'pg-employee', staff: 'pg-order-staff', parity: 'pg-parity', removable: 'pg-removable', read: 'pg-order-read' },
+  { engine: 'SQL Server', connection: 'ms', formId: 'ms-order', versionColumn: undefined, lines: 'ms-order-line', employees: 'ms-employee', staff: 'ms-order-staff', parity: 'ms-parity', removable: 'ms-removable', read: 'ms-order-read' },
 ] as const
 
 /** The keys a delete of an order acts through on the fixture, with their actions: its lines and deliveries, and the deliveries' parcels (0051, 0056). */
@@ -87,6 +93,9 @@ export interface Sent {
   path: string
   headers: Record<string, string>
   body: string | undefined
+  /** The server's status once it answered, and an error's `code`: what a failing test can say it was told. */
+  status?: number
+  code?: string | undefined
 }
 
 export interface Plane {
@@ -96,6 +105,8 @@ export interface Plane {
   sent: Sent[]
   /** The clerk of tenant 1, through a client beside the page: what the database holds, asked by somebody else. */
   clerk: DataClient
+  /** The clerk of tenant 3, whose customers are the paged ones (0085), the same way. */
+  thirdClerk: DataClient
   /**
    * Connections whose database stops answering: opening one fails as a
    * refused socket does, which the server must say as 503 without passing the
@@ -153,6 +164,16 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
 }
 
 
+/** An error answer's `code`, or undefined when its body is not JSON that names one. */
+function codeOf(body: string): string | undefined {
+  try {
+    const { code } = JSON.parse(body) as { code?: unknown }
+    return typeof code === 'string' ? code : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * `app.inject` as a `fetch`, recording what was asked into `sent` when given a
  * list. Every request still being answered is in `pending`: a renderer that
@@ -167,7 +188,8 @@ function injectingFetch(app: Awaited<ReturnType<typeof createDataServer>>, pendi
     const method = (init?.method ?? 'GET').toUpperCase()
     const headers = Object.fromEntries(new Headers(init?.headers).entries())
     const body = typeof init?.body === 'string' ? init.body : undefined
-    sent?.push({ method, url: href, path: url.pathname, headers, body })
+    const entry: Sent = { method, url: href, path: url.pathname, headers, body }
+    sent?.push(entry)
     // A renderer abandons a search when the next keystroke arrives; the
     // browser's fetch then rejects with the signal's reason, and so does this.
     const signal = init?.signal ?? undefined
@@ -176,6 +198,8 @@ function injectingFetch(app: Awaited<ReturnType<typeof createDataServer>>, pendi
     pending.add(answering)
     void answering.finally(() => pending.delete(answering)).catch(() => {})
     const reply = await answering
+    entry.status = reply.statusCode
+    if (reply.statusCode >= 400) entry.code = codeOf(reply.body)
     signal?.throwIfAborted()
     const answered = new Headers()
     for (const [name, value] of Object.entries(reply.headers)) {
@@ -392,9 +416,10 @@ function childForms(engine: Engine, deletes: boolean): Array<{
  * each engine's `parity.removable`, which other rows refer to with NO ACTION
  * and RESTRICT, is published as `removable` of `ENGINES`, on a connection
  * scoped to `parity`. With `demo`, the server also accepts the live demo's
- * tokens, signed with `demoKey` (0070).
+ * tokens, signed with `demoKey` (0070). With `paged`, the order form is
+ * published again as `read` of `ENGINES`, which the clerk may only read.
  */
-export async function startPlane(options: { children?: boolean; deletes?: boolean; demo?: boolean } = {}): Promise<Plane> {
+export async function startPlane(options: { children?: boolean; deletes?: boolean; demo?: boolean; paged?: boolean } = {}): Promise<Plane> {
   const { pg, ms } = inject('databases')
   // 32 random bytes as base64url: the shape of the key a Durable Object starts its container with.
   const demoKey = options.demo === true ? randomBytes(32).toString('base64url') : undefined
@@ -434,26 +459,31 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
   }
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-host-'))
   const store = createFileConfigurationStore(root)
-  // The administrator's trail is the server's suites' subject; here it is required and discarded.
-  const app = await createDataServer({ verifyIdentity: await verifierFor(demoKey), admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  // The administrator's trail is the server's suites' subject; here it is required and discarded. So is the
+  // lookup deadline (0061), which counts a wait for a pooled connection: on CI's runner, beside the other
+  // files, a search past 892 ms was 503 lookup-timeout, so the plane runs with the longest, as 0034's does.
+  const app = await createDataServer({ verifyIdentity: await verifierFor(demoKey), admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store, lookupDeadlineMs: MAX_LOOKUP_DEADLINE_MS } })
 
   const admin = async (url: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> => {
     const reply = await app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${TOKENS.admin}` }, payload })
     if (reply.statusCode >= 300) throw new Error(`${url} answered ${String(reply.statusCode)}: ${reply.body}`)
     return reply.json<Record<string, unknown>>()
   }
-  for (const { connection, formId, versionColumn } of ENGINES) {
-    const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
-      connection,
-      root: { schema: 'sales', name: 'order' },
-      formId,
-      title: 'Order',
-      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
-      ...(versionColumn === undefined ? {} : { versionColumn }),
-    })
-    const base = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
-    const policy: FormPolicy = deletes ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES } : base
-    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+  for (const { connection, formId: order, versionColumn, read } of ENGINES) {
+    for (const formId of options.paged === true ? [order, read] : [order]) {
+      const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
+        connection,
+        root: { schema: 'sales', name: 'order' },
+        formId,
+        title: 'Order',
+        lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+        ...(versionColumn === undefined ? {} : { versionColumn }),
+      })
+      const base = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
+      // `read` the clerk may only read, so a record of it is drawn with every field disabled.
+      const policy: FormPolicy = formId === read ? { ...base, operations: offered(bindings as unknown as Proposed, true) } : deletes ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES } : base
+      await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+    }
   }
   for (const { parity: connection, removable: formId } of deletes ? ENGINES : []) {
     // A table whose key the database numbers, so its version column proves a record (0050); its tenant pinned to the clerk's.
@@ -509,6 +539,7 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
     fetch: injectingFetch(app, pending, sent),
     sent,
     clerk: createDataClient({ token: () => TOKENS.clerk, fetch: injectingFetch(app, pending) }),
+    thirdClerk: createDataClient({ token: () => TOKENS.thirdClerk, fetch: injectingFetch(app, pending) }),
     unreachable,
     lose,
     store,

@@ -25,6 +25,13 @@
 //     on Save; and in an order line opened alone, Tab into the React paper
 //     lands on its Order, a native select, which ArrowDown moves from
 //     nothing to its first order (0066);
+//   - a customer list that goes on (0085): signed in again as tenant 3's
+//     clerk, whose customers are one lookup page and ten more, Tab reaches
+//     each renderer's Customer and Down opens one page with the renderer's
+//     sentence that there are more under it, the keyboard still on the box,
+//     and the paper passes axe -- colour contrast and target size among
+//     it -- while the list is open and saying so, with nothing past either
+//     edge at any width;
 //   - the grids' colours, which axe cannot decide behind AG Grid's painted
 //     layers: a header's and a cell's text against what the browser painted
 //     there, the focused cell's teal border at 3:1 on the open row and on
@@ -109,7 +116,7 @@
 // One module per reason to change, under scripts/browser/: the plane, the
 // server of the built page, the stylesheet's reads, the measurements, the
 // workspace's states, the record's journey, a delete's states, Download
-// CSV's, and the policy's allowance.
+// CSV's, a customer list that goes on, and the policy's allowance.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
 // scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
@@ -130,6 +137,7 @@ import { deleteJourney } from './browser/deleting.mjs'
 import { exportJourney } from './browser/exporting.mjs'
 import { recordJourney } from './browser/journey.mjs'
 import { audit, decide, describeFocus, focusedOn, focusScroll, measureWidth } from './browser/measure.mjs'
+import { moreJourney } from './browser/more.mjs'
 import { startPlane } from './browser/plane.mjs'
 import { DIST, POLICY, serve } from './browser/serve.mjs'
 import { widths } from './browser/styles.mjs'
@@ -232,7 +240,8 @@ async function run(gate, browser) {
         await measured(page, 'Signed out')
 
         const run = { record: await plane.order(2), customer: 9000 + pass, reached }
-        for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run), ...exportJourney(plane, gate, run)]) {
+        // The list that goes on last, since it signs in as another clerk.
+        for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run), ...exportJourney(plane, gate, run), ...moreJourney(plane, gate)]) {
           await act(page)
           await measured(page, state)
         }
@@ -271,7 +280,7 @@ async function run(gate, browser) {
   // A failed check fails the run in recordedPerBrowser, which says so.
   if (gate.failures().length > 0) return
   console.log(
-    `browser checks passed: the host page's workspace, journey, deletes and downloads at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
+    `browser checks passed: the host page's workspace, journey, deletes, downloads and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
   )
 }
 

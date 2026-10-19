@@ -20,6 +20,7 @@
         { "file": "apps/host/src/delete.test.tsx" },
         { "file": "apps/host/src/delete-rows.test.tsx" },
         { "file": "apps/host/src/lookup-controls.test.tsx" },
+        { "file": "apps/host/src/lookup-more.test.tsx" },
         { "file": "apps/examples/src/previews.test.tsx" },
         { "browserGate": "apps/examples" },
         { "browserGate": "apps/host" }

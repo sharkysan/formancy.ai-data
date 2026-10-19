@@ -82,6 +82,8 @@ export {
 export type { SizedReadBack, SizedRow } from './sized.js'
 export { loadSizedCustomers, SIZED_CHUNK_ROWS, verifySizedCustomers } from './sized-load.js'
 export type { SizedLoad, SizedTarget } from './sized-load.js'
+export { insertPaged, PAGED_LATER, PAGED_ORDERS, PAGED_TENANT, pagedCustomers, pagedOrderNotes } from './paged.js'
+export type { PagedCustomer, PagedTarget } from './paged.js'
 export type { ServerAnswer, ServerRecord } from './servers.js'
 // For a suite that starts its own container through startPostgresContainer or
 // startSqlServerContainer and keeps it in a typed variable, without declaring

@@ -241,9 +241,17 @@ A client is its address, so people behind one NAT share a rate-limit
 bucket, and nothing reports a trusted-proxy list too wide or too narrow
 ([0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)).
 
-**The host page.** `hasMore` and `omitted` do not reach the person, the
-server's sentences are English, and "Load the saved record" discards the
-draft ([0029](../decisions/0029-a-host-renders-a-published-form-through-one-client.md)).
+**The host page.** The server's sentences are English, and "Load the
+saved record" discards the draft
+([0029](../decisions/0029-a-host-renders-a-published-form-through-one-client.md)).
+A lookup's list says that more rows match, never how many, and in a
+typeahead it says so only while the list is open, on a line every
+reference theme of formancy 0.6.0 draws the open list over: a screen
+reader hears it, the eye does not
+([0085](../decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)).
+A form the person may only read, chosen with no record open, holds each
+renderer's empty form hidden, whose lookups each ask for their first page
+(found while 0085 was written, and not changed by it).
 A record is never in the page's address, and a reload or a closed tab does
 not ask before leaving unsaved work
 ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).

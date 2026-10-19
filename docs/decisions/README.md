@@ -66,7 +66,7 @@ only enforcement is "we remember" says so plainly.
 | [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042, 0056; extended by 0066 |
 | [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050; extended by 0030, 0051, 0068 |
 | [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted; extended by 0043, 0050 |
-| [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted; narrowed by 0028, 0056; extended by 0044, 0061 |
+| [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted; narrowed by 0028, 0056; extended by 0044, 0061, 0085 |
 | [0013](0013-published-configuration-is-files-with-link-based-swap.md) | Published configuration is files, and compare-and-swap is a hard link | accepted; extended by 0030, 0065; narrowed by 0062 |
 | [0014](0014-host-identity-is-verified-offline.md) | Host identity is a token verified offline, with a pinned algorithm | accepted; extended by 0059 |
 | [0015](0015-a-record-operation-is-one-guarded-statement.md) | A record operation is one guarded statement, canonical in and out, never retried | accepted; narrowed by 0041; extended by 0031, 0043, 0044, 0050, 0079 |
@@ -83,7 +83,7 @@ only enforcement is "we remember" says so plainly.
 | [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted; narrowed by 0040 |
 | [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted; extended by 0049 |
 | [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md) | Row filters, labels and refusals mean the same on both engines | accepted; narrowed by 0067; extended by 0079 |
-| [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047, 0060, 0066; extended by 0032, 0058 |
+| [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047, 0060, 0066, 0085; extended by 0032, 0058 |
 | [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042, 0066; extended by 0062, 0075 |
 | [0031](0031-an-answer-lost-after-a-write-is-unknown.md) | An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here | accepted; extended by 0040, 0041, 0047, 0050, 0053, 0058 |
 | [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md) | A clean install is the composed stack behind one proxy, and CI runs its guide | accepted; extended by 0035, 0037, 0046, 0051, 0059, 0071; narrowed by 0072, 0083 |
@@ -120,7 +120,7 @@ only enforcement is "we remember" says so plainly.
 | [0063](0063-the-default-lookup-deadline-is-outside-the-measured-product.md) | The default lookup deadline is outside the measured product | accepted |
 | [0064](0064-the-first-releases-notes-summarise-the-development-before-it.md) | The first release's notes summarise the development before it | accepted |
 | [0065](0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md) | With publisher roles set, a draft is published only when a publisher who did not submit it approves it, and a restore is one publisher's alone | accepted |
-| [0066](0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md) | A lookup a person can search is generated as a typeahead, and a host draws the control it is given | accepted |
+| [0066](0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md) | A lookup a person can search is generated as a typeahead, and a host draws the control it is given | accepted; extended by 0085 |
 | [0067](0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md) | The adapter suites run on every image of a per-engine matrix, and what the versions disagree on is named | accepted; extended by 0077 |
 | [0068](0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md) | A snapshot records the server it was read from, data-core says whether this release was tested on it, and nothing refuses a server discovery can read | accepted |
 | [0069](0069-the-examples-page-is-served-at-formancy-ai-data-examples.md) | The examples page is served at formancy.ai/data/examples/, by a Worker of its own that Cloudflare deploys from main, under a policy that refuses anything inline | accepted; narrowed by 0072; extended by 0070, 0083 |
@@ -139,6 +139,7 @@ only enforcement is "we remember" says so plainly.
 | [0082](0082-a-sql-server-container-that-never-becomes-ready-says-how-it-ended-and-is-given-no-memory-bound.md) | A SQL Server container that never becomes ready fails its start with how Docker says it ended, and is given no memory bound | accepted |
 | [0083](0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md) | The studio and the host page are served under a Content-Security-Policy each, the examples page's with only what each was measured needing | accepted |
 | [0084](0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md) | A release does not wait for the performance figures to be measured again | accepted |
+| [0085](0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md) | A lookup says when its list goes on, never how long it is | accepted |
 | [0086](0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md) | A failed start of the live demo says why in the Worker's live log | accepted; extended by 0087 |
 | [0087](0087-a-live-demo-start-cloudflare-has-no-instance-for-is-started-again-within-a-minute.md) | A live demo start Cloudflare has no instance for is started again, within a minute | accepted |
 | [0088](0088-the-demo-image-makes-postgresqls-socket-directory-at-every-start-and-the-gate-runs-it-with-run-empty.md) | The demo image makes PostgreSQL's socket directory at every start, and the gate runs it with /run empty, as Cloudflare does | accepted |

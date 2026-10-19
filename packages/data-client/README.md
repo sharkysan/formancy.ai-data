@@ -23,7 +23,7 @@ Apache-2.0 `@formancy/spec` for types only.
 ```ts
 createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, exportRecords, create, update, delete, reconcile, query, resolve }
 isUnknownWrite(outcome) // → whether a create, update or delete's outcome is an UnknownWrite
-lookupSources(client, formId, form, operation | () => operation) // → { [source]: { resolve } }
+lookupSources(client, formId, form, operation | () => operation) // → { [source]: { resolve, maxRows } }
 sourceNames(form)       // → every optionsSource the document names, once each, in document order
 fieldProblems(refusal)  // → { [field]: [sentence, …] }, for engine.applyServerErrors
 ```
@@ -150,6 +150,27 @@ a title, operations or children is `unexpected`.
   `unavailable`, since trying again helps a read by key. A source rejects
   with either, and a renderer shows "could not be loaded". The 499 `abandoned` the server
   answers an abandoned lookup reaches nobody: it is the audit trail's.
+- **A search says whether its list goes on, never how long it is**
+  ([0085](../../docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)).
+  A source answers a search with one page, `{ options, more, withheld }`:
+  `more` exactly when the server read a row past the page, `withheld` the
+  matching rows whose key does not fit a token, which the server counts as
+  `omitted` and cannot offer
+  ([0012](../../docs/decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md)).
+  A label request answers the rows it names, as a list. Each source's
+  `maxRows` is `DEFAULT_MAX_PAGE_SIZE`, the largest page the runtime plane
+  answers a lookup, so a renderer asks for and shows exactly that page.
+  What a control says of it is the renderer's own (formancy.ai 0177): in
+  an open typeahead "Showing the first 50; there are more — keep typing to
+  narrow.", under a plain select "Showing the first 50; there are more
+  than this list can show.", how many matches cannot be chosen here only
+  when the list is complete, and nothing under a closed typeahead or a
+  field a rule disables. formancy 0.6.0's Blueprint theme draws a
+  typeahead's open list over the line its sentence is on, as the other
+  three reference themes' stylesheets place it too, so a sighted person
+  does not read the sentence while the list is open; a screen reader hears
+  it from the line's live region (measured in Chromium and Firefox on
+  2026-10-18).
 - **A write is known only when the data server says what happened**
   ([0031](../../docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
   A record, the server's 502 `unknown-outcome`, a 4xx with a sentence, or a
@@ -247,12 +268,13 @@ to update asks under update's filter without a new application.
   What the browser sends again on its own is answered by the server once per
   write id, in its process only: a copy that reaches another replica is
   applied again.
-- **`hasMore` and `omitted` do not reach the person.** Until formancy
-  0.6.0 a renderer's option contract was a list of `{ value, label }`, as
-  read at 0.3.0 on 2026-10-09 and unchanged at 0.4.0 and 0.5.0. From 0.6.0
-  a source may answer a page, `{ options, more, withheld }`, and
-  `lookupSources` still answers a list, so a list of exactly one page looks
-  complete. A typeahead keeps narrowing; a plain select does not.
+- **No total.** A search's page says that more rows match, never how
+  many: the server reads one row past the page rather than counting
+  (0012), and since formancy 0.6.0 a renderer refuses a page that names a
+  total, as a source that failed. Until 0.6.0 a renderer's option contract
+  was a list of `{ value, label }`, so a list of exactly one page looked
+  complete. Past the page a typeahead narrows as the person types; a plain
+  select cannot, and says so.
 - **Its types are `@formancy/spec` 0.6.0's.** `PublishedForm.form` is the
   `FormSchema` of the `@formancy/spec` this package pins exactly (0002), and
   there `specVersion` may be `"4"`, so a host whose engine is

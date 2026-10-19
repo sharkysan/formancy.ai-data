@@ -89,10 +89,15 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > Content-Security-Policy each, which their browser gates hold in every
 > browser, where 0.1.0's nginx sends none
 > ([0083](./docs/decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md));
-> and a release no longer held until the performance figures are measured
+> a release no longer held until the performance figures are measured
 > again, so the performance page may describe an earlier version, which
 > its *When and on what* and that version's changelog section name
-> ([0084](./docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)),
+> ([0084](./docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md));
+> and a lookup that says when its list goes on past its page, never how
+> long it is -- seen under a plain select, heard from an open typeahead's
+> status line, which the open list covers -- where 0.1.0's lists of one
+> page look complete
+> ([0085](./docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)),
 > as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
 > *What it does* links the decision record whose **Verified by** names
 > what fails when the line stops being true. Not yet: a figure on the performance page for a
@@ -273,6 +278,11 @@ until then the address is formancy.ai's 404
   would show a binary or unsupported column, which no label can spell, is
   refused before it is published
   ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
+  It says when its list goes on, never how long it is, and when matching
+  rows cannot be chosen here: under a plain select, where it is seen, and
+  from an open typeahead's status line, which formancy 0.6.0's themes draw
+  the open list over, so a screen reader hears it and the eye does not
+  ([0085](./docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)).
 - **Every write is one guarded statement.** A stale save is refused instead
   of overwriting
   ([0015](./docs/decisions/0015-a-record-operation-is-one-guarded-statement.md));
