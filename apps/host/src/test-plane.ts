@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient } from '@formancy/data-client'
-import { applyPresentation, EMPTY_PRESENTATION } from '@formancy/data-core'
+import { applyPresentation, EMPTY_PRESENTATION, MAX_LOOKUP_DEADLINE_MS } from '@formancy/data-core'
 import type { FieldBinding, FormBindings, FormPolicy, PresentationOverrides } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, createIdentityVerifier, DRIVER_FACTORIES } from '@formancy/data-server'
@@ -459,8 +459,10 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
   }
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-host-'))
   const store = createFileConfigurationStore(root)
-  // The administrator's trail is the server's suites' subject; here it is required and discarded.
-  const app = await createDataServer({ verifyIdentity: await verifierFor(demoKey), admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  // The administrator's trail is the server's suites' subject; here it is required and discarded. So is the
+  // lookup deadline (0061), which counts a wait for a pooled connection: on CI's runner, beside the other
+  // files, a search past 892 ms was 503 lookup-timeout, so the plane runs with the longest, as 0034's does.
+  const app = await createDataServer({ verifyIdentity: await verifierFor(demoKey), admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store, lookupDeadlineMs: MAX_LOOKUP_DEADLINE_MS } })
 
   const admin = async (url: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> => {
     const reply = await app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${TOKENS.admin}` }, payload })
