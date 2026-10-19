@@ -93,6 +93,9 @@ export interface Sent {
   path: string
   headers: Record<string, string>
   body: string | undefined
+  /** The server's status once it answered, and an error's `code`: what a failing test can say it was told. */
+  status?: number
+  code?: string | undefined
 }
 
 export interface Plane {
@@ -161,6 +164,16 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
 }
 
 
+/** An error answer's `code`, or undefined when its body is not JSON that names one. */
+function codeOf(body: string): string | undefined {
+  try {
+    const { code } = JSON.parse(body) as { code?: unknown }
+    return typeof code === 'string' ? code : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * `app.inject` as a `fetch`, recording what was asked into `sent` when given a
  * list. Every request still being answered is in `pending`: a renderer that
@@ -175,7 +188,8 @@ function injectingFetch(app: Awaited<ReturnType<typeof createDataServer>>, pendi
     const method = (init?.method ?? 'GET').toUpperCase()
     const headers = Object.fromEntries(new Headers(init?.headers).entries())
     const body = typeof init?.body === 'string' ? init.body : undefined
-    sent?.push({ method, url: href, path: url.pathname, headers, body })
+    const entry: Sent = { method, url: href, path: url.pathname, headers, body }
+    sent?.push(entry)
     // A renderer abandons a search when the next keystroke arrives; the
     // browser's fetch then rejects with the signal's reason, and so does this.
     const signal = init?.signal ?? undefined
@@ -184,6 +198,8 @@ function injectingFetch(app: Awaited<ReturnType<typeof createDataServer>>, pendi
     pending.add(answering)
     void answering.finally(() => pending.delete(answering)).catch(() => {})
     const reply = await answering
+    entry.status = reply.statusCode
+    if (reply.statusCode >= 400) entry.code = codeOf(reply.body)
     signal?.throwIfAborted()
     const answered = new Headers()
     for (const [name, value] of Object.entries(reply.headers)) {

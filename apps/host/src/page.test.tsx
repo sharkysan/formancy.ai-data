@@ -314,12 +314,21 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
   // held with the list open and the sentence said -- waited for, so axe
   // runs on that state (watched failing with the client's source answering
   // a search with a list, as it did before 0085: the sentence never came).
+  // Where the sentence does not come, the failure names each lookup search
+  // the page sent and what the server answered it: CI met an Angular list
+  // that said its source failed, which no run here reproduced.
   test('passes the floor with a customer list open that says there are more', async () => {
     const more = createFormText({ locale: '' })('options.more', { count: DEFAULT_MAX_PAGE_SIZE })
+    const from = plane.sent.length
+    const searches = () =>
+      plane.sent
+        .slice(from)
+        .filter((sent) => sent.path.includes('/lookups/') && sent.path.endsWith('/query'))
+        .map((sent) => ({ body: sent.body, status: sent.status, code: sent.code }))
     const user = await openForm(plane, formId, TOKENS.thirdClerk)
     for (const renderer of RENDERERS) {
       await user.click(within(paper(renderer)).getByRole('combobox', { name: 'Customer' }))
-      await waitFor(() => expect({ renderer, statuses: statuses(renderer) }).toEqual({ renderer, statuses: expect.arrayContaining([more]) as unknown }), { timeout: 15_000 })
+      await waitFor(() => expect({ renderer, statuses: statuses(renderer), searches: searches() }).toEqual({ renderer, statuses: expect.arrayContaining([more]) as unknown, searches: expect.anything() as unknown }), { timeout: 15_000 })
       expect(await floor(`${renderer}'s customer list, saying there are more`)).toEqual(CLEAN(`${renderer}'s customer list, saying there are more`))
     }
   })
