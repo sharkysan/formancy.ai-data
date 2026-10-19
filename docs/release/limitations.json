@@ -2281,7 +2281,7 @@
       ]
     },
     "0070": {
-      "reviewed": "sha256:2477a5865e258db779555fcc2666648984dd38c7f28fef7f35a547380d13546c",
+      "reviewed": "sha256:e5fc753382537f66ebbc67e0c0aa5b9a68d59e2d3d7dbab4efa8abcbc02c47ce",
       "limitations": [
         {
           "area": "operations",
@@ -2793,7 +2793,7 @@
       ]
     },
     "0087": {
-      "reviewed": "sha256:f5a5626307572a99d860c8edb3490873b7c6aab89494dfa2886f65ba393d4847",
+      "reviewed": "sha256:0bca6d1dde4c15aa21b6bb2b456720f143958ba641103d0b3658dd2a76581ce0",
       "limitations": [
         {
           "area": "operations",
@@ -2808,6 +2808,10 @@
           "says": "A live demo start Cloudflare has no instance for is told by an undocumented sentence of Cloudflare's; reworded, such a start is said as a failed container and not started again."
         }
       ]
+    },
+    "0088": {
+      "reviewed": "sha256:d4b02cdcac61d225947860b0fbfb0dd80f840dbd1a871a8ffac18c26e98c7f1c",
+      "none": "A fix of the demo image's start and of the gate's fidelity to Cloudflare: nothing a visitor or an operator meets. What else Cloudflare's VM starts differently from Docker is 0070's cost that the Durable Object's code and the image on Cloudflare are read after a deploy."
     }
   }
 }

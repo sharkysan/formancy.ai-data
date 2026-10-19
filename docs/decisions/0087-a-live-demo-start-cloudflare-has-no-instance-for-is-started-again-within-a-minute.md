@@ -1,6 +1,6 @@
 # 0087 — A live demo start Cloudflare has no instance for is started again, within a minute
 
-- **Status:** accepted
+- **Status:** accepted; the first sign-in after it said the container exited 1 at once, not that Cloudflare had no instance, which [0088](0088-the-demo-image-makes-postgresqls-socket-directory-at-every-start-and-the-gate-runs-it-with-run-empty.md) found and fixed
 - **Date:** 2026-10-19
 - **Deciders:** Daniel Bacher
 - **Verified by:**

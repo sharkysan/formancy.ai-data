@@ -914,6 +914,16 @@ encrypt is now refused before its login is sent (0081, under *Fixed*).
   and a running visitor's Durable Object is held from eviction while its
   container runs, up to 15 minutes. Whether no instance was the cause the
   next sign-in's line says.
+- **The live demo's container starts on Cloudflare**
+  ([0088](docs/decisions/0088-the-demo-image-makes-postgresqls-socket-directory-at-every-start-and-the-gate-runs-it-with-run-empty.md)).
+  With 0087 deployed, the next sign-in's line said what had happened every
+  time: the container exited with code 1 within 250 ms. Cloudflare starts
+  it with `/run` empty, where Docker keeps the image's, and PostgreSQL's
+  socket directory, made under `/run` when the image was built, was gone,
+  so PostgreSQL refused to start ("could not create lock file"), which
+  the same image does under Docker with `--tmpfs /run`. `start.sh` now
+  makes the directory at every start, and the gate runs every container
+  with `/run` empty, as Cloudflare does.
 
 ### Fixed
 
