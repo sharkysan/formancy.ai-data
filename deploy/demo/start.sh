@@ -10,6 +10,12 @@
 # outlives it.
 set -eu
 
+# PostgreSQL's socket directory, which build.sh made under /run: Cloudflare
+# starts the container with /run empty, and PostgreSQL then exits at once,
+# "could not create lock file", so the container did (0088).
+mkdir -p /run/postgresql
+chown postgres:postgres /run/postgresql
+
 gosu postgres pg_ctl -D "$PGDATA" -w -s start
 
 # A new password for the demo's account, known to this start alone: in the

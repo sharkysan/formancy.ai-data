@@ -391,7 +391,11 @@ which `wrangler tail` shows and nothing keeps
 The Durable Object listens to `monitor()` after each start, starts again
 a start Cloudflare has no instance for, and gives a start 60 s; a start
 that answers says how long it took
-([0087](../decisions/0087-a-live-demo-start-cloudflare-has-no-instance-for-is-started-again-within-a-minute.md)). 0070 does the sums and names the rest.
+([0087](../decisions/0087-a-live-demo-start-cloudflare-has-no-instance-for-is-started-again-within-a-minute.md)).
+Cloudflare starts the container with `/run` empty, where Docker keeps the
+image's, so the image makes PostgreSQL's socket directory at every start
+and the gate runs it with `/run` empty too
+([0088](../decisions/0088-the-demo-image-makes-postgresqls-socket-directory-at-every-start-and-the-gate-runs-it-with-run-empty.md)). 0070 does the sums and names the rest.
 
 ## Configuration
 

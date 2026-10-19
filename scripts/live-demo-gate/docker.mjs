@@ -64,6 +64,10 @@ export function runArguments({ image, name, port, quota, variables }) {
     quota.swap,
     '--publish',
     `127.0.0.1::${String(port)}`,
+    // Cloudflare's VM starts the container with /run empty, where Docker
+    // keeps the image's (0088).
+    '--tmpfs',
+    '/run',
     ...variables.flatMap((variable) => ['--env', variable]),
     image,
   ]

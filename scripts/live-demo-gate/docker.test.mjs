@@ -66,6 +66,15 @@ describe('the docker run of a visitor’s container', () => {
     expect(() => runArguments({ image: 'i', name: 'n', port: 1, quota: quotaOf('basic'), variables: ['FORMANCY_DATA_DEMO_IDENTITY_SECRET=k'] })).toThrow(/a variable's name, never its value/)
   })
 
+  // Cloudflare's VM starts the container with an empty /run, where
+  // Docker keeps the image's: PostgreSQL's socket directory, made by the
+  // image's build under /run, was gone on Cloudflare, and every start
+  // exited 1 within a quarter of a second (0088). Run so here, the gate
+  // meets what Cloudflare does.
+  test('runs with an empty /run, as Cloudflare starts it', () => {
+    expect(arguments_[arguments_.indexOf('--tmpfs') + 1]).toBe('/run')
+  })
+
   // Cloudflare runs linux/amd64 images only; a port published beyond
   // loopback would put a visitor's server on this machine's network.
   test('runs linux/amd64 under the quota, its port on loopback only, the image last', () => {
