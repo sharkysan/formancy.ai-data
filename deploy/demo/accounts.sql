@@ -15,6 +15,9 @@
 -- * the customer form offers create and no update or delete, because the
 --   table has no version column the generator could prove an update by: so
 --   no UPDATE or DELETE on customer;
+-- * a customer's created_at is the database's, from its default: INSERT on
+--   every column but that one, so the form shows when a customer was
+--   created and no visitor can say it (0089);
 -- * an order's lines, deliveries and their parcels are deleted by the
 --   cascades of a delete of the order or the delivery, and a delete that
 --   reaches a table is held to this account's DELETE on it (0049): hence
@@ -44,6 +47,7 @@ grant update (carrier, shipped_at, row_version) on sales.delivery to formancy_de
 
 grant select, delete on sales.parcel to formancy_demo;
 
-grant select, insert on sales.customer to formancy_demo;
+grant select on sales.customer to formancy_demo;
+grant insert (tenant_id, customer_no, name, country_code, credit_limit, active) on sales.customer to formancy_demo;
 
 grant select on sales.employee, sales.country to formancy_demo;

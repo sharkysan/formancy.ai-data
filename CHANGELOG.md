@@ -954,6 +954,15 @@ encrypt is now refused before its login is sent (0081, under *Fixed*).
   the same image does under Docker with `--tmpfs /run`. `start.sh` now
   makes the directory at every start, and the gate runs every container
   with `/run` empty, as Cloudflare does.
+- **A live demo visitor can no longer say when a customer was created**
+  ([0089](docs/decisions/0089-the-live-demos-account-may-not-write-when-a-customer-was-created.md)).
+  The customer form offered "Created at" on create, because the demo
+  account could INSERT every column of `sales.customer`, and what the
+  account may do is what the form offers (0027). It may now INSERT every
+  column but `created_at`: the form shows it disabled, the server refuses
+  a create that sends it, and the column's default writes it. The
+  generator is unchanged; a deployment that wants the same for its own
+  table grants it the same way.
 
 ### Fixed
 
