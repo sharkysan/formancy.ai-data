@@ -216,6 +216,25 @@ describe("a clerk's day on the demo's data", () => {
     }
   })
 
+  // When a customer was created is the database's to say, by the column's
+  // default. With INSERT on the whole table the generator offers it on
+  // create, and a visitor could backdate a new customer by a decade.
+  test("stamps a new customer's creation in the database, and refuses one a clerk sends", async () => {
+    const clara = as('clara')
+    const opened = (await call(clara, '/v1/forms/customer')).json as OpenedForm
+    expect(opened.form.logic?.rules).toContainEqual({ target: 'created_at', kind: 'disabled', cel: 'true' })
+    const customerNo = Math.max(...data.customers.map((customer) => customer.customerNo)) + 1
+    const answers = { customer_no: customerNo, name: 'Created Here AG', active: true }
+    const backdated = await write(clara, '/v1/forms/customer/records/create', { answers: { ...answers, created_at: '2016-10-01T00:00:00Z' } })
+    expect(backdated.status).toBe(403)
+    expect(backdated.json).toMatchObject({ code: 'over-posting' })
+    const before = Date.now()
+    const created = await write(clara, '/v1/forms/customer/records/create', { answers })
+    expect(created.status, JSON.stringify(created.json)).toBe(201)
+    const read = await call(clara, '/v1/forms/customer/records/read', { record: created.json.record })
+    expect(Math.abs(Date.parse(read.json.answers.created_at as string) - before)).toBeLessThan(60_000)
+  })
+
   // The journey the page offers, end to end through the demo account's
   // grants: an order for one of the clerk's customers, a line and a
   // delivery under it -- each found as the order's child -- a change, and

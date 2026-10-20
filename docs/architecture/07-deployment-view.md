@@ -396,6 +396,10 @@ Cloudflare starts the container with `/run` empty, where Docker keeps the
 image's, so the image makes PostgreSQL's socket directory at every start
 and the gate runs it with `/run` empty too
 ([0088](../decisions/0088-the-demo-image-makes-postgresqls-socket-directory-at-every-start-and-the-gate-runs-it-with-run-empty.md)). 0070 does the sums and names the rest.
+What the demo's forms offer is what `deploy/demo/accounts.sql` grants its
+account, column by column where a column is the database's to write: a
+customer's `created_at` is shown and never written by a visitor
+([0089](../decisions/0089-the-live-demos-account-may-not-write-when-a-customer-was-created.md)).
 
 ## Configuration
 

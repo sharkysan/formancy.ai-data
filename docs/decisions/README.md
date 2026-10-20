@@ -143,3 +143,4 @@ only enforcement is "we remember" says so plainly.
 | [0086](0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md) | A failed start of the live demo says why in the Worker's live log | accepted; extended by 0087 |
 | [0087](0087-a-live-demo-start-cloudflare-has-no-instance-for-is-started-again-within-a-minute.md) | A live demo start Cloudflare has no instance for is started again, within a minute | accepted |
 | [0088](0088-the-demo-image-makes-postgresqls-socket-directory-at-every-start-and-the-gate-runs-it-with-run-empty.md) | The demo image makes PostgreSQL's socket directory at every start, and the gate runs it with /run empty, as Cloudflare does | accepted |
+| [0089](0089-the-live-demos-account-may-not-write-when-a-customer-was-created.md) | The live demo's account may not write when a customer was created | accepted |
