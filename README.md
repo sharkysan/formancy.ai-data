@@ -21,99 +21,54 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 
 <!-- end generated -->
 
-> **Status: 0.1.0, the first release.** On `main` since it, and not yet
-> released: publication under review
-> ([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)),
-> which a 0.1.0 server does not have and whose setting it ignores; a
-> lookup a person can search generated as a typeahead
+> **Status: 0.2.0, the second release.** Over 0.1.0 it adds publication
+> a second person reviews, once publisher roles are set
+> ([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md));
+> a lookup a person can search generated as a typeahead
 > ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)),
-> which a form published at 0.1.0 does not carry until it is regenerated
-> and published again; the adapter suites on every image of each engine's
-> matrix, which [*What it is tested on*](#what-it-is-tested-on) names
-> ([0067](./docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md));
-> a snapshot that records the server it was read from, with a SQL Server
-> older than 2019 refused at discovery and its release named
-> ([0068](./docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md));
-> the examples page served at https://formancy.ai/data/examples/, under a
-> strict Content-Security-Policy, which Cloudflare deploys from `main` and
-> not from a release
-> ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md));
-> the rate limit and the log counting each client by the address a
-> proxy the operator names forwarded, which the composed stack sets for its
-> nginx and the Cloudflare overlay's cloudflared, where a 0.1.0 server
-> counts everybody behind a proxy as one
-> ([0071](./docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md));
-> the studio, the host page and the examples page serving their fonts
-> from their own build, so that no page asks Google or any other host for
-> anything, where 0.1.0's pages ask Google for theirs
-> ([0072](./docs/decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md));
-> a field moved to another generated section in the studio, which a
-> 0.1.0 server refuses to read or import
-> ([0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md));
-> the release saying, where 0.1.0 said nothing, that no test runs on Azure SQL
-> Database or Azure SQL Managed Instance, which
-> [*What it is tested on*](#what-it-is-tested-on) and the release's
-> register both name as not tested
-> ([0073](./docs/decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md));
-> on PostgreSQL 18, a NOT NULL added NOT VALID read as a nullable
-> column with an unvalidated check, which a 0.1.0 server reads as NOT NULL
-> though rows older than it may hold NULL
-> ([0077](./docs/decisions/0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md));
-> on PostgreSQL, a lookup or a record statement after one stopped
-> part-way on its connection answering as it would have, where a 0.1.0
-> server can answer that lookup `unavailable` and refuse that read
-> ([0078](./docs/decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md));
-> the [live demo](#live-demo) at https://formancy.ai/data/demo/,
-> main's server and PostgreSQL in a Cloudflare Container of each visitor's
-> own, which Cloudflare deploys from `main` once its Worker is created and
-> not from a release
-> ([0070](./docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md));
-> a form's records downloaded as one CSV file, made whole or refused,
-> which a 0.1.0 server does not have
-> ([0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md));
+> which says when its list goes on, never how long it is
+> ([0085](./docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md));
+> a form's records downloaded as one CSV file, made whole or refused, from
+> the host page's Records panel and each child section
+> ([0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md),
+> [0080](./docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md));
 > a SQL Server connection that logs in as an Entra managed identity or
-> service principal, which the server says at start no test logs in as,
-> with every allowlist entry refusing a key it does not read, where
-> a 0.1.0 server ignores those keys and refuses an Entra entry for want of
-> a user and a password
+> service principal, which no test logs in as
 > ([0074](./docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md));
-> a SQL login that asks for TLS refused, before its login is sent,
-> when whoever answers in the server's place says it will not encrypt,
-> where a 0.1.0 server sends that login, its password in it, unencrypted
+> a SQL login that asks for TLS refused, before its login is sent, when
+> whoever answers in the server's place says it will not encrypt, where
+> 0.1.0 sends that login, its password in it, unencrypted
 > ([0081](./docs/decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md));
-> the host page's Download CSV, in the head of the Records panel and
-> of each child section, which saves the CSV file of what the grid lists
-> through the browser and needs a server that makes it
-> ([0080](./docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md));
-> the composed stack's studio and host page served under a
-> Content-Security-Policy each, which their browser gates hold in every
-> browser, where 0.1.0's nginx sends none
-> ([0083](./docs/decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md));
-> a release no longer held until the performance figures are measured
-> again, so the performance page may describe an earlier version, which
-> its *When and on what* and that version's changelog section name
-> ([0084](./docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md));
-> and a lookup that says when its list goes on past its page, never how
-> long it is -- seen under a plain select, heard from an open typeahead's
-> status line, which the open list covers -- where 0.1.0's lists of one
-> page look complete
-> ([0085](./docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)),
-> as [`CHANGELOG.md`](./CHANGELOG.md)'s *Unreleased* says. Each line under
-> *What it does* links the decision record whose **Verified by** names
-> what fails when the line stops being true. Not yet: a figure on the performance page for a
-> page of records, a file of them, the menu of forms or a delete, a host
-> page that draws a field an update may not write as read-only
-> ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong)),
-> a host page on another origin run in a browser, a run through a real
-> Cloudflare tunnel, anything that reads what Cloudflare sends at the
-> examples page's address, which was read by hand once, on 2026-10-16,
-> a sign-in to the live demo on Cloudflare, whose Worker answers since
-> 2026-10-19 and whose every start failed that day, now said in its live
-> log
-> ([0086](./docs/decisions/0086-a-failed-start-of-the-live-demo-says-why-in-the-workers-live-log.md)),
-> and a licence a lawyer has reviewed.
-> [`CHANGELOG.md`](./CHANGELOG.md) says what the release contains and what
-> each step before it found.
+> and the adapter suites on every image of each engine's matrix, with a
+> snapshot that records the server it was read from and a SQL Server older
+> than 2019 refused at discovery
+> ([0067](./docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md),
+> [0068](./docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
+> [`CHANGELOG.md`](./CHANGELOG.md)'s 0.2.0 section says what else changed,
+> what to do when upgrading from 0.1.0, and what is knowingly missing; its
+> *Unreleased* says what is on `main` since. The examples page at
+> https://formancy.ai/data/examples/
+> ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md))
+> and the [live demo](#live-demo) at https://formancy.ai/data/demo/
+> ([0070](./docs/decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md))
+> are deployed by Cloudflare from `main`, not from a release. Each line
+> under *What it does* links the decision record whose **Verified by**
+> names what fails when the line stops being true. Not yet: performance
+> figures measured on this release -- [the performance page](./docs/performance.md)
+> describes 0.1.0
+> ([0084](./docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md))
+> -- and any for a page of records, a file of them, the menu of forms or a
+> delete; a host page that draws a field an update may not write as
+> read-only
+> ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong));
+> a host page on another origin run in a browser; a run through a real
+> Cloudflare tunnel; anything that reads what Cloudflare sends at the
+> examples page's address, which was read by hand once, on 2026-10-16, or
+> a sign-in to the live demo on Cloudflare, which was read by hand on
+> 2026-10-19, its start answering after 1778 ms
+> ([0088](./docs/decisions/0088-the-demo-image-makes-postgresqls-socket-directory-at-every-start-and-the-gate-runs-it-with-run-empty.md));
+> a test that logs in as an Entra principal; and a licence a lawyer has
+> reviewed.
 
 ## Try it
 
@@ -158,7 +113,7 @@ until then the address is formancy.ai's 404
   [0007](./docs/decisions/0007-sqlserver-discovery-and-what-it-hides.md),
   [0027](./docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md),
   [0049](./docs/decisions/0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md)).
-  Unreleased, not in 0.1.0: a snapshot records which server it was read
+  Since 0.2.0, not in 0.1.0: a snapshot records which server it was read
   from -- the product, the major version and, on SQL Server, the database's
   compatibility level -- from which `@formancy/data-core` says whether this
   release was tested on that server, never taking Azure SQL Database for
@@ -180,7 +135,7 @@ until then the address is formancy.ai's 404
   token alone. No test logs in as either: the server says so at start for
   each such connection, and [*What it is tested on*](#what-it-is-tested-on)
   says so in a row of its own ([0074](./docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
-  Unreleased, not in 0.1.0: a SQL login that asks for TLS keeps TDS 7's,
+  Since 0.2.0, not in 0.1.0: a SQL login that asks for TLS keeps TDS 7's,
   which every image of the matrix takes, and is refused before its login
   is sent when the server's first answer says it will not encrypt, as
   MS-TDS says a client ends such a connection; a 0.1.0 server sends the
@@ -238,7 +193,7 @@ until then the address is formancy.ai's 404
   same connection name, and refused when the target database's drift blocks
   it, as a restore is
   ([0062](./docs/decisions/0062-a-published-version-moves-between-deployments-as-its-version-file.md)).
-- **Can have a second person approve publication**, unreleased: not in
+- **Can have a second person approve publication**, since 0.2.0: not in
   0.1.0. With `FORMANCY_DATA_PUBLISHER_ROLES` set, nobody publishes or imports a
   version alone: an administrator submits a draft, which the server keeps,
   and a publisher who did not submit it approves it, which checks it again
@@ -405,7 +360,7 @@ until then the address is formancy.ai's 404
 - **Every CI run ends in a report** of what it was tested on, which a release
   signs and attaches
   ([0035](./docs/decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)),
-  and on `main` since 0.1.0 it holds every shared case on every image of
+  and since 0.2.0 it holds every shared case on every image of
   each engine's matrix, failing a run in which one is missing or failed on
   any of them
   ([0067](./docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md));

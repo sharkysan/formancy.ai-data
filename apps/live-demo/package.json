@@ -1,6 +1,6 @@
 {
   "name": "@formancy/data-live-demo",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "The live master-detail demo's own code: the sample sales data its database is loaded with, generated from a fixed seed; the personas a visitor signs in as and the tokens signed for them; the forms its image publishes at build time; and the Worker that starts each visitor's own server on Cloudflare and forwards the page's requests to it. Never published.",
   "license": "SEE LICENSE IN LICENSE.md",

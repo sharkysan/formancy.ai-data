@@ -1,6 +1,6 @@
 {
   "name": "@formancy/data-fixtures",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "One business model written for PostgreSQL and SQL Server, the containers that load it, and the comparator every adapter is held to. Test support; never published.",
   "license": "SEE LICENSE IN LICENSE.md",

@@ -1,6 +1,6 @@
 {
   "name": "@formancy/data-client",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The browser's side of Formancy Data's runtime plane: a fetch-based client for a published form's records and lookups, and option sources both formancy renderers take. Framework-neutral, no Node.",
   "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",

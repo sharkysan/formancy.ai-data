@@ -10,6 +10,84 @@ later.
 
 ## Unreleased
 
+## 0.2.0 — 2026-10-20
+
+**The second release of Formancy Data.** Publication can be reviewed by a
+second person; a person can download a list's records as one CSV file; a
+lookup a person can search is a typeahead, and a lookup says when its list
+goes on; SQL Server may be reached as a Microsoft Entra principal and is
+tested from 2019 to 2025; and a SQL login that asked for TLS is no longer
+sent to a server that answers it will not encrypt, which 0.1.0 did. Built
+on formancy's `@formancy/*` packages at 0.6.0.
+
+### Get it
+
+- **Server image:** `ghcr.io/sharkysan/formancy-data-server:v0.2.0`,
+  signed, with its SBOM attached. There is no `latest` tag.
+- **npm packages, with provenance:** `@formancy/data-core`,
+  `@formancy/data-postgres`, `@formancy/data-sqlserver`,
+  `@formancy/data-server` and `@formancy/data-client`, all at 0.2.0.
+- **Try it on your machine:** the
+  [getting-started guide](https://github.com/sharkysan/formancy.ai-data/blob/v0.2.0/docs/getting-started.md)
+  starts both databases, the server, the studio and a host page with one
+  command. CI runs it as written.
+
+### Upgrade from 0.1.0
+
+- **Upgrade if you connect to SQL Server with TLS on.** 0.1.0 sent the
+  login, its password in it, unencrypted when whoever answered in SQL
+  Server's place said it would not encrypt; 0.2.0 refuses before the login
+  is sent
+  ([0081](https://github.com/sharkysan/formancy.ai-data/blob/v0.2.0/docs/decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)).
+- **The connection allowlist refuses a key it does not read**, and the
+  server does not start until it is removed; it names the key
+  ([0074](https://github.com/sharkysan/formancy.ai-data/blob/v0.2.0/docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
+- **A SQL Server older than 2019 is refused at discovery**, in a sentence
+  that says which release it is
+  ([0068](https://github.com/sharkysan/formancy.ai-data/blob/v0.2.0/docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
+- **A form published at 0.1.0 keeps plain selects** for its lookups until
+  it is regenerated in the studio's Drift step and published again, and
+  0.2.0's import refuses a version file exported from 0.1.0
+  ([0066](https://github.com/sharkysan/formancy.ai-data/blob/v0.2.0/docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
+  A 0.1.0 server refuses to read a version in which a field was moved to
+  another section.
+- **Nothing is reviewed until you set publisher roles**, and nobody's
+  forwarded address is believed until you name trusted proxies: both
+  settings are new, and unset, a server behaves as 0.1.0 did
+  ([0065](https://github.com/sharkysan/formancy.ai-data/blob/v0.2.0/docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md),
+  [0071](https://github.com/sharkysan/formancy.ai-data/blob/v0.2.0/docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)).
+- **For embedders**, under *Changed* below: `ConfigurationStore` has
+  `drafts()`; `ConnectionConfig`'s `user` and `password` are optional;
+  `ServerIdentity` extends `ServerFacts`; `DriftKind` has
+  `server-untested`; and a `LookupSource` answers a search with a page and
+  has `maxRows`.
+
+### Known gaps
+
+- **A typeahead's "there are more" is heard, not seen.** formancy 0.6.0's
+  themes draw the open list over the line that says it, so a screen reader
+  hears it and the eye does not; a plain select's is seen
+  ([0085](https://github.com/sharkysan/formancy.ai-data/blob/v0.2.0/docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)).
+- **The performance figures are 0.1.0's.**
+  [The performance page](https://github.com/sharkysan/formancy.ai-data/blob/v0.2.0/docs/performance.md)
+  was measured on 2026-10-15 at commit `2e0c4071e113`, and this release's
+  measured code, its tedious and its `@formancy/spec` differ from what it
+  ran; the default lookup deadline, 892 ms, is still derived from those
+  figures
+  ([0084](https://github.com/sharkysan/formancy.ai-data/blob/v0.2.0/docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)).
+- **No test logs in as an Entra principal**; the login is built and its
+  settings checked, and a SQL login is what the suites use.
+- The licence has not been reviewed by a lawyer.
+- As in 0.1.0: no performance figures for listing records, the menu of
+  forms, a delete or a CSV export; a host page on another origin is not
+  run in a browser; the Cloudflare guide is checked offline; and the host
+  page does not yet show a field that an update may not write as
+  read-only.
+
+The release report attached below says what this release was tested on.
+Its *Known limitations* section lists every limitation the decision records
+name, one sentence each. Everything below says what changed and why.
+
 ### Added
 
 - **A second person can review publication.** Until now one administrator
