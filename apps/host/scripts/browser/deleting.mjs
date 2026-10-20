@@ -127,8 +127,13 @@ async function notDeleted(page, { plane, check, run, notes }) {
 
 /** Deleted beside the page first, while its row is still listed: the server's 404. */
 async function cannotFind(page, { plane, check, run }) {
+  // Loading the saved record lists the grid again, as its version moved
+  // (form-view.tsx). Removed before that list was answered, the row is gone
+  // from the grid too, and nothing is left to press: once on CI, 2026-10-20.
+  const listed = page.waitForResponse((response) => response.request().method() === 'POST' && /\/records\/list$/.test(new URL(response.url()).pathname))
   await page.getByRole('region', { name: 'Not deleted', exact: true }).getByRole('button', { name: 'Load the saved record', exact: true }).click()
   await page.getByRole('region', { name: `Order ${run.kept}`, exact: true }).getByRole('status').filter({ hasText: 'Loaded record' }).waitFor(WITHIN)
+  await listed
   // Deleted beside the page first, while its row is still listed: the server's 404.
   await plane.remove(run.gone)
   await until(async () => (await row(page, run.gone.slice(3)).count()) === 1, 'the deleted row was no longer listed, so its Delete cannot be pressed')
