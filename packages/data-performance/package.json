@@ -1,6 +1,6 @@
 {
   "name": "@formancy/data-performance",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Measures the shipped data server through @formancy/data-client against a sized customer table on PostgreSQL and SQL Server, and renders docs/performance.md from what it measured. Never published.",
   "license": "SEE LICENSE IN LICENSE.md",
