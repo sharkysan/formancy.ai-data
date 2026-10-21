@@ -21,31 +21,18 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 
 <!-- end generated -->
 
-> **Status: 0.2.0, the second release.** Over 0.1.0 it adds publication
-> a second person reviews, once publisher roles are set
-> ([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md));
-> a lookup a person can search generated as a typeahead
-> ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)),
-> which says when its list goes on, never how long it is
-> ([0085](./docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md));
-> a form's records downloaded as one CSV file, made whole or refused, from
-> the host page's Records panel and each child section
-> ([0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md),
-> [0080](./docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md));
-> a SQL Server connection that logs in as an Entra managed identity or
-> service principal, which no test logs in as
-> ([0074](./docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md));
-> a SQL login that asks for TLS refused, before its login is sent, when
-> whoever answers in the server's place says it will not encrypt, where
-> 0.1.0 sends that login, its password in it, unencrypted
-> ([0081](./docs/decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md));
-> and the adapter suites on every image of each engine's matrix, with a
-> snapshot that records the server it was read from and a SQL Server older
-> than 2019 refused at discovery
-> ([0067](./docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md),
-> [0068](./docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
-> [`CHANGELOG.md`](./CHANGELOG.md)'s 0.2.0 section says what else changed,
-> what to do when upgrading from 0.1.0, and what is knowingly missing; its
+> **Status: 0.3.0, the third release.** Over 0.2.0 it adds the host
+> token's verifier as a package of its own, `@formancy/data-identity`,
+> which a product that verifies the same tokens installs without the
+> server, Fastify or a driver
+> ([0091](./docs/decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md));
+> a host page that drills down one level at a time, with a trail back
+> ([0090](./docs/decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md));
+> and a release SBOM of what a consumer's install brings, held to that
+> install
+> ([0092](./docs/decisions/0092-the-sbom-describes-what-a-consumer-installs-and-is-held-to-that-install.md)).
+> [`CHANGELOG.md`](./CHANGELOG.md)'s 0.3.0 section says what else changed,
+> what to do when upgrading from 0.2.0, and what is knowingly missing; its
 > *Unreleased* says what is on `main` since. The examples page at
 > https://formancy.ai/data/examples/
 > ([0069](./docs/decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md))
@@ -894,7 +881,7 @@ first deploy is read.
 | `@formancy/data-postgres` | The PostgreSQL adapter, on the `postgres` driver. |
 | `@formancy/data-sqlserver` | The SQL Server adapter, on `mssql` over `tedious` — pure JavaScript, no ODBC. |
 | `@formancy/data-client` | The browser's side of the runtime plane: a `fetch`-based client for the forms a person may read, a published form's definition, its records -- one by its token or a page at a time, created, updated and deleted -- and its lookups, and the option sources both formancy renderers take. Source-available, framework-neutral, no Node. |
-| `@formancy/data-identity` | The host's identity token, verified offline under a pinned algorithm against one key or a JSON Web Key Set read from a file and read again on demand, and the secret references a setting names. jose and Node alone, so a product that verifies the same tokens installs neither Fastify nor a driver; the server re-exports it. Published from 0.3.0 ([0091](./docs/decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)). |
+| `@formancy/data-identity` | The host's identity token, verified offline under a pinned algorithm against one key or a JSON Web Key Set read from a file and read again on demand, and the secret references a setting names. jose and Node alone, so a product that verifies the same tokens installs neither Fastify nor a driver; the server re-exports it. Published since 0.3.0 ([0091](./docs/decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)). |
 | `@formancy/data-server` | The server: configuration store, host identity through `@formancy/data-identity` and the settings that choose its key, the administrator and runtime planes over HTTP, the audit trail, and the composition root that starts them from configuration. Fastify, like formancy's. |
 | `@formancy/data-fixtures` | Private test support: one business model for both engines, a table keyed by a uuid the database fills among its edge cases, with its restricted reader and the order form's own account; the comparator both adapters' discovery answers to; the cases both engines share -- parity and drift -- each with one expectation; the sized table the performance harness reads; and `renamedColumn`, a snapshot as discovery reports it after a rename. Never published. |
 | `@formancy/data-performance` | Private: the harness that measures the shipped server against both engines and renders `docs/performance.md` from what it measured. Never published. |

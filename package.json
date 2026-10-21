@@ -1,6 +1,6 @@
 {
   "name": "formancy-data",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Formancy Data: turn an existing PostgreSQL or SQL Server database into formancy forms that fit your application.",
   "license": "SEE LICENSE IN LICENSE.md",

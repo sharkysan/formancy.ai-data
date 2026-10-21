@@ -1,6 +1,6 @@
 {
   "name": "@formancy/data-studio",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "The administrator's application: connect a database, choose a root table, generate a form, write its policy, preview and publish it, and review drift. Speaks only to the data server's administrator plane. Never published.",
   "license": "SEE LICENSE IN LICENSE.md",

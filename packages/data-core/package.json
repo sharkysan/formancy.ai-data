@@ -1,6 +1,6 @@
 {
   "name": "@formancy/data-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The Formancy Data core: the database-neutral adapter port and metadata contract. No driver, no HTTP, no Node.",
   "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",

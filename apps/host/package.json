@@ -1,6 +1,6 @@
 {
   "name": "@formancy/data-host",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "A host application's workspace over the data server's runtime plane: the forms a person may read, a form's records in an AG Grid Community grid, a record under @formancy/react, @formancy/angular or both, and its child rows, through @formancy/data-client. An example, never published.",
   "license": "SEE LICENSE IN LICENSE.md",

@@ -1,6 +1,6 @@
 {
   "name": "@formancy/data-identity",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The host identity tokens Formancy Data verifies: a JWT checked offline under a pinned algorithm, against one key or a JSON Web Key Set read from a file, and the secret references a setting names. jose and Node, and nothing else.",
   "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",
