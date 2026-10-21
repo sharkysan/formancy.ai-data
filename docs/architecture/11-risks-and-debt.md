@@ -480,6 +480,15 @@ SQL Server: page *k* reads every row before *k* × 50, and a row that moves
 between two pages is skipped unseen or refuses the file `moved`. Keyset
 paging, which 0044 declined, is what would pay it down.
 
+**One verifier, two products, two installs.** The cost of
+[0091](../decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md),
+bought so that a product verifying the server's tokens runs the server's
+code without the server: the two share the code, not the release. Each
+verifies under the `@formancy/data-identity` it installed, a fix reaches
+the other only when it moves to that release, and nothing here can see
+the other product's. Two import paths name the one verifier, and the
+server's stays while anything imports it from there.
+
 ## 11.6 People and process
 
 **One maintainer.** `GOVERNANCE.md` says plainly that Formancy Data has a

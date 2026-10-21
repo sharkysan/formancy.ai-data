@@ -82,8 +82,8 @@ tables below.
   ([0050](../decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md),
   [0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)).
 - **Where secrets live.** Configuration names a secret and never holds one;
-  `packages/data-server/src/secrets.ts` resolves `env:` and `file:`
-  references once, in the composition root, and the store behind them is
+  `packages/data-identity/src/secrets.ts` resolves `env:` and `file:`
+  references once, for the composition root, and the store behind them is
   the operator's (0019).
 - **Transport security.** TLS is the operator's proxy's. The composed
   stack is plain and on loopback, and its guide's section 8 says so

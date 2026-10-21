@@ -2845,6 +2845,19 @@
     "0089": {
       "reviewed": "sha256:e25d6ea3951717cb2fcdf9af59efa0b35d9a8cae824a9ffcdd25c3fa4f7a7090",
       "none": "A grant of the live demo's own account: nothing a user, integrator or operator of a release meets. The generator is unchanged, so a deployment's own column with a default is still offered wherever its account may INSERT it, as 0027 says."
+    },
+    "0091": {
+      "reviewed": "sha256:ce549a2b2195dacd678a070a250883da68f4f9eb68138f97d518a6c03b955c33",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A product that verifies host tokens with `@formancy/data-identity` accepts what the data server accepts only while both install the same release of it; nothing checks that they do."
+        },
+        {
+          "area": "operations",
+          "says": "The first release that publishes `@formancy/data-identity` creates its name on npm, which a Granular Access token limited to the packages it names may not do, and the `npm-token` job does not check for that."
+        }
+      ]
     }
   }
 }

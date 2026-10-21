@@ -351,7 +351,11 @@ npm audit signatures
 `NPM_TOKEN` must be an Automation or Granular Access token. A classic token on
 an account that enforces 2FA on writes demands a one-time password at publish
 time, and the `npm-token` job checks for that beside the gates. A rehearsal
-does not read it.
+does not read it. A Granular Access token limited to the packages it names
+may not create one it does not name, and the `npm-token` job does not check
+for that: 0.3.0 publishes `@formancy/data-identity` for the first time
+([0091](docs/decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)),
+so before that tag such a token must name it too, or the whole scope.
 
 It is a secret of the `npm` environment, not of the repository: the two jobs
 that read it, `npm-token` and `publish`, name that environment, and its

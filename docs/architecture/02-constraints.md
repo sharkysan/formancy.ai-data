@@ -67,7 +67,7 @@ right, what it led to and what holds that, or that nothing does.
 - Nothing in a package reads configuration.
   `packages/data-server/src/main.ts` reads every setting, and a secret is
   named by a reference, `env:NAME` or `file:/absolute/path`, which
-  `packages/data-server/src/secrets.ts` resolves without ever repeating its
+  `packages/data-identity/src/secrets.ts` resolves without ever repeating its
   value in an error ([0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md),
   [0025](../decisions/0025-each-adapter-owns-its-driver.md)).
 - Identifiers come from approved metadata and are quoted by the adapter, one

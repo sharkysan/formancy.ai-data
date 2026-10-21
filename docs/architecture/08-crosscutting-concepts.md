@@ -142,7 +142,8 @@ its own package opened, `connectPostgres` or `connectSqlServer`, from its own
 copy of its driver ([0025](../decisions/0025-each-adapter-owns-its-driver.md)).
 The composition root, `packages/data-server/src/main.ts`, reads every
 setting, and names a secret by a reference, `env:NAME` or
-`file:/absolute/path`, which `secrets.ts` beside it resolves without ever
+`file:/absolute/path`, which `resolveSecret`, from
+`@formancy/data-identity` ([0091](../decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)), resolves without ever
 repeating the reference's value. Section 7 has the settings. A service
 principal's client secret is such a reference, and an Entra login's
 failure is a sentence with at most Entra's AADSTS code: the credential's
@@ -177,9 +178,10 @@ connection string pasted where a name goes, since the request log names
 routes, never the path, query or Host header as sent
 ([0033](../decisions/0033-the-administrator-plane-is-audited.md)).
 
-**Held by** `secrets.test.ts`, `connections.test.ts`, `routes/admin.test.ts`,
+**Held by** `packages/data-identity/src/secrets.test.ts`; by
+`connections.test.ts`, `routes/admin.test.ts`,
 `routes/entra.integration.test.ts`, `routes/unencrypted.integration.test.ts`
-and `server-log.test.ts` in `packages/data-server/src/`, by
+and `server-log.test.ts` in `packages/data-server/src/`; by
 `packages/data-sqlserver/src/entra.test.ts` and `encryption.test.ts`, and by the
 getting-started gate, which fails when a secret or a token reaches any log
 of the composed stack
@@ -225,7 +227,7 @@ form's policy never grants it
 ([0020](../decisions/0020-administration-is-a-separate-plane.md)).
 
 **Held by** `packages/data-core/src/policy/evaluate.test.ts` and
-`validate.test.ts` beside it; `packages/data-server/src/identity.test.ts`;
+`validate.test.ts` beside it; `packages/data-identity/src/identity.test.ts`;
 and `packages/data-server/src/e2e.integration.test.ts`, where on both
 engines another tenant can neither read the order nor pick its customer.
 

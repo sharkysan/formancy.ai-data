@@ -45,7 +45,10 @@ again.
 4. **npm.** An environment named `npm`, whose deployment policy admits only
    tags matching `v*`, holding an Automation or Granular Access token as
    `NPM_TOKEN`. [RELEASING.md](../RELEASING.md#secrets) says why it is an
-   environment's secret and not the repository's.
+   environment's secret and not the repository's. A Granular Access token
+   limited to the packages it names must name `@formancy/data-identity`
+   too before 0.3.0, the first release that publishes it
+   ([0091](decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)).
 5. **The image.** The release workflow pushes it to GHCR. If GitHub ever
    shows the package as private, change it under the package's *Package
    settings › Change visibility*.

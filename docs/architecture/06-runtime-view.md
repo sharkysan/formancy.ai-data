@@ -165,7 +165,8 @@ moment can both succeed, and nothing deletes a draft (0065).
    and `forms()` (`packages/data-client/src/client.ts`) sends `GET
    /v1/forms`, the token in the Authorization header and nowhere else
    ([0029](../decisions/0029-a-host-renders-a-published-form-through-one-client.md)).
-2. `createIdentityVerifier` (`identity.ts`) checks signature, issuer,
+2. `createIdentityVerifier` (`identity.ts`, in `@formancy/data-identity`
+   since [0091](../decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)) checks signature, issuer,
    audience, `exp` and `sub`, the algorithm pinned and no URL fetched
    ([0014](../decisions/0014-host-identity-is-verified-offline.md)). With
    `FORMANCY_DATA_IDENTITY_KEYS_FILE` the key is chosen by kid from a set
@@ -184,8 +185,9 @@ moment can both succeed, and nothing deletes a draft (0065).
    and Forms (`apps/host/src/forms-nav.tsx`) draws the menu
    ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
 
-Held by `identity.test.ts`, `identity-keys.test.ts`, `identity-file.test.ts`
-and `identity-settings.test.ts`, a real SIGHUP among them;
+Held by data-identity's `identity.test.ts`, `identity-keys.test.ts` and
+`identity-file.test.ts` and the server's `identity-settings.test.ts`, a real
+SIGHUP among them;
 `scripts/mint-token.test.mjs`; `menu.test.ts` and `children.test.ts` in
 `packages/data-core/src/records`; `routes/runtime-menu.test.ts`, where the
 menu answers over a registry that refuses every connection, the same to the

@@ -30,6 +30,14 @@ existed would be documented and inert.
   the one in force, anything else leaves it (0059).
 - **`resolveSecret(reference)`** — `env:NAME` or `file:/absolute/path`. Never
   the secret itself, and no error ever repeats one.
+
+  These four functions, `KeySet` and `KeySetRefusal` live in
+  [`@formancy/data-identity`](../data-identity/README.md), which depends on
+  jose alone, and are re-exported here with their types, the same objects
+  ([0091](../../docs/decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)):
+  an import from either package is one verifier, and a set either made is
+  one the other's verifier accepts. What reads the identity settings, the
+  key set file tool and `main.ts` stay here.
 - **`createDataServer(options)`** — `GET /health`, and `GET /v1/whoami`, which
   returns exactly the identity the server derived from the host's token so a
   wrong issuer, audience or claim mapping shows before any form depends on it.

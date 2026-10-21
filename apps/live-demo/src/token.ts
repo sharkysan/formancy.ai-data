@@ -4,7 +4,7 @@
  * token with the key it started that visitor's container with -- and the
  * image's build, which signs its administrator's token with a key that
  * lives as long as one RUN. The server verifies them as it verifies any
- * host's (packages/data-server/src/identity.ts), and as the composed
+ * host's (packages/data-identity/src/identity.ts), and as the composed
  * stack's minter signs them (deploy/mint-token.mjs).
  *
  * The image's FORMANCY_DATA_ISSUER, FORMANCY_DATA_AUDIENCE and

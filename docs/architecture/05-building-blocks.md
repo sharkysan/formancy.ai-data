@@ -14,8 +14,11 @@ apps         examples              studio                  host
              react · angular       builder-core · react    react · angular
              no server             administrator plane     runtime plane
 ──────────────────────────────────────────────────────────────────────────
-server       data-server           Fastify, jose; meets the adapters in
+server       data-server           Fastify; meets the adapters in
                                    drivers.ts and nowhere else
+──────────────────────────────────────────────────────────────────────────
+identity     data-identity         jose and Node alone: the host's token,
+                                   verified; no data-core, no setting read
 ──────────────────────────────────────────────────────────────────────────
 edges        data-postgres         data-sqlserver          data-client
              data-core, postgres   data-core, mssql        data-core, fetch
@@ -44,7 +47,8 @@ What each manifest lets it import:
 | `@formancy/data-postgres` | yes | data-core, `postgres` | data-fixtures |
 | `@formancy/data-sqlserver` | yes | data-core, `mssql`, `@types/mssql` | data-fixtures |
 | `@formancy/data-client` | yes | data-core, `@formancy/spec` | data-server, data-fixtures, both drivers, `jose`, `@formancy/core` |
-| `@formancy/data-server` | yes | data-core, data-postgres, data-sqlserver, `@formancy/spec`, `fastify`, `@fastify/rate-limit`, `jose` | data-fixtures |
+| `@formancy/data-identity` | yes | `jose` | — |
+| `@formancy/data-server` | yes | data-core, data-identity, data-postgres, data-sqlserver, `@formancy/spec`, `fastify`, `@fastify/rate-limit` | data-fixtures, `jose` |
 | `@formancy/data-fixtures` | no | data-core, `postgres`, `mssql`, testcontainers, `vitest` | — |
 | `@formancy/data-performance` | no | data-core, data-client, data-server, both adapters, data-fixtures, both drivers, `jose` | — |
 | `@formancy/data-examples` | no | data-core; formancy's renderers, engine, spec and themes; Fontsource's faces; React, Angular | data-fixtures, data-postgres and `postgres` for the snapshot capture; `@formancy/conformance` |
@@ -188,6 +192,30 @@ whatever that backend runs next; the server opens that second client in
 connections per database (0061). Each behaviour is held by the package's
 `*.integration.test.ts` suites against the images they name (0003).
 
+### `@formancy/data-identity`
+
+The host's token, verified offline under a pinned algorithm
+([0014](../decisions/0014-host-identity-is-verified-offline.md)), against
+one key or a key set selected by kid and read again whenever asked
+([0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)):
+the server's, and that of any product that verifies the same tokens
+without the server
+([0091](../decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)).
+jose and Node's built-ins, and nothing of this workspace. It reads no
+setting: the server's `identity-settings.ts` reads the environment and
+hands it a key.
+
+| File | Responsibility |
+|---|---|
+| `identity.ts` | `createIdentityVerifier`: a token's signature, issuer, audience, `exp` and `sub`, and the actor, roles and attributes it vouches for; `oneKeySet`, the set a one-key setting verifies with, which the server's key set tool writes |
+| `identity-keys.ts`, `ed25519.ts` | `KeySet`, made only by `readKeySet` and the builders, which refuse a key under which anyone signs, and verified under only through `verifyWithKeySet`, which the package's entry does not export |
+| `identity-file.ts` | `openKeySetFile`: a key set file read now and again whenever asked, a refused read leaving the set in force |
+| `secrets.ts` | `resolveSecret`: `env:NAME` or `file:/absolute/path`, and no error that repeats the reference's value |
+
+The server re-exports the values it exported before, the same objects
+(`packages/data-server/src/index.test.ts`), and the install gate verifies
+a token through both packages' published code.
+
 ### `@formancy/data-server`
 
 Fastify. `createDataServer` (`app.ts`) installs what every route passes —
@@ -208,13 +236,12 @@ runtime plane only when given a registry and a store.
 | `planes.ts` | `servedPlanes`: one audit sink, the server's log, for both planes ([0033](../decisions/0033-the-administrator-plane-is-audited.md)); out of `main.ts` so `server-log.test.ts` can hold the wiring |
 | `drivers.ts` | `DRIVER_FACTORIES`, the one place the server meets the adapters: per engine, its connection opened through the adapter's own connect function, as a SQL login or, on SQL Server, an Entra principal, one login object for each connection while its secret is the same (0074), pinged, and its ports made (0025) |
 | `connections.ts` | The operator's allowlist, every problem at once, and `createConnectionRegistry`, the only place a connection's name becomes a database ([0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)). An entry logs in as a SQL login or as an Entra principal, and refuses a key it does not read (0074) |
-| `secrets.ts` | `resolveSecret`: `env:NAME` or `file:/absolute/path`, and no error that repeats the reference's value |
 | `config-store.ts` | `<root>/<id>/<version>.json`, compare-and-swap by hard link (0013); `drafts()` beside it under review |
 | `bundle.ts`, `bundle-format2.ts`, `served-schema.ts`, `generation.ts` | `validateBundle`, on publish and on every read (0019): the form in the spec version the generator writes (0042), the fingerprint, the bindings, the policy, and in format 2 the base with its presentation (0030) |
 | `published.ts` | `loadPublished` and `loadVersion`: one read, validated, for both planes |
 | `publishing.ts`, `reassigned.ts` | What a version must be to be written and what the database must be to serve it, shared by publish, restore and import ([0062](../decisions/0062-a-published-version-moves-between-deployments-as-its-version-file.md)); the keys a publish must confirm (0039) |
 | `governance.ts`, `drafts.ts`, `publisher-roles.ts` | Publication under review ([0065](../decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)): `GRANTS` classifies every administrator operation and `refusalFor` is the one decision; each form's drafts are numbered entries beside its versions, their state derived on every read; the setting that turns review on |
-| `identity.ts`, `identity-keys.ts`, `identity-settings.ts`, `identity-file.ts`, `ed25519.ts` | The host's token, verified offline under a pinned algorithm ([0014](../decisions/0014-host-identity-is-verified-offline.md)), from one key or a key set selected by kid and read again on SIGHUP ([0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)) |
+| `identity-settings.ts` | The identity key's settings, one key or a key set file read again on SIGHUP ([0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)), opened through `@formancy/data-identity`, whose verifier, key set and secret references `index.ts` re-exports (0091) |
 | `identity-keys-tool.ts`, `identity-keys-cli.ts` | The key set file tool the image ships beside the server, reading the settings through `identity-settings.ts` as `main.ts` does (0059) |
 | `audit.ts` | `auditRequests`, the one set of hooks both planes install: one event per request, and a route without an audit name stops the server (0023, 0033) |
 | `export-limits.ts` | `EXPORT_DEADLINE_MS`, how long a file of records may take, derived from the read timeout of the proxy in front, which `export-limits.test.ts` holds it below in `deploy/web/nginx.conf` ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)) |
