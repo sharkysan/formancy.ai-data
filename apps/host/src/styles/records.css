@@ -176,11 +176,11 @@
   overflow: auto;
 }
 
-.lanes[data-layout='separate'] > .master {
+.lanes:is([data-layout='separate'], [data-layout='drill']) > .master {
   max-height: calc(100dvh - 8.25rem);
 }
 
-.lanes:is([data-layout='side-by-side'], [data-layout='separate']) .grid-bench.master-bench {
+.lanes:is([data-layout='side-by-side'], [data-layout='separate'], [data-layout='drill']) .grid-bench.master-bench {
   flex: 0 1 auto;
   min-height: 7.25rem;
   max-height: none;

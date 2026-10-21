@@ -490,3 +490,41 @@ compares every byte with the server's (0080). What it costs: the
 file is not the table at one moment, each page reads every row before its
 offset, and the bounds are a budget and a derivation, not measurements
 ([section 11.2](11-risks-and-debt.md#112-known-limitations-by-area)).
+
+## 6.11 Drilling down a form's levels
+
+1. Drill down, the fourth choice of the open form's Layout group, shows one
+   level at a time: the records, the record, then a child row of the level
+   above and its own child sections, as deep as the menu's children go
+   ([0090](../decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)). The level shown is the workspace's place,
+   `#form=…&layout=drill&view=record&level=<n>` (`apps/host/src/layout.ts`),
+   a number and never a record.
+2. A row opened in a section of level n -- a click, Space or Enter -- or
+   its New goes down. `apps/host/src/use-drill.ts` shows the level below
+   again when it already holds that row; otherwise it asks the guard with a
+   `drill` request, which drops every level below n
+   (`apps/host/src/leave.ts`, owners named by `drillOwner` and
+   `drillBase`), sends `POST /v1/forms/:child/records/read` (6.6), drops an
+   answer the person has since moved past, and asks again on the answer,
+   as `opening.ts` does. `apps/host/src/drill-level.tsx` draws the row in
+   its own sessions, the parent's field preset and disabled, and lists its
+   own children with `parent: { field, record }` (6.5), each child form's
+   definition asked once per form.
+3. A crumb (`apps/host/src/trail.tsx`) or Back shows a level above and
+   drops nothing; an entry asking for a level no longer held shows the
+   deepest one above it and is written over (`apps/host/src/address.ts`).
+   A crumb's name is read from the stored record by
+   `apps/host/src/crumbs.ts`.
+4. A delete (6.7) of a record a level holds -- at its level, or from any
+   grid in any layout, where the guard asks about the levels first -- takes
+   that level and the levels below with it, matched by the record and not
+   the depth, and shows the level above, replacing the entry, its
+   section's grid saying the row is gone. Back, like a crumb, drops a
+   row's read still out.
+
+Held by `apps/host/src/drill.test.tsx` on both engines, `layout.test.ts`,
+`leave.test.ts`, `crumbs.test.ts`, `address.test.tsx`, and the browser
+gate's `apps/host/scripts/browser/drilling.mjs`. What it costs: the levels
+are in memory only, so a reload opens the records; a row open on a rail in
+another layout and the same row a level down are two panes; a crumb's name
+comes from a rule over the form's fields (0090).

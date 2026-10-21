@@ -16,6 +16,8 @@ import type { Renderer } from './session.js'
  * | a child row created in one of a child's panes                  | that child's other panes                 |
  * | a renderer hidden by the renderer switch                       | that renderer's panes, everywhere        |
  * | a layout or view change; paging; search; sort                  | nothing: every view stays mounted        |
+ * | Drill down: going down from level n; a delete there            | every level below n (0090)               |
+ * | Drill down: going up a level                                   | nothing: every level stays mounted       |
  *
  * A deletion out, or unknown (0053), is listed with its owner's panes and
  * goes where they go, but for a renderer hidden: it is drawn by none. One
@@ -23,6 +25,11 @@ import type { Renderer } from './session.js'
  * grid's (`gridOwner`): the records grid's goes only with the grid --
  * another form, Back or Forward, Sign out -- and a child grid's with its
  * section, as that child's panes do but for its own rows and its New.
+ *
+ * In Drill down (0090) a level's panes, its sections' and their grids'
+ * deletions are owned under the level's number (`drillOwner`, `drillBase`),
+ * which `levelOf` reads back; the record and its sections are level 1, the
+ * records grid level 0. What drops the record drops every level under it.
  */
 
 /**
@@ -61,6 +68,12 @@ export type LeaveRequest =
   /** The detail following a record one of its panes created: `owner`'s pane in `by` holds it already. */
   | { kind: 'created'; owner: string; record: string; by: Renderer }
   | { kind: 'renderer'; hides: readonly Renderer[]; shows: string }
+  /** Drill down: going down from level `below` into a row, or a new one when `record` is null, whose form is `title`. */
+  | { kind: 'drill'; below: number; record: string | null; title: string }
+  /** Drill down: deleting `record`, which drops the levels below `below`. */
+  | { kind: 'drill-delete'; below: number; record: string }
+  /** Drill down: going up to a level held above. */
+  | { kind: 'level' }
   | { kind: 'layout' }
   | { kind: 'view' }
   | { kind: 'page' }
@@ -69,7 +82,8 @@ export type LeaveRequest =
 
 /** Which panes a request drops: by owner -- `master` for the record's, or a child section's key -- and by renderer, but for the one it `keeps`. */
 export interface Discarded {
-  owners: 'all' | readonly string[]
+  /** Every owner, the ones named, or in Drill down every level deeper than a number. */
+  owners: 'all' | readonly string[] | { deeperThan: number }
   /** Owners `all` leaves out: the records grid's deletion, which a request that replaces only the record leaves where it is. */
   spares?: readonly string[]
   renderers: 'all' | readonly Renderer[]
@@ -103,6 +117,23 @@ export function gridOwner(owner: string): string {
 /** What the record's requests leave: the records grid stays, and so does a deletion asked from one of its rows. */
 const RECORDS_GRID: readonly string[] = [gridOwner('master')]
 
+/** The owner of a Drill down level's own panes and of its deletion: the level, then the child form and its field. */
+export function drillOwner(level: number, form: string, field: string): string {
+  return `drill-${String(level)}~${form}~${field}`
+}
+
+/** What the owners of a Drill down level's child sections start with. */
+export function drillBase(level: number): string {
+  return `drill-${String(level)}/`
+}
+
+/** The level `owner` is drawn at: a Drill down level's number, 0 for the records grid, and 1 for the record and its sections. */
+export function levelOf(owner: string): number {
+  const level = /^drill-([1-9]\d*)[~/]/.exec(owner)
+  if (level !== null) return Number(level[1])
+  return owner === gridOwner('master') ? 0 : 1
+}
+
 /** What `request` would discard, or null when it discards nothing. */
 export function discards(request: LeaveRequest): Discarded | null {
   switch (request.kind) {
@@ -124,6 +155,10 @@ export function discards(request: LeaveRequest): Discarded | null {
     }
     case 'renderer':
       return { owners: 'all', renderers: request.hides }
+    case 'drill':
+    case 'drill-delete':
+      return { owners: { deeperThan: request.below }, renderers: 'all' }
+    case 'level':
     case 'layout':
     case 'view':
     case 'page':
@@ -137,11 +172,13 @@ export function discards(request: LeaveRequest): Discarded | null {
 export function atRisk(request: LeaveRequest, panes: readonly PaneWork[]): PaneWork[] {
   const dropped = discards(request)
   if (dropped === null) return []
-  const { keeps } = dropped
+  const { keeps, owners } = dropped
+  const dropsOwner = (owner: string): boolean =>
+    owners === 'all' ? !(dropped.spares?.includes(owner) ?? false) : 'deeperThan' in owners ? levelOf(owner) > owners.deeperThan : owners.includes(owner)
   return panes.filter(
     (pane) =>
       pane.work !== null &&
-      (dropped.owners === 'all' ? !(dropped.spares?.includes(pane.owner) ?? false) : dropped.owners.includes(pane.owner)) &&
+      dropsOwner(pane.owner) &&
       (dropped.renderers === 'all' || (pane.renderer !== null && dropped.renderers.includes(pane.renderer))) &&
       !(keeps !== undefined && keeps.owner === pane.owner && keeps.renderer === pane.renderer),
   )
@@ -154,6 +191,10 @@ export function lead(request: LeaveRequest): Said {
     case 'row':
     case 'child-row':
       return ['Opening ', { code: request.record }, closes]
+    case 'drill':
+      return request.record === null ? [`Starting a new ${request.title}${closes}`] : ['Opening ', { code: request.record }, closes]
+    case 'drill-delete':
+      return ['Deleting ', { code: request.record }, closes]
     case 'load':
       return ['Loading ', { code: request.record }, closes]
     case 'created':

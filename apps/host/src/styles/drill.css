@@ -1,0 +1,68 @@
+/* ------------------------------------------------------------- Drill down
+ *
+ * Drill down (0090): one level at a time, under a trail of the levels
+ * above. Room variables only; nothing here selects inside .sheet or
+ * .grid-bench. The level shown is the lanes' one column, as a view of
+ * Separate views is, and level 0 is sized by Separate views' own rules
+ * for its records view (records.css, narrow.css).
+ */
+
+.trail {
+  min-width: 0;
+}
+
+.trail ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trail li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+/* The separator is drawn, not said: the list says how many levels there are. */
+.trail li + li::before {
+  content: '›';
+  color: var(--muted);
+  padding-inline: 0.125rem;
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2.5rem;
+  max-width: 100%;
+  padding: 0 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+/* A level above: what the person acts on, in violet. */
+button.crumb {
+  color: var(--client);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+button.crumb:hover {
+  border-color: var(--edge-strong);
+}
+
+/* The level shown: the page, not a way to it. */
+.crumb[aria-current='page'] {
+  font-weight: 600;
+}

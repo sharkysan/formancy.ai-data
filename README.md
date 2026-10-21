@@ -552,6 +552,18 @@ records and the record are side by side, stacked, or separate views, and
 the address says which form and layout, never which record. Open by record
 token loads one by its token.
 
+Drill down, the fourth layout, shows one level at a time: the records, the
+record, a child row of it with its own children, and so on as deep as the
+forms go -- an employee, an order it approved, that order's line. Opening a
+row goes down a level, and a trail above says where you are, each level
+above a button back to it; Back and Forward move between the levels too.
+A record is named in the trail by its first required plain text field, a
+customer by its name, or else by its token. Going up keeps the levels
+below as they were, typing included; going down elsewhere asks first when a
+level below holds unsaved work. The levels are in the page's memory, so a
+reload starts on the records
+([0090](./docs/decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)).
+
 Download CSV, beside New record in the Records panel and beside each child
 section's New, saves one file of the records that grid lists, as the server
 makes it: the search you submitted, not what the box holds, the grid's

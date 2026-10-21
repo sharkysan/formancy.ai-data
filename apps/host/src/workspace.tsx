@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 import type { FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { useAddressRequests, useHistory } from './address.js'
 import { useAfterRender } from './after-render.js'
+import { childFormsOf } from './child-forms.js'
 import type { ChildForm } from './children.js'
 import { FormView } from './form-view.js'
 import { FormsNav } from './forms-nav.js'
@@ -49,6 +50,7 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   const storage = useMemo(browserStorage, [])
   const ids = useMemo(() => menu.forms.map((form) => form.id), [menu])
   const narrow = useMedia('(max-width: 56rem)')
+  const phone = useMedia('(max-width: 40rem)')
   const [first] = useState(() => arrival({ hash: window.location.hash, menu: ids, phone: typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 40rem)').matches }))
   const [place, setPlaceState] = useState<Place>({ form: null, layout: first.layout, view: 'records' })
   const placeRef = useRef(place)
@@ -70,6 +72,15 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
 
   const menuEntry = useCallback((id: string) => menu.forms.find((form) => form.id === id), [menu])
 
+  /** The children the menu names for a form, for Drill down's levels (0090): none for a form the menu does not name. */
+  const childrenFor = useCallback(
+    async (id: string) => {
+      const found = menuEntry(id)
+      return found === undefined ? [] : childFormsOf(client, menu, found)
+    },
+    [client, menu, menuEntry],
+  )
+
   const openForm = useCallback(
     async (id: string, { focus, push }: { focus: boolean; push: boolean }) => {
       const chosen = menuEntry(id)
@@ -88,23 +99,12 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         if (focus) after(() => formHeading.current?.focus())
         return
       }
-      // The children the menu names, each opened as itself: its own policy
-      // decides what its list returns, and a child the server no longer lists
-      // for this person now is left out (0045).
-      const children = await Promise.all(
-        chosen.children
-          .filter((child) => ids.includes(child.form))
-          .map(async (child) => {
-            const answer = await client.form(child.form)
-            const own = menuEntry(child.form)
-            return answer.ok && answer.value.list !== null && own !== undefined ? { child, menu: own, definition: answer.value } : null
-          }),
-      )
+      const children = await childFormsOf(client, menu, chosen)
       if (asking.current !== mine) return
-      setOpened({ entry: chosen, state: 'open', definition: definition.value, children: children.filter((child): child is ChildForm => child !== null) })
+      setOpened({ entry: chosen, state: 'open', definition: definition.value, children })
       if (focus) after(() => formHeading.current?.focus())
     },
-    [client, ids, menuEntry, setPlace, write, after],
+    [client, menu, menuEntry, setPlace, write, after],
   )
 
   // Arriving: the keyboard on Forms, the fragment's form opened when the
@@ -129,15 +129,16 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   // Back, Forward, and a fragment typed into the address bar.
   const historyView = useAddressRequests({ guard, ids, menuEntry, openForm, setPlace, placeRef, history })
 
-  const changeLayout = (layout: Layout): void => {
-    const next: Place = { ...placeRef.current, layout, view: 'records' }
+  /** A layout chosen replaces the entry, on the records -- or, entering Drill down, on the level the form says (0090). */
+  const changeLayout = (layout: Layout, at: { view: View; level?: number } = { view: 'records' }): void => {
+    const next: Place = { ...placeRef.current, layout, view: at.view, level: at.level }
     setPlace(next)
     write(next, false)
   }
 
-  /** A view chosen pushes an entry; one the page moves to by itself -- the records after a delete -- replaces it. */
-  const changeView = (view: View, replace = false): void => {
-    const next: Place = { ...placeRef.current, view }
+  /** A view chosen pushes an entry; one the page moves to by itself -- the records after a delete -- replaces it. In Drill down, `level` is the level the record view shows. */
+  const changeView = (view: View, replace = false, level?: number): void => {
+    const next: Place = { ...placeRef.current, view, level: view === 'record' ? level : undefined }
     setPlace(next)
     write(next, !replace)
   }
@@ -170,8 +171,10 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
               childForms={opened.children}
               layout={place.layout}
               view={place.view}
+              level={place.level}
               historyView={historyView}
               narrow={narrow}
+              phone={phone}
               renderer={renderer}
               split={split}
               notice={guard.pending === null ? null : <UnsavedNotice pending={guard.pending} onKeep={guard.keep} onDiscard={guard.discard} />}
@@ -181,6 +184,7 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
               onRenderer={chooseRenderer}
               onSplit={setSplit}
               onSplitSettled={(share) => writeSplit(storage, share)}
+              childFormsOf={childrenFor}
             />
           </GuardContext.Provider>
         ) : (

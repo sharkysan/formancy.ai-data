@@ -7,11 +7,15 @@
  * link opens the form and its layout, never a record. The host token is in
  * no URL either (0029).
  *
+ * Drill down (0090) adds `&level=<n>` to its record view: how deep the level
+ * shown is, a number, never which records the levels hold. The levels are
+ * in memory, so an address with a level arrives on the records too.
+ *
  * A fragment rather than a query string: a fragment never leaves the
  * browser, and a query string is part of a request line a proxy may log.
  */
 
-export const LAYOUTS = ['side-by-side', 'stacked', 'separate'] as const
+export const LAYOUTS = ['side-by-side', 'stacked', 'separate', 'drill'] as const
 export type Layout = (typeof LAYOUTS)[number]
 
 export const VIEWS = ['records', 'record'] as const
@@ -22,6 +26,8 @@ export interface Place {
   form: string | null
   layout: Layout
   view: View
+  /** In Drill down's record view, the level shown: 1 for the record, 2 for a child row of it, and so on. */
+  level?: number | undefined
 }
 
 /**
@@ -33,35 +39,45 @@ export interface Asked {
   form: string | null
   layout: Layout | null
   view: View | null
+  level: number | null
 }
 
-const KEYS = new Set(['form', 'layout', 'view'])
+const KEYS = new Set(['form', 'layout', 'view', 'level'])
 
 const isLayout = (value: string): value is Layout => (LAYOUTS as readonly string[]).includes(value)
 const isView = (value: string): value is View => (VIEWS as readonly string[]).includes(value)
+/** A whole number from one, as the page writes it: no sign, no leading zero, nothing after. */
+const levelOf = (value: string): number | null => (/^[1-9]\d*$/.test(value) ? Number(value) : null)
 
-/** The fragment for `place`: the form when one is open, then the layout and the view. */
+/** The fragment for `place`: the form when one is open, then the layout and the view, and in Drill down's record view the level. */
 export function fragmentOf(place: Place): string {
   const params = new URLSearchParams()
   if (place.form !== null) params.set('form', place.form)
   params.set('layout', place.layout)
   params.set('view', place.view)
+  if (place.layout === 'drill' && place.view === 'record') params.set('level', String(place.level ?? 1))
   return `#${params.toString()}`
 }
 
 /** What `hash` -- `location.hash`, with or without its `#` -- asks for. */
 export function readFragment(hash: string): Asked {
   const params = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash)
-  const asked: Asked = { form: null, layout: null, view: null }
+  const asked: Asked = { form: null, layout: null, view: null, level: null }
   const seen = new Set<string>()
   for (const [key, value] of params) {
     if (!KEYS.has(key) || seen.has(key)) continue
     seen.add(key)
     if (key === 'form') asked.form = value
     else if (key === 'layout') asked.layout = isLayout(value) ? value : null
-    else asked.view = isView(value) ? value : null
+    else if (key === 'view') asked.view = isView(value) ? value : null
+    else asked.level = levelOf(value)
   }
   return asked
+}
+
+/** The level a place shows in Drill down: 0 for the records, the record view's level otherwise, 1 when it names none. */
+export function levelShown(place: { view: View | null; level?: number | null | undefined }): number {
+  return place.view === 'record' ? (place.level ?? 1) : 0
 }
 
 /**

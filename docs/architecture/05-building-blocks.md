@@ -396,7 +396,12 @@ save's answer does — framework-neutral, so both renderers show one decision
 `src/grid-datasource.ts` and `src/grid-options.tsx` put a page of records
 at a time in AG Grid Community (0044), the grid's handle giving the sort
 its datasource last asked with; `src/children.tsx` lists a record's
-child rows; `src/download.tsx` is Download CSV in the head of the Records
+child rows; Drill down, a layout of one level at a time, is
+`src/use-drill.ts` -- the levels below the record, in memory -- with
+`src/drill-level.tsx` drawing a level, `src/trail.tsx` the trail back up,
+`src/crumbs.ts` what each crumb is called, and `src/child-forms.ts` the
+children the menu names for a level's form
+([0090](../decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)); `src/download.tsx` is Download CSV in the head of the Records
 panel and of each child section, and `src/save-file.ts` hands the file to
 the browser through an object URL and a clicked `<a download>`
 ([0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)); `src/guard.ts` and `src/leave.ts` are one guard over every way

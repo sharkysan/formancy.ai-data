@@ -8,7 +8,9 @@
 // delete on PostgreSQL (0050). The identity verifier takes literal tokens,
 // as the studio's gate does: the administrator's, and a clerk's of tenant 1
 // and of tenant 3, whose customers are the paged ones, one lookup page and
-// ten more, inserted beside the fixture's (0085).
+// ten more, inserted beside the fixture's (0085). And the customer form,
+// read only, which Drill down goes down from: a customer, its orders, their
+// lines (0090).
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -20,6 +22,7 @@ import postgres from 'postgres'
 
 export const FORM = 'pg-order'
 export const LINES = 'pg-order-line'
+export const CUSTOMERS = 'pg-customer'
 export const TOKENS = { admin: 'browser-gate-administrator', clerk: 'browser-gate-clerk', thirdClerk: 'browser-gate-clerk-tenant-3' }
 
 /** The keys a delete of an order acts through on the fixture, with their actions: its lines and deliveries, and the deliveries' parcels. */
@@ -78,8 +81,8 @@ export async function startPlane() {
     if (reply.statusCode >= 300) throw new Error(`${path} answered ${String(reply.statusCode)}: ${reply.body}`)
     return reply.json()
   }
-  const publish = async ({ formId, title, table, lookups, policy }) => {
-    const proposal = await call(TOKENS.admin, '/v1/form-proposals', { connection: 'pg', root: { schema: 'sales', name: table }, formId, title, lookups, versionColumn: 'row_version' })
+  const publish = async ({ formId, title, table, lookups, policy, versionColumn = 'row_version' }) => {
+    const proposal = await call(TOKENS.admin, '/v1/form-proposals', { connection: 'pg', root: { schema: 'sales', name: table }, formId, title, lookups, ...(versionColumn === null ? {} : { versionColumn }) })
     // Published as the generator made it (0030 refuses anything but
     // presentation over the generated base), which draws a lookup as a
     // typeahead where it can be searched (0066).
@@ -102,14 +105,28 @@ export async function startPlane() {
     lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
     policy: (bindings) => clerkPolicy(bindings, { rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }),
   })
+  // A customer has no version column, so it is read only: Drill down only reads it.
+  await publish({
+    formId: CUSTOMERS,
+    title: 'Customer',
+    table: 'customer',
+    lookups: [],
+    versionColumn: null,
+    policy: (bindings) =>
+      clerkPolicy(bindings, {
+        operations: { read: ['clerk'], create: [], update: [] },
+        fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: [] }])),
+        lookups: {},
+      }),
+  })
   const source = form.model.fields.find((field) => field.key === 'customer').optionsSource
   const sql = postgres(fixture.admin, { onnotice: () => {} })
   return {
     server,
-    /** A fresh order of tenant 1's with `lines` lines, for one width's run, made the way the page would make it; `notes` finds it. */
-    order: async (lines = 0, notes = null) => {
-      const customer = (await call(TOKENS.clerk, `/v1/forms/${FORM}/lookups/${source}/query`, { operation: 'create', search: 'Muster' })).rows[0].token
-      const record = (await call(TOKENS.clerk, `/v1/forms/${FORM}/records/create`, { answers: { customer, order_date: '2026-10-08', status: 'placed', amount: '1', notes } })).record
+    /** A fresh order of tenant 1's with `lines` lines, for one width's run, made the way the page would make it; `notes` finds it, and `customer` is searched for its customer. */
+    order: async (lines = 0, notes = null, customer = 'Muster') => {
+      const buyer = (await call(TOKENS.clerk, `/v1/forms/${FORM}/lookups/${source}/query`, { operation: 'create', search: customer })).rows[0].token
+      const record = (await call(TOKENS.clerk, `/v1/forms/${FORM}/records/create`, { answers: { customer: buyer, order_date: '2026-10-08', status: 'placed', amount: '1', notes } })).record
       for (let no = 1; no <= lines; no += 1) await call(TOKENS.clerk, `/v1/forms/${LINES}/records/create`, { answers: { order: record, line_no: String(no), quantity: String(no), unit_price: '2.50' } })
       return record
     },

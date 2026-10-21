@@ -90,7 +90,8 @@ export function Detail({
           <h3 id="detail-heading" className="section-heading" tabIndex={-1} ref={headingRef}>
             <Words said={heading} />
           </h3>
-          {separate || open?.kind === 'record' ? (
+          {/* In Drill down the trail is the way back (0090). */}
+          {layout !== 'drill' && (separate || open?.kind === 'record') ? (
             <button type="button" className={separate ? 'button back' : 'button quiet back'} onClick={onBack}>
               {separate ? (
                 <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 16 16">

@@ -2846,6 +2846,33 @@
       "reviewed": "sha256:e25d6ea3951717cb2fcdf9af59efa0b35d9a8cae824a9ffcdd25c3fa4f7a7090",
       "none": "A grant of the live demo's own account: nothing a user, integrator or operator of a release meets. The generator is unchanged, so a deployment's own column with a default is still offered wherever its account may INSERT it, as 0027 says."
     },
+    "0090": {
+      "reviewed": "sha256:a77114e3407ebfd1086f41da5ef6640b8d8cd3064728db5cb065844d9093601b",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "Drill down's levels are in the page's memory only: a reload, or a link sent to someone, opens the form's records, and the path down has to be walked again.",
+          "heldBy": "apps/host/src/layout.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "One Back after a record is deleted at a Drill down level can show nothing new: the entry it lands on is the level the delete replaced."
+        },
+        {
+          "area": "host",
+          "says": "A child row open on a section's rail in another layout and the same row opened a level down in Drill down are two forms with their own unsaved changes, and the unsaved-changes notice names both."
+        },
+        {
+          "area": "host",
+          "says": "Drill down's trail names a record by the first required plain text field of its form, which can be a field a person would not have chosen, and by its token when no field qualifies.",
+          "heldBy": "apps/host/src/crumbs.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "On a phone the four layouts of the Layout group take two rows."
+        }
+      ]
+    },
     "0091": {
       "reviewed": "sha256:a780be75b3e728fa74966a845329262eb78851238e3f6fb96a49685f0d31da3b",
       "limitations": [

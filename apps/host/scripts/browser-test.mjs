@@ -75,6 +75,13 @@
 //     server answers for the request the page sent, with no anchor of it
 //     left in the document -- the Records' file and an order's lines' --
 //     and a refusal is the server's sentence on the button's line;
+//   - Drill down (0090): a customer, one of its orders and that order's
+//     line three levels down, the trail naming each; Tab reaches the
+//     trail's buttons in order, Enter on a crumb puts the keyboard on its
+//     level's heading, and the browser's own Back goes down again to the
+//     level the crumb left; on a phone the trail draws its ends and a
+//     button, said collapsed, that draws the rest and leaves the keyboard
+//     on the first crumb it drew;
 //   - the separator between the records and the record: a pointer drags it
 //     within its limits and the share is kept, and letting it go fits the
 //     grids' columns to the rows shown then -- a column a search filled
@@ -116,7 +123,8 @@
 // One module per reason to change, under scripts/browser/: the plane, the
 // server of the built page, the stylesheet's reads, the measurements, the
 // workspace's states, the record's journey, a delete's states, Download
-// CSV's, a customer list that goes on, and the policy's allowance.
+// CSV's, Drill down's, a customer list that goes on, and the policy's
+// allowance.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
 // scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
@@ -134,6 +142,7 @@ import { afterEveryPass, agGridRowProblem, canary, canaryProblem, environmentOf,
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { allowanceProblem } from './browser/allowance.mjs'
 import { deleteJourney } from './browser/deleting.mjs'
+import { drillJourney } from './browser/drilling.mjs'
 import { exportJourney } from './browser/exporting.mjs'
 import { recordJourney } from './browser/journey.mjs'
 import { audit, decide, describeFocus, focusedOn, focusScroll, measureWidth } from './browser/measure.mjs'
@@ -241,7 +250,7 @@ async function run(gate, browser) {
 
         const run = { record: await plane.order(2), customer: 9000 + pass, reached }
         // The list that goes on last, since it signs in as another clerk.
-        for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run), ...exportJourney(plane, gate, run), ...moreJourney(plane, gate)]) {
+        for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run), ...exportJourney(plane, gate, run), ...drillJourney(plane, gate, run), ...moreJourney(plane, gate)]) {
           await act(page)
           await measured(page, state)
         }
@@ -280,7 +289,7 @@ async function run(gate, browser) {
   // A failed check fails the run in recordedPerBrowser, which says so.
   if (gate.failures().length > 0) return
   console.log(
-    `browser checks passed: the host page's workspace, journey, deletes, downloads and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
+    `browser checks passed: the host page's workspace, journey, deletes, downloads, Drill down and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
   )
 }
 
