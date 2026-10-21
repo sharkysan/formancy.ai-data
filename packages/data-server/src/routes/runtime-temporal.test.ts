@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf, generateForm, WRITE_ID_HEADER } from '@formancy/data-core'
 import type { ColumnMeta, DatabaseAdapter, DescribedRoot, FormPolicy, InsertRequest, LookupAdapter, NormalizedType, RecordAdapter, RecordFailure, RecordOutcome, UpdateRequest } from '@formancy/data-core'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
 import type { PublishedBundle } from '../bundle.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
-import type { IdentityVerifier } from '../identity.js'
 
 /*
  * An instant and a time on the runtime plane's update (0040), over fake

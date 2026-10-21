@@ -741,6 +741,37 @@ importers:
         specifier: ^0.3.1
         version: 0.3.1
 
+  packages/data-identity:
+    dependencies:
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
+    devDependencies:
+      '@arethetypeswrong/cli':
+        specifier: 'catalog:'
+        version: 0.18.5
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.5
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 5.0.3(vitest@5.0.3)
+      publint:
+        specifier: 'catalog:'
+        version: 0.3.25
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)(unrun@0.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      unrun:
+        specifier: ^0.3.1
+        version: 0.3.1
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@types/node@22.20.5)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.3(@types/node@22.20.5)(esbuild@0.28.2)(sass-embedded@1.104.1)(sass@1.104.1)(yaml@2.9.1))
+
   packages/data-performance:
     dependencies:
       '@formancy/data-client':
@@ -838,6 +869,9 @@ importers:
       '@formancy/data-core':
         specifier: workspace:*
         version: link:../data-core
+      '@formancy/data-identity':
+        specifier: workspace:*
+        version: link:../data-identity
       '@formancy/data-postgres':
         specifier: workspace:*
         version: link:../data-postgres
@@ -850,9 +884,6 @@ importers:
       fastify:
         specifier: ^5.12.5
         version: 5.12.5
-      jose:
-        specifier: ^6.2.12
-        version: 6.2.12
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: 'catalog:'
@@ -866,6 +897,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.3(vitest@5.0.3)
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
       publint:
         specifier: 'catalog:'
         version: 0.3.25

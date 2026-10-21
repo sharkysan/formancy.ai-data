@@ -79,8 +79,9 @@ describe('openKeySetFile', () => {
     expect(await file.readAgain()).toEqual({ read: true, changed: false, kids: ['a', 'c'], leftOut: [] })
   })
 
-  // A set refused at start stops the process (main.ts): the path is
-  // configuration and is named, as resolveSecret names a secret file's.
+  // A set refused at start stops the process (data-server's main.ts): the
+  // path is configuration and is named, as resolveSecret names a secret
+  // file's.
   test('a file that cannot be read, or is refused, at start is a sentence', async () => {
     await expect(openKeySetFile(path, 'HS256')).rejects.toThrow(`the identity key set file ${path} cannot be read`)
     await writeFile(path, text({ ...hs('a'), jwk: { kty: 'oct', kid: 'a', k: 'c2hvcnQ' } }))

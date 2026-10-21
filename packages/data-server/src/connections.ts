@@ -1,7 +1,7 @@
 import { isDatabaseKind } from '@formancy/data-core'
 import type { DatabaseAdapter, DatabaseKind, DiscoveryScope, LookupAdapter, RecordAdapter } from '@formancy/data-core'
-import { resolveSecret } from './secrets.js'
-import type { SecretSource } from './secrets.js'
+import { resolveSecret } from '@formancy/data-identity'
+import type { SecretSource } from '@formancy/data-identity'
 
 /**
  * How a SQL Server connection logs in when it is not a SQL login: as a

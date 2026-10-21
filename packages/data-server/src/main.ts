@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { resolveSecret } from '@formancy/data-identity'
 import { createDataServer } from './app.js'
 import type { DataServerOptions } from './app.js'
 import { createFileConfigurationStore } from './config-store.js'
@@ -11,7 +12,6 @@ import { servedPlanes } from './planes.js'
 import { lookupDeadlineSetting } from './lookup-deadline.js'
 import { publisherRolesSetting } from './publisher-roles.js'
 import { rateLimitSetting } from './rate-limit.js'
-import { resolveSecret } from './secrets.js'
 import { trustedProxiesSetting } from './trusted-proxies.js'
 
 /**

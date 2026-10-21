@@ -17,6 +17,7 @@ import type {
   RecordOutcome,
   UpdateRequest,
 } from '@formancy/data-core'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
@@ -25,7 +26,6 @@ import { recordReference } from '../audit.js'
 import type { AuditSink, RuntimeAuditEvent } from '../audit.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
-import type { IdentityVerifier } from '../identity.js'
 
 /*
  * The runtime plane over fake ports. What the database does with a request is

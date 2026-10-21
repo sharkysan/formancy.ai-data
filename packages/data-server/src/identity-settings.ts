@@ -1,12 +1,6 @@
 import { isAbsolute } from 'node:path'
-import { createIdentityVerifier } from './identity.js'
-import type { IdentityOptions, IdentityVerifier, OneKey } from './identity.js'
-import { openKeySetFile } from './identity-file.js'
-import type { KeySetFile } from './identity-file.js'
-import { isKeySetAlgorithm } from './identity-keys.js'
-import type { KeySetAlgorithm, PublicKeyAlgorithm } from './identity-keys.js'
-import { resolveSecret } from './secrets.js'
-import type { SecretSource } from './secrets.js'
+import { createIdentityVerifier, isKeySetAlgorithm, openKeySetFile, resolveSecret } from '@formancy/data-identity'
+import type { IdentityOptions, IdentityVerifier, KeySetAlgorithm, KeySetFile, OneKey, SecretSource } from '@formancy/data-identity'
 
 /**
  * Where the host identity's key comes from, as the environment names it, and
@@ -27,6 +21,9 @@ export type IdentityKeySource =
   | { kind: 'secret'; reference: string }
   | { kind: 'public-key'; path: string; algorithm: PublicKeyAlgorithm }
   | { kind: 'key-set'; path: string; algorithm: KeySetAlgorithm }
+
+/** What a public key file verifies: the algorithms the verifier's own OneKey takes for one, so the two cannot differ. */
+type PublicKeyAlgorithm = Extract<OneKey, { kind: 'public-key' }>['algorithm']
 
 export type IdentityKeySetting = { ok: true; source: IdentityKeySource } | { ok: false; problem: string }
 

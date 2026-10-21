@@ -2,10 +2,9 @@ import { createPublicKey, generateKeyPairSync, randomBytes } from 'node:crypto'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createIdentityVerifier, readKeySet } from '@formancy/data-identity'
 import { SignJWT } from 'jose'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { createIdentityVerifier } from './identity.js'
-import { readKeySet } from './identity-keys.js'
 import { runKeysTool } from './identity-keys-tool.js'
 
 /*

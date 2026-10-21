@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf, generateForm } from '@formancy/data-core'
 import type { ColumnMeta, DatabaseAdapter, FormPolicy, LookupAdapter, LookupSignal, NormalizedType, ObjectRef, RecordAdapter } from '@formancy/data-core'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
@@ -11,7 +12,6 @@ import type { RuntimeAuditEvent } from '../audit.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
-import type { IdentityVerifier } from '../identity.js'
 
 /*
  * What the lookup routes decide around the adapter (0061), over fake ports

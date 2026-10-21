@@ -7,6 +7,7 @@ import { EMPTY_PRESENTATION, MAX_LOOKUP_DEADLINE_MS } from '@formancy/data-core'
 import type { FieldBinding, FormPolicy, ObjectRef } from '@formancy/data-core'
 import { blockTable, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { BlockedTable, PostgresFixture, SqlServerFixture } from '@formancy/data-fixtures'
+import { createIdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { SignJWT } from 'jose'
 import { connectPostgres } from '@formancy/data-postgres'
@@ -18,7 +19,6 @@ import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionConfig, ConnectionRegistry } from '../connections.js'
 import { createConnectionRegistry } from '../connections.js'
 import { DRIVER_FACTORIES, POSTGRES_LOOKUPS_APPLICATION } from '../drivers.js'
-import { createIdentityVerifier } from '../identity.js'
 
 /*
  * A lookup statement stops when its request is abandoned or its deadline

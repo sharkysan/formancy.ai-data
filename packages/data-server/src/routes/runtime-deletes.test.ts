@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, DELETE_REFUSED, describedOf, generateForm } from '@formancy/data-core'
 import type { ColumnMeta, DatabaseAdapter, DeleteOutcome, ForeignKeyMeta, DeleteRequest, Described, DescribedTable, FormPolicy, InboundKey, LookupAdapter, NormalizedType, ObjectMeta, ObjectRef, RecordAdapter } from '@formancy/data-core'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
@@ -12,7 +13,6 @@ import type { PublishedBundle } from '../bundle.js'
 import { validateBundle } from '../bundle.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
-import type { IdentityVerifier } from '../identity.js'
 
 /*
  * `POST /v1/forms/:id/records/delete` and what `GET /v1/forms/:id` says of

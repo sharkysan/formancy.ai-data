@@ -6,6 +6,7 @@ import { EMPTY_PRESENTATION, presentationOf } from '@formancy/data-core'
 import type { FieldBinding, FieldWrites, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, PresentationOverrides } from '@formancy/data-core'
 import { EDGE_VALUES, EXPORT_ROWS, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, WRITER } from '@formancy/data-fixtures'
 import type { PostgresFixture, SqlServerFixture } from '@formancy/data-fixtures'
+import { createIdentityVerifier } from '@formancy/data-identity'
 import { connectPostgres } from '@formancy/data-postgres'
 import { connectSqlServer } from '@formancy/data-sqlserver'
 import type { FormSchema, LayoutNode } from '@formancy/spec'
@@ -18,7 +19,6 @@ import { createFileConfigurationStore } from './config-store.js'
 import type { ConnectionConfig, ConnectionRegistry } from './connections.js'
 import { createConnectionRegistry } from './connections.js'
 import { DRIVER_FACTORIES } from './drivers.js'
-import { createIdentityVerifier } from './identity.js'
 
 /*
  * The whole product, end to end, on both engines: HTTP into the real server,

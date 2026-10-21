@@ -29,7 +29,6 @@ import { ed25519Point } from './ed25519.js'
 
 export const KEY_SET_ALGORITHMS = ['RS256', 'ES256', 'EdDSA', 'HS256'] as const
 export type KeySetAlgorithm = (typeof KEY_SET_ALGORITHMS)[number]
-export type PublicKeyAlgorithm = Exclude<KeySetAlgorithm, 'HS256'>
 
 export function isKeySetAlgorithm(value: unknown): value is KeySetAlgorithm {
   return KEY_SET_ALGORITHMS.some((algorithm) => algorithm === value)
@@ -281,13 +280,13 @@ export class KeySet {
     return new KeySet(BUILD, algorithm, inForce, leftOut, undefined)
   }
 
-  /** `FORMANCY_DATA_IDENTITY_SECRET`'s key: HS256 over the secret's UTF-8 bytes, at least 32 of them. */
+  /** A shared secret's key, as the server's `FORMANCY_DATA_IDENTITY_SECRET` names one: HS256 over the secret's UTF-8 bytes, at least 32 of them. */
   static fromSecret(secret: string): KeySet {
     if (Buffer.byteLength(secret, 'utf8') < MIN_SECRET_BYTES) throw new KeySetRefusal(`the identity secret must be at least ${String(MIN_SECRET_BYTES)} bytes`)
     return new KeySet(BUILD, 'HS256', [], [], createSecretKey(Buffer.from(secret, 'utf8')))
   }
 
-  /** `FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE`'s key: an SPKI PEM, imported by jose as it always was, for RS256, ES256 or EdDSA and never HS256. */
+  /** A public key's, as the server's `FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE` names one: an SPKI PEM, imported by jose as it always was, for RS256, ES256 or EdDSA and never HS256. */
   static async fromPem(pem: string, algorithm: string): Promise<KeySet> {
     if (algorithm !== 'RS256' && algorithm !== 'ES256' && algorithm !== 'EdDSA') {
       throw new KeySetRefusal('a public key verifies RS256, ES256 or EdDSA: HS256 is a shared secret, never a public key')
@@ -338,9 +337,9 @@ export class KeySet {
 
   /**
    * A one-key setting's key as a key set file holding it under `kid`: what
-   * `identity-keys-cli.mjs convert` writes. The secret's key is the base64url
-   * of the bytes this set verifies with, not the secret's text, which is also
-   * valid base64url and another key (M2). Read back before it is returned.
+   * the server's `identity-keys-cli.mjs convert` writes. The secret's key is
+   * the base64url of the bytes this set verifies with, not the secret's text,
+   * which is also valid base64url and another key (M2). Read back before it is returned.
    * This is key material; nothing logs it.
    */
   async document(kid: string): Promise<string> {

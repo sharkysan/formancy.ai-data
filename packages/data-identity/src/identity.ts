@@ -45,8 +45,9 @@ const NOT_A_KEY_SET = 'the identity key set is not one readKeySet made'
 
 /**
  * The set a one-key setting verifies with: a secret's UTF-8 bytes, at least
- * 32 of them, or the PEM as jose imports it. What `identity-keys-cli.mjs
- * convert` writes is this set's key, so the two never differ.
+ * 32 of them, or the PEM as jose imports it. What the server's
+ * `identity-keys-cli.mjs convert` writes is this set's key, so the two never
+ * differ.
  */
 export async function oneKeySet(key: OneKey): Promise<KeySet> {
   return key.kind === 'secret' ? KeySet.fromSecret(key.secret) : KeySet.fromPem(key.pem, key.algorithm)
