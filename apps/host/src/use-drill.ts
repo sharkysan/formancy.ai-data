@@ -30,8 +30,12 @@ import type { LeaveRequest, Said } from './leave.js'
  *   `level`, so Back and Forward move between levels as they move between
  *   Separate views' views. An entry asking for a level no longer held
  *   shows the deepest one above it, written over that entry.
- * - **Gone.** A record deleted at a level takes the levels below it with
- *   it, and the level above is shown, its section saying the row is gone.
+ * - **Gone.** A record deleted -- at its level, from a grid, in any layout
+ *   -- takes the level that holds it and the levels below with it, by the
+ *   record and never by the depth, since a level may have been replaced
+ *   while a delete was out; the level above is shown, its section saying
+ *   the row is gone. A row a level holds asks about the levels from it
+ *   down before its Delete asks anything.
  */
 
 /** What a section asks to go down into: a row by its token, or a new one. */
@@ -61,6 +65,8 @@ export interface DrillStep {
 
 /** What a section does when its level is told something by the levels below. */
 export interface SectionHandle {
+  /** The record whose rows it lists: a section mounted again for another parent is another section. */
+  parent: string
   /** The row the level below held is gone: said on the grid, which asks for its page again. */
   removed(line: Said): void
   /** The keyboard on the section's heading. */
@@ -75,11 +81,15 @@ export interface SectionDrill {
   held: string | null
   /** Go down into `want`; `toRow` gives the keyboard back on Keep editing, `refused` says a read the server refused. */
   descend(want: DrillWant, toRow: () => void, refused: (message: string) => void): void
-  /** Before a row's Delete: the held row's asks about the levels below first, then `go`; `back` on Keep editing. */
-  beforeDelete(token: string, go: () => void, back: () => void): void
-  /** A row of this section's grid is gone: the level below goes with it when it held that row. */
-  rowGone(token: string): void
-  /** The section's handle, by its owner, while it is mounted. */
+}
+
+/** What every grid of the open form tells the levels held, in every layout: a record's rows can be deleted wherever they are listed. */
+export interface HeldLevels {
+  /** Before a row's Delete: when a level holds that record, the guard asks about it and the levels below first, then `go`; `back` on Keep editing. */
+  beforeDelete(formId: string, token: string, go: () => void, back: () => void): void
+  /** A record gone from a grid: the level that holds it, and every level below, go too. */
+  recordGone(formId: string, token: string): void
+  /** A section's handle, by its owner, while it is mounted. */
   register(owner: string, handle: SectionHandle | null): void
 }
 
@@ -93,12 +103,14 @@ export interface Drill {
   descend(from: SectionAt, want: DrillWant, back: { toRow(): void; refused(message: string): void }): void
   /** A crumb: the level shown is `level`, an entry pushed; `back` on Keep editing. */
   up(level: number, back: () => void): void
-  /** What a section at `level` is given. */
+  /** What a section at `level` is given in Drill down. */
   section(at: SectionAt): SectionDrill
-  /** A level's record saved: its token, and what its crumb calls it now. */
-  saved(level: number, token: string, name: string | null): void
-  /** The record at `level` deleted, or not found and closed. */
-  gone(level: number, target: DeleteTarget, word: 'Deleted' | 'Closed', quiet: boolean): void
+  /** What every grid is given, in every layout. */
+  levels: HeldLevels
+  /** A level's record saved: its token, and what its crumb calls it now; nothing when that level has since been replaced. */
+  saved(step: DrillStep, token: string, name: string | null): void
+  /** The record a level showed deleted, or not found and closed: wherever it is held now, if anywhere. */
+  gone(step: DrillStep, target: DeleteTarget, word: 'Deleted' | 'Closed', quiet: boolean): void
   /** Shown, when Drill down draws it and it is held: a deletion's region at that level must be on screen. True when it was hidden. */
   reveal(level: number): boolean
   /** The record at level 1 replaced: every level below goes. */
@@ -155,6 +167,10 @@ export function useDrill({
   // read for an earlier request is not the person's latest.
   const asked = useRef(0)
   const sections = useRef(new Map<string, SectionHandle>())
+  const register = useCallback((owner: string, handle: SectionHandle | null) => {
+    if (handle === null) sections.current.delete(owner)
+    else sections.current.set(owner, handle)
+  }, [])
   const headings = useRef(new Map<number, HTMLHeadingElement>())
   const [children, setChildren] = useState<Readonly<Record<string, readonly ChildForm[]>>>({})
   const askedChildren = useRef(new Set<string>())
@@ -164,10 +180,15 @@ export function useDrill({
     setPathState(next)
   }, [])
 
+  // Read by the answers, which arrive after the render they were asked in.
+  const layoutRef = useRef(layout)
+  layoutRef.current = layout
   const deepest = 1 + path.length
   const held = (at: number): boolean => at === 0 || (at === 1 && open) || (at >= 2 && at <= 1 + pathRef.current.length)
   const asking = levelShown({ view, level })
   const shown = layout === 'drill' ? Math.min(asking, open ? deepest : 0) : asking === 0 ? 0 : 1
+  const shownRef = useRef(shown)
+  shownRef.current = shown
   // The level Drill down last showed, for entering it again.
   const last = useRef<number | null>(null)
   if (layout === 'drill') last.current = shown
@@ -230,6 +251,8 @@ export function useDrill({
           if (asked.current !== mine || guard.waiting()) return
           if (!answer.ok) {
             back.refused(answer.message)
+            // The question's buttons are gone with it: the keyboard goes back to what asked.
+            if (discarded) after(back.toRow)
             return
           }
           const record = answer.value
@@ -261,49 +284,57 @@ export function useDrill({
     )
   }
 
-  const register = useCallback((owner: string, handle: SectionHandle | null) => {
-    if (handle === null) sections.current.delete(owner)
-    else sections.current.set(owner, handle)
-  }, [])
-
   function section(at: SectionAt): SectionDrill {
     const below = path[at.level - 1]
     const mine = below !== undefined && below.from === at.owner ? below : undefined
     return {
       held: mine?.token ?? null,
       descend: (wanted, toRow, refused) => descend(at, wanted, { toRow, refused }),
-      beforeDelete: (token, go, back) => {
-        const now = pathRef.current[at.level - 1]
-        if (now === undefined || now.from !== at.owner || now.token !== token) {
-          go()
-          return
-        }
-        guard.ask({ kind: 'drill-delete', below: at.level, record: token }, go, back)
-      },
-      rowGone: (token) => {
-        const now = pathRef.current[at.level - 1]
-        if (now !== undefined && now.from === at.owner && now.token === token) setPath(pathRef.current.slice(0, at.level - 1))
-      },
-      register,
     }
   }
 
-  function saved(at: number, token: string, name: string | null): void {
-    const step = pathRef.current[at - 2]
-    if (step === undefined) return
-    setPath(pathRef.current.map((each) => (each === step ? { ...each, token, name } : each)))
-    sections.current.get(step.from)?.reload()
+  /** The first level that holds `formId`'s record `token`, and every level below it, dropped: its index in the path, or null when none held it. */
+  function drop(formId: string, token: string): number | null {
+    const index = pathRef.current.findIndex((step) => step.form.child.form === formId && step.token === token)
+    if (index === -1) return null
+    asked.current += 1
+    setPath(pathRef.current.slice(0, index))
+    return index
   }
 
-  function gone(at: number, target: DeleteTarget, word: 'Deleted' | 'Closed', quiet: boolean): void {
-    const step = pathRef.current[at - 2]
-    if (step === undefined) return
-    setPath(pathRef.current.slice(0, at - 2))
+  const levels: HeldLevels = {
+    beforeDelete: (formId, token, go, back) => {
+      const index = pathRef.current.findIndex((step) => step.form.child.form === formId && step.token === token)
+      if (index === -1) go()
+      else guard.ask({ kind: 'drill-delete', below: index + 1, record: token }, go, back)
+    },
+    recordGone: (formId, token) => {
+      const index = drop(formId, token)
+      // Shown at or below the level gone, the level above it is shown, with no step of its own in the history.
+      if (index !== null && layoutRef.current === 'drill' && shownRef.current >= index + 2) show(index + 1, true, false)
+    },
+    register,
+  }
+
+  function saved(step: DrillStep, token: string, name: string | null): void {
+    // By the step's key: a level replaced while its save was out is not the one to rename.
+    const now = pathRef.current.find((each) => each.key === step.key)
+    if (now === undefined) return
+    setPath(pathRef.current.map((each) => (each === now ? { ...each, token, name } : each)))
+    sections.current.get(now.from)?.reload()
+  }
+
+  function gone(step: DrillStep, target: DeleteTarget, word: 'Deleted' | 'Closed', quiet: boolean): void {
+    // The grid it was opened from says so, while it still lists that parent's rows.
     const above = sections.current.get(step.from)
-    above?.removed(goneLine(target, word))
-    // Shown at or below the level gone, the level above is shown in its place, with no step of its own in the history.
-    if (layout === 'drill' && shown >= at) show(at - 1, true, false)
-    if (!quiet) after(() => above?.focusHeading())
+    if (above !== undefined && above.parent === step.parent) above.removed(goneLine(target, word))
+    const index = drop(step.form.child.form, target.record)
+    if (index === null || layoutRef.current !== 'drill') return
+    const at = index + 2
+    const showing = shownRef.current
+    if (showing >= at) show(at - 1, true, false)
+    // The keyboard on the section's heading when the person is where it is drawn: one who moved on hears nothing.
+    if (!quiet && showing >= at - 1) after(() => above?.focusHeading())
   }
 
   function reveal(at: number): boolean {
@@ -338,6 +369,8 @@ export function useDrill({
   // views do.
   useEffect(() => {
     if (historyView === 0 || layout !== 'drill') return
+    // The person moved: a read still out is for a level they left, as after a crumb.
+    asked.current += 1
     if (shown !== asking) show(shown, true, false)
     if (shown >= 2) focusLevel(shown)
     // On each change made by history, and only then.
@@ -350,6 +383,7 @@ export function useDrill({
     descend,
     up,
     section,
+    levels,
     saved,
     gone,
     reveal,

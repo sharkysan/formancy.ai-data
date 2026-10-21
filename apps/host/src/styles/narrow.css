@@ -82,7 +82,7 @@
     max-height: calc(100dvh - 11rem);
   }
 
-  .lanes[data-layout='separate'] > .master {
+  .lanes:is([data-layout='separate'], [data-layout='drill']) > .master {
     max-height: calc(100dvh - 11rem);
   }
 
@@ -108,7 +108,7 @@
   }
 
   .lanes[data-layout='side-by-side'] > .master,
-  .lanes[data-layout='separate'] > .master {
+  .lanes:is([data-layout='separate'], [data-layout='drill']) > .master {
     position: static;
     max-height: none;
     overflow: visible;
@@ -120,7 +120,7 @@
   }
 
   /* The records view alone: as tall as the window below the panel's top. */
-  .lanes[data-layout='separate'] .grid-bench.master-bench {
+  .lanes:is([data-layout='separate'], [data-layout='drill']) .grid-bench.master-bench {
     flex: none;
     max-height: clamp(16rem, 100dvh - 27rem, 56rem);
   }
@@ -262,7 +262,7 @@
     max-width: none;
   }
 
-  .lanes[data-layout='separate'] .grid-bench.master-bench {
+  .lanes:is([data-layout='separate'], [data-layout='drill']) .grid-bench.master-bench {
     max-height: clamp(14rem, 100dvh - 30rem, 56rem);
   }
 

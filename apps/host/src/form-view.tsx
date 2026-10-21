@@ -227,9 +227,10 @@ export function FormView({
   const paged = layout === 'separate' || layout === 'drill'
   const say = (said: Said, kind: 'answer' | 'refused' = 'answer'): void => setLine({ said, kind })
 
-  /** In Separate views, `half` shown if it is not, without a step of its own in the history: the page moved there, the person did not. True when it was hidden. */
+  /** In Separate views, `half` shown if it is not, without a step of its own in the history: the page moved there, the person did not; in Drill down, its level, 0 or 1. True when it was hidden. */
   function reveal(half: View): boolean {
-    if (!paged || view === half) return false
+    const hidden = drilling ? drill.shown !== (half === 'records' ? 0 : 1) : paged && view !== half
+    if (!hidden) return false
     onView(half, true, half === 'record' ? 1 : undefined)
     return true
   }
@@ -357,13 +358,16 @@ export function FormView({
     else removal.ask(detailTarget(title, now.token, removal.heard(now.token)))
   }
 
-  /** A row's Delete (0053); the open record's row waits for a save of it, as its header's Delete does. */
+  /** A row's Delete (0053); the open record's row waits for a save of it, as its header's Delete does. A row a Drill down level holds -- a form that is its own child -- asks about the levels first. */
   function deleteRow(row: GridRow): void {
     const now = openRef.current
     const target = rowTarget(title, row, now?.kind === 'record' ? { record: now.token, heard: removal.heard(now.token) } : null)
     if (target === null) return
-    if (target.open && saving) grid.current?.say([SAVE_OUT])
-    else removal.ask(target)
+    const confirm = (): void => {
+      if (target.open && saving) grid.current?.say([SAVE_OUT])
+      else removal.ask(target)
+    }
+    drill.levels.beforeDelete(formId, target.record, confirm, () => grid.current?.focusRecord(target.record, DELETE_COLUMN))
   }
 
   /**
@@ -374,6 +378,7 @@ export function FormView({
    * when the person moved on before the answer: the grid alone hears it.
    */
   function recordGone(target: DeleteTarget, word: 'Deleted' | 'Closed', quiet: boolean): void {
+    drill.levels.recordGone(formId, target.record)
     const now = openRef.current
     if (now?.kind === 'record' && now.token === target.record) {
       opening.replaced()
@@ -499,6 +504,7 @@ export function FormView({
                   renderer={renderer}
                   refit={released}
                   onShow={() => reveal('record')}
+                  levels={drill.levels}
                   drill={drilling && parent.kind === 'record' ? drill.section({ level: 1, owner: `${form.child.form}~${form.child.field}`, form, parentNoun: title, parent: parent.token }) : undefined}
                 />
               ))}

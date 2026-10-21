@@ -24,7 +24,14 @@
   deleted (0050): a delete at level 2 goes to level 1, its section saying
   the row is gone; the held row's Delete in the grid asks about the levels
   below first; a delete answered after the person went up moves nothing;
-  and a delete at level 1 takes every level below with it. Each case was
+  a delete at level 1 takes every level below with it; a delete answered
+  after its level was replaced leaves the level that replaced it, typing
+  included; and the row a level holds, deleted from its grid in another
+  layout, asks about that level first and takes it with it. On both
+  engines: the record's delete, answered while the person is a level
+  down, shows level 1 with the keyboard in its answer; Back drops a row's
+  read that is still out; and a read refused after the guard's Discard
+  gives the keyboard back to the row. Each case was
   watched failing with the rule it holds broken, one at a time: the
   same-row shortcut removed, going down discarding nothing, the record
   sparing the levels, Back's clamp removed, the levels unmounted in other
@@ -32,7 +39,12 @@
   token, a save naming nothing, a deleted level kept, the held row deleted
   without asking, the record's delete keeping its levels, the level above
   shown whenever a level went, the crumbs' text left out; and the phone's
-  button, pressed, first left the keyboard on the page.
+  button, pressed, first left the keyboard on the page. The cases a review
+  of the branch found were each watched failing before their fix: the new
+  level vanished with the old one's answer, Drill down showed a line
+  deleted in Side by side with its typing, level 1's answer was drawn
+  hidden, Back's read pulled the person two levels down, and the keyboard
+  fell to the page.
   `apps/host/src/layout.test.ts` — `level` is written only in Drill down's
   record view, read as a whole number from one, and never where a person
   arrives. `apps/host/src/leave.test.ts` — every owner says its level, and
@@ -44,8 +56,10 @@
   The host's browser gate, `apps/host/scripts/browser/drilling.mjs`, in
   Chromium, Firefox and WebKit: a customer, its order and that order's
   line, the trail by Tab and Enter, the browser's own Back, and on a phone
-  the trail's ends and a button for the rest, with axe's contrast and
-  target-size rules and nothing past either edge down to 320 pixels.
+  the trail's ends and a button for the rest, level 0 sized as
+  Separate views' records view (watched failing at every width before the
+  records' rules named Drill down), with axe's contrast and target-size
+  rules and nothing past either edge down to 320 pixels.
 
 ## Context
 
@@ -104,8 +118,11 @@ every layout does
 
 **Delete at a level goes to the level above**, replacing the entry, its
 section's grid saying the row is gone and the keyboard on that section's
-heading, the levels below with it. The row a level below holds, deleted
-from its grid, asks about the levels below first.
+heading, the levels below with it. A record a level holds, deleted from
+any grid in any layout, asks about that level and the levels below first,
+and once gone takes them with it. A level is matched by its record, never
+by its depth: a delete answered after its level was replaced leaves the
+level that replaced it.
 
 **The other layouts are unchanged.** Another layout shows level 1 as it
 always did; the levels below stay mounted and hidden, their work still the

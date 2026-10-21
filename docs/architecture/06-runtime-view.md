@@ -515,9 +515,12 @@ offset, and the bounds are a budget and a derivation, not measurements
    deepest one above it and is written over (`apps/host/src/address.ts`).
    A crumb's name is read from the stored record by
    `apps/host/src/crumbs.ts`.
-4. A delete at a level (6.7) takes the levels below with it and shows the
-   level above, replacing the entry, its section's grid saying the row is
-   gone.
+4. A delete (6.7) of a record a level holds -- at its level, or from any
+   grid in any layout, where the guard asks about the levels first -- takes
+   that level and the levels below with it, matched by the record and not
+   the depth, and shows the level above, replacing the entry, its
+   section's grid saying the row is gone. Back, like a crumb, drops a
+   row's read still out.
 
 Held by `apps/host/src/drill.test.tsx` on both engines, `layout.test.ts`,
 `leave.test.ts`, `crumbs.test.ts`, `address.test.tsx`, and the browser

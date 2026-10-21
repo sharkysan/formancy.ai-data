@@ -96,7 +96,7 @@ export function DrillLevel({
     discards: { kind: 'drill-delete', below: level - 1, record: open.kind === 'record' ? open.token : '' },
     onGone: (target, word, quiet) => {
       opening.replaced()
-      drill.gone(level, target, word, quiet)
+      drill.gone(step, target, word, quiet)
     },
     onLoad: (target) => {
       // The stored record read again into this level's forms: what it replaces is this level's own.
@@ -119,10 +119,10 @@ export function DrillLevel({
     opening.answered(result, from, (now) => {
       setOpen({ kind: 'record', token: now.token })
       if (now.discarded) setLine(['Discarded the unsaved changes. ', 'Opened ', { code: now.token }, '.'])
-      drill.saved(level, now.token, nameOf(from))
+      drill.saved(step, now.token, nameOf(from))
     })
     const now = openRef.current
-    if (result.kind === 'saved' && now.kind === 'record') drill.saved(level, now.token, nameOf(from))
+    if (result.kind === 'saved' && now.kind === 'record') drill.saved(step, now.token, nameOf(from))
   }
 
   /** This level's Delete, in its header (0053); while a save of it is out, it waits, and says so. */
@@ -184,6 +184,7 @@ export function DrillLevel({
             ownerBase={drillBase(level)}
             idBase={`${idBase}-child`}
             onShow={() => drill.reveal(level)}
+            levels={drill.levels}
             drill={parentNow.kind === 'record' ? drill.section({ level, owner: sectionOwner, form: each, parentNoun: title, parent: parentNow.token }) : undefined}
           />
         )

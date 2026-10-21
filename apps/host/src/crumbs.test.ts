@@ -60,6 +60,9 @@ describe("a level's name", () => {
     expect(recordName(FIELDS, unread, null)).toBe('Muster AG')
   })
 
+  // A crumb says the form and what names the record, so two levels of one
+  // form read apart; the token is code, as the page sets every token; and
+  // a new record is new, never an empty name (watched failing: no module).
   test('is said with the form, the token as code, or as new', () => {
     expect(crumbOf(2, 'Customer', { token: 'k1:4711', name: 'Muster AG' })).toEqual({ level: 2, said: ['Customer Muster AG'] })
     expect(crumbOf(3, 'Order line', { token: 'k1:4711,2', name: null })).toEqual({ level: 3, said: ['Order line ', { code: 'k1:4711,2' }] })

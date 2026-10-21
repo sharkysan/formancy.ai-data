@@ -21,7 +21,7 @@ import { detailTarget, gone, rowTarget, SAVE_OUT } from './deletion.js'
 import type { DeleteTarget } from './deletion.js'
 import type { GridRow } from './grid-datasource.js'
 import { Words } from './words.js'
-import type { SectionDrill } from './use-drill.js'
+import type { HeldLevels, SectionDrill } from './use-drill.js'
 
 /** What the record above a child section is: a saved record, or a new one not saved yet. */
 export type ParentOpen = { kind: 'new' } | { kind: 'record'; token: string }
@@ -66,9 +66,11 @@ type ChildOpen = null | { kind: 'new' } | { kind: 'record'; token: string }
  * In Drill down (0090) a row opened, or New, goes down a level instead of
  * onto the rail (`drill`): the rail is not drawn -- a row open on it from
  * another layout stays mounted and hidden, its work still the guard's --
- * the grid marks the row the level below holds, and that row's Delete asks
- * about the levels below first. A section of a level from 2 down is owned
- * under its level (`ownerBase`, `idBase`), so no owner or id is twice.
+ * and the grid marks the row the level below holds. In every layout, a
+ * row a Drill down level holds asks about that level and the levels below
+ * before its Delete asks anything, and once gone takes them with it
+ * (`levels`). A section of a level from 2 down is owned under its level
+ * (`ownerBase`, `idBase`), so no owner or id is twice.
  */
 export function ChildSection({
   client,
@@ -83,6 +85,7 @@ export function ChildSection({
   ownerBase = '',
   idBase = 'child',
   drill,
+  levels,
 }: {
   client: DataClient
   form: ChildForm
@@ -102,6 +105,8 @@ export function ChildSection({
   idBase?: string
   /** In Drill down, how the section goes down a level (0090). */
   drill?: SectionDrill | undefined
+  /** The Drill down levels held, which a row deleted here may hold, in every layout. */
+  levels?: HeldLevels | undefined
 }): ReactElement {
   const { child, menu, definition } = form
   const owner = `${ownerBase}${child.form}~${child.field}`
@@ -166,12 +171,13 @@ export function ChildSection({
   const prefix = (discarded: boolean): Said => (discarded ? ['Discarded the unsaved changes. '] : [])
 
   // Its handle, for the levels below: a row they held gone, a save there to show.
-  const register = drill?.register
+  const register = levels?.register
+  const listing = parent.kind === 'record' ? parent.token : null
   useEffect(() => {
-    if (register === undefined) return undefined
-    register(owner, { removed: (said) => grid.current?.removed(said), focusHeading: () => sectionHeading.current?.focus(), reload: () => grid.current?.reload() })
+    if (register === undefined || listing === null) return undefined
+    register(owner, { parent: listing, removed: (said) => grid.current?.removed(said), focusHeading: () => sectionHeading.current?.focus(), reload: () => grid.current?.reload() })
     return () => register(owner, null)
-  }, [register, owner])
+  }, [register, owner, listing])
 
   function askRow(token: string, how: OpenHow, at: RowAt): void {
     // In Drill down every open goes down a level: a click, Space and Enter alike.
@@ -216,25 +222,17 @@ export function ChildSection({
     else removal.ask(detailTarget(title, now.token, removal.heard(now.token)))
   }
 
-  /** A row's Delete (0053); the open row's waits for a save of it, as its header's Delete does. In Drill down the row the level below holds asks about the levels below first. */
+  /** A row's Delete (0053); the open row's waits for a save of it, as its header's Delete does. A row a Drill down level holds asks about the levels first. */
   function deleteRow(row: GridRow): void {
-    if (drill !== undefined && row.record !== null && row.record === drill.held) {
-      const token = row.record
-      drill.beforeDelete(
-        token,
-        () => {
-          const target = rowTarget(title, row, null)
-          if (target !== null) removal.ask(target)
-        },
-        () => grid.current?.focusRecord(token, DELETE_COLUMN),
-      )
-      return
-    }
     const now = openRef.current
     const target = rowTarget(title, row, now?.kind === 'record' ? { record: now.token, heard: removal.heard(now.token) } : null)
     if (target === null) return
-    if (target.open && saving) grid.current?.say([SAVE_OUT])
-    else removal.ask(target)
+    const confirm = (): void => {
+      if (target.open && saving) grid.current?.say([SAVE_OUT])
+      else removal.ask(target)
+    }
+    if (levels === undefined) confirm()
+    else levels.beforeDelete(child.form, target.record, confirm, () => grid.current?.focusRecord(target.record, DELETE_COLUMN))
   }
 
   /** The row has gone from the page: its detail emptied when open, the grid asked again and saying so first, the keyboard on this section's heading. */
@@ -248,7 +246,7 @@ export function ChildSection({
       setLine([])
     }
     grid.current?.removed(gone(target, word))
-    drill?.rowGone(target.record)
+    levels?.recordGone(child.form, target.record)
     if (!quiet) after(() => sectionHeading.current?.focus())
   }
 

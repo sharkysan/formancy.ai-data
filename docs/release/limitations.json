@@ -2847,7 +2847,7 @@
       "none": "A grant of the live demo's own account: nothing a user, integrator or operator of a release meets. The generator is unchanged, so a deployment's own column with a default is still offered wherever its account may INSERT it, as 0027 says."
     },
     "0090": {
-      "reviewed": "sha256:7bd4b4d742f068f776150922f7c29a0a4797bde75f5760a2b92b662d14ea91c0",
+      "reviewed": "sha256:a77114e3407ebfd1086f41da5ef6640b8d8cd3064728db5cb065844d9093601b",
       "limitations": [
         {
           "area": "host",

@@ -32,6 +32,16 @@ const same = (got, want) => (JSON.stringify(got) === JSON.stringify(want) ? null
 /** Whether the window is a phone's, where the trail draws its ends: the page's own media query. */
 const phone = (page) => page.evaluate(() => window.matchMedia('(max-width: 40rem)').matches)
 
+/** How the Records panel and its grid's well are sized, as the browser computed them: what a layout's rules decide. */
+const recordsSize = (page) =>
+  page.evaluate(() => {
+    const panel = document.querySelector('.lanes > .master')
+    const well = panel?.querySelector('.grid-bench.master-bench')
+    if (!panel || !well) return null
+    const of = (element, keys) => Object.fromEntries(keys.map((key) => [key, getComputedStyle(element)[key]]))
+    return { panel: of(panel, ['maxHeight', 'overflowY', 'position']), well: of(well, ['maxHeight', 'flexGrow', 'flexShrink', 'flexBasis', 'minHeight']) }
+  })
+
 /** Enter on the first cell of a row, as a person at the keyboard opens one. */
 async function enterOn(page, locator) {
   const cell = locator.getByRole('gridcell').first()
@@ -47,7 +57,11 @@ async function aCustomer(page, at) {
   at.line = `${at.order},1`
   await carryOn(page, page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Customer ${CUSTOMERS}` }))
   await records(page).getByRole('grid', { name: 'Records', exact: true }).waitFor(WITHIN)
+  // Level 0 is Separate views' records view, sized as it is at this width: the panel and the grid's well.
+  await page.getByRole('radio', { name: 'Separate views', exact: true }).check()
+  const separate = await recordsSize(page)
   await page.getByRole('radio', { name: 'Drill down', exact: true }).check()
+  check("Drill down: its records are sized as Separate views' records", same(await recordsSize(page), separate))
   await enterOn(page, row(page, 'Records', at.name))
   await heading(page, `Customer k1:1,${String(at.no)}`).waitFor(WITHIN)
   check('Drill down: a customer is named in the trail by its name', same(await crumbs(page), ['Records', `Customer ${at.name}`]))

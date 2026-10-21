@@ -3,7 +3,8 @@
  * Drill down (0090): one level at a time, under a trail of the levels
  * above. Room variables only; nothing here selects inside .sheet or
  * .grid-bench. The level shown is the lanes' one column, as a view of
- * Separate views is.
+ * Separate views is, and level 0 is sized by Separate views' own rules
+ * for its records view (records.css, narrow.css).
  */
 
 .trail {
@@ -64,8 +65,4 @@ button.crumb:hover {
 /* The level shown: the page, not a way to it. */
 .crumb[aria-current='page'] {
   font-weight: 600;
-}
-
-.lanes[data-layout='drill'] > .master {
-  max-height: calc(100dvh - 8.25rem);
 }

@@ -16,10 +16,14 @@ import type { Engine, Plane } from './test-plane.js'
  * publishes: an order's lines, and an employee's employees and the orders
  * it created.
  *
- * Found by role and accessible name. Two reads the accessibility tree
- * cannot answer, said where they are made: `location.hash`, which is the
- * browser's, and element ids, which two levels of one form must never mint
- * twice and which have no role or name.
+ * Found by role and accessible name. What the accessibility tree cannot
+ * answer is read off the DOM, each where it is made: `location.hash`, which
+ * is the browser's; element ids, which two levels of one form must never
+ * mint twice and which have no role or name; the crumb that is the page,
+ * by `aria-current`, which the tree gives no role of its own; the role of
+ * the focused element, to tell a grid's cell from its other controls; and
+ * the levels still mounted, by their class, which hidden ones have no role
+ * to be found by.
  */
 
 let plane: Plane
@@ -117,26 +121,6 @@ async function drilling(formId: string, fetch: typeof globalThis.fetch = plane.f
   return user
 }
 
-/** `plane.fetch`, with every read of `formId`'s records held until `release`: an answer that comes once the person has moved on. */
-function holdingReads(formId: string): { fetch: typeof globalThis.fetch; release: () => void; held: () => number; answered: () => number } {
-  let open: () => void = () => {}
-  const gate = new Promise<void>((resolve) => {
-    open = resolve
-  })
-  let held = 0
-  let answered = 0
-  const fetch: typeof globalThis.fetch = async (input, init) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-    if (!url.endsWith(`/v1/forms/${formId}/records/read`)) return plane.fetch(input, init)
-    held += 1
-    await gate
-    const response = await plane.fetch(input, init)
-    answered += 1
-    return response
-  }
-  return { fetch, release: () => open(), held: () => held, answered: () => answered }
-}
-
 describe.each(ENGINES)('Drill down on $engine', (engine) => {
   // One level at a time, each an entry of the history, with the trail
   // naming every level above as a button and the one shown as the page: an
@@ -190,6 +174,88 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     await waitFor(() => expect(focusedName()).toBe(`Order line ${lines[0] ?? ''}`), ARRIVES)
   })
 
+  // Back while a row's read is out is going up too: the answer is dropped,
+  // as a crumb drops it, and does not pull the person two levels down
+  // (watched failing: the answer pushed the line's level after Back).
+  test('Back drops a read that is out', async () => {
+    const words = stamp('drill-back-late')
+    const { order } = await orderWithLines(engine, words, [1])
+    const held = holdingRequests(plane.fetch, ({ path }) => path.endsWith(`/v1/forms/${engine.lines}/records/read`))
+    const user = await drilling(engine.formId, held.fetch)
+    await searchRecords(user, words, [order.slice(3)])
+    await pressOn(user, 'Records', order.slice(3), '{Enter}')
+    await answeredOnce('Order line')
+    await pressOn(user, 'Order line', '1', '{Enter}')
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    window.history.back()
+    await waitFor(() => expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=records`), ARRIVES)
+    await held.pass()
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=records`)
+    expect(screen.queryByRole('heading', { name: /^Order line k1:/ })).toBeNull()
+  })
+
+  // A read refused after the guard's question was answered with Discard:
+  // the notice's button is gone, so the keyboard goes back to the row that
+  // asked, as the records grid's does (watched failing: the keyboard fell
+  // to the page).
+  test('a read refused after Discard gives the keyboard back to the row', async () => {
+    const words = stamp('drill-refused-discard')
+    const { order, lines } = await orderWithLines(engine, words, [1, 2])
+    const held = holdingRequests(plane.fetch, ({ path }) => path.endsWith(`/v1/forms/${engine.lines}/records/read`))
+    const user = await drilling(engine.formId, held.fetch)
+    await searchRecords(user, words, [order.slice(3)])
+    await pressOn(user, 'Records', order.slice(3), '{Enter}')
+    await answeredOnce('Order line')
+    await pressOn(user, 'Order line', '1', '{Enter}')
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    await held.pass()
+    await waitFor(() => expect(focusedName()).toBe(`Order line ${lines[0] ?? ''}`), ARRIVES)
+    const quantity = await waitFor(() => within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByLabelText(/^Quantity\b/) as HTMLInputElement, ARRIVES)
+    await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
+    await user.type(quantity, '5')
+    await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: `Order ${order}` }))
+    await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    await pressOn(user, 'Order line', '2', '{Enter}')
+    const notice = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
+    await user.click(within(notice).getByRole('button', { name: 'Discard and continue' }))
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    await held.fail()
+    await waitFor(() => expect(document.activeElement?.getAttribute('role')).toBe('gridcell'), ARRIVES)
+    expect(document.activeElement?.textContent).toBe('2')
+  })
+
+  // The record's delete answered while the person is a level down: what it
+  // asks of them -- here "Not deleted", the record having changed -- is
+  // drawn at level 1, which is shown, with the keyboard in it, as Separate
+  // views shows the record view (watched failing: the answer was drawn on
+  // the hidden level 1 and the keyboard stayed a level down).
+  test("the record's delete, answered a level down, shows level 1", async () => {
+    const words = stamp('drill-not-deleted')
+    const { order, lines } = await orderWithLines(engine, words, [1])
+    const held = holdingRequests(plane.fetch, ({ path }) => path.endsWith(`/v1/forms/${engine.formId}/records/delete`))
+    const user = await drilling(engine.formId, held.fetch)
+    await searchRecords(user, words, [order.slice(3)])
+    await pressOn(user, 'Records', order.slice(3), '{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    await user.click(screen.getByRole('button', { name: 'Delete record' }))
+    await user.click(within(await waitFor(() => screen.getByRole('region', { name: `Delete Order ${order}?` }), ARRIVES)).getByRole('button', { name: 'Delete it' }))
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    await answeredOnce('Order line')
+    await pressOn(user, 'Order line', '1', '{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order line ${lines[0] ?? ''}`), ARRIVES)
+    // The order changed beside the page: the delete, sent at the version read, is refused as stale.
+    const clerk = client(TOKENS.clerk)
+    const read = await clerk.read(engine.formId, order)
+    if (!read.ok || read.value.version === null) throw new Error('the order was not read')
+    expect(await clerk.update(engine.formId, { record: order, version: read.value.version, answers: { notes: `${words} moved on` } })).toMatchObject({ ok: true })
+    await held.pass()
+    const detail = await waitFor(() => screen.getByRole('region', { name: `Order ${order}` }), ARRIVES)
+    await waitFor(() => expect(detail.contains(document.activeElement)).toBe(true), ARRIVES)
+    expect(trail()).toEqual(['Records', `Order ${order}`])
+    expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=1`)
+  })
+
   // In Drill down a row opens as the next level, never on its section's
   // rail: back at the order, its section marks the row the next level
   // holds as open, and no rail heading is drawn (watched failing: no
@@ -241,17 +307,16 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
   test('an answer for a level left behind is dropped', async () => {
     const words = stamp('drill-late')
     const { order } = await orderWithLines(engine, words, [1])
-    const held = holdingReads(engine.lines)
+    const held = holdingRequests(plane.fetch, ({ path }) => path.endsWith(`/v1/forms/${engine.lines}/records/read`))
     const user = await drilling(engine.formId, held.fetch)
     await searchRecords(user, words, [order.slice(3)])
     await pressOn(user, 'Records', order.slice(3), '{Enter}')
     await answeredOnce('Order line')
     await pressOn(user, 'Order line', '1', '{Enter}')
-    await waitFor(() => expect(held.held()).toBe(1), ARRIVES)
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
     await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: 'Records' }))
     await waitFor(() => expect(focusedName()).toBe('Records'), ARRIVES)
-    held.release()
-    await waitFor(() => expect(held.answered()).toBe(1), ARRIVES)
+    await held.pass()
     await new Promise((resolve) => setTimeout(resolve, 200))
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=records`)
     expect(focusedName()).toBe('Records')
@@ -651,6 +716,62 @@ describe.each(ENGINES.filter((engine) => engine.connection === 'ms'))('Drill dow
     expect(focusedName()).toBe('Records')
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=records`)
     expect(trail()).toEqual(['Records'])
+  })
+
+  // A level's delete answered after the person went up, went down into
+  // another row, and discarded the deletion to do so: the level now at that
+  // depth is another record's, and stays, typing included; only the grid
+  // above says the row is gone (watched failing: the new level vanished
+  // with the old one's answer).
+  test('a late delete leaves the level that replaced its own', async () => {
+    const words = stamp('drill-late-delete')
+    const { order, lines } = await orderWithLines(engine, words, [1, 2])
+    const held = holdingRequests(plane.fetch, ({ path }) => path.endsWith(`/v1/forms/${engine.lines}/records/delete`))
+    const user = await drilling(engine.formId, held.fetch)
+    await toOrderLine(user, words, order, lines[0] ?? '')
+    await user.click(screen.getByRole('button', { name: 'Delete Order line' }))
+    await user.click(within(await waitFor(() => confirmation('Order line', lines[0] ?? ''), ARRIVES)).getByRole('button', { name: 'Delete it' }))
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    await crumb(user, `Order ${order}`)
+    await pressOn(user, 'Order line', '2', '{Enter}')
+    await user.click(within(await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)).getByRole('button', { name: 'Discard and continue' }))
+    await waitFor(() => expect(focusedName()).toBe(`Order line ${lines[1] ?? ''}`), ARRIVES)
+    const quantity = await field(`Order line ${lines[1] ?? ''}`, /^Quantity\b/)
+    await waitFor(() => expect(quantity.value).toBe('2'), ARRIVES)
+    await user.type(quantity, '4')
+    await held.pass()
+    await waitFor(async () => expect(await client(TOKENS.clerk).read(engine.lines, lines[0] ?? '')).toMatchObject({ ok: false, status: 404 }), ARRIVES)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(trail()).toEqual(['Records', `Order ${order}`, `Order line ${lines[1] ?? ''}`])
+    expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=2`)
+    expect((await field(`Order line ${lines[1] ?? ''}`, /^Quantity\b/)).value).toBe('24')
+  })
+
+  // The row a level holds, deleted from its grid in another layout: the
+  // guard asks about the level's typing first, as it does in Drill down,
+  // and once deleted the level is gone, so Drill down does not show a
+  // record that is not there (watched failing: no question, and Drill down
+  // showed the deleted line with its typing).
+  test('a held row deleted in another layout asks first, and takes its level', async () => {
+    const words = stamp('drill-other-layout')
+    const { order, lines } = await orderWithLines(engine, words, [1, 2])
+    const user = await drilling(engine.formId)
+    await toOrderLine(user, words, order, lines[0] ?? '')
+    const quantity = await field(`Order line ${lines[0] ?? ''}`, /^Quantity\b/)
+    await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
+    await user.type(quantity, '6')
+    await user.click(screen.getByRole('radio', { name: 'Side by side' }))
+    await answeredOnce('Order line')
+    await user.click(within(gridSection('Order line')).getByRole('button', { name: `Delete Order line ${lines[0] ?? ''}` }))
+    const notice = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
+    expect(within(notice).getAllByRole('paragraph').map((text) => text.textContent)).toContain(`Deleting ${lines[0] ?? ''} closes these forms:`)
+    expect(listed(notice)).toEqual([`Order line ${lines[0] ?? ''}, React: changes that are not saved.`])
+    await user.click(within(notice).getByRole('button', { name: 'Discard and continue' }))
+    await user.click(within(await waitFor(() => confirmation('Order line', lines[0] ?? ''), ARRIVES)).getByRole('button', { name: 'Delete it' }))
+    await waitFor(() => expect(rows('Order line').map((cells) => cells[0])).toEqual(['2']), ARRIVES)
+    await user.click(screen.getByRole('radio', { name: 'Drill down' }))
+    expect(trail()).toEqual(['Records', `Order ${order}`])
+    expect(screen.queryByRole('heading', { name: `Order line ${lines[0] ?? ''}` })).toBeNull()
   })
 
   // The record itself deleted at level 1 takes every level below with it,
