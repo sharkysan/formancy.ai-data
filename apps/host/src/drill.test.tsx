@@ -676,22 +676,29 @@ describe.each(ENGINES.filter((engine) => engine.connection === 'ms'))('Drill dow
 describe.each(ENGINES)('Drill down on a phone, and the floor, on $engine', (engine) => {
   // Every level a person reaches passes axe with a name on every control:
   // the trail's crumbs are buttons named by their text, and the level shown
-  // is no button (watched failing: the trail had no crumbs).
+  // is no button (watched failing with the crumbs' text left out). A grid
+  // just mounted is named once AG Grid has drawn it, so each level is read
+  // once every section's grid has answered.
   test('every level passes axe with a name on every control', async () => {
+    const floor = async (level: number): Promise<void> => {
+      await waitFor(() => expect(unnamed()).toEqual([]), ARRIVES)
+      expect({ level, axe: await audit(), unnamed: unnamed() }).toEqual({ level, axe: [], unnamed: [] })
+    }
     const { order, line } = await approvedOrder(engine)
     const user = await drilling(engine.employees)
-    expect({ level: 0, axe: await audit(), unnamed: unnamed() }).toEqual({ level: 0, axe: [], unnamed: [] })
+    await floor(0)
     await pressOn(user, 'Records', '1', '{Enter}')
     await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
-    expect({ level: 1, axe: await audit(), unnamed: unnamed() }).toEqual({ level: 1, axe: [], unnamed: [] })
-    await answeredOnce('Order, Approved by')
+    for (const section of ['Employee', 'Order, Created by', 'Order, Approved by']) await answeredOnce(section)
+    await floor(1)
     await pressOn(user, 'Order, Approved by', order.slice(3), '{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
-    expect({ level: 2, axe: await audit(), unnamed: unnamed() }).toEqual({ level: 2, axe: [], unnamed: [] })
+    // A level's sections are drawn once its form's children are known, a moment after the level.
     await answeredOnce('Order line')
+    await floor(2)
     await pressOn(user, 'Order line', '1', '{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
-    expect({ level: 3, axe: await audit(), unnamed: unnamed() }).toEqual({ level: 3, axe: [], unnamed: [] })
+    await floor(3)
   })
 
   // On a phone, past three crumbs, the trail draws the first, a button that
