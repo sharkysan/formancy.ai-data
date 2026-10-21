@@ -29,7 +29,7 @@ import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
 import { Split } from './split.js'
 
-const LAYOUT_LABELS: Readonly<Record<Layout, string>> = { 'side-by-side': 'Side by side', stacked: 'Stacked', separate: 'Separate views' }
+const LAYOUT_LABELS: Readonly<Record<Layout, string>> = { 'side-by-side': 'Side by side', stacked: 'Stacked', separate: 'Separate views', drill: 'Drill down' }
 
 const DISCARDED: Said = ['Discarded the unsaved changes. ']
 
