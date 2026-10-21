@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DataClient, FormMenuChild, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { columnsOf } from './grid-datasource.js'
@@ -21,6 +21,7 @@ import { detailTarget, gone, rowTarget, SAVE_OUT } from './deletion.js'
 import type { DeleteTarget } from './deletion.js'
 import type { GridRow } from './grid-datasource.js'
 import { Words } from './words.js'
+import type { SectionDrill } from './use-drill.js'
 
 /** What the record above a child section is: a saved record, or a new one not saved yet. */
 export type ParentOpen = { kind: 'new' } | { kind: 'record'; token: string }
@@ -61,6 +62,13 @@ type ChildOpen = null | { kind: 'new' } | { kind: 'record'; token: string }
  * The section is drawn only for a child whose `list` this person is offered
  * -- the workspace leaves any other out when the form is chosen -- so the
  * button asks nothing more of the definition.
+ *
+ * In Drill down (0090) a row opened, or New, goes down a level instead of
+ * onto the rail (`drill`): the rail is not drawn -- a row open on it from
+ * another layout stays mounted and hidden, its work still the guard's --
+ * the grid marks the row the level below holds, and that row's Delete asks
+ * about the levels below first. A section of a level from 2 down is owned
+ * under its level (`ownerBase`, `idBase`), so no owner or id is twice.
  */
 export function ChildSection({
   client,
@@ -72,6 +80,9 @@ export function ChildSection({
   renderer,
   refit,
   onShow,
+  ownerBase = '',
+  idBase = 'child',
+  drill,
 }: {
   client: DataClient
   form: ChildForm
@@ -85,9 +96,15 @@ export function ChildSection({
   refit: number
   /** The record view shown, in Separate views: a deletion's answer may come once the person has gone to the records. True when it was hidden. */
   onShow: () => boolean
+  /** What the section's owner starts with: a Drill down level's (`drillBase`), or nothing at level 1. */
+  ownerBase?: string
+  /** What its element ids start with: `child` at level 1. */
+  idBase?: string
+  /** In Drill down, how the section goes down a level (0090). */
+  drill?: SectionDrill | undefined
 }): ReactElement {
   const { child, menu, definition } = form
-  const owner = `${child.form}~${child.field}`
+  const owner = `${ownerBase}${child.form}~${child.field}`
   const { ask } = useGuardContext()
   const after = useAfterRender()
   const grid = useRef<RecordGridHandle>(null)
@@ -103,7 +120,7 @@ export function ChildSection({
 
   const title = menu.title
   const fieldLabel = String(definition.form.model.fields.find((field) => field.key === child.field)?.label ?? child.field)
-  const headingId = `child-${String(index)}-heading`
+  const headingId = `${idBase}-${String(index)}-heading`
   const canCreate = menu.operations.includes('create') && definition.operations.includes('create')
   const waiting = parent.kind === 'new'
   const waitingText = `${title} rows are listed once this ${parentNoun} is saved.`
@@ -148,7 +165,20 @@ export function ChildSection({
 
   const prefix = (discarded: boolean): Said => (discarded ? ['Discarded the unsaved changes. '] : [])
 
+  // Its handle, for the levels below: a row they held gone, a save there to show.
+  const register = drill?.register
+  useEffect(() => {
+    if (register === undefined) return undefined
+    register(owner, { removed: (said) => grid.current?.removed(said), focusHeading: () => sectionHeading.current?.focus(), reload: () => grid.current?.reload() })
+    return () => register(owner, null)
+  }, [register, owner])
+
   function askRow(token: string, how: OpenHow, at: RowAt): void {
+    // In Drill down every open goes down a level: a click, Space and Enter alike.
+    if (drill !== undefined) {
+      drill.descend({ kind: 'record', token }, () => grid.current?.focusAt(at), (message) => grid.current?.say([message]))
+      return
+    }
     if (open?.kind === 'record' && open.token === token) {
       if (how === 'enter') detailHeading.current?.focus()
       return
@@ -186,8 +216,20 @@ export function ChildSection({
     else removal.ask(detailTarget(title, now.token, removal.heard(now.token)))
   }
 
-  /** A row's Delete (0053); the open row's waits for a save of it, as its header's Delete does. */
+  /** A row's Delete (0053); the open row's waits for a save of it, as its header's Delete does. In Drill down the row the level below holds asks about the levels below first. */
   function deleteRow(row: GridRow): void {
+    if (drill !== undefined && row.record !== null && row.record === drill.held) {
+      const token = row.record
+      drill.beforeDelete(
+        token,
+        () => {
+          const target = rowTarget(title, row, null)
+          if (target !== null) removal.ask(target)
+        },
+        () => grid.current?.focusRecord(token, DELETE_COLUMN),
+      )
+      return
+    }
     const now = openRef.current
     const target = rowTarget(title, row, now?.kind === 'record' ? { record: now.token, heard: removal.heard(now.token) } : null)
     if (target === null) return
@@ -206,6 +248,7 @@ export function ChildSection({
       setLine([])
     }
     grid.current?.removed(gone(target, word))
+    drill?.rowGone(target.record)
     if (!quiet) after(() => sectionHeading.current?.focus())
   }
 
@@ -218,6 +261,10 @@ export function ChildSection({
       return
     }
     const parentToken = parent.token
+    if (drill !== undefined) {
+      drill.descend({ kind: 'new' }, () => newButton.current?.focus(), (message) => grid.current?.say([message]))
+      return
+    }
     ask(
       { kind: 'child-new', owner, title },
       (discarded) => {
@@ -279,7 +326,7 @@ export function ChildSection({
             noun={title}
             parent={{ field: child.field, record: parent.token }}
             search=""
-            openToken={open?.kind === 'record' ? open.token : null}
+            openToken={drill !== undefined ? drill.held : open?.kind === 'record' ? open.token : null}
             canCreate={canCreate}
             quiet
             refit={refit}
@@ -291,7 +338,7 @@ export function ChildSection({
         </>
       )}
       {open === null ? null : (
-        <div className="child-detail">
+        <div className="child-detail" hidden={drill !== undefined}>
           <div className="title-row">
             <h5 id={`${headingId}-detail`} className="child-detail-heading" tabIndex={-1} ref={detailHeading}>
               <Words said={open.kind === 'record' ? [`${title} `, { code: open.token }] : [`New ${title}`]} />

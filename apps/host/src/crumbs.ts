@@ -16,15 +16,17 @@ export interface Crumb {
 
 /**
  * A record's name: the answer to the first field, in the form's order, that
- * is text with no pattern and no format, that the form requires, and that
- * is not the field naming the level above. A pattern or a format says a
- * number, an e-mail or an id, and a field the form does not require may
- * hold a default that names nothing. Null when that answer is not text with
+ * is text with no pattern and no format, that the form requires, that is
+ * neither a lookup nor a select, and that is not the field naming the
+ * level above. A pattern or a format says a number, an e-mail or an id; a
+ * lookup's answer is another record's token and a select's a code; and a
+ * field the form does not require may hold a default that names nothing. Null when that answer is not text with
  * something in it -- or the person may not read it, and there is none.
  */
 export function recordName(fields: readonly FieldDef[], answers: Readonly<Record<string, unknown>>, parentField: string | null): string | null {
   for (const field of fields) {
     if (field.type !== 'text' || field.pattern !== undefined || field.format !== undefined || field.required !== true || field.key === parentField) continue
+    if (field.optionsSource !== undefined || field.options !== undefined) continue
     if (!(field.key in answers)) continue
     const answer = answers[field.key]
     return typeof answer === 'string' && answer.trim() !== '' ? answer : null

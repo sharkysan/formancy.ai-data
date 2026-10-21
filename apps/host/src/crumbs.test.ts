@@ -40,6 +40,19 @@ describe("a level's name", () => {
     expect(recordName(FIELDS.filter((field) => field.key !== 'name' && field.key !== 'owner'), ANSWERS, null)).toBeNull()
   })
 
+  // A lookup's answer is another record's token, and a select's a code:
+  // neither names this record. An order named by its customer's token would
+  // read as the order's own (watched failing: the customer was taken).
+  test('passes over a lookup and a select', () => {
+    const fields: FieldDef[] = [
+      { key: 'customer', type: 'text', required: true, optionsSource: 'pg-order.customer' },
+      { key: 'kind', type: 'text', required: true, options: [{ value: 'a', label: 'A' }] },
+      { key: 'title', type: 'text', required: true },
+    ]
+    expect(recordName(fields, { customer: 'k1:7', kind: 'a', title: 'Spring order' }, null)).toBe('Spring order')
+    expect(recordName(fields.slice(0, 2), { customer: 'k1:7', kind: 'a' }, null)).toBeNull()
+  })
+
   // A field the person may not read has no answer, so it names nothing --
   // the next field that qualifies does, rather than an empty crumb.
   test('passes over a field the person may not read', () => {

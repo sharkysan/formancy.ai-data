@@ -50,6 +50,7 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   const storage = useMemo(browserStorage, [])
   const ids = useMemo(() => menu.forms.map((form) => form.id), [menu])
   const narrow = useMedia('(max-width: 56rem)')
+  const phone = useMedia('(max-width: 40rem)')
   const [first] = useState(() => arrival({ hash: window.location.hash, menu: ids, phone: typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 40rem)').matches }))
   const [place, setPlaceState] = useState<Place>({ form: null, layout: first.layout, view: 'records' })
   const placeRef = useRef(place)
@@ -70,6 +71,15 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   }, [])
 
   const menuEntry = useCallback((id: string) => menu.forms.find((form) => form.id === id), [menu])
+
+  /** The children the menu names for a form, for Drill down's levels (0090): none for a form the menu does not name. */
+  const childrenFor = useCallback(
+    async (id: string) => {
+      const found = menuEntry(id)
+      return found === undefined ? [] : childFormsOf(client, menu, found)
+    },
+    [client, menu, menuEntry],
+  )
 
   const openForm = useCallback(
     async (id: string, { focus, push }: { focus: boolean; push: boolean }) => {
@@ -161,8 +171,10 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
               childForms={opened.children}
               layout={place.layout}
               view={place.view}
+              level={place.level}
               historyView={historyView}
               narrow={narrow}
+              phone={phone}
               renderer={renderer}
               split={split}
               notice={guard.pending === null ? null : <UnsavedNotice pending={guard.pending} onKeep={guard.keep} onDiscard={guard.discard} />}
@@ -172,6 +184,7 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
               onRenderer={chooseRenderer}
               onSplit={setSplit}
               onSplitSettled={(share) => writeSplit(storage, share)}
+              childFormsOf={childrenFor}
             />
           </GuardContext.Provider>
         ) : (

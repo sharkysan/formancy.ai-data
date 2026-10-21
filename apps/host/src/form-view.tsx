@@ -4,11 +4,14 @@ import type { DataClient, FormMenuEntry, PublishedForm } from '@formancy/data-cl
 import { useAfterRender } from './after-render.js'
 import { ChildSection } from './children.js'
 import type { ChildForm } from './children.js'
+import { crumbOf, recordName } from './crumbs.js'
+import type { Crumb } from './crumbs.js'
 import { DeleteRegion } from './delete-confirm.js'
 import { useDeleteFlow } from './delete-flow.js'
 import { detailTarget, gone, rowTarget, SAVE_OUT } from './deletion.js'
 import type { DeleteTarget } from './deletion.js'
 import { Detail } from './detail.js'
+import { DrillLevel } from './drill-level.js'
 import type { MasterOpen } from './detail.js'
 import { columnsOf } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
@@ -28,6 +31,8 @@ import { Segmented, focusChoice } from './segmented.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
 import { Split } from './split.js'
+import { Trail } from './trail.js'
+import { useDrill } from './use-drill.js'
 
 const LAYOUT_LABELS: Readonly<Record<Layout, string>> = { 'side-by-side': 'Side by side', stacked: 'Stacked', separate: 'Separate views', drill: 'Drill down' }
 
@@ -100,8 +105,10 @@ export function FormView({
   childForms,
   layout,
   view,
+  level,
   historyView,
   narrow,
+  phone,
   renderer,
   split,
   notice,
@@ -111,6 +118,7 @@ export function FormView({
   onRenderer,
   onSplit,
   onSplitSettled,
+  childFormsOf,
 }: {
   client: DataClient
   entry: FormMenuEntry
@@ -118,20 +126,27 @@ export function FormView({
   childForms: readonly ChildForm[]
   layout: Layout
   view: View
+  /** In Drill down's record view, the level the address asks for (0090). */
+  level: number | undefined
   /** How many times Back or Forward has changed the view: each time, the keyboard goes to what the view shows. */
   historyView: number
   /** The window draws Side by side stacked (≤ 56rem). */
   narrow: boolean
+  /** A phone's window (≤ 40rem): Drill down's trail draws its ends. */
+  phone: boolean
   renderer: RendererChoice
   split: number
   notice: ReactNode
   headingRef: RefObject<HTMLHeadingElement | null>
-  onLayout: (layout: Layout) => void
+  /** A layout chosen; entering Drill down, on the level it shows. */
+  onLayout: (layout: Layout, at?: { view: View; level?: number }) => void
   /** `replace`: the view changed without a step of its own in the history -- after a delete, the record view is not one to go back to. */
   onView: (view: View, replace?: boolean, level?: number) => void
   onRenderer: (choice: RendererChoice) => void
   onSplit: (share: number) => void
   onSplitSettled: (share: number) => void
+  /** The children the menu names for a form: each Drill down level's sections. */
+  childFormsOf: (formId: string) => Promise<ChildForm[]>
 }): ReactElement {
   const formId = entry.id
   const { ask } = useGuardContext()
@@ -150,6 +165,8 @@ export function FormView({
   const [search, setSearch] = useState('')
   const [tokenOpen, setTokenOpen] = useState(false)
   const [loadRefusal, setLoadRefusal] = useState<string | null>(null)
+  /** What the record's crumb calls it, from what is stored (crumbs.ts). */
+  const [masterName, setMasterName] = useState<string | null>(null)
   /** How many times the separator has been let go: each grid in the lanes fits its columns again. */
   const [released, setReleased] = useState(0)
   const deleteButton = useRef<HTMLButtonElement>(null)
@@ -191,6 +208,19 @@ export function FormView({
     onShow: (target) => reveal(target.from.kind === 'detail' ? 'record' : 'records'),
   })
   const { saving } = removal
+  const drill = useDrill({
+    client,
+    layout,
+    view,
+    level,
+    historyView,
+    open: open !== null,
+    onView,
+    headingOf: (at) => (at === 0 ? recordsHeading.current : detailHeading.current),
+    childFormsOf,
+  })
+  const drilling = layout === 'drill'
+  const nameOf = (session: Session): string | null => recordName(definition.form.model.fields, session.saved().answers, null)
 
   const both = renderer === 'both'
   /** One view at a time: Separate views' two, or Drill down's levels (0090). */
@@ -204,7 +234,7 @@ export function FormView({
     return true
   }
 
-  /** The detail, with the keyboard on its heading: in Separate views, the record view. */
+  /** The detail, with the keyboard on its heading: in Separate views, the record view; in Drill down, level 1. */
   function toDetail(): void {
     if (paged) onView('record', false, 1)
     after(() => detailHeading.current?.focus())
@@ -212,13 +242,16 @@ export function FormView({
 
   /** The record now open in every pane, and what the detail's line says of it, if anything. */
   function opened(token: string, said?: Said): void {
+    drill.dropAll()
     setOpen({ kind: 'record', token })
+    setMasterName(sessions[0] === undefined ? null : nameOf(sessions[0]))
     setLoadRefusal(null)
     if (said !== undefined) say(said)
   }
 
   function askRow(token: string, how: OpenHow, at: RowAt): void {
-    const moves = how === 'enter'
+    // In Drill down every open goes down a level: a click and Space too (0090).
+    const moves = how === 'enter' || drilling
     if (open?.kind === 'record' && open.token === token) {
       if (moves) toDetail()
       return
@@ -249,8 +282,10 @@ export function FormView({
       { kind: 'new' },
       (discarded) => {
         opening.replaced()
+        drill.dropAll()
         for (const session of sessions) session.open()
         setOpen({ kind: 'new' })
+        setMasterName(null)
         setLoadRefusal(null)
         say([...(discarded ? DISCARDED : []), both ? 'Both forms are empty, for a new record.' : 'The form is empty, for a new record.'])
         toDetail()
@@ -311,6 +346,7 @@ export function FormView({
   function answered(result: SaveResult, session: Session): void {
     grid.current?.reload()
     opening.answered(result, session, (now) => opened(now.token, now.discarded ? [...DISCARDED, 'Opened ', { code: now.token }, '.'] : undefined))
+    if (result.kind === 'saved') setMasterName(nameOf(session))
   }
 
   /** The open record's Delete, in the detail's header (0053). While a save of it is out, it waits for the answer, and says so. */
@@ -341,6 +377,7 @@ export function FormView({
     const now = openRef.current
     if (now?.kind === 'record' && now.token === target.record) {
       opening.replaced()
+      drill.dropAll()
       for (const session of sessions) session.open()
       openRef.current = null
       setOpen(null)
@@ -358,7 +395,8 @@ export function FormView({
   // would send it -- without what those buttons also do, writing an entry,
   // which would drop the one Forward goes to.
   useEffect(() => {
-    if (historyView === 0) return
+    // Drill down's levels from 2 down are the drill's own (use-drill.ts).
+    if (historyView === 0 || (drilling && drill.shown >= 2)) return
     if (view === 'record' && openRef.current !== null) after(() => detailHeading.current?.focus())
     else if (view === 'records') toOpenRow()
     // On each change made by history, and only then.
@@ -369,11 +407,26 @@ export function FormView({
   const parent = open?.kind === 'record' ? { kind: 'record' as const, token: open.token } : open?.kind === 'new' ? { kind: 'new' as const } : null
   const twice = (form: string): boolean => childForms.filter((child) => child.child.form === form).length > 1
   const style = { '--records-share': `${String(split)}fr`, '--record-share': `${String(100 - split)}fr` } as CSSProperties
+  /** Drill down's trail: the records, the record, and each level held down to the one shown. */
+  const crumbs: Crumb[] = [
+    { level: 0, said: ['Records'] },
+    ...(open === null ? [] : [crumbOf(1, title, open.kind === 'record' ? { token: open.token, name: masterName } : null)]),
+    ...drill.path.map((step) => crumbOf(step.level, step.form.menu.title, step.token === null ? null : { token: step.token, name: step.name })),
+  ].slice(0, drill.shown + 1)
 
   return (
     <>
-      <FormHead title={title} formId={formId} operations={definition.operations} layout={layout} note={note} headingRef={headingRef} onLayout={onLayout} />
+      <FormHead
+        title={title}
+        formId={formId}
+        operations={definition.operations}
+        layout={layout}
+        note={note}
+        headingRef={headingRef}
+        onLayout={(next) => (next === 'drill' ? onLayout(next, drill.enter(open !== null)) : onLayout(next))}
+      />
       {notice}
+      {drilling ? <Trail crumbs={crumbs} compact={phone} onUp={(at, button) => drill.up(at, () => button.focus())} /> : null}
       <div className="lanes" data-layout={layout} data-view={paged ? view : 'records'} ref={lanes} style={style}>
         <Records
           gridRef={grid}
@@ -381,7 +434,7 @@ export function FormView({
           formId={formId}
           definition={definition}
           columns={columns}
-          hidden={paged && view === 'record'}
+          hidden={drilling ? drill.shown !== 0 : paged && view === 'record'}
           openToken={open?.kind === 'record' ? open.token : null}
           canCreate={canCreate}
           headingRef={recordsHeading}
@@ -414,7 +467,7 @@ export function FormView({
           line={line}
           layout={layout}
           canCreate={canCreate}
-          hidden={paged && view === 'records'}
+          hidden={drilling ? drill.shown !== 1 : paged && view === 'records'}
           headingRef={detailHeading}
           onBack={back}
           renderer={renderer}
@@ -446,9 +499,13 @@ export function FormView({
                   renderer={renderer}
                   refit={released}
                   onShow={() => reveal('record')}
+                  drill={drilling && parent.kind === 'record' ? drill.section({ level: 1, owner: `${form.child.form}~${form.child.field}`, form, parentNoun: title, parent: parent.token }) : undefined}
                 />
               ))}
         </Detail>
+        {drill.path.map((step) => (
+          <DrillLevel key={step.key} client={client} step={step} childForms={drill.childrenOf(step.form.child.form)} renderer={renderer} hidden={!drilling || drill.shown !== step.level} refit={released} drill={drill} />
+        ))}
       </div>
     </>
   )
