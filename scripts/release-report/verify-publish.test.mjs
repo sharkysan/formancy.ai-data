@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { describe, expect, test } from 'vitest'
 import { LICENSE_FIELD } from '../verify-licenses.mjs'
 import { packageTarball, tgz } from './test-archive.mjs'
-import { describeTarball, downloadedProblems, npmPurl, pinned, publishProblems } from './verify-publish.mjs'
+import { describeTarball, downloadedProblems, lockedPackages, npmPurl, pinned, publishProblems, sbomInstallProblems } from './verify-publish.mjs'
 
 /**
  * What a release refuses before anything permanent happens (0035): the
@@ -30,16 +30,36 @@ function green() {
       },
       testedOn: {
         runtime: [
-          { name: 'postgres', loaded: '3.4.9' },
-          { name: 'mssql', loaded: '12.7.4' },
-          { name: 'tedious', under: 'mssql', loaded: '20.3.3' },
-          { name: 'fastify', loaded: '5.12.5' },
+          { package: '@formancy/data-server', name: 'postgres', loaded: '3.4.9' },
+          { package: '@formancy/data-server', name: 'mssql', loaded: '12.7.4' },
+          { package: '@formancy/data-server', name: 'tedious', under: 'mssql', loaded: '20.3.3' },
+          // A clean install, the install gate's, resolved a newer fastify than the suites ran; the report says so.
+          { package: '@formancy/data-server', name: 'fastify', loaded: '5.12.5', fresh: '5.12.7' },
         ],
-        upstream: [{ name: '@formancy/spec', version: '0.3.0' }],
+        upstream: [
+          { name: '@formancy/spec', version: '0.3.0', shipped: true },
+          { name: '@formancy/react', version: '0.3.0', shipped: false },
+        ],
       },
     },
     tarballs,
-    sbom: { components: ['pkg:npm/postgres@3.4.9', 'pkg:npm/mssql@12.7.4', 'pkg:npm/tedious@20.3.3', 'pkg:npm/%40formancy/spec@0.3.0', 'pkg:npm/%40formancy/data-core@0.1.0', 'pkg:npm/fastify@5.12.5'].map((purl) => ({ purl })) },
+    // As cdxgen writes an install of the tarballs: each package by its URL, and the graph of who depends on whom.
+    sbom: {
+      components: [
+        'pkg:npm/%40formancy/data-core@0.1.0',
+        'pkg:npm/%40formancy/data-server@0.1.0',
+        'pkg:npm/postgres@3.4.9',
+        'pkg:npm/mssql@12.7.4',
+        'pkg:npm/tedious@20.3.3',
+        'pkg:npm/fastify@5.12.7',
+        'pkg:npm/%40formancy/spec@0.3.0',
+      ].map((purl) => ({ purl })),
+      dependencies: [
+        { ref: 'pkg:npm/%40formancy/data-core@0.1.0', dependsOn: ['pkg:npm/%40formancy/spec@0.3.0'] },
+        { ref: 'pkg:npm/%40formancy/data-server@0.1.0', dependsOn: ['pkg:npm/%40formancy/data-core@0.1.0', 'pkg:npm/postgres@3.4.9', 'pkg:npm/mssql@12.7.4', 'pkg:npm/fastify@5.12.7'] },
+        { ref: 'pkg:npm/mssql@12.7.4', dependsOn: ['pkg:npm/tedious@20.3.3'] },
+      ],
+    },
     notes: '## 0.1.0\n\nThe first.\n',
     release: 'v0.1.0',
     version: '0.1.0',
@@ -138,31 +158,160 @@ describe('the tarballs', () => {
 })
 
 describe('the SBOM', () => {
-  // An inventory that names another driver than the suites ran describes a
-  // release nobody tested; one without a driver omits what talks to the
-  // customer's database.
-  test('is refused with another mssql than the suites loaded, or without postgres', () => {
-    expect(refusals((inputs) => (inputs.sbom.components[1].purl = 'pkg:npm/mssql@12.0.0'))).toEqual(['the SBOM names mssql 12.0.0, where the suites loaded 12.7.4'])
-    expect(refusals((inputs) => inputs.sbom.components.shift())).toEqual(["the SBOM names no postgres, a driver that talks to a customer's database"])
-    expect(refusals((inputs) => (inputs.sbom.components[3].purl = 'pkg:npm/%40formancy/spec@0.2.0'))).toEqual(['the SBOM names @formancy/spec 0.2.0, where the suites loaded 0.3.0'])
+  const at = (name) => (inputs) => inputs.sbom.components.findIndex((component) => component.purl.startsWith(`pkg:npm/${name}@`))
+  const replace = (name, purl) => (inputs) => (inputs.sbom.components[at(name)(inputs)].purl = purl)
+  const edge = (from, to, purl) => (inputs) => {
+    const node = inputs.sbom.dependencies.find((entry) => entry.ref === from)
+    node.dependsOn = node.dependsOn.map((each) => (each.startsWith(`pkg:npm/${to}@`) ? purl : each))
+  }
+
+  // Both drivers are named, and every package this release publishes, at
+  // its version: an SBOM read off the workspace named none of them, where
+  // they are links (0092; watched failing on the check by name, which
+  // asked neither).
+  test('is refused without a driver, or without a package this release publishes at its version', () => {
+    expect(refusals((inputs) => inputs.sbom.components.splice(at('postgres')(inputs), 1))).toContain("the SBOM names no postgres, a driver that talks to a customer's database")
+    expect(refusals(replace('%40formancy/data-core', 'pkg:npm/%40formancy/data-core@0.0.9'))).toEqual(['the SBOM names no @formancy/data-core 0.1.0, which this release publishes'])
   })
 
-  // Every runtime dependency the report names is held to the SBOM, the one
-  // under a facade included: tedious is what speaks TDS to the server, and a
-  // server's fastify is what answers every request. A typed list of drivers
-  // would let either differ from what the suites loaded, unnoticed.
-  test('is refused with another version of any runtime dependency the suites loaded, nested ones included', () => {
-    const at = (name) => (inputs) => inputs.sbom.components.findIndex((component) => component.purl.startsWith(`pkg:npm/${name}@`))
-    const replace = (name, purl) => (inputs) => (inputs.sbom.components[at(name)(inputs)].purl = purl)
-    expect(refusals(replace('tedious', 'pkg:npm/tedious@19.0.0'))).toEqual(['the SBOM names tedious 19.0.0, where the suites loaded 20.3.3'])
-    expect(refusals(replace('fastify', 'pkg:npm/fastify@5.0.0'))).toEqual(['the SBOM names fastify 5.0.0, where the suites loaded 5.12.5'])
+  // An upstream package a published package's install brings is named, at
+  // a version the suites loaded; one only an app declares -- the React
+  // renderer here -- is not asked for (0092; watched failing on the check by
+  // name, which asked neither and never read `shipped`).
+  test('is refused without a shipped upstream package, or with another version of one, and not for one nothing installs', () => {
+    expect(refusals((inputs) => inputs.sbom.components.splice(at('%40formancy/spec')(inputs), 1))).toEqual(['the SBOM names no @formancy/spec, which a published package depends on'])
+    expect(refusals(replace('%40formancy/spec', 'pkg:npm/%40formancy/spec@0.2.0'))).toEqual(['the SBOM names @formancy/spec 0.2.0, where the suites loaded 0.3.0'])
+    expect(refusals()).toEqual([])
   })
 
-  // Both spellings a package URL gives a scoped name.
+  // A runtime dependency is held where a published package is given it, in
+  // the SBOM's graph, at the version its suites loaded -- a nested one where
+  // the dependency that declares it is given it, tedious under mssql. A
+  // consumer's tree can hold one name at two versions, the other brought by
+  // a dependency of a dependency that no suite's record names: a check by
+  // name refused that correct SBOM (0092; watched failing on the check by
+  // name, which refused the second tedious and asked nothing of the graph).
+  test('holds each runtime dependency where the package that declares it is given it', () => {
+    expect(refusals(edge('pkg:npm/%40formancy/data-server@0.1.0', 'fastify', 'pkg:npm/fastify@5.0.0'))).toEqual([
+      'the SBOM gives @formancy/data-server fastify 5.0.0, where its suites loaded 5.12.5 and a clean install resolved 5.12.7',
+    ])
+    expect(refusals(edge('pkg:npm/mssql@12.7.4', 'tedious', 'pkg:npm/tedious@19.0.0'))).toEqual(['the SBOM gives mssql tedious 19.0.0, where its suites loaded 20.3.3'])
+    expect(refusals((inputs) => (inputs.sbom.dependencies[1].dependsOn = inputs.sbom.dependencies[1].dependsOn.filter((purl) => !purl.includes('postgres'))))).toEqual([
+      'the SBOM records no dependency of @formancy/data-server on postgres',
+    ])
+    // A second tedious, under something else, is no refusal: mssql is given the one the suites loaded.
+    expect(
+      refusals((inputs) => {
+        inputs.sbom.components.push({ purl: 'pkg:npm/tedious@19.0.0' }, { purl: 'pkg:npm/legacy-tool@1.0.0' })
+        inputs.sbom.dependencies.push({ ref: 'pkg:npm/legacy-tool@1.0.0', dependsOn: ['pkg:npm/tedious@19.0.0'] })
+      }),
+    ).toEqual([])
+  })
+
+  // The SBOM is of an install made on the day, as the install gate's clean
+  // install is: a version that install resolved and no suite ran is the
+  // release body's to say ("which no suite ran"), not a refusal; one
+  // neither ran nor resolved is refused (0092; watched failing on the
+  // check by name, which refused the fresh fastify).
+  test('takes a version the install gate resolved, and no other the suites did not run', () => {
+    expect(refusals()).toEqual([])
+    expect(refusals((inputs) => (inputs.report.testedOn.runtime[3].fresh = null))).toEqual(['the SBOM gives @formancy/data-server fastify 5.12.7, where its suites loaded 5.12.5'])
+  })
+
+  // A nested dependency is held under the version of its parent the
+  // published package is actually given -- a clean install's newer mssql
+  // here -- not the one the suites loaded (watched failing on the 0.2.0
+  // tarballs, installed on 2026-10-21: "records no dependency of mssql on
+  // tedious", the SBOM's mssql being 12.7.10).
+  test('holds a nested dependency under the parent the published package is given', () => {
+    const newer = (inputs) => {
+      inputs.report.testedOn.runtime[1].fresh = '12.7.5'
+      inputs.sbom.components[inputs.sbom.components.findIndex((component) => component.purl === 'pkg:npm/mssql@12.7.4')].purl = 'pkg:npm/mssql@12.7.5'
+      edge('pkg:npm/%40formancy/data-server@0.1.0', 'mssql', 'pkg:npm/mssql@12.7.5')(inputs)
+      inputs.sbom.dependencies.find((entry) => entry.ref === 'pkg:npm/mssql@12.7.4').ref = 'pkg:npm/mssql@12.7.5'
+    }
+    expect(refusals(newer)).toEqual([])
+  })
+
+  // A package of types alone carries no code that runs, and cdxgen's
+  // --required-only leaves it out of the inventory: the check asks nothing
+  // of one, so an SBOM is not refused for what it leaves out by design
+  // (watched failing on the 0.2.0 tarballs: "records no dependency of
+  // @formancy/data-sqlserver on @types/mssql").
+  test('asks nothing of a package of types alone', () => {
+    expect(refusals((inputs) => inputs.report.testedOn.runtime.push({ package: '@formancy/data-server', name: '@types/mssql', loaded: '12.3.0' }))).toEqual([])
+  })
+
+  // cdxgen that stops writing the graph stops every release, with a
+  // sentence, rather than passing: nothing would be held where it is given.
+  test('is refused without a dependency graph', () => {
+    const refused = refusals((inputs) => delete inputs.sbom.dependencies)
+    expect(refused).toContain('the SBOM records no dependency of @formancy/data-server on fastify')
+    expect(refused).toContain('the SBOM records no dependency of mssql on tedious')
+  })
+
   test('reads a scoped package URL, encoded or not', () => {
     expect(npmPurl('pkg:npm/%40formancy/spec@0.3.0?type=module')).toEqual({ name: '@formancy/spec', version: '0.3.0' })
     expect(npmPurl('pkg:npm/@formancy/spec@0.3.0')).toEqual({ name: '@formancy/spec', version: '0.3.0' })
     expect(npmPurl('pkg:pypi/x@1')).toBeUndefined()
+  })
+})
+
+describe('the SBOM against the install it describes', () => {
+  /** npm's lockfile of the project the tarballs were installed into, lockfileVersion 3. */
+  const lockfile = () => ({
+    lockfileVersion: 3,
+    packages: {
+      '': { name: 'formancy-data', version: '0.1.0', dependencies: { '@formancy/data-server': 'file:x.tgz' } },
+      'node_modules/@formancy/data-server': { version: '0.1.0' },
+      'node_modules/mssql': { version: '12.7.4' },
+      'node_modules/mssql/node_modules/tedious': { version: '20.3.3' },
+      'node_modules/linked': { link: true },
+      'node_modules/a-dev-tool': { version: '1.0.0', dev: true },
+    },
+  })
+  const sbom = (purls) => ({ components: purls.map((purl) => ({ purl })) })
+  const named = ['pkg:npm/%40formancy/data-server@0.1.0', 'pkg:npm/mssql@12.7.4', 'pkg:npm/tedious@20.3.3']
+
+  // What npm installed, nested copies included, and nothing else: the
+  // project itself, a link and a dev dependency are not part of what a
+  // consumer installs.
+  test('reads what npm installed from its lockfile', () => {
+    expect(lockedPackages(lockfile())).toEqual([
+      { name: '@formancy/data-server', version: '0.1.0' },
+      { name: 'mssql', version: '12.7.4' },
+      { name: 'tedious', version: '20.3.3' },
+    ])
+  })
+
+  // The SBOM names exactly what that install holds: a tool cdxgen found
+  // somewhere else, or a package the install holds and the SBOM leaves
+  // out, is refused -- the 0.2.0 SBOM, read off the workspace, named vitest
+  // and Playwright and left out tedious (0092; watched failing: no such
+  // check).
+  test('names exactly what the install holds', () => {
+    expect(sbomInstallProblems(sbom(named), lockfile())).toEqual([])
+    expect(sbomInstallProblems(sbom([...named, 'pkg:npm/vitest@5.0.3']), lockfile())).toEqual(['the SBOM names vitest 5.0.3, which the install it describes does not hold'])
+    expect(sbomInstallProblems(sbom(named.slice(0, 2)), lockfile())).toEqual(['the SBOM leaves out tedious 20.3.3, which the install it describes holds'])
+    expect(sbomInstallProblems({ components: [...sbom(named).components, { name: 'a-binary' }] }, lockfile())).toEqual([
+      'the SBOM names a-binary, a component with no npm package URL, in an inventory of an npm install',
+    ])
+  })
+
+  // A package of types alone is left out on both sides: cdxgen does not
+  // list it, and an SBOM is not refused for leaving it out (watched failing
+  // on the 0.2.0 tarballs: "leaves out @types/mssql 12.3.0").
+  test('leaves out packages of types alone', () => {
+    const typed = lockfile()
+    typed.packages['node_modules/@types/mssql'] = { version: '12.3.0' }
+    expect(lockedPackages(typed).map((entry) => entry.name)).not.toContain('@types/mssql')
+    expect(sbomInstallProblems(sbom(named), typed)).toEqual([])
+  })
+
+  // An empty or missing lockfile holds nothing, so nothing the SBOM names
+  // could be held to it: refused, never passed.
+  test('is refused against an install that holds nothing', () => {
+    expect(sbomInstallProblems(sbom(named), { packages: {} })).toEqual(['the install the SBOM describes holds no package, so nothing it names can be held to it'])
   })
 })
 

@@ -10,6 +10,24 @@ later.
 
 ## Unreleased
 
+### Changed
+
+- **A release's SBOM describes what a consumer installs, and is held to
+  that install.** The SBOM 0.2.0 published was cdxgen's reading of the
+  workspace. It listed vitest, Playwright, testcontainers and Vite as
+  required, and left out tedious and every package it published. It is now
+  the inventory of the release's tarballs, installed by npm into a project
+  of their own as a consumer installs them, with no lifecycle script and
+  no peer. The release is refused when the SBOM names anything that
+  install does not hold, or leaves out anything it holds. The check reads
+  the SBOM's dependency graph rather than names, so a second copy of a
+  name, which a dependency of a dependency brings, no longer refuses a
+  correct SBOM. Each published package must be given its runtime
+  dependencies at a version the suites ran or the install gate's clean
+  install resolved; tedious is checked under the mssql it is given. Packages
+  of types alone are left out of the SBOM, as cdxgen leaves them out
+  ([0092](docs/decisions/0092-the-sbom-describes-what-a-consumer-installs-and-is-held-to-that-install.md)).
+
 ### Added
 
 - **`@formancy/data-identity`, the host-token verifier on its own.**

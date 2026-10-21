@@ -4,7 +4,7 @@
 //
 //   verify-publish.mjs --stage content --report release-report/release-report.json \
 //     --tarballs release-tarballs --notes release-report/RELEASE_NOTES.md --release <r> --version <v>
-//   verify-publish.mjs --stage sbom --report release-report/release-report.json --sbom <file>
+//   verify-publish.mjs --stage sbom --report release-report/release-report.json --sbom <file> --installed <package-lock.json>
 //   verify-publish.mjs --stage downloads --report ... --tarballs ... --notes ... --sbom ... --release <r> --version <v>
 //
 // `content` refuses, a sentence each: a report with problems, a partial or
@@ -17,9 +17,15 @@
 // every tarball, as the step's output `checked`. It runs before cdxgen, whose
 // dependencies nothing locks, so what it pins is what the gates uploaded.
 //
-// `sbom` refuses an SBOM without a driver, or naming another version of a
-// runtime dependency -- one under a facade included -- or of an upstream
-// package than the suites loaded, and pins the SBOM the same way.
+// `sbom` refuses an SBOM that is not the inventory of the install it was
+// made from -- the published tarballs, installed by npm as a consumer
+// installs them (0092): one that names a package that install does not
+// hold, or leaves out one it holds, by npm's lockfile of it; and one that
+// leaves out a driver, a package this release publishes at its version, or
+// an upstream package their install brings, or that gives a published
+// package -- or the dependency that declares a nested one, tedious under
+// mssql -- a runtime dependency at another version than its suites loaded,
+// read from the SBOM's dependency graph. It pins the SBOM the same way.
 //
 // `downloads`, in the publish job, refuses any file it downloaded that is not
 // byte for byte one `check` pinned, any pinned file it did not download, and
@@ -43,6 +49,9 @@ import { readTarball } from './tarball.mjs'
 export const DRIVERS = ['postgres', 'mssql']
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
+
+/** A package of TypeScript declarations alone: no code of it runs, and cdxgen's --required-only leaves it out, so the SBOM's checks ask nothing of one (0092). */
+const typesOnly = (name) => String(name).startsWith('@types/')
 
 /** A package URL's npm name and version: `pkg:npm/%40formancy/spec@0.3.0?x` is `@formancy/spec`, `0.3.0`. */
 export function npmPurl(purl) {
@@ -106,22 +115,109 @@ function tarballProblems(report, tarballs, version) {
 }
 
 /**
- * The SBOM: both drivers named, and every runtime dependency the report
- * names -- tedious under mssql included -- and every upstream package at the
- * version the suites loaded.
+ * The SBOM's dependency graph: each package's `name@version` to the
+ * packages, `{ name, version }`, it depends on. cdxgen writes each
+ * reference as the package's URL.
+ */
+function dependencyGraph(sbom) {
+  const graph = new Map()
+  for (const { ref, dependsOn } of sbom?.dependencies ?? []) {
+    const from = npmPurl(ref)
+    if (from !== undefined) graph.set(`${from.name}@${from.version}`, (dependsOn ?? []).map(npmPurl).filter((to) => to !== undefined))
+  }
+  return graph
+}
+
+/**
+ * The SBOM against the report (0092): both drivers named; every package this
+ * release publishes named at its version; every upstream package the report
+ * marks shipped -- one a consumer's install of the published packages
+ * brings -- named, and every upstream package it names at a version the
+ * suites loaded; and each runtime dependency held where it is given, read
+ * from the SBOM's dependency graph: a published package given each it
+ * declares, and a nested one given by the dependency that declares it, at
+ * the version the suites loaded or the install gate's clean install of the
+ * same tarballs resolved in this run. A consumer's tree can hold one name at two
+ * versions, the other brought by a dependency of a dependency no suite's
+ * record names, so a runtime dependency is never held by its name alone
+ * (formancy.ai-report 0017).
  */
 export function sbomProblems(report, sbom) {
   const problems = []
   const components = (sbom?.components ?? []).map((component) => npmPurl(component.purl)).filter((entry) => entry !== undefined)
+  const names = (name, version) => components.some((component) => component.name === name && (version === undefined || component.version === version))
+  const runtime = report.testedOn?.runtime ?? []
+  const upstream = report.testedOn?.upstream ?? []
+  const version = report.subject?.version
+  for (const driver of DRIVERS) if (!names(driver)) problems.push(`the SBOM names no ${driver}, a driver that talks to a customer's database`)
+  for (const { package: name } of report.results?.buildIdentity ?? []) {
+    if (!names(name, version)) problems.push(`the SBOM names no ${name} ${String(version)}, which this release publishes`)
+  }
+  for (const name of new Set(upstream.filter((entry) => entry.shipped === true).map((entry) => entry.name))) {
+    if (!names(name)) problems.push(`the SBOM names no ${name}, which a published package depends on`)
+  }
+  const graph = dependencyGraph(sbom)
+  const givenTo = (from, name) => (graph.get(`${from.name}@${String(from.version)}`) ?? []).filter((to) => to.name === name)
+  for (const entry of runtime.filter((each) => !typesOnly(each.name))) {
+    // A nested dependency is given by the one that declares it, at whichever version the published package is given that one.
+    const declarers = entry.under === undefined ? [{ name: entry.package, version }] : givenTo({ name: entry.package, version }, entry.under)
+    const declarer = declarers[0] ?? { name: entry.under, version: undefined }
+    const given = declarers.flatMap((from) => givenTo(from, entry.name))
+    if (given.length === 0) problems.push(`the SBOM records no dependency of ${declarer.name} on ${entry.name}`)
+    // The version the suites ran, or the one the install gate's clean install resolved in this run, which the release body names as run by no suite.
+    const fresh = entry.fresh === null || entry.fresh === undefined ? null : entry.fresh
+    for (const to of given) {
+      if (to.version !== entry.loaded && to.version !== fresh) problems.push(`the SBOM gives ${declarer.name} ${entry.name} ${to.version}, where its suites loaded ${entry.loaded}${fresh === null ? '' : ` and a clean install resolved ${fresh}`}`)
+      else if (!names(to.name, to.version)) problems.push(`the SBOM names no ${to.name} ${to.version}, which ${declarer.name} depends on`)
+    }
+  }
   const loaded = new Map()
-  const note = (name, version) => loaded.set(name, new Set([...(loaded.get(name) ?? []), version]))
-  for (const entry of report.testedOn?.runtime ?? []) note(entry.name, entry.loaded)
-  for (const entry of report.testedOn?.upstream ?? []) note(entry.name, entry.version)
-  for (const driver of DRIVERS) if (!components.some((component) => component.name === driver)) problems.push(`the SBOM names no ${driver}, a driver that talks to a customer's database`)
+  for (const entry of upstream) loaded.set(entry.name, new Set([...(loaded.get(entry.name) ?? []), entry.version, ...(entry.fresh === null || entry.fresh === undefined ? [] : [entry.fresh])]))
   for (const component of components) {
     const versions = loaded.get(component.name)
     if (versions !== undefined && !versions.has(component.version)) problems.push(`the SBOM names ${component.name} ${component.version}, where the suites loaded ${[...versions].join(', ')}`)
   }
+  return [...new Set(problems)]
+}
+
+/**
+ * Every package an install holds, from npm's lockfile of it (its `packages`
+ * map, lockfileVersion 2 and 3): `[{ name, version }]`, each as npm
+ * installed it, nested copies included, the project itself, a link, a dev
+ * dependency and a package of types alone left out.
+ */
+export function lockedPackages(lockfile) {
+  return Object.entries(lockfile?.packages ?? {})
+    .filter(([path, entry]) => path !== '' && entry?.link !== true && entry?.dev !== true)
+    .map(([path, entry]) => ({ name: entry.name ?? path.slice(path.lastIndexOf('node_modules/') + 'node_modules/'.length), version: entry.version }))
+    .filter((entry) => !typesOnly(entry.name))
+}
+
+/**
+ * The SBOM against the install it describes (0092), `lockfile` being npm's
+ * lockfile of the project `check` installed the tarballs into: every
+ * component an npm package that install holds, at that version, and every
+ * package it holds a component. The report says what the SBOM must name;
+ * this says it names nothing else -- no test tool, no package of another
+ * tree -- and leaves nothing out (formancy.ai-health's check).
+ */
+export function sbomInstallProblems(sbom, lockfile) {
+  const installed = lockedPackages(lockfile)
+  if (installed.length === 0) return ['the install the SBOM describes holds no package, so nothing it names can be held to it']
+  const key = ({ name, version }) => `${name} ${String(version)}`
+  const held = new Set(installed.map(key))
+  const problems = []
+  const named = new Set()
+  for (const component of sbom?.components ?? []) {
+    const npm = npmPurl(component.purl)
+    if (npm === undefined) {
+      problems.push(`the SBOM names ${String(component.name ?? component['bom-ref'] ?? 'a component')}, a component with no npm package URL, in an inventory of an npm install`)
+      continue
+    }
+    named.add(key(npm))
+    if (!held.has(key(npm))) problems.push(`the SBOM names ${key(npm)}, which the install it describes does not hold`)
+  }
+  for (const entry of held) if (!named.has(entry)) problems.push(`the SBOM leaves out ${entry}, which the install it describes holds`)
   return problems
 }
 
@@ -231,7 +327,8 @@ if (process.argv[1]?.replaceAll('\\', '/').endsWith('scripts/release-report/veri
     if (problems.length === 0) output('checked', JSON.stringify(pinned([...filesIn(dirname(reportFile)), ...filesIn(dir)])))
   } else if (stage === 'sbom') {
     const file = resolve(option('--sbom'))
-    problems = sbomProblems(report, JSON.parse(readFileSync(file, 'utf8')))
+    const sbom = JSON.parse(readFileSync(file, 'utf8'))
+    problems = [...sbomProblems(report, sbom), ...sbomInstallProblems(sbom, JSON.parse(readFileSync(resolve(option('--installed')), 'utf8')))]
     if (problems.length === 0) output('checked', JSON.stringify(pinned([{ path: relative(process.cwd(), file).replaceAll('\\', '/'), bytes: readFileSync(file) }])))
   } else if (stage === 'downloads') {
     const sbom = resolve(option('--sbom'))

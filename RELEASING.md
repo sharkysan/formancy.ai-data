@@ -86,10 +86,15 @@ cannot be taken back:
    a tarball without `LICENSE.md` and `NOTICE` or with the wrong licence
    field; and a missing or overlong body. Then it pins what it checked, the
    sha256 of every file of the report and of every tarball, as its outputs,
-   and only then generates a CycloneDX SBOM, refusing one without either
-   driver, or naming a version of any runtime dependency -- tedious under
-   mssql included -- or of upstream other than the suites loaded, and pins
-   that too. It is not a job that can write nothing: every job of a run can
+   and only then generates a CycloneDX SBOM of those tarballs, installed
+   by npm into a project of their own as a consumer installs them, with no
+   lifecycle script and no peer; it refuses one that names anything that
+   install does not hold or leaves out anything it holds, or that leaves out
+   either driver, a published package at its version or an upstream package
+   their install brings, or gives a published package -- or mssql, tedious
+   -- a runtime dependency at a version neither the suites ran nor the
+   install gate's clean install resolved, read from the SBOM's dependency
+   graph ([0092](docs/decisions/0092-the-sbom-describes-what-a-consumer-installs-and-is-held-to-that-install.md)), and pins that too. It is not a job that can write nothing: every job of a run can
    write to the run's artefacts, this one uploads the SBOM, and cdxgen's own
    dependencies are not locked; the pins are what tie what is published to
    what was checked. It does not ask whether the published performance

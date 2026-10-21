@@ -128,10 +128,12 @@ jobs:
   # `contents: read` and no secret: the report is green and is this run's, of
   # this commit, release and version; the tarballs are the install gate's,
   # byte for byte, one per published package, each at the release's version
-  # and carrying its licence; the release body exists and fits; the SBOM
-  # names both drivers, and every runtime dependency and upstream package it
-  # names at the version the suites loaded. Not whether the published
-  # performance figures were measured on this product (0084).
+  # and carrying its licence; the release body exists and fits; the SBOM is
+  # the inventory of those tarballs as npm installs them for a consumer, and
+  # names both drivers, every published package at its version and what
+  # their install brings, each runtime dependency where it is given at the
+  # version the suites loaded (0092). Not whether the published performance
+  # figures were measured on this product (0084).
   #
   # It is not a job that can write nothing: like every job of a run it can
   # write to the run's artefacts, and it uploads the SBOM. So what it checked
@@ -152,17 +154,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node alone: the checks below import nothing but Node's own modules,
+      # and the workspace is not installed, so nothing reads it in place of
+      # what ships (0092). Whether docs/performance.md still describes this
+      # product is not asked here: RELEASING.md's step 2b asks it, and the
+      # version's changelog section says when the figures are an earlier
+      # product's (0084). performance-stale.test.mjs fails when a workflow
+      # runs that check.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: corepack enable pnpm
-
-      # cdxgen reads the installed tree. Whether docs/performance.md still
-      # describes this product is not asked here: RELEASING.md's step 2b
-      # asks it, and the version's changelog section says when the figures
-      # are an earlier product's (0084). performance-stale.test.mjs fails
-      # when a workflow runs that check.
-      - run: pnpm install --frozen-lockfile
 
       - uses: actions/download-artifact@v4
         with:
@@ -188,30 +189,45 @@ jobs:
 
       # A bill of materials for what actually ships, so a customer -- or an
       # auditor -- can answer "what is in this" without resolving it
-      # themselves. --required-only because an SBOM for a released artefact
-      # should describe the artefact, not the workbench.
+      # themselves. It describes the artefact, not the workbench: the
+      # tarballs pinned above, installed by npm into a project of their own
+      # outside the checkout as a consumer installs them, with no lifecycle
+      # script run and the peers left to the host that brings them, and
+      # --required-only (0092). Read off the workspace, 0.2.0's SBOM named
+      # the suites' tools as required, and left out tedious and every package
+      # it published, which in the workspace are links.
       - name: Generate a CycloneDX SBOM
         id: sbom
         env:
           RELEASE: ${{ needs.tag.outputs.release }}
           VERSION: ${{ needs.tag.outputs.version }}
         run: |
+          mkdir "${RUNNER_TEMP}/formancy-data-sbom"
+          cd "${RUNNER_TEMP}/formancy-data-sbom"
+          printf '{ "name": "formancy-data", "version": "%s", "private": true }\n' "${VERSION}" > package.json
+          npm install --ignore-scripts --legacy-peer-deps --no-audit --no-fund "${GITHUB_WORKSPACE}"/release-tarballs/*.tgz
           npx --yes @cyclonedx/cdxgen@12.8.4 \
             --type javascript \
             --required-only \
-            --output "formancy-data-${RELEASE}-sbom.cdx.json" \
+            --output "${GITHUB_WORKSPACE}/formancy-data-${RELEASE}-sbom.cdx.json" \
             --project-name formancy-data \
             --project-version "${VERSION}" \
             .
 
-      - name: The SBOM names what the suites loaded
+      # The SBOM names exactly what npm's lockfile of that install holds, and
+      # what the report says the release is: both drivers, every published
+      # package at its version, every upstream package their install brings,
+      # each runtime dependency given where it is declared at the version
+      # the suites loaded.
+      - name: The SBOM is the install's, and names what the suites loaded
         id: sbom-checked
         env:
           RELEASE: ${{ needs.tag.outputs.release }}
         run: |
           node scripts/release-report/verify-publish.mjs --stage sbom \
             --report release-report/release-report.json \
-            --sbom "formancy-data-${RELEASE}-sbom.cdx.json"
+            --sbom "formancy-data-${RELEASE}-sbom.cdx.json" \
+            --installed "${RUNNER_TEMP}/formancy-data-sbom/package-lock.json"
 
       - uses: actions/upload-artifact@v4
         with:
