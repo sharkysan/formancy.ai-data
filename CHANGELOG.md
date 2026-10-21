@@ -10,6 +10,72 @@ later.
 
 ## Unreleased
 
+## 0.3.0 — 2026-10-21
+
+**The third release of Formancy Data.**
+- The host token's verifier is now a package of its own,
+  `@formancy/data-identity`. A product that verifies the same tokens no
+  longer installs the server, Fastify and both database drivers to do it.
+- The host page can drill down one level at a time, with a trail of the
+  levels back.
+- The release's SBOM now describes what a consumer installs, and the
+  release checks it against that install.
+
+Built on formancy's `@formancy/*` packages at 0.6.0.
+
+### Get it
+
+- **Server image:** `ghcr.io/sharkysan/formancy-data-server:v0.3.0`,
+  signed, with its SBOM attached. There is no `latest` tag.
+- **npm packages, with provenance:** `@formancy/data-core`,
+  `@formancy/data-postgres`, `@formancy/data-sqlserver`,
+  `@formancy/data-server`, `@formancy/data-client` and, new,
+  `@formancy/data-identity`, all at 0.3.0.
+- **Try it on your machine:** the
+  [getting-started guide](https://github.com/sharkysan/formancy.ai-data/blob/v0.3.0/docs/getting-started.md)
+  starts both databases, the server, the studio and a host page with one
+  command. CI runs it as written.
+
+### Upgrade from 0.2.0
+
+- **Nothing to change.** `@formancy/data-server` still exports every name
+  of the host's identity it exported before, now re-exported from
+  `@formancy/data-identity`.
+- **To verify host tokens without the server,** depend on
+  `@formancy/data-identity` alone; its only dependency is jose
+  ([0091](https://github.com/sharkysan/formancy.ai-data/blob/v0.3.0/docs/decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)).
+- **The SBOM attached to this release, and to its image, is a different
+  inventory from 0.2.0's.**
+  - 0.2.0's listed the repository's test tools and left out tedious and the
+    released packages themselves.
+  - 0.3.0's lists what an npm install of the six packages brings, at the
+    versions it resolved on the day.
+  - It leaves out packages of TypeScript declarations alone and the peers
+    ([0092](https://github.com/sharkysan/formancy.ai-data/blob/v0.3.0/docs/decisions/0092-the-sbom-describes-what-a-consumer-installs-and-is-held-to-that-install.md)).
+
+### Known gaps
+
+- **The performance figures are still 0.1.0's.**
+  [The performance page](https://github.com/sharkysan/formancy.ai-data/blob/v0.3.0/docs/performance.md)
+  was measured on 2026-10-15, at commit `2e0c4071e113`.
+  - This release's measured code and dependencies differ from what that
+    run measured.
+  - The default lookup deadline, 892 ms, is still derived from those
+    figures
+    ([0084](https://github.com/sharkysan/formancy.ai-data/blob/v0.3.0/docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)).
+- **Drill down's levels are in the page's memory.** A reload opens a form's
+  records again
+  ([0090](https://github.com/sharkysan/formancy.ai-data/blob/v0.3.0/docs/decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)).
+- **As in 0.2.0:**
+  - A typeahead's "there are more" is heard, not seen, under formancy
+    0.6.0's themes.
+  - No test logs in as an Entra principal.
+  - The licence has not been reviewed by a lawyer.
+
+The release report attached below says what this release was tested on.
+Its *Known limitations* section lists every limitation the decision records
+name, one sentence each. Everything below says what changed and why.
+
 ### Changed
 
 - **A release's SBOM describes what a consumer installs, and is held to
