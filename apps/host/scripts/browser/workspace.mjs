@@ -101,7 +101,11 @@ export function workspaceJourney(plane, { check }, run) {
       await page.getByLabel('Host token').fill(TOKENS.clerk)
       await page.getByRole('button', { name: 'Sign in' }).click()
       await page.getByRole('heading', { level: 2, name: 'No form open' }).waitFor(WITHIN)
-      check('signed in: the keyboard is on Forms', await focusedOn(page, page.getByRole('heading', { name: 'Forms', exact: true })))
+      // The workspace moves the keyboard in an effect after it is drawn, so
+      // a check at the first sight of it can be early: once in WebKit, in
+      // the 0.2.0 release run.
+      const forms = page.getByRole('heading', { name: 'Forms', exact: true })
+      check('signed in: the keyboard is on Forms', await until(async () => (await focusedOn(page, forms)) === null, 'never').then(() => null, async () => focusedOn(page, forms)))
     }],
     ['Records, side by side', async (page) => {
       await page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Order ${FORM}` }).click()
