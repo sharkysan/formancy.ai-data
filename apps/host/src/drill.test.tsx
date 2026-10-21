@@ -2,8 +2,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient } from '@formancy/data-client'
-import { focusedName } from './test-accessible.js'
-import { answeredOnce, chooseForm, gridSection, mount, searchRecords, signIn, stamp } from './test-host.js'
+import { audit, focusedName, unnamed } from './test-accessible.js'
+import { answeredOnce, chooseForm, gridSection, mount, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { RendererName, User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -256,5 +256,311 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=records`)
     expect(focusedName()).toBe('Records')
     expect(screen.queryByRole('heading', { name: /^Order( line)? k1:/ })).toBeNull()
+  })
+})
+
+/** A new employee's id, unique in this run: employees have no generated key. */
+let employees = 200_000 + (Date.now() % 700_000)
+
+/** An employee managed by `manager`, made beside the page: its token. */
+async function employeeUnder(engine: Engine, manager: string, name: string): Promise<string> {
+  employees += 1
+  const as = client(TOKENS.clerk)
+  const definition = await as.form(engine.employees)
+  if (!definition.ok) throw new Error(definition.message)
+  // The manager's field, as the generator named the lookup.
+  const field = definition.value.form.model.fields.find((each) => each.optionsSource !== undefined)?.key ?? 'manager'
+  const created = await as.create(engine.employees, { id: String(employees), name, [field]: manager })
+  if (!created.ok || created.value.record === null) throw new Error(`the employee was not created: ${created.ok ? 'no token' : created.message}`)
+  return created.value.record
+}
+
+/** An order approved by employee 1, written by the database's owner, with a line numbered 1: their tokens. */
+async function approvedOrder(engine: Engine): Promise<{ order: string; line: string }> {
+  const order = await plane.db.insertApprovedOrder(engine.connection, 1)
+  const line = await client(TOKENS.clerk).create(engine.lines, { order, line_no: '1', quantity: '1', unit_price: '2.50' })
+  if (!line.ok || line.value.record === null) throw new Error(`the line was not created: ${line.ok ? 'no token' : line.message}`)
+  return { order, line: line.value.record }
+}
+
+/** Employee 1's name, as stored. */
+async function firstEmployee(engine: Engine): Promise<string> {
+  const read = await client(TOKENS.clerk).read(engine.employees, 'k1:1')
+  if (!read.ok) throw new Error(read.message)
+  return String(read.value.answers['name'])
+}
+
+/** Press the crumb named `name`. */
+async function crumb(user: User, name: string): Promise<void> {
+  await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name }))
+}
+
+/** A field of a level's React pane, by its label, once drawn. */
+async function field(heading: string, label: RegExp): Promise<HTMLInputElement> {
+  return waitFor(() => within(pane(heading, 'React')).getByLabelText(label) as HTMLInputElement, ARRIVES)
+}
+
+/** Down from employee 1 to the approved order's line: level 3, with the keyboard on its heading. */
+async function toLine(user: User, order: string, line: string): Promise<void> {
+  await pressOn(user, 'Records', '1', '{Enter}')
+  await answeredOnce('Order, Approved by')
+  await pressOn(user, 'Order, Approved by', order.slice(3), '{Enter}')
+  await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+  await answeredOnce('Order line')
+  await pressOn(user, 'Order line', '1', '{Enter}')
+  await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
+}
+
+/** Back one entry, once the browser has said so: the address alone cannot tell a Back the page answered from none. */
+async function back(): Promise<void> {
+  let popped = false
+  window.addEventListener(
+    'popstate',
+    () => {
+      popped = true
+    },
+    { once: true },
+  )
+  window.history.back()
+  await waitFor(() => expect(popped).toBe(true), ARRIVES)
+}
+
+/** What the unsaved notice lists, item by item. */
+function listed(notice: HTMLElement): string[] {
+  return within(notice)
+    .getAllByRole('listitem')
+    .map((item) => item.textContent ?? '')
+}
+
+describe.each(ENGINES)('Drill down, deep, on $engine', (engine) => {
+  // Three levels below the records: employee 1, an order it approved, and
+  // that order's line, the trail naming each. A crumb names a record by its
+  // first required plain text field -- an employee by its name -- and by
+  // its token otherwise: an order's status has a default, so the form does
+  // not require it, and its customer is a lookup (watched failing: the
+  // levels stopped at one).
+  test('goes three levels below an employee, and the trail names each', async () => {
+    const { order, line } = await approvedOrder(engine)
+    const name = await firstEmployee(engine)
+    const user = await drilling(engine.employees)
+    await toLine(user, order, line)
+    expect(trail()).toEqual(['Records', `Employee ${name}`, `Order ${order}`, `Order line ${line}`])
+    expect(current()).toBe(`Order line ${line}`)
+    expect(window.location.hash).toBe(`#form=${engine.employees}&layout=drill&view=record&level=3`)
+    await waitFor(async () => expect((await field(`Order line ${line}`, /^Quantity\b/)).value).toBe('1'), ARRIVES)
+  })
+
+  // A form that is its own child, three times over: each level's sessions
+  // and sections are owned under the level, so no element id is minted
+  // twice, and every level still passes axe with a name on every control
+  // (watched failing: the levels stopped at one).
+  test('an employee under an employee under an employee mints no id twice', async () => {
+    const third = await employeeUnder(engine, 'k1:2', stamp('third'))
+    const user = await drilling(engine.employees)
+    await pressOn(user, 'Records', '1', '{Enter}')
+    await answeredOnce('Employee')
+    await pressOn(user, 'Employee', '2', '{Enter}')
+    await waitFor(() => expect(trail()).toHaveLength(3), ARRIVES)
+    const cell = await waitFor(() => {
+      const found = screen
+        .getAllByRole('grid', { name: 'Employee' })
+        .flatMap((grid) => within(grid).queryAllByRole('gridcell'))
+        .find((each) => each.textContent === third.slice(3))
+      expect(found).toBeDefined()
+      return found as HTMLElement
+    }, ARRIVES)
+    cell.focus()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(trail()).toHaveLength(4), ARRIVES)
+    // Read from the DOM: an id has no role and no name.
+    const ids = [...document.querySelectorAll('[id]')].map((element) => element.id)
+    expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([])
+    expect({ axe: await audit(), unnamed: unnamed() }).toEqual({ axe: [], unnamed: [] })
+  })
+
+  // Going up drops nothing, and going down into the row the level below
+  // holds shows it as it was, typing included: the levels stay mounted.
+  // A level read again would have dropped the typing (watched failing: the
+  // levels stopped at one).
+  test('a crumb keeps the levels below, and the same row shows them unchanged', async () => {
+    const { order, line } = await approvedOrder(engine)
+    const name = await firstEmployee(engine)
+    const user = await drilling(engine.employees)
+    await toLine(user, order, line)
+    const quantity = await field(`Order line ${line}`, /^Quantity\b/)
+    await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
+    await user.clear(quantity)
+    await user.type(quantity, '42')
+    await crumb(user, `Employee ${name}`)
+    await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
+    expect(unsavedNotice()).toBeNull()
+    await pressOn(user, 'Order, Approved by', order.slice(3), '{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    await pressOn(user, 'Order line', '1', '{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
+    expect((await field(`Order line ${line}`, /^Quantity\b/)).value).toBe('42')
+  })
+
+  // Going down into another row replaces the levels below, and asks first
+  // when one of them holds work, naming its form: Keep editing leaves every
+  // level as it was, Discard and continue replaces them (watched failing:
+  // the levels stopped at one).
+  test('going down into another row asks first when a level below holds work', async () => {
+    const first = await approvedOrder(engine)
+    const second = await approvedOrder(engine)
+    const name = await firstEmployee(engine)
+    const user = await drilling(engine.employees)
+    await toLine(user, first.order, first.line)
+    const quantity = await field(`Order line ${first.line}`, /^Quantity\b/)
+    await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
+    await user.clear(quantity)
+    await user.type(quantity, '42')
+    await crumb(user, `Employee ${name}`)
+    await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
+
+    await pressOn(user, 'Order, Approved by', second.order.slice(3), '{Enter}')
+    const notice = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
+    expect(within(notice).getAllByRole('paragraph').map((text) => text.textContent)).toContain(`Opening ${second.order} closes these forms:`)
+    expect(listed(notice)).toEqual([`Order line ${first.line}, React: changes that are not saved.`])
+    await user.click(within(notice).getByRole('button', { name: 'Keep editing' }))
+    expect(unsavedNotice()).toBeNull()
+    expect(trail()).toEqual(['Records', `Employee ${name}`])
+    expect(document.activeElement?.getAttribute('role')).toBe('gridcell')
+
+    await pressOn(user, 'Order, Approved by', second.order.slice(3), '{Enter}')
+    await user.click(within(await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)).getByRole('button', { name: 'Discard and continue' }))
+    await waitFor(() => expect(focusedName()).toBe(`Order ${second.order}`), ARRIVES)
+    expect(trail()).toEqual(['Records', `Employee ${name}`, `Order ${second.order}`])
+  })
+
+  // What replaces the record at level 1 replaces every level under it, as
+  // it replaces the child sections: another employee opened from the
+  // records asks about the line typed into three levels down (the design's
+  // eighth goal; watched failing: the levels stopped at one).
+  test('another record at level 1 asks about every level below, and drops them', async () => {
+    const { order, line } = await approvedOrder(engine)
+    const user = await drilling(engine.employees)
+    await toLine(user, order, line)
+    const quantity = await field(`Order line ${line}`, /^Quantity\b/)
+    await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
+    await user.type(quantity, '7')
+    await crumb(user, 'Records')
+    await pressOn(user, 'Records', '2', '{Enter}')
+    const notice = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
+    expect(listed(notice)).toEqual([`Order line ${line}, React: changes that are not saved.`])
+    await user.click(within(notice).getByRole('button', { name: 'Discard and continue' }))
+    await waitFor(() => expect(focusedName()).toBe('Employee k1:2'), ARRIVES)
+    expect(trail()).toHaveLength(2)
+  })
+
+  // A new row at a level: preset with the level above and drawn disabled
+  // there, named new until a save creates it, then by what is stored, and
+  // listed in the section above (watched failing: the levels stopped at one).
+  test('a new line at level 3 is named new until it is saved', async () => {
+    const { order } = await approvedOrder(engine)
+    const user = await drilling(engine.employees)
+    await pressOn(user, 'Records', '1', '{Enter}')
+    await answeredOnce('Order, Approved by')
+    await pressOn(user, 'Order, Approved by', order.slice(3), '{Enter}')
+    await answeredOnce('Order line')
+    await user.click(within(gridSection('Order line')).getByRole('button', { name: 'New Order line' }))
+    await waitFor(() => expect(focusedName()).toBe('New Order line'), ARRIVES)
+    expect(current()).toBe('New Order line')
+    const sheet = pane('New Order line', 'React')
+    const parent = (await waitFor(() => within(sheet).getByRole('combobox', { name: /^Order\*?$/ }), ARRIVES)) as HTMLSelectElement
+    expect({ disabled: parent.disabled, value: parent.value }).toEqual({ disabled: true, value: order })
+    for (const [label, value] of [
+      [/^Line no\b/, '5'],
+      [/^Quantity\b/, '3'],
+      [/^Unit price\b/, '1.25'],
+    ] as const) {
+      const input = within(sheet).getByLabelText(label) as HTMLInputElement
+      await user.clear(input)
+      await user.type(input, value)
+    }
+    await user.click(within(sheet).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(current()).toMatch(/^Order line k1:/), ARRIVES)
+    const token = current().slice('Order line '.length)
+    expect(screen.getByRole('heading', { level: 3, name: `Order line ${token}` })).toBeTruthy()
+    await crumb(user, `Order ${order}`)
+    await waitFor(() => expect(rows('Order line').map((cells) => cells[0])).toEqual(['1', '5']), ARRIVES)
+  })
+
+  // A crumb says what is stored: typing a name into a new employee changes
+  // nothing in the trail, and the save that creates it names the crumb by
+  // what was stored. An employee has no version to update under, so its
+  // saved record is read only and the create is the save here (watched
+  // failing: the levels stopped at one).
+  test('a save names its crumb, typing does not', async () => {
+    const named = stamp('named')
+    const name = await firstEmployee(engine)
+    const user = await drilling(engine.employees)
+    await pressOn(user, 'Records', '1', '{Enter}')
+    await answeredOnce('Employee')
+    await user.click(within(gridSection('Employee')).getByRole('button', { name: 'New Employee' }))
+    await waitFor(() => expect(trail()).toEqual(['Records', `Employee ${name}`, 'New Employee']), ARRIVES)
+    employees += 1
+    await user.type(await field('New Employee', /^Id\b/), String(employees))
+    await user.type(await field('New Employee', /^Name\b/), named)
+    expect(trail()).toEqual(['Records', `Employee ${name}`, 'New Employee'])
+    await user.click(within(pane('New Employee', 'React')).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(trail()).toEqual(['Records', `Employee ${name}`, `Employee ${named}`]), ARRIVES)
+  })
+
+  // Another layout shows level 1 as that layout shows it, and the levels
+  // below stay mounted and hidden, their work still the guard's; Drill
+  // down again shows the level the person left (the design's second call;
+  // watched failing: the levels stopped at one).
+  test('another layout keeps the levels below, and Drill down returns to them', async () => {
+    const { order, line } = await approvedOrder(engine)
+    const user = await drilling(engine.employees)
+    await toLine(user, order, line)
+    const quantity = await field(`Order line ${line}`, /^Quantity\b/)
+    await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
+    await user.type(quantity, '9')
+    await user.click(screen.getByRole('radio', { name: 'Side by side' }))
+    expect(screen.getByRole('heading', { level: 3, name: 'Employee k1:1' })).toBeTruthy()
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: `Order line ${line}` })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    const notice = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
+    expect(listed(notice)).toEqual([`Order line ${line}, React: changes that are not saved.`])
+    await user.click(within(notice).getByRole('button', { name: 'Keep editing' }))
+    await user.click(screen.getByRole('radio', { name: 'Drill down' }))
+    expect(current()).toBe(`Order line ${line}`)
+    expect(window.location.hash).toBe(`#form=${engine.employees}&layout=drill&view=record&level=3`)
+    expect((await field(`Order line ${line}`, /^Quantity\b/)).value).toBe('19')
+  })
+
+  // Back onto an entry whose level is gone -- replaced by going down
+  // elsewhere -- shows the deepest level held above it and takes the entry,
+  // so the next Back goes on rather than sticking (the design's first call;
+  // watched failing: the levels stopped at one).
+  test('Back onto a level that is gone shows the deepest one held', async () => {
+    const first = await approvedOrder(engine)
+    const second = await approvedOrder(engine)
+    const name = await firstEmployee(engine)
+    const user = await drilling(engine.employees)
+    await toLine(user, first.order, first.line)
+    await crumb(user, `Employee ${name}`)
+    await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
+    await pressOn(user, 'Order, Approved by', second.order.slice(3), '{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order ${second.order}`), ARRIVES)
+    const at = (level: number): string => `#form=${engine.employees}&layout=drill&view=record&level=${String(level)}`
+    expect(window.location.hash).toBe(at(2))
+
+    await back()
+    await waitFor(() => expect(window.location.hash).toBe(at(1)), ARRIVES)
+    await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
+    await back()
+    // The line's entry: level 3 is gone, so level 2 is shown and the entry says so.
+    await waitFor(() => expect(window.location.hash).toBe(at(2)), ARRIVES)
+    await waitFor(() => expect(focusedName()).toBe(`Order ${second.order}`), ARRIVES)
+    expect(trail()).toEqual(['Records', `Employee ${name}`, `Order ${second.order}`])
+    await back()
+    await waitFor(() => expect(window.location.hash).toBe(at(2)), ARRIVES)
+    await back()
+    await waitFor(() => expect(window.location.hash).toBe(at(1)), ARRIVES)
+    await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
   })
 })
