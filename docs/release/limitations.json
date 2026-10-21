@@ -1765,12 +1765,12 @@
         {
           "area": "operations",
           "says": "A key set is read again only when the server is sent SIGHUP, and nothing fetches a provider's keys, so a provider's new key verifies only once the operator's file holds it and the server has been signalled.",
-          "heldBy": "packages/data-server/src/identity-file.test.ts"
+          "heldBy": "packages/data-identity/src/identity-file.test.ts"
         },
         {
           "area": "operations",
           "says": "A key set file that cannot be read, or is refused, when SIGHUP arrives leaves the set in force, a key the file removed included, and only the log says so; the same file stops the next start until it is fixed.",
-          "heldBy": "packages/data-server/src/identity-file.test.ts"
+          "heldBy": "packages/data-identity/src/identity-file.test.ts"
         },
         {
           "area": "operations",
@@ -1780,7 +1780,7 @@
         {
           "area": "operations",
           "says": "A key its provider marks for another use or algorithm is left out of force and named in the log, so a signing key the provider re-marks leaves force at the next read.",
-          "heldBy": "packages/data-server/src/identity-keys.test.ts"
+          "heldBy": "packages/data-identity/src/identity-keys.test.ts"
         },
         {
           "area": "operations",
@@ -1793,7 +1793,7 @@
         {
           "area": "operations",
           "says": "An HS256 key's kid that is its own `k`, or 43 base64 characters or more, refuses the key set, because a kid is logged; a 32-byte thumbprint cannot name an HS256 key.",
-          "heldBy": "packages/data-server/src/identity-keys.test.ts"
+          "heldBy": "packages/data-identity/src/identity-keys.test.ts"
         },
         {
           "area": "server",

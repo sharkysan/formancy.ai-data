@@ -6,12 +6,15 @@
  * is on trial is that the published entry points resolve, with the types that
  * shipped. Connecting to a database is the integration suites' business.
  */
+import { createHmac, randomBytes } from 'node:crypto'
 import { createDataClient, EXPORT_MAX_BYTES, exportFileName, fieldProblems, LIST_PAGE_SIZE, lookupSources, sourceNames } from '@formancy/data-client'
 import type { DeleteOutcome, FormMenu, Outcome, PublishedForm, RecordFile, RecordList, Refusal } from '@formancy/data-client'
 import { DATABASE_KINDS, isDatabaseKind, reachesPast } from '@formancy/data-core'
 import type { CascadeRule, DatabaseAdapter, DatabaseKind, FormPolicy } from '@formancy/data-core'
+import { createIdentityVerifier, KeySet, readKeySet } from '@formancy/data-identity'
+import type { HostIdentity, IdentityOutcome } from '@formancy/data-identity'
 import { connectPostgres, createPostgresAdapter } from '@formancy/data-postgres'
-import { DRIVER_FACTORIES } from '@formancy/data-server'
+import { createIdentityVerifier as serverIdentityVerifier, DRIVER_FACTORIES, KeySet as ServerKeySet, KeySetRefusal as ServerKeySetRefusal } from '@formancy/data-server'
 import type { AdminAuditEvent, AuditEvent, AuditSink, RuntimeAuditEvent } from '@formancy/data-server'
 import { connectSqlServer, createSqlServerAdapter } from '@formancy/data-sqlserver'
 import type { FormSchema } from '@formancy/spec'
@@ -141,4 +144,30 @@ const lines: CascadeRule = { table: { schema: 'sales', name: 'order_line' }, for
 const cascading: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] }, fields: {}, rowFilters: [], lookups: {}, cascades: [lines] }
 if (!reachesPast({ removed: [{ schema: 'sales', name: 'order' }, lines.table], cleared: [] }) || cascading.cascades?.length !== 1) throw new Error('reachesPast() did not read a reach past its root')
 
-console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists, exports, the menu, deletion and cascades included; audit events`)
+// The host's identity (0091): a package of its own, which another product
+// verifies the server's tokens with, and which the server re-exports. A
+// token signed here with node:crypto alone is verified under a JSON Web Key
+// Set through both packages' published code. A second copy of data-identity
+// -- bundled into the server's dist, or installed beneath it -- would brand
+// sets of its own, and the server's verifier would refuse every set that
+// data-identity's readKeySet made, and its KeySetRefusal another class.
+const secret = randomBytes(32)
+const set = readKeySet(JSON.stringify({ keys: [{ kty: 'oct', kid: 'host-1', alg: 'HS256', k: secret.toString('base64url') }] }), 'HS256')
+const part = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url')
+const signed = `${part({ alg: 'HS256', typ: 'JWT', kid: 'host-1' })}.${part({ sub: 'clerk-7', iss: 'https://host.example', aud: 'formancy-data', exp: Math.floor(Date.now() / 1000) + 60, roles: ['clerk'], tid: 3 })}`
+const token = `${signed}.${createHmac('sha256', secret).update(signed).digest('base64url')}`
+for (const make of [createIdentityVerifier, serverIdentityVerifier]) {
+  const verify = await make({ key: { kind: 'key-set', keys: () => set }, issuer: 'https://host.example', audience: 'formancy-data', attributes: { tenant: 'tid' } })
+  const verified: IdentityOutcome = await verify(token)
+  const identity: HostIdentity | undefined = verified.ok ? verified.identity : undefined
+  if (identity?.actor.id !== 'clerk-7' || identity.attributes['tenant'] !== '3') throw new Error(`a token was not verified under a set data-identity read: ${verified.ok ? 'another identity' : verified.reason}`)
+}
+let refused = false
+try {
+  readKeySet('{"keys":[]}', 'HS256')
+} catch (error) {
+  refused = error instanceof ServerKeySetRefusal
+}
+if (!refused || ServerKeySet !== KeySet || serverIdentityVerifier !== createIdentityVerifier) throw new Error('the server carries a copy of data-identity instead of re-exporting it')
+
+console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists, exports, the menu, deletion and cascades included; audit events; a host token verified through data-identity and the server alike`)

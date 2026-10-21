@@ -58,6 +58,10 @@ component_management:
       name: packages/data-fixtures
       paths:
         - packages/data-fixtures/**
+    - component_id: data-identity
+      name: packages/data-identity
+      paths:
+        - packages/data-identity/**
     - component_id: data-performance
       name: packages/data-performance
       paths:

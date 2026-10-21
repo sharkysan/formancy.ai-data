@@ -1019,10 +1019,10 @@ says what an author and a publisher may each do, and what it costs).
 | **SQL Server** | `mcr.microsoft.com/mssql/server:2022-latest`; `@formancy/data-fixtures` and `@formancy/data-sqlserver` also on `mcr.microsoft.com/mssql/server:2019-latest` and `mcr.microsoft.com/mssql/server:2025-latest`; an image outside the matrix that one file names shows only what that file shows |  |
 | **Recognised, not tested** | None: Azure SQL Database and Azure SQL Managed Instance are recognised by a snapshot and called not tested |  |
 | **SQL Server logins** | SQL login; Entra managed identity and Entra service principal are accepted and not tested |  |
+| `jose`, by `@formancy/data-identity` | 6.2.12 | `^6.2.12` |
 | `postgres`, by `@formancy/data-postgres` | 3.4.9 | `^3.4.9` |
 | `@fastify/rate-limit`, by `@formancy/data-server` | 11.2.0 | `^11.2.0` |
 | `fastify`, by `@formancy/data-server` | 5.12.5 | `^5.12.5` |
-| `jose`, by `@formancy/data-server` | 6.2.12 | `^6.2.12` |
 | `@azure/identity`, by `@formancy/data-sqlserver` | 4.13.3 | `4.13.3` |
 | `@types/mssql`, by `@formancy/data-sqlserver` | 12.3.0 | `^12.3.0` |
 | `mssql`, by `@formancy/data-sqlserver` | 12.7.4 | `^12.0.0` |
