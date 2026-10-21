@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import type { FormMenuEntry } from '@formancy/data-client'
 import type { Guard } from './guard.js'
-import { fragmentOf, readFragment } from './layout.js'
+import { fragmentOf, levelShown, readFragment } from './layout.js'
 import type { Place } from './layout.js'
 
 /*
@@ -167,6 +167,19 @@ export function useAddressRequests({
           )
         } finally {
           arriving.current = false
+        }
+        return
+      }
+      // A level of Drill down, by Back or Forward between the page's own
+      // entries (0090): the entry is the page's from now on, and the level it
+      // asks for is shown -- or, when it is no longer held, the deepest one
+      // above it, which the form writes over this entry. An entry asking for
+      // the level already shown moves nothing, so Back is never stuck on it.
+      if (number !== null && now.layout === 'drill' && asks.layout === 'drill' && asks.form === now.form) {
+        entry.current = number
+        if (levelShown(asks) !== levelShown(now)) {
+          setPlace({ ...now, view: asks.view ?? 'records', level: asks.view === 'record' ? (asks.level ?? 1) : undefined })
+          setHistoryView((n) => n + 1)
         }
         return
       }

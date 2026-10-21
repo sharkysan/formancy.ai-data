@@ -225,6 +225,55 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     expect((screen.getByRole('radio', { name: 'Stacked' }) as HTMLInputElement).checked).toBe(true)
   })
 
+  // Drill down's records and its record are levels 0 and 1 (0090), each an
+  // entry of its own, as Separate views' views are: Back and Forward move
+  // between them and the keyboard goes to what the level shows. Its entry
+  // popped while another layout is shown moves nothing, as Separate views'
+  // does (watched failing: no Drill down to choose).
+  test('Back and Forward move between the levels of Drill down', async () => {
+    const user = mount(plane.fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, engine.formId)
+    await user.click(screen.getByRole('radio', { name: 'Drill down' }))
+    expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=records`)
+    const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
+    const cell = within(grid).getAllByRole('gridcell')[0] as HTMLElement
+    const token = `k1:${String(cell.textContent)}`
+    cell.focus()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order ${token}`), ARRIVES)
+    expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=1`)
+
+    window.history.back()
+    await waitFor(() => expect(document.activeElement?.getAttribute('role')).toBe('gridcell'), ARRIVES)
+    expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=records`)
+    window.history.forward()
+    await waitFor(() => expect(focusedName()).toBe(`Order ${token}`), ARRIVES)
+    expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=1`)
+
+    await user.click(screen.getByRole('radio', { name: 'Stacked' }))
+    await backTo(window.location.hash, 2)
+    expect((screen.getByRole('radio', { name: 'Stacked' }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  // A level is in memory only: a typed address that asks for one the page
+  // holds no entry for is written over with the page's own, and the level
+  // shown stays (watched failing: no Drill down to choose).
+  test("a typed level is written over with the page's own", async () => {
+    const user = mount(plane.fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, engine.formId)
+    await user.click(screen.getByRole('radio', { name: 'Drill down' }))
+    const cell = within(within(gridSection('Records')).getByRole('grid', { name: 'Records' })).getAllByRole('gridcell')[0] as HTMLElement
+    const token = `k1:${String(cell.textContent)}`
+    cell.focus()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order ${token}`), ARRIVES)
+    window.location.hash = `#form=${engine.formId}&layout=drill&view=record&level=5`
+    await waitFor(() => expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=1`), ARRIVES)
+    expect(screen.getByRole('heading', { level: 3, name: `Order ${token}` })).toBeTruthy()
+  })
+
   // Signed out and in again: the history keeps the entries the first
   // sign-in wrote, and this one's do not continue their count. Back onto
   // one of them is asked about as an address the page did not write, and

@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 import type { FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { useAddressRequests, useHistory } from './address.js'
 import { useAfterRender } from './after-render.js'
+import { childFormsOf } from './child-forms.js'
 import type { ChildForm } from './children.js'
 import { FormView } from './form-view.js'
 import { FormsNav } from './forms-nav.js'
@@ -88,23 +89,12 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         if (focus) after(() => formHeading.current?.focus())
         return
       }
-      // The children the menu names, each opened as itself: its own policy
-      // decides what its list returns, and a child the server no longer lists
-      // for this person now is left out (0045).
-      const children = await Promise.all(
-        chosen.children
-          .filter((child) => ids.includes(child.form))
-          .map(async (child) => {
-            const answer = await client.form(child.form)
-            const own = menuEntry(child.form)
-            return answer.ok && answer.value.list !== null && own !== undefined ? { child, menu: own, definition: answer.value } : null
-          }),
-      )
+      const children = await childFormsOf(client, menu, chosen)
       if (asking.current !== mine) return
-      setOpened({ entry: chosen, state: 'open', definition: definition.value, children: children.filter((child): child is ChildForm => child !== null) })
+      setOpened({ entry: chosen, state: 'open', definition: definition.value, children })
       if (focus) after(() => formHeading.current?.focus())
     },
-    [client, ids, menuEntry, setPlace, write, after],
+    [client, menu, menuEntry, setPlace, write, after],
   )
 
   // Arriving: the keyboard on Forms, the fragment's form opened when the
@@ -129,15 +119,16 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   // Back, Forward, and a fragment typed into the address bar.
   const historyView = useAddressRequests({ guard, ids, menuEntry, openForm, setPlace, placeRef, history })
 
-  const changeLayout = (layout: Layout): void => {
-    const next: Place = { ...placeRef.current, layout, view: 'records' }
+  /** A layout chosen replaces the entry, on the records -- or, entering Drill down, on the level the form says (0090). */
+  const changeLayout = (layout: Layout, at: { view: View; level?: number } = { view: 'records' }): void => {
+    const next: Place = { ...placeRef.current, layout, view: at.view, level: at.level }
     setPlace(next)
     write(next, false)
   }
 
-  /** A view chosen pushes an entry; one the page moves to by itself -- the records after a delete -- replaces it. */
-  const changeView = (view: View, replace = false): void => {
-    const next: Place = { ...placeRef.current, view }
+  /** A view chosen pushes an entry; one the page moves to by itself -- the records after a delete -- replaces it. In Drill down, `level` is the level the record view shows. */
+  const changeView = (view: View, replace = false, level?: number): void => {
+    const next: Place = { ...placeRef.current, view, level: view === 'record' ? level : undefined }
     setPlace(next)
     write(next, !replace)
   }

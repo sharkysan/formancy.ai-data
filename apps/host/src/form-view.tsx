@@ -128,7 +128,7 @@ export function FormView({
   headingRef: RefObject<HTMLHeadingElement | null>
   onLayout: (layout: Layout) => void
   /** `replace`: the view changed without a step of its own in the history -- after a delete, the record view is not one to go back to. */
-  onView: (view: View, replace?: boolean) => void
+  onView: (view: View, replace?: boolean, level?: number) => void
   onRenderer: (choice: RendererChoice) => void
   onSplit: (share: number) => void
   onSplitSettled: (share: number) => void
@@ -193,18 +193,20 @@ export function FormView({
   const { saving } = removal
 
   const both = renderer === 'both'
+  /** One view at a time: Separate views' two, or Drill down's levels (0090). */
+  const paged = layout === 'separate' || layout === 'drill'
   const say = (said: Said, kind: 'answer' | 'refused' = 'answer'): void => setLine({ said, kind })
 
   /** In Separate views, `half` shown if it is not, without a step of its own in the history: the page moved there, the person did not. True when it was hidden. */
   function reveal(half: View): boolean {
-    if (layout !== 'separate' || view === half) return false
-    onView(half, true)
+    if (!paged || view === half) return false
+    onView(half, true, half === 'record' ? 1 : undefined)
     return true
   }
 
   /** The detail, with the keyboard on its heading: in Separate views, the record view. */
   function toDetail(): void {
-    if (layout === 'separate') onView('record')
+    if (paged) onView('record', false, 1)
     after(() => detailHeading.current?.focus())
   }
 
@@ -288,7 +290,7 @@ export function FormView({
 
   /** Back to the records, or to the open row beside them. */
   function back(): void {
-    if (layout === 'separate') onView('records')
+    if (paged) onView('records')
     toOpenRow()
   }
 
@@ -347,7 +349,7 @@ export function FormView({
     }
     grid.current?.removed(gone(target, word))
     if (quiet) return
-    if (layout === 'separate') onView('records', true)
+    if (paged) onView('records', true)
     after(() => recordsHeading.current?.focus())
   }
 
@@ -362,7 +364,6 @@ export function FormView({
     // On each change made by history, and only then.
   }, [historyView])
 
-  const separate = layout === 'separate'
   const sideBySide = layout === 'side-by-side'
   const note = narrow && sideBySide
   const parent = open?.kind === 'record' ? { kind: 'record' as const, token: open.token } : open?.kind === 'new' ? { kind: 'new' as const } : null
@@ -373,14 +374,14 @@ export function FormView({
     <>
       <FormHead title={title} formId={formId} operations={definition.operations} layout={layout} note={note} headingRef={headingRef} onLayout={onLayout} />
       {notice}
-      <div className="lanes" data-layout={layout} data-view={separate ? view : 'records'} ref={lanes} style={style}>
+      <div className="lanes" data-layout={layout} data-view={paged ? view : 'records'} ref={lanes} style={style}>
         <Records
           gridRef={grid}
           client={client}
           formId={formId}
           definition={definition}
           columns={columns}
-          hidden={separate && view === 'record'}
+          hidden={paged && view === 'record'}
           openToken={open?.kind === 'record' ? open.token : null}
           canCreate={canCreate}
           headingRef={recordsHeading}
@@ -413,7 +414,7 @@ export function FormView({
           line={line}
           layout={layout}
           canCreate={canCreate}
-          hidden={separate && view === 'records'}
+          hidden={paged && view === 'records'}
           headingRef={detailHeading}
           onBack={back}
           renderer={renderer}

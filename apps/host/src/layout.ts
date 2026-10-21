@@ -27,7 +27,7 @@ export interface Place {
   layout: Layout
   view: View
   /** In Drill down's record view, the level shown: 1 for the record, 2 for a child row of it, and so on. */
-  level?: number
+  level?: number | undefined
 }
 
 /**
@@ -73,6 +73,11 @@ export function readFragment(hash: string): Asked {
     else asked.level = levelOf(value)
   }
   return asked
+}
+
+/** The level a place shows in Drill down: 0 for the records, the record view's level otherwise, 1 when it names none. */
+export function levelShown(place: { view: View | null; level?: number | null | undefined }): number {
+  return place.view === 'record' ? (place.level ?? 1) : 0
 }
 
 /**
