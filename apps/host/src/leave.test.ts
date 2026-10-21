@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { atRisk, discards, gridOwner, lead, WORK } from './leave.js'
+import { atRisk, discards, drillBase, drillOwner, gridOwner, lead, levelOf, WORK } from './leave.js'
 import type { LeaveRequest, PaneWork } from './leave.js'
 
 /*
@@ -112,6 +112,74 @@ describe('what each way of leaving a form discards', () => {
   })
 })
 
+describe("Drill down's levels (0090)", () => {
+  /** A workspace in Drill down three levels deep: the record, an order under it, that order's line, and a kept fourth level. */
+  const LEVELS: PaneWork[] = [
+    { owner: 'master', renderer: 'react', name: ['Employee ', { code: 'k1:1' }], work: 'changed' },
+    { owner: 'pg-order-staff~created_by', renderer: 'react', name: ['Order ', { code: 'k1:9' }], work: 'changed' },
+    { owner: drillOwner(2, 'pg-order-staff', 'created_by'), renderer: 'react', name: ['Order ', { code: 'k1:4711' }], work: 'changed' },
+    { owner: `${drillBase(2)}pg-order-line~order`, renderer: 'angular', name: ['Order line ', { code: 'k1:4711,9' }], work: 'saving' },
+    { owner: drillOwner(3, 'pg-order-line', 'order'), renderer: 'react', name: ['Order line ', { code: 'k1:4711,2' }], work: 'changed' },
+    { owner: drillOwner(3, 'pg-order-line', 'order'), renderer: 'angular', name: ['Order line ', { code: 'k1:4711,2' }], work: null },
+    { owner: gridOwner(`${drillBase(3)}pg-x~y`), renderer: null, name: ['X ', { code: 'k1:1' }], work: 'deleting' },
+    { owner: drillOwner(4, 'pg-employee', 'manager'), renderer: 'angular', name: ['Employee ', { code: 'k1:2' }], work: 'unknown' },
+  ]
+  const named = (request: LeaveRequest): string[] => atRisk(request, LEVELS).map((pane) => `${pane.owner} ${String(pane.renderer)}`)
+
+  // A level's owner says its level, its own panes' and its sections' alike,
+  // a grid's deletion included; everything else is the record's, level 1,
+  // but for the records grid, which is above every level. Read wrong, a
+  // level's work would be dropped with the wrong request, or kept past it.
+  test('every owner says its level', () => {
+    expect(levelOf('master')).toBe(1)
+    expect(levelOf(gridOwner('master'))).toBe(0)
+    expect(levelOf('pg-order-line~order')).toBe(1)
+    expect(levelOf(gridOwner('pg-order-line~order'))).toBe(1)
+    expect(levelOf(drillOwner(3, 'pg-employee', 'manager'))).toBe(3)
+    expect(levelOf(`${drillBase(2)}pg-order-line~order`)).toBe(2)
+    expect(levelOf(gridOwner(`${drillBase(12)}pg-order-line~order`))).toBe(12)
+    // A form id that merely starts like one is not a level's.
+    expect(levelOf('drill-down~x')).toBe(1)
+  })
+
+  // Going down from a level replaces the levels below it and nothing else:
+  // the record, the level gone down from and its sections keep their work.
+  // A guard that asked about them would stop a person for nothing; one that
+  // skipped the levels below would drop a line someone typed into without a
+  // word (watched failing: no such request).
+  test('going down from a level drops every level below it, and nothing at or above it', () => {
+    expect(discards({ kind: 'drill', below: 2, record: 'k1:4711,3', title: 'Order line' })).toEqual({ owners: { deeperThan: 2 }, renderers: 'all' })
+    expect(named({ kind: 'drill', below: 2, record: 'k1:4711,3', title: 'Order line' })).toEqual([
+      `${drillOwner(3, 'pg-order-line', 'order')} react`,
+      `${gridOwner(`${drillBase(3)}pg-x~y`)} null`,
+      `${drillOwner(4, 'pg-employee', 'manager')} angular`,
+    ])
+    expect(named({ kind: 'drill', below: 1, record: null, title: 'Order' })).toEqual([
+      `${drillOwner(2, 'pg-order-staff', 'created_by')} react`,
+      `${drillBase(2)}pg-order-line~order angular`,
+      `${drillOwner(3, 'pg-order-line', 'order')} react`,
+      `${gridOwner(`${drillBase(3)}pg-x~y`)} null`,
+      `${drillOwner(4, 'pg-employee', 'manager')} angular`,
+    ])
+    expect(named({ kind: 'drill-delete', below: 3, record: 'k1:4711,2' })).toEqual([`${drillOwner(4, 'pg-employee', 'manager')} angular`])
+  })
+
+  // Going up shows another level and drops nothing: every level stays
+  // mounted, as every lane does for a layout or a view.
+  test('going up a level drops nothing', () => {
+    expect(discards({ kind: 'level' })).toBeNull()
+    expect(named({ kind: 'level' })).toEqual([])
+  })
+
+  // What drops the record drops every level under it, as it drops its
+  // child sections: they are that record's. A child section's own row
+  // keeps to that section, at level 1 and at every level.
+  test('the record and a section keep their old reach', () => {
+    expect(named({ kind: 'row', record: 'k1:2' })).toHaveLength(LEVELS.filter((pane) => pane.work !== null).length)
+    expect(named({ kind: 'child-row', owner: `${drillBase(2)}pg-order-line~order`, record: 'k1:4711,9' })).toEqual([`${drillBase(2)}pg-order-line~order angular`])
+  })
+})
+
 describe('what the notice says', () => {
   // The lead names what was asked for, so the person can tell which press
   // they are being asked about: "closes these forms" alone would not say.
@@ -128,6 +196,9 @@ describe('what the notice says', () => {
     expect(text({ kind: 'child-new', owner: 'lines', title: 'Order line' })).toBe('Starting a new Order line closes these forms:')
     expect(text({ kind: 'renderer', hides: ['react'], shows: 'Angular' })).toBe('Showing Angular closes these forms:')
     expect(text({ kind: 'created', owner: 'master', record: 'k1:7', by: 'angular' })).toBe('Opening `k1:7`, just created in Angular, closes these forms:')
+    expect(text({ kind: 'drill', below: 1, record: 'k1:1003,4', title: 'Order line' })).toBe('Opening `k1:1003,4` closes these forms:')
+    expect(text({ kind: 'drill', below: 1, record: null, title: 'Order line' })).toBe('Starting a new Order line closes these forms:')
+    expect(text({ kind: 'drill-delete', below: 2, record: 'k1:1003,4' })).toBe('Deleting `k1:1003,4` closes these forms:')
   })
 
   // Each kind of unsaved work in its own words: a save the server has not
