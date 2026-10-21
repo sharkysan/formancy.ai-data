@@ -29,6 +29,19 @@ later.
   npm token limited to the packages it names must name it too
   ([0091](docs/decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)).
 
+- **Drill down, a fourth layout of the host page: one level at a time,
+  with a trail back.** The workspace reached a record's child rows and
+  stopped there: to see an order's lines from a customer, a person went to
+  the order form and found the order again. In Drill down, opening a row
+  goes down a level -- the record, a child row of it with its own child
+  sections, and so on as deep as the menu's children go -- and a
+  breadcrumb trail names every level above as a button back to it. Back
+  and Forward move between levels; going up keeps the levels below as
+  they were, and going down elsewhere asks first when one of them holds
+  unsaved work. The address says the level, a number, never a record, so
+  a reload starts on the records; the other three layouts are unchanged
+  ([0090](docs/decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)).
+
 ## 0.2.0 — 2026-10-20
 
 **The second release of Formancy Data.** Publication can be reviewed by a
