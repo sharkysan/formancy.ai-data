@@ -250,6 +250,13 @@
     padding-inline: calc(0.5rem + 2px);
   }
 
+  /* The four layouts do not fit 320 in one row, as the three did: the
+     group wraps, its track rounded to the rows it holds (0090). */
+  .layout .segmented {
+    flex-wrap: wrap;
+    border-radius: 1.375rem;
+  }
+
   .search-block {
     flex-basis: 100%;
     max-width: none;

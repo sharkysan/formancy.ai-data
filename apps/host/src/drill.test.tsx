@@ -672,3 +672,55 @@ describe.each(ENGINES.filter((engine) => engine.connection === 'ms'))('Drill dow
     expect(document.querySelectorAll('.drill-level')).toHaveLength(0)
   })
 })
+
+describe.each(ENGINES)('Drill down on a phone, and the floor, on $engine', (engine) => {
+  // Every level a person reaches passes axe with a name on every control:
+  // the trail's crumbs are buttons named by their text, and the level shown
+  // is no button (watched failing: the trail had no crumbs).
+  test('every level passes axe with a name on every control', async () => {
+    const { order, line } = await approvedOrder(engine)
+    const user = await drilling(engine.employees)
+    expect({ level: 0, axe: await audit(), unnamed: unnamed() }).toEqual({ level: 0, axe: [], unnamed: [] })
+    await pressOn(user, 'Records', '1', '{Enter}')
+    await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
+    expect({ level: 1, axe: await audit(), unnamed: unnamed() }).toEqual({ level: 1, axe: [], unnamed: [] })
+    await answeredOnce('Order, Approved by')
+    await pressOn(user, 'Order, Approved by', order.slice(3), '{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    expect({ level: 2, axe: await audit(), unnamed: unnamed() }).toEqual({ level: 2, axe: [], unnamed: [] })
+    await answeredOnce('Order line')
+    await pressOn(user, 'Order line', '1', '{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
+    expect({ level: 3, axe: await audit(), unnamed: unnamed() }).toEqual({ level: 3, axe: [], unnamed: [] })
+  })
+
+  // On a phone, past three crumbs, the trail draws the first, a button that
+  // says how many levels there are, collapsed, and the last two; pressed, it
+  // draws every crumb and the keyboard goes to the first one it drew, since
+  // the button itself is gone (watched failing: the keyboard fell to the
+  // page with the button). jsdom resolves no media query, so the window's
+  // is stood in for, as the browser gate measures the real one.
+  test('the trail draws its ends, and a button that draws the rest', async () => {
+    const { order, line } = await approvedOrder(engine)
+    const name = await firstEmployee(engine)
+    const media = Object.getOwnPropertyDescriptor(window, 'matchMedia')
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({ matches: /max-width: (40|56)rem/.test(query), media: query, addEventListener: () => {}, removeEventListener: () => {} }),
+    })
+    try {
+      const user = await drilling(engine.employees)
+      await toLine(user, order, line)
+      expect(trail()).toEqual(['Records', '…', `Order ${order}`, `Order line ${line}`])
+      const more = within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: 'Show all 4 levels' })
+      expect(more.getAttribute('aria-expanded')).toBe('false')
+      expect({ axe: await audit(), unnamed: unnamed() }).toEqual({ axe: [], unnamed: [] })
+      await user.click(more)
+      expect(trail()).toEqual(['Records', `Employee ${name}`, `Order ${order}`, `Order line ${line}`])
+      await waitFor(() => expect(focusedName()).toBe(`Employee ${name}`), ARRIVES)
+    } finally {
+      if (media === undefined) Reflect.deleteProperty(window, 'matchMedia')
+      else Object.defineProperty(window, 'matchMedia', media)
+    }
+  })
+})
