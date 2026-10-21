@@ -5,7 +5,7 @@ import type { DataClient } from '@formancy/data-client'
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { answeredOnce, chooseForm, gridSection, mount, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { RendererName, User } from './test-host.js'
-import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
+import { EDGES, ENGINES, holdingRequests, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
 /*
@@ -562,5 +562,113 @@ describe.each(ENGINES)('Drill down, deep, on $engine', (engine) => {
     await back()
     await waitFor(() => expect(window.location.hash).toBe(at(1)), ARRIVES)
     await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
+  })
+})
+
+/** The confirmation a Delete opened, by its question. */
+function confirmation(noun: string, record: string): HTMLElement {
+  return screen.getByRole('region', { name: `Delete ${noun} ${record}?` })
+}
+
+/** Down from an order to its line `no`: level 2, the order found by `words`. */
+async function toOrderLine(user: User, words: string, order: string, line: string, no = '1'): Promise<void> {
+  await searchRecords(user, words, [order.slice(3)])
+  await pressOn(user, 'Records', order.slice(3), '{Enter}')
+  await answeredOnce('Order line')
+  await pressOn(user, 'Order line', no, '{Enter}')
+  await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
+}
+
+// On SQL Server alone: there an order line's rowversion proves a delete,
+// and on PostgreSQL the line form offers none (0050), so no level below the
+// record can be deleted there.
+describe.each(ENGINES.filter((engine) => engine.connection === 'ms'))('Drill down, deleting, on $engine', (engine) => {
+  // A record deleted at a level is gone from every level: the level above
+  // is shown, with no step of its own in the history, its section's grid
+  // says the row is gone, and the keyboard is on that section's heading
+  // (watched failing: the level stayed, showing a record that is gone).
+  test('a delete at level 2 goes to level 1', async () => {
+    const words = stamp('drill-delete')
+    const { order, lines } = await orderWithLines(engine, words, [1, 2])
+    const user = await drilling(engine.formId)
+    await toOrderLine(user, words, order, lines[0] ?? '')
+    await user.click(screen.getByRole('button', { name: 'Delete Order line' }))
+    await user.click(within(await waitFor(() => confirmation('Order line', lines[0] ?? ''), ARRIVES)).getByRole('button', { name: 'Delete it' }))
+    await waitFor(() => expect(focusedName()).toBe('Order line'), ARRIVES)
+    expect(trail()).toEqual(['Records', `Order ${order}`])
+    expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=1`)
+    await waitFor(() => expect(within(gridSection('Order line')).getAllByRole('status').some((status) => status.textContent?.startsWith(`Deleted Order line ${lines[0] ?? ''}. `))).toBe(true), ARRIVES)
+    await waitFor(() => expect(rows('Order line').map((cells) => cells[0])).toEqual(['2']), ARRIVES)
+  })
+
+  // The row the level below holds, deleted from its grid one level up: the
+  // levels below go with it, so the guard asks about them first, naming
+  // what they hold; Discard and continue goes on to the confirmation, and
+  // once deleted the level below is gone (watched failing: no question, and
+  // the typing was dropped without a word).
+  test("the held row's Delete in the grid asks about the levels below first", async () => {
+    const words = stamp('drill-held')
+    const { order, lines } = await orderWithLines(engine, words, [1, 2])
+    const user = await drilling(engine.formId)
+    await toOrderLine(user, words, order, lines[0] ?? '')
+    const quantity = await field(`Order line ${lines[0] ?? ''}`, /^Quantity\b/)
+    await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
+    await user.type(quantity, '5')
+    await crumb(user, `Order ${order}`)
+    await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    await user.click(within(gridSection('Order line')).getByRole('button', { name: `Delete Order line ${lines[0] ?? ''}` }))
+    const notice = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
+    expect(within(notice).getAllByRole('paragraph').map((text) => text.textContent)).toContain(`Deleting ${lines[0] ?? ''} closes these forms:`)
+    expect(listed(notice)).toEqual([`Order line ${lines[0] ?? ''}, React: changes that are not saved.`])
+    await user.click(within(notice).getByRole('button', { name: 'Discard and continue' }))
+    await user.click(within(await waitFor(() => confirmation('Order line', lines[0] ?? ''), ARRIVES)).getByRole('button', { name: 'Delete it' }))
+    await waitFor(() => expect(rows('Order line').map((cells) => cells[0])).toEqual(['2']), ARRIVES)
+    expect(screen.queryByRole('heading', { name: `Order line ${lines[0] ?? ''}` })).toBeNull()
+    // The level below is gone: going down into the other line reads it, and the trail has nothing past it.
+    await pressOn(user, 'Order line', '2', '{Enter}')
+    await waitFor(() => expect(trail()).toEqual(['Records', `Order ${order}`, `Order line ${lines[1] ?? ''}`]), ARRIVES)
+  })
+
+  // A delete answered once the person has gone up: the levels below the
+  // deleted record still go, but nothing moves the person or the keyboard
+  // -- as a delete answered after the person moved on is quiet in the
+  // detail (watched failing with the level above shown whenever a level
+  // went: the answer pulled the person back down to the order).
+  test('a delete answered after the person went up is quiet', async () => {
+    const words = stamp('drill-quiet')
+    const { order, lines } = await orderWithLines(engine, words, [1])
+    const held = holdingRequests(plane.fetch, ({ path }) => path.endsWith(`/v1/forms/${engine.lines}/records/delete`))
+    const user = await drilling(engine.formId, held.fetch)
+    await toOrderLine(user, words, order, lines[0] ?? '')
+    await user.click(screen.getByRole('button', { name: 'Delete Order line' }))
+    await user.click(within(await waitFor(() => confirmation('Order line', lines[0] ?? ''), ARRIVES)).getByRole('button', { name: 'Delete it' }))
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    await crumb(user, 'Records')
+    await waitFor(() => expect(focusedName()).toBe('Records'), ARRIVES)
+    await held.pass()
+    await waitFor(async () => expect(await client(TOKENS.clerk).read(engine.lines, lines[0] ?? '')).toMatchObject({ ok: false, status: 404 }), ARRIVES)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(focusedName()).toBe('Records')
+    expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=records`)
+    expect(trail()).toEqual(['Records'])
+  })
+
+  // The record itself deleted at level 1 takes every level below with it,
+  // and the records are shown, as in Separate views (watched failing: the
+  // levels below outlived their record).
+  test('a delete at level 1 goes to the records, and the levels below go with it', async () => {
+    const words = stamp('drill-record')
+    const { order, lines } = await orderWithLines(engine, words, [1])
+    const user = await drilling(engine.formId)
+    await toOrderLine(user, words, order, lines[0] ?? '')
+    await crumb(user, `Order ${order}`)
+    await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    await user.click(screen.getByRole('button', { name: 'Delete record' }))
+    await user.click(within(await waitFor(() => confirmation('Order', order), ARRIVES)).getByRole('button', { name: 'Delete it' }))
+    await waitFor(() => expect(focusedName()).toBe('Records'), ARRIVES)
+    expect(trail()).toEqual(['Records'])
+    expect(screen.queryByRole('heading', { name: `Order line ${lines[0] ?? ''}` })).toBeNull()
+    // Read from the DOM: a level not shown is still mounted while it is held, and none is.
+    expect(document.querySelectorAll('.drill-level')).toHaveLength(0)
   })
 })
