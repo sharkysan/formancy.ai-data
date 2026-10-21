@@ -29,14 +29,14 @@
     "@formancy/data-postgres": "workspace:*",
     "@formancy/data-sqlserver": "workspace:*",
     "@formancy/spec": "0.6.0",
-    "fastify": "^5.12.5"
+    "fastify": "^5.12.5",
+    "jose": "^6.2.12"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",
     "@formancy/data-fixtures": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "jose": "^6.2.12",
     "publint": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

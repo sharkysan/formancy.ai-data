@@ -1024,6 +1024,7 @@ says what an author and a publisher may each do, and what it costs).
 | `postgres`, by `@formancy/data-postgres` | 3.4.9 | `^3.4.9` |
 | `@fastify/rate-limit`, by `@formancy/data-server` | 11.2.0 | `^11.2.0` |
 | `fastify`, by `@formancy/data-server` | 5.12.5 | `^5.12.5` |
+| `jose`, by `@formancy/data-server` | 6.2.12 | `^6.2.12` |
 | `@azure/identity`, by `@formancy/data-sqlserver` | 4.13.3 | `4.13.3` |
 | `@types/mssql`, by `@formancy/data-sqlserver` | 12.3.0 | `^12.3.0` |
 | `mssql`, by `@formancy/data-sqlserver` | 12.7.4 | `^12.0.0` |

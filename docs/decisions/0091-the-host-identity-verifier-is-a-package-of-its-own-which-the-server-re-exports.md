@@ -123,9 +123,14 @@ server and a Report at different versions verify under whichever each
 installed; nothing here can see the other product's.
 
 jose is now a runtime dependency of data-identity, which the release
-report and the README's *What it is tested on* name, and a development
-dependency of the server, whose tests still sign tokens with it. The
-server's image builds one more workspace package. The published
+report and the README's *What it is tested on* name, and it stays one of
+the server's, which no longer imports it: the image's token minter
+(`deploy/mint-token.mjs`) and the container gate's SIGHUP check sign
+tokens with jose as the server resolves it, from `/app`, which has only
+the server's own dependencies (watched failing in CI's `container` and
+both `getting-started` jobs with jose moved to the server's development
+dependencies: "Cannot find module 'jose'"). The server's image builds one
+more workspace package. The published
 performance figures were measured on these files at their old paths, so
 the stale check names them removed from the server and added to
 data-identity until the next measurement (0084).

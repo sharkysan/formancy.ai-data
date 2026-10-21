@@ -884,6 +884,9 @@ importers:
       fastify:
         specifier: ^5.12.5
         version: 5.12.5
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: 'catalog:'
@@ -897,9 +900,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.3(vitest@5.0.3)
-      jose:
-        specifier: ^6.2.12
-        version: 6.2.12
       publint:
         specifier: 'catalog:'
         version: 0.3.25
