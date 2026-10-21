@@ -158,9 +158,9 @@ describe('a refused set', () => {
   })
 
   // readKeySet is exported, and an embedder's algorithm is not checked by
-  // main.ts: one that is not one of the four -- written in lower case,
-  // another algorithm, or a name every object has -- is a refusal, never a
-  // TypeError and never a set read for no algorithm.
+  // the server's main.ts: one that is not one of the four -- written in lower
+  // case, another algorithm, or a name every object has -- is a refusal,
+  // never a TypeError and never a set read for no algorithm.
   test.each(['hs256', 'PS256', '__proto__', 'toString', 'constructor'])('an algorithm, %s, that is not one of the four', (algorithm) => {
     expect(refusal(set(oct('a'), { kid: 'z' }), algorithm as Parameters<typeof readKeySet>[1])).toBe('the algorithm of a key set is RS256, ES256, EdDSA or HS256')
   })

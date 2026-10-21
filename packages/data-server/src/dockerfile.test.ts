@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
@@ -21,9 +21,14 @@ interface Manifest {
   dependencies?: Record<string, string>
 }
 
-/** The package directory for a workspace package name, read from the manifests rather than assumed. */
+/**
+ * The package directory for a workspace package name, read from every
+ * manifest under packages/ rather than from a list: a list written here was
+ * one more place a new package had to be added before this test could even
+ * say the Dockerfile forgot it.
+ */
 function directoryOf(name: string): string {
-  for (const directory of ['data-core', 'data-postgres', 'data-sqlserver', 'data-server', 'data-fixtures']) {
+  for (const directory of readdirSync(join(repo, 'packages'))) {
     try {
       if (read(directory).name === name) return directory
     } catch {

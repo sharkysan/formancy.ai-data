@@ -99,7 +99,7 @@ Formancy Data
   policy does not name.** 401 or 403, and the adapter is never asked. Held
   by `packages/data-server/src/routes/runtime.test.ts`,
   `packages/data-core/src/policy/evaluate.test.ts` and
-  `packages/data-server/src/identity.test.ts`
+  `packages/data-identity/src/identity.test.ts`
   ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md),
   [0014](../decisions/0014-host-identity-is-verified-offline.md),
   [0022](../decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)).
@@ -287,7 +287,7 @@ Formancy Data
   image's copy list forgot.
 - **Q36. An operator replaces the host identity key set and sends
   SIGHUP.** The new set is read; a bad file leaves the old set in force and
-  says so. Held by `packages/data-server/src/identity-file.test.ts` and the
+  says so. Held by `packages/data-identity/src/identity-file.test.ts` and the
   `container` job
   ([0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)).
 - **Q37. A person asks for the menu of forms.** It names the forms they may

@@ -3,13 +3,13 @@ import { request as httpRequest } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from './app.js'
 import type { DataServerOptions } from './app.js'
 import { createFileConfigurationStore } from './config-store.js'
 import type { ConnectionRegistry } from './connections.js'
-import type { IdentityVerifier } from './identity.js'
 
 /*
  * Whom the server believes about a client's address (0071), through the

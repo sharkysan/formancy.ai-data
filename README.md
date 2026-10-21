@@ -882,7 +882,8 @@ first deploy is read.
 | `@formancy/data-postgres` | The PostgreSQL adapter, on the `postgres` driver. |
 | `@formancy/data-sqlserver` | The SQL Server adapter, on `mssql` over `tedious` — pure JavaScript, no ODBC. |
 | `@formancy/data-client` | The browser's side of the runtime plane: a `fetch`-based client for the forms a person may read, a published form's definition, its records -- one by its token or a page at a time, created, updated and deleted -- and its lookups, and the option sources both formancy renderers take. Source-available, framework-neutral, no Node. |
-| `@formancy/data-server` | The server: configuration store, host identity, the administrator and runtime planes over HTTP, the audit trail, and the composition root that starts them from configuration. Fastify, like formancy's. |
+| `@formancy/data-identity` | The host's identity token, verified offline under a pinned algorithm against one key or a JSON Web Key Set read from a file and read again on demand, and the secret references a setting names. jose and Node alone, so a product that verifies the same tokens installs neither Fastify nor a driver; the server re-exports it. Published from 0.3.0 ([0091](./docs/decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)). |
+| `@formancy/data-server` | The server: configuration store, host identity through `@formancy/data-identity` and the settings that choose its key, the administrator and runtime planes over HTTP, the audit trail, and the composition root that starts them from configuration. Fastify, like formancy's. |
 | `@formancy/data-fixtures` | Private test support: one business model for both engines, a table keyed by a uuid the database fills among its edge cases, with its restricted reader and the order form's own account; the comparator both adapters' discovery answers to; the cases both engines share -- parity and drift -- each with one expectation; the sized table the performance harness reads; and `renamedColumn`, a snapshot as discovery reports it after a rename. Never published. |
 | `@formancy/data-performance` | Private: the harness that measures the shipped server against both engines and renders `docs/performance.md` from what it measured. Never published. |
 
@@ -1019,6 +1020,7 @@ says what an author and a publisher may each do, and what it costs).
 | **SQL Server** | `mcr.microsoft.com/mssql/server:2022-latest`; `@formancy/data-fixtures` and `@formancy/data-sqlserver` also on `mcr.microsoft.com/mssql/server:2019-latest` and `mcr.microsoft.com/mssql/server:2025-latest`; an image outside the matrix that one file names shows only what that file shows |  |
 | **Recognised, not tested** | None: Azure SQL Database and Azure SQL Managed Instance are recognised by a snapshot and called not tested |  |
 | **SQL Server logins** | SQL login; Entra managed identity and Entra service principal are accepted and not tested |  |
+| `jose`, by `@formancy/data-identity` | 6.2.12 | `^6.2.12` |
 | `postgres`, by `@formancy/data-postgres` | 3.4.9 | `^3.4.9` |
 | `@fastify/rate-limit`, by `@formancy/data-server` | 11.2.0 | `^11.2.0` |
 | `fastify`, by `@formancy/data-server` | 5.12.5 | `^5.12.5` |

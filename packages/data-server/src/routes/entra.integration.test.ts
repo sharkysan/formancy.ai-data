@@ -6,6 +6,7 @@ import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
 import type { FieldBinding, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
 import { startSqlServerFixture } from '@formancy/data-fixtures'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FormSchema } from '@formancy/spec'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -15,7 +16,6 @@ import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionConfig, ConnectionRegistry } from '../connections.js'
 import { createConnectionRegistry, parseConnections } from '../connections.js'
 import { DRIVER_FACTORIES } from '../drivers.js'
-import type { IdentityVerifier } from '../identity.js'
 
 /*
  * A connection that logs in as an Entra principal, through the server's

@@ -10,6 +10,25 @@ later.
 
 ## Unreleased
 
+### Added
+
+- **`@formancy/data-identity`, the host-token verifier on its own.**
+  Formancy Report verifies the same host identity tokens the data server
+  verifies, and installing `@formancy/data-server` for that would bring
+  Fastify and both database drivers with it. `createIdentityVerifier`,
+  `KeySet`, `KeySetRefusal`, `readKeySet`, `openKeySetFile` and
+  `resolveSecret`, with their types, now live in a package that depends on
+  jose alone, beside `isKeySetAlgorithm` and `oneKeySet`, which the
+  server's settings and key set file tool share with it. The server
+  re-exports every name it exported before, the same objects, so nothing
+  that imports them from `@formancy/data-server` changes, and a key set
+  either made is one the other's verifier accepts. The settings, the key
+  set file tool and the composition root stay in the server: nothing in
+  the new package reads a setting. It is published for the first time
+  with 0.3.0, at the version every Data package carries; a Granular Access
+  npm token limited to the packages it names must name it too
+  ([0091](docs/decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md)).
+
 ## 0.2.0 — 2026-10-20
 
 **The second release of Formancy Data.** Publication can be reviewed by a

@@ -5,6 +5,7 @@ import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
 import type { FieldBinding, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
 import { PRELOGIN_ENCRYPTION, preloginAnswer, SQLSERVER_IMAGE, startPreloginStandIn, startSqlServerFixture, TDS_PACKET } from '@formancy/data-fixtures'
 import type { PreloginStandIn, SqlServerFixture } from '@formancy/data-fixtures'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FormSchema } from '@formancy/spec'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, expect, test } from 'vitest'
@@ -14,7 +15,6 @@ import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
 import { createConnectionRegistry, parseConnections } from '../connections.js'
 import { DRIVER_FACTORIES } from '../drivers.js'
-import type { IdentityVerifier } from '../identity.js'
 
 /*
  * A SQL login whose connection asks for TLS, answered by whoever stands in

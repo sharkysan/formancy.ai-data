@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { EMPTY_PRESENTATION, serverStanding } from '@formancy/data-core'
 import type { DatabaseKind, DriftChange, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, ServerFacts } from '@formancy/data-core'
 import { SQLSERVER_IMAGE, startPostgresContainer, startSqlServerContainer } from '@formancy/data-fixtures'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import { connectPostgres } from '@formancy/data-postgres'
 import { connectSqlServer } from '@formancy/data-sqlserver'
 import type { FormSchema } from '@formancy/spec'
@@ -14,7 +15,6 @@ import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionConfig, ConnectionRegistry } from '../connections.js'
 import { createConnectionRegistry } from '../connections.js'
 import { DRIVER_FACTORIES } from '../drivers.js'
-import type { IdentityVerifier } from '../identity.js'
 
 /*
  * A server this release was not tested on, through the administrator

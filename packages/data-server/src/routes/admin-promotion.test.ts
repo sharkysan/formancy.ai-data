@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, presentationOf } from '@formancy/data-core'
 import type { ColumnMeta, DatabaseAdapter, FormBindings, LookupAdapter, MetadataSnapshot, NormalizedType, RecordAdapter } from '@formancy/data-core'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FormSchema, LayoutNode } from '@formancy/spec'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -11,7 +12,6 @@ import type { AdminAuditEvent } from '../audit.js'
 import type { ConfigurationStore } from '../config-store.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
-import type { IdentityVerifier } from '../identity.js'
 
 /*
  * A published version moved to another deployment (0062): the version file

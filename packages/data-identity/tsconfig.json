@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    // Node's crypto and file system are what this package runs on, and
+    // nothing it imports brings their types in with it.
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"]
+}

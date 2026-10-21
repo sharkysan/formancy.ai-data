@@ -81,11 +81,14 @@ plane (`routes/admin*.ts`) only when given a connection registry, a store and
 administrator roles, and the runtime plane (`routes/runtime.ts`) only when
 given a registry and a store. Both planes audit through the one set of hooks
 in `audit.ts` (0023, 0033). `main.ts` is the composition root: every setting
-is read there, and a secret reference it names is resolved by `secrets.ts`.
-The identity key's settings are parsed by `identity-settings.ts`, through
-which `identity-keys-cli.ts`, the key set file tool the image ships beside
-the server, reads them too; a key set file is read, and read again on
-SIGHUP, by `identity-file.ts` (0059).
+is read there, and a secret reference it names is resolved by
+`data-identity`'s `secrets.ts`. The identity key's settings are parsed by
+`identity-settings.ts`, through which `identity-keys-cli.ts`, the key set
+file tool the image ships beside the server, reads them too; a key set file
+is read, and read again on SIGHUP, by `data-identity`'s `identity-file.ts`
+(0059). `data-identity` is the host's token verified, jose and Node alone,
+which the server re-exports and another product can install without it
+(0091).
 `data-client` is the browser's side of the runtime plane. `data-fixtures` is test support: one business model
 (`model.ts`) loaded into both engines through testcontainers, the comparator
 each adapter's discovery answers to (`conformance.ts`), and the one
@@ -414,8 +417,8 @@ pnpm --filter @formancy/data-core exec vitest run -t "a test's name"       # one
 In the packages, a file that starts containers is named
 `*.integration.test.ts`. `data-client` and `apps/host` start both databases
 once per run in a vitest `globalSetup` instead, so every file there needs
-Docker. `data-core`, `apps/examples` and `apps/studio` need none. `pnpm
-test:repo` needs `pnpm build` first too: `scripts/mint-token.test.mjs` runs
+Docker. `data-core`, `data-identity`, `apps/examples` and `apps/studio` need
+none. `pnpm test:repo` needs `pnpm build` first too: `scripts/mint-token.test.mjs` runs
 the built server's code. `pnpm test:browser` measures in Chromium alone
 unless `FORMANCY_BROWSERS` names more (`firefox`, `chromium,webkit`, `all`);
 CI runs every browser. The dev servers and the snapshot captures are in

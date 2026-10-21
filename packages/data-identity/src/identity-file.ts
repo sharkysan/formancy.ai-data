@@ -5,8 +5,8 @@ import type { KeySet, KeySetAlgorithm, LeftOutKey } from './identity-keys.js'
 
 /**
  * What one read again of a key set file did, which the log line is built from
- * (identity-settings.ts). `problem` is readKeySet's sentence, so it holds no
- * text of the file.
+ * (data-server's identity-settings.ts). `problem` is readKeySet's sentence,
+ * so it holds no text of the file.
  */
 export type KeySetReadAgain =
   | { read: true; changed: true; kids: readonly string[]; added: readonly string[]; removed: readonly string[]; replaced: readonly string[]; leftOut: readonly LeftOutKey[] }
@@ -57,7 +57,8 @@ async function readSet(path: string, algorithm: KeySetAlgorithm, read: (path: st
 /**
  * The key set in `path`, read now -- a refused set throws, which stops the
  * server at start -- and read again whenever `readAgain` is called: on SIGHUP
- * in the running server (main.ts), and by an embedder wherever it chooses.
+ * in the running server (data-server's main.ts), and by an embedder wherever
+ * it chooses.
  *
  * A read that fails keeps the set in force, a key removed from the file
  * included, because a typo or a half-written file must not refuse every

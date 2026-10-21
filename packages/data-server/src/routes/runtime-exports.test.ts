@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf, EXPORT_MAX_BYTES, generateForm, LIST_PAGE_SIZE } from '@formancy/data-core'
 import type { ColumnMeta, DatabaseAdapter, FieldBinding, DescribedTable, FormPolicy, ListOutcome, ListRequest, LookupAdapter, LookupConfig, NormalizedType, ObjectRef, RecordAdapter, RowFilters } from '@formancy/data-core'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createDataServer } from '../app.js'
@@ -13,7 +14,6 @@ import type { PublishedBundle } from '../bundle.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
 import { EXPORT_DEADLINE_MS } from '../export-limits.js'
-import type { IdentityVerifier } from '../identity.js'
 
 /*
  * `POST /v1/forms/:id/records/export` over fake ports (0079). What the

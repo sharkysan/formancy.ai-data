@@ -1,5 +1,5 @@
+import type { HostIdentity } from '@formancy/data-identity'
 import type { AdminOperation } from './audit.js'
-import type { HostIdentity } from './identity.js'
 
 /*
  * Who may do what on the administrator's plane (0065). Without review,

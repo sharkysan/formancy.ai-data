@@ -133,7 +133,7 @@ jobs:
       # Every suite reports, rather than the first failure cancelling the rest.
       fail-fast: false
       matrix:
-        package: ['@formancy/data-core', '@formancy/data-fixtures', '@formancy/data-postgres', '@formancy/data-sqlserver', '@formancy/data-server', '@formancy/data-client', '@formancy/data-performance', '@formancy/data-examples', '@formancy/data-studio', '@formancy/data-host', '@formancy/data-live-demo']
+        package: ['@formancy/data-core', '@formancy/data-identity', '@formancy/data-fixtures', '@formancy/data-postgres', '@formancy/data-sqlserver', '@formancy/data-server', '@formancy/data-client', '@formancy/data-performance', '@formancy/data-examples', '@formancy/data-studio', '@formancy/data-host', '@formancy/data-live-demo']
     steps:
       - uses: actions/checkout@v4
 

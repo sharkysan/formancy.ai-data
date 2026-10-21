@@ -25,6 +25,7 @@
   "dependencies": {
     "@fastify/rate-limit": "^11.2.0",
     "@formancy/data-core": "workspace:*",
+    "@formancy/data-identity": "workspace:*",
     "@formancy/data-postgres": "workspace:*",
     "@formancy/data-sqlserver": "workspace:*",
     "@formancy/spec": "0.6.0",

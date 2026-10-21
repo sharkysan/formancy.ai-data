@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, EMPTY_PRESENTATION, serverStanding } from '@formancy/data-core'
 import type { ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, NormalizedType, ObjectMeta, RecordAdapter, ServerIdentity } from '@formancy/data-core'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
 import type { ConfigurationStore } from '../config-store.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
-import type { IdentityVerifier } from '../identity.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({

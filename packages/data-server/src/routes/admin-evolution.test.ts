@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, EMPTY_PRESENTATION, presentationOf } from '@formancy/data-core'
 import type { ColumnMeta, DatabaseAdapter, FormBindings, LookupAdapter, MetadataSnapshot, NormalizedType, ObjectMeta, PresentationOverrides, RecordAdapter } from '@formancy/data-core'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FormSchema, LayoutNode } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
 import type { FastifyInstance } from 'fastify'
@@ -11,7 +12,6 @@ import { createDataServer } from '../app.js'
 import type { ConfigurationStore } from '../config-store.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
-import type { IdentityVerifier } from '../identity.js'
 
 /*
  * The administrator plane's evolution routes (0030): the versions list and

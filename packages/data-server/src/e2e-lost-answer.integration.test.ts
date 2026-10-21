@@ -6,6 +6,7 @@ import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
 import type { DatabaseKind, FieldBinding, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
 import { answerBytes, EDGE_VALUES, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, startTcpHop } from '@formancy/data-fixtures'
 import type { PostgresFixture, SqlServerFixture, TcpHop } from '@formancy/data-fixtures'
+import { createIdentityVerifier } from '@formancy/data-identity'
 import { connectPostgres } from '@formancy/data-postgres'
 import { connectSqlServer } from '@formancy/data-sqlserver'
 import type { FormSchema } from '@formancy/spec'
@@ -19,7 +20,6 @@ import { createFileConfigurationStore } from './config-store.js'
 import type { ConnectionConfig, ConnectionRegistry } from './connections.js'
 import { createConnectionRegistry } from './connections.js'
 import { DRIVER_FACTORIES } from './drivers.js'
-import { createIdentityVerifier } from './identity.js'
 
 /*
  * Release gate 6 (0031): a write whose answer is lost after the database

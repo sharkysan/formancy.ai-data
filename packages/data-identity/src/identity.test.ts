@@ -244,9 +244,9 @@ describe('createIdentityVerifier with a key set', () => {
   // A set is checked by its builders and verified by this module alone. Were
   // its verification a method looked up on the set, code that reached the
   // class -- an own property on a set, or the prototype's -- would turn every
-  // verifier into one that accepts anything, the one-key ones main.ts builds
-  // included; and a public verify would let an embedder pass looser options
-  // than these. Each attempt below is refused, or changes nothing.
+  // verifier into one that accepts anything, the one-key ones the server's
+  // main.ts builds included; and a public verify would let an embedder pass
+  // looser options than these. Each attempt below is refused, or changes nothing.
   test('replacing a set’s methods, or the class’s, changes nothing the verifier accepts', async () => {
     const forged = async () => ({ payload: { sub: 'forged', exp: 9_999_999_999 }, protectedHeader: { alg: 'HS256' } })
     const real = readKeySet(JSON.stringify({ keys: [a.jwk] }), 'HS256')

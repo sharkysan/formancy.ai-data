@@ -1,6 +1,4 @@
-import { oneKeySet } from './identity.js'
-import { openKeySetFile } from './identity-file.js'
-import { isKeySetAlgorithm } from './identity-keys.js'
+import { isKeySetAlgorithm, oneKeySet, openKeySetFile } from '@formancy/data-identity'
 import { identityKeySource, oneKey } from './identity-settings.js'
 
 /**

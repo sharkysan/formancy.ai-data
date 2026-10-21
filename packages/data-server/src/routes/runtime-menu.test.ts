@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, generateForm } from '@formancy/data-core'
 import type { ColumnMeta, FormPolicy, NormalizedType, ObjectRef } from '@formancy/data-core'
+import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
@@ -11,7 +12,6 @@ import type { PublishedBundle } from '../bundle.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
-import type { IdentityVerifier } from '../identity.js'
 
 /*
  * `GET /v1/forms` (0045): the forms a person may read, and the children

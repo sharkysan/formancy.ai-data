@@ -409,8 +409,9 @@ sentence naming it. The identity key's settings are parsed by
 `identity-settings.ts`, which the image's key set tool,
 `identity-keys-cli.ts`, shares. A secret is never a value in configuration:
 it is a reference, `env:NAME` or `file:/absolute/path`, resolved by
-`secrets.ts`, whose errors name the reference's form and never its value
-(`secrets.test.ts`). A database password, or a service principal's client
+`resolveSecret` (`packages/data-identity/src/secrets.ts`), whose errors
+name the reference's form and never its value (`secrets.test.ts` beside
+it). A database password, or a service principal's client
 secret, is resolved where its connection is first opened, by the registry in `connections.ts`
 ([0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)),
 so a reference that cannot be resolved is found at that connection's first

@@ -6,6 +6,7 @@ import { EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { FieldBinding, FormBindings, FormPolicy, MetadataSnapshot } from '@formancy/data-core'
 import { EDGE_VALUES, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { PostgresFixture, SqlServerFixture } from '@formancy/data-fixtures'
+import { createIdentityVerifier } from '@formancy/data-identity'
 import { connectPostgres } from '@formancy/data-postgres'
 import { connectSqlServer } from '@formancy/data-sqlserver'
 import type { LightMyRequestResponse } from 'fastify'
@@ -17,7 +18,6 @@ import { createFileConfigurationStore } from '../config-store.js'
 import type { ConnectionConfig, ConnectionRegistry } from '../connections.js'
 import { createConnectionRegistry } from '../connections.js'
 import { DRIVER_FACTORIES } from '../drivers.js'
-import { createIdentityVerifier } from '../identity.js'
 
 /*
  * Two drafts of the order form through review (0065), on both engines,

@@ -29,12 +29,12 @@ import type {
   PublishedForm,
   RecordFailure,
 } from '@formancy/data-core'
+import type { HostIdentity } from '@formancy/data-identity'
 import { canonicalize } from '@formancy/spec'
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry, OpenConnection } from '../connections.js'
-import type { HostIdentity } from '../identity.js'
 import type { AuditSink, RuntimeAuditEvent, RuntimeOperation } from '../audit.js'
 import { auditedForm, auditRequests, recordReference } from '../audit.js'
 import { lookupDeadline } from '../lookup-deadline.js'

@@ -45,9 +45,9 @@ In the packages a file that starts containers is named
 databases once per run in a vitest `globalSetup`
 (`packages/data-client/src/test-databases.ts`,
 `apps/host/src/test-databases.ts`), so every file there needs Docker;
-`data-core`, `apps/examples` and `apps/studio` need none. The whole product
-runs over HTTP into the real server and through the real drivers on both
-engines in `packages/data-server/src/e2e.integration.test.ts`
+`data-core`, `data-identity`, `apps/examples` and `apps/studio` need none.
+The whole product runs over HTTP into the real server and through the real
+drivers on both engines in `packages/data-server/src/e2e.integration.test.ts`
 ([0025](../decisions/0025-each-adapter-owns-its-driver.md)).
 
 A SQL Server container that never says it is ready fails its start with
