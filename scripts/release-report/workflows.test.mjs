@@ -130,6 +130,25 @@ describe('release.yml', () => {
     expect(ids.filter((id) => order.includes(id))).toEqual(order)
   })
 
+  // The SBOM describes what a consumer installs (0092): the tarballs the
+  // install gate ran, installed by npm into a project of their own outside
+  // the checkout, with no lifecycle script and the peers left to the host,
+  // and cdxgen over that project. The workspace is not installed in `check`,
+  // so nothing reads it in place of what ships: read off the workspace,
+  // 0.2.0's SBOM named vitest and Playwright and left out tedious and every
+  // package it published. The check holds the SBOM to npm's lockfile of
+  // that install (watched failing against the workflow as v0.2.0 ran it).
+  test('makes the SBOM of the tarballs installed as a consumer installs them, never of the workspace', () => {
+    const check = release.jobs.check
+    expect(check.steps.filter((step) => /\bpnpm\b|corepack/.test(String(step.run)))).toEqual([])
+    const sbom = String(check.steps.find((step) => step.id === 'sbom').run)
+    expect(sbom).toMatch(/cd "\$\{RUNNER_TEMP\}\/formancy-data-sbom"/)
+    expect(sbom).toContain('npm install --ignore-scripts --legacy-peer-deps --no-audit --no-fund "${GITHUB_WORKSPACE}"/release-tarballs/*.tgz')
+    expect(sbom).toMatch(/cdxgen@[\d.]+ \\\s+--type javascript \\\s+--required-only/)
+    expect(sbom.trim().endsWith('.')).toBe(true)
+    expect(String(check.steps.find((step) => step.id === 'sbom-checked').run)).toContain('--installed "${RUNNER_TEMP}/formancy-data-sbom/package-lock.json"')
+  })
+
   // Every job of a run can write to its artefacts, `check` included, and
   // cdxgen, which `check` runs, has dependencies nothing locks. So `check`
   // pins the report and the tarballs before cdxgen runs, the SBOM after it

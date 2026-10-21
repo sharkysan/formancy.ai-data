@@ -869,7 +869,7 @@
       ]
     },
     "0035": {
-      "reviewed": "sha256:b03fac6259950848212c28ad4148aa1d149ad654575c2dda663afc195c354cb6",
+      "reviewed": "sha256:f88afa8af16b2a3243d0ec52c134846b2f6d20a32884e58a65f3511e6461ef11",
       "limitations": [
         {
           "area": "databases",
@@ -2883,6 +2883,23 @@
         {
           "area": "operations",
           "says": "The first release that publishes `@formancy/data-identity` creates its name on npm, which a Granular Access token limited to the packages it names may not do, and the `npm-token` job does not check for that."
+        }
+      ]
+    },
+    "0092": {
+      "reviewed": "sha256:682fc13d3af0555762e7cfe5a5149d8e68116b726b8b3c8468d8ffc896f91a53",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "A release's SBOM lists the versions a clean npm install of its packages resolved on the day it was made; a runtime dependency may be newer than the version the suites ran, which the release body names as run by no suite."
+        },
+        {
+          "area": "operations",
+          "says": "A release's SBOM leaves out packages of TypeScript declarations alone, such as `@types/mssql`, which a consumer's type checker reads and no code of which runs."
+        },
+        {
+          "area": "operations",
+          "says": "A release's SBOM leaves out the peers its packages name, which the host installs."
         }
       ]
     }

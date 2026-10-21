@@ -55,6 +55,10 @@ gate's or lack their licence files, and a release whose measured code,
 runtime dependencies or build inputs differ from what `docs/performance.md`
 was measured on
 ([0034](../decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
+The SBOM it checks is cdxgen's inventory of the tarballs installed by npm
+as a consumer installs them, held to npm's lockfile of that install and to
+the report through its dependency graph
+([0092](../decisions/0092-the-sbom-describes-what-a-consumer-installs-and-is-held-to-that-install.md)).
 Only then does `publish`, the one job with write permissions, push the image
 with build provenance, sign it with cosign keylessly, by digest, attach the
 CycloneDX SBOM as an attestation, and publish the tarballs. The report labels

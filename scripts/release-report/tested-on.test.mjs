@@ -239,6 +239,20 @@ describe('testedOn()', () => {
     expect(dockerfileImages('FROM --platform=$BUILDPLATFORM node:22-alpine AS build\nRUN true\nFROM node:22-slim AS runtime\n')).toEqual(['node:22-alpine', 'node:22-slim'])
   })
 
+  // An upstream package is shipped when a consumer's install of the
+  // published packages brings it: a published package's `dependencies`
+  // name it, or a shipped package's own do. One only an app or a test
+  // declares -- the renderers, the themes, core where the suites use it --
+  // is not, and the release's SBOM is held to the shipped ones alone, so a
+  // correct SBOM is not refused for leaving out what nothing installs
+  // (0092; watched failing: no package was marked).
+  test('marks shipped the upstream packages a published package brings', () => {
+    const shipped = (name) => facts.upstream.filter((entry) => entry.name === name).some((entry) => entry.shipped === true)
+    expect(shipped('@formancy/spec')).toBe(true)
+    for (const name of ['@formancy/react', '@formancy/angular', '@formancy/themes', '@formancy/core']) expect(shipped(name), name).toBe(false)
+    for (const entry of facts.upstream) expect(typeof entry.shipped, entry.name).toBe('boolean')
+  })
+
   // A lookup that found nothing would render an empty row that equals
   // itself, and the README test above would pass on a table of blanks.
   test('finds a version for every browser, every tool and every package it names', () => {

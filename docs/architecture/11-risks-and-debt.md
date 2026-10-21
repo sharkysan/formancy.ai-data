@@ -372,8 +372,11 @@ Vite folds in as text
 The apps bundle their fonts under the SIL Open Font License 1.1, and a
 font fix reaches them only when the catalog's pins move
 ([0072](../decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
-A release's SBOM names what cdxgen finds, which on 2026-10-09 left out
-`tedious`, the package under `mssql` that speaks to SQL Server (0035). The
+A release's SBOM is the inventory of a consumer's install of its tarballs
+on the day: a runtime dependency may be newer than the suites ran, which
+the release body says, and packages of types alone and the peers are not
+in it
+([0092](../decisions/0092-the-sbom-describes-what-a-consumer-installs-and-is-held-to-that-install.md)). The
 examples demo is the page as `main` holds it, deployed without waiting for
 that commit's CI, and what it serves was read by hand once
 ([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).

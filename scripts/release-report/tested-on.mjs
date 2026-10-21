@@ -104,25 +104,36 @@ function runtime(root, packages, local) {
   return entries
 }
 
-/** Every upstream @formancy/* package a workspace manifest names, and theirs, recursively; each as Node loads it. */
+/**
+ * Every upstream @formancy/* package a workspace manifest names, and theirs,
+ * recursively; each as Node loads it. `direct` when a workspace manifest
+ * names it, in any field, the apps' included; `shipped` when a consumer's
+ * install of the published packages brings it: a published package's
+ * `dependencies` name it, or a shipped package's own do. The release's SBOM
+ * is held to the shipped ones (verify-publish.mjs, 0092).
+ */
 function upstream(root, packages, local) {
   const seen = new Map()
-  const visit = (fromDir, name, declared, direct) => {
+  const visit = (fromDir, name, declared, direct, shipped) => {
     const found = mustBeInstalled(fromDir, name)
     const key = `${name}@${found.version}`
-    const entry = seen.get(key) ?? { name, version: found.version, declared: null, direct: false }
+    const known = seen.get(key)
+    const entry = known ?? { name, version: found.version, declared: null, direct: false, shipped: false }
     if (declared !== null) entry.declared = declared
     entry.direct ||= direct
-    if (seen.has(key)) return
+    // Walked again only when this visit ships what an earlier one did not, so what it brings is marked shipped too.
+    if (known !== undefined && (known.shipped || !shipped)) return
+    entry.shipped ||= shipped
     seen.set(key, entry)
     for (const [inner] of Object.entries(readJson(join(found.dir, 'package.json')).dependencies ?? {})) {
-      if (inner.startsWith('@formancy/')) visit(found.dir, inner, null, false)
+      if (inner.startsWith('@formancy/')) visit(found.dir, inner, null, false, entry.shipped)
     }
   }
+  const publishing = new Set(published(root).map(({ manifest }) => manifest.name))
   for (const { dir, manifest } of packages) {
     for (const field of FIELDS) {
       for (const [name, spec] of Object.entries(manifest[field] ?? {})) {
-        if (name.startsWith('@formancy/') && !local.has(name)) visit(join(root, dir), name, String(spec), true)
+        if (name.startsWith('@formancy/') && !local.has(name)) visit(join(root, dir), name, String(spec), true, field === 'dependencies' && publishing.has(manifest.name))
       }
     }
   }
