@@ -275,7 +275,7 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
   })
 
   // A save is a request in flight, and the form stays editable meanwhile:
-  // neither renderer holds input during a submit, at 0.3.0 to 0.6.0. What
+  // neither renderer holds input during a submit, at 0.3.0 to 0.7.0. What
   // the person types then is theirs, and newer than what was sent -- a session
   // that set every stored answer back would replace it, and then say "Created"
   // over the loss. Only the answers still as they were sent take the stored

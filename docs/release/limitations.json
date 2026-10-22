@@ -2785,7 +2785,7 @@
         },
         {
           "area": "host",
-          "says": "A typeahead says that more rows match only while its list is open, and every reference theme of formancy 0.6.0 draws the open list over that sentence, so a sighted person does not read it; a screen reader hears it from the field’s status line, and a plain select’s sentence is seen."
+          "says": "A typeahead says that more rows match only while its list is open, and every reference theme of formancy 0.6.0 and 0.7.0 draws the open list over that sentence, so a sighted person does not read it; a screen reader hears it from the field’s status line, and a plain select’s sentence is seen."
         },
         {
           "area": "forms",
@@ -2900,6 +2900,19 @@
         {
           "area": "operations",
           "says": "A release's SBOM leaves out the peers its packages name, which the host installs."
+        }
+      ]
+    },
+    "0093": {
+      "reviewed": "sha256:9956f3649ee77b31f191097a0243af6612e7811116697c8b089b9504947972f7",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A form published before 0093 over a column named `__proto__` is refused when it is read, and leaves the menu, until it is published again under the key `__proto___`."
+        },
+        {
+          "area": "forms",
+          "says": "The field over a column named `__proto__` is keyed `__proto___`, so a host's own code, draft or rule that named the key `__proto__` names nothing."
         }
       ]
     }

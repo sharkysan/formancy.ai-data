@@ -147,3 +147,4 @@ only enforcement is "we remember" says so plainly.
 | [0090](0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md) | A host's workspace can drill down one level at a time, with a trail back | accepted |
 | [0091](0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md) | The host identity verifier is a package of its own, which the server re-exports | accepted |
 | [0092](0092-the-sbom-describes-what-a-consumer-installs-and-is-held-to-that-install.md) | The SBOM describes what a consumer installs, and is held to that install | accepted |
+| [0093](0093-a-column-named-proto-is-generated-under-another-key.md) | A column named `__proto__` is generated under another key, and `constructor` keeps its own | accepted |

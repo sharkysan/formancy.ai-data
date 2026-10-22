@@ -2,13 +2,16 @@ import { schemaHash } from '@formancy/spec'
 import type { ObjectRef } from '../metadata.js'
 
 /**
- * CEL's reserved words, and the key formancy reserves for a repeater row.
+ * CEL's reserved words, and the keys formancy refuses.
  *
  * A field key becomes a variable in logic expressions, so a column called `in`
- * or `null` would make a field no rule could ever refer to. `_id` is refused
- * by formancy's validator outright.
+ * or `null` would make a field no rule could ever refer to. `_id`, the key
+ * formancy reserves for a repeater row, is refused by its validator outright,
+ * and since 0.7.0 so is `__proto__`, which no answer could be stored under
+ * (formancy.ai 0185, 0093).
  */
 const RESERVED = new Set([
+  '__proto__',
   '_id',
   'as',
   'break',

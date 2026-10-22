@@ -204,7 +204,7 @@ describe('sales.order, at the edges the fixture inserts', () => {
   // Validate first, because that is the path a person takes to see a verdict:
   // the released engine checks answers once the form has been submitted, and
   // on every change after that (`runValidation` in @formancy/core, at 0.3.0
-  // to 0.6.0). Typed into an untouched form, both renderers rightly
+  // to 0.7.0). Typed into an untouched form, both renderers rightly
   // show nothing yet, and this test would pass by checking nothing -- which is
   // how its first version failed, on the second value.
   test('the largest amount is valid in both, and one fractional digit more is "pattern" in both', async () => {

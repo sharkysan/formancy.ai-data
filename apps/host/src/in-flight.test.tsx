@@ -7,7 +7,7 @@ import type { Engine, Holding, Plane } from './test-plane.js'
 
 /*
  * A save the server has not answered yet, through the page. Neither renderer
- * holds the form during a submit, at 0.3.0 to 0.6.0, so in that moment a
+ * holds the form during a submit, at 0.3.0 to 0.7.0, so in that moment a
  * person goes on typing, presses Save again, or opens another record -- and on
  * `app.inject` the moment is too short to reach, so the writes here are held
  * after the server has made them (`holdingWrites`) and answered when the test

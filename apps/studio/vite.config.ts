@@ -26,9 +26,10 @@ export default defineConfig({
   // about is worse than an error. 4390 is the server's, 4391 the examples'.
   server: { port: 4392, strictPort: true, proxy: { '/v1': SERVER } },
   preview: { port: 4392, strictPort: true, proxy: { '/v1': SERVER } },
-  // Measured with `vite build` on 2026-10-18: one chunk of 805.2 kB
-  // minified, 219.4 kB gzipped, with @formancy/* at 0.6.0, where main at
-  // 8b31cf5, at 0.5.0, was 797.1 kB and 217.1 kB -- the released renderer,
+  // Measured with `vite build` on 2026-10-22: one chunk of 807.0 kB
+  // minified, 220.1 kB gzipped, with @formancy/* at 0.7.0, where main at
+  // f7cb622, at 0.6.0, was 805.2 kB and 219.4 kB, as on 2026-10-18 at
+  // 8b31cf5 against 797.1 kB and 217.1 kB at 0.5.0 -- the released renderer,
   // engine, spec validator and builder session, and since 0.5.0 the
   // renderers' words in English, German and French. The studio's own code
   // had grown it past the last limit before that: on 2026-10-11 it was

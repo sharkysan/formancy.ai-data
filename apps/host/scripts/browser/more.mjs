@@ -12,7 +12,7 @@
 // saying so. Every check has one name in every browser (0058).
 //
 // Where the sentence is drawn, held as 0085's cost: every reference theme of
-// formancy 0.6.0 places the open list at the foot of the box (`top: 100%`,
+// formancy 0.6.0 and 0.7.0, whose stylesheets are byte-identical, places the open list at the foot of the box (`top: 100%`,
 // `z-index: 20`, up to 14rem tall), over the line under it, which is where
 // the status is. Measured on 2026-10-18 in Chromium 153 and Firefox 155 on
 // Windows at 1280 and 320 px: the window showed the option "First 01" at
@@ -76,7 +76,7 @@ function listSaysMore(name, { check }) {
       const within = status !== undefined && list !== undefined && status.top >= list.top - 1 && status.bottom <= list.bottom + 1 && status.left >= list.left - 1 && status.right <= list.right + 1
       return { elsewhere, within, shown: hit === null ? 'nothing' : `${hit.getAttribute('role') ?? hit.tagName.toLowerCase()} "${(hit.textContent ?? '').trim().slice(0, 30)}"` }
     })
-    check(`a list that goes on (${name}): the open list covers the sentence, as 0085 says formancy 0.6.0 draws it`, under.within ? null : 'the sentence lies outside the open list: read 0085’s cost again')
+    check(`a list that goes on (${name}): the open list covers the sentence, as 0085 says formancy 0.6.0 and 0.7.0 draw it`, under.within ? null : 'the sentence lies outside the open list: read 0085’s cost again')
     check(`a list that goes on (${name}): every text on the paper whose contrast axe left undecided lies under the open list`, under.elsewhere.length === 0 ? null : `undecided elsewhere: ${under.elsewhere.slice(0, 4).join('; ')}`)
     console.log(`  where the sentence is, the window shows ${under.shown}; ${String(open.undecided.length)} texts lie under the open list`)
   }

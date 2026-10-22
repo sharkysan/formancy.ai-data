@@ -10,6 +10,51 @@ later.
 
 ## Unreleased
 
+### Changed
+
+- **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's
+  release of 2026-10-21, adopted the day after it was published, and
+  generated forms stay on spec 3** (0055, 0042). Why: 0.7.0 is upstream's
+  newest release; its spec version 4 is unchanged and still the newest, and
+  it fixes how the engine reads an answer, which a form generated here
+  meets wherever a column is named after something every JavaScript object
+  has. The 23 exact pins in six manifests and the eight release-age
+  exemptions move together; the lockfile changes only in the eight
+  `@formancy` entries, and nothing new is installed. What you notice:
+  - **A column named `__proto__` is generated as the field `__proto___`**
+    (0093). formancy 0.7.0 refuses `__proto__` as a key, and through 0.6.0
+    nothing typed into such a field was kept in the browser. A form
+    published before over such a column is refused when it is read, and
+    leaves the menu, until it is published again; read from the code, not
+    tested.
+  - **A field over a column named `constructor`, `toString` or another name
+    every object has is checked by what the person gave it.** Through 0.6.0
+    the engine the renderers run read an empty one as the function the
+    object inherits: a NOT NULL date column named `constructor`, left empty,
+    was refused as not a date where it should say it is required, and the
+    generator's test now holds the 0.7.0 answer (0093). Its key is
+    unchanged.
+  - **A nullable yes/no field's error now takes the person to it.** It is
+    drawn as a radio group, which 0.7.0 gives the field's id (formancy.ai
+    0186), so the error summary's link and a failed save move focus to its
+    first option, where they did nothing before. No table in this
+    repository's fixtures has a nullable boolean column, so no test here
+    reaches it.
+  - **Nothing else generated meets 0.7.0's breaking changes.** A generated
+    form has no matrix, no signature and no rule that reads a group, and the
+    host supplies no check and no list through a prototype. The two forms
+    the examples page generates hash and canonicalize as under 0.6.0,
+    compared on 2026-10-22.
+  - **The studio's bundle** is 807.0 kB minified, 220.1 kB gzipped, 1.9 kB
+    more than main at 0.6.0, both measured on 2026-10-22; it stays under its
+    810 kB warning limit.
+  - **The themes' stylesheets and the renderers' search, submit and error
+    wording are unchanged** -- the stylesheets byte for byte, and the
+    renderers' code differs only in the three ids above, compared on
+    2026-10-22 -- so the README's pictures keep their stylesheet digests,
+    and every comment that named a renderer's behaviour at 0.6.0 names 0.7.0
+    too.
+
 ## 0.3.0 — 2026-10-21
 
 **The third release of Formancy Data.**

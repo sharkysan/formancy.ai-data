@@ -165,7 +165,7 @@ a title, operations or children is `unexpected`.
   narrow.", under a plain select "Showing the first 50; there are more
   than this list can show.", how many matches cannot be chosen here only
   when the list is complete, and nothing under a closed typeahead or a
-  field a rule disables. formancy 0.6.0's Blueprint theme draws a
+  field a rule disables. formancy 0.6.0's and 0.7.0's Blueprint theme draws a
   typeahead's open list over the line its sentence is on, as the other
   three reference themes' stylesheets place it too, so a sighted person
   does not read the sentence while the list is open; a screen reader hears
@@ -203,7 +203,7 @@ a title, operations or children is `unexpected`.
 - **Field problems are sentences.** The renderers print an error entry as
   it is, beside the field and in the error summary, as observed at 0.3.0 on
   2026-10-09, at 0.4.0 on 2026-10-10 and at 0.5.0 on 2026-10-11, and read
-  in 0.6.0's code on 2026-10-18, so `fieldProblems` hands them the server's
+  in 0.6.0's code on 2026-10-18 and 0.7.0's on 2026-10-22, so `fieldProblems` hands them the server's
   sentence, which never echoes a value. The code stays on the
   refusal for a program.
 
@@ -275,14 +275,15 @@ to update asks under update's filter without a new application.
   was a list of `{ value, label }`, so a list of exactly one page looked
   complete. Past the page a typeahead narrows as the person types; a plain
   select cannot, and says so.
-- **Its types are `@formancy/spec` 0.6.0's.** `PublishedForm.form` is the
+- **Its types are `@formancy/spec` 0.7.0's.** `PublishedForm.form` is the
   `FormSchema` of the `@formancy/spec` this package pins exactly (0002), and
   there `specVersion` may be `"4"`, so a host whose engine is
   `@formancy/core` 0.3.0 does not compile the React snippet above: TS2322 at
   `createFormEngine`, measured with TypeScript 6.0.3 and `skipLibCheck` off
   on 2026-10-10, and again against 0.5.0's types on 2026-10-11, when a host
-  whose engine is at 0.4.0 compiled it; 0.6.0's `FormSchema` declaration is
-  byte-identical to 0.5.0's, compared on 2026-10-18. The document itself is spec 3
+  whose engine is at 0.4.0 compiled it; 0.6.0's and 0.7.0's `FormSchema`
+  declarations are byte-identical to 0.5.0's, compared on 2026-10-18 and
+  2026-10-22. The document itself is spec 3
   ([0042](../../docs/decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)),
   so such a host casts it to its own `@formancy/spec`'s `FormSchema`, or
   moves its renderer to 0.4.0 or later. Nothing here type-checks a 0.3.0 or
