@@ -11,6 +11,15 @@ describe('fieldKeyFor', () => {
     expect(fieldKeyFor('group')).toBe('group')
   })
 
+  // formancy 0.7.0 refuses `__proto__` as a key (`key.unstorable`, formancy.ai
+  // 0185), so a column of that name generated as it is would make a form
+  // nobody can publish (0093). `constructor` is a key like any other since
+  // 0.7.0 reads an answer as the value's own, and stays as it is.
+  test('steps around __proto__, which formancy refuses as a key', () => {
+    expect(fieldKeyFor('__proto__')).toBe('__proto___')
+    expect(fieldKeyFor('constructor')).toBe('constructor')
+  })
+
   // SQL allows names formancy's key rule does not: spaces, a leading digit,
   // letters outside ASCII. Each becomes something the rule accepts.
   test('makes any column name into a valid key', () => {

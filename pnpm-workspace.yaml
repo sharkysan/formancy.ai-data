@@ -76,11 +76,11 @@ catalog:
 # for a version the lockfile no longer installs is removed:
 # scripts/upstream-deps.mjs refuses either.
 minimumReleaseAgeExclude:
-  - '@formancy/angular@0.6.0'
-  - '@formancy/builder-core@0.6.0'
-  - '@formancy/conformance@0.6.0'
-  - '@formancy/core@0.6.0'
-  - '@formancy/expressions@0.6.0'
-  - '@formancy/react@0.6.0'
-  - '@formancy/spec@0.6.0'
-  - '@formancy/themes@0.6.0'
+  - '@formancy/angular@0.7.0'
+  - '@formancy/builder-core@0.7.0'
+  - '@formancy/conformance@0.7.0'
+  - '@formancy/core@0.7.0'
+  - '@formancy/expressions@0.7.0'
+  - '@formancy/react@0.7.0'
+  - '@formancy/spec@0.7.0'
+  - '@formancy/themes@0.7.0'

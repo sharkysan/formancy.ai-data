@@ -171,6 +171,34 @@ describe('generateForm', () => {
     }
   })
 
+  // A column is named by whoever made the table, and `__proto__` is a name
+  // SQL takes. formancy 0.7.0's validator refuses it as a key, so generated as
+  // it is the form is refused at publish, after a person had reviewed it
+  // (0093); the field keeps its column under the next key the rules allow.
+  test('a column named __proto__ generates a document formancy accepts, bound to that column', () => {
+    const snapshot = fixtureLike('postgres', (objects) => {
+      const notes = objects.find((object) => object.ref.name === 'order')?.columns.find((column) => column.name === 'notes')
+      if (notes !== undefined) notes.name = '__proto__'
+    })
+    const result = generateForm(snapshot, ORDER)
+    valid(result)
+    expect(result.bindings.fields.filter((binding) => binding.kind === 'column' && binding.column === '__proto__').map((binding) => binding.field)).toEqual(['__proto___'])
+  })
+
+  // `constructor` keeps its name (0093), which is sound only because formancy
+  // 0.7.0 reads an answer as the value's own (formancy.ai 0185): through
+  // 0.6.0 an unanswered field so keyed held `function Object`, and the engine
+  // checked that as the answer -- watched failing at 0.6.0 with `shape`, a
+  // date that is not a date, where the person had left it empty.
+  test('a NOT NULL column named constructor is a field the engine refuses empty', () => {
+    const snapshot = fixtureLike('postgres', (objects) => {
+      const date = objects.find((object) => object.ref.name === 'order')?.columns.find((column) => column.name === 'order_date')
+      if (date !== undefined) date.name = 'constructor'
+    })
+    const { form } = generateForm(snapshot, ORDER)
+    expect(serverErrors(form, { customer: 'k', status: 'placed', amount: '1.5' })).toEqual({ constructor: ['required'] })
+  })
+
   // A person reviews the output and a regeneration must change only what the
   // database changed. Anything non-deterministic would show as a diff nobody made.
   test('is deterministic', () => {

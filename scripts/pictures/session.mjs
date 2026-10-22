@@ -97,7 +97,7 @@ export function said(error, secrets) {
 
 /**
  * The renderers search a lookup DEBOUNCE_MS after its text changes -- 250 in
- * @formancy/react and @formancy/angular, at 0.3.0 to 0.6.0, with no minimum
+ * @formancy/react and @formancy/angular, at 0.3.0 to 0.7.0, with no minimum
  * length, so a Load that fills a lookup starts one, unless a rule disables
  * it, which from 0.6.0 asks only for its label -- and mark its box
  * `aria-busy="true"` while the answer is out (react dist/index.mjs, the
