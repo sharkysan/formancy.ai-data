@@ -430,7 +430,7 @@
       ]
     },
     "0024": {
-      "reviewed": "sha256:4367da309caf601e3841e50efe59624db65d103d3ffb94abdd343f8fb7306afe",
+      "reviewed": "sha256:5a046aa2ab9f92b254e512a3879341667b840f1e20e785a632ed8e9995f148f2",
       "limitations": [
         {
           "area": "studio",
@@ -2395,7 +2395,7 @@
       ]
     },
     "0072": {
-      "reviewed": "sha256:87b18bc36ef927de06baca9926022285383dfd6b3b10aa426878167239abaee9",
+      "reviewed": "sha256:6b209fb7aadf069fdcd2c661268f04e641a9f1842e94c0c93f823ae314e5d81d",
       "limitations": [
         {
           "area": "licence",
@@ -2930,6 +2930,19 @@
         {
           "area": "testing",
           "says": "A nullable yes/no field is drawn only in the examples' jsdom tests: no table of the shared model has a nullable boolean column, so the host's suites and the browser gates never draw one."
+        }
+      ]
+    },
+    "0096": {
+      "reviewed": "sha256:b955c1effb0d87d2d1e71600791281ac165d3e9094c5af7876b7d70e5792926b",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "The examples page, the studio and the host page draw with formancy's admin palette at the `@formancy/themes` release this repository pins, so a palette change upstream reaches them only with the version bump that brings it."
+        },
+        {
+          "area": "studio",
+          "says": "The studio's page carries the `--wb-*` variables formancy's `room.css` sets for the builder's panes, which it does not load, so they recolour nothing."
         }
       ]
     }

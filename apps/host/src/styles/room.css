@@ -1,27 +1,15 @@
-/* The room: the admin's variables, the page, and what is said rather than drawn. */
+/*
+ * The room's two font stacks, the page, and what is said rather than drawn. The
+ * palette is formancy's own, @formancy/themes/room.css, which main.tsx imports
+ * before this file (0096).
+ */
 
 :root {
-  /* formancy.ai apps/admin/src/admin.css */
-  --ground: #080a12;
-  --glass: rgb(17 22 36 / 74%);
-  --text: #eef1f8;
-  --muted: #95a0b4;
-  --edge: rgb(255 255 255 / 9%);
-  --edge-strong: rgb(255 255 255 / 15%);
-  --client: #8b7bff;
-  --server: #3fe0d5;
-  --invalid: #ff7a8a;
-  --ok: #4fdc8a;
-  --warn: #ffd27a;
-
-  --display: 'Archivo', 'Archivo Variable', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-
   /* The two stacks admin.css reads from workbench.css as --wb-sans and
-     --wb-mono, as the examples page and the studio name them. */
+     --wb-mono, which room.css does not carry, as the examples page and the
+     studio name them. */
   --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
-
-  color-scheme: dark;
 }
 
 *:where(:not(.sheet *, .grid-bench *)) {

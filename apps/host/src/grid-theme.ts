@@ -3,7 +3,7 @@ import { themeQuartz } from 'ag-grid-community'
 /**
  * The grid in the room (0047, UX-SPEC §6.1): AG Grid Community's Quartz
  * theme, recoloured only through its parameters, each a variable of the
- * room's (styles/room.css, the admin's palette) or an opaque mix of
+ * room's (@formancy/themes/room.css, the admin's palette, 0096) or an opaque mix of
  * parameters that are -- grid-theme.test.ts fails on anything else.
  *
  * - The well is the bench: `--ground`, opaque, as AG Grid requires.

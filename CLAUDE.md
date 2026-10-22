@@ -233,11 +233,13 @@ applied, not a new one:
   for what the server did, with the builder's panes from `workbench.css`
   recoloured only through its `--wb-*` variables and not one rule overridden
   for colour. The Studio is that admin extended with connection, discovery,
-  mapping and drift panes. It wears `admin.css`'s variables, not a palette of
-  its own, so the tool stays one tool in two places. It edits presentation
+  mapping and drift panes. It wears the admin's palette, `@formancy/themes`'
+  `room.css`, not a palette of its own, so the tool stays one tool in two
+  places. It edits presentation
   with controls of its own over `@formancy/builder-core`'s session, not the
   builder's panes, which cannot be held to edits that keep the bindings
-  (0024); so it loads no `workbench.css` and sets no `--wb-*`.
+  (0024); so it loads no `workbench.css`, and the `--wb-*` that `room.css`
+  sets recolour nothing in it.
 - **Form previews on white paper, in Blueprint.** An administrator previews
   what the people filling in the form will see, not the admin. A generated form
   renders through `@formancy/react` or `@formancy/angular` with a shipped theme.
@@ -303,19 +305,18 @@ the same promises:
   one browser made a check another did not
   ([0058](docs/decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
 - **The palette guard**, `scripts/palette.test.mjs` in `pnpm test:repo`:
-  every stylesheet that copies `admin.css`'s variables says the same value for
-  each.
+  every app that draws with the admin's palette imports `@formancy/themes`'
+  `room.css` before its own stylesheet, and no stylesheet here declares one
+  of its variables again
+  ([0096](docs/decisions/0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md)).
 - **The README's pictures**, `scripts/pictures/readme.test.mjs` in
   `pnpm test:repo` and each app's `pictures.mjs --check` in
   `pnpm test:pictures`, in Chromium, in a CI job of its own: every picture is whole elements of a state the page
   reaches, and a caption quotes only text those elements hold
   ([0038](docs/decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 
-What nothing holds yet, said: the palette is copied from `admin.css` by hand,
-into `app.css`, the studio's `styles/room.css` and the host's
-`styles/room.css`, and the palette guard holds them to each other but nothing
-fails when upstream's moves; that the examples' `app.css` never reaches into a
-preview's paper is held by review; what a README picture looks like, which
+What nothing holds yet, said: that the examples' `app.css` never reaches
+into a preview's paper is held by review; what a README picture looks like, which
 review alone holds; and the one-shell bullet has nothing to hold until the
 `formancy.ai/data` page exists.
 

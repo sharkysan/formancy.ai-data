@@ -344,9 +344,10 @@ that product on purpose (0063).
 Every app with a page -- the examples page, the studio and the host page --
 is private, built by Vite, and carries the licence and notice
 texts of everything it bundles in `THIRD-PARTY-NOTICES.txt` (0046). Each
-is formancy.ai's admin applied: `admin.css`'s variables copied into the
-app's stylesheet, which `scripts/palette.test.mjs` holds to the other
-apps' and nothing holds to upstream's, and the room's faces imported in
+is formancy.ai's admin applied: the admin's palette, `@formancy/themes`'
+`room.css`, imported in `apps/*/src/main.tsx` before the app's own
+stylesheet, which declares none of its variables
+([0096](../decisions/0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md)), and the room's faces imported in
 `apps/*/src/main.tsx` from Fontsource's packages and bundled, so no page
 asks another host for anything
 ([0072](../decisions/0072-the-apps-serve-their-own-fonts-and-no-page-asks-another-host-for-anything.md)).
