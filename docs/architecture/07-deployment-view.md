@@ -30,7 +30,9 @@ installs the server's workspace dependencies against the lockfile with
 package (`scripts/sync-licenses.mjs`) and writes a self-contained tree with
 `pnpm deploy`; the runtime stage holds that tree and nothing of pnpm or the
 repository. It runs as `node`, owns `/var/lib/formancy-data`, the directory
-to mount the store's volume on, and declares no `VOLUME`: an anonymous volume
+to mount the store's volume on, and nothing else: its code is root's, so the
+server cannot change what it runs, and it starts on a read-only root
+([0101](../decisions/0101-the-server-image-gives-its-user-the-store-and-not-its-code.md)). It declares no `VOLUME`: an anonymous volume
 nobody asked for is a surprise, not a default. The issuer, the audience and
 the identity key have no defaults, so an unconfigured container stops and
 names the setting it needs rather than accept tokens from an issuer nobody
@@ -40,7 +42,8 @@ named.
 graph which workspace packages the Dockerfile must copy. The `container` job
 builds the image on every pull request and runs it: unconfigured, it names
 `FORMANCY_DATA_IDENTITY_SECRET`; configured, it serves `/health`, runs as
-`node`, carries `LICENSE.md`, can write the store's directory, reads each
+`node`, carries `LICENSE.md`, can write the store's directory and none of
+its code, serves on a read-only root, reads each
 setting the table below marks as the job's, answers a path that is not plain
 400 `path-not-plain`, and says `Cache-Control: no-store`, which a proxy in
 front relies on ([0037](../decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)).
