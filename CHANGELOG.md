@@ -109,6 +109,13 @@ later.
 - **Drill down's refs are written after a render, not during it**, so a
   render React throws away writes nothing the answers read; behaviour is
   unchanged.
+- **A host token verifies only in the spelling the host signed** (0100,
+  which narrows 0014). jose read the host's token with an `=` after its
+  signature as the same token, so one credential had two spellings, which
+  anything keying by a token's text could be handed. `@formancy/data-identity`
+  now refuses a token that is not three base64url parts, without padding,
+  as `ERR_JWS_INVALID`. Found by the formancy.ai-report repository's review
+  of its own server.
 - **A save over a record somebody else changed is answered stale, even when
   the change moved a field the person may not write** (0098, which narrows
   0022). A renderer sends every field back, so the old value of a computed

@@ -217,7 +217,7 @@
       ]
     },
     "0014": {
-      "reviewed": "sha256:0172731be7cb155fde9e02c1fbde566b4a5002cb497f8e576785d7c077cba38b",
+      "reviewed": "sha256:2a5c11276fd9c31c87b828a9f36d218a64caa37208f2bf57c46735f445c7b552",
       "limitations": [
         {
           "area": "operations",
@@ -2972,6 +2972,15 @@
           "area": "host",
           "says": "In a layout that moves between none of them, Back takes one press for each Separate views view or Drill down level the open form's history holds, shows nothing new on each, and writes the layout shown over those entries, so Forward no longer brings their views or levels back.",
           "heldBy": "apps/host/src/address.test.tsx"
+        }
+      ]
+    },
+    "0100": {
+      "reviewed": "sha256:07cc169a3d4f7257243a1c54dc34127e8f9a0dde80ccf83a8d424d48c9c9a528",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A host token with a space, a newline or padding added on its way to the server, or written in base64 rather than base64url, is refused as malformed, though jose would have read some of those."
         }
       ]
     }
