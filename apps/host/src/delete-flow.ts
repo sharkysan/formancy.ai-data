@@ -4,9 +4,9 @@ import type { DataClient } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
 import { again, answer, checked, checking, close, confirm, deletionWork, HELD, IDLE, send } from './deletion.js'
 import type { DeleteTarget, Deletion } from './deletion.js'
-import { useGuardContext, useRegistered } from './guard.js'
+import { formsAtRisk, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
-import { atRisk, gridOwner } from './leave.js'
+import { gridOwner } from './leave.js'
 import type { LeaveRequest, PaneWork } from './leave.js'
 import type { Session } from './session.js'
 
@@ -32,9 +32,11 @@ import type { Session } from './session.js'
  *   Delete it waits for the answer.
  * - **The version** a delete of the open record names is the newest the
  *   detail heard, as it is when Delete it is pressed (`useHeard`).
- * - **What a delete of the open record drops** is listed in its
- *   confirmation, as the guard would list it; typed into since, it is named
- *   before anything is sent.
+ * - **What a delete drops** is listed in its confirmation, as the guard
+ *   would list it -- the open record's forms, and the Drill down levels
+ *   that hold the record, from any row (0094) -- and nothing is dropped
+ *   before Delete it; typed into since, it is named before anything is
+ *   sent.
  * - **The keyboard** goes to every state that asks something of the person,
  *   each time it is a new one -- in Separate views to the view it is drawn
  *   in, which the person may have left while it was out -- and back to what
@@ -76,6 +78,8 @@ export interface DeleteFlowOptions {
   sessions: readonly Session[]
   /** The request whose discards are what a delete of the open record drops: New for the record, New <child> for a child row. */
   discards: LeaveRequest
+  /** The forms of the Drill down levels that hold `target`'s record, and of every level below them, that hold work: the delete drops them too (0094). None when no level holds it. */
+  held?: (target: DeleteTarget) => readonly PaneWork[]
   /** The record has gone from the page: deleted, or not found and closed. `quiet` when the person moved on before the answer came: only the grid hears it. */
   onGone(target: DeleteTarget, word: 'Deleted' | 'Closed', quiet: boolean): void
   /** Load the saved record. */
@@ -130,15 +134,11 @@ export function useDeleteFlow(options: DeleteFlowOptions): DeleteFlow {
   const entry = useDeletionEntry(options.owner, flow)
   useRegionFocus(deletion, regionRef, (target) => latest.current.onShow(target))
 
-  /** The record's forms that hold work, which a delete of it drops, as the guard would list them. */
-  const atRiskNow = (): PaneWork[] =>
-    atRisk(
-      latest.current.discards,
-      registry
-        .entries()
-        .filter((pane) => pane.renderer !== null)
-        .map((pane) => ({ owner: pane.owner, renderer: pane.renderer, name: pane.name(), work: pane.work() })),
-    )
+  /** The forms that hold work which a delete of `target` drops, as the guard would list them: the open record's, and the levels that hold it, each once. */
+  const atStake = (target: DeleteTarget): PaneWork[] => {
+    const forms = [...(target.open ? formsAtRisk(registry, latest.current.discards) : []), ...(latest.current.held?.(target) ?? [])]
+    return forms.filter((pane, index) => forms.findIndex((other) => named(other) === named(pane)) === index)
+  }
 
   return {
     deletion,
@@ -147,9 +147,9 @@ export function useDeleteFlow(options: DeleteFlowOptions): DeleteFlow {
     heard,
     ask(target) {
       for (const other of registry.entries()) if (other !== entry) other.close?.()
-      flow.set(confirm(current.current, target, target.open ? atRiskNow() : []))
+      flow.set(confirm(current.current, target, atStake(target)))
     },
-    confirm: () => sendDeletion(flow, atRiskNow, heard),
+    confirm: () => sendDeletion(flow, atStake, heard),
     check: () => checkDeletion(flow),
     ...regionAnswers(flow),
   }
@@ -251,20 +251,18 @@ function useRegionFocus(deletion: Deletion, regionRef: RefObject<HTMLDivElement 
   }, [n])
 }
 
-/** Delete it: sent, unless a save of the open record is out or one of its forms was typed into since it asked. */
-function sendDeletion(flow: FlowState, atRiskNow: () => PaneWork[], heard: (record: string) => string | null): void {
+/** Delete it: sent, unless a save of the open record is out or a form it drops was typed into since it asked. */
+function sendDeletion(flow: FlowState, atStake: (target: DeleteTarget) => PaneWork[], heard: (record: string) => string | null): void {
   const now = flow.current.current
   if (now.state !== 'confirming') return
   const { sessions, client, formId } = flow.latest.current
-  if (now.target.open) {
-    // A save out moves the version the delete would name: Delete it waits for its answer, and says so.
-    if (sessions.some((session) => session.isSaving())) return
-    // Typed into since the question was asked: named before anything is dropped, as the guard names it.
-    const risky = atRiskNow()
-    if (risky.some((pane) => !now.discards.some((listed) => named(listed) === named(pane)))) {
-      flow.set({ ...now, discards: risky, n: now.n + 1 })
-      return
-    }
+  // A save out moves the version the delete would name: Delete it waits for its answer, and says so.
+  if (now.target.open && sessions.some((session) => session.isSaving())) return
+  // Typed into since the question was asked: named before anything is dropped, as the guard names it.
+  const risky = atStake(now.target)
+  if (risky.some((pane) => !now.discards.some((listed) => named(listed) === named(pane)))) {
+    flow.set({ ...now, discards: risky, n: now.n + 1 })
+    return
   }
   // The open record's newest version as of now: a save answered while it asked moved it.
   const target = now.target.open ? { ...now.target, version: heard(now.target.record) ?? now.target.version } : now.target

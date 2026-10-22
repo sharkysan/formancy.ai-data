@@ -142,6 +142,19 @@ describe("Drill down's levels (0090)", () => {
     expect(levelOf('drill-down~x')).toBe(1)
   })
 
+  // A form may be called `drill-3`: a form id is lower case, digits, `.`,
+  // `_` and `-`. Its section at level 1 is owned as `drill-3~order`, which
+  // read as level 3 would keep that section's typing past going down from
+  // level 1 and 2, and drop it with going down from level 2 (watched
+  // failing: level 3). The same form further down is still its level's.
+  test("a section of a form whose id spells a level's is level 1", () => {
+    expect(levelOf('drill-3~order')).toBe(1)
+    expect(levelOf(gridOwner('drill-3~order'))).toBe(1)
+    expect(levelOf(drillOwner(2, 'drill-3', 'order'))).toBe(2)
+    expect(levelOf(`${drillBase(2)}drill-3~order`)).toBe(2)
+    expect(levelOf(gridOwner(`${drillBase(4)}drill-3~order`))).toBe(4)
+  })
+
   // Going down from a level replaces the levels below it and nothing else:
   // the record, the level gone down from and its sections keep their work.
   // A guard that asked about them would stop a person for nothing; one that

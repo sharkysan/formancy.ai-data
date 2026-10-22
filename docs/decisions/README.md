@@ -101,7 +101,7 @@ only enforcement is "we remember" says so plainly.
 | [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md) | A form's records are listed a page at a time under its read policy, searched and paged as a lookup is | accepted; narrowed by 0056; extended by 0079 |
 | [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md) | The runtime plane lists the forms a person may read, and nothing about the others | accepted; extended by 0050 |
 | [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md) | A built app carries the licence and notice texts of everything it bundles | accepted; extended by 0069, 0072 |
-| [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md) | A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone | accepted; extended by 0050, 0058, 0070, 0080; narrowed by 0053 |
+| [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md) | A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone | accepted; extended by 0050, 0058, 0070, 0080; narrowed by 0053; amended by 0097 |
 | [0048](0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md) | The licence is in force before a lawyer has read it | accepted; extended by 0054; amended by 0064 |
 | [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md) | A snapshot says whether its account may delete from each table, and every foreign key that refers to it | accepted; narrowed by 0050; extended by 0056 |
 | [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md) | A record is deleted one at a time, by its token and the version its person read, under the form's policy, in one guarded statement | accepted; narrowed by 0067; extended by 0051, 0052, 0053, 0057 |
@@ -144,10 +144,12 @@ only enforcement is "we remember" says so plainly.
 | [0087](0087-a-live-demo-start-cloudflare-has-no-instance-for-is-started-again-within-a-minute.md) | A live demo start Cloudflare has no instance for is started again, within a minute | accepted |
 | [0088](0088-the-demo-image-makes-postgresqls-socket-directory-at-every-start-and-the-gate-runs-it-with-run-empty.md) | The demo image makes PostgreSQL's socket directory at every start, and the gate runs it with /run empty, as Cloudflare does | accepted |
 | [0089](0089-the-live-demos-account-may-not-write-when-a-customer-was-created.md) | The live demo's account may not write when a customer was created | accepted |
-| [0090](0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md) | A host's workspace can drill down one level at a time, with a trail back | accepted |
+| [0090](0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md) | A host's workspace can drill down one level at a time, with a trail back | accepted; amended by 0094, 0097 |
 | [0091](0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md) | The host identity verifier is a package of its own, which the server re-exports | accepted |
 | [0092](0092-the-sbom-describes-what-a-consumer-installs-and-is-held-to-that-install.md) | The SBOM describes what a consumer installs, and is held to that install | accepted |
 | [0093](0093-a-column-named-proto-is-generated-under-another-key.md) | A column named `__proto__` is generated under another key, and `constructor` keeps its own | accepted |
+| [0094](0094-a-held-rows-delete-names-the-levels-it-drops-in-its-confirmation.md) | A row a Drill down level holds names the levels it drops in its Delete's confirmation, and drops nothing before Delete it | accepted |
 | [0095](0095-a-nullable-yes-no-column-is-a-select-of-yes-and-no.md) | A nullable yes/no column is a select of Yes and No, not a radio group | accepted |
 | [0096](0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md) | The apps wear formancy's `room.css` rather than a copy of `admin.css` | accepted |
+| [0097](0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md) | Back goes on past the open form's own entries in every layout | accepted |
 | [0098](0098-an-echo-the-record-moved-since-it-was-read-is-a-stale-save.md) | An echo the record moved since it was read is a stale save, not over-posting | accepted |

@@ -44,6 +44,7 @@ export function Detail({
   onLoad,
   sessions,
   onAnswer,
+  onLoaded,
   canDelete,
   saving,
   deleteRef,
@@ -69,6 +70,8 @@ export function Detail({
   onLoad: (token: string) => void
   sessions: readonly Session[]
   onAnswer: (result: SaveResult, session: Session) => void
+  /** A pane's "Load the saved record" replaced its draft with what is stored. */
+  onLoaded: (session: Session) => void
   /** The form offers this person delete (0053): Delete record in the header of an open record. */
   canDelete: boolean
   /** A save of the record is out: Delete record waits for its answer. */
@@ -134,7 +137,7 @@ export function Detail({
         {sessions
           .filter((session) => shown.includes(session.renderer))
           .map((session) => (
-            <Pane key={session.renderer} session={session} title={formTitle} idBase={formId} onAnswer={(result) => onAnswer(result, session)} />
+            <Pane key={session.renderer} session={session} title={formTitle} idBase={formId} onAnswer={(result) => onAnswer(result, session)} onLoaded={() => onLoaded(session)} />
           ))}
       </div>
       {children}

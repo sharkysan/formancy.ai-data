@@ -1321,7 +1321,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:cab66ee5e04a98291b20a20d0f897ba57f07f2427205fce6d0b7971bbca30985",
+      "reviewed": "sha256:db69c856f20063ec131497d3e8102ded2544964992446560fe63caf5a446a08e",
       "limitations": [
         {
           "area": "host",
@@ -2847,7 +2847,7 @@
       "none": "A grant of the live demo's own account: nothing a user, integrator or operator of a release meets. The generator is unchanged, so a deployment's own column with a default is still offered wherever its account may INSERT it, as 0027 says."
     },
     "0090": {
-      "reviewed": "sha256:a77114e3407ebfd1086f41da5ef6640b8d8cd3064728db5cb065844d9093601b",
+      "reviewed": "sha256:84ce6cfdde5fae7ba0a7ec50735540e2a39d7db63f6f80565718f0e0e08f9803",
       "limitations": [
         {
           "area": "host",
@@ -2952,6 +2952,26 @@
         {
           "area": "writes",
           "says": "A changed value in a field the person may not write, sent with a version the record no longer holds, is answered 409 stale rather than 403 over-posting, so such tampering is told only that its version is old; nothing is written."
+        }
+      ]
+    },
+    "0094": {
+      "reviewed": "sha256:4698363847961760c0d13c633f65e6af92864f77b2a4a1bcc16b429b63f7c27c",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A row a Drill down level holds, deleted while the person goes down into it and types there, takes that typing with it once the delete is done, without a word; its confirmation named only what the levels held when it was asked or Delete it was pressed.",
+          "heldBy": "apps/host/src/drill.test.tsx"
+        }
+      ]
+    },
+    "0097": {
+      "reviewed": "sha256:0c8c7a09ddf2eeb15c6d3f259382eb3ab1fb6f5bc555666b9fc56444da3137d2",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "In a layout that moves between none of them, Back takes one press for each Separate views view or Drill down level the open form's history holds, shows nothing new on each, and writes the layout shown over those entries, so Forward no longer brings their views or levels back.",
+          "heldBy": "apps/host/src/address.test.tsx"
         }
       ]
     }

@@ -125,6 +125,12 @@ export function DrillLevel({
     if (result.kind === 'saved' && now.kind === 'record') drill.saved(step, now.token, nameOf(from))
   }
 
+  /** A form's "Load the saved record": the crumb and the section above say what is stored, as after a save. */
+  function loaded(from: Session): void {
+    const now = openRef.current
+    if (now.kind === 'record') drill.saved(step, now.token, nameOf(from))
+  }
+
   /** This level's Delete, in its header (0053); while a save of it is out, it waits, and says so. */
   function deleteOpen(): void {
     const now = openRef.current
@@ -165,7 +171,7 @@ export function DrillLevel({
           .filter((session) => renderersOf(renderer).includes(session.renderer))
           .map((session) => (
             // The paper is named for the row, so it differs from a level above of the same form.
-            <Pane key={session.renderer} session={session} title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`} idBase={owner} namedBy={headingId} onAnswer={(result) => answered(result, session)} />
+            <Pane key={session.renderer} session={session} title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`} idBase={owner} namedBy={headingId} onAnswer={(result) => answered(result, session)} onLoaded={() => loaded(session)} />
           ))}
       </div>
       {(childForms ?? []).map((each, index) => {
