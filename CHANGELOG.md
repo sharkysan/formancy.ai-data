@@ -109,10 +109,6 @@ later.
 - **Drill down's refs are written after a render, not during it**, so a
   render React throws away writes nothing the answers read; behaviour is
   unchanged.
-
-
-### Fixed
-
 - **A save over a record somebody else changed is answered stale, even when
   the change moved a field the person may not write** (0098, which narrows
   0022). A renderer sends every field back, so the old value of a computed
