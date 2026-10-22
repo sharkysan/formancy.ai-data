@@ -2350,7 +2350,7 @@
       ]
     },
     "0071": {
-      "reviewed": "sha256:5ad3e3656d3c077a567a618395b8067045ca236f5cb4877142b268c7da8684e0",
+      "reviewed": "sha256:95bcdf3e295317df158f28f1d737705a8e28c4208ce714939b7442f37e3df78a",
       "limitations": [
         {
           "area": "operations",
@@ -2972,6 +2972,15 @@
           "area": "host",
           "says": "In a layout that moves between none of them, Back takes one press for each Separate views view or Drill down level the open form's history holds, shows nothing new on each, and writes the layout shown over those entries, so Forward no longer brings their views or levels back.",
           "heldBy": "apps/host/src/address.test.tsx"
+        }
+      ]
+    },
+    "0099": {
+      "reviewed": "sha256:ce7d0a9af25b87a7bac3f648c3de25485da8df4ac082cdec1fce88a35400abd8",
+      "limitations": [
+        {
+          "area": "server",
+          "says": "A trusted-proxy list that covers all but part of a family's addresses, such as half of IPv4 and a quarter more, still starts: only a list that trusts every IPv4 or every IPv6 peer is refused."
         }
       ]
     }
