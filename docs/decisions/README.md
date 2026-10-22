@@ -86,7 +86,7 @@ only enforcement is "we remember" says so plainly.
 | [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047, 0060, 0066, 0085; extended by 0032, 0058 |
 | [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042, 0066; extended by 0062, 0075 |
 | [0031](0031-an-answer-lost-after-a-write-is-unknown.md) | An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here | accepted; extended by 0040, 0041, 0047, 0050, 0053, 0058 |
-| [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md) | A clean install is the composed stack behind one proxy, and CI runs its guide | accepted; extended by 0035, 0037, 0046, 0051, 0059, 0071; narrowed by 0072, 0083 |
+| [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md) | A clean install is the composed stack behind one proxy, and CI runs its guide | accepted; extended by 0035, 0037, 0046, 0051, 0059, 0071, 0101; narrowed by 0072, 0083 |
 | [0033](0033-the-administrator-plane-is-audited.md) | The administrator's plane is audited like the runtime, one event per request | accepted; extended by 0060, 0062, 0065 |
 | [0034](0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md) | Performance is measured through the shipped server against a sized lookup table, and held without a clock by rows read and round trips | accepted; narrowed by 0061, 0063, 0071, 0084; extended by 0061 |
 | [0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md) | A release report is derived from the run that gated the release, and says what it did not test | accepted; extended by 0034, 0058, 0064, 0067, 0068; SBOM by 0092 |
@@ -153,3 +153,4 @@ only enforcement is "we remember" says so plainly.
 | [0096](0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md) | The apps wear formancy's `room.css` rather than a copy of `admin.css` | accepted |
 | [0097](0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md) | Back goes on past the open form's own entries in every layout | accepted |
 | [0098](0098-an-echo-the-record-moved-since-it-was-read-is-a-stale-save.md) | An echo the record moved since it was read is a stale save, not over-posting | accepted |
+| [0101](0101-the-server-image-gives-its-user-the-store-and-not-its-code.md) | The server image gives its user the store, and not its code | accepted |

@@ -94,7 +94,9 @@ RUN apk add --no-cache libstdc++ \
  && adduser -u 1000 -G node -s /sbin/nologin -D node
 
 COPY --from=build /usr/local/bin/node /usr/local/bin/node
-COPY --from=build --chown=node:node /app /app
+# Root's, so the server, run as node by start.sh, cannot change the code it
+# runs (0101); it writes only the store and PostgreSQL's data.
+COPY --from=build /app /app
 COPY --from=build /tools /tools
 COPY LICENSE.md NOTICE /usr/share/formancy-data/
 COPY packages/data-fixtures/fixtures/postgres.sql deploy/demo/accounts.sql deploy/demo/password.sql deploy/demo/connections.json deploy/demo/build.sh deploy/demo/start.sh /demo/

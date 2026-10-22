@@ -176,6 +176,7 @@ async function main() {
     const key = first.state.stored().get('key')
     const password = await container.serverVariable('FORMANCY_DEMO_DB_PASSWORD')
     check('neither the identity key nor the database password is in what the container wrote', leaks([{ where: "the first visitor's container's output", text: container.log }], { 'the identity key': key, 'the database password': password }).join('; ') || null)
+    check('the server cannot write its own code', (await container.writableCode()).slice(0, 3).join(', ') || null)
     check('the key the container verifies with is the one the Durable Object stored', (await container.serverVariable(IDENTITY_SECRET_VARIABLE)) === key ? null : 'they differ')
 
     // The reset, as the idle timeout makes it.

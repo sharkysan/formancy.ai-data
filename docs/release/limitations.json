@@ -730,7 +730,7 @@
       ]
     },
     "0032": {
-      "reviewed": "sha256:08d642eac3f12580a5d806d7afbcc0b6f766abc648d44c4a347e389082201cf6",
+      "reviewed": "sha256:7b6dcdc556cd55d22b9d2e7dcaed2e15cf7a654c76a91e071236cfa8a1f136a2",
       "limitations": [
         {
           "area": "operations",
@@ -2972,6 +2972,15 @@
           "area": "host",
           "says": "In a layout that moves between none of them, Back takes one press for each Separate views view or Drill down level the open form's history holds, shows nothing new on each, and writes the layout shown over those entries, so Forward no longer brings their views or levels back.",
           "heldBy": "apps/host/src/address.test.tsx"
+        }
+      ]
+    },
+    "0101": {
+      "reviewed": "sha256:7facaf9e3c74c012c7e2418c401f19d910d4850da555e2cb62e3a7a7746179a2",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The composed stack does not run the server on a read-only root, though the image starts on one; an operator who wants it adds read_only and keeps the store's volume."
         }
       ]
     }

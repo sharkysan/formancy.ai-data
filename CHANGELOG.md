@@ -89,6 +89,15 @@ later.
   back to where it started, and the form could not be left by Back. Each
   press now lands one entry back, writing the layout shown over it.
 
+- **The server image's code is root's, and the server's user writes only
+  its store** (0101). The runtime stage copied `/app` with `--chown` to
+  `node`, the user the server runs as, so a flaw that let a request write a
+  file could have replaced the code it runs; the live demo's image did the
+  same. Both copy it as root's now, the `container` job asks the running
+  server whether it can write its own code and runs the image on a read-only
+  root, and the live demo's gate asks its image the same. Found by the
+  formancy.ai-report repository's review of its own server.
+
 ### Fixed
 
 - **A grid's row says what Space and Enter do in Drill down**: both open

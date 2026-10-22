@@ -178,6 +178,18 @@ export class DockerContainer {
   }
 
   /**
+   * What of the server's code its own user could write (0101): every path
+   * under /app it owns or anybody may write, a link passed over since its
+   * own mode means nothing, and the entry point it runs when a write to it
+   * went through. Empty when it can write none.
+   */
+  async writableCode() {
+    const owned = await docker(['exec', '--user', 'node', this.name, 'find', '/app', '!', '-type', 'l', '(', '-user', 'node', '-o', '-perm', '-0002', ')', '-print'])
+    const wrote = await docker(['exec', '--user', 'node', this.name, 'touch', '/app/dist/main.mjs']).then(() => true, () => false)
+    return [...owned.split('\n').filter((line) => line !== ''), ...(wrote ? ['/app/dist/main.mjs, which it wrote'] : [])]
+  }
+
+  /**
    * A variable of the server's environment inside the running container,
    * read as the server's own user: root in the container may not read
    * /proc/1/environ (measured in stage 2, 2026-10-16).
