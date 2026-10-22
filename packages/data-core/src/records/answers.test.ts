@@ -47,7 +47,7 @@ const PG_FORM = orderForm(PG)
 
 describe('toFormAnswers', () => {
   // Each answer in the shape its generated control holds: a lookup as the
-  // token of its columns, the radio's 'true', a whole number a number field
+  // token of its columns, the select's 'true', a whole number a number field
   // can hold, and a bigint key and a decimal as the exact text they are.
   test('answers each readable field in its control’s shape, with the record token and version', () => {
     expect(toFormAnswers(PG_FORM.bindings, ALL_FIELDS, read(STORED))).toEqual({
@@ -77,9 +77,9 @@ describe('toFormAnswers', () => {
     expect(answers.customer).toBeNull()
   })
 
-  // The column has three states and the radio three answers: no answer is
+  // The column has three states and the select three answers: no answer is
   // NULL, never false.
-  test('answers the three-state flag as the radio’s strings, or null', () => {
+  test('answers the three-state flag as the select’s strings, or null', () => {
     const answer = (paid: ApiValue): ApiValue | undefined => toFormAnswers(PG_FORM.bindings, ALL_FIELDS, read({ ...STORED, paid })).answers.paid
     expect([answer(true), answer(false), answer(null)]).toEqual(['true', 'false', null])
   })
@@ -157,7 +157,7 @@ describe('toFormAnswers', () => {
 
 describe('canonicalValue', () => {
   // A file of records holds the column's value, not the control's (0079):
-  // the radio's 'true' is the boolean true, a number field's 2 the text
+  // the select's 'true' is the boolean true, a number field's 2 the text
   // '2'. Each column field's answer goes back to exactly what was read, or
   // a file would hold what no read returns.
   test('undoes toFormAnswers for every column field', () => {
@@ -180,7 +180,7 @@ describe('canonicalValue', () => {
   })
 })
 
-/** What a clerk enters for a new order, in canonical form; `paid` the radio's other answer from the planner tests'. */
+/** What a clerk enters for a new order, in canonical form; `paid` the select's other answer from the planner tests'. */
 const ANSWERS = { ...CLERK_ANSWERS, paid: 'false' }
 
 /**

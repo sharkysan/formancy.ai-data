@@ -506,7 +506,7 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   database unreachable, or a deadlock or lock timeout the engine documents as
   such. Nothing was written in either case.
 - **`toFormAnswers`** is the inverse, for the fields the actor may read: a
-  lookup as its token, the three-state radio as `'true'`/`'false'`/`null`, and
+  lookup as its token, the three-state select as `'true'`/`'false'`/`null`, and
   a whole number as a number, because the released engine reports canonical
   text in a number field as below its minimum.
 

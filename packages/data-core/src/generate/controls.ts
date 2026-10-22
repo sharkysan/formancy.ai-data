@@ -74,11 +74,14 @@ export function controlFor(type: NormalizedType, nullable: boolean): ControlPlan
 
     case 'boolean':
       // A nullable boolean has three answers, and a checkbox has two: unticked
-      // would silently mean false where the database holds "unknown".
+      // would silently mean false where the database holds "unknown". A select,
+      // not a radio group: its empty choice takes an answer back to "unknown",
+      // which a radio group never can, and a rule disables it, which no
+      // renderer does for a radio group through formancy 0.7.0 (0095).
       return nullable
         ? {
             field: {
-              type: 'radio',
+              type: 'select',
               options: [
                 { value: 'true', label: 'Yes' },
                 { value: 'false', label: 'No' },

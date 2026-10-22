@@ -34,10 +34,11 @@ later.
     was refused as not a date where it should say it is required, and the
     generator's test now holds the 0.7.0 answer (0093). Its key is
     unchanged.
-  - **A nullable yes/no field's error now takes the person to it.** It is
-    drawn as a radio group, which 0.7.0 gives the field's id (formancy.ai
-    0186), so the error summary's link and a failed save move focus to its
-    first option, where they did nothing before. No table in this
+  - **A nullable yes/no field still drawn as a radio group**, in a form
+    published before it became a select (0095), now takes the person to it
+    from the error summary: 0.7.0 gives a radio group the field's id
+    (formancy.ai 0186), so the summary's link and a failed save move focus
+    to its first option, where they did nothing before. No table in this
     repository's fixtures has a nullable boolean column, so no test here
     reaches it.
   - **Nothing else generated meets 0.7.0's breaking changes.** A generated
@@ -54,6 +55,17 @@ later.
     2026-10-22 -- so the README's pictures keep their stylesheet digests,
     and every comment that named a renderer's behaviour at 0.6.0 names 0.7.0
     too.
+- **A nullable yes/no column is generated as a select of Yes and No, not a
+  radio group** (0095). Why: a radio group, once answered, could never be
+  taken back to no answer, the NULL the column held; and neither formancy
+  renderer disables a radio group a rule disables, so a yes/no the person may
+  not write took a choice the server then refused at save. The select's empty
+  choice is no answer, and a rule disables it under both renderers. The
+  answers are the same `'true'` and `'false'`, so the server reads them as
+  before, and a form published earlier keeps its radio group until it is
+  published again. Shown in the examples' tests under React and Angular, in
+  jsdom; no table of the shared model has such a column, so the host page
+  and the browser gates never draw one.
 
 ## 0.3.0 — 2026-10-21
 
