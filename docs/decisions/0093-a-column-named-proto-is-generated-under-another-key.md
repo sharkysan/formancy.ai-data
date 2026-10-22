@@ -88,8 +88,9 @@ browser as on the server.
 - **A form published before this record over a column named `__proto__` is
   refused when it is read**, until it is published again. Its stored form
   carries the key `__proto__`, which the validator refuses on every read of a
-  bundle (`served-schema.ts`, 0019), and its base is no longer what the
-  generator makes from its request. So it leaves the menu, and its records,
+  bundle (`served-schema.ts`, 0019). That its base is no longer what the
+  generator makes is not asked on a read (`bundle-format2.ts`), only when a
+  version is written. So it leaves the menu, and its records,
   lookups and export are refused. Read from the code, not tested. Publishing
   it again generates the field under `__proto___`; a presentation follows the
   field by the column it stands for
