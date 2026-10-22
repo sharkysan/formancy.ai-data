@@ -127,9 +127,16 @@ export function drillBase(level: number): string {
   return `drill-${String(level)}/`
 }
 
-/** The level `owner` is drawn at: a Drill down level's number, 0 for the records grid, and 1 for the record and its sections. */
+/**
+ * The level `owner` is drawn at: a Drill down level's number, 0 for the
+ * records grid, and 1 for the record and its sections. Read from the
+ * owner's shape, not its start: a form may be called `drill-3`, so the
+ * record's section of it is `drill-3~<field>`, while a level's own owner
+ * holds a second `~` and its sections' a `/`, which no form id or field
+ * key holds.
+ */
 export function levelOf(owner: string): number {
-  const level = /^drill-([1-9]\d*)[~/]/.exec(owner)
+  const level = /^drill-([1-9]\d*)(?:\/|~[^~/]+~)/.exec(owner)
   if (level !== null) return Number(level[1])
   return owner === gridOwner('master') ? 0 : 1
 }

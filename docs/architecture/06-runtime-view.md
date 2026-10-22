@@ -516,12 +516,19 @@ offset, and the bounds are a budget and a derivation, not measurements
 3. A crumb (`apps/host/src/trail.tsx`) or Back shows a level above and
    drops nothing; an entry asking for a level no longer held shows the
    deepest one above it and is written over (`apps/host/src/address.ts`).
+   In another layout, Back onto one of the form's own entries takes it
+   over, written over with what the page shows, and the next Back goes on
+   ([0097](../decisions/0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md)).
    A crumb's name is read from the stored record by
-   `apps/host/src/crumbs.ts`.
+   `apps/host/src/crumbs.ts`, when the level opens and after a save or a
+   Load the saved record, which also has the section above list the row
+   again.
 4. A delete (6.7) of a record a level holds -- at its level, or from any
-   grid in any layout, where the guard asks about the levels first -- takes
-   that level and the levels below with it, matched by the record and not
-   the depth, and shows the level above, replacing the entry, its
+   grid in any layout, whose confirmation names the levels' work and drops
+   nothing before Delete it
+   ([0094](../decisions/0094-a-held-rows-delete-names-the-levels-it-drops-in-its-confirmation.md))
+   -- takes that level and the levels below with it, matched by the record
+   and not the depth, and shows the level above, replacing the entry, its
    section's grid saying the row is gone. Back, like a crumb, drops a
    row's read still out.
 

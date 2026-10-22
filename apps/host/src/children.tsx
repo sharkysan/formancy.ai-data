@@ -154,6 +154,7 @@ export function ChildSection({
     owner,
     sessions,
     discards: { kind: 'child-new', owner, title },
+    held: (target) => levels?.atRisk(child.form, target.record) ?? [],
     onGone: (target, word, quiet) => rowGone(target, word, quiet),
     onLoad: (target) => {
       grid.current?.reload()
@@ -222,17 +223,13 @@ export function ChildSection({
     else removal.ask(detailTarget(title, now.token, removal.heard(now.token)))
   }
 
-  /** A row's Delete (0053); the open row's waits for a save of it, as its header's Delete does. A row a Drill down level holds asks about the levels first. */
+  /** A row's Delete (0053); the open row's waits for a save of it, as its header's Delete does. A row a Drill down level holds names the levels in its confirmation (0094). */
   function deleteRow(row: GridRow): void {
     const now = openRef.current
     const target = rowTarget(title, row, now?.kind === 'record' ? { record: now.token, heard: removal.heard(now.token) } : null)
     if (target === null) return
-    const confirm = (): void => {
-      if (target.open && saving) grid.current?.say([SAVE_OUT])
-      else removal.ask(target)
-    }
-    if (levels === undefined) confirm()
-    else levels.beforeDelete(child.form, target.record, confirm, () => grid.current?.focusRecord(target.record, DELETE_COLUMN))
+    if (target.open && saving) grid.current?.say([SAVE_OUT])
+    else removal.ask(target)
   }
 
   /** The row has gone from the page: its detail emptied when open, the grid asked again and saying so first, the keyboard on this section's heading. */
@@ -331,6 +328,7 @@ export function ChildSection({
             bench="child-bench"
             {...(canDelete ? { remove: { noun: title, press: deleteRow } } : {})}
             after={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={5} idBase={`${headingId}-row-delete`} /> : null}
+            drilling={drill !== undefined}
             onOpen={askRow}
           />
         </>

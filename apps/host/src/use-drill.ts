@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { DataClient, FormRecord } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
 import type { ChildForm } from './children.js'
 import { recordName } from './crumbs.js'
 import { gone as goneLine } from './deletion.js'
 import type { DeleteTarget } from './deletion.js'
-import { useGuardContext } from './guard.js'
+import { formsAtRisk, useGuardContext } from './guard.js'
 import { levelShown } from './layout.js'
 import type { Layout, View } from './layout.js'
-import type { LeaveRequest, Said } from './leave.js'
+import type { LeaveRequest, PaneWork, Said } from './leave.js'
 
 /*
  * Drill down's levels (0090), as one open form holds them: level 0 is its
@@ -34,8 +34,9 @@ import type { LeaveRequest, Said } from './leave.js'
  *   -- takes the level that holds it and the levels below with it, by the
  *   record and never by the depth, since a level may have been replaced
  *   while a delete was out; the level above is shown, its section saying
- *   the row is gone. A row a level holds asks about the levels from it
- *   down before its Delete asks anything.
+ *   the row is gone. A row a level holds names the levels from it down in
+ *   its Delete's confirmation, which drops them only once the record is
+ *   gone (0094).
  */
 
 /** What a section asks to go down into: a row by its token, or a new one. */
@@ -85,8 +86,8 @@ export interface SectionDrill {
 
 /** What every grid of the open form tells the levels held, in every layout: a record's rows can be deleted wherever they are listed. */
 export interface HeldLevels {
-  /** Before a row's Delete: when a level holds that record, the guard asks about it and the levels below first, then `go`; `back` on Keep editing. */
-  beforeDelete(formId: string, token: string, go: () => void, back: () => void): void
+  /** What a row's Delete names in its confirmation: the forms of the level that holds that record, if one does, and of every level below it, that hold work (0094). */
+  atRisk(formId: string, token: string): PaneWork[]
   /** A record gone from a grid: the level that holds it, and every level below, go too. */
   recordGone(formId: string, token: string): void
   /** A section's handle, by its owner, while it is mounted. */
@@ -180,18 +181,22 @@ export function useDrill({
     setPathState(next)
   }, [])
 
-  // Read by the answers, which arrive after the render they were asked in.
-  const layoutRef = useRef(layout)
-  layoutRef.current = layout
   const deepest = 1 + path.length
   const held = (at: number): boolean => at === 0 || (at === 1 && open) || (at >= 2 && at <= 1 + pathRef.current.length)
   const asking = levelShown({ view, level })
   const shown = layout === 'drill' ? Math.min(asking, open ? deepest : 0) : asking === 0 ? 0 : 1
+  // Read by the answers and the handlers, which run after the render that
+  // drew what they act on: written once that render is on the page, never
+  // while one is made, which React may make and throw away.
+  const layoutRef = useRef(layout)
   const shownRef = useRef(shown)
-  shownRef.current = shown
   // The level Drill down last showed, for entering it again.
   const last = useRef<number | null>(null)
-  if (layout === 'drill') last.current = shown
+  useLayoutEffect(() => {
+    layoutRef.current = layout
+    shownRef.current = shown
+    if (layout === 'drill') last.current = shown
+  })
 
   function focusLevel(at: number): void {
     after(() => (at < 2 ? headingOf(at as 0 | 1) : (headings.current.get(at) ?? null))?.focus())
@@ -303,10 +308,9 @@ export function useDrill({
   }
 
   const levels: HeldLevels = {
-    beforeDelete: (formId, token, go, back) => {
+    atRisk: (formId, token) => {
       const index = pathRef.current.findIndex((step) => step.form.child.form === formId && step.token === token)
-      if (index === -1) go()
-      else guard.ask({ kind: 'drill-delete', below: index + 1, record: token }, go, back)
+      return index === -1 ? [] : formsAtRisk(guard.registry, { kind: 'drill-delete', below: index + 1, record: token })
     },
     recordGone: (formId, token) => {
       const index = drop(formId, token)

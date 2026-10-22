@@ -68,10 +68,11 @@ export function useHistory(): History {
 /**
  * Back, Forward and a fragment typed into the address bar, as requests:
  * another form goes through the guard; Back or Forward between the views of
- * Separate views changes the view, and the number returned grows each time,
- * so the form moves the keyboard to what the view shows; anything else is
- * written over with the page's own address. The hashchange that follows a
- * popstate is not a second request.
+ * Separate views, or the levels of Drill down, changes the view, and the
+ * number returned grows each time, so the form moves the keyboard to what
+ * the view shows; another of the open form's own entries is taken over;
+ * anything else is written over with the page's own address. The
+ * hashchange that follows a popstate is not a second request.
  *
  * Kept editing -- or replaced by another request while it waits -- Back or
  * Forward is undone by going the same distance the other way, so the history
@@ -189,6 +190,17 @@ export function useAddressRequests({
         entry.current = number
         setPlace({ ...now, view: asks.view })
         setHistoryView((n) => n + 1)
+        return
+      }
+      // The open form's own entry, of a view or a level the layout shown does
+      // not move between -- one written before a layout change replaced the
+      // entry after it: the entry is the page's from now on, written over
+      // with what the page shows, so the next Back goes on past it (0097).
+      // Undone instead, as an address the page did not write is, every Back
+      // came back to where it started, and the form could not be left by it.
+      if (number !== null && asks.form === now.form) {
+        entry.current = number
+        write(now, false)
         return
       }
       // Nothing the page does: its own address back -- over an earlier

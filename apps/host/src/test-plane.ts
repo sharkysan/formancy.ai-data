@@ -13,6 +13,8 @@ import { AUDIENCE, ISSUER, TENANT_CLAIM } from '@formancy/data-live-demo/worker'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import { inject } from 'vitest'
+import { childForms, clerkPolicy, lookupsOf, offered, ORDER_CASCADES } from './test-forms.js'
+import type { Proposed } from './test-forms.js'
 
 /*
  * One suite file's server: the real data server over the run's two databases,
@@ -67,21 +69,16 @@ export const PAGED = inject('paged')
  * publishes beside the order form: an order's lines, reached through their
  * order (0043); employees, each managed by an employee -- a form that is its
  * own child; and orders by who created and who approved them -- one form
- * twice under one parent, which this clerk may only read. `read` is the
- * order form again, which `startPlane({ paged: true })` publishes for the
- * clerk to read only (0085).
+ * twice under one parent, which this clerk may only read. With
+ * `startPlane({ children: true, deliveries: true })`, an order's deliveries
+ * too, named by their carrier (test-forms.ts). `read` is the order form
+ * again, which `startPlane({ paged: true })` publishes for the clerk to
+ * read only (0085).
  */
 export const ENGINES = [
-  { engine: 'PostgreSQL', connection: 'pg', formId: 'pg-order', versionColumn: 'row_version' as string | undefined, lines: 'pg-order-line', employees: 'pg-employee', staff: 'pg-order-staff', parity: 'pg-parity', removable: 'pg-removable', read: 'pg-order-read' },
-  { engine: 'SQL Server', connection: 'ms', formId: 'ms-order', versionColumn: undefined, lines: 'ms-order-line', employees: 'ms-employee', staff: 'ms-order-staff', parity: 'ms-parity', removable: 'ms-removable', read: 'ms-order-read' },
+  { engine: 'PostgreSQL', connection: 'pg', formId: 'pg-order', versionColumn: 'row_version' as string | undefined, lines: 'pg-order-line', employees: 'pg-employee', staff: 'pg-order-staff', deliveries: 'pg-delivery', parity: 'pg-parity', removable: 'pg-removable', read: 'pg-order-read' },
+  { engine: 'SQL Server', connection: 'ms', formId: 'ms-order', versionColumn: undefined, lines: 'ms-order-line', employees: 'ms-employee', staff: 'ms-order-staff', deliveries: 'ms-delivery', parity: 'ms-parity', removable: 'ms-removable', read: 'ms-order-read' },
 ] as const
-
-/** The keys a delete of an order acts through on the fixture, with their actions: its lines and deliveries, and the deliveries' parcels (0051, 0056). */
-const ORDER_CASCADES: NonNullable<FormPolicy['cascades']> = [
-  { table: { schema: 'sales', name: 'order_line' }, foreignKey: 'fk_order_line_order', onDelete: 'cascade' },
-  { table: { schema: 'sales', name: 'delivery' }, foreignKey: 'fk_delivery_order', onDelete: 'cascade' },
-  { table: { schema: 'sales', name: 'parcel' }, foreignKey: 'fk_parcel_delivery', onDelete: 'cascade' },
-]
 
 export type Engine = (typeof ENGINES)[number]
 
@@ -151,18 +148,6 @@ export interface Plane {
   }
   close(): Promise<void>
 }
-
-/** A clerk may do everything the form offers, on the fields it writes, inside their tenant: the end-to-end journey's policy. */
-function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
-  return {
-    version: 1,
-    operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
-    rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
-    lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
-  }
-}
-
 
 /** An error answer's `code`, or undefined when its body is not JSON that names one. */
 function codeOf(body: string): string | undefined {
@@ -335,77 +320,6 @@ export function losingWrites(fetch: typeof globalThis.fetch, { when, times = 1, 
   }
 }
 
-/** The bindings as a proposal answers them: what the policy below is derived from. */
-interface Proposed {
-  fields: FieldBinding[]
-  operations: { create?: unknown; update?: unknown; delete?: unknown }
-}
-
-/** The lookup fields of a proposal, each with its foreign key. */
-const lookupsOf = (bindings: Proposed): Array<{ field: string; foreignKey: string }> =>
-  bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? [{ field: binding.field, foreignKey: binding.foreignKey }] : []))
-
-/** Each operation the form offers, granted to the clerk, unless `readOnly` -- delete only when `deletes` asks for it (0053). */
-function offered(bindings: Proposed, readOnly = false, deletes = false): FormPolicy['operations'] {
-  const grant = (operation: unknown): string[] => (readOnly || operation === false || operation === undefined ? [] : ['clerk'])
-  return { read: ['clerk'], create: grant(bindings.operations.create), update: grant(bindings.operations.update), ...(deletes ? { delete: grant(bindings.operations.delete) } : {}) }
-}
-
-/**
- * What each child form of `ENGINES` is published with: its table, the
- * lookups the generator makes of its foreign keys, the labels a person gave
- * two of them in the studio, and its policy for tenant 1's clerk, derived
- * from the bindings.
- */
-function childForms(engine: Engine, deletes: boolean): Array<{
-  formId: string
-  title: string
-  table: string
-  lookups: Array<{ foreignKey: string; display: string[] }>
-  versionColumn?: string
-  pinned?: string[]
-  labels?: Record<string, string>
-  policy: (bindings: Proposed) => FormPolicy
-}> {
-  // On SQL Server both tables carry a rowversion, which the generator finds itself.
-  const version = engine.connection === 'pg' ? { versionColumn: 'row_version' } : {}
-  return [
-    {
-      formId: engine.lines,
-      title: 'Order line',
-      table: 'order_line',
-      lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
-      ...version,
-      // No tenant column of its own: its rows are its tenant's orders' lines, through the order lookup's filter (0043).
-      policy: (bindings) => ({ ...clerkPolicy(bindings.fields), operations: offered(bindings, false, deletes), rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }),
-    },
-    {
-      formId: engine.employees,
-      title: 'Employee',
-      table: 'employee',
-      lookups: [{ foreignKey: 'fk_employee_manager', display: ['name'] }],
-      // Employees are nobody's tenant: no row filter, and a manager may be any of them.
-      policy: (bindings) => ({ ...clerkPolicy(bindings.fields), operations: offered(bindings), rowFilters: [], lookups: Object.fromEntries(lookupsOf(bindings).map(({ field }) => [field, []])) }),
-    },
-    {
-      formId: engine.staff,
-      title: 'Order',
-      table: 'order',
-      lookups: [
-        { foreignKey: 'fk_order_created_by', display: ['name'] },
-        { foreignKey: 'fk_order_approved_by', display: ['name'] },
-      ],
-      ...version,
-      // Its tenant comes from the token, as the row filter says.
-      pinned: ['tenant_id'],
-      // The generator labels both lookups by their table, "Employee"; a person tells them apart.
-      labels: { fk_order_created_by: 'Created by', fk_order_approved_by: 'Approved by' },
-      // Read only, so the page draws a record of it with every field disabled.
-      policy: (bindings) => ({ ...clerkPolicy(bindings.fields), operations: offered(bindings, true), lookups: Object.fromEntries(lookupsOf(bindings).map(({ field }) => [field, []])) }),
-    },
-  ]
-}
-
 /**
  * Starts the server and publishes `pg-order` and `ms-order` through the
  * administrator's plane -- with `children`, each engine's child forms of
@@ -419,7 +333,7 @@ function childForms(engine: Engine, deletes: boolean): Array<{
  * tokens, signed with `demoKey` (0070). With `paged`, the order form is
  * published again as `read` of `ENGINES`, which the clerk may only read.
  */
-export async function startPlane(options: { children?: boolean; deletes?: boolean; demo?: boolean; paged?: boolean } = {}): Promise<Plane> {
+export async function startPlane(options: { children?: boolean; deletes?: boolean; deliveries?: boolean; demo?: boolean; paged?: boolean } = {}): Promise<Plane> {
   const { pg, ms } = inject('databases')
   // 32 random bytes as base64url: the shape of the key a Durable Object starts its container with.
   const demoKey = options.demo === true ? randomBytes(32).toString('base64url') : undefined
@@ -498,7 +412,7 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
     await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
   }
   for (const engine of options.children === true ? ENGINES : []) {
-    for (const child of childForms(engine, deletes)) {
+    for (const child of childForms(engine, { deletes, deliveries: options.deliveries === true })) {
       const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
         connection: engine.connection,
         root: { schema: 'sales', name: child.table },

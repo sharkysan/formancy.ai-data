@@ -78,6 +78,37 @@ later.
   their stylesheet digests cover the changed files; all but one came out
   byte for byte as before, and that one, `studio-carried`, comes out the
   same from `main` without this change.
+- **A row a Drill down level holds names that level's unsaved work in its
+  Delete's confirmation, and drops nothing before Delete it** (0094, which
+  amends 0090). It used to ask about the levels first and drop their typing
+  at Discard and continue, so a person who then pressed Keep it had lost
+  typing for a delete they did not make.
+- **Back goes on past the open form's own entries in every layout** (0097,
+  which amends 0047 and 0090). In Stacked or Side by side after moving
+  between Separate views' views or Drill down's levels, every Back came
+  back to where it started, and the form could not be left by Back. Each
+  press now lands one entry back, writing the layout shown over it.
+
+### Fixed
+
+- **A grid's row says what Space and Enter do in Drill down**: both open
+  the record and move the keyboard to it. AG Grid's live region said what
+  the other layouts do -- Space opens it and keeps the keyboard in the
+  grid -- so a person at a screen reader was told the wrong thing.
+- **The trail's separators are drawn and not read**: generated content is
+  read out, so a screen reader heard "›" between crumbs. The rule gives it
+  empty alternative text, which the browser gate holds in each browser; a
+  browser that does not know that syntax draws no separator.
+- **Load the saved record at any level, the record's included, renames its
+  crumb and has the grid above list what is stored**, as a save does. A
+  crumb kept the name the record was opened or saved with.
+- **A form called `drill-<n>` is no longer read as Drill down's level n**:
+  its section's work at level 1 was kept past going down from level 1 and
+  dropped with going down from a deeper one. The level is read from the
+  owner's shape, which no form id or field key can spell.
+- **Drill down's refs are written after a render, not during it**, so a
+  render React throws away writes nothing the answers read; behaviour is
+  unchanged.
 
 
 ### Fixed

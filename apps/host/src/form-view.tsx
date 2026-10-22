@@ -194,6 +194,8 @@ export function FormView({
     owner: 'master',
     sessions,
     discards: { kind: 'new' },
+    // Read when a Delete asks, after `drill` below is made.
+    held: (target) => drill.levels.atRisk(formId, target.record),
     onGone: (target, word, quiet) => recordGone(target, word, quiet),
     onLoad: (target) => {
       // The row's version moves with the record: the grid lists it again.
@@ -350,6 +352,12 @@ export function FormView({
     if (result.kind === 'saved') setMasterName(nameOf(session))
   }
 
+  /** A pane's "Load the saved record": the grid and the crumb say what is stored, as after a save. */
+  function loadedSaved(session: Session): void {
+    grid.current?.reload()
+    setMasterName(nameOf(session))
+  }
+
   /** The open record's Delete, in the detail's header (0053). While a save of it is out, it waits for the answer, and says so. */
   function deleteOpen(): void {
     const now = openRef.current
@@ -358,16 +366,13 @@ export function FormView({
     else removal.ask(detailTarget(title, now.token, removal.heard(now.token)))
   }
 
-  /** A row's Delete (0053); the open record's row waits for a save of it, as its header's Delete does. A row a Drill down level holds -- a form that is its own child -- asks about the levels first. */
+  /** A row's Delete (0053); the open record's row waits for a save of it, as its header's Delete does. A row a Drill down level holds -- a form that is its own child -- names the levels in its confirmation (0094). */
   function deleteRow(row: GridRow): void {
     const now = openRef.current
     const target = rowTarget(title, row, now?.kind === 'record' ? { record: now.token, heard: removal.heard(now.token) } : null)
     if (target === null) return
-    const confirm = (): void => {
-      if (target.open && saving) grid.current?.say([SAVE_OUT])
-      else removal.ask(target)
-    }
-    drill.levels.beforeDelete(formId, target.record, confirm, () => grid.current?.focusRecord(target.record, DELETE_COLUMN))
+    if (target.open && saving) grid.current?.say([SAVE_OUT])
+    else removal.ask(target)
   }
 
   /**
@@ -452,6 +457,7 @@ export function FormView({
           onOpen={askRow}
           remove={canDelete ? { noun: title, press: deleteRow } : undefined}
           after={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="records-delete" /> : null}
+          drilling={drilling}
         />
         {sideBySide ? (
           <Split
@@ -484,6 +490,7 @@ export function FormView({
           onLoad={load}
           sessions={sessions}
           onAnswer={answered}
+          onLoaded={loadedSaved}
           canDelete={canDelete}
           saving={saving}
           deleteRef={deleteButton}
