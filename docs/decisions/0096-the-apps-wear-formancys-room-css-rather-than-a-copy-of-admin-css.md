@@ -79,4 +79,8 @@ cannot be half-applied.
 - **The README's pictures were taken again**, because each record's
   stylesheet digest covers the app's stylesheet with its imports and that
   text changed; what they show did not, since every variable computes to the
-  value the copy gave it.
+  value the copy gave it. Taken on 2026-10-22 in
+  `mcr.microsoft.com/playwright:v1.63.0-noble`, every picture but one came
+  out byte for byte as it was; `studio-carried` did not, and the same scene
+  taken in the same container from `main` without this change came out with
+  the same bytes, so what moved it is not this record.

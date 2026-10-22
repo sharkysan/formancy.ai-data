@@ -75,7 +75,9 @@ later.
   nothing on a page changes. `scripts/palette.test.mjs` now fails when an app
   draws with the palette without importing it, or a stylesheet here declares
   one of its variables again. The README's pictures were taken again, since
-  their stylesheet digests cover the changed files.
+  their stylesheet digests cover the changed files; all but one came out
+  byte for byte as before, and that one, `studio-carried`, comes out the
+  same from `main` without this change.
 
 ## 0.3.0 — 2026-10-21
 
