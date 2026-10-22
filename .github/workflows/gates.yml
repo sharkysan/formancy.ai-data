@@ -370,10 +370,17 @@ jobs:
       # run shows whether WebKit launches there without it (0058).
       # install-deps runs apt-get through sudo itself. Skipped by a typo in
       # the condition, WebKit fails to launch, naming what is missing: closed.
+      # Twelve minutes, from the runner's own times: read from GitHub's API
+      # on 2026-10-22 over the last 25 CI runs, the step took 26 to 274 s
+      # when it ended, and three times it was stopped at 5 minutes while
+      # apt was still fetching -- once at its 63rd download of 117 MB for 187
+      # packages from azure.archive.ubuntu.com -- not hung. The leg's whole job took 443
+      # to 912 s when it passed, so the slowest of those with this step at
+      # its limit still ends inside the job's 30 minutes.
       - name: WebKit's system libraries
         if: matrix.browser == 'webkit'
         run: pnpm --filter @formancy/data-examples exec playwright install-deps webkit
-        timeout-minutes: 5
+        timeout-minutes: 12
 
       # Builds the page first (turbo's `dependsOn`), then measures it, in this
       # leg's browser alone: turbo passes FORMANCY_BROWSERS to the gates
