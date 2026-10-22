@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
@@ -7,8 +8,9 @@ import { ROOM_GRID } from './grid-theme.js'
 /*
  * The grid in the room (0047): AG Grid is recoloured only through its theme
  * parameters, each a variable of the room's or an opaque mix of parameters
- * that are, so the palette guard that holds room.css to the admin's holds
- * the grid too. No stylesheet of the host's reaches into the grid: a rule on
+ * that are: the admin's palette, @formancy/themes/room.css, which the page
+ * imports and no stylesheet here declares again (0096), so the grid moves
+ * with the room. No stylesheet of the host's reaches into the grid: a rule on
  * an `.ag-*` class or an `--ag-*` property breaks in AG Grid's minor
  * releases and would be a second palette.
  *
@@ -18,8 +20,11 @@ import { ROOM_GRID } from './grid-theme.js'
 const source = dirname(fileURLToPath(import.meta.url))
 const styles = join(source, 'styles')
 
-/** The room's variables, as room.css declares them. */
-const ROOM = new Set([...readFileSync(join(styles, 'room.css'), 'utf8').matchAll(/^\s*(--[\w-]+):/gm)].map((match) => match[1]))
+/** The variables a stylesheet declares at the start of a line. */
+const declared = (file: string): string[] => [...readFileSync(file, 'utf8').matchAll(/^\s*(--[\w-]+):/gm)].map((match) => String(match[1]))
+
+/** The room's variables: the admin's palette as formancy publishes it, and the two font stacks the page's own room.css adds. */
+const ROOM = new Set([...declared(createRequire(import.meta.url).resolve('@formancy/themes/room.css')), ...declared(join(styles, 'room.css'))])
 
 /** Every value in the parameters that is a string, with the path it is at. */
 function strings(value: unknown, at: string): Array<[string, string]> {
