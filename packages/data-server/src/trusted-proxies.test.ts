@@ -91,6 +91,35 @@ describe('FORMANCY_DATA_TRUSTED_PROXIES', () => {
     for (const entry of entries) expect(problem).not.toContain(entry)
   })
 
+  // A prefix of 0 is refused, and two entries that are its two halves were
+  // not: 0.0.0.0/1 and 128.0.0.0/1 trust every IPv4 peer as surely, and so
+  // does ::ffff:0.0.0.0/96, the whole of IPv4 as @fastify/proxy-addr reads a
+  // mapped range, which compares an IPv4-mapped peer as IPv4 (0099). The
+  // list as a whole is what the server believes, so it is the whole that is
+  // held to the rule: every peer of a family, by any number of entries, is
+  // everybody. Watched failing before 0099 with every row accepted.
+  test.each([
+    ['0.0.0.0/1, 128.0.0.0/1', 'IPv4', 'the two halves of IPv4'],
+    ['::ffff:0.0.0.0/96', 'IPv4', 'the whole of IPv4, mapped'],
+    ['0.0.0.0/1, ::ffff:128.0.0.0/97', 'IPv4', 'one half plain and one mapped'],
+    ['10.0.0.0/8, 0.0.0.0/2, 64.0.0.0/2, 128.0.0.0/1', 'IPv4', 'quarters and a half, and a range inside them'],
+    ['::/1, 8000::/1', 'IPv6', 'the two halves of IPv6'],
+  ] as const)('refuses %j, whose entries together trust every %s peer: %s', (text, family) => {
+    const outcome = trustedProxiesSetting(text)
+    expect(outcome).toEqual({ ok: false, problem: expect.stringMatching(new RegExp(`^FORMANCY_DATA_TRUSTED_PROXIES: its entries together cover every ${family} address, which trusts every peer`)) as unknown })
+    for (const entry of text.split(',').map((part) => part.trim())) expect(outcome.ok ? '' : outcome.problem).not.toContain(entry)
+  })
+
+  // What stops short of everybody is the operator's to name: half of IPv4 is
+  // a mistake this rule does not catch, and a wide IPv6 range covers no IPv4
+  // peer, since proxy-addr matches an IPv4 peer only against an IPv4 range or
+  // a mapped one of /96 or narrower.
+  test('accepts entries that together stop short of every peer of a family', () => {
+    expect(trustedProxiesSetting('0.0.0.0/1, 128.0.0.0/2').ok).toBe(true)
+    expect(trustedProxiesSetting('0.0.0.0/1, ::/1').ok).toBe(true)
+    expect(trustedProxiesSetting('::/1, 8000::/2, ::ffff:0.0.0.0/97').ok).toBe(true)
+  })
+
   // One refused entry refuses the list: starting with the rest would trust
   // fewer proxies than written, and the operator would read one bucket for
   // everybody as the setting not working, or more than written.
@@ -114,6 +143,7 @@ describe('trustedProxies, as createDataServer checks it', () => {
     [['10.0.0.2', ' 10.0.0.3'], /^trustedProxies\[1\] is not an IP address or a CIDR range/],
     [['10.0.0.2', ''], /^trustedProxies\[1\] is empty/],
     [['10.0.0.5/24'], /^trustedProxies\[0\] has bits set past its prefix/],
+    [['0.0.0.0/1', '128.0.0.0/1'], /^trustedProxies together cover every IPv4 address, which trusts every peer/],
     [true, /^trustedProxies is not a list/],
     ['10.0.0.2', /^trustedProxies is not a list/],
   ] as const)('refuses %j', (list, sentence) => {

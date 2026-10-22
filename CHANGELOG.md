@@ -109,6 +109,12 @@ later.
 - **Drill down's refs are written after a render, not during it**, so a
   render React throws away writes nothing the answers read; behaviour is
   unchanged.
+- **A trusted-proxy list whose entries together trust every peer stops the
+  server**, as a prefix of 0 already did (0099, which narrows 0071).
+  `0.0.0.0/1, 128.0.0.0/1` and `::ffff:0.0.0.0/96`, which
+  `@fastify/proxy-addr` matches against every IPv4 peer, started and let any
+  client choose its own rate-limit bucket and logged address. Found by the
+  formancy.ai-report repository's review of its own server.
 - **A save over a record somebody else changed is answered stale, even when
   the change moved a field the person may not write** (0098, which narrows
   0022). A renderer sends every field back, so the old value of a computed
