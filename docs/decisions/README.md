@@ -76,7 +76,7 @@ only enforcement is "we remember" says so plainly.
 | [0019](0019-a-published-form-is-checked-every-time-it-is-read.md) | A published form is one bundle, checked every time it is read; a form reaches only allowlisted databases | accepted; extended by 0030, 0041, 0042, 0045, 0062, 0074 |
 | [0020](0020-administration-is-a-separate-plane.md) | Administration is a separate plane, held by a role in the host's token | accepted; extended by 0033, 0065 |
 | [0021](0021-generated-forms-preview-in-both-frameworks.md) | Generated forms are previewed in both frameworks, generated in the browser from a captured snapshot | accepted; narrowed by 0029; extended by 0058, 0069 |
-| [0022](0022-the-runtime-plane-asks-the-policy-every-time.md) | The runtime plane asks the policy on every request, and removes only the echo it can prove | accepted; narrowed by 0031, 0040; extended by 0041, 0044, 0045, 0050 |
+| [0022](0022-the-runtime-plane-asks-the-policy-every-time.md) | The runtime plane asks the policy on every request, and removes only the echo it can prove | accepted; narrowed by 0031, 0040, 0098; extended by 0041, 0044, 0045, 0050 |
 | [0023](0023-the-audit-trail-is-operational-not-evidence.md) | The audit trail is operational, never holds a value, and is not evidence | accepted; extended by 0031, 0033, 0044, 0045, 0050, 0079 |
 | [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032, 0052, 0058, 0060, 0062, 0065, 0075; palette copy reversed by 0096 |
 | [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted; extended by 0061, 0074 |
@@ -150,3 +150,4 @@ only enforcement is "we remember" says so plainly.
 | [0093](0093-a-column-named-proto-is-generated-under-another-key.md) | A column named `__proto__` is generated under another key, and `constructor` keeps its own | accepted |
 | [0095](0095-a-nullable-yes-no-column-is-a-select-of-yes-and-no.md) | A nullable yes/no column is a select of Yes and No, not a radio group | accepted |
 | [0096](0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md) | The apps wear formancy's `room.css` rather than a copy of `admin.css` | accepted |
+| [0098](0098-an-echo-the-record-moved-since-it-was-read-is-a-stale-save.md) | An echo the record moved since it was read is a stale save, not over-posting | accepted |

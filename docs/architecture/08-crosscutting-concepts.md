@@ -210,7 +210,10 @@ that does not fit its form.
 
 **The policy is asked on every request**, nothing cached per actor, and only
 an echo it can prove harmless is removed from a submission
-([0022](../decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)).
+([0022](../decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)),
+or one the record moved since the version the person sent, which the
+guarded statement then answers stale
+([0098](../decisions/0098-an-echo-the-record-moved-since-it-was-read-is-a-stale-save.md)).
 The same scoping reaches every operation: a lookup token is a reference,
 never a permission
 ([0012](../decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md));

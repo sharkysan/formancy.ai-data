@@ -119,10 +119,13 @@ function contextOf(identity: HostIdentity): PolicyContext {
  * here: a defaulted column the generator left writable can still be one the
  * policy grants nobody. The echo is removed on create when it is empty, and on
  * update when it equals what the record holds. Anything else in such a field
- * still reaches the planner and is refused: a changed value there is tampering
- * or a stale client, and either way is not saved (0022). An unedited instant
- * or time the actor may write is the planner's to remove, against the same
- * read (0040).
+ * still reaches the planner and is refused: a changed value there is
+ * tampering, and is not saved (0022). Unless the record has moved on since
+ * the version the person sent (`behind`): then the echo is what they read
+ * before another write moved the field -- a computed total, a stamp a trigger
+ * sets -- so it is removed too, and the guarded statement answers the save as
+ * the stale one it is (0098). An unedited instant or time the actor may write
+ * is the planner's to remove, against the same read (0040).
  */
 function withoutEchoes(
   bundle: PublishedBundle,
@@ -130,6 +133,7 @@ function withoutEchoes(
   operation: 'create' | 'update',
   answers: unknown,
   current?: Readonly<Record<string, unknown>>,
+  behind = false,
 ): unknown {
   if (!isRecord(answers)) return answers
   const kept: Record<string, unknown> = { ...answers }
@@ -137,9 +141,9 @@ function withoutEchoes(
     if (!Object.hasOwn(kept, binding.field)) continue
     if (checkSubmittedFields(bundle.policy, actor, bundle.bindings, operation, [binding.field]).ok) continue
     const value = kept[binding.field]
-    const echo = current === undefined
+    const echo = behind || (current === undefined
       ? value === null || value === undefined || value === ''
-      : Object.hasOwn(current, binding.field) && canonicalize(value ?? null) === canonicalize(current[binding.field] ?? null)
+      : Object.hasOwn(current, binding.field) && canonicalize(value ?? null) === canonicalize(current[binding.field] ?? null))
     if (echo) delete kept[binding.field]
   }
   return kept
@@ -382,7 +386,10 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       if (!root.ok) return root.answer
       described = root.described
     }
-    const plan = planUpdate(bundle.snapshot, bundle.bindings, bundle.policy, actor, record, version, withoutEchoes(bundle, actor, 'update', answers, current?.answers), current, described)
+    // The record as read now is newer than the one the person saved over: the
+    // database will answer stale, and an echo the change moved is not theirs.
+    const behind = current !== undefined && current.version !== null && current.version !== version
+    const plan = planUpdate(bundle.snapshot, bundle.bindings, bundle.policy, actor, record, version, withoutEchoes(bundle, actor, 'update', answers, current?.answers, behind), current, described)
     if (!plan.ok) {
       if (plan.code === 'invalid-values') return { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }
       if (plan.code === 'record-not-read' && unread !== undefined) return recordFailure(bundle.bindings, unread)

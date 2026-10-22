@@ -404,7 +404,7 @@
       ]
     },
     "0022": {
-      "reviewed": "sha256:8d78c20d897e0f5cced18deb7073cec39aa37cfcd408066cbeeefd5b22799ec6",
+      "reviewed": "sha256:71727ef0ff96dd0c98f8e65d6497c3c5e56c7752c57846e197b7626de433efe1",
       "limitations": [
         {
           "area": "writes",
@@ -2943,6 +2943,15 @@
         {
           "area": "studio",
           "says": "The studio's page carries the `--wb-*` variables formancy's `room.css` sets for the builder's panes, which it does not load, so they recolour nothing."
+        }
+      ]
+    },
+    "0098": {
+      "reviewed": "sha256:e450a1885d66d6947beda22b4d5bceb71a559f98c97fb6513227634650212adc",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "A changed value in a field the person may not write, sent with a version the record no longer holds, is answered 409 stale rather than 403 over-posting, so such tampering is told only that its version is old; nothing is written."
         }
       ]
     }

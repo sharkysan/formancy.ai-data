@@ -79,6 +79,17 @@ later.
   byte for byte as before, and that one, `studio-carried`, comes out the
   same from `main` without this change.
 
+
+### Fixed
+
+- **A save over a record somebody else changed is answered stale, even when
+  the change moved a field the person may not write** (0098, which narrows
+  0022). A renderer sends every field back, so the old value of a computed
+  total or a trigger's stamp came with it, and the save was refused `403
+  over-posting`, saying the person had changed a field they cannot change,
+  where `409 stale` asks them to reload, which mends it. Shown on both
+  engines with an order line whose `line_total` another save moved.
+
 ## 0.3.0 — 2026-10-21
 
 **The third release of Formancy Data.**

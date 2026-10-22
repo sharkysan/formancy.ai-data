@@ -353,6 +353,22 @@ describe('the runtime plane', () => {
     expect((await post('/v1/forms/customer/records/update', { record: RECORD, answers: current })).statusCode).toBe(400)
   })
 
+  // A record another client changed since it was read can have moved a field
+  // this person may not write -- a computed total, a stamp a trigger sets --
+  // so their echo of it differs from what is stored now. That is a stale
+  // save, not over-posting: refused as a change to a read-only field, the
+  // person is told they changed a field they never touched, and that
+  // reloading will not help. With the version they sent behind the record's,
+  // the echo is the record's old value, and the guarded statement answers.
+  test('updates: an echo the record moved since it was read is a stale save, 409, not a refused field', async () => {
+    const read = { tenant_id: 1, customer_no: 7, name: 'Neuer Name', country: 'k1:CH', created_at: '2026-10-08T00:00:00Z' }
+    readOutcome = { ok: true, values: { ...STORED, created_at: '2026-10-21T09:00:00Z' }, version: '00000000000007d2' }
+    writeOutcome = { ok: false, code: 'stale', message: 'changed' }
+    const saved = await post('/v1/forms/customer/records/update', { record: RECORD, version: VERSION, answers: read })
+    expect({ status: saved.statusCode, code: saved.json().code }).toEqual({ status: 409, code: 'stale' })
+    expect(calls.updates.map((update) => update.set.map((entry) => entry.name))).toEqual([expect.not.arrayContaining(['created_at'])])
+  })
+
   // Every way the database can be out of reach answers the same, says nothing
   // about hosts, and writes nothing: a lookup that throws, a connection that
   // will not open, and a form published against a connection the operator has

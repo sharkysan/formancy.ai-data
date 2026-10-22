@@ -271,7 +271,8 @@ describe.each([
     expect(created.statusCode, created.body).toBe(201)
     const { record, version } = created.json()
     expect(record).toBe(`k1:${EDGE_VALUES.beyondSafeInteger},2`)
-    expect((await call('POST', `/v1/forms/${lineForm}/records/read`, clerk, { record })).json().answers).toMatchObject({ order, quantity: 2, unit_price: '1.50', line_total: '3.00' })
+    const read = (await call('POST', `/v1/forms/${lineForm}/records/read`, clerk, { record })).json()
+    expect(read.answers).toMatchObject({ order, quantity: 2, unit_price: '1.50', line_total: '3.00' })
 
     expect((await call('POST', `/v1/forms/${lineForm}/records/read`, otherClerk, { record })).statusCode).toBe(404)
     const theirs = await call('POST', `/v1/forms/${lineForm}/records/update`, otherClerk, { record, version, answers: { quantity: 9 } })
@@ -283,6 +284,15 @@ describe.each([
     const saved = await call('POST', `/v1/forms/${lineForm}/records/update`, clerk, { record, version, answers: { quantity: 3 } })
     expect(saved.statusCode, saved.body).toBe(200)
     expect(saved.json().answers).toMatchObject({ quantity: 3, line_total: '4.50' })
+
+    // A renderer sends every field back, the computed total among them (0011).
+    // A save from the version read before that one carries the total as it
+    // was read, which the save above moved in the database: it is stale, not
+    // a change to a field nobody may write, which reloading would not mend
+    // (0098).
+    const behind = await call('POST', `/v1/forms/${lineForm}/records/update`, clerk, { record, version, answers: { ...read.answers, quantity: 4 } })
+    expect(behind.statusCode, behind.body).toBe(409)
+    expect(behind.json()).toMatchObject({ code: 'stale' })
   })
 
   // A list is a read of many records (0044): each tenant's clerk is listed
