@@ -52,7 +52,7 @@ import {
 describe('planCreate', () => {
   // The whole translation in one request. Each value is what the codec made
   // of the answer; the tenant comes from the context; the customer token
-  // becomes its two columns; `paid` is a boolean, not the radio's string; an
+  // becomes its two columns; `paid` is a boolean, not the select's string; an
   // omitted `status` is absent, so the database's default applies; and every
   // lookup selection is handed back to be rechecked under the actor's filters.
   test('turns answers into exactly the insert, with the tenant from the context and every selection to recheck', () => {
@@ -246,11 +246,11 @@ describe('planCreate', () => {
     })
   })
 
-  // The nullable boolean is a radio of 'true' and 'false' (0009), because a
+  // The nullable boolean is a select of 'true' and 'false' (0009, 0095), because a
   // checkbox has two answers and the column three. Only those strings and
   // null are answers: the JSON boolean is not what the form holds, and
   // formancy's own server check would refuse it as an option anyway.
-  test('reads the three-state radio as true, false or null, and nothing else', () => {
+  test('reads the three-state select as true, false or null, and nothing else', () => {
     for (const [answer, held] of [
       ['true', true],
       ['false', false],

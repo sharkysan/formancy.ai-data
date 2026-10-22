@@ -544,7 +544,10 @@ describe('generateForm', () => {
     expect(blocked.notes).toContainEqual(expect.objectContaining({ kind: 'blocked', message: expect.stringMatching(/shape must be given a value/) }))
   })
 
-  // A nullable boolean has three answers. A checkbox would turn "unknown" into false.
+  // A nullable boolean has three answers. A checkbox would turn "unknown" into
+  // false, and a radio group can never be returned to "unknown" once
+  // answered, nor be disabled by a rule (0095): a select of Yes and No, whose
+  // empty choice is no answer.
   test('a nullable boolean gets three states, a NOT NULL one a checkbox', () => {
     const { form } = generateForm(
       fixtureLike('postgres', (objects) => {
@@ -554,7 +557,7 @@ describe('generateForm', () => {
       { ...ORDER, root: { schema: 'sales', name: 'customer' }, lookups: [] },
     )
     expect(form.model.fields.find((field) => field.key === 'active')?.type).toBe('checkbox')
-    expect(form.model.fields.find((field) => field.key === 'vip')).toMatchObject({ type: 'radio', options: [{ value: 'true' }, { value: 'false' }] })
+    expect(form.model.fields.find((field) => field.key === 'vip')).toMatchObject({ type: 'select', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] })
   })
 
   // formancy's datetime is a UTC instant; a zoned timestamp maps onto it. A

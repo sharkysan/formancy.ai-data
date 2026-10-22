@@ -336,7 +336,7 @@
       ]
     },
     "0018": {
-      "reviewed": "sha256:15e4926f9a68e3fd467329d9a76a6925319a6b49d25c05f2412269cb0265ca59",
+      "reviewed": "sha256:5e5570e2ba15bf994e336bb26a125fe93e09bdf892c29a1cf3c9f4ed99794f5e",
       "limitations": [
         {
           "area": "access",
@@ -348,7 +348,7 @@
         },
         {
           "area": "forms",
-          "says": "The planner is strict: a JSON boolean for the three-state radio, `'true'` for a checkbox, an empty patch, a changed key and a tenant attribute of `'042'` are refused, and `PATCH {}` is an error."
+          "says": "The planner is strict: a JSON boolean for the three-state select, `'true'` for a checkbox, an empty patch, a changed key and a tenant attribute of `'042'` are refused, and `PATCH {}` is an error."
         },
         {
           "area": "forms",
@@ -2913,6 +2913,23 @@
         {
           "area": "forms",
           "says": "The field over a column named `__proto__` is keyed `__proto___`, so a host's own code, draft or rule that named the key `__proto__` names nothing."
+        }
+      ]
+    },
+    "0095": {
+      "reviewed": "sha256:db859e16bb9f54e8e366af1076f58703597ccaf6df4218ce958483ccac380cae",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A form published before 0095 keeps a nullable yes/no column's radio group until it is published again: its answer cannot be taken back to no answer, and a rule that disables it does not stop a choice, which the server then refuses for a field the person may not write."
+        },
+        {
+          "area": "forms",
+          "says": "A nullable yes/no field is a select, which shows the answer given and opens for the others, where a radio group showed both."
+        },
+        {
+          "area": "testing",
+          "says": "A nullable yes/no field is drawn only in the examples' jsdom tests: no table of the shared model has a nullable boolean column, so the host's suites and the browser gates never draw one."
         }
       ]
     }

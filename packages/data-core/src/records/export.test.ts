@@ -134,7 +134,7 @@ describe('a record of a file', () => {
 
   // A record arrives as the form's answers (toFormAnswers), whose shapes are
   // the controls': a whole number a number field holds is a number, a
-  // nullable boolean the radio's 'true'. The file holds the column's value,
+  // nullable boolean the select's 'true'. The file holds the column's value,
   // and a lookup's label beside the token it resolved from; a label the
   // resolve did not give -- a row outside the lookup's read filter -- is an
   // empty cell, never the token. The 2^53 + 1 key and the largest amount go

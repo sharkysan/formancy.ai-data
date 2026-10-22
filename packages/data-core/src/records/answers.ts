@@ -15,8 +15,8 @@ import type { RecordRead, RecordValue } from './types.js'
  * Most answers are the column's canonical value as it is (0008). Three are
  * not, because the generated control holds something else (0009):
  *
- * - a nullable boolean is a radio of 'true' and 'false', because a checkbox
- *   has two answers and the column three;
+ * - a nullable boolean is a select of 'true' and 'false', because a checkbox
+ *   has two answers and the column three (0095);
  * - an integer whose range JavaScript holds is a `number` field, and the codec
  *   returns every integer as canonical text — the released engine reports the
  *   text '42' in a bounded number field as below its minimum;
@@ -30,7 +30,7 @@ type LookupBinding = Extract<FieldBinding, { kind: 'lookup' }>
 function shapeOf(binding: ColumnBinding): 'three-state' | 'whole-number' | 'as-is' {
   const control = controlFor(binding.type, binding.nullable)
   if (!('field' in control)) return 'as-is'
-  if (control.field.type === 'radio') return 'three-state'
+  if (binding.type.kind === 'boolean' && control.field.type === 'select') return 'three-state'
   return control.field.type === 'number' && binding.type.kind === 'integer' ? 'whole-number' : 'as-is'
 }
 
@@ -143,7 +143,7 @@ function formValue(binding: ColumnBinding, value: ApiValue): ApiValue {
 /**
  * A column field's answer as its column's canonical value: `formValue`
  * undone, for a reader of the value rather than of the control -- a file of
- * records (0079). The radio's 'true' and 'false' are a nullable boolean's;
+ * records (0079). The select's 'true' and 'false' are a nullable boolean's;
  * a number is a whole-number field's, which the generator makes only for a
  * range JavaScript holds exactly, so its decimal is the canonical text.
  * Throws on an answer its control could not hold, as `formValue` throws on
@@ -153,7 +153,7 @@ export function canonicalValue(binding: ColumnBinding, answer: ApiValue): ApiVal
   const shape = shapeOf(binding)
   if (answer === null || shape === 'as-is') return answer
   if (shape === 'three-state') {
-    if (answer !== 'true' && answer !== 'false') throw new Error(`${binding.field} answers something other than 'true' or 'false'; its control is a radio of the two.`)
+    if (answer !== 'true' && answer !== 'false') throw new Error(`${binding.field} answers something other than 'true' or 'false'; its control is a select of the two.`)
     return answer === 'true'
   }
   if (typeof answer !== 'number' || !Number.isSafeInteger(answer)) throw new Error(`${binding.field} answers something other than a whole number its control holds.`)
