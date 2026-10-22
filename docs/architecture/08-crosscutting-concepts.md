@@ -332,16 +332,17 @@ The three apps apply formancy.ai's concept; `CLAUDE.md`'s section on the
 user interface is the rule, and this is what each part of it rests on.
 
 - **The same room**: a dark bench, glass panels, violet for what the person
-  acts on and teal for what the server did, in `admin.css`'s variables,
-  copied. The studio edits presentation, a patch over the generated base
+  acts on and teal for what the server did, in the admin's palette,
+  `@formancy/themes/room.css`, which every app imports from the formancy
+  release this repository pins (formancy.ai 0178,
+  [0096](../decisions/0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md)). The studio edits presentation, a patch over the generated base
   ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)),
   with controls of its own over `@formancy/builder-core`'s session, so it
   loads no `workbench.css`
   ([0024](../decisions/0024-the-studio-speaks-only-the-admin-plane.md)).
-  `scripts/palette.test.mjs` holds every copy to the same values; nothing
-  fails when upstream's `admin.css` moves. Since formancy 0.6.0 upstream
-  publishes the palette as `@formancy/themes/room.css` (formancy.ai 0178),
-  which no app here imports yet.
+  `scripts/palette.test.mjs` fails when an app reads the palette without
+  importing it, or declares one of its variables again; what a moved colour
+  does to contrast is the browser gates' axe rules' to find.
 - **The room's own faces**: Fontsource's packages at the release
   formancy.ai installs, bundled into each app, so no page asks another
   host for anything

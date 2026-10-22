@@ -4,11 +4,11 @@
  *
  * The same room as formancy.ai's admin, playground and site: a dark bench,
  * glass panels, violet for what a person acts on and teal for what the server
- * did. The variables in styles/room.css are copied from formancy.ai's
- * apps/admin/src/admin.css, unchanged, a third time: an application's
- * stylesheet is not a package this repository could depend on.
- * scripts/palette.test.mjs fails when the three copies here disagree; when the
- * admin's palette moves upstream, they move with it, by hand.
+ * did. The palette is formancy's own, @formancy/themes/room.css, the file
+ * formancy.ai's admin imports, which main.tsx imports before this file; when
+ * the admin's palette moves, the page moves with the formancy release this
+ * repository pins. scripts/palette.test.mjs fails when a stylesheet here
+ * declares one of its variables again (0096).
  *
  * Two things on the page are not the host's to dress. The forms are what the
  * host's people fill in, so they are white paper in the Blueprint theme from

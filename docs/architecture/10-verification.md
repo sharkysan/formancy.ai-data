@@ -168,8 +168,9 @@ and each of these fails on the change that breaks what it holds:
   ([0046](../decisions/0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md)).
   `scripts/check-cla.test.mjs`: a change to `CLA.md` under a signature.
 - **Size and look.** `scripts/source-size.test.mjs`: no source file past
-  the budget `CLAUDE.md` sets. `scripts/palette.test.mjs`: every stylesheet
-  that copies `admin.css`'s variables says the same value for each.
+  the budget `CLAUDE.md` sets. `scripts/palette.test.mjs`: every app that
+  draws with the admin's palette imports `@formancy/themes/room.css`, and no
+  stylesheet declares one of its variables again.
   `scripts/no-other-host.test.mjs`: no app's `index.html`, built page or
   linked stylesheet names an address on another host, every family the
   room and Blueprint draw with has a face in the build, and the apps import

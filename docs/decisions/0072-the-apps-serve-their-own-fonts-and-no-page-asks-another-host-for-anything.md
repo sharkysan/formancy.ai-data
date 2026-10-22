@@ -1,6 +1,6 @@
 # 0072 — The apps serve their own fonts, from Fontsource's packages at the release formancy.ai installs, and no page asks another host for anything
 
-- **Status:** accepted; extends [0058](0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md), [0038](0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md) and [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md); narrows [0069](0069-the-examples-page-is-served-at-formancy-ai-data-examples.md) and [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)
+- **Status:** accepted; extends [0058](0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md), [0038](0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md) and [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md); narrows [0069](0069-the-examples-page-is-served-at-formancy-ai-data-examples.md) and [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md); narrowed by [0096](0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md): `--display` is read from `@formancy/themes/room.css`, not from a copy of the palette
 - **Date:** 2026-10-16
 - **Deciders:** Daniel Bacher
 - **Verified by:**

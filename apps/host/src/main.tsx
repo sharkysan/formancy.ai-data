@@ -9,6 +9,8 @@ import '@fontsource/ibm-plex-sans/600.css'
 import '@fontsource/ibm-plex-mono/400.css'
 import '@fontsource/ibm-plex-mono/500.css'
 import '@formancy/themes/blueprint.css'
+// The admin's palette, from formancy rather than copied (0096).
+import '@formancy/themes/room.css'
 import './host.css'
 import { demoBase, demoSession } from './demo.js'
 import { Host } from './host.js'

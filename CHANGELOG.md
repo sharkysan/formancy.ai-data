@@ -66,6 +66,16 @@ later.
   published again. Shown in the examples' tests under React and Angular, in
   jsdom; no table of the shared model has such a column, so the host page
   and the browser gates never draw one.
+- **The examples page, the studio and the host page wear formancy's
+  `@formancy/themes/room.css`**, the file formancy.ai's admin imports,
+  rather than three hand copies of its `admin.css` variables (0096). Why: a
+  copy is what this repository's first rule refuses (0002), and nothing held
+  the three to upstream's palette, only to each other; since formancy 0.6.0
+  the palette is a package. The colours are the same, value for value, so
+  nothing on a page changes. `scripts/palette.test.mjs` now fails when an app
+  draws with the palette without importing it, or a stylesheet here declares
+  one of its variables again. The README's pictures were taken again, since
+  their stylesheet digests cover the changed files.
 
 ## 0.3.0 — 2026-10-21
 

@@ -4,11 +4,10 @@
  *
  * The same room as formancy.ai's admin, playground and site: a dark bench,
  * glass panels, violet for what a person acts on and teal for what the server
- * did. The variables in styles/room.css are copied from formancy.ai's
- * apps/admin/src/admin.css, unchanged, because an application's stylesheet is
- * not a package this repository could depend on. When the admin's palette
- * moves, that file moves with it, by hand. The studio uses none of the
- * builder's panes (0024), so it loads no workbench.css and sets no --wb-*.
+ * did. The palette is formancy's own, @formancy/themes/room.css, the file
+ * formancy.ai's admin imports, which main.tsx imports before this file (0096).
+ * The studio uses none of the builder's panes (0024), so it loads no
+ * workbench.css, and the --wb-* room.css sets recolour nothing here.
  *
  * The preview is not the studio: it is what the people filling the form in
  * will see, so it is white paper in the Blueprint theme from

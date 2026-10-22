@@ -49,9 +49,6 @@ function built(app) {
   return dist
 }
 
-/** The comment each copy of the admin's palette opens its variables with (scripts/palette.test.mjs). */
-const MARK = '/* formancy.ai apps/admin/src/admin.css */'
-
 /** Every .css file of an app's own source, as text: not installed, built or measured. */
 function ownStylesheets(directory) {
   const found = []
@@ -123,16 +120,20 @@ function widthProblems(rules) {
 }
 
 /**
- * The stacks the room and the theme draw text with, for `app`: `--display`,
- * `--sans` and `--mono` of its copy of the admin's palette, and Blueprint's
- * `--fm-sans` and `--fm-mono`, from the theme the app installs.
+ * The stacks the room and the theme draw text with, for `app`: `--display` of
+ * the admin's palette, `@formancy/themes/room.css` (0096), `--sans` and
+ * `--mono` of the app's own stylesheet, which room.css does not carry, and
+ * Blueprint's `--fm-sans` and `--fm-mono`, each from the themes the app
+ * installs.
  */
 function stacks(app) {
   const directory = join(repo, 'apps', app)
-  const palette = ownStylesheets(directory).find((css) => css.includes(MARK))
-  const blueprint = readFileSync(createRequire(join(directory, 'package.json')).resolve('@formancy/themes/blueprint.css'), 'utf8')
-  const found = {}
-  for (const name of ['--display', '--sans', '--mono']) found[name] = palette === undefined ? undefined : property(palette, name)
+  const themes = createRequire(join(directory, 'package.json'))
+  const room = readFileSync(themes.resolve('@formancy/themes/room.css'), 'utf8')
+  const blueprint = readFileSync(themes.resolve('@formancy/themes/blueprint.css'), 'utf8')
+  const own = ownStylesheets(directory).find((css) => /--sans\s*:/.test(css))
+  const found = { '--display': property(room, '--display') }
+  for (const name of ['--sans', '--mono']) found[name] = own === undefined ? undefined : property(own, name)
   for (const name of ['--fm-sans', '--fm-mono']) found[name] = property(blueprint, name)
   return found
 }

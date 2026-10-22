@@ -238,9 +238,11 @@ Formancy Data
   one record at a time, and the page says what the server did. Held by
   `apps/host/src/delete.test.tsx` and `apps/host/src/delete-rows.test.tsx`
   ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
-- **Q29. A stylesheet that copies `admin.css`'s variables changes one.**
-  `scripts/palette.test.mjs` fails until every copy says the same value.
-  Nothing fails when upstream's `admin.css` moves.
+- **Q29. A stylesheet here declares one of the admin's palette's variables
+  again, or an app draws with it without importing it.**
+  `scripts/palette.test.mjs` fails, naming the stylesheet and the variable,
+  or the app
+  ([0096](../decisions/0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md)).
 
 ### Performance
 
