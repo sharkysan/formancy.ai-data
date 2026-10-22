@@ -259,7 +259,10 @@ offset, not measured here; the rest is 0044's and 0061's, in
    ([0026](../decisions/0026-name-every-column-fact-the-engines-disagree-on.md)).
    An update reads the record first, where the actor may, to tell an
    unedited echo from a change, an instant or a time included
-   ([0040](../decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)),
+   ([0040](../decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md));
+   read at a version newer than the one sent, every echo of a field the
+   actor may not write is removed, and the statement answers the save stale
+   ([0098](../decisions/0098-an-echo-the-record-moved-since-it-was-read-is-a-stale-save.md)),
    and `planUpdate` needs a confirmed concurrency token.
 4. Each lookup selection is checked by `lookups.rejects` under the actor's
    filters, with a deadline and no abandonment, since a write goes on after
