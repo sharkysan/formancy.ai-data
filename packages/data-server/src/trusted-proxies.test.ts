@@ -104,7 +104,7 @@ describe('FORMANCY_DATA_TRUSTED_PROXIES', () => {
     ['0.0.0.0/1, ::ffff:128.0.0.0/97', 'IPv4', 'one half plain and one mapped'],
     ['10.0.0.0/8, 0.0.0.0/2, 64.0.0.0/2, 128.0.0.0/1', 'IPv4', 'quarters and a half, and a range inside them'],
     ['::/1, 8000::/1', 'IPv6', 'the two halves of IPv6'],
-  ] as const)('refuses %j, whose entries together trust every %s peer: %s', (text, family) => {
+  ] as const)('refuses %j, whose entries together trust every %s peer: %s', (text, family, _what) => {
     const outcome = trustedProxiesSetting(text)
     expect(outcome).toEqual({ ok: false, problem: expect.stringMatching(new RegExp(`^FORMANCY_DATA_TRUSTED_PROXIES: its entries together cover every ${family} address, which trusts every peer`)) as unknown })
     for (const entry of text.split(',').map((part) => part.trim())) expect(outcome.ok ? '' : outcome.problem).not.toContain(entry)
