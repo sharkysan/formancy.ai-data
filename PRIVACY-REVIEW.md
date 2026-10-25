@@ -2,7 +2,7 @@
 
 **Do not treat as approved policy until configuration and operator information are verified.**
 
-Controller: [Legal operator name and postal address]. Contact: info@formancy.ai.
+Controller: Daniel Bacher, Untertor 17, 8400 Winterthur, Switzerland. Contact: info@formancy.ai.
 
 The public demo/site may be served through Cloudflare infrastructure. Delivery and security processing can involve IP address, request metadata, browser information, and technical security signals. Confirm Cloudflare product configuration, processors, retention, and international transfers against the production account. Do not assert that Cloudflare Web Analytics, Zaraz, Turnstile, or optional cookies are installed without checking deployment settings.
 
