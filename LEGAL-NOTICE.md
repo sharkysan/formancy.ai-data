@@ -2,7 +2,7 @@
 
 **Publication blocker:** Insert the operator's verified legal name, postal address and, where applicable, company registration and VAT details. These cannot be inferred from a GitHub account.
 
-**Responsible operator:** [Legal name], [Street and number], [Postal code, city, country].
+**Responsible operator:** Daniel Bacher, Untertor 17, 8400 Winterthur, Switzerland.
 
 **Contact:** info@formancy.ai
 
