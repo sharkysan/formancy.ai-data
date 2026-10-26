@@ -27,6 +27,7 @@ const STATUS: Readonly<Record<BrowseRefusalCode, number>> = {
   'unknown-object': 404,
   'nothing-readable': 403,
   'not-sortable': 400,
+  'not-comparable': 400,
   'not-searchable': 400,
 }
 
@@ -63,8 +64,10 @@ function browseFailure(failure: RecordFailure): { status: number; code: string; 
  * discovers it, so the object, its columns and its key are names the
  * server read from the catalog a moment ago and never the body's (0011).
  * The page is a list's statement (0044), with no filter but what the
- * account's grants and row security apply. The audit names the object
- * once the snapshot holds it, never the search, the sort or a row.
+ * account's grants and row security apply, and the equal values a follow
+ * of a foreign key narrows it to (0103), each column one the snapshot
+ * shows and each value checked against it. The audit names the object
+ * once the snapshot holds it, never the search, the sort, a value or a row.
  *
  * Each page costs a discovery and the page's statement: nothing is cached
  * between pages, so a page is never decided over a catalog older than the
