@@ -67,7 +67,11 @@ tables below.
   anywhere (0014, 0059). The studio and the host page hold a token in
   memory and forget it on a reload (0024).
 - **A table's definition.** The module reads the catalog and reads and
-  writes rows. Drift is reviewed and refused, never migrated
+  writes rows. A schema is migrated by the application's own tool --
+  Flyway, Liquibase, EF Core Migrations, Prisma Migrate or a similar one
+  -- and seen here only as the catalog after it, whichever tool ran it
+  ([the README](../../README.md#when-the-schema-changes) says what follows
+  a migration). Drift is reviewed and refused, never migrated
   ([0010](../decisions/0010-drift-is-classified-against-the-bindings.md),
   [0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)), and
   restoring a version changes no table

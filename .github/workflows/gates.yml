@@ -370,10 +370,61 @@ jobs:
       # run shows whether WebKit launches there without it (0058).
       # install-deps runs apt-get through sudo itself. Skipped by a typo in
       # the condition, WebKit fails to launch, naming what is missing: closed.
+      # Twelve minutes, from the runner's own times: read from GitHub's API
+      # on 2026-10-22 over the last 25 CI runs, the step took 26 to 274 s
+      # when it ended, and three times it was stopped at 5 minutes while
+      # apt was still fetching -- once at its 63rd download of 117 MB for 187
+      # packages from azure.archive.ubuntu.com -- not hung. The leg's whole job took 443
+      # to 912 s when it passed, so the slowest of those with this step at
+      # its limit still ends inside the job's 30 minutes.
+      #
+      # The packages apt fetched are kept between runs and put back where apt
+      # looks before it downloads. No time limit fixes a mirror that crawls:
+      # on 2026-10-26 run 40407008209's leg had ten packages from
+      # azure.archive.ubuntu.com in twelve minutes, twice, and a pull
+      # request cannot go green while it does. apt takes a kept package only
+      # when its checksum is the one the fresh index names, so the versions
+      # installed -- which 0058's facts rest on and the report reads from
+      # dpkg -- are those a download would have brought; one the index no
+      # longer names is dropped by autoclean before the rest are kept. A
+      # cache a pull request saves is its own; the one main saves is every
+      # pull request's. Never in a release, which restores no cache.
+      - name: Restore WebKit's system packages
+        id: webkit-debs
+        if: inputs.release == '' && matrix.browser == 'webkit'
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/webkit-debs
+          key: webkit-debs-${{ runner.os }}
+          restore-keys: webkit-debs-${{ runner.os }}-
+      - name: Put them where apt looks first
+        if: inputs.release == '' && matrix.browser == 'webkit'
+        run: |
+          if [ -d "$HOME/webkit-debs" ]; then
+            find "$HOME/webkit-debs" -maxdepth 1 -name '*.deb' -exec sudo cp -t /var/cache/apt/archives {} +
+          fi
       - name: WebKit's system libraries
         if: matrix.browser == 'webkit'
         run: pnpm --filter @formancy/data-examples exec playwright install-deps webkit
-        timeout-minutes: 5
+        timeout-minutes: 12
+      # Named by the packages it holds, so a run that fetched a newer one
+      # saves a new cache and one that fetched nothing saves none.
+      - name: Keep the packages apt used
+        id: webkit-kept
+        if: inputs.release == '' && matrix.browser == 'webkit'
+        run: |
+          sudo apt-get autoclean
+          mkdir -p "$HOME/webkit-debs"
+          rm -f "$HOME"/webkit-debs/*.deb
+          find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp -t "$HOME/webkit-debs" {} +
+          echo "kept $(find "$HOME/webkit-debs" -name '*.deb' | wc -l) packages"
+          echo "key=webkit-debs-$RUNNER_OS-$(ls "$HOME/webkit-debs" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - name: Save WebKit's system packages
+        if: inputs.release == '' && matrix.browser == 'webkit' && steps.webkit-kept.outputs.key != steps.webkit-debs.outputs.cache-matched-key
+        uses: actions/cache/save@v4
+        with:
+          path: ~/webkit-debs
+          key: ${{ steps.webkit-kept.outputs.key }}
 
       # Builds the page first (turbo's `dependsOn`), then measures it, in this
       # leg's browser alone: turbo passes FORMANCY_BROWSERS to the gates

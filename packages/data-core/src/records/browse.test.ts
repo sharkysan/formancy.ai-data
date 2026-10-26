@@ -34,7 +34,7 @@ const SNAPSHOT = createSnapshot({
   ],
 })
 
-const query = (name: string, extra: Partial<BrowseQuery> = {}): BrowseQuery => ({ object: ref(name), search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE, ...extra })
+const query = (name: string, extra: Partial<BrowseQuery> = {}): BrowseQuery => ({ object: ref(name), equal: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE, ...extra })
 
 function planned(name: string, extra: Partial<BrowseQuery> = {}) {
   const plan = planBrowse(SNAPSHOT, query(name, extra))
@@ -124,10 +124,58 @@ describe('planBrowse', () => {
   })
 })
 
+describe('planBrowse, narrowed to equal values (0103)', () => {
+  // A row followed through a foreign key is found by the values of its key's columns: each bound as a list binds a parent's, through the same listTerms check.
+  test('narrows to the rows whose columns equal the values given', () => {
+    const plan = planned('country', { equal: [{ column: 'iso_code', value: 'CH' }, { column: 'id', value: '1' }] })
+    expect(plan.request.equal).toEqual([
+      { name: 'iso_code', type: NAME, value: 'CH' },
+      { name: 'id', type: INT32, value: '1' },
+    ])
+    expect(listTerms(plan.request).equal).toEqual(plan.request.equal)
+  })
+
+  // A column the page does not show is one the account may not read or the adapter cannot spell: narrowing by it would find rows by what the person is not shown, or throw for the whole page.
+  test('refuses to narrow by a column the page does not show', () => {
+    expect(planBrowse(SNAPSHOT, query('customer', { equal: [{ column: 'id', value: '1' }] }))).toMatchObject({ ok: false, code: 'not-comparable' })
+    expect(planBrowse(SNAPSHOT, query('country', { equal: [{ column: 'flag', value: '00' }] }))).toMatchObject({ ok: false, code: 'not-comparable' })
+    expect(planBrowse(SNAPSHOT, query('country', { equal: [{ column: 'nope', value: '1' }] }))).toMatchObject({ ok: false, code: 'not-comparable' })
+  })
+
+  // Equality is a key's: a timestamp's instant has more than one spelling, and the engines compare it in different precisions, so a value equal on one could find nothing on the other.
+  test('refuses to narrow by a kind no key has', () => {
+    const stamps = createSnapshot({
+      kind: 'postgres', serverVersion: '17.6', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, gaps: [],
+      objects: [object('events', 'table', [col('at', 1, { kind: 'timestamp', withTimeZone: true, precision: 6 })])],
+    })
+    expect(planBrowse(stamps, { ...query('events'), equal: [{ column: 'at', value: '2026-10-26T12:00:00Z' }] })).toMatchObject({ ok: false, code: 'not-comparable' })
+  })
+
+  // A value its column cannot hold would make listTerms throw: a 500 for the page, where a refusal that says which column belongs.
+  test('refuses a value its column cannot hold, naming the column and never the value', () => {
+    const refused = planBrowse(SNAPSHOT, query('country', { equal: [{ column: 'id', value: '1e3' }] }))
+    expect(refused).toMatchObject({ ok: false, code: 'not-comparable' })
+    expect(JSON.stringify(refused)).not.toContain('1e3')
+    expect(planBrowse(SNAPSHOT, query('country', { equal: [{ column: 'name', value: 'x'.repeat(201) }] }))).toMatchObject({ ok: false, code: 'not-comparable' })
+  })
+
+  // listTerms throws on a column named twice; the planner is public, so it refuses before anything is built.
+  test('refuses a column named twice', () => {
+    const twice = [{ column: 'id', value: '1' }, { column: 'id', value: '2' }]
+    expect(planBrowse(SNAPSHOT, query('country', { equal: twice }))).toMatchObject({ ok: false, code: 'not-comparable' })
+  })
+})
+
 describe('validateBrowseQuery', () => {
   // Leaving properties out is how a first page is asked for.
   test('fills what is left out', () => {
     expect(validateBrowseQuery({ object: { schema: 'sales', name: 'country' } })).toEqual({ ok: true, query: query('country') })
+  })
+
+  // A follow is a browse narrowed by column and value, read as given: which columns may narrow it is the planner's question, asked over the server's own snapshot.
+  test('reads an equal as columns and values', () => {
+    const equal = [{ column: 'tenant_id', value: '1' }, { column: 'customer_no', value: '1001' }]
+    expect(validateBrowseQuery({ object: { schema: 'sales', name: 'country' }, equal })).toEqual({ ok: true, query: query('country', { equal }) })
   })
 
   // A property ignored today is one somebody reads tomorrow, and an object named by anything but its two parts is a name nobody approved.
@@ -138,6 +186,11 @@ describe('validateBrowseQuery', () => {
     ['an empty name', { object: { schema: 'sales', name: '' } }],
     ['a sort term with no direction', { object: ref('country'), sort: [{ column: 'name' }] }],
     ['a column sorted twice', { object: ref('country'), sort: [{ column: 'name', direction: 'asc' }, { column: 'name', direction: 'desc' }] }],
+    ['an equal that is not a list', { object: ref('country'), equal: { iso_code: 'CH' } }],
+    ['an equal term with more than a column and a value', { object: ref('country'), equal: [{ column: 'iso_code', value: 'CH', op: 'like' }] }],
+    ['an equal value that is not text', { object: ref('country'), equal: [{ column: 'id', value: 1 }] }],
+    ['an equal value of NULL, which equals nothing', { object: ref('country'), equal: [{ column: 'id', value: null }] }],
+    ['a column narrowed twice', { object: ref('country'), equal: [{ column: 'id', value: '1' }, { column: 'id', value: '2' }] }],
   ])('refuses %s as malformed', (_, body) => {
     expect(validateBrowseQuery(body)).toMatchObject({ ok: false, code: 'malformed' })
   })

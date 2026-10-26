@@ -40,6 +40,14 @@ export interface IdentityOptions {
   clockToleranceSeconds?: number
 }
 
+/**
+ * A compact JWS as the host signs one: three base64url parts, none empty,
+ * and nothing else -- no padding, no space, no `+` or `/` (RFC 7515, 7.1
+ * and 2). jose decodes a part with an `=` after it to the same bytes, so
+ * without this a token had more than one spelling (0101).
+ */
+const COMPACT = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
+
 /** Why a token is refused when the verifier is handed something that is not a set the builders made. */
 const NOT_A_KEY_SET = 'the identity key set is not one readKeySet made'
 
@@ -80,6 +88,8 @@ export async function createIdentityVerifier(options: IdentityOptions): Promise<
   const tolerance = options.clockToleranceSeconds ?? 30
 
   return async (token) => {
+    // jose's code for what is not a JWS, which a malformed token got before.
+    if (!COMPACT.test(token)) return { ok: false, reason: 'ERR_JWS_INVALID' }
     let set: unknown
     try {
       set = keys()

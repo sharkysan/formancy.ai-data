@@ -186,7 +186,10 @@ believes `X-Forwarded-For` only from the peers `FORMANCY_DATA_TRUSTED_PROXIES`
 names, each an IP address or a CIDR range; unset, it believes nobody, and no
 `X-Forwarded-*` header is read at all
 ([0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)).
-`true`, `*` and a prefix of 0 stop the process as trusting every peer, and a
+`true`, `*` and a prefix of 0 stop the process as trusting every peer, as
+do entries that together cover every IPv4 or every IPv6 peer, read as
+`@fastify/proxy-addr` matches one
+([0100](../decisions/0100-a-proxy-list-whose-entries-together-trust-every-peer-is-refused.md)), and a
 whole number as counting hops. The rate limit's key and the log's client
 address are one function's, so a forwarded value that is not an address is
 not believed.

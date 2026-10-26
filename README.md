@@ -196,6 +196,11 @@ until then the address is formancy.ai's 404
   form or policy between, and nothing written. Unset, as in the composed
   stack, nobody browses
   ([0099](./docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
+  A row follows its foreign keys either way -- to the row it refers to and
+  to the rows that refer to it -- each follow a browse of the other end
+  narrowed to the row's values, with a trail back; a key holding a NULL
+  follows nothing, and one the step cannot follow is named with why
+  ([0103](./docs/decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
 - **Reviews drift** against what a published form's bindings and lookups rest
   on, and says which operations each change blocks
   ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md))
@@ -504,7 +509,11 @@ Review step lists the drafts for a publisher to approve or reject
 ([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)). Its last step, Browse, pages through the rows of
 a discovered connection's tables and views for a holder of a browse role,
 and waits for one otherwise
-([0099](./docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
+([0099](./docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md));
+a row's Related button lists the foreign keys it can be followed through,
+either way, from the discovery the studio holds, and a follow pages the
+other end narrowed to the row's values, with Back to the page it left
+([0103](./docs/decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
 
 Its suite runs the real server in the test — `createDataServer` with a fake
 connection registry over snapshots captured from the shared fixture, as every
@@ -1006,7 +1015,9 @@ Behind a proxy, the server counts and logs each client by the address the
 proxy forwarded only when `FORMANCY_DATA_TRUSTED_PROXIES` names that proxy,
 by its address or its range; unset, as in 0.1.0, everybody behind it is one
 client to the rate limit and the log names the proxy. `true`, `*`, a hop
-count and a range written with an interface's address stop the server, and
+count, a range written with an interface's address and entries that
+together cover every address of a family stop the server
+([0100](./docs/decisions/0100-a-proxy-list-whose-entries-together-trust-every-peer-is-refused.md)), and
 a forwarded value that is not an address is not believed. The composed
 stack names its nginx's fixed address and the one the Cloudflare overlay
 gives cloudflared, never their networks, whose gateways are how a local
@@ -1028,11 +1039,66 @@ says what an author and a publisher may each do, and what it costs).
 
 Reading rows is a role of its own. With `FORMANCY_DATA_BROWSE_ROLES` set,
 each role also an administrator role, its holders read every row the
-connection's account can read, through the studio's Browse step; unset,
-as in the composed stack, nobody does
-([0099](./docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md);
+connection's account can read, through the studio's Browse step, and
+follow a row's foreign keys there either way; unset, as in the composed
+stack, nobody does
+([0099](./docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md),
+[0103](./docs/decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md);
 [the data server's README](./packages/data-server/README.md#browsing-rows)
 says what it reads and what it costs).
+
+### When the schema changes
+
+Formancy Data never changes a table. A schema migration is the job of the
+tool your application already uses -- Flyway, Liquibase, EF Core
+Migrations, Prisma Migrate or a similar one -- and nothing here depends on
+which tool ran the DDL: the server reads the result in the catalog, as the
+connection's account sees it, and that account needs no right to change a
+table. What follows a migration is drift:
+
+- **At once, at run time.** Every request reads the table's description
+  again, and what drift blocks in a form's own table -- a bound column
+  dropped or retyped, a key no longer unique -- is refused with `409
+  drift`, never written past; the host page says nothing was saved and an
+  administrator must review the form
+  ([0041](./docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)).
+- **In the studio's Drift step.** The connection discovered again, each
+  change is classified against what a published form's bindings and
+  lookups rest on: blocking, or for review. A column that may have been
+  renamed is a possible rename for a person to confirm, never a guess
+  ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md)).
+- **Then a new version.** Generated again, the form keeps its presentation,
+  carried by what each field stands for
+  ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md));
+  a key that now names another column waits for someone to say what
+  happens to its grants
+  ([0039](./docs/decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md));
+  and a version the database can no longer serve is neither restored
+  ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md))
+  nor imported
+  ([0062](./docs/decisions/0062-a-published-version-moves-between-deployments-as-its-version-file.md)).
+
+A migration in two steps never stops a form: first only add -- the new
+column, the new table -- and publish the forms that use them; remove what
+they no longer bind afterwards. A column dropped or retyped in one step
+stops each form that binds it in the form's own table until that form is
+published again.
+
+Such a tool keeps its own record of what it ran in a table:
+`flyway_schema_history`, Liquibase's `databasechangelog` and
+`databasechangeloglock`, EF Core's `__EFMigrationsHistory`, Prisma's
+`_prisma_migrations`. In a schema approved for discovery it is a table like
+any other: offered to generate a form from, and read in the Browse step by
+a browse role. Where the tool lets you, keep it in a schema the connection
+does not approve -- Flyway's `defaultSchema`, Liquibase's
+`liquibaseSchemaName`, EF Core's `MigrationsHistoryTable(name, schema)`;
+Prisma Migrate keeps it in the schema it migrates.
+
+Nothing here checks drift before a migration reaches production. A
+pipeline can: migrate a staging database first, then ask the administrator
+plane's `POST /v1/forms/:id/drift` for each published form with an
+administrator's token, whose answer's `blocking` says whether the change
+stops it. No command does that for you yet.
 
 ## What it is tested on
 

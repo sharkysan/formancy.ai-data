@@ -78,9 +78,13 @@ export interface TestPlane {
   unreachable: Set<string>
   /**
    * The rows a browse pages through (0099), by `schema.name`, in the order
-   * a test means them to be read. Paged by the request's offset and limit
-   * and nothing else: what a database does with a sort or a search is the
-   * adapter suites' to prove, against real servers (0003).
+   * a test means them to be read. Narrowed by the request's equal values,
+   * as a follow of a foreign key asks (0103) -- a row is kept when it holds
+   * each value exactly as the term spells it, which the canonical text a
+   * test puts in always is -- and paged by its offset and limit, and
+   * nothing else: what a database does with a sort, a search, or a value
+   * spelled another way is the adapter suites' to prove, against real
+   * servers (0003).
    */
   rows: Map<string, Array<Record<string, ApiValue>>>
   /** Connections the operator has taken out of the allowlist since the server started. */
@@ -148,13 +152,16 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
         discover: async () => databases.get(id) ?? now,
         close: async () => {},
       }
-      // The administrator plane never touches a lookup, and reads records only to browse them (0099).
+      // The administrator plane never touches a lookup, and reads records only to browse them (0099), narrowed or not (0103).
       const records = {
         list: async (request: ListRequest) => {
           const { schema, name } = request.target.table
-          const page = (rows.get(`${schema}.${name}`) ?? []).slice(request.offset, request.offset + request.limit + 1)
+          const narrowed = (rows.get(`${schema}.${name}`) ?? []).filter((values) => request.equal.every((term) => values[term.name] === term.value))
+          const page = narrowed.slice(request.offset, request.offset + request.limit + 1)
           const described = describedOf(databases.get(id) ?? now, request.target.table) as DescribedTable
-          return { ok: true, described, rows: page.map((values) => ({ values, version: null })) }
+          // Only the columns the request names, as an adapter reads them: a fake that answered every value it holds would show a page what the server's discovery left out.
+          const read = (values: Record<string, ApiValue>) => Object.fromEntries(request.columns.filter((column) => Object.hasOwn(values, column.name)).map((column) => [column.name, values[column.name]]))
+          return { ok: true, described, rows: page.map((values) => ({ values: read(values), version: null })) }
         },
       } as unknown as RecordAdapter
       return { adapter, lookups: {} as LookupAdapter, records }

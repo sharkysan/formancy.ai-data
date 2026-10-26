@@ -1,6 +1,6 @@
 # 0099 — A browse role reads any table or view's rows, a page at a time, as the connection's account reads them
 
-- **Status:** accepted; extends [0020](0020-administration-is-a-separate-plane.md): the administrator's plane reads rows, for a role of its own; extends [0033](0033-the-administrator-plane-is-audited.md): the administrator's event names the object a browse read; extends [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md): a list's statement pages an object no form is published over
+- **Status:** accepted; extends [0020](0020-administration-is-a-separate-plane.md): the administrator's plane reads rows, for a role of its own; extends [0033](0033-the-administrator-plane-is-audited.md): the administrator's event names the object a browse read; extends [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md): a list's statement pages an object no form is published over; extended by [0103](0103-a-browsed-row-follows-its-foreign-keys-either-way.md): a browse may be narrowed to the rows equal to given values in shown columns of a key kind, and the studio follows a row's foreign keys through it either way
 - **Date:** 2026-10-26
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/routes/admin-browse.test.ts` --
