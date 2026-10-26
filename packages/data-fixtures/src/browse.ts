@@ -1,3 +1,5 @@
+import { EDGE_VALUES } from './values.js'
+
 /*
  * What a browse of a table or view shows on both engines (0099), written
  * once for both adapters' `list.integration.test.ts`, which load LIST_ROWS
@@ -19,6 +21,14 @@
  * - `columns`: `sales.country` shows the columns the owner may read that
  *   have a text form, in its key order, and leaves out its bytea or
  *   varbinary flag and its point or geography shape, naming them.
+ * - `follows`: tenant 1's customer 1001, browsed narrowed to its key, is
+ *   followed (0103) through `fk_order_customer`, the key on `sales.order`
+ *   that refers to it, to its orders: the fixture's and LIST_ROWS' second,
+ *   in key order, and never tenant 2's, whose customer is numbered 1001 too.
+ *   Each of those orders, followed back through the same key, finds that
+ *   customer alone. The key is composite, and a follow pairs its columns by
+ *   position as the catalog reports them: one that dropped the tenant would
+ *   find tenant 2's order and customer as well.
  *
  * Every order here starts with a number, so it is one order on both
  * engines: text order is each engine's collation (0012).
@@ -68,6 +78,19 @@ export const BROWSE_PARITY = {
       { id: '1', iso_code: 'CH', name: 'Switzerland' },
       { id: '2', iso_code: 'DE', name: 'Germany' },
     ],
+  },
+  follows: {
+    /** The row followed from: tenant 1's customer 1001, by its key. */
+    object: { schema: 'sales', name: 'customer' },
+    equal: [
+      { column: 'tenant_id', value: '1' },
+      { column: 'customer_no', value: '1001' },
+    ],
+    key: 'fk_order_customer',
+    /** What it is referred by: the orders the key names it in, by id in key order. */
+    orders: { object: { schema: 'sales', name: 'order' }, ids: [EDGE_VALUES.beyondSafeInteger, '9007199254740995'] },
+    /** What it is, by name, and what each of those orders refers to. */
+    names: ['Muster AG'],
   },
 } as const
 

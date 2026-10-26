@@ -153,4 +153,5 @@ only enforcement is "we remember" says so plainly.
 | [0096](0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md) | The apps wear formancy's `room.css` rather than a copy of `admin.css` | accepted |
 | [0097](0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md) | Back goes on past the open form's own entries in every layout | accepted |
 | [0098](0098-an-echo-the-record-moved-since-it-was-read-is-a-stale-save.md) | An echo the record moved since it was read is a stale save, not over-posting | accepted |
-| [0099](0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md) | A browse role reads any table or view's rows, a page at a time, as the connection's account reads them | accepted |
+| [0099](0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md) | A browse role reads any table or view's rows, a page at a time, as the connection's account reads them | accepted; extended by 0103 |
+| [0103](0103-a-browsed-row-follows-its-foreign-keys-either-way.md) | A browsed row follows its foreign keys either way, each follow a browse narrowed to the row's values | accepted |

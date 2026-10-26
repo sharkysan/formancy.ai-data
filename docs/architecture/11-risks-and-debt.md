@@ -290,7 +290,19 @@ server refuses a version holding a move
 What a delete also does is listed by foreign key only, never by trigger or
 rule ([0052](../decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md)),
 and the Review step does not show what a draft changes from the version it
-replaces (0065).
+replaces (0065). The Browse step follows a row only through foreign keys
+over key kinds -- not a timestamp, a boolean or binary -- whose columns the
+account may read at both ends, both in the approved schemas, and onto a
+table it can see; the rest are named, a key with a NULL in it follows
+nothing, and a relationship the catalog does not declare is not offered. A
+follow compares with the database's equality, as the key does, so under a
+case-insensitive collation it finds what the key matches. Following what
+refers to a row may read the whole referring table, since neither engine
+indexes those columns by itself, unmeasured; the step offers what its own
+discovery holds, which the server plans again and may refuse; the trail is
+lost on a reload; and the audit names the object followed to, never the
+values
+([0103](../decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
 
 **The server.** Each request for the menu of forms reads and validates every
 published form, with nothing cached

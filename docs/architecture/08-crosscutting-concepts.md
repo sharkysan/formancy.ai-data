@@ -110,6 +110,9 @@ quotes is approved metadata
 a row filter reaches an adapter as a column it quotes and a value it binds,
 never as a predicate
 ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md));
+a browse narrowed to equal values names its columns in the body, and each
+reaches an adapter only as the server's own snapshot spells a column the
+page shows, its value bound (0103);
 and a form names a connection only by an id the allowlist holds
 ([0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)).
 
@@ -296,7 +299,10 @@ refused, and `null` for every other operation -- a count, never which
 An administrator event carries `object`: for a `browse`, the table or view
 it read as `schema.name`, once the server's snapshot holds it, and `null`
 for every other operation -- never the search or a row
-([0099](../decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
+([0099](../decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)),
+nor the values a follow of a foreign key narrowed the browse to, so the
+trail tells that a table was browsed and not which row led there
+([0103](../decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
 
 **It is operational, not evidence.** The event is written after the commit,
 by another system: a crash between the two loses it, and whoever runs the

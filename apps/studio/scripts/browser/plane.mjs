@@ -26,9 +26,12 @@ const IDENTITIES = new Map([
 
 /**
  * The rows a browse reads, by `schema.name`: an order wider than a phone,
- * with a long note and a NULL, so the grid scrolls inside its own region.
- * Paged by offset and limit alone; what a database does with a sort or a
- * search is the adapter suites' to prove (0003).
+ * with a long note and a NULL, so the grid scrolls inside its own region;
+ * and the customer and the employee it refers to, so a row's foreign key
+ * can be followed and a NULL one is said (0103). Narrowed by the request's
+ * equal values, each spelled as the rows hold it, and paged by offset and
+ * limit; what a database does with a sort, a search or another spelling is
+ * the adapter suites' to prove (0003).
  */
 const ORDER = { tenant_id: '1', customer_no: '1001', order_date: '2026-10-08', status: 'placed', amount: '99999999999999.9999', group: 'A', created_by: '1', approved_by: null, row_version: '1' }
 const ROWS = new Map([
@@ -36,6 +39,11 @@ const ROWS = new Map([
     { id: '9007199254740993', ...ORDER, notes: 'Deliver to the loading dock at the back of the building, not the front desk.' },
     { id: '9007199254740995', ...ORDER, notes: null, status: 'shipped' },
   ]],
+  ['sales.customer', [
+    { tenant_id: '1', customer_no: '1001', name: 'Muster AG', country_code: 'CH' },
+    { tenant_id: '1', customer_no: '1002', name: 'Beispiel GmbH', country_code: 'DE' },
+  ]],
+  ['sales.employee', [{ id: '1', name: 'Ada Lovelace', manager_id: null }]],
   ['sales.customer_summary', [
     { tenant_id: '1', customer_no: '1001', name: 'Muster AG', order_count: '2' },
     { tenant_id: '2', customer_no: '1001', name: 'Other Tenant GmbH', order_count: '1' },
@@ -44,7 +52,8 @@ const ROWS = new Map([
 
 const records = {
   list: async (request) => {
-    const page = (ROWS.get(`${request.target.table.schema}.${request.target.table.name}`) ?? []).slice(request.offset, request.offset + request.limit + 1)
+    const rows = (ROWS.get(`${request.target.table.schema}.${request.target.table.name}`) ?? []).filter((values) => request.equal.every((term) => values[term.name] === term.value))
+    const page = rows.slice(request.offset, request.offset + request.limit + 1)
     return { ok: true, described: null, rows: page.map((values) => ({ values, version: null })) }
   },
 }
