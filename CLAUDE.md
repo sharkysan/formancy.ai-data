@@ -36,7 +36,9 @@ One path runs through the packages, and most changes touch one step of it.
 1. **Discover.** An adapter's `discover(scope)` reads the catalog as the
    connected account and returns a `MetadataSnapshot`, made only through
    `data-core`'s `createSnapshot`, with a gap for whatever that account could
-   not see (0004, 0027).
+   not see (0004, 0027). A holder of a browse role reads a page of any
+   discovered table or view's rows as that account does, planned by
+   `records/browse.ts` and run as a list (`routes/admin-browse.ts`; 0099).
 2. **Generate.** `generateForm` (`data-core/src/generate/`) turns a snapshot
    and a `GenerationRequest` into a formancy form, its `FormBindings` — field
    to column — and notes saying what it inferred and what it refused (0009).

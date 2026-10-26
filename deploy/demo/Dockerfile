@@ -95,7 +95,7 @@ RUN apk add --no-cache libstdc++ \
 
 COPY --from=build /usr/local/bin/node /usr/local/bin/node
 # Root's, so the server, run as node by start.sh, cannot change the code it
-# runs (0101); it writes only the store and PostgreSQL's data.
+# runs (0102); it writes only the store and PostgreSQL's data.
 COPY --from=build /app /app
 COPY --from=build /tools /tools
 COPY LICENSE.md NOTICE /usr/share/formancy-data/

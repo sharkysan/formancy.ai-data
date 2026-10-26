@@ -1,4 +1,4 @@
-# 0101 — The server image gives its user the store, and not its code
+# 0102 — The server image gives its user the store, and not its code
 
 - **Status:** accepted; extends [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md): the image's code is root's, and the server starts on a read-only root
 - **Date:** 2026-10-22

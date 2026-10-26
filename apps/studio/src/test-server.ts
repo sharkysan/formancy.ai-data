@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createSnapshot } from '@formancy/data-core'
-import type { ColumnMeta, CoverageGap, DatabaseAdapter, LookupAdapter, MetadataSnapshot, RecordAdapter, ReferentialAction, ServerFacts } from '@formancy/data-core'
+import { createSnapshot, describedOf } from '@formancy/data-core'
+import type { ApiValue, ColumnMeta, CoverageGap, DatabaseAdapter, DescribedTable, ListRequest, LookupAdapter, MetadataSnapshot, RecordAdapter, ReferentialAction, ServerFacts } from '@formancy/data-core'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
 import type { ConfigurationStore, ConnectionRegistry, IdentityVerifier } from '@formancy/data-server'
 import owner from './fixtures/postgres-owner.json'
@@ -53,17 +53,19 @@ export const SQLSERVER_READER_SNAPSHOT = readSnapshot(sqlserverReader)
  * (0065), `admin` is an author -- an administrator without a publisher
  * role; `publisher` holds the publisher role alone, which a reviewed plane
  * also lets in; `both` holds both, and still never approves what it
- * submitted.
+ * submitted. `browser` administers and holds the browse role (0099).
  */
-export const TOKENS = { admin: 'studio-test-administrator', clerk: 'studio-test-clerk', publisher: 'studio-test-publisher', both: 'studio-test-both' } as const
+export const TOKENS = { admin: 'studio-test-administrator', clerk: 'studio-test-clerk', publisher: 'studio-test-publisher', both: 'studio-test-both', browser: 'studio-test-browser' } as const
 export const ADMIN_ROLE = 'data-admin'
 export const PUBLISHER_ROLE = 'data-publisher'
+export const BROWSE_ROLE = 'data-browser'
 
 const verifyIdentity: IdentityVerifier = async (token) => {
   if (token === TOKENS.admin) return { ok: true, identity: { actor: { id: 'ada', roles: [ADMIN_ROLE] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-7', roles: ['clerk'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.publisher) return { ok: true, identity: { actor: { id: 'grace', roles: [PUBLISHER_ROLE] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.both) return { ok: true, identity: { actor: { id: 'lin', roles: [ADMIN_ROLE, PUBLISHER_ROLE] }, attributes: { tenant: '1' } } }
+  if (token === TOKENS.browser) return { ok: true, identity: { actor: { id: 'bo', roles: [ADMIN_ROLE, BROWSE_ROLE] }, attributes: { tenant: '1' } } }
   return { ok: false, reason: 'ERR_JWS_INVALID' }
 }
 
@@ -74,6 +76,13 @@ export interface TestPlane {
   databases: Map<string, MetadataSnapshot>
   /** Connections whose database does not answer. */
   unreachable: Set<string>
+  /**
+   * The rows a browse pages through (0099), by `schema.name`, in the order
+   * a test means them to be read. Paged by the request's offset and limit
+   * and nothing else: what a database does with a sort or a search is the
+   * adapter suites' to prove, against real servers (0003).
+   */
+  rows: Map<string, Array<Record<string, ApiValue>>>
   /** Connections the operator has taken out of the allowlist since the server started. */
   removed: Set<string>
   /** Every request the studio made, as method and path, in order, with the JSON body it sent, if any. */
@@ -98,9 +107,10 @@ export const CONNECTIONS = ['fixture', 'fixture-reader', 'fixture-sqlserver', 'f
  * administrator plane does not exist. `review: true` starts it as
  * `FORMANCY_DATA_PUBLISHER_ROLES=data-publisher` would (0065): nobody
  * publishes directly, an administrator submits a draft, and a publisher
- * who did not submit it approves it.
+ * who did not submit it approves it. `browse: true` starts it as
+ * `FORMANCY_DATA_BROWSE_ROLES=data-browser` would (0099).
  */
-export async function startPlane(options: { administrator?: boolean; review?: boolean } = {}): Promise<TestPlane> {
+export async function startPlane(options: { administrator?: boolean; review?: boolean; browse?: boolean } = {}): Promise<TestPlane> {
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-studio-'))
   const store = createFileConfigurationStore(root)
   const databases = new Map<string, MetadataSnapshot>([
@@ -111,6 +121,7 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
     ['fixture-writer', WRITER_SNAPSHOT],
   ])
   const unreachable = new Set<string>()
+  const rows = new Map<string, Array<Record<string, ApiValue>>>()
   const removed = new Set<string>()
   const requests: TestPlane['requests'] = []
   let held: { path: RegExp; until: Promise<void> } | null = null
@@ -137,18 +148,27 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
         discover: async () => databases.get(id) ?? now,
         close: async () => {},
       }
-      // The administrator plane never touches a record or a lookup.
-      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter }
+      // The administrator plane never touches a lookup, and reads records only to browse them (0099).
+      const records = {
+        list: async (request: ListRequest) => {
+          const { schema, name } = request.target.table
+          const page = (rows.get(`${schema}.${name}`) ?? []).slice(request.offset, request.offset + request.limit + 1)
+          const described = describedOf(databases.get(id) ?? now, request.target.table) as DescribedTable
+          return { ok: true, described, rows: page.map((values) => ({ values, version: null })) }
+        },
+      } as unknown as RecordAdapter
+      return { adapter, lookups: {} as LookupAdapter, records }
     },
     close: async () => {},
   }
 
   // The administrator's trail is the server's suites' subject; here it is required and discarded.
   const audit = { sink: () => {} }
+  const browse = options.browse === true ? { browseRoles: [BROWSE_ROLE] } : {}
   const admin =
     options.review === true
-      ? { registry, store, adminRoles: [ADMIN_ROLE, PUBLISHER_ROLE], publisherRoles: [PUBLISHER_ROLE], audit }
-      : { registry, store, adminRoles: [ADMIN_ROLE], audit }
+      ? { registry, store, adminRoles: [ADMIN_ROLE, PUBLISHER_ROLE, BROWSE_ROLE], publisherRoles: [PUBLISHER_ROLE], ...browse, audit }
+      : { registry, store, adminRoles: [ADMIN_ROLE, BROWSE_ROLE], ...browse, audit }
   const app = await createDataServer(options.administrator === false ? { verifyIdentity } : { verifyIdentity, admin })
 
   const fetch: typeof globalThis.fetch = async (input, init) => {
@@ -177,6 +197,7 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
     fetch,
     databases,
     unreachable,
+    rows,
     removed,
     requests,
     hold: (path) => {

@@ -178,7 +178,7 @@ export class DockerContainer {
   }
 
   /**
-   * What of the server's code its own user could write (0101): every path
+   * What of the server's code its own user could write (0102): every path
    * under /app it owns or anybody may write, a link passed over since its
    * own mode means nothing, and the entry point it runs when a write to it
    * went through. Empty when it can write none.

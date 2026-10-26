@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import { READER_ACCESS, WRITER_ACCESS } from './access.js'
+import { BROWSE_PARITY } from './browse.js'
+import type { BrowseCase } from './browse.js'
 import { CASCADE_PARITY } from './cascades.js'
 import type { CascadeCase } from './cascades.js'
 import {
+  browseCase,
   cascadeCase,
   covers,
   deleteCase,
@@ -66,6 +69,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   CASCADE_PARITY: (Object.keys(CASCADE_PARITY) as CascadeCase[]).map(cascadeCase),
   UUID_PARITY: (Object.keys(UUID_PARITY) as UuidCase[]).map(uuidCase),
   EXPORT_PARITY: (Object.keys(EXPORT_PARITY) as ExportCase[]).map(exportCase),
+  BROWSE_PARITY: (Object.keys(BROWSE_PARITY) as BrowseCase[]).map(browseCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],

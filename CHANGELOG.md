@@ -10,6 +10,34 @@ later.
 
 ## Unreleased
 
+### Added
+
+- **A browse role reads any table or view's rows, a page at a time, in the
+  studio's new Browse step** (0099). Why: somebody setting up a form wants
+  to look at the data first -- what a table holds, whether a view returns
+  what its name says -- and until now that meant a database client and a
+  second set of credentials. `POST /v1/connections/:id/browse` answers fifty
+  rows of an object the connection's account can see, as it reads them,
+  searched and sorted, and writes nothing. What you notice:
+  - **Nobody browses until `FORMANCY_DATA_BROWSE_ROLES` names who may**,
+    each role also an administrator role (`admin.browseRoles` for an
+    embedder). Publishing a form never needed a row, so upgrading gives
+    reading rows to nobody. A holder reads every row the connection's
+    account can read, with no form or policy between: give the role to few
+    people.
+  - **`GET /v1/administration` refuses `browse`** to a caller without a
+    browse role, review or not, so its `refuses` is no longer `{}` on a
+    deployment without review; the studio lists Browse last, waiting for
+    a role.
+  - **The administrator's audit event has a field `object`**: the table or
+    view a browse read, as `schema.name`, and `null` for every other
+    operation. A sink that checks an event's exact shape sees one more key.
+  - A view, or a table with no key the account may read, is ordered by
+    every column shown, and rows alike in all of them may trade places
+    between pages. Binary, rowversion and unsupported columns are not
+    shown, and are named. Every page discovers the connection again; not
+    measured.
+
 ### Changed
 
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's
@@ -90,7 +118,7 @@ later.
   press now lands one entry back, writing the layout shown over it.
 
 - **The server image's code is root's, and the server's user writes only
-  its store** (0101). The runtime stage copied `/app` with `--chown` to
+  its store** (0102). The runtime stage copied `/app` with `--chown` to
   `node`, the user the server runs as, so a flaw that let a request write a
   file could have replaced the code it runs; the live demo's image did the
   same. Both copy it as root's now, the `container` job asks the running

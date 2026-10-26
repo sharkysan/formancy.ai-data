@@ -29,6 +29,8 @@ export const ADMIN_OPERATIONS: Readonly<Record<string, AdminOperation>> = {
   'GET /v1/forms/:id/drafts/:draft': 'draft-read',
   'POST /v1/forms/:id/drafts/:draft/approval': 'draft-approve',
   'POST /v1/forms/:id/drafts/:draft/rejection': 'draft-reject',
+  // Refused to everyone without a browse role (0099).
+  'POST /v1/connections/:id/browse': 'browse',
 }
 
 /** The operation a request to the plane is, by the route that matched it, HEAD as the GET it answers for. */
@@ -62,6 +64,8 @@ export interface AdminTrail {
   restoredFrom?: number
   /** The draft a submit wrote (0065); one the path names is read from the path. */
   draft?: number
+  /** The table or view a browse read (0099), as `schema.name`, once the snapshot holds it. */
+  object?: string
 }
 
 declare module 'fastify' {
@@ -105,6 +109,7 @@ export function describeAdmin(known: (connection: string) => boolean) {
       expectedBase: trail.expectedBase ?? null,
       restoredFrom: trail.restoredFrom ?? null,
       draft: trail.draft ?? draftOf(params.draft) ?? null,
+      object: trail.object ?? null,
       status: base.status,
       outcome: base.outcome,
     }

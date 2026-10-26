@@ -38,6 +38,7 @@ export type AdminOperation =
   | 'draft-read'
   | 'draft-approve'
   | 'draft-reject'
+  | 'browse'
 
 /**
  * One operational audit event of the runtime plane: who asked for what,
@@ -76,7 +77,7 @@ export interface RuntimeAuditEvent extends AuditEventBase {
 /**
  * One operational audit event of the administrator's plane (0033): who
  * connected, discovered, proposed, published, read, compared, regenerated,
- * restored or imported, and under review (0065) who submitted, read,
+ * restored, imported or browsed which table (0099), and under review (0065) who submitted, read,
  * approved, rejected or withdrew which draft, against which connection and
  * which version, and how it ended. Who approved a version is said here and
  * nowhere else: the version file is the bundle alone.
@@ -99,6 +100,12 @@ export interface AdminAuditEvent extends AuditEventBase {
   restoredFrom: number | null
   /** Under review (0065): the draft addressed, or the one a submit wrote; an approval's `formVersion` is the version it wrote. */
   draft: number | null
+  /**
+   * Browse only (0099): the table or view read, as `schema.name`, once the
+   * server's own snapshot holds it -- never a name only the body said.
+   * A name, never a row.
+   */
+  object: string | null
 }
 
 /** Both planes, told apart by `plane`. A typed sink narrows on it before reading a plane's own fields. */

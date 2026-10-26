@@ -570,7 +570,7 @@ jobs:
           # Unprivileged, and carrying its licence.
           test "$(docker exec data-server id -un)" = "node"
           docker exec data-server test -f /app/LICENSE.md
-          # It cannot write its own code (0101): nothing under /app is the
+          # It cannot write its own code (0102): nothing under /app is the
           # server user's or writable by everybody -- a link is passed over,
           # since its own mode means nothing -- and a write to the entry
           # point it runs is refused.
@@ -594,7 +594,7 @@ jobs:
           docker rm -f data-server
 
       # Nothing but the store is written, so the server starts on a root an
-      # operator mounts read-only, with the store's directory a volume (0101).
+      # operator mounts read-only, with the store's directory a volume (0102).
       - name: On a read-only root, it starts and serves health
         run: |
           docker run -d --name data-server-read-only --read-only -p 127.0.0.1:4390:4390 \

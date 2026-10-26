@@ -71,7 +71,7 @@ const sink: AuditSink = (event: AuditEvent) => {
   }
 }
 await sink({ at: 't', plane: 'runtime', actor: null, operation: 'read', form: 'order', formVersion: null, status: 401, outcome: 'unauthenticated', record: null, rows: null })
-await sink({ at: 't', plane: 'admin', actor: 'a', operation: 'publish', connection: 'erp', form: 'order', formVersion: 1, expectedBase: null, restoredFrom: null, draft: null, status: 201, outcome: 'ok' })
+await sink({ at: 't', plane: 'admin', actor: 'a', operation: 'publish', connection: 'erp', form: 'order', formVersion: 1, expectedBase: null, restoredFrom: null, draft: null, object: null, status: 201, outcome: 'ok' })
 if (heard.join() !== 'runtime no record,admin erp') throw new Error('an audit sink did not tell the planes apart')
 
 const form: FormSchema = { specVersion: '3', id: 'order', title: 'Order', model: { fields: [{ key: 'customer', type: 'select', optionsSource: 'order.customer' }] } }

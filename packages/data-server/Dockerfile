@@ -53,7 +53,7 @@ WORKDIR /app
 
 # Root's, readable by everybody and writable by nobody else: the server's
 # user cannot change the code it runs, so a flaw that lets a request write a
-# file cannot replace it (0101). The store below is the one place it writes.
+# file cannot replace it (0102). The store below is the one place it writes.
 COPY --from=build /app /app
 
 # The configuration store's directory, owned by the user the server runs as.

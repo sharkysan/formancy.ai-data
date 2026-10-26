@@ -2,6 +2,8 @@ import type { DatabaseKind } from '@formancy/data-core'
 import { DATABASE_KINDS } from '@formancy/data-core'
 import type { TestOptions } from 'vitest'
 import { TestRunner } from 'vitest'
+import { BROWSE_PARITY } from './browse.js'
+import type { BrowseCase } from './browse.js'
 import { CASCADE_PARITY } from './cascades.js'
 import type { CascadeCase } from './cascades.js'
 import { DELETE_PARITY } from './deletes.js'
@@ -91,6 +93,9 @@ export const uuidCase = (name: UuidCase): string => `uuid: ${name}`
 /** What a file of a form's records holds on each engine (0079), by the name of its entry in EXPORT_PARITY. */
 export const exportCase = (name: ExportCase): string => `export: ${name}`
 
+/** What a browse of a table or view shows on each engine (0099), by the name of its entry in BROWSE_PARITY. */
+export const browseCase = (name: BrowseCase): string => `browse: ${name}`
+
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
  * every filter, label, temporal read, refusal and edge value, then the two
@@ -98,7 +103,7 @@ export const exportCase = (name: ExportCase): string => `export: ${name}`
  * then what a form scoped through a parent shows (0043), then what a list of
  * a form's records shows (0044), then what a delete does (0050) and what it
  * does past its record (0051), then what a uuid key does (0056), then what a
- * file of a form's records holds (0079).
+ * file of a form's records holds (0079), then what a browse shows (0099).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -120,6 +125,7 @@ export function sharedCases(): string[] {
     ...(Object.keys(CASCADE_PARITY) as CascadeCase[]).map(cascadeCase),
     ...(Object.keys(UUID_PARITY) as UuidCase[]).map(uuidCase),
     ...(Object.keys(EXPORT_PARITY) as ExportCase[]).map(exportCase),
+    ...(Object.keys(BROWSE_PARITY) as BrowseCase[]).map(browseCase),
   ]
   const seen = new Set<string>()
   for (const id of ids) {
