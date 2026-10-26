@@ -1015,7 +1015,9 @@ Behind a proxy, the server counts and logs each client by the address the
 proxy forwarded only when `FORMANCY_DATA_TRUSTED_PROXIES` names that proxy,
 by its address or its range; unset, as in 0.1.0, everybody behind it is one
 client to the rate limit and the log names the proxy. `true`, `*`, a hop
-count and a range written with an interface's address stop the server, and
+count, a range written with an interface's address and entries that
+together cover every address of a family stop the server
+([0100](./docs/decisions/0100-a-proxy-list-whose-entries-together-trust-every-peer-is-refused.md)), and
 a forwarded value that is not an address is not believed. The composed
 stack names its nginx's fixed address and the one the Cloudflare overlay
 gives cloudflared, never their networks, whose gateways are how a local
