@@ -1,9 +1,10 @@
 /* ------------------------------------------------------------- browse
  *
  * A connection's rows (0099): a page of a table or view in a grid of its
- * own. Classes only, as review's panes are. The grid scrolls sideways inside
- * its own region, which takes the keyboard's focus to scroll, so a wide
- * table never scrolls the page.
+ * own, and a row's related rows below it (0103). Classes only, as review's
+ * panes are. The grid scrolls sideways inside its own region, which takes
+ * the keyboard's focus to scroll, so a wide table never scrolls the page;
+ * the related rows are outside it, and wrap.
  */
 
 .browsed {
@@ -87,4 +88,76 @@
   color: var(--muted);
   background: transparent;
   cursor: not-allowed;
+}
+
+/* A row's way to its related rows: quiet in every row, violet in the row open below the grid. */
+.related-toggle {
+  min-height: 1.75rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--edge-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.related-toggle:hover,
+.related-toggle[aria-expanded='true'] {
+  border-color: var(--client);
+  color: var(--client);
+}
+
+.related-toggle:focus-visible {
+  outline: 2px solid var(--client);
+}
+
+/* A row's related rows (0103): a panel of their own between the grid and the page buttons. */
+.related {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 2%);
+}
+
+.related > h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.9375rem;
+}
+
+.related > h5 {
+  margin: 0.75rem 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.ways {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+
+/* A follow goes somewhere, as a link does: violet and underlined, and it wraps, since a key's values can be long. */
+.follow {
+  display: inline-block;
+  max-width: 100%;
+  min-height: 1.75rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: none;
+  color: var(--client);
+  font-size: inherit;
+  text-align: start;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  overflow-wrap: anywhere;
+}
+
+/* A key with a NULL in it goes nowhere, and is said, not offered. */
+.no-row {
+  padding: 0.25rem 0;
+  color: var(--muted);
 }

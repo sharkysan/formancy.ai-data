@@ -185,6 +185,27 @@ describe('a page', () => {
     expect(requests).toEqual([])
   })
 
+  // A follow of a foreign key is a browse narrowed by column and value (0103): the values reach the port bound, as a parent's do, each column one the server's snapshot names.
+  test('narrowed by a column and a value, reaches the port with them as the planner checked them', async () => {
+    const server = await serve()
+    const response = await browse(server, 'browser', { ...EMPLOYEE, equal: [{ column: 'id', value: '2' }] })
+    expect(response.statusCode).toBe(200)
+    expect(requests[0]?.equal).toEqual([{ name: 'id', type: INT32, value: '2' }])
+  })
+
+  // A column a browse cannot be narrowed by, or a value it cannot hold, would make the adapter's own check throw: a 500 where the browser asked for something it may not.
+  test.each([
+    ['a column the page does not show', { column: 'photo', value: '00' }],
+    ['a value its column cannot hold', { column: 'id', value: 'two' }],
+  ])('narrowed by %s is 400, and nothing is read', async (_, term) => {
+    const server = await serve()
+    const response = await browse(server, 'browser', { ...EMPLOYEE, equal: [term] })
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toMatchObject({ code: 'not-comparable' })
+    expect(response.body).not.toContain('two')
+    expect(requests).toEqual([])
+  })
+
   // A body checked after the discovery would cost a catalog read for a request that was never going to run.
   test('a malformed body is 400 before the connection is opened', async () => {
     const server = await serve()
