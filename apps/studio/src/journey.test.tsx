@@ -47,6 +47,8 @@ const ADMIN_PLANE = [
   /^GET \/v1\/forms\/[^/]+\/drafts\/\d+$/,
   /^POST \/v1\/forms\/[^/]+\/drafts\/\d+\/approval$/,
   /^POST \/v1\/forms\/[^/]+\/drafts\/\d+\/rejection$/,
+  // A connection's rows, for a browse role alone (0099); browse.test.tsx walks it.
+  /^POST \/v1\/connections\/[^/]+\/browse$/,
 ]
 
 /** Signed out, and in again as somebody else, as a person shares a studio: the workbench starts over. */
@@ -252,6 +254,8 @@ describe('the journey', () => {
       ['6. Preview', true],
       ['7. Publish', true],
       ['8. Drift', false],
+      // Refused without a browse role, which this administrator does not hold (0099).
+      ['9. Browse', true],
     ])
     expect(within(steps).getByRole('button', { name: '2. Choose' }).getAttribute('aria-describedby')).not.toBeNull()
     expect(step('Connect')).toBeTruthy()
@@ -310,6 +314,7 @@ describe('the journey under review', () => {
       ['7. Submit', true],
       ['8. Drift', false],
       ['9. Review', false],
+      ['10. Browse', true],
     ])
   })
 })

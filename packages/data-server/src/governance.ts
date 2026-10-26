@@ -9,6 +9,9 @@ import type { AdminOperation } from './audit.js'
  * submit it approves it. Restoring a version stays one publisher's action,
  * alone.
  *
+ * Browsing a connection's rows (0099) is a grant of its own, review or
+ * not: a holder of a browse role may, and nobody else.
+ *
  * `refusalFor` is the one decision. The plane's preHandler asks it for
  * every route, and a draft's routes ask it again with the draft in hand;
  * the administration answer and each draft's `refuses` are derived from
@@ -26,8 +29,10 @@ import type { AdminOperation } from './audit.js'
  *   (`publisher-required`). Approving a draft also needs a publisher other
  *   than its submitter (`own-draft`); rejecting one is also its own
  *   submitter's, which is a withdrawal.
+ * - `browser`: an administrator holding a browse role, review or not
+ *   (`browse-role-required`, 0099); with no browse role set, nobody.
  */
-export type Grant = 'administrator' | 'reviewed' | 'publisher'
+export type Grant = 'administrator' | 'reviewed' | 'publisher' | 'browser'
 
 /**
  * Every operation of the plane, classified: an operation added to
@@ -54,9 +59,11 @@ export const GRANTS: Readonly<Record<AdminOperation, Grant>> = {
   'draft-submit': 'administrator',
   'draft-approve': 'publisher',
   'draft-reject': 'publisher',
+  // It reads a connection's rows, which publishing a form never needed (0099).
+  browse: 'browser',
 }
 
-export type GovernanceCode = 'review-required' | 'publisher-required' | 'own-draft'
+export type GovernanceCode = 'review-required' | 'publisher-required' | 'own-draft' | 'browse-role-required'
 
 /** A refusal governance decides: always 403, a stable code, and the sentence for it, written once. */
 export interface GovernanceRefusal {
@@ -81,31 +88,49 @@ export const REFUSALS: Readonly<Record<GovernanceCode, GovernanceRefusal>> = {
     code: 'own-draft',
     message: 'You submitted this draft: a publisher other than you approves it.',
   },
+  'browse-role-required': {
+    status: 403,
+    code: 'browse-role-required',
+    message: "Reading a connection's rows needs a browse role, which this deployment gives to nobody or not to you.",
+  },
 }
 
 /** The operations whose refusal depends on the draft: their routes ask once the draft is read, so an unknown one is 404 first. */
 export const DECIDED_ON_THE_DRAFT: ReadonlySet<AdminOperation> = new Set<AdminOperation>(['draft-approve', 'draft-reject'])
 
-/** Who is asking, as governance reads them: the token's `sub`, and whether they publish. */
+/** Who is asking, as governance reads them: the token's `sub`, whether they publish, and whether they browse. */
 export interface Caller {
   id: string
   /** True without review, where every administrator publishes; under it, whether a role of theirs is a publisher role. */
   publisher: boolean
+  /** Whether a role of theirs is a browse role (0099); false for everybody when none is set. */
+  browser: boolean
 }
 
-/** The caller a verified identity is, under `publisherRoles` -- `undefined` for no review. Never anything a body says. */
-export function callerOf(identity: HostIdentity, publisherRoles: ReadonlySet<string> | undefined): Caller {
-  return { id: identity.actor.id, publisher: publisherRoles === undefined || identity.actor.roles.some((role) => publisherRoles.has(role)) }
+/**
+ * The caller a verified identity is, under `publisherRoles` -- `undefined`
+ * for no review -- and `browseRoles` -- `undefined` for nobody. Never
+ * anything a body says.
+ */
+export function callerOf(identity: HostIdentity, publisherRoles: ReadonlySet<string> | undefined, browseRoles?: ReadonlySet<string>): Caller {
+  const roles = identity.actor.roles
+  return {
+    id: identity.actor.id,
+    publisher: publisherRoles === undefined || roles.some((role) => publisherRoles.has(role)),
+    browser: browseRoles !== undefined && roles.some((role) => browseRoles.has(role)),
+  }
 }
 
 /**
  * Whether `caller` may do `operation`, or the refusal: the one decision.
- * Without review nothing is refused. `draft` is the draft addressed, for
+ * Without review nothing is refused but a browse. `draft` is the draft addressed, for
  * approval and rejection; without one, what the grant alone refuses.
  */
 export function refusalFor(operation: AdminOperation, caller: Caller, review: boolean, draft?: { submittedBy: string }): GovernanceRefusal | undefined {
-  if (!review) return undefined
   const grant = GRANTS[operation]
+  // Before review: browsing is its own grant, whether publication is reviewed or not.
+  if (grant === 'browser') return caller.browser ? undefined : REFUSALS['browse-role-required']
+  if (!review) return undefined
   if (grant === 'administrator') return undefined
   if (grant === 'reviewed') return REFUSALS['review-required']
   const own = draft !== undefined && draft.submittedBy === caller.id

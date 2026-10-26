@@ -140,7 +140,7 @@ const of = (operation: AdminAuditEvent['operation']) => events.filter((entry) =>
 
 /** An expected event, every field present: what a case does not give is null, as the plane writes it. */
 const event = (fields: Partial<AdminAuditEvent> & Pick<AdminAuditEvent, 'operation' | 'status' | 'outcome'>): AdminAuditEvent => ({
-  at: NOW, plane: 'admin', actor: 'a', connection: null, form: null, formVersion: null, expectedBase: null, restoredFrom: null, draft: null, ...fields,
+  at: NOW, plane: 'admin', actor: 'a', connection: null, form: null, formVersion: null, expectedBase: null, restoredFrom: null, draft: null, object: null, ...fields,
 })
 
 describe('what holds the trail in place', () => {

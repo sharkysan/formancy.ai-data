@@ -5,6 +5,7 @@ import type { BuilderSession } from '@formancy/builder-core'
 import type { FormPolicy, MetadataSnapshot } from '@formancy/data-core'
 import type { Regeneration } from '@formancy/data-server'
 import { reviewedBy } from './api.js'
+import { BrowseStep } from './browse.js'
 import type { Failure, Proposal, ProposalRequest } from './api.js'
 import { asked, carriedAgain, carryDraft, decide } from './carry.js'
 import type { Carried } from './carry.js'
@@ -23,13 +24,14 @@ import { PublishStep } from './publish.js'
 import { ReviewStep } from './review.js'
 import type { SignedIn } from './sign-in.js'
 
-type StepId = 'connect' | 'choose' | 'generate' | 'policy' | 'presentation' | 'preview' | 'publish' | 'drift' | 'review'
+type StepId = 'connect' | 'choose' | 'generate' | 'policy' | 'presentation' | 'preview' | 'publish' | 'drift' | 'review' | 'browse'
 
 /**
  * The journey of plan section 3, in its order. Signing in is the step before
  * these. Under review (0065) nobody publishes directly: the Publish step
- * submits a draft and is called Submit, and the Review step, last, is where
- * drafts are approved, rejected and withdrawn.
+ * submits a draft and is called Submit, and the Review step is where
+ * drafts are approved, rejected and withdrawn. Browse (0099) is last: it
+ * reads a connection's rows, and is no step on the way to a form.
  */
 function stepsOf(review: boolean): ReadonlyArray<{ id: StepId; title: string }> {
   return [
@@ -42,6 +44,7 @@ function stepsOf(review: boolean): ReadonlyArray<{ id: StepId; title: string }> 
     { id: 'publish', title: review ? 'Submit' : 'Publish' },
     { id: 'drift', title: 'Drift' },
     ...(review ? [{ id: 'review' as const, title: 'Review' }] : []),
+    { id: 'browse', title: 'Browse' },
   ]
 }
 
@@ -105,6 +108,9 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     publish: generated === null ? 'after a form is generated' : null,
     drift: null,
     review: null,
+    // The server's own refusal, from the administration answer, before the
+    // discovery it would otherwise wait for: no discovery gives a browse role.
+    browse: administration.refuses.browse !== undefined ? 'needs a browse role' : discovered === null ? 'after a connection is discovered' : null,
   }
 
   function discovering(): void {
@@ -219,6 +225,9 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         return <DriftStep client={client} formId={publishedId ?? generated?.request.formId ?? ''} refuses={administration.refuses} onRegenerated={takeUp} />
       case 'review':
         return <ReviewStep client={client} me={identity.actor.id} />
+      case 'browse':
+        // Keyed by the connection, so a page of another database's rows never stays on screen once it is discovered.
+        return discovered === null ? null : <BrowseStep key={discovered.connection} client={client} connection={discovered.connection} snapshot={discovered.snapshot} />
       case 'choose':
         return discovered === null ? null : (
           <ChooseStep

@@ -317,7 +317,7 @@ describe('without review', () => {
   // administration answer says so -- so a studio asks rather than guesses.
   test('the draft routes do not exist, an administrator publishes alone, and the administration answer says review is off', async () => {
     const plain = await serve(false)
-    expect((await plain.inject({ method: 'GET', url: '/v1/administration', headers: as('author') })).json()).toEqual({ review: false, publisher: true, refuses: {} })
+    expect((await plain.inject({ method: 'GET', url: '/v1/administration', headers: as('author') })).json()).toEqual({ review: false, publisher: true, refuses: { browse: { code: 'browse-role-required', message: "Reading a connection's rows needs a browse role, which this deployment gives to nobody or not to you." } } })
     for (const [method, url] of [['GET', '/v1/drafts'], ['POST', '/v1/forms/employee/drafts'], ['GET', '/v1/forms/employee/drafts/1'], ['POST', '/v1/forms/employee/drafts/1/approval'], ['POST', '/v1/forms/employee/drafts/1/rejection']] as const) {
       expect((await plain.inject({ method, url, headers: as('author') })).statusCode, `${method} ${url}`).toBe(404)
     }
@@ -336,10 +336,12 @@ describe('what the answers say a caller may do, against what every route does', 
   /** What the grant alone refuses each caller, and what it refuses them on a draft the submitter holds, or on their own. */
   const RR = 'review-required'
   const PR = 'publisher-required'
+  // No caller here holds a browse role, and browsing is refused review or not (0099).
+  const BR = 'browse-role-required'
   const EXPECTED = {
-    author: { refuses: { publish: RR, import: RR, restore: PR, 'draft-approve': PR, 'draft-reject': PR }, submitters: { approve: PR, reject: PR }, own: { approve: PR } },
-    publisher: { refuses: { publish: RR, import: RR }, submitters: {}, own: { approve: 'own-draft' } },
-    submitter: { refuses: { publish: RR, import: RR }, submitters: { approve: 'own-draft' }, own: { approve: 'own-draft' } },
+    author: { refuses: { publish: RR, import: RR, restore: PR, 'draft-approve': PR, 'draft-reject': PR, browse: BR }, submitters: { approve: PR, reject: PR }, own: { approve: PR } },
+    publisher: { refuses: { publish: RR, import: RR, browse: BR }, submitters: {}, own: { approve: 'own-draft' } },
+    submitter: { refuses: { publish: RR, import: RR, browse: BR }, submitters: { approve: 'own-draft' }, own: { approve: 'own-draft' } },
   } as const
 
   /** A body every route of the plane accepts, as far as its shape goes: a proposal, a publish over version 1, a restore of version 1. */
