@@ -1,8 +1,9 @@
 // Drill down's states in the browser (0090): a customer made for the pass,
 // one of its orders and that order's line three levels down -- each
 // measured by the gate's `measured` on the way -- and what only a real
-// browser shows: the trail's crumbs reached by Tab in order, Enter on one
-// putting the keyboard on its level's heading, the browser's own Back
+// browser shows: the trail's crumbs reached by Tab in order, its
+// separators drawn and not read, Enter on one putting the keyboard on its
+// level's heading, the browser's own Back
 // going down again, and on a phone the trail's ends and a button that
 // draws the rest, which then leaves the keyboard on the crumb it drew.
 
@@ -78,6 +79,11 @@ async function anOrderLine(page, at) {
   const all = ['Records', `Customer ${at.name}`, `Order ${at.order}`, `Order line ${at.line}`]
   at.compact = await phone(page)
   check('Drill down: three levels down, the trail names every level, or on a phone its ends', same(await crumbs(page), at.compact ? ['Records', '…', `Order ${at.order}`, `Order line ${at.line}`] : all))
+  // The separator between crumbs is drawn, never read: Playwright's
+  // accessibility tree takes a pseudo-element's `content`, and its
+  // alternative text when the rule gives one, as the browsers do.
+  const said = await trail(page).ariaSnapshot()
+  check("Drill down: the trail's separators are drawn and not read", said.includes('›') ? `the trail reads ${JSON.stringify(said)}` : null)
   // From the Layout group, Tab reaches the trail's buttons in order, and the level shown is no stop of it.
   await page.getByRole('radio', { name: 'Drill down', exact: true }).focus()
   const reached = []

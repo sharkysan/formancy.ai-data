@@ -378,7 +378,7 @@
       ]
     },
     "0020": {
-      "reviewed": "sha256:c6d1ee4e73bf4667f4a5128c32cce9766c63f59ed44dbb5bd51d748763792db1",
+      "reviewed": "sha256:feb5c9e225ea7ccc8a28ed82ef08716b73b87109be26700c6d79172352e64dfc",
       "limitations": [
         {
           "area": "access",
@@ -759,7 +759,7 @@
       ]
     },
     "0033": {
-      "reviewed": "sha256:ade1ab5d95e8bbf28efd749d95b6d6bc4b85916a62a94e661c0e66666695ef37",
+      "reviewed": "sha256:d209ff634b770aa4cb6b2c919d5cea7ee88e75d8f8d2284e69d301496f400797",
       "limitations": [
         {
           "area": "server",
@@ -1198,7 +1198,7 @@
       ]
     },
     "0044": {
-      "reviewed": "sha256:23113cd38d242d97a06e117163dfee0376ec4d33d988b5412557bce8318893f3",
+      "reviewed": "sha256:86a57a8d24cf8ce33ccc0998a75de02398d465966e0e454406ec4b9eb3963424",
       "limitations": [
         {
           "area": "forms",
@@ -1321,7 +1321,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:cab66ee5e04a98291b20a20d0f897ba57f07f2427205fce6d0b7971bbca30985",
+      "reviewed": "sha256:db69c856f20063ec131497d3e8102ded2544964992446560fe63caf5a446a08e",
       "limitations": [
         {
           "area": "host",
@@ -2019,7 +2019,7 @@
       ]
     },
     "0065": {
-      "reviewed": "sha256:4fad718a3e3ad33bd4115a7cbc5445d39c5b951c2fd869d4f5a4328f6126820c",
+      "reviewed": "sha256:aaaa9e95344e58f5d2df48dddd52734d1d3417194744a187856850c72668ead1",
       "limitations": [
         {
           "area": "access",
@@ -2847,7 +2847,7 @@
       "none": "A grant of the live demo's own account: nothing a user, integrator or operator of a release meets. The generator is unchanged, so a deployment's own column with a default is still offered wherever its account may INSERT it, as 0027 says."
     },
     "0090": {
-      "reviewed": "sha256:a77114e3407ebfd1086f41da5ef6640b8d8cd3064728db5cb065844d9093601b",
+      "reviewed": "sha256:84ce6cfdde5fae7ba0a7ec50735540e2a39d7db63f6f80565718f0e0e08f9803",
       "limitations": [
         {
           "area": "host",
@@ -2952,6 +2952,54 @@
         {
           "area": "writes",
           "says": "A changed value in a field the person may not write, sent with a version the record no longer holds, is answered 409 stale rather than 403 over-posting, so such tampering is told only that its version is old; nothing is written."
+        }
+      ]
+    },
+    "0094": {
+      "reviewed": "sha256:4698363847961760c0d13c633f65e6af92864f77b2a4a1bcc16b429b63f7c27c",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A row a Drill down level holds, deleted while the person goes down into it and types there, takes that typing with it once the delete is done, without a word; its confirmation named only what the levels held when it was asked or Delete it was pressed.",
+          "heldBy": "apps/host/src/drill.test.tsx"
+        }
+      ]
+    },
+    "0097": {
+      "reviewed": "sha256:0c8c7a09ddf2eeb15c6d3f259382eb3ab1fb6f5bc555666b9fc56444da3137d2",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "In a layout that moves between none of them, Back takes one press for each Separate views view or Drill down level the open form's history holds, shows nothing new on each, and writes the layout shown over those entries, so Forward no longer brings their views or levels back.",
+          "heldBy": "apps/host/src/address.test.tsx"
+        }
+      ]
+    },
+    "0099": {
+      "reviewed": "sha256:297fa6d01f330dfb2663a29d75b5a4ba5471baa187eefe1a3489831714751840",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A holder of a role FORMANCY_DATA_BROWSE_ROLES names reads every row of every table and view in the approved schemas that the connection's account can read, with no form, policy, row filter or field rule between; give the role to few people, or browse through a connection whose account may read less."
+        },
+        {
+          "area": "operations",
+          "says": "Every page a browse shows discovers the connection's whole scope again before its statement, with nothing cached between pages, so a catalog with many objects makes every page slower; not measured."
+        },
+        {
+          "area": "databases",
+          "says": "A view, or a table with no key the account may read, is browsed in the order of every column shown, and rows equal in all of them may trade places between pages.",
+          "heldBy": "packages/data-core/src/records/browse.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "A browse shows no binary, rowversion or unsupported column and none the account may not select, naming each; it has no row count, no filter beyond the search, no export and no editing, and the studio sorts by one column at a time.",
+          "heldBy": "apps/studio/src/browse.test.tsx"
+        },
+        {
+          "area": "server",
+          "says": "The audit trail names the connection and the object a browse read, never its search, its sort, a row or how many rows.",
+          "heldBy": "packages/data-server/src/routes/admin-browse.test.ts"
         }
       ]
     }

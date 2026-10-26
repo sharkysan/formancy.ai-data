@@ -40,6 +40,7 @@ export function Records({
   onOpen,
   remove,
   after,
+  drilling,
 }: {
   client: DataClient
   formId: string
@@ -62,6 +63,8 @@ export function Records({
   remove: RowDelete | undefined
   /** A row's delete confirmation, in place under the grid. */
   after: ReactNode
+  /** Shown in Drill down: the grid's rows say so (0090). */
+  drilling: boolean
 }): ReactElement {
   const [typed, setTyped] = useState(search)
   const labels = new Map(columns.map((column) => [column.key, column.label]))
@@ -120,6 +123,7 @@ export function Records({
         bench="master-bench"
         {...(remove === undefined ? {} : { remove })}
         after={after}
+        drilling={drilling}
         onOpen={onOpen}
         onClearSearch={() => {
           setTyped('')

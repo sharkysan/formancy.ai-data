@@ -50,6 +50,7 @@ export function Pane({
   idBase,
   namedBy,
   onAnswer,
+  onLoaded,
 }: {
   session: Session
   title: string
@@ -61,6 +62,8 @@ export function Pane({
   namedBy?: string
   /** A save the server answered with a record: the workspace shows it in its grid. */
   onAnswer?: (result: SaveResult) => void
+  /** The stored record replaced the draft, by "Load the saved record": the workspace shows what is stored, as after a save. */
+  onLoaded?: () => void
 }): ReactElement {
   const { engine, generation } = useSyncExternalStore(session.subscribe, session.opened)
   const name = NAMES[session.renderer]
@@ -83,7 +86,8 @@ export function Pane({
   const loaded = useCallback(() => {
     setReloaded(session.opened().generation)
     say(DISCARDED)
-  }, [session, say])
+    onLoaded?.()
+  }, [session, say, onLoaded])
 
   return (
     <section className="pane" aria-labelledby={namedBy === undefined ? headingId : `${namedBy} ${headingId}`}>

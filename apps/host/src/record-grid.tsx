@@ -85,6 +85,8 @@ export interface RecordGridProps {
   remove?: RowDelete
   /** What the panel holds after the well: a row's delete confirmation, in place. */
   after?: ReactNode
+  /** Shown in Drill down, where every open goes down a level: what the grid says of a row follows (0090). */
+  drilling?: boolean
   onOpen(token: string, how: OpenHow, at: RowAt): void
   onClearSearch?(): void
 }
@@ -290,6 +292,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
             if (row.record === null) setStatus({ kind: 'refused', text: [CANNOT_OPEN], help: null, clear: false, retry: false })
             else latest.current.onOpen(row.record, how, { rowIndex: rowIndex ?? 0, colId })
           },
+          drilling: () => latest.current.drilling === true,
         },
       }),
     // The options are the grid's for its life; what changes is read through `latest`.

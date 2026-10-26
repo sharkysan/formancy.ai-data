@@ -218,10 +218,11 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     await waitFor(() => expect(focusedName()).toBe(`Order ${token}`), ARRIVES)
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=separate&view=record`)
 
-    // Stacked replaces the entry, so the one behind asks for the view the
-    // page is in: Back lands there, and the page goes forward again.
+    // Stacked replaces the entry, so the one behind asks for a view Stacked
+    // does not move between: Back lands there, and the entry is the page's,
+    // written over with the place it shows.
     await user.click(screen.getByRole('radio', { name: 'Stacked' }))
-    await backTo(window.location.hash, 2)
+    await backTo(window.location.hash, 1)
     expect((screen.getByRole('radio', { name: 'Stacked' }) as HTMLInputElement).checked).toBe(true)
   })
 
@@ -252,8 +253,34 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=1`)
 
     await user.click(screen.getByRole('radio', { name: 'Stacked' }))
-    await backTo(window.location.hash, 2)
+    await backTo(window.location.hash, 1)
     expect((screen.getByRole('radio', { name: 'Stacked' }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  // Back in a layout that moves between none of the open form's entries
+  // goes on past each, one press an entry, to the form opened before. Undone
+  // instead -- the page going forward again, as it does for an address it
+  // did not write -- every Back landed on the entry behind and came back,
+  // and the person could not leave the form by Back at all (watched
+  // failing: the order line form never came back).
+  test("Back in another layout goes past Drill down's levels to the form before", async () => {
+    const user = mount(plane.fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, engine.lines)
+    await chooseForm(user, engine.formId)
+    await user.click(screen.getByRole('radio', { name: 'Drill down' }))
+    const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
+    const cell = within(grid).getAllByRole('gridcell')[0] as HTMLElement
+    const token = `k1:${String(cell.textContent)}`
+    cell.focus()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order ${token}`), ARRIVES)
+    await user.click(screen.getByRole('radio', { name: 'Stacked' }))
+
+    await backTo(`#form=${engine.formId}&layout=stacked&view=records`, 1)
+    window.history.back()
+    await screen.findByRole('heading', { level: 2, name: new RegExp(` ${engine.lines}$`) }, ARRIVES)
+    expect(window.location.hash).toBe(`#form=${engine.lines}&layout=stacked&view=records`)
   })
 
   // A level is in memory only: a typed address that asks for one the page

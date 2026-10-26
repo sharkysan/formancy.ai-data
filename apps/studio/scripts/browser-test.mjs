@@ -31,7 +31,8 @@
 //     a blocking drift, a refused restore, a regeneration and what it
 //     carried (0030), a version file chosen and its import refused (0062),
 //     and under review a draft submitted, a draft open for review and a
-//     draft approved (0065);
+//     draft approved (0065); and a browse's grid, a table wider than the
+//     window scrolling in its own region, a sort and a view (0099);
 //   - every web font the built studio declares had loaded by the end of
 //     each pass, on each origin the pass signed in to, and in the pass that
 //     refuses every font file, none had (0058): a state measured before a
@@ -58,7 +59,7 @@
 //
 // One module per reason to change, under scripts/browser/: the planes, the
 // server of the built page, the stylesheet's reads, the measurements, the
-// journey and the states of review.
+// journey, the states of review, and a browse.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
 // scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
@@ -72,6 +73,7 @@ import { join } from 'node:path'
 import { afterEveryPass, canary, canaryProblem, declaredFamilies, fontProblem, foreignProblem, fromTheTop, guardRequests, hearPolicy, policyRefused, unlikeTheTable, webFonts } from '../../../scripts/browser-gate.mjs'
 import { FACTS } from '../../../scripts/browsers.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
+import { browse } from './browser/browse.mjs'
 import { journey } from './browser/journey.mjs'
 import { audit, describeFocus, measured } from './browser/measure.mjs'
 import { startPlane, TOKENS } from './browser/plane.mjs'
@@ -216,7 +218,7 @@ async function run(gate, browser) {
       gate.check('the studio is sent with the policy nginx.conf sends it', sentWith(response))
       await wayIn(gate, page)
       await measured(gate, page, 'Connect')
-      for (const [state, act] of journey(plane, gate.check)) {
+      for (const [state, act] of [...journey(plane, gate.check), ...browse(gate.check)]) {
         await act(page)
         await measured(gate, page, state)
       }
@@ -242,7 +244,7 @@ async function run(gate, browser) {
   // A failed check fails the run in recordedPerBrowser, which says so.
   if (gate.failures().length > 0) return
   console.log(
-    `browser checks passed: the studio's whole journey, and its states under review, at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, for the layout, focus and colour facts jsdom cannot represent`,
+    `browser checks passed: the studio's whole journey and a browse, and its states under review, at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, for the layout, focus and colour facts jsdom cannot represent`,
   )
 }
 

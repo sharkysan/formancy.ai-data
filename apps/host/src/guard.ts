@@ -41,6 +41,17 @@ export interface Registry {
   entries(): PaneEntry[]
 }
 
+/** The forms -- panes a renderer draws, not deletions -- that `request` would drop with work in them, as they are now: what a delete's confirmation names (0053). */
+export function formsAtRisk(registry: Registry, request: LeaveRequest): PaneWork[] {
+  return atRisk(
+    request,
+    registry
+      .entries()
+      .filter((pane) => pane.renderer !== null)
+      .map((pane) => ({ owner: pane.owner, renderer: pane.renderer, name: pane.name(), work: pane.work() })),
+  )
+}
+
 export function createRegistry(): Registry {
   const held = new Set<PaneEntry>()
   return {

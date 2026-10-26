@@ -188,6 +188,14 @@ until then the address is formancy.ai's 404
   version is one publisher's, alone. Unset, as in the composed stack,
   every administrator publishes alone, as before
   ([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)).
+- **Lets a browse role read any table or view's rows**, on `main` since
+  0.3.0. With `FORMANCY_DATA_BROWSE_ROLES` set, each role also an
+  administrator role, its holders page through the rows of any table or
+  view the connection's account can see, fifty at a time, searched and
+  sorted, in the studio's Browse step: as that account reads them, with no
+  form or policy between, and nothing written. Unset, as in the composed
+  stack, nobody browses
+  ([0099](./docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
 - **Reviews drift** against what a published form's bindings and lookups rest
   on, and says which operations each change blocks
   ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md))
@@ -493,7 +501,10 @@ on — a store, an allowlist and `FORMANCY_DATA_ADMIN_ROLES`, as
 one, the studio says so at sign-in. Against a server that reviews
 publication, it submits a draft where it would publish or import, and a
 Review step lists the drafts for a publisher to approve or reject
-([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)).
+([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)). Its last step, Browse, pages through the rows of
+a discovered connection's tables and views for a holder of a browse role,
+and waits for one otherwise
+([0099](./docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
 
 Its suite runs the real server in the test — `createDataServer` with a fake
 connection registry over snapshots captured from the shared fixture, as every
@@ -547,9 +558,15 @@ above a button back to it; Back and Forward move between the levels too.
 A record is named in the trail by its first required plain text field, a
 customer by its name, or else by its token. Going up keeps the levels
 below as they were, typing included; going down elsewhere asks first when a
-level below holds unsaved work. The levels are in the page's memory, so a
-reload starts on the records
+level below holds unsaved work, and deleting a row a level below holds
+names that work in the delete's own confirmation, dropping nothing unless
+you delete it
+([0094](./docs/decisions/0094-a-held-rows-delete-names-the-levels-it-drops-in-its-confirmation.md)).
+The levels are in the page's memory, so a reload starts on the records
 ([0090](./docs/decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)).
+In every layout Back goes on past the open form's earlier views and
+levels, one press each, to the form before
+([0097](./docs/decisions/0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md)).
 
 Download CSV, beside New record in the Records panel and beside each child
 section's New, saves one file of the records that grid lists, as the server
@@ -1008,6 +1025,14 @@ none, so its guide publishes as one administrator
 ([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md);
 [the data server's README](./packages/data-server/README.md#publication-under-review)
 says what an author and a publisher may each do, and what it costs).
+
+Reading rows is a role of its own. With `FORMANCY_DATA_BROWSE_ROLES` set,
+each role also an administrator role, its holders read every row the
+connection's account can read, through the studio's Browse step; unset,
+as in the composed stack, nobody does
+([0099](./docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md);
+[the data server's README](./packages/data-server/README.md#browsing-rows)
+says what it reads and what it costs).
 
 ## What it is tested on
 

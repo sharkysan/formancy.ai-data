@@ -1,6 +1,6 @@
-import { driftRefusal, exportColumns, exportHeader, exportRecord, generateForm, listTerms, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
-import type { FormBindings, FormPolicy, FormRecord, ListOutcome, MetadataSnapshot, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
-import { covers, EXPORT_PARITY, exportCase, FIXTURE_SCOPE, LIST_PARITY, LIST_ROWS, listCase, startSqlServerFixture } from '@formancy/data-fixtures'
+import { browsePage, driftRefusal, exportColumns, exportHeader, exportRecord, generateForm, listTerms, planBrowse, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
+import type { BrowseQuery, FormBindings, FormPolicy, FormRecord, ListOutcome, MetadataSnapshot, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
+import { BROWSE_PARITY, browseCase, covers, EXPORT_PARITY, exportCase, FIXTURE_SCOPE, LIST_PARITY, LIST_ROWS, listCase, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -290,5 +290,66 @@ describe('a file of shipments', covers('sqlserver', exportCase('shipments')), ()
     const file = lines.map((line) => (line.ok ? line.text : line.message)).join('')
     expect(file).toBe(EXPORT_PARITY.shipments)
     expect(Buffer.from(file, 'utf8').equals(Buffer.from(EXPORT_PARITY.shipments, 'utf8'))).toBe(true)
+  })
+})
+
+/*
+ * A table or view browsed (0099): a page `planBrowse` plans over the owner's
+ * snapshot, run by this adapter's own `list` and read by `browsePage`, as
+ * the server's browse route runs it. Every expectation is BROWSE_PARITY's,
+ * written once for both engines.
+ */
+async function browsed(query: Partial<BrowseQuery> & Pick<BrowseQuery, 'object'>) {
+  const plan = planBrowse(snapshot, { search: '', sort: [], offset: 0, limit: 50, ...query })
+  if (!plan.ok) throw new Error(`expected a browse, got ${plan.code}: ${plan.message}`)
+  const outcome = await records.list(plan.request)
+  if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
+  return { plan, page: browsePage(outcome.rows, plan.request.limit) }
+}
+
+/** A page's rows as their values in the given columns' order, so a row is compared whole. */
+const valuesIn = (columns: readonly string[], rows: ReadonlyArray<Record<string, unknown>>) => rows.map((row) => columns.map((column) => row[column]))
+
+describe('a view browsed', covers('sqlserver', browseCase('view'), browseCase('sort'), browseCase('search')), () => {
+  // A view has no key. Refused, no view could be browsed; ordered by
+  // nothing, offset paging would take whatever order the engine chose for
+  // each statement, and a row could be on two pages or none.
+  test('pages in the order of every column it shows', async () => {
+    const { object, columns, size, pages } = BROWSE_PARITY.view
+    for (const expected of pages) {
+      const { plan, page } = await browsed({ object, offset: expected.offset, limit: size })
+      expect(plan.ordered).toBe('columns')
+      expect(plan.columns.map((column) => column.name)).toEqual(columns)
+      expect({ offset: expected.offset, rows: valuesIn(columns, page.rows), hasMore: page.hasMore }).toEqual({ offset: expected.offset, rows: expected.rows, hasMore: expected.hasMore })
+    }
+  })
+
+  // A requested order is followed by every column, so the rows it ties
+  // keep one order between pages rather than the engine's.
+  test('sorted by a column, ties keep the order of every column', async () => {
+    const { object, sort, rows } = BROWSE_PARITY.sort
+    const { page } = await browsed({ object, sort: [...sort] })
+    expect(valuesIn(BROWSE_PARITY.view.columns, page.rows)).toEqual(rows)
+  })
+
+  // A browse's search is a list's own, over the text and number columns.
+  test('a search finds the row whose text holds it', async () => {
+    const { object, text, rows } = BROWSE_PARITY.search
+    const { page } = await browsed({ object, search: text })
+    expect(valuesIn(BROWSE_PARITY.view.columns, page.rows)).toEqual(rows)
+  })
+})
+
+describe('a table with columns that have no text', covers('sqlserver', browseCase('columns')), () => {
+  // A binary or unsupported column has no canonical text this adapter
+  // reads back: asked for, the statement would throw for the whole page.
+  // Left out and named, the rest of the table is still browsed.
+  test('shows the rest in key order, and names what it left out', async () => {
+    const { object, columns, omitted, rows } = BROWSE_PARITY.columns
+    const { plan, page } = await browsed({ object })
+    expect(plan.ordered).toBe('key')
+    expect(plan.columns.map((column) => column.name)).toEqual(columns)
+    expect(plan.omitted).toEqual(omitted)
+    expect(page).toEqual({ rows, hasMore: false })
   })
 })

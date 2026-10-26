@@ -516,12 +516,19 @@ offset, and the bounds are a budget and a derivation, not measurements
 3. A crumb (`apps/host/src/trail.tsx`) or Back shows a level above and
    drops nothing; an entry asking for a level no longer held shows the
    deepest one above it and is written over (`apps/host/src/address.ts`).
+   In another layout, Back onto one of the form's own entries takes it
+   over, written over with what the page shows, and the next Back goes on
+   ([0097](../decisions/0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md)).
    A crumb's name is read from the stored record by
-   `apps/host/src/crumbs.ts`.
+   `apps/host/src/crumbs.ts`, when the level opens and after a save or a
+   Load the saved record, which also has the section above list the row
+   again.
 4. A delete (6.7) of a record a level holds -- at its level, or from any
-   grid in any layout, where the guard asks about the levels first -- takes
-   that level and the levels below with it, matched by the record and not
-   the depth, and shows the level above, replacing the entry, its
+   grid in any layout, whose confirmation names the levels' work and drops
+   nothing before Delete it
+   ([0094](../decisions/0094-a-held-rows-delete-names-the-levels-it-drops-in-its-confirmation.md))
+   -- takes that level and the levels below with it, matched by the record
+   and not the depth, and shows the level above, replacing the entry, its
    section's grid saying the row is gone. Back, like a crumb, drops a
    row's read still out.
 
@@ -531,3 +538,32 @@ gate's `apps/host/scripts/browser/drilling.mjs`. What it costs: the levels
 are in memory only, so a reload opens the records; a row open on a rail in
 another layout and the same row a level down are two panes; a crumb's name
 comes from a rule over the form's fields (0090).
+
+## 6.12 Browsing a connection's rows
+
+1. In the studio's Browse step, after a discovery, an administrator whose
+   token holds a role `FORMANCY_DATA_BROWSE_ROLES` names chooses a table or
+   view, and a search; the step sends `POST /v1/connections/:id/browse`
+   with the object, the search, a sort and a page. Without such a role
+   `governance.ts` refuses it, 403 `browse-role-required`, before the
+   route reads its body, and the step was listed as waiting for one
+   ([0099](../decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
+2. `routes/admin-browse.ts` checks the body (`validateBrowseQuery`), then
+   discovers the connection again, as `GET …/metadata` does, and
+   `planBrowse` plans the page over that snapshot: an object it holds, the
+   columns the account may select that have canonical text, and an order
+   ended by a key it shows or, for a view, by every shown column. The
+   object is in the audit event from here, as `schema.name`.
+3. The request is a list's (6.5): the adapter's `list` runs it as one
+   statement, through its own `listTerms`, with no filter but what the
+   account's grants and row security apply, and `browsePage` keeps fifty
+   rows and whether more follow. The answer names the columns shown, those
+   left out and why, and how the page is ordered.
+
+Held by `routes/admin-browse.test.ts`, `browse-roles.test.ts`, data-core's
+`records/browse.test.ts`, both adapters' `list.integration.test.ts` (the
+shared `browse:` cases) and the studio's `browse.test.tsx`. What it costs:
+whoever holds the role reads every row the connection's account can read;
+every page is a discovery and a statement; rows of a view equal in every
+shown column may trade places between pages
+([section 11.2](11-risks-and-debt.md#112-known-limitations-by-area)).

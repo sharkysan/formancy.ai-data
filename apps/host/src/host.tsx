@@ -88,6 +88,7 @@ export function Host({ fetch, base = '', session, save = saveFile }: { fetch: ty
         )}
 
         <footer className="colophon">
+          <p><a href="https://formancy.ai/legal/">Legal notice</a> · <a href="https://formancy.ai/privacy/">Privacy</a></p>
           <p>Formancy Data is source-available, not open source. The formancy packages it renders with are Apache-2.0.</p>
         </footer>
       </div>

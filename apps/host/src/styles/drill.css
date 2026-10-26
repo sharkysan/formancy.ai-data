@@ -28,9 +28,13 @@
   min-width: 0;
 }
 
-/* The separator is drawn, not said: the list says how many levels there are. */
+/* The separator is drawn, not said: the list says how many levels there
+ * are. Generated content is read out unless the rule gives it alternative
+ * text, here none. One declaration: the build's minifier keeps the older
+ * of two, which would be read. A browser that does not know the slash
+ * draws no separator, and the crumbs stay a list of buttons. */
 .trail li + li::before {
-  content: '›';
+  content: '›' / '';
   color: var(--muted);
   padding-inline: 0.125rem;
 }

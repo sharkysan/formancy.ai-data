@@ -12,24 +12,25 @@ import type { Engine, Plane } from './test-plane.js'
  * Drill down (0090): the open form one level at a time -- its records, the
  * record, a child row of it, that row's child rows -- with a trail of
  * buttons back to each level above. On both engines, against the real
- * server, through the child forms `startPlane({ children: true })`
- * publishes: an order's lines, and an employee's employees and the orders
- * it created.
+ * server, through the child forms `startPlane({ children: true,
+ * deliveries: true })` publishes: an order's lines and deliveries, and an
+ * employee's employees and the orders it created.
  *
  * Found by role and accessible name. What the accessibility tree cannot
  * answer is read off the DOM, each where it is made: `location.hash`, which
  * is the browser's; element ids, which two levels of one form must never
  * mint twice and which have no role or name; the crumb that is the page,
  * by `aria-current`, which the tree gives no role of its own; the role of
- * the focused element, to tell a grid's cell from its other controls; and
- * the levels still mounted, by their class, which hidden ones have no role
- * to be found by.
+ * the focused element, to tell a grid's cell from its other controls; the
+ * levels still mounted, by their class, which hidden ones have no role to
+ * be found by; and what AG Grid's live region says of a row, a polite
+ * live region with no role, by its class.
  */
 
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true, deletes: true })
+  plane = await startPlane({ children: true, deletes: true, deliveries: true })
 })
 
 afterAll(async () => {
@@ -86,6 +87,17 @@ async function rowOf(heading: string, first: string): Promise<HTMLElement> {
     .find((candidate) => within(candidate).queryAllByRole('gridcell')[0]?.textContent === first) as HTMLElement
 }
 
+/** Enter on the first cell of the row of the grid `heading` names that has a cell saying `text`, once it is listed. */
+async function enterRowWith(user: User, heading: string, text: string): Promise<void> {
+  await waitFor(() => expect(rows(heading).some((cells) => cells.includes(text))).toBe(true), ARRIVES)
+  const grid = within(gridSection(heading)).getByRole('grid', { name: heading })
+  const row = within(grid)
+    .getAllByRole('row')
+    .find((candidate) => within(candidate).queryAllByRole('gridcell').some((cell) => cell.textContent === text)) as HTMLElement
+  ;(within(row).getAllByRole('gridcell')[0] as HTMLElement).focus()
+  await user.keyboard('{Enter}')
+}
+
 /** Press `key` on the first cell of that row. */
 async function pressOn(user: User, heading: string, first: string, key: '{Enter}' | ' '): Promise<void> {
   const cell = within(await rowOf(heading, first)).getAllByRole('gridcell')[0] as HTMLElement
@@ -105,6 +117,11 @@ function trail(): string[] {
 function current(): string {
   const nav = screen.getByRole('navigation', { name: 'Breadcrumb' })
   return [...nav.querySelectorAll('[aria-current="page"]')].map((element) => element.textContent ?? '').join(' | ')
+}
+
+/** What AG Grid's live region last said of a row of the grid `heading` names, without the mark it adds to a sentence said twice. */
+function rowSays(heading: string): string {
+  return (gridSection(heading).querySelector('.ag-aria-description-container')?.textContent ?? '').replaceAll('\u200b', '')
 }
 
 /** A level's pane: the region its heading and the renderer name. */
@@ -254,6 +271,100 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     await waitFor(() => expect(detail.contains(document.activeElement)).toBe(true), ARRIVES)
     expect(trail()).toEqual(['Records', `Order ${order}`])
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=1`)
+  })
+
+  // What a row says it does is what the layout does with it: in Drill down
+  // Space and Enter both open the record and move the keyboard to it, and
+  // in the other layouts Space opens it and keeps the keyboard in the
+  // grid. Said as the other layouts say it, a person at a screen reader
+  // presses Space to look at a row and is taken away from the list
+  // (watched failing: the other layouts' sentence in Drill down).
+  test('a row says what Space and Enter do in each layout', async () => {
+    const user = await drilling(engine.formId)
+    // AG Grid speaks of a row when it moves the keyboard itself -- an arrow
+    // key, a click -- and not when a cell is focused from outside it: so a
+    // row's first cell is focused, and the keyboard moves one column.
+    const firstCell = (): HTMLElement => within(within(gridSection('Records')).getByRole('grid', { name: 'Records' })).getAllByRole('gridcell')[0] as HTMLElement
+    firstCell().focus()
+    await user.keyboard('{ArrowRight}')
+    await waitFor(() => expect(rowSays('Records')).toBe('Space or Enter opens this record and moves to it.'), ARRIVES)
+    await user.click(screen.getByRole('radio', { name: 'Side by side' }))
+    firstCell().focus()
+    await user.keyboard('{ArrowRight}')
+    await waitFor(() => expect(rowSays('Records')).toBe('Space opens this record. Enter opens it and moves to it.'), ARRIVES)
+  })
+
+  // A crumb says what is stored, a delivery's by its carrier, its first
+  // required plain text field: a save that changes the carrier renames it,
+  // typing does not; and Load the saved record, after a save refused as
+  // stale, names it by what it loaded, while the section above lists what
+  // is stored too, as it does after a save there (watched failing: the
+  // crumb kept the carrier the level was saved with, and the section above
+  // listed it).
+  test('a save renames its crumb, and so does Load the saved record', async () => {
+    const words = stamp('drill-carrier')
+    const { order } = await orderWithLines(engine, words, [])
+    const clerk = client(TOKENS.clerk)
+    const made = await clerk.create(engine.deliveries, { order, carrier: `${words} Post` })
+    if (!made.ok || made.value.record === null) throw new Error(`the delivery was not created: ${made.ok ? 'no token' : made.message}`)
+    const delivery = made.value.record
+    const user = await drilling(engine.formId)
+    await searchRecords(user, words, [order.slice(3)])
+    await pressOn(user, 'Records', order.slice(3), '{Enter}')
+    await enterRowWith(user, 'Delivery', `${words} Post`)
+    await waitFor(() => expect(trail()).toEqual(['Records', `Order ${order}`, `Delivery ${words} Post`]), ARRIVES)
+
+    const carrier = (): Promise<HTMLInputElement> => field(`Delivery ${delivery}`, /^Carrier\b/)
+    await user.clear(await carrier())
+    await user.type(await carrier(), `${words} Bahn`)
+    expect(trail()).toEqual(['Records', `Order ${order}`, `Delivery ${words} Post`])
+    const sheet = pane(`Delivery ${delivery}`, 'React')
+    await user.click(within(sheet).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(trail()).toEqual(['Records', `Order ${order}`, `Delivery ${words} Bahn`]), ARRIVES)
+
+    // Moved on elsewhere, so the next save here is stale.
+    const read = await clerk.read(engine.deliveries, delivery)
+    if (!read.ok || read.value.version === null) throw new Error('the delivery was not read')
+    expect(await clerk.update(engine.deliveries, { record: delivery, version: read.value.version, answers: { carrier: `${words} Rail` } })).toMatchObject({ ok: true })
+    await user.clear(await carrier())
+    await user.type(await carrier(), `${words} Ship`)
+    await user.click(within(sheet).getByRole('button', { name: 'Save' }))
+    const refused = await waitFor(() => within(sheet).getByRole('region', { name: `Delivery ${delivery} React Not saved` }), ARRIVES)
+    await user.click(within(refused).getByRole('button', { name: 'Load the saved record' }))
+    await waitFor(() => expect(trail()).toEqual(['Records', `Order ${order}`, `Delivery ${words} Rail`]), ARRIVES)
+    await crumb(user, `Order ${order}`)
+    await waitFor(() => expect(rows('Delivery').flat()).toContain(`${words} Rail`), ARRIVES)
+  })
+
+  // The record at level 1 is named as a level below is: Load the saved
+  // record in its form names its crumb by what it loaded, and the records
+  // list what is stored (watched failing: the crumb kept the carrier the
+  // record was opened with).
+  test('Load the saved record at level 1 names its crumb by what it loaded', async () => {
+    const words = stamp('drill-carrier-one')
+    const { order } = await orderWithLines(engine, words, [])
+    const clerk = client(TOKENS.clerk)
+    const made = await clerk.create(engine.deliveries, { order, carrier: `${words} Post` })
+    if (!made.ok || made.value.record === null) throw new Error(`the delivery was not created: ${made.ok ? 'no token' : made.message}`)
+    const delivery = made.value.record
+    const user = await drilling(engine.deliveries)
+    await searchRecords(user, words, [delivery.slice(3)])
+    await pressOn(user, 'Records', delivery.slice(3), '{Enter}')
+    await waitFor(() => expect(trail()).toEqual(['Records', `Delivery ${words} Post`]), ARRIVES)
+
+    const read = await clerk.read(engine.deliveries, delivery)
+    if (!read.ok || read.value.version === null) throw new Error('the delivery was not read')
+    expect(await clerk.update(engine.deliveries, { record: delivery, version: read.value.version, answers: { carrier: `${words} Rail` } })).toMatchObject({ ok: true })
+    const sheet = screen.getByRole('region', { name: 'React' })
+    const carrier = (await waitFor(() => within(sheet).getByLabelText(/^Carrier\b/), ARRIVES)) as HTMLInputElement
+    await user.clear(carrier)
+    await user.type(carrier, `${words} Ship`)
+    await user.click(within(sheet).getByRole('button', { name: 'Save' }))
+    const refused = await waitFor(() => within(sheet).getByRole('region', { name: 'React Not saved' }), ARRIVES)
+    await user.click(within(refused).getByRole('button', { name: 'Load the saved record' }))
+    await waitFor(() => expect(trail()).toEqual(['Records', `Delivery ${words} Rail`]), ARRIVES)
+    await crumb(user, 'Records')
+    await waitFor(() => expect(rows('Records').flat()).toContain(`${words} Rail`), ARRIVES)
   })
 
   // In Drill down a row opens as the next level, never on its section's
@@ -667,28 +778,38 @@ describe.each(ENGINES.filter((engine) => engine.connection === 'ms'))('Drill dow
   })
 
   // The row the level below holds, deleted from its grid one level up: the
-  // levels below go with it, so the guard asks about them first, naming
-  // what they hold; Discard and continue goes on to the confirmation, and
-  // once deleted the level below is gone (watched failing: no question, and
-  // the typing was dropped without a word).
-  test("the held row's Delete in the grid asks about the levels below first", async () => {
+  // levels below go with it, so its confirmation names what they hold, as
+  // the open record's names its own forms (0053), and nothing is dropped
+  // before Delete it: Keep it leaves the typing where it was, and once
+  // deleted the level below is gone. Asked about before the confirmation,
+  // the typing was dropped for a delete the person then kept from
+  // happening (watched failing: the guard's question came first).
+  test("the held row's Delete names the levels below in its confirmation, and Keep it keeps their typing", async () => {
     const words = stamp('drill-held')
     const { order, lines } = await orderWithLines(engine, words, [1, 2])
+    const line = lines[0] ?? ''
     const user = await drilling(engine.formId)
-    await toOrderLine(user, words, order, lines[0] ?? '')
-    const quantity = await field(`Order line ${lines[0] ?? ''}`, /^Quantity\b/)
+    await toOrderLine(user, words, order, line)
+    const quantity = await field(`Order line ${line}`, /^Quantity\b/)
     await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
     await user.type(quantity, '5')
     await crumb(user, `Order ${order}`)
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
-    await user.click(within(gridSection('Order line')).getByRole('button', { name: `Delete Order line ${lines[0] ?? ''}` }))
-    const notice = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
-    expect(within(notice).getAllByRole('paragraph').map((text) => text.textContent)).toContain(`Deleting ${lines[0] ?? ''} closes these forms:`)
-    expect(listed(notice)).toEqual([`Order line ${lines[0] ?? ''}, React: changes that are not saved.`])
-    await user.click(within(notice).getByRole('button', { name: 'Discard and continue' }))
-    await user.click(within(await waitFor(() => confirmation('Order line', lines[0] ?? ''), ARRIVES)).getByRole('button', { name: 'Delete it' }))
+    const rowDelete = (): HTMLElement => within(gridSection('Order line')).getByRole('button', { name: `Delete Order line ${line}` })
+    await user.click(rowDelete())
+    const asked = await waitFor(() => confirmation('Order line', line), ARRIVES)
+    expect(unsavedNotice()).toBeNull()
+    expect(listed(asked)).toEqual([`Order line ${line}, React: changes that are not saved.`])
+    await user.click(within(asked).getByRole('button', { name: 'Keep it' }))
+    await pressOn(user, 'Order line', '1', '{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
+    expect((await field(`Order line ${line}`, /^Quantity\b/)).value).toBe('15')
+
+    await crumb(user, `Order ${order}`)
+    await user.click(rowDelete())
+    await user.click(within(await waitFor(() => confirmation('Order line', line), ARRIVES)).getByRole('button', { name: 'Delete it' }))
     await waitFor(() => expect(rows('Order line').map((cells) => cells[0])).toEqual(['2']), ARRIVES)
-    expect(screen.queryByRole('heading', { name: `Order line ${lines[0] ?? ''}` })).toBeNull()
+    expect(screen.queryByRole('heading', { name: `Order line ${line}` })).toBeNull()
     // The level below is gone: going down into the other line reads it, and the trail has nothing past it.
     await pressOn(user, 'Order line', '2', '{Enter}')
     await waitFor(() => expect(trail()).toEqual(['Records', `Order ${order}`, `Order line ${lines[1] ?? ''}`]), ARRIVES)
@@ -747,31 +868,31 @@ describe.each(ENGINES.filter((engine) => engine.connection === 'ms'))('Drill dow
     expect((await field(`Order line ${lines[1] ?? ''}`, /^Quantity\b/)).value).toBe('24')
   })
 
-  // The row a level holds, deleted from its grid in another layout: the
-  // guard asks about the level's typing first, as it does in Drill down,
-  // and once deleted the level is gone, so Drill down does not show a
-  // record that is not there (watched failing: no question, and Drill down
-  // showed the deleted line with its typing).
-  test('a held row deleted in another layout asks first, and takes its level', async () => {
+  // The row a level holds, deleted from its grid in another layout: its
+  // confirmation names the level's typing, as it does in Drill down, and
+  // once deleted the level is gone, so Drill down does not show a record
+  // that is not there (watched failing: no word of the typing, and Drill
+  // down showed the deleted line with it).
+  test('a held row deleted in another layout names its level, and takes it', async () => {
     const words = stamp('drill-other-layout')
     const { order, lines } = await orderWithLines(engine, words, [1, 2])
+    const line = lines[0] ?? ''
     const user = await drilling(engine.formId)
-    await toOrderLine(user, words, order, lines[0] ?? '')
-    const quantity = await field(`Order line ${lines[0] ?? ''}`, /^Quantity\b/)
+    await toOrderLine(user, words, order, line)
+    const quantity = await field(`Order line ${line}`, /^Quantity\b/)
     await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
     await user.type(quantity, '6')
     await user.click(screen.getByRole('radio', { name: 'Side by side' }))
     await answeredOnce('Order line')
-    await user.click(within(gridSection('Order line')).getByRole('button', { name: `Delete Order line ${lines[0] ?? ''}` }))
-    const notice = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
-    expect(within(notice).getAllByRole('paragraph').map((text) => text.textContent)).toContain(`Deleting ${lines[0] ?? ''} closes these forms:`)
-    expect(listed(notice)).toEqual([`Order line ${lines[0] ?? ''}, React: changes that are not saved.`])
-    await user.click(within(notice).getByRole('button', { name: 'Discard and continue' }))
-    await user.click(within(await waitFor(() => confirmation('Order line', lines[0] ?? ''), ARRIVES)).getByRole('button', { name: 'Delete it' }))
+    await user.click(within(gridSection('Order line')).getByRole('button', { name: `Delete Order line ${line}` }))
+    const asked = await waitFor(() => confirmation('Order line', line), ARRIVES)
+    expect(unsavedNotice()).toBeNull()
+    expect(listed(asked)).toEqual([`Order line ${line}, React: changes that are not saved.`])
+    await user.click(within(asked).getByRole('button', { name: 'Delete it' }))
     await waitFor(() => expect(rows('Order line').map((cells) => cells[0])).toEqual(['2']), ARRIVES)
     await user.click(screen.getByRole('radio', { name: 'Drill down' }))
     expect(trail()).toEqual(['Records', `Order ${order}`])
-    expect(screen.queryByRole('heading', { name: `Order line ${lines[0] ?? ''}` })).toBeNull()
+    expect(screen.queryByRole('heading', { name: `Order line ${line}` })).toBeNull()
   })
 
   // The record itself deleted at level 1 takes every level below with it,

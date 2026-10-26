@@ -46,6 +46,20 @@ export type OpenHow = 'click' | 'space' | 'enter'
 
 const SPACE_OR_ENTER = (key: string): boolean => key === ' ' || key === 'Enter'
 
+/** What AG Grid's live region says about a row: what the page does with it. */
+const ROW_WORDS: Readonly<Record<string, string>> = {
+  ariaRowSelect: 'Space opens this record. Enter opens it and moves to it.',
+  ariaRowDeselect: 'This record is open.',
+  ariaRowToggleSelection: 'Space opens this record.',
+}
+
+/** The same in Drill down, where Space and Enter both go down to the record (0090). */
+const DRILL_ROW_WORDS: Readonly<Record<string, string>> = {
+  ariaRowSelect: 'Space or Enter opens this record and moves to it.',
+  ariaRowDeselect: 'This record is open. Space or Enter moves to it.',
+  ariaRowToggleSelection: 'Space or Enter opens this record.',
+}
+
 /** The value of a loading or failed row: nothing. AG Grid's skeleton says "Row data is loading" and "ERR". */
 function EmptyCell(): null {
   return null
@@ -175,6 +189,8 @@ export interface GridCallbacks {
   resized(): void
   /** A row asked for -- by a click, Space or Enter -- whether or not it has a token. */
   asked(row: GridRow | undefined, how: OpenHow, rowIndex: number | null, colId: string): void
+  /** Whether the grid is shown in Drill down, where Space and Enter both go down: read every time AG Grid words a row. */
+  drilling(): boolean
 }
 
 /** The options of a grid named by the heading `labelledBy`, for its whole life. */
@@ -214,12 +230,10 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
     scrollbarWidth: 16,
     tabToNextCell: () => false,
     tabToNextHeader: () => false,
-    // What AG Grid's live region says about a row is what the page does with it.
-    localeText: {
-      ariaRowSelect: 'Space opens this record. Enter opens it and moves to it.',
-      ariaRowDeselect: 'This record is open.',
-      ariaRowToggleSelection: 'Space opens this record.',
-    },
+    // What AG Grid's live region says about a row is what the page does with
+    // it, in the layout shown now: the options are the grid's for its life,
+    // and a layout changes under it.
+    getLocaleText: ({ key, defaultValue }) => (on.drilling() ? DRILL_ROW_WORDS : ROW_WORDS)[key] ?? defaultValue,
     focusGridInnerElement: (params) => {
       const token = on.openToken()
       const node = token === null ? undefined : params.api.getRowNode(token)

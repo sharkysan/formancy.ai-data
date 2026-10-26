@@ -10,6 +10,34 @@ later.
 
 ## Unreleased
 
+### Added
+
+- **A browse role reads any table or view's rows, a page at a time, in the
+  studio's new Browse step** (0099). Why: somebody setting up a form wants
+  to look at the data first -- what a table holds, whether a view returns
+  what its name says -- and until now that meant a database client and a
+  second set of credentials. `POST /v1/connections/:id/browse` answers fifty
+  rows of an object the connection's account can see, as it reads them,
+  searched and sorted, and writes nothing. What you notice:
+  - **Nobody browses until `FORMANCY_DATA_BROWSE_ROLES` names who may**,
+    each role also an administrator role (`admin.browseRoles` for an
+    embedder). Publishing a form never needed a row, so upgrading gives
+    reading rows to nobody. A holder reads every row the connection's
+    account can read, with no form or policy between: give the role to few
+    people.
+  - **`GET /v1/administration` refuses `browse`** to a caller without a
+    browse role, review or not, so its `refuses` is no longer `{}` on a
+    deployment without review; the studio lists Browse last, waiting for
+    a role.
+  - **The administrator's audit event has a field `object`**: the table or
+    view a browse read, as `schema.name`, and `null` for every other
+    operation. A sink that checks an event's exact shape sees one more key.
+  - A view, or a table with no key the account may read, is ordered by
+    every column shown, and rows alike in all of them may trade places
+    between pages. Binary, rowversion and unsupported columns are not
+    shown, and are named. Every page discovers the connection again; not
+    measured.
+
 ### Changed
 
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's
@@ -78,10 +106,37 @@ later.
   their stylesheet digests cover the changed files; all but one came out
   byte for byte as before, and that one, `studio-carried`, comes out the
   same from `main` without this change.
-
+- **A row a Drill down level holds names that level's unsaved work in its
+  Delete's confirmation, and drops nothing before Delete it** (0094, which
+  amends 0090). It used to ask about the levels first and drop their typing
+  at Discard and continue, so a person who then pressed Keep it had lost
+  typing for a delete they did not make.
+- **Back goes on past the open form's own entries in every layout** (0097,
+  which amends 0047 and 0090). In Stacked or Side by side after moving
+  between Separate views' views or Drill down's levels, every Back came
+  back to where it started, and the form could not be left by Back. Each
+  press now lands one entry back, writing the layout shown over it.
 
 ### Fixed
 
+- **A grid's row says what Space and Enter do in Drill down**: both open
+  the record and move the keyboard to it. AG Grid's live region said what
+  the other layouts do -- Space opens it and keeps the keyboard in the
+  grid -- so a person at a screen reader was told the wrong thing.
+- **The trail's separators are drawn and not read**: generated content is
+  read out, so a screen reader heard "›" between crumbs. The rule gives it
+  empty alternative text, which the browser gate holds in each browser; a
+  browser that does not know that syntax draws no separator.
+- **Load the saved record at any level, the record's included, renames its
+  crumb and has the grid above list what is stored**, as a save does. A
+  crumb kept the name the record was opened or saved with.
+- **A form called `drill-<n>` is no longer read as Drill down's level n**:
+  its section's work at level 1 was kept past going down from level 1 and
+  dropped with going down from a deeper one. The level is read from the
+  owner's shape, which no form id or field key can spell.
+- **Drill down's refs are written after a render, not during it**, so a
+  render React throws away writes nothing the answers read; behaviour is
+  unchanged.
 - **A save over a record somebody else changed is answered stale, even when
   the change moved a field the person may not write** (0098, which narrows
   0022). A renderer sends every field back, so the old value of a computed

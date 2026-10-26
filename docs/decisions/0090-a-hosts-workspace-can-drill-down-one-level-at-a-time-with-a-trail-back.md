@@ -1,6 +1,6 @@
 # 0090 — A host's workspace can drill down one level at a time, with a trail back
 
-- **Status:** accepted
+- **Status:** accepted; amended by [0094](0094-a-held-rows-delete-names-the-levels-it-drops-in-its-confirmation.md): a record a level holds, deleted from a row, names the levels' work in its confirmation instead of asking first, and drops nothing before Delete it; and by [0097](0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md): Back in another layout over Drill down's entries takes each over and goes on
 - **Date:** 2026-10-21
 - **Deciders:** Daniel Bacher
 - **Verified by:**

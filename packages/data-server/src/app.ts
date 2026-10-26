@@ -61,8 +61,13 @@ export interface DataServerOptions {
    * a publisher's. Each must be one of `adminRoles`. Absent, there is no
    * review; the runnable server reads `FORMANCY_DATA_PUBLISHER_ROLES` for it
    * (main.ts).
+   *
+   * `browseRoles` names who may read any table or view of a connection, a
+   * page of rows at a time (0099). Each must be one of `adminRoles`.
+   * Absent, nobody browses; the runnable server reads
+   * `FORMANCY_DATA_BROWSE_ROLES` for it.
    */
-  admin?: { registry: ConnectionRegistry; store: ConfigurationStore; adminRoles: readonly string[]; publisherRoles?: readonly string[]; audit: AdminOptions['audit'] }
+  admin?: { registry: ConnectionRegistry; store: ConfigurationStore; adminRoles: readonly string[]; publisherRoles?: readonly string[]; browseRoles?: readonly string[]; audit: AdminOptions['audit'] }
   /**
    * The runtime plane: published forms, their records and their lookups, for
    * the host application's people. Absent, none of those routes exist.

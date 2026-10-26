@@ -101,7 +101,7 @@ describe('signing in', () => {
       await signIn(reviewed)
       expect(reviewed.requests.map((request) => `${request.method} ${request.path}`)).toEqual(['GET /v1/whoami', 'GET /v1/connections', 'GET /v1/administration'])
       const steps = within(screen.getByRole('navigation', { name: 'Steps' })).getAllByRole('button').map((button) => button.textContent)
-      expect(steps.slice(6)).toEqual(['7. Submit', '8. Drift', '9. Review'])
+      expect(steps.slice(6)).toEqual(['7. Submit', '8. Drift', '9. Review', '10. Browse'])
       expect(await audit()).toEqual([])
     } finally {
       await reviewed.close()
