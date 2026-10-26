@@ -77,6 +77,57 @@ function entryProblem(entry: unknown): string | undefined {
   return undefined
 }
 
+/** ::ffff:0:0/96, where an IPv4 address is written as IPv6, as a 128-bit number. */
+const MAPPED = 0xffffn << 32n
+
+/** An entry's addresses, first and past the last, as a number of its family's width. */
+function rangeOf(entry: string): { family: 4 | 6; start: bigint; end: bigint } {
+  const slash = entry.indexOf('/')
+  const address = slash === -1 ? entry : entry.slice(0, slash)
+  const family = isIP(address) === 4 ? 4 : 6
+  const width = family === 4 ? 32 : 128
+  const prefix = slash === -1 ? width : Number(entry.slice(slash + 1))
+  const start = addressBytes(address, family).reduce((value, byte) => (value << 8n) | BigInt(byte), 0n)
+  return { family, start, end: start + (1n << BigInt(width - prefix)) }
+}
+
+/** Whether `ranges`, each first and past the last, together hold every number below `size`. */
+function covers(ranges: ReadonlyArray<readonly [bigint, bigint]>, size: bigint): boolean {
+  let reached = 0n
+  for (const [start, end] of [...ranges].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+    if (start > reached) return false
+    if (end > reached) reached = end
+  }
+  return reached >= size
+}
+
+/**
+ * The family whose every peer `entries`, each one entryProblem passed,
+ * together trust, or `undefined`. Read as @fastify/proxy-addr matches a
+ * peer: an IPv4-mapped peer is compared as IPv4, against an IPv4 range or a
+ * mapped one of /96 or narrower; any other IPv6 peer against the other IPv6
+ * ranges. A prefix of 0 is one entry's problem; this is the same rule held
+ * by the list, whose entries the server believes together (0100).
+ */
+function everybodyOf(entries: readonly string[]): 4 | 6 | undefined {
+  const ipv4: Array<readonly [bigint, bigint]> = []
+  const ipv6: Array<readonly [bigint, bigint]> = [[MAPPED, MAPPED + (1n << 32n)]]
+  for (const entry of entries) {
+    const { family, start, end } = rangeOf(entry)
+    if (family === 4) ipv4.push([start, end])
+    else if (start >= MAPPED && end <= MAPPED + (1n << 32n)) ipv4.push([start - MAPPED, end - MAPPED])
+    else ipv6.push([start, end])
+  }
+  if (covers(ipv4, 1n << 32n)) return 4
+  if (covers(ipv6, 1n << 128n)) return 6
+  return undefined
+}
+
+/** The sentence for a list that trusts every peer of `family`, after the words naming the list. */
+function everybodySentence(family: 4 | 6): string {
+  return `cover every IPv${String(family)} address, which trusts every peer, as a prefix of 0 does: ${ASK}`
+}
+
 export type TrustedProxiesSetting = { ok: true; trustedProxies: string[] } | { ok: false; problem: string }
 
 /**
@@ -93,6 +144,8 @@ export function trustedProxiesSetting(text: string | undefined): TrustedProxiesS
     const problem = entryProblem(entry)
     if (problem !== undefined) return { ok: false, problem: `${SETTING}: entry ${String(index + 1)} ${problem}.` }
   }
+  const family = everybodyOf(entries)
+  if (family !== undefined) return { ok: false, problem: `${SETTING}: its entries together ${everybodySentence(family)}.` }
   return { ok: true, trustedProxies: [...new Set(entries)] }
 }
 
@@ -103,7 +156,8 @@ export function trustedProxiesProblem(list: unknown): string | undefined {
     const problem = entryProblem(entry)
     if (problem !== undefined) return `trustedProxies[${String(index)}] ${problem}.`
   }
-  return undefined
+  const family = everybodyOf(list as string[])
+  return family === undefined ? undefined : `trustedProxies together ${everybodySentence(family)}.`
 }
 
 /**
