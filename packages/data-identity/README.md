@@ -77,7 +77,7 @@ A token is read only as the host signed it: three base64url parts without
 padding, joined by dots. One with an `=` after a part, a space or a
 newline around it, or base64's `+` and `/` is `ERR_JWS_INVALID` before any
 key is asked, so a credential has one spelling
-([0100](../../docs/decisions/0100-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md)).
+([0101](../../docs/decisions/0101-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md)).
 
 ## What it does not do
 

@@ -538,3 +538,32 @@ gate's `apps/host/scripts/browser/drilling.mjs`. What it costs: the levels
 are in memory only, so a reload opens the records; a row open on a rail in
 another layout and the same row a level down are two panes; a crumb's name
 comes from a rule over the form's fields (0090).
+
+## 6.12 Browsing a connection's rows
+
+1. In the studio's Browse step, after a discovery, an administrator whose
+   token holds a role `FORMANCY_DATA_BROWSE_ROLES` names chooses a table or
+   view, and a search; the step sends `POST /v1/connections/:id/browse`
+   with the object, the search, a sort and a page. Without such a role
+   `governance.ts` refuses it, 403 `browse-role-required`, before the
+   route reads its body, and the step was listed as waiting for one
+   ([0099](../decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
+2. `routes/admin-browse.ts` checks the body (`validateBrowseQuery`), then
+   discovers the connection again, as `GET …/metadata` does, and
+   `planBrowse` plans the page over that snapshot: an object it holds, the
+   columns the account may select that have canonical text, and an order
+   ended by a key it shows or, for a view, by every shown column. The
+   object is in the audit event from here, as `schema.name`.
+3. The request is a list's (6.5): the adapter's `list` runs it as one
+   statement, through its own `listTerms`, with no filter but what the
+   account's grants and row security apply, and `browsePage` keeps fifty
+   rows and whether more follow. The answer names the columns shown, those
+   left out and why, and how the page is ordered.
+
+Held by `routes/admin-browse.test.ts`, `browse-roles.test.ts`, data-core's
+`records/browse.test.ts`, both adapters' `list.integration.test.ts` (the
+shared `browse:` cases) and the studio's `browse.test.tsx`. What it costs:
+whoever holds the role reads every row the connection's account can read;
+every page is a discovery and a statement; rows of a view equal in every
+shown column may trade places between pages
+([section 11.2](11-risks-and-debt.md#112-known-limitations-by-area)).

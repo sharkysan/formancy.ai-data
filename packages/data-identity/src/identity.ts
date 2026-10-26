@@ -44,7 +44,7 @@ export interface IdentityOptions {
  * A compact JWS as the host signs one: three base64url parts, none empty,
  * and nothing else -- no padding, no space, no `+` or `/` (RFC 7515, 7.1
  * and 2). jose decodes a part with an `=` after it to the same bytes, so
- * without this a token had more than one spelling (0100).
+ * without this a token had more than one spelling (0101).
  */
 const COMPACT = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
 

@@ -1,6 +1,6 @@
 # 0014 — Host identity is a token verified offline, with a pinned algorithm
 
-- **Status:** accepted; extended by [0059](0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md): a key set selected by `kid`, read again from its file on SIGHUP; still offline; narrowed by [0100](0100-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md): a token is verified only in the compact form the host signed, without padding
+- **Status:** accepted; extended by [0059](0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md): a key set selected by `kid`, read again from its file on SIGHUP; still offline; narrowed by [0101](0101-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md): a token is verified only in the compact form the host signed, without padding
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-server/src/identity.test.ts` — a valid token

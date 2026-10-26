@@ -80,7 +80,7 @@ describe('createIdentityVerifier', () => {
   // host's own: two spellings of one credential, which a cache, a log or a
   // list of revoked tokens keyed by the token's text would tell apart. Each
   // spelling but the one the host signed is refused as malformed, before any
-  // key is asked (0100). Watched failing with the signature's `=` accepted.
+  // key is asked (0101). Watched failing with the signature's `=` accepted.
   test('refuses a token that is not its compact form exactly', async () => {
     const verify = await createIdentityVerifier(BASE)
     const signed = await token({ sub: 'u' })

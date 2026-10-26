@@ -1,4 +1,4 @@
-# 0100 — A host token is refused unless it is its compact form exactly
+# 0101 — A host token is refused unless it is its compact form exactly
 
 - **Status:** accepted; narrows [0014](0014-host-identity-is-verified-offline.md): a token is verified only in the one spelling the host signed
 - **Date:** 2026-10-22

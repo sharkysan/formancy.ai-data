@@ -237,6 +237,11 @@ no other, and a key by the name of what it stands for, not its table
 Publication is reviewed only when `FORMANCY_DATA_PUBLISHER_ROLES` is set,
 and a publisher restores any version alone
 ([0065](../decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)).
+A holder of a role `FORMANCY_DATA_BROWSE_ROLES` names reads every row the
+connection's account can read, with no form or policy between; each page
+discovers the scope again, unmeasured, and a view's rows equal in every
+shown column may trade places between pages
+([0099](../decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
 A client is its address, so people behind one NAT share a rate-limit
 bucket, and nothing reports a trusted-proxy list too wide or too narrow
 ([0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)).

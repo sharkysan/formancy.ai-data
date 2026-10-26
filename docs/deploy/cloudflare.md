@@ -379,6 +379,7 @@ that does, so they hold either way:
 | `GET` | `/health` | shared | behind Access | not forwarded |
 | `GET` | `/v1/administration` | administrator | behind Access | not forwarded |
 | `GET` | `/v1/connections` | administrator | behind Access | not forwarded |
+| `POST` | `/v1/connections/:id/browse` | administrator | behind Access | not forwarded |
 | `GET` | `/v1/connections/:id/metadata` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/connections/:id/test` | administrator | behind Access | not forwarded |
 | `GET` | `/v1/drafts` | administrator | behind Access | not forwarded |
@@ -638,6 +639,7 @@ pass  GET https://formancy.example.com/host/  Access answered first
 pass  GET https://formancy.example.com/health  Access answered first
 pass  GET https://formancy.example.com/v1/administration  Access answered first
 pass  GET https://formancy.example.com/v1/connections  Access answered first
+pass  POST https://formancy.example.com/v1/connections/erp/browse  Access answered first
 pass  GET https://formancy.example.com/v1/connections/erp/metadata  Access answered first
 pass  POST https://formancy.example.com/v1/connections/erp/test  Access answered first
 pass  GET https://formancy.example.com/v1/drafts  Access answered first
@@ -666,7 +668,7 @@ pass  GET https://formancy.example.com/v1/forms/order/versions/1  Access answere
 pass  GET https://formancy.example.com/v1/forms/order/versions/latest  Access answered first
 pass  GET https://formancy.example.com/v1/whoami  Access answered first
 pass  GET http://formancy.example.com/studio/  redirected to HTTPS
-33 requests, 33 as expected, 0 not.
+34 requests, 34 as expected, 0 not.
 ```
 
 <!-- end generated -->

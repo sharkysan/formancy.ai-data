@@ -10,6 +10,34 @@ later.
 
 ## Unreleased
 
+### Added
+
+- **A browse role reads any table or view's rows, a page at a time, in the
+  studio's new Browse step** (0099). Why: somebody setting up a form wants
+  to look at the data first -- what a table holds, whether a view returns
+  what its name says -- and until now that meant a database client and a
+  second set of credentials. `POST /v1/connections/:id/browse` answers fifty
+  rows of an object the connection's account can see, as it reads them,
+  searched and sorted, and writes nothing. What you notice:
+  - **Nobody browses until `FORMANCY_DATA_BROWSE_ROLES` names who may**,
+    each role also an administrator role (`admin.browseRoles` for an
+    embedder). Publishing a form never needed a row, so upgrading gives
+    reading rows to nobody. A holder reads every row the connection's
+    account can read, with no form or policy between: give the role to few
+    people.
+  - **`GET /v1/administration` refuses `browse`** to a caller without a
+    browse role, review or not, so its `refuses` is no longer `{}` on a
+    deployment without review; the studio lists Browse last, waiting for
+    a role.
+  - **The administrator's audit event has a field `object`**: the table or
+    view a browse read, as `schema.name`, and `null` for every other
+    operation. A sink that checks an event's exact shape sees one more key.
+  - A view, or a table with no key the account may read, is ordered by
+    every column shown, and rows alike in all of them may trade places
+    between pages. Binary, rowversion and unsupported columns are not
+    shown, and are named. Every page discovers the connection again; not
+    measured.
+
 ### Changed
 
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's
@@ -109,7 +137,7 @@ later.
 - **Drill down's refs are written after a render, not during it**, so a
   render React throws away writes nothing the answers read; behaviour is
   unchanged.
-- **A host token verifies only in the spelling the host signed** (0100,
+- **A host token verifies only in the spelling the host signed** (0101,
   which narrows 0014). jose read the host's token with an `=` after its
   signature as the same token, so one credential had two spellings, which
   anything keying by a token's text could be handed. `@formancy/data-identity`

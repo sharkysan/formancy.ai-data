@@ -1,6 +1,7 @@
 export { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
 export type { ExpectedAccess, ExpectedCapability, ExpectedObjectAccess, ExpectedObjectFacts } from './access.js'
 export {
+  browseCase,
   covers,
   cascadeCase,
   deleteCase,
@@ -21,6 +22,8 @@ export {
   uuidCase,
 } from './cases.js'
 export { DELETE_PARITY, deleteAnswer, UPDATE_RECREATED } from './deletes.js'
+export { BROWSE_PARITY } from './browse.js'
+export type { BrowseCase } from './browse.js'
 export { CASCADE_PARITY, cascadeAnswer, PARITY_CASCADES, REACH_PRIVILEGE_LOSSES } from './cascades.js'
 export type { CascadeCase } from './cascades.js'
 export type { DeleteAnswer, DeleteCase, DeleteExpectation } from './deletes.js'

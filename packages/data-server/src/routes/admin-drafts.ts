@@ -78,6 +78,8 @@ interface ReviewOptions {
   store: ConfigurationStore
   /** The roles that publish, or `undefined`: no review, and the administration answer alone. */
   publisherRoles: ReadonlySet<string> | undefined
+  /** The roles that browse (0099), or `undefined`: nobody. Read for the administration answer alone. */
+  browseRoles: ReadonlySet<string> | undefined
   allowlisted: (connection: string) => boolean
   discover: Discover
   refuse: Refuse
@@ -120,7 +122,7 @@ export function reviewRoutes(app: FastifyInstance, options: ReviewOptions): void
   const { store, publisherRoles, refuse } = options
   const review = publisherRoles !== undefined
   // The preHandler set it before any handler runs, refusing a request without one.
-  const caller = (request: FastifyRequest): Caller => callerOf(request.identity as HostIdentity, publisherRoles)
+  const caller = (request: FastifyRequest): Caller => callerOf(request.identity as HostIdentity, publisherRoles, options.browseRoles)
   const send = (reply: FastifyReply, refusal: Refusal) => refuse(reply, refusal.status, refusal.code, refusal.message, refusal.extra)
 
   app.get('/v1/administration', async (request) => administrationOf(caller(request), review))

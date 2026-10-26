@@ -431,6 +431,7 @@ are turned on by configuration:
 | `FORMANCY_DATA_STORE_DIR` and `FORMANCY_DATA_CONNECTIONS` | The runtime plane: published forms, records, lookups. The connections file is the allowlist (JSON); passwords and client secrets in it are `env:` or `file:` references. See *The allowlist*, below. |
 | `FORMANCY_DATA_ADMIN_ROLES` | The administrator's plane, for tokens holding one of these comma-separated roles. Needs the two above. Its requests are audited to the same log as the runtime's, one `audit` line per event, told apart by `audit.plane`. |
 | `FORMANCY_DATA_PUBLISHER_ROLES` | Review of publication, for tokens holding one of these comma-separated roles, each also one of the administrator roles: nobody publishes alone, and a publisher approves another administrator's draft. Needs the administrator's plane. Unset, no review. See *Publication under review*, below ([0065](../../docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)). |
+| `FORMANCY_DATA_BROWSE_ROLES` | Reading rows, for tokens holding one of these comma-separated roles, each also one of the administrator roles: any table or view the connection's account can see, a page at a time. Needs the administrator's plane. Unset, nobody browses. See *Browsing rows*, below ([0099](../../docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)). |
 | `FORMANCY_DATA_AUDIT_KEY` | Records named in the audit trail by a keyed hash. A secret reference. Without it, no record is named. |
 
 Without the store and the allowlist the server verifies tokens and nothing
@@ -879,7 +880,8 @@ The routes:
   refuses }` (the type `Administration`): whether the deployment reviews,
   whether the caller publishes, and every operation the caller's grant
   refuses them, each with its `code` and `message`. Without review it is
-  `{ review: false, publisher: true, refuses: {} }`. A client draws what it
+  `{ review: false, publisher: true, refuses: {} }`, but for `browse`,
+  refused to a caller without a browse role (*Browsing rows*, below). A client draws what it
   offers from this rather than guessing; a clerk is 403 `forbidden`.
 - **The draft routes exist only under review**; without it the router
   answers 404 for each.
@@ -962,6 +964,68 @@ publisher as version 2, which the runtime serves, with who approved read
 from the trail; `src/publisher-roles.test.ts` the setting, and an
 embedder's `admin.publisherRoles` refused by `createDataServer`;
 `src/routes/admin-audit.test.ts` the draft routes' events.
+
+### Browsing rows
+
+Without it, nobody reads a row through the administrator's plane: it
+connects, discovers, proposes and publishes, and reads no record. A
+deployment that wants its administrators to look at the data a form will
+show names the roles that may ([0099](../../docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)):
+
+```bash
+FORMANCY_DATA_ADMIN_ROLES=data-admin,data-browser \
+FORMANCY_DATA_BROWSE_ROLES=data-browser \
+node dist/main.mjs
+```
+
+Comma-separated, space around each role ignored, each counted once, and
+each also one of `FORMANCY_DATA_ADMIN_ROLES`. Set and naming no role,
+naming a role the administrator roles do not have, or set on a server
+without the administrator's plane, it stops the process with a sentence
+naming what is wrong. It is read once, at start, and the startup `planes`
+line says `browse`. An embedder passes `admin.browseRoles`, held to the same
+rule. It is a grant of its own, review or not: a publisher browses only if
+a role of theirs is a browse role too.
+
+**`POST /v1/connections/:id/browse`**, `{ object: { schema, name }, search?,
+sort?, offset?, limit? }`: one page of the rows of a table or view the
+connection's account can see, as that account reads them -- its grants and
+row security decide which rows and columns exist, and no form, policy or
+filter stands between. A POST, so the search is in no URL a proxy logs. The
+server discovers the connection again for every page, and plans it over
+that snapshot (`planBrowse` in data-core), so the object, its columns and
+its key are the catalog's names, never the body's. The answer
+(`BrowseAnswer`) is `{ object, kind, columns, omitted, ordered, rows,
+hasMore }`: the columns the page shows, those it leaves out with why --
+`not-readable`, or `no-text` for binary, rowversion and unsupported
+columns, which no adapter reads as text -- and `ordered`, `key` when a
+primary or unique key it shows ends the order, `columns` when every shown
+column does, for a view or a table without one, where rows equal in all of
+them may trade places between pages. Fifty rows at most, as a list's page;
+no count.
+
+Refusals: 400 for a body of another shape, a sort by a column the page does
+not show (`not-sortable`) or a search with no text or number column
+(`not-searchable`); 403 `browse-role-required`, before the body is read,
+for a caller without a browse role, and `nothing-readable` for an object
+with no column to show; 404 `unknown-object` for one the snapshot does not
+hold; and, from the database, 403 `permission-denied`, 409
+`schema-changed`, 422 `refused` or 503 `unavailable`. Nothing is written,
+and nothing is retried.
+
+What it costs: a holder of a browse role reads every row of every table
+and view in the approved schemas that the connection's account can read,
+which is often everything. Give the role to few people, or browse through a
+connection whose account may read less. Every page discovers the whole
+scope before its statement, which is not measured. The audit event,
+operation `browse`, names the connection and `object`, the table or view as
+`schema.name` once the snapshot holds it, and never the search, the sort,
+a row or how many.
+
+`src/routes/admin-browse.test.ts` holds who may browse, what reaches the
+records port, the refusals and the trail; `src/browse-roles.test.ts` the
+setting; and both adapters' `list.integration.test.ts` what a browse reads
+on each engine, the shared `browse:` cases.
 
 ## Licence
 

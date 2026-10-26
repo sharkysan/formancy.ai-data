@@ -160,7 +160,7 @@ describe("the runnable server's log", () => {
       { operation: 'publish', outcome: 'review-required' },
     ])
     const plain = await runnable()
-    expect((await plain.inject({ method: 'GET', url: '/v1/administration', headers: { authorization: 'Bearer admin' } })).json()).toEqual({ review: false, publisher: true, refuses: {} })
+    expect((await plain.inject({ method: 'GET', url: '/v1/administration', headers: { authorization: 'Bearer admin' } })).json()).toEqual({ review: false, publisher: true, refuses: { browse: { code: 'browse-role-required', message: "Reading a connection's rows needs a browse role, which this deployment gives to nobody or not to you." } } })
     expect(servedPlanes({ registry: registry(), store, adminRoles: [], publisherRoles: ['data-publisher'], auditKey: undefined, origins: [], lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, log: () => plain.log }).admin).toBeUndefined()
   })
 

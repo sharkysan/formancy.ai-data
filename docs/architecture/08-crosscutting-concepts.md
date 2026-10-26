@@ -195,7 +195,7 @@ and the server verifies it offline, the algorithm pinned, building the
 identity from exactly the claims the operator mapped
 ([0014](../decisions/0014-host-identity-is-verified-offline.md)), in the
 one spelling the host signed, base64url without padding
-([0100](../decisions/0100-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md)); a key set
+([0101](../decisions/0101-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md)); a key set
 is selected by `kid` and read again on SIGHUP, and nothing is fetched
 ([0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)).
 
@@ -295,6 +295,10 @@ throws is logged and does not fail the request. A runtime event carries
 `rows`: for an `export`, the records its file held, or held when it was
 refused, and `null` for every other operation -- a count, never which
 ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+An administrator event carries `object`: for a `browse`, the table or view
+it read as `schema.name`, once the server's snapshot holds it, and `null`
+for every other operation -- never the search or a row
+([0099](../decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
 
 **It is operational, not evidence.** The event is written after the commit,
 by another system: a crash between the two loses it, and whoever runs the
