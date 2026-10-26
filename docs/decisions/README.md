@@ -86,7 +86,7 @@ only enforcement is "we remember" says so plainly.
 | [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047, 0060, 0066, 0085; extended by 0032, 0058 |
 | [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042, 0066; extended by 0062, 0075 |
 | [0031](0031-an-answer-lost-after-a-write-is-unknown.md) | An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here | accepted; extended by 0040, 0041, 0047, 0050, 0053, 0058 |
-| [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md) | A clean install is the composed stack behind one proxy, and CI runs its guide | accepted; extended by 0035, 0037, 0046, 0051, 0059, 0071; narrowed by 0072, 0083 |
+| [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md) | A clean install is the composed stack behind one proxy, and CI runs its guide | accepted; extended by 0035, 0037, 0046, 0051, 0059, 0071, 0102; narrowed by 0072, 0083 |
 | [0033](0033-the-administrator-plane-is-audited.md) | The administrator's plane is audited like the runtime, one event per request | accepted; extended by 0060, 0062, 0065, 0099 |
 | [0034](0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md) | Performance is measured through the shipped server against a sized lookup table, and held without a clock by rows read and round trips | accepted; narrowed by 0061, 0063, 0071, 0084; extended by 0061 |
 | [0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md) | A release report is derived from the run that gated the release, and says what it did not test | accepted; extended by 0034, 0058, 0064, 0067, 0068; SBOM by 0092 |
@@ -156,4 +156,5 @@ only enforcement is "we remember" says so plainly.
 | [0099](0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md) | A browse role reads any table or view's rows, a page at a time, as the connection's account reads them | accepted; extended by 0103 |
 | [0100](0100-a-proxy-list-whose-entries-together-trust-every-peer-is-refused.md) | A proxy list whose entries together trust every peer of a family is refused | accepted |
 | [0101](0101-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md) | A host token is refused unless it is its compact form exactly | accepted |
+| [0102](0102-the-server-image-gives-its-user-the-store-and-not-its-code.md) | The server image gives its user the store, and not its code | accepted |
 | [0103](0103-a-browsed-row-follows-its-foreign-keys-either-way.md) | A browsed row follows its foreign keys either way, each follow a browse narrowed to the row's values | accepted |

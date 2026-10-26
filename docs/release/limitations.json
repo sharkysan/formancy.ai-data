@@ -730,7 +730,7 @@
       ]
     },
     "0032": {
-      "reviewed": "sha256:08d642eac3f12580a5d806d7afbcc0b6f766abc648d44c4a347e389082201cf6",
+      "reviewed": "sha256:83f8aacbb456f199e382b140325c597676df0cf5bbb51b783ce4baffe0567114",
       "limitations": [
         {
           "area": "operations",
@@ -3072,6 +3072,15 @@
         {
           "area": "access",
           "says": "A host token with a space, a newline or padding added on its way to the server, or written in base64 rather than base64url, is refused as malformed, though jose would have read some of those."
+        }
+      ]
+    },
+    "0102": {
+      "reviewed": "sha256:651b8216d37f2d7e7b3e74d424d3baac9f2a645a08d1967874f0c687eaa8aefe",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The composed stack does not run the server on a read-only root, though the image starts on one; an operator who wants it adds read_only and keeps the store's volume."
         }
       ]
     }

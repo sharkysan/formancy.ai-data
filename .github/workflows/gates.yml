@@ -621,6 +621,19 @@ jobs:
           # Unprivileged, and carrying its licence.
           test "$(docker exec data-server id -un)" = "node"
           docker exec data-server test -f /app/LICENSE.md
+          # It cannot write its own code (0102): nothing under /app is the
+          # server user's or writable by everybody -- a link is passed over,
+          # since its own mode means nothing -- and a write to the entry
+          # point it runs is refused.
+          owned=$(docker exec data-server find /app ! -type l \( -user node -o -perm -0002 \) -print)
+          if [ -n "$owned" ]; then
+            echo "::error::The server's user can write its own code: $(echo "$owned" | head -3 | paste -sd ' ')"
+            exit 1
+          fi
+          if docker exec data-server sh -c 'touch /app/dist/main.mjs' 2>/dev/null; then
+            echo "::error::The server's user wrote to /app/dist/main.mjs"
+            exit 1
+          fi
           # The store's directory is the server's own to write. Docker gives a
           # new named volume the owner of the image directory it is mounted
           # on, so without the Dockerfile's mkdir and chown a composed
@@ -630,6 +643,26 @@ jobs:
             exit 1
           }
           docker rm -f data-server
+
+      # Nothing but the store is written, so the server starts on a root an
+      # operator mounts read-only, with the store's directory a volume (0102).
+      - name: On a read-only root, it starts and serves health
+        run: |
+          docker run -d --name data-server-read-only --read-only -p 127.0.0.1:4390:4390 \
+            -v formancy-data-ci-store:/var/lib/formancy-data \
+            -e FORMANCY_DATA_ISSUER=https://host.example \
+            -e FORMANCY_DATA_AUDIENCE=formancy-data \
+            -e FORMANCY_DATA_IDENTITY_SECRET=env:HOST_SECRET \
+            -e HOST_SECRET=a-shared-secret-of-at-least-thirty-two-bytes \
+            formancy/data-server:ci
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4390/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:4390/health || { docker logs data-server-read-only; exit 1; }
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4390/v1/whoami)" = "401"
+          docker rm -f data-server-read-only
+          docker volume rm formancy-data-ci-store
 
       # FORMANCY_DATA_RATE_LIMIT is a public setting (0034). rate-limit.test.ts
       # holds how it is parsed; only the running image shows main.ts reads it:
