@@ -3,11 +3,12 @@ import { SEARCHABLE_KINDS } from '../lookup/searchable.js'
 import { checkPage, checkSearch } from '../lookup/search.js'
 import type { PageErrorCode, SearchErrorCode } from '../lookup/search.js'
 import type { LookupSearchColumn } from '../lookup/types.js'
+import { isKeyValue, isLookupKeyType } from '../lookup/values.js'
 import type { ColumnMeta, MetadataSnapshot, NormalizedTypeKind, ObjectMeta, ObjectRef } from '../metadata.js'
 import { LIST_PAGE_SIZE } from '../runtime.js'
 import { findObject } from '../snapshot.js'
 import { keyOrderProblem } from './prepare.js'
-import type { ListRequest, RecordColumn, RecordRead, RecordSort } from './types.js'
+import type { ListRequest, RecordColumn, RecordRead, RecordSort, RecordValue } from './types.js'
 
 /*
  * A table or view's rows, a page at a time, as the connection's account
@@ -16,7 +17,9 @@ import type { ListRequest, RecordColumn, RecordRead, RecordSort } from './types.
  * between: the account's own grants and row security decide which rows and
  * columns exist, as they decided what discovery saw. The request is a list's
  * (0044), so an adapter runs it as the statement it runs for a form's page,
- * through the same `listTerms` check.
+ * through the same `listTerms` check. A browse narrowed to the rows equal
+ * to given values in some columns is how a row's foreign key is followed,
+ * either way (`follow.ts`, 0103).
  *
  * Every name reaching SQL is one the server's own snapshot holds -- the
  * object, each column, the key -- never one the browser typed (0011).
@@ -33,9 +36,20 @@ export interface BrowseSortTerm {
   direction: 'asc' | 'desc'
 }
 
-/** What a browser asks for: the object, and a list's search, order and page. */
+/**
+ * One column a browse is narrowed by (0103): the rows whose value in it is
+ * this one, spelled as the column holds it. What a follow of a foreign key
+ * asks for, one term per column of the key.
+ */
+export interface BrowseEqualTerm {
+  column: string
+  value: string
+}
+
+/** What a browser asks for: the object, the columns it is narrowed by, and a list's search, order and page. */
 export interface BrowseQuery {
   object: ObjectRef
+  equal: BrowseEqualTerm[]
   search: string
   sort: BrowseSortTerm[]
   offset: number
@@ -48,7 +62,7 @@ export interface OmittedColumn {
   reason: 'not-readable' | 'no-text'
 }
 
-export type BrowseRefusalCode = 'unknown-object' | 'nothing-readable' | 'not-sortable' | 'not-searchable'
+export type BrowseRefusalCode = 'unknown-object' | 'nothing-readable' | 'not-sortable' | 'not-comparable' | 'not-searchable'
 
 export interface BrowseRefusal {
   ok: false
@@ -96,14 +110,37 @@ function shownKey(object: ObjectMeta, shown: ReadonlySet<string>): string[] | nu
 }
 
 /**
+ * The columns and values a browse is narrowed by, each a shown column of a
+ * key kind -- the kinds whose values have one spelling on both engines
+ * (`lookup/values.ts`) -- named once, with a value it can hold; or why not.
+ * A value is checked before anything is bound, as a lookup's token is: one
+ * its column cannot hold would make `listTerms` throw for the whole page.
+ * The refusal names the column, never the value.
+ */
+function equalTerms(object: ObjectMeta, byName: ReadonlyMap<string, ColumnMeta>, equal: readonly BrowseEqualTerm[]): { ok: true; equal: RecordValue[] } | BrowseRefusal {
+  const terms: RecordValue[] = []
+  for (const term of equal) {
+    const column = byName.get(term.column)
+    if (column === undefined || !isLookupKeyType(column.type)) {
+      return refuse('not-comparable', `${term.column} is not a column of ${nameOf(object.ref)} this page shows that rows can be found by.`)
+    }
+    if (terms.some((known) => known.name === column.name)) return refuse('not-comparable', `${term.column} is named twice.`)
+    if (!isKeyValue(column.type, term.value)) return refuse('not-comparable', `The value given for ${term.column} is not one ${nameOf(object.ref)}.${term.column} can hold.`)
+    terms.push({ name: column.name, type: column.type, value: term.value })
+  }
+  return { ok: true, equal: terms }
+}
+
+/**
  * The page `query` asks for of an object in `snapshot`, as its account reads
  * it -- or why not.
  *
  * In this order: the object is one the snapshot holds (`unknown-object`);
  * it has a column the account may select with a text form
  * (`nothing-readable`); every sort term names a shown column
- * (`not-sortable`); a search has a text or integer column to match
- * (`not-searchable`). The order is the requested terms, then the key's
+ * (`not-sortable`); every equal term a shown column of a key kind, once,
+ * with a value it can hold (`not-comparable`); a search has a text or
+ * integer column to match (`not-searchable`). The order is the requested terms, then the key's
  * columns -- or, without a key it may read, every shown column -- each
  * ascending, NULLs last where the snapshot says a column holds them.
  */
@@ -125,6 +162,8 @@ export function planBrowse(snapshot: MetadataSnapshot, query: BrowseQuery): Plan
     if (!byName.has(term.column)) return refuse('not-sortable', `${term.column} is not a column of ${nameOf(object.ref)} this page shows.`)
     requested.push(term)
   }
+  const equal = equalTerms(object, byName, query.equal)
+  if (!equal.ok) return equal
   const searchable = shown.filter((column) => SEARCHABLE_KINDS.has(column.type.kind))
   if (query.search !== '' && searchable.length === 0) return refuse('not-searchable', `${nameOf(object.ref)} has no text or number column a search can match.`)
 
@@ -141,7 +180,7 @@ export function planBrowse(snapshot: MetadataSnapshot, query: BrowseQuery): Plan
     columns,
     filters: { kind: 'unrestricted' },
     through: [],
-    equal: [],
+    equal: equal.equal,
     search: query.search === '' ? null : { text: query.search, columns: searchable.map((column) => ({ name: column.name, type: column.type }) as LookupSearchColumn) },
     sort,
     offset: query.offset,
@@ -157,7 +196,7 @@ export function browsePage(rows: ReadonlyArray<Omit<RecordRead, 'ok'>>, limit: n
 
 export type BrowseQueryCheck = { ok: true; query: BrowseQuery } | { ok: false; code: 'malformed' | SearchErrorCode | PageErrorCode; message: string }
 
-const PROPERTIES = new Set(['object', 'search', 'sort', 'offset', 'limit'])
+const PROPERTIES = new Set(['object', 'equal', 'search', 'sort', 'offset', 'limit'])
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const isName = (value: unknown): value is string => typeof value === 'string' && value !== ''
 const malformed = (message: string): BrowseQueryCheck => ({ ok: false, code: 'malformed', message })
@@ -185,26 +224,49 @@ function sortOf(sort: unknown): { ok: true; sort: BrowseSortTerm[] } | { ok: fal
   return { ok: true, sort: terms }
 }
 
+function equalOf(equal: unknown): { ok: true; equal: BrowseEqualTerm[] } | { ok: false; message: string } {
+  if (equal === undefined) return { ok: true, equal: [] }
+  if (!Array.isArray(equal)) return { ok: false, message: 'The equal is a list of { column, value }.' }
+  const seen = new Set<string>()
+  const terms: BrowseEqualTerm[] = []
+  for (const entry of equal as unknown[]) {
+    if (!isRecord(entry) || !hasExactly(entry, ['column', 'value'])) return { ok: false, message: 'Each equal term is { column, value } and nothing else.' }
+    const { column, value } = entry
+    if (!isName(column)) return { ok: false, message: 'An equal term names a column.' }
+    // NULL equals nothing in SQL, and a follow never starts from one (follow.ts): a value is text, spelled as its column holds it.
+    if (typeof value !== 'string') return { ok: false, message: `${column} is narrowed to a value spelled as text.` }
+    if (seen.has(column)) return { ok: false, message: `${column} is named twice in the equal.` }
+    seen.add(column)
+    terms.push({ column, value })
+  }
+  return { ok: true, equal: terms }
+}
+
 /**
  * The query a browse is planned from, from a request's body: the object as
- * `{ schema, name }` and nothing else, then a list's search and page, read
- * by a list's own checks, and a sort by column. Everything but the object
- * may be left out -- the search is then `''`, the sort `[]`, the offset 0
- * and the limit `LIST_PAGE_SIZE` -- and any other property is refused.
+ * `{ schema, name }` and nothing else, the columns and values it is
+ * narrowed by, then a list's search and page, read by a list's own checks,
+ * and a sort by column. Everything but the object may be left out -- the
+ * equal and the sort are then `[]`, the search `''`, the offset 0 and the
+ * limit `LIST_PAGE_SIZE` -- and any other property is refused. Which
+ * columns may narrow it is the planner's question, over the server's own
+ * snapshot.
  */
 export function validateBrowseQuery(body: unknown): BrowseQueryCheck {
   if (!isRecord(body)) return malformed('A browse query is an object.')
   const unknown = Object.keys(body).filter((key) => !PROPERTIES.has(key))
-  if (unknown.length > 0) return malformed(`A browse query has an object, a search, a sort, an offset and a limit, and not ${unknown.join(', ')}.`)
+  if (unknown.length > 0) return malformed(`A browse query has an object, an equal, a search, a sort, an offset and a limit, and not ${unknown.join(', ')}.`)
   const object = body['object']
   if (!isRecord(object) || !hasExactly(object, ['schema', 'name']) || !isName(object['schema']) || !isName(object['name'])) {
     return malformed('The object is { schema, name }, both named.')
   }
+  const equal = equalOf(body['equal'])
+  if (!equal.ok) return malformed(equal.message)
   const search = checkSearch(body['search'] === undefined ? '' : body['search'])
   if (!search.ok) return search
   const sort = sortOf(body['sort'])
   if (!sort.ok) return malformed(sort.message)
   const page = checkPage(body['offset'] ?? 0, body['limit'] ?? LIST_PAGE_SIZE, LIST_PAGE_SIZE)
   if (!page.ok) return page
-  return { ok: true, query: { object: { schema: object['schema'], name: object['name'] }, search: search.search, sort: sort.sort, offset: page.offset, limit: page.limit } }
+  return { ok: true, query: { object: { schema: object['schema'], name: object['name'] }, equal: equal.equal, search: search.search, sort: sort.sort, offset: page.offset, limit: page.limit } }
 }

@@ -987,14 +987,15 @@ line says `browse`. An embedder passes `admin.browseRoles`, held to the same
 rule. It is a grant of its own, review or not: a publisher browses only if
 a role of theirs is a browse role too.
 
-**`POST /v1/connections/:id/browse`**, `{ object: { schema, name }, search?,
-sort?, offset?, limit? }`: one page of the rows of a table or view the
-connection's account can see, as that account reads them -- its grants and
-row security decide which rows and columns exist, and no form, policy or
-filter stands between. A POST, so the search is in no URL a proxy logs. The
-server discovers the connection again for every page, and plans it over
-that snapshot (`planBrowse` in data-core), so the object, its columns and
-its key are the catalog's names, never the body's. The answer
+**`POST /v1/connections/:id/browse`**, `{ object: { schema, name }, equal?,
+search?, sort?, offset?, limit? }`: one page of the rows of a table or view
+the connection's account can see, as that account reads them -- its grants
+and row security decide which rows and columns exist, and no form, policy or
+filter stands between but the `equal` the request names. A POST, so the
+search and the values are in no URL a proxy logs. The server discovers the
+connection again for every page, and plans it over that snapshot
+(`planBrowse` in data-core), so the object, its columns and its key are the
+catalog's names, never the body's. The answer
 (`BrowseAnswer`) is `{ object, kind, columns, omitted, ordered, rows,
 hasMore }`: the columns the page shows, those it leaves out with why --
 `not-readable`, or `no-text` for binary, rowversion and unsupported
@@ -1004,8 +1005,24 @@ column does, for a view or a table without one, where rows equal in all of
 them may trade places between pages. Fifty rows at most, as a list's page;
 no count.
 
-Refusals: 400 for a body of another shape, a sort by a column the page does
-not show (`not-sortable`) or a search with no text or number column
+`equal`, a list of `{ column, value }`, narrows the page to the rows whose
+value in each column is the one given, spelled as the column holds it and
+compared with the database's own equality, as a foreign key compares it:
+it is how the studio follows a row's foreign key, either way, to the rows
+of the other end that hold the row's values
+([0103](../../docs/decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md);
+`browseRelations` and `followTerms` in data-core derive what a row can
+follow, from a snapshot). Each column is one the page shows, of a key kind
+-- text, integer, decimal, uuid or date -- named once, with a value it can
+hold; the values are bound as a child form's parent is, and NULL is no
+value. Left out, nothing narrows the page.
+
+Refusals: 400 for a body of another shape, a NULL in `equal` or a column
+named twice in it among them (`malformed`), a sort by a column the page
+does not show (`not-sortable`), an `equal` naming a column the page does
+not show or one of another kind, or a value its column cannot hold
+(`not-comparable`, whose sentence names the
+column and never the value), or a search with no text or number column
 (`not-searchable`); 403 `browse-role-required`, before the body is read,
 for a caller without a browse role, and `nothing-readable` for an object
 with no column to show; 404 `unknown-object` for one the snapshot does not
@@ -1017,15 +1034,19 @@ What it costs: a holder of a browse role reads every row of every table
 and view in the approved schemas that the connection's account can read,
 which is often everything. Give the role to few people, or browse through a
 connection whose account may read less. Every page discovers the whole
-scope before its statement, which is not measured. The audit event,
-operation `browse`, names the connection and `object`, the table or view as
+scope before its statement, which is not measured. An `equal` over a
+foreign key's referring columns, which neither engine indexes by itself,
+may read the whole table; not measured either. The audit event, operation
+`browse`, names the connection and `object`, the table or view as
 `schema.name` once the snapshot holds it, and never the search, the sort,
-a row or how many.
+an `equal`'s values, a row or how many.
 
 `src/routes/admin-browse.test.ts` holds who may browse, what reaches the
-records port, the refusals and the trail; `src/browse-roles.test.ts` the
-setting; and both adapters' `list.integration.test.ts` what a browse reads
-on each engine, the shared `browse:` cases.
+records port, an `equal` included, the refusals and the trail;
+`src/browse-roles.test.ts` the setting; and both adapters'
+`list.integration.test.ts` what a browse reads on each engine, the shared
+`browse:` cases, `browse: follows` a row followed through a composite
+foreign key either way.
 
 ## Licence
 

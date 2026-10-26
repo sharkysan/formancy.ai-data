@@ -1,18 +1,31 @@
 import { useRef, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
-import { LIST_PAGE_SIZE } from '@formancy/data-core'
-import type { ApiValue, BrowseSortTerm, MetadataSnapshot, ObjectRef, OmittedColumn } from '@formancy/data-core'
+import { browseRelations, LIST_PAGE_SIZE } from '@formancy/data-core'
+import type { ApiValue, BrowseEqualTerm, BrowseRelations, BrowseSortTerm, MetadataSnapshot, ObjectRef, OmittedColumn } from '@formancy/data-core'
 import type { BrowseAnswer } from '@formancy/data-server'
 import type { AdminClient } from './api.js'
 import { describeRef } from './choice.js'
+import { useFocusAfterRender } from './focus.js'
+import { KeyHints, Related, sayTerms } from './related.js'
 
-/** What the page on screen was asked for, so the next and previous pages and a sort ask for the same object and search. */
+/** What the page on screen was asked for, so the next and previous pages, a sort and a Back ask for the same object, values and search. */
 interface Asked {
   object: ObjectRef
+  /** The columns and values the page is narrowed to: a follow's (0103), and `[]` for a page Show rows asked for. */
+  equal: BrowseEqualTerm[]
   search: string
   sort: BrowseSortTerm | null
   offset: number
 }
+
+/**
+ * What a page that arrives does to the way back: Show rows starts a new
+ * trail; a follow adds the page it left, and Back takes off the page it
+ * returns to, each of them `moved`, which puts the selector, the search
+ * box and the keyboard on the page reached. A page or a sort is `null`,
+ * and keeps the trail as it is.
+ */
+type Move = { trail: Asked[]; moved: boolean } | null
 
 const REASONS: Readonly<Record<OmittedColumn['reason'], string>> = {
   'not-readable': 'this connection may not read it',
@@ -30,16 +43,24 @@ function nextSort(current: BrowseSortTerm | null, column: string): BrowseSortTer
   return { column, direction: current?.column === column && current.direction === 'asc' ? 'desc' : 'asc' }
 }
 
+/** How the status line begins: what narrows the page -- a follow's values, then a search -- before what it shows. */
+function narrowedBy(asked: Asked): string {
+  const lead = [...(asked.equal.length === 0 ? [] : [`where ${sayTerms(asked.equal)}`]), ...(asked.search === '' ? [] : [`matching “${asked.search}”`]), 'showing'].join(', ')
+  return `${lead.charAt(0).toUpperCase()}${lead.slice(1)}`
+}
+
 /**
  * The Browse step (0099): a page of rows of any table or view the
  * discovered connection can see, as its account reads them, fifty at a
- * time, with a search and a sort by any column the page shows.
+ * time, with a search and a sort by any column the page shows; and a row's
+ * foreign keys followed either way (0103), each follow a browse of the
+ * other end narrowed to the row's values, with a Back to the page it left.
  *
  * Read only: nothing here changes a row, and the server refuses the route
  * to anybody without a browse role, which the step list says before the
- * step is opened. The tables and views to choose from are the discovery's;
- * the server discovers again for every page, so a name the catalog no
- * longer has is refused rather than read.
+ * step is opened. The tables and views to choose from are the discovery's,
+ * and so are the keys a row offers; the server discovers again for every
+ * page, so a name the catalog no longer has is refused rather than read.
  *
  * A press while a page is on its way does nothing, and a button with
  * nothing to do says so through `aria-disabled` rather than `disabled`,
@@ -51,24 +72,50 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
   const [chosen, setChosen] = useState(snapshot.objects[0] === undefined ? '' : describeRef(snapshot.objects[0].ref))
   const [search, setSearch] = useState('')
   const [shown, setShown] = useState<{ asked: Asked; page: BrowseAnswer } | null>(null)
+  // The pages a follow left, the last one first back.
+  const [trail, setTrail] = useState<Asked[]>([])
+  // The row on the page whose related rows are open, by its place on the page.
+  const [related, setRelated] = useState<number | null>(null)
   const [refusal, setRefusal] = useState<string | null>(null)
   const busy = useRef(false)
+  const focusAfterRender = useFocusAfterRender()
 
-  async function load(asked: Asked): Promise<void> {
+  async function load(asked: Asked, move: Move = null): Promise<void> {
     if (busy.current) return
     busy.current = true
     setRefusal(null)
-    const outcome = await client.browse(connection, { object: asked.object, search: asked.search, sort: asked.sort === null ? [] : [asked.sort], offset: asked.offset, limit: LIST_PAGE_SIZE })
+    const outcome = await client.browse(connection, { object: asked.object, equal: asked.equal, search: asked.search, sort: asked.sort === null ? [] : [asked.sort], offset: asked.offset, limit: LIST_PAGE_SIZE })
     busy.current = false
-    if (outcome.ok) setShown({ asked, page: outcome.value })
-    else setRefusal(outcome.message)
+    if (!outcome.ok) {
+      setRefusal(outcome.message)
+      return
+    }
+    setShown({ asked, page: outcome.value })
+    setRelated(null)
+    if (move === null) return
+    setTrail(move.trail)
+    if (!move.moved) return
+    setChosen(describeRef(asked.object))
+    setSearch(asked.search)
+    focusAfterRender('browsed-heading')
   }
 
   function submit(event: FormEvent): void {
     event.preventDefault()
     const object = snapshot.objects.find((candidate) => describeRef(candidate.ref) === chosen)
     if (object === undefined) return
-    void load({ object: object.ref, search: search.trim(), sort: null, offset: 0 })
+    void load({ object: object.ref, equal: [], search: search.trim(), sort: null, offset: 0 }, { trail: [], moved: false })
+  }
+
+  function follow(object: ObjectRef, equal: BrowseEqualTerm[]): void {
+    if (shown === null) return
+    void load({ object, equal, search: '', sort: null, offset: 0 }, { trail: [...trail, shown.asked], moved: true })
+  }
+
+  function back(): void {
+    const to = trail.at(-1)
+    if (to === undefined) return
+    void load(to, { trail: trail.slice(0, -1), moved: true })
   }
 
   const option = (ref: ObjectRef) => <option key={describeRef(ref)} value={describeRef(ref)}>{describeRef(ref)}</option>
@@ -108,25 +155,65 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
           {refusal}
         </p>
       )}
-      {shown === null ? null : <Page asked={shown.asked} page={shown.page} onLoad={(asked) => void load(asked)} />}
+      {shown === null ? null : (
+        <Page
+          asked={shown.asked}
+          page={shown.page}
+          relations={browseRelations(snapshot, shown.page.object)}
+          related={related}
+          back={trail.at(-1)?.object ?? null}
+          onLoad={(asked) => void load(asked)}
+          onRelated={(index) => setRelated((open) => (open === index ? null : index))}
+          onFollow={follow}
+          onBack={back}
+        />
+      )}
     </>
   )
 }
 
-/** One page on screen: what it leaves out and how it is ordered, the rows, and the way to the next and previous pages. */
-function Page({ asked, page, onLoad }: { asked: Asked; page: BrowseAnswer; onLoad: (asked: Asked) => void }): ReactElement {
+interface PageProps {
+  asked: Asked
+  page: BrowseAnswer
+  /** The keys a row of this object can be followed through, from the studio's discovery. */
+  relations: BrowseRelations
+  /** The row whose related rows are open, by its place on the page. */
+  related: number | null
+  /** The object of the page a follow left, which Back returns to. */
+  back: ObjectRef | null
+  onLoad: (asked: Asked) => void
+  onRelated: (index: number) => void
+  onFollow: (object: ObjectRef, equal: BrowseEqualTerm[]) => void
+  onBack: () => void
+}
+
+/**
+ * One page on screen: the way back, what narrows it, what it leaves out and
+ * how it is ordered, the rows -- each with its related rows, where its
+ * object has a key to follow -- and the way to the next and previous pages.
+ */
+function Page({ asked, page, relations, related, back, onLoad, onRelated, onFollow, onBack }: PageProps): ReactElement {
   const name = describeRef(page.object)
   const first = asked.offset + 1
   const last = asked.offset + page.rows.length
   const range = page.rows.length === 0 ? (asked.offset === 0 ? 'no rows' : `no rows from row ${String(first)}`) : `rows ${String(first)} to ${String(last)}`
   const atStart = asked.offset === 0
+  const relating = relations.relations.length > 0
+  const open = related === null ? undefined : page.rows[related]
   return (
     <section className="browsed" aria-labelledby="browsed-heading">
-      <h3 id="browsed-heading">
+      <h3 id="browsed-heading" tabIndex={-1}>
         <code>{name}</code> <span className="kind">{page.kind}</span>
       </h3>
+      {back === null ? null : (
+        <p className="actions">
+          <button type="button" className="button" onClick={onBack}>
+            Back to {describeRef(back)}
+          </button>
+        </p>
+      )}
       <p role="status">
-        {asked.search === '' ? 'Showing' : `Matching “${asked.search}”, showing`} {range}
+        {narrowedBy(asked)} {range}
         {page.hasMore ? ', and more follow.' : '.'}
       </p>
       {page.omitted.length === 0 ? null : (
@@ -138,6 +225,7 @@ function Page({ asked, page, onLoad }: { asked: Asked; page: BrowseAnswer; onLoa
           trade places between pages.
         </p>
       )}
+      <KeyHints name={name} kind={page.kind} relations={relations} />
       <div className="rows" role="region" aria-labelledby="rows-caption" tabIndex={0}>
         <table>
           <caption id="rows-caption">
@@ -145,6 +233,7 @@ function Page({ asked, page, onLoad }: { asked: Asked; page: BrowseAnswer; onLoa
           </caption>
           <thead>
             <tr>
+              {relating ? <th scope="col">Related</th> : null}
               {page.columns.map((column) => {
                 const sorted = asked.sort?.column === column.name ? asked.sort.direction : null
                 const next = nextSort(asked.sort, column.name)
@@ -169,6 +258,21 @@ function Page({ asked, page, onLoad }: { asked: Asked; page: BrowseAnswer; onLoa
             {page.rows.map((row, index) => (
               // A row has no identity a view can promise; its place on the page is what it is.
               <tr key={asked.offset + index}>
+                {relating ? (
+                  <td>
+                    {/* Named by aria-label, its visible word first (WCAG 2.5.3), for the same reason as a header's. */}
+                    <button
+                      type="button"
+                      className="related-toggle"
+                      aria-label={`Related to row ${String(asked.offset + index + 1)}`}
+                      aria-expanded={related === index}
+                      aria-controls={related === index ? 'related' : undefined}
+                      onClick={() => onRelated(index)}
+                    >
+                      Related
+                    </button>
+                  </td>
+                ) : null}
                 {page.columns.map((column) => (
                   <td key={column.name}>
                     <Cell value={row[column.name]} />
@@ -179,6 +283,9 @@ function Page({ asked, page, onLoad }: { asked: Asked; page: BrowseAnswer; onLoa
           </tbody>
         </table>
       </div>
+      {related === null || open === undefined ? null : (
+        <Related key={related} id="related" name={name} number={asked.offset + related + 1} row={open} relations={relations} onFollow={onFollow} />
+      )}
       <p className="actions">
         <button type="button" className="button" aria-disabled={atStart} onClick={() => (atStart ? undefined : onLoad({ ...asked, offset: Math.max(0, asked.offset - LIST_PAGE_SIZE) }))}>
           Previous page

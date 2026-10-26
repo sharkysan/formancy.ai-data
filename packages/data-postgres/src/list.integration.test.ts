@@ -1,5 +1,5 @@
-import { browsePage, driftRefusal, exportColumns, exportHeader, exportRecord, generateForm, listTerms, planBrowse, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
-import type { BrowseQuery, FormBindings, FormPolicy, FormRecord, ListOutcome, MetadataSnapshot, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
+import { browsePage, browseRelations, driftRefusal, exportColumns, exportHeader, exportRecord, followTerms, generateForm, listTerms, planBrowse, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
+import type { ApiValue, BrowseQuery, BrowseRelation, FormBindings, FormPolicy, FormRecord, ListOutcome, MetadataSnapshot, ObjectRef, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
 import { BROWSE_PARITY, browseCase, covers, EXPORT_PARITY, exportCase, FIXTURE_SCOPE, LIST_PARITY, LIST_ROWS, listCase, startPostgresFixture } from '@formancy/data-fixtures'
 import type { PostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
@@ -294,7 +294,7 @@ describe('a file of shipments', covers('postgres', exportCase('shipments')), () 
  * written once for both engines.
  */
 async function browsed(query: Partial<BrowseQuery> & Pick<BrowseQuery, 'object'>) {
-  const plan = planBrowse(snapshot, { search: '', sort: [], offset: 0, limit: 50, ...query })
+  const plan = planBrowse(snapshot, { equal: [], search: '', sort: [], offset: 0, limit: 50, ...query })
   if (!plan.ok) throw new Error(`expected a browse, got ${plan.code}: ${plan.message}`)
   const outcome = await records.list(plan.request)
   if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
@@ -345,5 +345,42 @@ describe('a table with columns that have no text', covers('postgres', browseCase
     expect(plan.columns.map((column) => column.name)).toEqual(columns)
     expect(plan.omitted).toEqual(omitted)
     expect(page).toEqual({ rows, hasMore: false })
+  })
+})
+
+/**
+ * A row followed through `key`, that way, as the studio offers it (0103):
+ * the relation `browseRelations` derives from this suite's own discovery,
+ * and the terms `followTerms` pairs from the row, browsed. Neither is
+ * written here, so the key's columns are paired as this engine's catalog
+ * reports them.
+ */
+async function followed(from: ObjectRef, direction: BrowseRelation['direction'], key: string, row: Readonly<Record<string, ApiValue>>) {
+  const relation = browseRelations(snapshot, from).relations.find((entry) => entry.direction === direction && entry.key === key)
+  if (relation === undefined) throw new Error(`${key} cannot be followed ${direction} from ${from.schema}.${from.name}`)
+  const equal = followTerms(relation, row)
+  if (equal === null) throw new Error(`${key} holds a NULL in the row followed from ${from.schema}.${from.name}`)
+  return { relation, ...(await browsed({ object: relation.to.object, equal })) }
+}
+
+describe('a row followed through a foreign key', covers('postgres', browseCase('follows')), () => {
+  // A follow is a browse of the other end narrowed by the key's columns,
+  // paired by position. Narrowed by the customer number alone, or not at
+  // all, tenant 2's order of its own customer 1001 would be followed to, and
+  // tenant 2's customer followed back to; paired crosswise, nothing would.
+  test("finds a customer's orders and no other tenant's, and from each order that customer alone", async () => {
+    const { object, equal, key, orders, names } = BROWSE_PARITY.follows
+    const start = await browsed({ object, equal: [...equal] })
+    expect(start.page.rows.map((row) => row['name'])).toEqual(names)
+    const [customer] = start.page.rows
+    if (customer === undefined) throw new Error('the customer followed from was not browsed')
+    const referred = await followed(object, 'referred-by', key, customer)
+    expect(referred.relation.to.object).toEqual(orders.object)
+    expect(referred.page.rows.map((row) => row['id'])).toEqual(orders.ids)
+    for (const order of referred.page.rows) {
+      const back = await followed(orders.object, 'refers-to', key, order)
+      expect(back.relation.to.object).toEqual(object)
+      expect(back.page.rows.map((row) => row['name'])).toEqual(names)
+    }
   })
 })

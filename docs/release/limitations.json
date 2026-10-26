@@ -2976,7 +2976,7 @@
       ]
     },
     "0099": {
-      "reviewed": "sha256:297fa6d01f330dfb2663a29d75b5a4ba5471baa187eefe1a3489831714751840",
+      "reviewed": "sha256:e9d993a79c064041cca37c6d8c19b18926ebdfcc9b35b325870c754a2f93eb47",
       "limitations": [
         {
           "area": "access",
@@ -3009,6 +3009,60 @@
         {
           "area": "server",
           "says": "A trusted-proxy list that covers all but part of a family's addresses, such as half of IPv4 and a quarter more, still starts: only a list that trusts every IPv4 or every IPv6 peer is refused."
+        }
+      ]
+    },
+    "0103": {
+      "reviewed": "sha256:63bb2c0e81344778a9d6faa8387ee847487d9da4de920efd850a02d0d8cf571f",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "A browsed row is followed only through a foreign key whose columns are all of a key kind -- text, integer, decimal, uuid or date -- so a key over a timestamp, a boolean or binary is named in the Browse step and not followed.",
+          "heldBy": "packages/data-core/src/records/follow.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "A foreign key through a column the connection's account may not read at either end, one to or from a table outside the approved schemas, and one onto a table the account cannot see are each named in the Browse step and not followed.",
+          "heldBy": "packages/data-core/src/records/follow.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "A relationship the catalog does not declare as a foreign key, such as a column naming another table's row by convention or anything a view joins, is not offered to follow."
+        },
+        {
+          "area": "databases",
+          "says": "A row whose foreign key holds a NULL in any column follows nothing through it, since it refers to no row on either engine, even where its other columns would find rows.",
+          "heldBy": "packages/data-core/src/records/follow.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A follow compares the row's values with each engine's own equality, as the foreign key does, so under a case- or accent-insensitive collation it finds the rows the key would match and not only those spelled the same."
+        },
+        {
+          "area": "databases",
+          "says": "A foreign key the database does not enforce, or has not validated, is offered to follow as any other, and a follow through it finds what the row's values find, which may be nothing."
+        },
+        {
+          "area": "studio",
+          "says": "Where a table the connection's account cannot see may refer to the browsed object, or its snapshot does not record what refers to each table, the Browse step says that the keys referring to it may not all be offered.",
+          "heldBy": "packages/data-core/src/records/follow.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "The studio offers the follows its own discovery holds, so a column dropped or made unreadable since is refused by the server as not-comparable when followed, a key dropped since still narrows by its columns, and a key added since is not offered until the studio discovers again.",
+          "heldBy": "packages/data-server/src/routes/admin-browse.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Following what refers to a row narrows the referring table by the key's columns, which neither engine indexes on its own, so it may read the whole table where nobody made such an index; not measured."
+        },
+        {
+          "area": "studio",
+          "says": "The trail of follows lives in the page, so a reload loses it along with the sign-in."
+        },
+        {
+          "area": "server",
+          "says": "The values a follow narrows by travel in the browse request's body and stand on the page, while the audit trail names only the connection and the object, never a value, so it cannot tell which row was followed."
         }
       ]
     }

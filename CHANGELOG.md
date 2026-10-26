@@ -37,6 +37,33 @@ later.
     between pages. Binary, rowversion and unsupported columns are not
     shown, and are named. Every page discovers the connection again; not
     measured.
+- **A browsed row follows its foreign keys either way, in the studio's
+  Browse step** (0103). Why: a key's value on a page -- an order's
+  customer number -- says nothing without the row it names, and the rows
+  that refer to a row -- a customer's orders -- are half of why one looks
+  at the data; finding either meant choosing the other table and searching
+  for the value, which matches every text and integer column and never a
+  composite key's columns together. A row's Related button lists, from the
+  discovery the studio holds, each key the row refers through and each key
+  that refers to it, every one a browse of the other end narrowed to the
+  row's values, and Back returns to the page left, exactly. What you
+  notice:
+  - **`POST /v1/connections/:id/browse` takes `equal`**, a list of
+    `{ column, value }`: the rows equal to each value, compared as the
+    database compares a key. Only a column the page shows, of a key kind --
+    text, integer, decimal, uuid or date -- with a value it can hold;
+    anything else is 400 `not-comparable`, naming the column and never the
+    value, and a column named twice is `malformed`. Left out, nothing
+    narrows the page, as before.
+  - A key with a NULL in any column follows to no row, as on both engines,
+    and the step says so. A key over another kind, through a column either
+    end may not read, to or from a table outside the approved schemas, or
+    onto one the account cannot see is named and not followed; where a
+    table the account cannot see may refer to the row's, the step says so.
+  - Following what refers to a row narrows the referring table by the
+    key's columns, which neither engine indexes by itself; not measured.
+    The trail lives in the page, and a reload loses it. The audit event is
+    a browse's, naming the object and never a value.
 
 ### Changed
 

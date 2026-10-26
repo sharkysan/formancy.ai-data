@@ -559,11 +559,38 @@ comes from a rule over the form's fields (0090).
    account's grants and row security apply, and `browsePage` keeps fifty
    rows and whether more follow. The answer names the columns shown, those
    left out and why, and how the page is ordered.
+4. A row follows its foreign keys either way
+   ([0103](../decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
+   From the snapshot the step holds, `browseRelations`
+   (`packages/data-core/src/records/follow.ts`) finds the object's own
+   foreign keys, and those its `referencedBy` names (0049), that a browse
+   can follow: both ends in the scope, and every column at both ends one
+   the account may read, of a key kind. When there is one, each row has a
+   Related button listing them as the browses they make; whether or not
+   there is, the page names each key it cannot follow, and why, and says
+   when a table's discovery could not tell that every key referring to it
+   was listed. A follow sends
+   the other end's object with `equal`: `followTerms` pairs its columns
+   with the row's values by position, and a key holding a NULL follows
+   nothing. The page left goes onto a trail, and Back sends it again as it
+   was -- its offset, sort, search and `equal`.
+5. The server plans a follow as any page, over its own discovery:
+   `planBrowse` takes an `equal` term only for a column the page shows, of
+   a key kind, with a value it can hold, and refuses anything else 400
+   `not-comparable`, naming the column and never the value; a column named
+   twice is a malformed body, refused before the discovery. The
+   terms are the list's `equal`, bound as a child form's parent is (0044)
+   and compared with the database's own equality, as the key compares
+   them; the audit event names the object, never a value.
 
 Held by `routes/admin-browse.test.ts`, `browse-roles.test.ts`, data-core's
-`records/browse.test.ts`, both adapters' `list.integration.test.ts` (the
-shared `browse:` cases) and the studio's `browse.test.tsx`. What it costs:
+`records/browse.test.ts` and `records/follow.test.ts`, both adapters'
+`list.integration.test.ts` (the shared `browse:` cases, `browse: follows`
+among them) and the studio's `browse.test.tsx`. What it costs:
 whoever holds the role reads every row the connection's account can read;
 every page is a discovery and a statement; rows of a view equal in every
-shown column may trade places between pages
+shown column may trade places between pages; only keys over key kinds are
+followed; following what refers to a row may read the whole referring
+table, since neither engine indexes its columns by itself; and the trail
+is lost on a reload
 ([section 11.2](11-risks-and-debt.md#112-known-limitations-by-area)).
