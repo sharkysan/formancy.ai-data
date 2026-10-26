@@ -73,6 +73,12 @@ with `resolveSecret('env:HOST_SECRET')`, and one public key is
 In a key set, a `kid` selects that key and no other; a token without one
 is tried against each key in force, in file order.
 
+A token is read only as the host signed it: three base64url parts without
+padding, joined by dots. One with an `=` after a part, a space or a
+newline around it, or base64's `+` and `/` is `ERR_JWS_INVALID` before any
+key is asked, so a credential has one spelling
+([0101](../../docs/decisions/0101-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md)).
+
 ## What it does not do
 
 - **It fetches nothing.** No key set URL, and no key a token names in its
@@ -84,6 +90,10 @@ is tried against each key in force, in file order.
   `resolveSecret` reads the environment or a file only for the reference
   it is handed.
 - **It does not mint tokens.** The host signs them.
+- **It does not bound a token's lifetime.** `exp` is required and must not
+  have passed, give or take `clockToleranceSeconds`; how far ahead it lies
+  is not checked, so a token the host signed to last a year is accepted for
+  a year.
 
 `src/identity.test.ts` holds the verifier, `src/identity-keys.test.ts` what
 a key set accepts and refuses, `src/identity-file.test.ts` a file read again,

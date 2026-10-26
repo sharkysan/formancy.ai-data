@@ -217,7 +217,7 @@
       ]
     },
     "0014": {
-      "reviewed": "sha256:0172731be7cb155fde9e02c1fbde566b4a5002cb497f8e576785d7c077cba38b",
+      "reviewed": "sha256:5795da09c26aadb61e2d8748d62889ddf28b4c29bc5384e3599649092e085006",
       "limitations": [
         {
           "area": "operations",
@@ -3063,6 +3063,15 @@
         {
           "area": "server",
           "says": "The values a follow narrows by travel in the browse request's body and stand on the page, while the audit trail names only the connection and the object, never a value, so it cannot tell which row was followed."
+        }
+      ]
+    },
+    "0101": {
+      "reviewed": "sha256:1c672cd217ec47c1ac02dea106e989af667e3c01bd7c02f0ab447d2d895a1757",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A host token with a space, a newline or padding added on its way to the server, or written in base64 rather than base64url, is refused as malformed, though jose would have read some of those."
         }
       ]
     }

@@ -196,7 +196,9 @@ That no package reads the environment is held by review.
 **Who is asking comes from a signature.** The host signs a short-lived JWT,
 and the server verifies it offline, the algorithm pinned, building the
 identity from exactly the claims the operator mapped
-([0014](../decisions/0014-host-identity-is-verified-offline.md)); a key set
+([0014](../decisions/0014-host-identity-is-verified-offline.md)), in the
+one spelling the host signed, base64url without padding
+([0101](../decisions/0101-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md)); a key set
 is selected by `kid` and read again on SIGHUP, and nothing is fetched
 ([0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md)).
 

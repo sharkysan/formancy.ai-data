@@ -74,6 +74,23 @@ describe('createIdentityVerifier', () => {
     expect(await verify(`${header}.${body}.`)).toMatchObject({ ok: false })
   })
 
+  // A compact JWS is three base64url parts and nothing else, without padding
+  // (RFC 7515, 7.1 and 2). jose decodes a part with an `=` after it to the
+  // same bytes, so the host's token with one more character verified as the
+  // host's own: two spellings of one credential, which a cache, a log or a
+  // list of revoked tokens keyed by the token's text would tell apart. Each
+  // spelling but the one the host signed is refused as malformed, before any
+  // key is asked (0101). Watched failing with the signature's `=` accepted.
+  test('refuses a token that is not its compact form exactly', async () => {
+    const verify = await createIdentityVerifier(BASE)
+    const signed = await token({ sub: 'u' })
+    expect(await verify(signed)).toMatchObject({ ok: true })
+    const [header = '', body = '', signature = ''] = signed.split('.')
+    for (const spelling of [`${header}.${body}.${signature}=`, `${header}=.${body}.${signature}`, `${header}.${body}=.${signature}`, ` ${signed}`, `${signed}\n`, `${header}.${body}.${signature.replaceAll('-', '+').replaceAll('_', '/')}+`]) {
+      expect(await verify(spelling), JSON.stringify(spelling.slice(-3))).toEqual({ ok: false, reason: 'ERR_JWS_INVALID' })
+    }
+  })
+
   // A short HMAC secret is a weaker key than HS256 claims. Refused at startup,
   // not discovered after the server has been accepting tokens.
   test('refuses a secret shorter than 32 bytes at construction', async () => {
