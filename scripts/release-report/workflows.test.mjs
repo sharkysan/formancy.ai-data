@@ -350,6 +350,30 @@ describe('gates.yml', () => {
     expect(deps.map((step) => ({ if: step.if, run: step.run }))).toEqual([{ if: "matrix.browser == 'webkit'", run: 'pnpm --filter @formancy/data-examples exec playwright install-deps webkit' }])
   })
 
+  // The runner's Ubuntu mirror has crawled for whole runs -- ten packages in
+  // twelve minutes on 2026-10-26 -- and no time limit fixes a download that
+  // never ends. The packages apt fetched are kept, and put where apt looks
+  // before it downloads: it takes one only when its checksum is the index's,
+  // so the versions installed, which 0058's facts rest on, are the ones a
+  // download would have brought. Never in a release, which restores no cache.
+  test("keeps WebKit's system packages between runs, seeded before apt and saved after it, never in a release", () => {
+    const browser = gates.jobs.browser.steps
+    const at = (predicate) => browser.findIndex(predicate)
+    const install = at((step) => String(step.run).includes('install-deps webkit'))
+    const restore = at((step) => String(step.uses).startsWith('actions/cache/restore@'))
+    // What each step does to apt's archive: copies into it, or reads from it.
+    const seed = at((step) => String(step.run).includes('cp -t /var/cache/apt/archives'))
+    const keep = at((step) => String(step.run).includes('find /var/cache/apt/archives'))
+    const save = at((step) => String(step.uses).startsWith('actions/cache/save@'))
+    expect({ restore: restore >= 0, seed: seed >= 0, keep: keep >= 0, save: save >= 0 }).toEqual({ restore: true, seed: true, keep: true, save: true })
+    expect([restore, seed, install, keep, save]).toEqual([...[restore, seed, install, keep, save]].sort((a, b) => a - b))
+    for (const index of [restore, seed, keep, save]) {
+      expect(browser[index].if, browser[index].name).toContain("matrix.browser == 'webkit'")
+      expect(browser[index].if, browser[index].name).toContain("inputs.release == ''")
+    }
+    expect(browser[restore].with.path).toBe(browser[save].with.path)
+  })
+
   // Without --force a suite's results could be a cached replay of another
   // commit's; without --summarize the report has no wall time for it.
   test('runs each package fresh, with its own timing, the package from the environment', () => {
@@ -382,11 +406,14 @@ describe('gates.yml', () => {
   // what any code that ran in that job left in the store: a dependency the
   // tests execute could reach the dist/ npm receives through it. CI keeps
   // its caches; a release or a rehearsal installs from the registry against
-  // the lockfile, as the release did before these gates were shared.
+  // the lockfile, as the release did before these gates were shared. The
+  // condition is that check alone, or that check first and more after it,
+  // joined by && only: an || anywhere could let a release through.
   test('restores no cache in a release or a rehearsal', () => {
     const caches = steps(gates).filter(({ step }) => String(step.uses).startsWith('actions/cache'))
     expect(caches.length).toBeGreaterThan(0)
-    expect(caches.filter(({ step }) => step.if !== "inputs.release == ''").map(({ job, step }) => `${job}: ${step.name ?? step.with?.path}`)).toEqual([])
+    const guarded = (condition) => condition === "inputs.release == ''" || (typeof condition === 'string' && condition.startsWith("inputs.release == '' && ") && !condition.includes('||'))
+    expect(caches.filter(({ step }) => !guarded(step.if)).map(({ job, step }) => `${job}: ${step.name ?? step.with?.path}`)).toEqual([])
     expect(steps(release).filter(({ step }) => String(step.uses).startsWith('actions/cache')).map(({ job }) => job)).toEqual([])
   })
 
