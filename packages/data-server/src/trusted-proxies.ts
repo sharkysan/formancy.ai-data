@@ -107,7 +107,7 @@ function covers(ranges: ReadonlyArray<readonly [bigint, bigint]>, size: bigint):
  * peer: an IPv4-mapped peer is compared as IPv4, against an IPv4 range or a
  * mapped one of /96 or narrower; any other IPv6 peer against the other IPv6
  * ranges. A prefix of 0 is one entry's problem; this is the same rule held
- * by the list, whose entries the server believes together (0099).
+ * by the list, whose entries the server believes together (0100).
  */
 function everybodyOf(entries: readonly string[]): 4 | 6 | undefined {
   const ipv4: Array<readonly [bigint, bigint]> = []

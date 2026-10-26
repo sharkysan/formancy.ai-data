@@ -14,7 +14,9 @@ import { FORM_ID, loadPublished } from '../published.js'
 import { conflictOver, keysRefusal, storable } from '../publishing.js'
 import type { Refusal } from '../publishing.js'
 import { readKeysConfirmed } from '../reassigned.js'
+import { browseRolesProblem } from '../browse-roles.js'
 import { ADMIN_OPERATIONS, adminOperationOf, adminTrail, describeAdmin } from './admin-audit.js'
+import { browseRoutes } from './admin-browse.js'
 import { reviewRoutes } from './admin-drafts.js'
 import { evolutionRoutes } from './admin-evolution.js'
 import { promotionRoutes } from './admin-promotion.js'
@@ -32,6 +34,13 @@ export interface AdminOptions {
    * restores. An empty list, or a role `adminRoles` lacks, stops the plane.
    */
   publisherRoles?: readonly string[]
+  /**
+   * The roles whose holders may read any table or view of a connection, a
+   * page of rows at a time (0099), each also in `adminRoles`. Absent,
+   * nobody browses; an empty list, or a role `adminRoles` lacks, stops the
+   * plane.
+   */
+  browseRoles?: readonly string[]
   authenticate: (request: FastifyRequest) => Promise<HostIdentity | undefined>
   /**
    * The operational trail (0023, 0033): one event per request, refusals
@@ -74,7 +83,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * drift, and since 0030 versions, regeneration and restore (plan section 13).
  * Every route requires a host identity holding one of `adminRoles` —
  * publishing a form and writing a business record are
- * different permissions, and nothing here touches a record. With
+ * different permissions, and nothing here writes a record. Nothing reads
+ * one either, but a browse (0099), which a browse role alone may ask for. With
  * `publisherRoles`, publication is reviewed (0065, governance.ts): the
  * same preHandler refuses what the caller's grant alone does not allow.
  *
@@ -99,6 +109,10 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
   const refused = given === undefined ? undefined : publisherRolesProblem(given, options.adminRoles)
   if (refused !== undefined) throw new Error(refused)
   const publishers = given === undefined ? undefined : new Set(given)
+  const browsing = options.browseRoles
+  const unbrowsable = browsing === undefined ? undefined : browseRolesProblem(browsing, options.adminRoles)
+  if (unbrowsable !== undefined) throw new Error(unbrowsable)
+  const browsers = browsing === undefined ? undefined : new Set(browsing)
   const review = publishers !== undefined
   auditRequests(app, { names: ADMIN_OPERATIONS, sink: options.audit.sink, now: options.audit.now, describe: describeAdmin((id) => registry.scope(id) !== undefined) })
 
@@ -117,7 +131,7 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     // the draft, and their routes ask once it is read.
     const operation = adminOperationOf(request)
     if (operation !== undefined && !DECIDED_ON_THE_DRAFT.has(operation)) {
-      const refusal = refusalFor(operation, callerOf(identity, publishers), review)
+      const refusal = refusalFor(operation, callerOf(identity, publishers, browsers), review)
       if (refusal !== undefined) return refuse(reply, refusal.status, refusal.code, refusal.message)
     }
     return undefined
@@ -250,5 +264,6 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
   const allowlisted = (name: string) => registry.scope(name) !== undefined
   evolutionRoutes(app, { store, discover, refuse })
   promotionRoutes(app, { store, allowlisted, discover, refuse })
-  reviewRoutes(app, { store, publisherRoles: publishers, allowlisted, discover, refuse })
+  reviewRoutes(app, { store, publisherRoles: publishers, browseRoles: browsers, allowlisted, discover, refuse })
+  browseRoutes(app, { connection, discover, refuse })
 }

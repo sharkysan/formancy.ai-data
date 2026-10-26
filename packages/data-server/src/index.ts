@@ -25,6 +25,7 @@ export { validateBundle } from './bundle.js'
 export type { BundleV1, BundleV2, BundleValidation, PublishedBundle } from './bundle.js'
 // What the connection test answers: the server, and whether this release was tested on it (0068).
 export type { ConnectionTest } from './routes/admin.js'
+export type { BrowseAnswer } from './routes/admin-browse.js'
 export type { Regeneration, Restoration } from './routes/admin-evolution.js'
 export type { Importation } from './routes/admin-promotion.js'
 // Publication under review (0065): the answers of the administration and draft routes.

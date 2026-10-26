@@ -1,4 +1,4 @@
-# 0099 — A proxy list whose entries together trust every peer of a family is refused
+# 0100 — A proxy list whose entries together trust every peer of a family is refused
 
 - **Status:** accepted; narrows [0071](0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md): the list as a whole, not only each entry, may not trust every peer
 - **Date:** 2026-10-22

@@ -1,6 +1,6 @@
 # 0071 — The server believes a forwarded client address only from the proxies an operator names, each by its address, and the composed stack names its nginx and cloudflared alone
 
-- **Status:** accepted; narrowed by [0099](0099-a-proxy-list-whose-entries-together-trust-every-peer-is-refused.md): a list whose entries together trust every IPv4 or every IPv6 peer is refused as a prefix of 0 is
+- **Status:** accepted; narrowed by [0100](0100-a-proxy-list-whose-entries-together-trust-every-peer-is-refused.md): a list whose entries together trust every IPv4 or every IPv6 peer is refused as a prefix of 0 is
 - **Date:** 2026-10-16
 - **Deciders:** Daniel Bacher
 - **Verified by:**

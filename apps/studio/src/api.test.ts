@@ -203,6 +203,7 @@ describe('the administrator plane, through the studio client', () => {
 /** The server's governance sentences (0065), as the client carries them. */
 const REVIEW_REQUIRED = { code: 'review-required', message: 'This deployment reviews publication: submit this version as a draft, and a publisher other than you approves it.' }
 const PUBLISHER_REQUIRED = { code: 'publisher-required', message: "This needs a publisher role: restoring a version, and approving or rejecting someone else's draft, are a publisher's." }
+const BROWSE_ROLE_REQUIRED = { code: 'browse-role-required', message: "Reading a connection's rows needs a browse role, which this deployment gives to nobody or not to you." }
 const OWN_DRAFT = { code: 'own-draft', message: 'You submitted this draft: a publisher other than you approves it.' }
 const NOTHING_DRIFTED = { changes: [], blocking: false, readable: true, writable: { create: true, update: true, delete: true }, runtime: { readable: true, writable: { create: true, update: true, delete: true } } }
 
@@ -226,12 +227,13 @@ describe('publication under review, through the studio client', () => {
   // would show an author an Approve button the server refuses, or hide a
   // publisher's restore.
   test('says, for each caller, whether the deployment reviews and what it refuses them', async () => {
-    expect(await admin.administration()).toEqual({ ok: true, value: { review: false, publisher: true, refuses: {} } })
+    // Browsing is refused to all three, review or not: none holds a browse role (0099).
+    expect(await admin.administration()).toEqual({ ok: true, value: { review: false, publisher: true, refuses: { browse: BROWSE_ROLE_REQUIRED } } })
     expect(await author.administration()).toEqual({
       ok: true,
-      value: { review: true, publisher: false, refuses: { publish: REVIEW_REQUIRED, import: REVIEW_REQUIRED, restore: PUBLISHER_REQUIRED, 'draft-approve': PUBLISHER_REQUIRED, 'draft-reject': PUBLISHER_REQUIRED } },
+      value: { review: true, publisher: false, refuses: { publish: REVIEW_REQUIRED, import: REVIEW_REQUIRED, restore: PUBLISHER_REQUIRED, 'draft-approve': PUBLISHER_REQUIRED, 'draft-reject': PUBLISHER_REQUIRED, browse: BROWSE_ROLE_REQUIRED } },
     })
-    expect(await publisher.administration()).toEqual({ ok: true, value: { review: true, publisher: true, refuses: { publish: REVIEW_REQUIRED, import: REVIEW_REQUIRED } } })
+    expect(await publisher.administration()).toEqual({ ok: true, value: { review: true, publisher: true, refuses: { publish: REVIEW_REQUIRED, import: REVIEW_REQUIRED, browse: BROWSE_ROLE_REQUIRED } } })
   })
 
   // A draft submitted, queued, read, approved, rejected and withdrawn, each

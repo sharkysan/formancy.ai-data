@@ -94,10 +94,10 @@ describe('FORMANCY_DATA_TRUSTED_PROXIES', () => {
   // A prefix of 0 is refused, and two entries that are its two halves were
   // not: 0.0.0.0/1 and 128.0.0.0/1 trust every IPv4 peer as surely, and so
   // does ::ffff:0.0.0.0/96, the whole of IPv4 as @fastify/proxy-addr reads a
-  // mapped range, which compares an IPv4-mapped peer as IPv4 (0099). The
+  // mapped range, which compares an IPv4-mapped peer as IPv4 (0100). The
   // list as a whole is what the server believes, so it is the whole that is
   // held to the rule: every peer of a family, by any number of entries, is
-  // everybody. Watched failing before 0099 with every row accepted.
+  // everybody. Watched failing before 0100 with every row accepted.
   test.each([
     ['0.0.0.0/1, 128.0.0.0/1', 'IPv4', 'the two halves of IPv4'],
     ['::ffff:0.0.0.0/96', 'IPv4', 'the whole of IPv4, mapped'],
