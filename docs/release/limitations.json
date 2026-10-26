@@ -2350,7 +2350,7 @@
       ]
     },
     "0071": {
-      "reviewed": "sha256:5ad3e3656d3c077a567a618395b8067045ca236f5cb4877142b268c7da8684e0",
+      "reviewed": "sha256:2e19440a8ce0efe0dbb2d93a7d045dab0e2814d6ecd9429f01254b08beb1e1e9",
       "limitations": [
         {
           "area": "operations",
@@ -3000,6 +3000,15 @@
           "area": "server",
           "says": "The audit trail names the connection and the object a browse read, never its search, its sort, a row or how many rows.",
           "heldBy": "packages/data-server/src/routes/admin-browse.test.ts"
+        }
+      ]
+    },
+    "0100": {
+      "reviewed": "sha256:7b86abfcefc1a4cea449bcf4ce7624f7f9b0f1cc50fb86303e26a2fed04287d6",
+      "limitations": [
+        {
+          "area": "server",
+          "says": "A trusted-proxy list that covers all but part of a family's addresses, such as half of IPv4 and a quarter more, still starts: only a list that trusts every IPv4 or every IPv6 peer is refused."
         }
       ]
     },

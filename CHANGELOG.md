@@ -137,6 +137,12 @@ later.
 - **Drill down's refs are written after a render, not during it**, so a
   render React throws away writes nothing the answers read; behaviour is
   unchanged.
+- **A trusted-proxy list whose entries together trust every peer stops the
+  server**, as a prefix of 0 already did (0100, which narrows 0071).
+  `0.0.0.0/1, 128.0.0.0/1` and `::ffff:0.0.0.0/96`, which
+  `@fastify/proxy-addr` matches against every IPv4 peer, started and let any
+  client choose its own rate-limit bucket and logged address. Found by the
+  formancy.ai-report repository's review of its own server.
 - **A host token verifies only in the spelling the host signed** (0101,
   which narrows 0014). jose read the host's token with an `=` after its
   signature as the same token, so one credential had two spellings, which
