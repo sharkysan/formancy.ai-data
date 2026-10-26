@@ -10,6 +10,7 @@ import { DRIVER_FACTORIES } from './drivers.js'
 import { identityKeySource, openIdentity, readAgainOnSignal } from './identity-settings.js'
 import { servedPlanes } from './planes.js'
 import { lookupDeadlineSetting } from './lookup-deadline.js'
+import { browseRolesSetting } from './browse-roles.js'
 import { publisherRolesSetting } from './publisher-roles.js'
 import { rateLimitSetting } from './rate-limit.js'
 import { trustedProxiesSetting } from './trusted-proxies.js'
@@ -122,6 +123,17 @@ if (!review.ok) {
   process.exit(1)
 }
 
+// Who may read a connection's rows (browse-roles.ts, 0099), read and
+// refused as review is: unset is nobody.
+const browse = browseRolesSetting(process.env['FORMANCY_DATA_BROWSE_ROLES'], {
+  adminRoles,
+  admin: storeDirectory !== undefined && connectionsFile !== undefined && adminRoles.length > 0,
+})
+if (!browse.ok) {
+  console.error(browse.problem)
+  process.exit(1)
+}
+
 // Which key, decided before any file is opened, and then opened
 // (identity-settings.ts): every refusal of it -- a secret or a file that
 // cannot be read, a short secret, a public key that does not import, a key
@@ -150,6 +162,8 @@ const { verifyIdentity, file: keyFile } = opened
  *   FORMANCY_DATA_ADMIN_ROLES       comma-separated roles that administer (0020)
  *   FORMANCY_DATA_PUBLISHER_ROLES   comma-separated roles, each also an admin role, that approve
  *                                   another administrator's draft; set, publication is reviewed (0065)
+ *   FORMANCY_DATA_BROWSE_ROLES      comma-separated roles, each also an admin role, that may read
+ *                                   any table or view of a connection; unset, nobody may (0099)
  *   FORMANCY_DATA_AUDIT_KEY         a secret reference naming records in the audit trail (0023)
  *
  * The store and the allowlist turn on the runtime plane; admin roles as well
@@ -184,12 +198,12 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
   const auditReference = process.env['FORMANCY_DATA_AUDIT_KEY']
   const auditKey = auditReference === undefined ? undefined : await resolveSecret(auditReference)
   // One trail for both planes, the server's own log (0033).
-  planes = servedPlanes({ registry, store, adminRoles, publisherRoles: review.publisherRoles, auditKey, origins: origins.origins, lookupDeadlineMs: deadline.ms, log: () => app.log })
+  planes = servedPlanes({ registry, store, adminRoles, publisherRoles: review.publisherRoles, browseRoles: browse.browseRoles, auditKey, origins: origins.origins, lookupDeadlineMs: deadline.ms, log: () => app.log })
 }
 
 const app = await createDataServer({ verifyIdentity, logger: true, rateLimit: limit.rateLimit, trustedProxies: proxies.trustedProxies, ...planes })
 const identityKeys = keyFile === undefined ? {} : { identityKeys: { kids: keyFile.current().kids, leftOut: keyFile.current().leftOut } }
-app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, review: planes.admin?.publisherRoles !== undefined, connections: registry?.ids() ?? [], trustedProxies: proxies.trustedProxies, ...identityKeys }, 'planes')
+app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, review: planes.admin?.publisherRoles !== undefined, browse: planes.admin?.browseRoles !== undefined, connections: registry?.ids() ?? [], trustedProxies: proxies.trustedProxies, ...identityKeys }, 'planes')
 // Once for each connection that logs in as an Entra principal, naming the
 // connection and nothing of the principal: no test of this release logs
 // in as one (0074).

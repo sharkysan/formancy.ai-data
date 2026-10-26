@@ -28,6 +28,14 @@
       "runtimeDoor": "not forwarded"
     },
     {
+      "method": "POST",
+      "path": "/v1/connections/:id/browse",
+      "plane": "administrator",
+      "sample": "/v1/connections/erp/browse",
+      "administratorDoor": "behind Access",
+      "runtimeDoor": "not forwarded"
+    },
+    {
       "method": "GET",
       "path": "/v1/connections/:id/metadata",
       "plane": "administrator",

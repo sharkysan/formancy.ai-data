@@ -169,6 +169,8 @@ export type { ExportQueryCheck, ExportQueryRefusal, ListQueryCheck, ListQueryErr
 export { exportColumns, exportHeader, exportRecord, exportText } from './records/export.js'
 export type { ExportColumns, ExportField, ExportLabels } from './records/export.js'
 export type { CsvCell, CsvRefusal, CsvText } from './records/csv.js'
+export { browsePage, planBrowse, validateBrowseQuery } from './records/browse.js'
+export type { BrowsePage, BrowseQuery, BrowseQueryCheck, BrowseRefusal, BrowseRefusalCode, BrowseSortTerm, OmittedColumn, PlannedBrowse } from './records/browse.js'
 export { listTerms } from './records/list-terms.js'
 export type { ListTerms } from './records/list-terms.js'
 export { throughTerms } from './records/through.js'

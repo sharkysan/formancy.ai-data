@@ -1,6 +1,6 @@
 # 0065 — With publisher roles set, a draft is published only when a publisher who did not submit it approves it, and a restore is one publisher's alone
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0099](0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md): the administration answer also refuses `browse`, review or not, to a caller without a browse role
 - **Date:** 2026-10-16
 - **Deciders:** Daniel Bacher
 - **Verified by:**

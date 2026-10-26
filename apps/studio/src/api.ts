@@ -1,5 +1,5 @@
-import type { DriftChange, DriftReport, GeneratedForm, GenerationRequest, LookupChoice, MetadataSnapshot, ObjectRef, ReassignedKey } from '@formancy/data-core'
-import type { Administration, Approval, BundleV2, ConnectionTest, DraftQueue, DraftRead, DraftRejection, DraftSubmission, HostIdentity, Importation, PublishedBundle, Regeneration, Restoration } from '@formancy/data-server'
+import type { BrowseQuery, DriftChange, DriftReport, GeneratedForm, GenerationRequest, LookupChoice, MetadataSnapshot, ObjectRef, ReassignedKey } from '@formancy/data-core'
+import type { Administration, Approval, BrowseAnswer, BundleV2, ConnectionTest, DraftQueue, DraftRead, DraftRejection, DraftSubmission, HostIdentity, Importation, PublishedBundle, Regeneration, Restoration } from '@formancy/data-server'
 
 /**
  * The studio's whole vocabulary: the data server's administrator plane, and
@@ -8,7 +8,9 @@ import type { Administration, Approval, BundleV2, ConnectionTest, DraftQueue, Dr
  * One function per route, and no route that is not one of these. The runtime
  * plane -- records and lookups -- is for the host application's people and is
  * not called from here, so publishing a form and writing a business record stay
- * different permissions all the way out to the screen (0020).
+ * different permissions all the way out to the screen (0020). Reading rows is
+ * the administrator plane's browse alone, which a browse role grants (0099),
+ * and which writes nothing.
  *
  * The response types are the server's own exports and data-core's, never
  * restated: a shape the server changes is a type error here before it is a
@@ -113,6 +115,8 @@ export interface AdminClient {
   approveDraft(formId: string, draft: number): Promise<Outcome<Approval>>
   /** The draft rejected -- or, by its submitter, withdrawn. Nothing is published. */
   rejectDraft(formId: string, draft: number): Promise<Outcome<DraftRejection>>
+  /** One page of a table or view's rows, as the connection's account reads them (0099). Needs a browse role; writes nothing. */
+  browse(connection: string, query: BrowseQuery): Promise<Outcome<BrowseAnswer>>
 }
 
 /**
@@ -229,5 +233,6 @@ export function createAdminClient({ token, fetch, base = '' }: { token: string; 
     draft: (formId, draft) => call('GET', `/v1/forms/${segment(formId)}/drafts/${String(draft)}`),
     approveDraft: (formId, draft) => call('POST', `/v1/forms/${segment(formId)}/drafts/${String(draft)}/approval`),
     rejectDraft: (formId, draft) => call('POST', `/v1/forms/${segment(formId)}/drafts/${String(draft)}/rejection`),
+    browse: (connection, query) => call('POST', `/v1/connections/${segment(connection)}/browse`, query),
   }
 }
