@@ -16,8 +16,8 @@
 //     the caret the click left; and where Enter moves or removes the button
 //     it was pressed on -- a field moved down, a filter removed, a conflict
 //     rebased, a restore refused, an import refused, a dropped label given,
-//     a draft approved -- the keyboard is somewhere deliberate afterwards,
-//     not on the page;
+//     a draft approved, a browse's condition applied or removed -- the
+//     keyboard is somewhere deliberate afterwards, not on the page;
 //   - the paper is the theme's: no rule of studio.css selects anything on the
 //     preview's paper, or on a draft's open for review (0065), so each shows
 //     what the published form will;
@@ -32,7 +32,9 @@
 //     carried (0030), a version file chosen and its import refused (0062),
 //     and under review a draft submitted, a draft open for review and a
 //     draft approved (0065); and a browse's grid, a table wider than the
-//     window scrolling in its own region, a sort and a view (0099);
+//     window scrolling in its own region, a sort and a view (0099), and its
+//     filter, the form open on a range of days, a condition applied, a
+//     value refused and the last condition removed (0104);
 //   - every web font the built studio declares had loaded by the end of
 //     each pass, on each origin the pass signed in to, and in the pass that
 //     refuses every font file, none had (0058): a state measured before a

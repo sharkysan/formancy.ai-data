@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf } from '@formancy/data-core'
-import type { ApiValue, ColumnMeta, CoverageGap, DatabaseAdapter, DescribedTable, ListRequest, LookupAdapter, MetadataSnapshot, RecordAdapter, ReferentialAction, ServerFacts } from '@formancy/data-core'
+import type { ApiValue, ColumnMeta, CoverageGap, DatabaseAdapter, DescribedTable, ListRequest, LookupAdapter, MetadataSnapshot, RecordAdapter, RecordFilter, ReferentialAction, ServerFacts } from '@formancy/data-core'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
 import type { ConfigurationStore, ConnectionRegistry, IdentityVerifier } from '@formancy/data-server'
 import owner from './fixtures/postgres-owner.json'
@@ -30,6 +30,14 @@ import sqlserverReader from './fixtures/sqlserver-reader.json'
  * row-level security on customer binds (0027). SQL Server as its owner, whose
  * order table keeps a rowversion, and as the reader, whose catalog hides what
  * it may not use behind gaps, the "cannot tell" the studio must show (0004).
+ *
+ * The registry's records port pages the rows a test puts in, for a browse
+ * (0099): narrowed by a follow's values (0103) and by the person's filter
+ * (0104), each condition compared as `RecordFilter`'s doc comment says an
+ * adapter compares it. It stands in for the adapters, whose comparison the
+ * parity suites prove on both engines against real servers (0003); here it
+ * is what lets a test see that the page the studio shows is the one the
+ * filter it sent asks for.
  */
 
 /** A snapshot read from a committed file, refused if it was edited after it was captured. */
@@ -81,10 +89,13 @@ export interface TestPlane {
    * a test means them to be read. Narrowed by the request's equal values,
    * as a follow of a foreign key asks (0103) -- a row is kept when it holds
    * each value exactly as the term spells it, which the canonical text a
-   * test puts in always is -- and paged by its offset and limit, and
-   * nothing else: what a database does with a sort, a search, or a value
-   * spelled another way is the adapter suites' to prove, against real
-   * servers (0003).
+   * test puts in always is -- and by the person's filter (0104), each
+   * condition with the meaning `RecordFilter`'s doc comment gives it
+   * (`holds`); then paged by its offset and limit, and nothing else. It
+   * stands in for the adapters: what a database does with a filter is the
+   * parity suites' to prove, on both engines, and what it does with a sort,
+   * a search, or a value spelled another way the adapter suites', against
+   * real servers (0003).
    */
   rows: Map<string, Array<Record<string, ApiValue>>>
   /** Connections the operator has taken out of the allowlist since the server started. */
@@ -104,6 +115,56 @@ export interface TestPlane {
 
 /** The connections the registry allows, in the order the server lists them. */
 export const CONNECTIONS = ['fixture', 'fixture-reader', 'fixture-sqlserver', 'fixture-sqlserver-reader', 'fixture-writer'] as const
+
+/** Two exact numbers, integers or decimals, spelled as columns hold them, in order: each scaled to the longer fraction, so nothing passes through a double. */
+function numberOrder(left: string, right: string): number {
+  const parts = (text: string) => {
+    const [whole = '', fraction = ''] = text.replace(/^-/, '').split('.')
+    return { sign: text.startsWith('-') ? '-' : '', whole, fraction }
+  }
+  const [a, b] = [parts(left), parts(right)]
+  const scale = Math.max(a.fraction.length, b.fraction.length)
+  const [x, y] = [a, b].map((part) => BigInt(`${part.sign}${part.whole}${part.fraction.padEnd(scale, '0')}`)) as [bigint, bigint]
+  return x < y ? -1 : x > y ? 1 : 0
+}
+
+/**
+ * A row's value against a range's bound. A day, an instant -- both
+ * midnight-to-the-second and `Z` -- and a zoneless timestamp, whose fraction
+ * follows the second, each sort as their text does, once the `Z` is off.
+ */
+function rangeOrder(type: Extract<RecordFilter, { op: 'range' }>['type'], value: string, bound: string): number {
+  if (type.kind === 'integer' || type.kind === 'decimal') return numberOrder(value, bound)
+  const [a, b] = [value.replace(/Z$/, ''), bound.replace(/Z$/, '')]
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+/**
+ * Whether a row a test put in holds one condition of the person's filter
+ * (0104), as `RecordFilter` says: `equals` the canonical value exactly, unit
+ * for unit, or the boolean spelled `true` or `false`; `range` at least
+ * `from`, at most `to`, below `before`; `contains` the text anywhere, case
+ * folded; `null` and `not-null` NULL or not, where text of no characters is
+ * a value. A column a row leaves out is NULL, as the page shows it.
+ */
+function holds(values: Record<string, ApiValue>, condition: RecordFilter): boolean {
+  const value = values[condition.column] ?? null
+  switch (condition.op) {
+    case 'null':
+      return value === null
+    case 'not-null':
+      return value !== null
+    case 'equals':
+      return value !== null && String(value) === condition.value
+    case 'contains':
+      return typeof value === 'string' && value.toLowerCase().includes(condition.text.toLowerCase())
+    case 'range': {
+      if (value === null) return false
+      const order = (bound: string) => rangeOrder(condition.type, String(value), bound)
+      return (condition.from === null || order(condition.from) >= 0) && (condition.to === null || order(condition.to) <= 0) && (condition.before === null || order(condition.before) < 0)
+    }
+  }
+}
 
 /**
  * `administrator: false` starts the server as one started without a store, an
@@ -152,11 +213,13 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
         discover: async () => databases.get(id) ?? now,
         close: async () => {},
       }
-      // The administrator plane never touches a lookup, and reads records only to browse them (0099), narrowed or not (0103).
+      // The administrator plane never touches a lookup, and reads records only to browse them (0099), narrowed or not (0103), filtered or not (0104).
       const records = {
         list: async (request: ListRequest) => {
           const { schema, name } = request.target.table
-          const narrowed = (rows.get(`${schema}.${name}`) ?? []).filter((values) => request.equal.every((term) => values[term.name] === term.value))
+          const narrowed = (rows.get(`${schema}.${name}`) ?? []).filter(
+            (values) => request.equal.every((term) => values[term.name] === term.value) && request.filter.every((condition) => holds(values, condition)),
+          )
           const page = narrowed.slice(request.offset, request.offset + request.limit + 1)
           const described = describedOf(databases.get(id) ?? now, request.target.table) as DescribedTable
           // Only the columns the request names, as an adapter reads them: a fake that answered every value it holds would show a page what the server's discovery left out.

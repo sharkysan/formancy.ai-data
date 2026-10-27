@@ -5,7 +5,7 @@ import type { ApiValue, BrowseEqualTerm, BrowseRelation, BrowseRelations, Object
 import { describeRef } from './choice.js'
 
 /** A value as a sentence says it: bare, unless bare it could not be read -- empty, or with space at an end -- and then in quotes. */
-const sayValue = (value: string): string => (value === '' || value.trim() !== value ? `“${value}”` : value)
+export const sayValue = (value: string): string => (value === '' || value.trim() !== value ? `“${value}”` : value)
 
 /** Equal terms as a page says them: `tenant_id = 1 and customer_no = 1001`. */
 export function sayTerms(terms: readonly BrowseEqualTerm[]): string {
