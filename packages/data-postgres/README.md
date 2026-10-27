@@ -147,6 +147,23 @@ in short:
   default collation — PostgreSQL 17 refuses ILIKE on a nondeterministic
   collation outright. It folds case as that collation does and **does not fold
   accents**: `uber` does not find `Über`, where formancy's own narrowing would.
+- **A person's filter is spelled as a row filter and a search are**
+  (0104). Each condition of a list's or a browse's `filter` is one more
+  conjunct of the page's WHERE, beside the parent, the row filters, the
+  throughs and the search (`records/filter.ts`). An equals on text, an
+  integer, a decimal, a uuid or a date is a row filter's comparison above,
+  so it is exact under any collation, the parity schema's nondeterministic
+  one included; on a boolean it is the column's equality with
+  `$n::text::bool`. A contains is the search's ILIKE through the default
+  collation, so it runs on a column PostgreSQL refuses LIKE on. `null` and
+  `not-null` are `is null` and `is not null`, and text of no characters is a
+  value. A range's `from`, `to` and `before` are `>=`, `<=` and `<`,
+  pg_catalog's operators, against a bound cast to the column's own type,
+  so an index on the column can serve it; its plan is not measured. A
+  timestamp's bounds are midnights, an instant's ending in `Z` and cast to
+  `timestamptz`, a zoneless one cast to `timestamp`, each written year
+  first: neither TimeZone nor DateStyle moves a day, which the list suite
+  holds in a session on Pacific/Chatham with `SQL, DMY`.
 - **The order is the config's**, NULL placement spelled for every column. Text
   sorts in the column's collation; on `postgres:17-alpine`, whose libc is
   musl, as observed on 2026-10-09, the default `en_US.utf8` orders by code
@@ -728,7 +745,14 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   says the key can be NULL or is not unique; and a file of the shipments
   (0079), `EXPORT_PARITY`'s `export: shipments`: the shipments listed
   through the adapter and written by data-core are the shared file's
-  bytes.
+  bytes. And a list or a browse narrowed by a person's filter (0104), each
+  case `COLUMN_FILTER_PARITY`'s: text equal exactly, under the parity
+  schema's case-insensitive collation too; an integer, a decimal, a
+  boolean, a uuid and a date equal; ranges holding the rows on their
+  bounds; a day range on an instant and on a zoneless timestamp, in the
+  default session and in one on Pacific/Chatham with `SQL, DMY`; a literal
+  contains; NULL and not NULL; and conditions together, beside a search,
+  beside a parent and beside a follow.
 - `uuid.integration.test.ts` — a uuid key end to end (0056), each case
   `UUID_PARITY`'s, as the order form's own account: `sales.delivery`'s key
   and its `gen_random_uuid()` default discovered, the key read-only in the

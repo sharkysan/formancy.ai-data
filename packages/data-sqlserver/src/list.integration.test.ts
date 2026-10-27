@@ -479,8 +479,9 @@ describe('a filter on a decimal', covers('sqlserver', columnFilterCase('decimal'
 })
 
 describe('a filter on a boolean', covers('sqlserver', columnFilterCase('boolean')), () => {
-  // A bit compared with the text 'true' would be converted by the server,
-  // and 'false' too: the value is a bit parameter of its own.
+  // The planner's `true` or `false` is a bit parameter of its own. A flag
+  // compared with nothing lists every customer, inactive or not, and an
+  // inverted one the other half: either fails one of the two.
   test('finds the inactive customers, and the active ones', async () => {
     const { field, entries } = COLUMN_FILTER_PARITY.boolean
     for (const entry of entries) expect(numbers(await customersWhere([{ field, ...entry.condition }])), entry.condition.value).toEqual(entry.keys)

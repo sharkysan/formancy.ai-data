@@ -436,10 +436,11 @@ const references = (page: RecordList): string[] => page.rows.map((row) => String
 
 describe('a filter that a text equals', covers('postgres', columnFilterCase('text')), () => {
   // PostgreSQL's `=` under the fixture's deterministic collation already
-  // counts case and a trailing space; under a nondeterministic one it would
-  // not, and SQL Server's under its case-insensitive collation does not. The
-  // row filter's spelling, `"C"` beside the column's own equality, holds
-  // either way (0028).
+  // counts case and a trailing space, so this case passes here with the
+  // column's own equality alone -- watched -- and fails SQL Server's. Under
+  // a nondeterministic collation it would not: the row filter's spelling,
+  // `"C"` beside the column's own equality, holds either way (0028), and
+  // `column filter: collation` below is where that half is held.
   test('finds the reference exactly as given: case and a trailing space count', async () => {
     const { field, entries } = COLUMN_FILTER_PARITY.text
     for (const entry of entries) expect(references(await shipmentsWhere([{ field, op: 'equals', value: entry.value }])), JSON.stringify(entry.value)).toEqual(entry.references)
@@ -569,8 +570,11 @@ describe('a timestamp or a date, in the session the composition root chose', () 
   // The composition root may set TimeZone and DateStyle. Pacific/Chatham is
   // +13:45 in March, so an instant's bound read on the session's clock lands
   // in another day: watched failing here alone, the default session
-  // passing, with the bounds cast to a zoneless timestamp. `SQL, DMY` reads
-  // `01/03/2026` as the first of March.
+  // passing, with an instant's bound cast to a zoneless timestamp. `SQL,
+  // DMY` reads `03/01/2026` as the third of January, where the default
+  // reads it as the first of March: watched failing here alone with every
+  // bound written month first. Year first, as the planner writes them,
+  // neither setting moves a day.
   beforeAll(async () => {
     zonedSql = postgres(fixture.admin, { onnotice: () => {}, connection: { TimeZone: 'Pacific/Chatham', DateStyle: 'SQL, DMY' } })
     const [settings] = await zonedSql<{ zone: string; style: string }[]>`select current_setting('TimeZone') as zone, current_setting('DateStyle') as style`

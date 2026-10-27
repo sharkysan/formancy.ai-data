@@ -422,6 +422,36 @@ own cascade never asks. Either rolls back what the cascade did
   transaction moved the parent out of the scope is `not-found` too, with
   READ_COMMITTED_SNAPSHOT off and on, where PostgreSQL writes it (the
   shared case `through: moved-parent`). The EXISTS's plan is not measured.
+- **A person's filter is spelled as a row filter and a search are**
+  (0104). Each condition of a list's or a browse's `filter` is one more
+  predicate of the page's WHERE, beside the parent, the row filters, the
+  throughs and the search (`records/filter.ts`). An equals on text, an
+  integer, a decimal, a uuid or a date is a row filter's predicate above,
+  so under a case-insensitive collation `ag` does not find `AG` and `AG `
+  does not find `AG`, as on PostgreSQL; on a boolean it compares a `bit`
+  parameter. A contains is the search's LIKE with `%`, `_` and `[`
+  escaped, and so folds case and accents as the column's collation does,
+  where PostgreSQL's ILIKE folds case alone: the search's difference, not a
+  new one. `null` and `not-null` are `is null` and `is not null`, and a
+  varchar of no characters is a value. A range's `from`, `to` and `before`
+  are `>=`, `<=` and `<` against a bound converted from text as its
+  column's value is: an integer, a decimal, a date and an instant as a write
+  binds them, an instant's midnight a `datetimeoffset` in UTC through style
+  127, which compares instants whatever offset each row was written in. A
+  zoneless timestamp has no write to bind as, so its midnight is a
+  `datetime2` of the column's scale through style 126 -- never the
+  column's own type when that is `datetime` or `smalldatetime`, which the
+  snapshot calls `datetime2(3)` and `datetime2(0)`. It needs to be neither:
+  a midnight is exact at every scale and each type converts to `datetime2`
+  exactly, a `datetime`'s 23:59:59.997 below the next midnight, while a
+  bound converted to `smalldatetime` fails the statement outside 1900 to
+  2079. Every bound is read through an ISO 8601 style, which neither the
+  session's language nor its DATEFORMAT changes. The list suite holds a
+  `datetime`, a `smalldatetime` and a `datetime2` of scale 7 and of scale 0
+  at midnight exactly, and every timestamp and date case again in a German
+  session with DATEFORMAT dmy. The plans are not measured; a `datetime` or
+  `smalldatetime` column is converted to the bound's `datetime2` to be
+  compared.
 - **Every write holds the table to the definition it was decided over**
   ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)).
   `describe(table)` reads the root's definition in one statement, and a read
@@ -577,8 +607,11 @@ checked once, by hand, on 2026-10-09, and is not a test.
 `pnpm test` starts SQL Server through `@formancy/data-fixtures`, once per
 test file, and runs the suite against it: discovery, the spike, lookups,
 what a lookup reads on the sized customers (0034), a lookup stopped when
-its caller goes (0061), records, a page of them and a file of the
-shipments written by data-core (`list.integration.test.ts`, 0044, 0079),
+its caller goes (0061), records, a page of them, a page narrowed by a
+person's filter -- each case `COLUMN_FILTER_PARITY`'s, and this engine's
+own `datetime`, `smalldatetime` and `datetime2` at midnight -- and a file
+of the shipments written by data-core (`list.integration.test.ts`, 0044,
+0079, 0104),
 the ways a record operation fails, a write whose answer is lost on the way back, and a
 uuid key end to end (`uuid.integration.test.ts`, 0056: discovered, generated
 read-only, its token in lower case, created, updated, listed in this

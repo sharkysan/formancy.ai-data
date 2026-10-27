@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { COLUMN_FILTER_PARITY, COLUMN_FILTER_ROWS } from './column-filters.js'
 import { LIST_ROWS } from './lists.js'
 import { FIXTURE_CUSTOMERS } from './sized.js'
+import { EDGE_VALUES } from './values.js'
 
 /*
  * The column filters' expectations (0104), held to the rows they are about
@@ -17,6 +18,56 @@ const midnight = (day: string): number => Date.parse(`${day}T00:00:00Z`)
 
 /** Whether `at` is in the whole days from `from` to `to`, either end left open by `null`. */
 const within = (at: number, from: string | null, to: string | null): boolean => (from === null || at >= midnight(from)) && (to === null || at < midnight(to) + DAY)
+
+/** Tenant 1's customers as the list suites leave them: the fixture's 1001, LIST_ROWS', each made active or not by COLUMN_FILTER_ROWS. */
+const CUSTOMERS = [
+  ...FIXTURE_CUSTOMERS.filter((row) => row.tenantId === 1).map((row) => [String(row.customerNo), row.name, EDGE_VALUES.largestCreditLimit] as const),
+  ...LIST_ROWS.customers,
+].map(([number, name, credit]) => ({
+  customer_no: number,
+  name,
+  credit_limit: credit,
+  active: String(COLUMN_FILTER_ROWS.customers.find(([customer]) => customer === number)?.[2]),
+}))
+
+type Customer = (typeof CUSTOMERS)[number]
+
+/** A condition on a customer, as the cases write one. */
+interface Condition {
+  readonly field: string
+  readonly op: string
+  readonly value?: string
+  readonly from?: string | null
+  readonly to?: string | null
+  readonly text?: string
+}
+
+/**
+ * Whether `condition` holds for `customer`, worked out here as the cases
+ * mean it: numbers compared as numbers, so `50` equals `50.00`, bounds
+ * inclusive, a contains case folded, and NULL in no range and equal to
+ * nothing.
+ */
+function holds(customer: Customer, condition: Condition): boolean {
+  const value = customer[condition.field as keyof Customer]
+  if (condition.op === 'null') return value === null
+  if (value === null) return false
+  switch (condition.op) {
+    case 'not-null':
+      return true
+    case 'contains':
+      return value.toLowerCase().includes(String(condition.text).toLowerCase())
+    case 'equals':
+      return condition.field === 'active' ? value === condition.value : Number(value) === Number(condition.value)
+    case 'range':
+      return (condition.from == null || Number(value) >= Number(condition.from)) && (condition.to == null || Number(value) <= Number(condition.to))
+    default:
+      throw new Error(`no ${condition.op} here`)
+  }
+}
+
+/** The customer numbers every condition holds for, in key order. */
+const where = (conditions: readonly Condition[]): string[] => CUSTOMERS.filter((customer) => conditions.every((condition) => holds(customer, condition))).map((customer) => customer.customer_no)
 
 describe('COLUMN_FILTER_ROWS', () => {
   // The suites update these customers rather than insert them; a number
@@ -76,6 +127,30 @@ describe('COLUMN_FILTER_PARITY', () => {
     expect(contains.keys.map(([, item]) => item)).toEqual(['1', '2', '3', '4'])
     expect(contains.keys.filter(([code]) => !code.toLowerCase().includes(contains.text.toLowerCase()))).toEqual([])
     expect(equals.map((entry) => `${entry.column}=${entry.value}`)).toEqual(['tenant_code=acme', 'tenant_code=acme ', 'tenant_code=ACME', 'tenant_code=Acmé', 'tenant_code=Acme', 'fixed_code=AB', 'fixed_code=ab'])
+  })
+
+  // Worked out over the customers the suites write, so an expectation typed
+  // wrong fails here before it fails both engines alike. And each condition
+  // of `together` leaves out a customer the others hold for: one that
+  // narrowed nothing would pass with the adapter's spelling of it removed,
+  // as the range of an earlier entry did on SQL Server.
+  test('the customer cases: each holds the customers its conditions hold for, and none of together is idle', () => {
+    for (const name of ['integer', 'decimal'] as const) {
+      const { field, entries } = COLUMN_FILTER_PARITY[name]
+      for (const entry of entries) expect(where([{ field, ...entry.condition }]), `${name} ${entry.condition.op}`).toEqual(entry.keys)
+    }
+    const { field: contained, entries: texts } = COLUMN_FILTER_PARITY.contains
+    for (const entry of texts) expect(where([{ field: contained, op: 'contains', text: entry.text }]), entry.text).toEqual(entry.keys)
+    const nulls = COLUMN_FILTER_PARITY.nulls
+    expect(where([{ field: nulls.field, op: 'null' }])).toEqual(nulls.null)
+    expect(where([{ field: nulls.field, op: 'not-null' }])).toEqual(nulls['not-null'])
+    for (const entry of COLUMN_FILTER_PARITY.together) {
+      expect(where(entry.filter)).toEqual(entry.keys)
+      entry.filter.forEach((condition, index) => {
+        const others = entry.filter.filter((_, other) => other !== index)
+        expect(where(others).length, `without ${condition.field} ${condition.op}`).toBeGreaterThan(entry.keys.length)
+      })
+    }
   })
 
   // The flags are set by the update the instants are: an expectation typed

@@ -107,7 +107,8 @@ export const COLUMN_FILTER_TENANT = '3'
  *   `_` and `[x]` match themselves, and case is folded.
  * - `nulls`: a credit limit is NULL, or is not.
  * - `together`: every condition holds: two that each hold for two
- *   customers hold together for one, and three for two.
+ *   customers hold together for one, and three for two, each of the three
+ *   leaving out a customer the other two hold for.
  * - `search`: a filter beside a list's search, both holding: each alone
  *   finds more.
  * - `parent`: a filter beside a parent: a line list narrowed to tenant 1's
@@ -208,10 +209,12 @@ export const COLUMN_FILTER_PARITY = {
       ],
       keys: ['2001'],
     },
+    // Each of the three leaves a customer out: the range 2006, `x Labs`;
+    // the contains 2001, `100% Cotton`; and `not-null` 2005, `[x] Labs`.
     {
       filter: [
-        { field: 'customer_no', op: 'range', from: '2002', to: '2006' },
-        { field: 'name', op: 'contains', text: 'trading' },
+        { field: 'customer_no', op: 'range', from: '2001', to: '2005' },
+        { field: 'name', op: 'contains', text: 'B' },
         { field: 'credit_limit', op: 'not-null' },
       ],
       keys: ['2003', '2004'],
