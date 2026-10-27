@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription, computeAccessibleName } from 'dom-accessibility-api'
 import { createSnapshot, LIST_PAGE_SIZE } from '@formancy/data-core'
 import type { BrowseFilterTerm } from '@formancy/data-core'
@@ -194,7 +194,7 @@ describe('the panel', () => {
     const user = await browsing()
     await show(user, 'sales.employee')
     expect(within(browseStep()).queryByRole('button', { name: 'Filter rows' })).toBeNull()
-    expect(within(browseStep()).getByText(/^No column/).textContent).toBe('No column this page shows can be filtered.')
+    expect(paragraphs(browseStep())).toContain('No column this page shows can be filtered.')
   })
 
   // The server discovers again for every page, so a page can show a column the studio's discovery has not seen: the panel cannot tell what it offers, or whether it holds NULLs, and offers nothing on it rather than a guess the server might refuse.
@@ -366,7 +366,7 @@ describe('removing and clearing', () => {
     await addCondition(user, 'manager_id', 'is NULL')
     await statusSays('Filtered by id from 1 and name contains “a” and manager_id is NULL, showing rows 1 to 1.')
     expect(within(browseStep()).queryByRole('form', { name: 'Add a condition' })).toBeNull()
-    expect(within(browseStep()).getByText(/^Every column/).textContent).toBe('Every column this page can be filtered by has a condition.')
+    expect(paragraphs(browseStep())).toContain('Every column this page can be filtered by has a condition.')
     expect(focusedName()).toBe('Filter rows')
     await user.click(within(browseStep()).getByRole('button', { name: 'Remove name contains “a”' }))
     await statusSays('Filtered by id from 1 and manager_id is NULL, showing rows 1 to 1.')
@@ -397,8 +397,7 @@ describe('a refusal', () => {
     // A range with neither bound is a malformed body, refused before the server reads the catalog; said the same way.
     await user.selectOptions(within(form()).getByRole('combobox', { name: 'Condition' }), 'is in a range')
     await user.click(within(form()).getByRole('button', { name: 'Apply' }))
-    await screen.findByText('A range on credit_limit has a from, a to or both.')
-    expect(alert()?.textContent).toBe('A range on credit_limit has a from, a to or both.')
+    await waitFor(() => expect(alert()?.textContent).toBe('A range on credit_limit has a from, a to or both.'))
 
     // Corrected, it is applied, and the alert goes.
     await user.type(within(form()).getByRole('textbox', { name: 'From' }), '1.23')
