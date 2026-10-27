@@ -29,9 +29,10 @@ const IDENTITIES = new Map([
  * with a long note and a NULL, so the grid scrolls inside its own region;
  * and the customer and the employee it refers to, so a row's foreign key
  * can be followed and a NULL one is said (0103). Narrowed by the request's
- * equal values, each spelled as the rows hold it, and paged by offset and
- * limit; what a database does with a sort, a search or another spelling is
- * the adapter suites' to prove (0003).
+ * equal values, each spelled as the rows hold it, and by the person's
+ * filter (0104) as far as `holds` compares it, and paged by offset and
+ * limit; what a database does with a sort, a search, a filter or another
+ * spelling is the adapter and parity suites' to prove (0003).
  */
 const ORDER = { tenant_id: '1', customer_no: '1001', order_date: '2026-10-08', status: 'placed', amount: '99999999999999.9999', group: 'A', created_by: '1', approved_by: null, row_version: '1' }
 const ROWS = new Map([
@@ -50,9 +51,27 @@ const ROWS = new Map([
   ]],
 ])
 
+/**
+ * Whether a row holds one condition of the filter, as `RecordFilter` says
+ * an adapter compares it: an equal value exactly, NULL or not. The states
+ * the gate measures ask for nothing else; a range or a contains is
+ * refused rather than ignored, so a state that asked for one would fail
+ * here instead of measuring a page the filter did not narrow. The
+ * studio's suite compares every operator (src/test-server.ts).
+ */
+function holds(values, condition) {
+  const value = values[condition.column] ?? null
+  if (condition.op === 'equals') return value !== null && String(value) === condition.value
+  if (condition.op === 'null') return value === null
+  if (condition.op === 'not-null') return value !== null
+  throw new Error(`the gate's plane compares no ${condition.op} condition`)
+}
+
 const records = {
   list: async (request) => {
-    const rows = (ROWS.get(`${request.target.table.schema}.${request.target.table.name}`) ?? []).filter((values) => request.equal.every((term) => values[term.name] === term.value))
+    const rows = (ROWS.get(`${request.target.table.schema}.${request.target.table.name}`) ?? []).filter(
+      (values) => request.equal.every((term) => values[term.name] === term.value) && request.filter.every((condition) => holds(values, condition)),
+    )
     const page = rows.slice(request.offset, request.offset + request.limit + 1)
     return { ok: true, described: null, rows: page.map((values) => ({ values, version: null })) }
   },
