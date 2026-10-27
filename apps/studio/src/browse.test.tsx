@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { createSnapshot, LIST_PAGE_SIZE } from '@formancy/data-core'
 import type { MetadataSnapshot } from '@formancy/data-core'
+import { browseRequests, browseStep, browsing as browsingOn, chosen, entries, grid, openRelated, pageHeading, show, status, statusSays } from './test-browse.js'
 import { audit, discover, goTo, signIn, unnamed } from './test-studio.js'
 import { OWNER_SNAPSHOT, startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
@@ -12,9 +13,10 @@ import type { TestPlane } from './test-server.js'
  * discovered connection can see, for a holder of a browse role alone,
  * against the real server behind the fake `fetch`. The plane's records
  * port narrows the rows a test puts in by the request's equal values and
- * pages them by offset and limit; what a database does with the sort and
- * the search the studio sends is the adapter suites' to prove, against
- * real servers (0003), so here the request body is what is held.
+ * filter, and pages them by offset and limit; what a database does with
+ * the sort and the search the studio sends is the adapter suites' to
+ * prove, against real servers (0003), so here the request body is what is
+ * held. The filter has a suite of its own, `browse-filter.test.tsx` (0104).
  *
  * A row's foreign keys are followed either way (0103): to the row it
  * refers to, and to the rows that refer to it, each a browse of the other
@@ -41,39 +43,8 @@ afterEach(async () => {
 })
 
 const browseButton = () => within(screen.getByRole('navigation', { name: 'Steps' })).getByRole('button', { name: /^\d+\. Browse$/ })
-const browses = () => plane.requests.filter((request) => request.path.endsWith('/browse'))
-const browseStep = () => screen.getByRole('main', { name: 'Browse' })
-const status = () => within(browseStep()).getByRole('status').textContent
-/** Waits for the page's status line, the live region a screen reader announces, to say `text`. */
-const statusSays = (text: string) => waitFor(() => expect(status()).toBe(text))
-const chosen = () => (within(browseStep()).getByLabelText('Table or view') as HTMLSelectElement).value
-
-/** The grid's rows as the cells' text, the header row first. */
-function grid(): string[][] {
-  // The grid's own region, named by its caption -- "sales.country, rows 1 to 2" -- beside the section named by its heading.
-  const table = within(screen.getByRole('region', { name: /^sales\.[^ ]+, / })).getByRole('table')
-  return within(table)
-    .getAllByRole('row')
-    .map((row) => [...row.querySelectorAll('th, td')].map((cell) => cell.textContent ?? ''))
-}
-
-async function show(user: Awaited<ReturnType<typeof signIn>>, object: string, search = ''): Promise<void> {
-  const browse = browseStep()
-  await user.selectOptions(within(browse).getByLabelText('Table or view'), object)
-  const box = within(browse).getByLabelText('Search')
-  await user.clear(box)
-  if (search !== '') await user.type(box, search)
-  await user.click(within(browse).getByRole('button', { name: 'Show rows' }))
-  await screen.findByRole('region', { name: new RegExp(`^${object.replace('.', '\\.')},`) })
-}
-
-/** Signed in as a browser, the fixture discovered, on the Browse step. */
-async function browsing(): Promise<Awaited<ReturnType<typeof signIn>>> {
-  const user = await signIn(plane, TOKENS.browser)
-  await discover(user)
-  await goTo(user, 'Browse')
-  return user
-}
+const browses = () => browseRequests(plane)
+const browsing = () => browsingOn(plane)
 
 /**
  * Rows to follow either way: a customer refers to its country and is
@@ -97,21 +68,6 @@ function relatedRows(): void {
   ])
 }
 
-/** A row's related rows opened by its button, and the section that says them. */
-async function openRelated(user: Awaited<ReturnType<typeof signIn>>, row: number): Promise<HTMLElement> {
-  await user.click(screen.getByRole('button', { name: `Related to row ${String(row)}` }))
-  return screen.getByRole('region', { name: new RegExp(`^Related to row ${String(row)} of `) })
-}
-
-/** What a list of the open section offers, each entry as its text. */
-const entries = (name: string) =>
-  within(screen.getByRole('list', { name }))
-    .getAllByRole('listitem')
-    .map((item) => item.textContent)
-
-/** The page's own heading, which a follow and a Back put the keyboard on. */
-const pageHeading = (name: string) => screen.getByRole('heading', { level: 3, name })
-
 describe('who sees the step', () => {
   // The server refuses the route to an administrator without a browse role; a step that opened anyway would fail on its first press.
   test('an administrator without a browse role sees it listed and waiting for one', async () => {
@@ -134,7 +90,7 @@ describe('a page', () => {
   test('shows the rows the server read, says NULL, and names the columns it left out', async () => {
     const user = await browsing()
     await show(user, 'sales.country')
-    expect(browses()).toEqual([{ method: 'POST', path: '/v1/connections/fixture/browse', body: { object: { schema: 'sales', name: 'country' }, equal: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE } }])
+    expect(browses()).toEqual([{ method: 'POST', path: '/v1/connections/fixture/browse', body: { object: { schema: 'sales', name: 'country' }, equal: [], filter: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE } }])
     expect(grid()).toEqual([
       ['Related', 'id', 'iso_code', 'name'],
       ['Related', '1', 'CH', 'Switzerland'],
@@ -180,9 +136,9 @@ describe('a page', () => {
     await user.click(screen.getByRole('button', { name: 'name, sort descending' }))
     await screen.findByRole('button', { name: 'name, sort ascending' })
     expect(browses().map((request) => request.body)).toEqual([
-      { object: { schema: 'sales', name: 'country' }, equal: [], search: 'Swi', sort: [], offset: 0, limit: LIST_PAGE_SIZE },
-      { object: { schema: 'sales', name: 'country' }, equal: [], search: 'Swi', sort: [{ column: 'name', direction: 'asc' }], offset: 0, limit: LIST_PAGE_SIZE },
-      { object: { schema: 'sales', name: 'country' }, equal: [], search: 'Swi', sort: [{ column: 'name', direction: 'desc' }], offset: 0, limit: LIST_PAGE_SIZE },
+      { object: { schema: 'sales', name: 'country' }, equal: [], filter: [], search: 'Swi', sort: [], offset: 0, limit: LIST_PAGE_SIZE },
+      { object: { schema: 'sales', name: 'country' }, equal: [], filter: [], search: 'Swi', sort: [{ column: 'name', direction: 'asc' }], offset: 0, limit: LIST_PAGE_SIZE },
+      { object: { schema: 'sales', name: 'country' }, equal: [], filter: [], search: 'Swi', sort: [{ column: 'name', direction: 'desc' }], offset: 0, limit: LIST_PAGE_SIZE },
     ])
     // The plane's port does not search; the status says what was asked for and what came back.
     expect(status()).toBe('Matching “Swi”, showing rows 1 to 2.')
@@ -376,7 +332,7 @@ describe('following a foreign key', () => {
     await openRelated(user, 1)
     await user.click(screen.getByRole('button', { name: 'sales.country where iso_code = CH' }))
     await screen.findByRole('region', { name: /^sales\.country, / })
-    expect(browses().at(-1)?.body).toEqual({ object: { schema: 'sales', name: 'country' }, equal: [{ column: 'iso_code', value: 'CH' }], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE })
+    expect(browses().at(-1)?.body).toEqual({ object: { schema: 'sales', name: 'country' }, equal: [{ column: 'iso_code', value: 'CH' }], filter: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE })
     expect(grid()).toEqual([
       ['Related', 'id', 'iso_code', 'name'],
       ['Related', '1', 'CH', 'Switzerland'],
@@ -409,6 +365,7 @@ describe('following a foreign key', () => {
         { column: 'tenant_id', value: '1' },
         { column: 'customer_no', value: '1001' },
       ],
+      filter: [],
       search: '',
       sort: [],
       offset: 0,
@@ -449,7 +406,7 @@ describe('following a foreign key', () => {
 
     await user.click(screen.getByRole('button', { name: 'Back to sales.order' }))
     await statusSays('Matching “placed”, showing rows 51 to 51.')
-    expect(left).toEqual({ object: { schema: 'sales', name: 'order' }, equal: [], search: 'placed', sort: [{ column: 'status', direction: 'asc' }], offset: 50, limit: LIST_PAGE_SIZE })
+    expect(left).toEqual({ object: { schema: 'sales', name: 'order' }, equal: [], filter: [], search: 'placed', sort: [{ column: 'status', direction: 'asc' }], offset: 50, limit: LIST_PAGE_SIZE })
     expect(browses().at(-1)?.body).toEqual(left)
     expect(screen.getByRole('columnheader', { name: 'status' }).getAttribute('aria-sort')).toBe('ascending')
     expect(within(browseStep()).getByLabelText('Search')).toHaveProperty('value', 'placed')
@@ -475,9 +432,9 @@ describe('following a foreign key', () => {
     await screen.findByRole('button', { name: 'name, sort descending' })
     const equal = [{ column: 'manager_id', value: '1' }]
     expect(browses().slice(1).map((request) => request.body)).toEqual([
-      { object: { schema: 'sales', name: 'employee' }, equal, search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE },
-      { object: { schema: 'sales', name: 'employee' }, equal, search: '', sort: [], offset: 50, limit: LIST_PAGE_SIZE },
-      { object: { schema: 'sales', name: 'employee' }, equal, search: '', sort: [{ column: 'name', direction: 'asc' }], offset: 0, limit: LIST_PAGE_SIZE },
+      { object: { schema: 'sales', name: 'employee' }, equal, filter: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE },
+      { object: { schema: 'sales', name: 'employee' }, equal, filter: [], search: '', sort: [], offset: 50, limit: LIST_PAGE_SIZE },
+      { object: { schema: 'sales', name: 'employee' }, equal, filter: [], search: '', sort: [{ column: 'name', direction: 'asc' }], offset: 0, limit: LIST_PAGE_SIZE },
     ])
     expect(status()).toBe('Where manager_id = 1, showing rows 1 to 50, and more follow.')
     // Paging is not leaving: the way back still names the page the follow left.
@@ -494,7 +451,7 @@ describe('following a foreign key', () => {
     await statusSays('Where iso_code = CH, showing rows 1 to 1.')
     await user.click(within(browseStep()).getByRole('button', { name: 'Show rows' }))
     await statusSays('Showing rows 1 to 2.')
-    expect(browses().at(-1)?.body).toEqual({ object: { schema: 'sales', name: 'country' }, equal: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE })
+    expect(browses().at(-1)?.body).toEqual({ object: { schema: 'sales', name: 'country' }, equal: [], filter: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE })
     expect(screen.queryByRole('button', { name: /^Back to / })).toBeNull()
   })
 
