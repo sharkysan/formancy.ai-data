@@ -26,16 +26,19 @@ export interface ListRouteSteps {
  * person may read, each exactly what `records/read` returns for its token,
  * in a total order, with whether more follow and no total.
  *
- * A POST, so the search never appears in a URL a proxy logs. The body is
- * checked first, as the read route checks its token; then the planner asks
- * the policy -- a list is a read, under the read filter and every through,
- * with no grant of its own -- before any statement. The page and the table
+ * A POST, so the search and a filter's values never appear in a URL a proxy
+ * logs. The body is checked first, as the read route checks its token; then
+ * the planner asks the policy -- a list is a read, under the read filter and
+ * every through, with no grant of its own -- and plans the person's filter,
+ * each condition on a field `GET` offers it on or refused `not-filterable`
+ * (0104), before any statement. The filter narrows; the read filter and the
+ * throughs still decide which rows exist. The page and the table
  * it was read from come from one statement, and the page is decided over
  * that description after it ran, as a read is (0041), and also refused
  * when the table no longer holds the key to a total order: refused, its
  * rows are discarded and never reach the body, and the log says `list`, as
  * the audit does. The audit names the operation `list` and no record, never
- * the search, the sort or the parent (0023).
+ * the search, the sort, the parent or the filter (0023).
  *
  * An adapter that answered `unknown-outcome` for a list -- which writes
  * nothing -- is a bug, and is answered 500, as for a read (0031).
