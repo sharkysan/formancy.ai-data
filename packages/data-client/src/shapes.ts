@@ -1,4 +1,4 @@
-import type { FieldError, FilterableField, FilterInput, FilterOp, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordList } from '@formancy/data-core'
+import type { FieldError, FilterableField, FilterDays, FilterInput, FilterOp, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordList } from '@formancy/data-core'
 import type { Refusal } from './client.js'
 
 /*
@@ -38,20 +38,24 @@ function isStrings(value: unknown): value is string[] {
  */
 const FILTER_OPERATORS: Readonly<Record<FilterOp, true>> = { equals: true, range: true, contains: true, null: true, 'not-null': true }
 const FILTER_INPUTS: Readonly<Record<FilterInput, true>> = { text: true, integer: true, decimal: true, date: true, uuid: true, boolean: true }
+const FILTER_DAYS: Readonly<Record<FilterDays, true>> = { utc: true, wall: true }
 
 /**
  * One field's filter offer: a field key, the operators it offers -- at
- * least one, each one data-core names -- and what a value is typed as,
- * `null` exactly when it offers only `null` and `not-null`. A panel draws
- * its inputs from this, so an offer it could not draw is not the server's.
+ * least one, each one data-core names -- what a value is typed as, `null`
+ * exactly when it offers only `null` and `not-null`, and whose clock a
+ * timestamp's days are on, one data-core names on a date input and `null`
+ * on every other. A panel draws its inputs from this, so an offer it could
+ * not draw is not the server's.
  */
 function isFilterableField(value: unknown): value is FilterableField {
   if (!isRecord(value) || typeof value['field'] !== 'string' || !isStrings(value['operators'])) return false
   const operators = value['operators']
   if (operators.length === 0 || !operators.every((op) => Object.hasOwn(FILTER_OPERATORS, op))) return false
-  const input = value['input']
+  const { input, days } = value
   const valued = operators.some((op) => op !== 'null' && op !== 'not-null')
-  return valued ? typeof input === 'string' && Object.hasOwn(FILTER_INPUTS, input) : input === null
+  if (!(valued ? typeof input === 'string' && Object.hasOwn(FILTER_INPUTS, input) : input === null)) return false
+  return days === null || (input === 'date' && typeof days === 'string' && Object.hasOwn(FILTER_DAYS, days))
 }
 
 /**

@@ -81,8 +81,10 @@ describe('when the data server is not what answers', () => {
   // (0104). A list without one -- a server older than filters -- or with
   // an offer a panel could not draw -- no operator, one data-core does not
   // name, a value's type it does not name, a type where only `null` and
-  // `not-null` are offered or none where a value is -- is not this
-  // server's either: a page would offer conditions the server refuses.
+  // `not-null` are offered or none where a value is, a clock for days it
+  // does not name, or on anything but a date -- is not this server's
+  // either: a page would offer conditions the server refuses, or say a
+  // timestamp's days are on a clock they are not.
   // Watched failing with `filterable` left unchecked: every one of those
   // lists was taken for the server's.
   test("a form without the server's list is unexpected, and a list of null or columns is the server's", async () => {
@@ -93,7 +95,7 @@ describe('when the data server is not what answers', () => {
     })
     const client = createDataClient({ token: () => 't', base })
     const columns = { searchable: [], sortable: ['id'] }
-    const offer = (operators: unknown, input: unknown) => ({ ...columns, filterable: [{ field: 'id', operators, input }] })
+    const offer = (operators: unknown, input: unknown, days: unknown = null) => ({ ...columns, filterable: [{ field: 'id', operators, input, days }] })
     for (const list of [
       undefined,
       'yes',
@@ -102,17 +104,20 @@ describe('when the data server is not what answers', () => {
       { searchable: [], sortable: [1], filterable: [] },
       columns,
       { ...columns, filterable: {} },
-      { ...columns, filterable: [{ operators: ['equals'], input: 'integer' }] },
+      { ...columns, filterable: [{ operators: ['equals'], input: 'integer', days: null }] },
+      { ...columns, filterable: [{ field: 'id', operators: ['equals'], input: 'integer' }] },
       offer([], null),
       offer(['like'], 'text'),
       offer(['equals'], 'money'),
       offer(['equals'], null),
       offer(['null', 'not-null'], 'text'),
+      offer(['range'], 'date', 'local'),
+      offer(['equals', 'range'], 'integer', 'utc'),
     ]) {
       body = { ...FORM, list }
       expect(await client.form('pg-order'), JSON.stringify(list)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
     }
-    for (const list of [null, { ...columns, filterable: [] }, offer(['equals', 'range'], 'integer'), offer(['null', 'not-null'], null), offer(['equals', 'contains', 'null', 'not-null'], 'text')]) {
+    for (const list of [null, { ...columns, filterable: [] }, offer(['equals', 'range'], 'integer'), offer(['null', 'not-null'], null), offer(['equals', 'contains', 'null', 'not-null'], 'text'), offer(['range'], 'date', 'utc'), offer(['range', 'null', 'not-null'], 'date', 'wall')]) {
       body = { ...FORM, list }
       expect(await client.form('pg-order'), JSON.stringify(list)).toEqual({ ok: true, value: body })
     }

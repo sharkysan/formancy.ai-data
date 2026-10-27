@@ -1,5 +1,4 @@
-import { checkSearch } from '../lookup/search.js'
-import type { SearchErrorCode } from '../lookup/search.js'
+import { checkSearch, MAX_SEARCH_LENGTH } from '../lookup/search.js'
 import { isKeyValue } from '../lookup/values.js'
 import type { ColumnMeta, NormalizedTypeKind } from '../metadata.js'
 import type { FilterCondition, FilterOffer, FilterOp } from '../runtime.js'
@@ -29,7 +28,7 @@ import type { EqualsFilterType, RangeFilterType, RecordFilter } from './types.js
  * equality, since a page shows it cut to the second (0040) and a person
  * would type what the page shows: its range is whole days.
  */
-const OWN: Partial<Record<NormalizedTypeKind, FilterOffer>> = {
+const OWN: Partial<Record<NormalizedTypeKind, Omit<FilterOffer, 'days'>>> = {
   text: { operators: ['equals', 'contains'], input: 'text' },
   integer: { operators: ['equals', 'range'], input: 'integer' },
   decimal: { operators: ['equals', 'range'], input: 'decimal' },
@@ -42,15 +41,17 @@ const OWN: Partial<Record<NormalizedTypeKind, FilterOffer>> = {
 /**
  * What a column offers a filter, from its type and whether it holds NULLs:
  * its kind's own operators, then `null` and `not-null` where the snapshot
- * says it holds NULLs -- or `null` when it offers nothing. A form's list
- * (`listColumns`), its planner, a browse's planner and the studio ask this
- * one function.
+ * says it holds NULLs -- or `null` when it offers nothing. A timestamp's
+ * offer says whose clock its days are on, which only its type knows. A
+ * form's list (`listColumns`), its planner, a browse's planner and the
+ * studio ask this one function.
  */
 export function filterOffer(column: Pick<ColumnMeta, 'type' | 'nullable'>): FilterOffer | null {
   const own = OWN[column.type.kind]
   const nulls: FilterOp[] = column.nullable ? ['null', 'not-null'] : []
-  if (own === undefined) return nulls.length === 0 ? null : { operators: nulls, input: null }
-  return { operators: [...own.operators, ...nulls], input: own.input }
+  if (own === undefined) return nulls.length === 0 ? null : { operators: nulls, input: null, days: null }
+  const days = column.type.kind !== 'timestamp' ? null : column.type.withTimeZone ? 'utc' : 'wall'
+  return { operators: [...own.operators, ...nulls], input: own.input, days }
 }
 
 const INTEGER = /^([+-]?)0*([0-9]+)$/
@@ -203,8 +204,13 @@ export function columnFilter(column: Pick<ColumnMeta, 'name' | 'type' | 'nullabl
   }
 }
 
-/** A filter as a request carried it, read, or why it is not one. */
-export type FilterRead<Term> = { ok: true; filter: Term[] } | { ok: false; code: 'malformed' | SearchErrorCode; message: string }
+/**
+ * A filter as a request carried it, read, or why it is not one: `malformed`
+ * for a body not shaped as a filter, `not-filterable` for what `contains`
+ * would find that a search could not -- the filter's to correct, not the
+ * search's.
+ */
+export type FilterRead<Term> = { ok: true; filter: Term[] } | { ok: false; code: 'malformed' | 'not-filterable'; message: string }
 
 /** The properties of each condition besides its name and its operator. */
 const SHAPES: Readonly<Record<FilterOp, readonly string[]>> = { equals: ['value'], range: ['from', 'to'], contains: ['text'], null: [], 'not-null': [] }
@@ -218,8 +224,25 @@ function hasExactly(record: Record<string, unknown>, keys: readonly string[]): b
   return present.length === keys.length && keys.every((key) => Object.hasOwn(record, key))
 }
 
+/**
+ * Why what a `contains` on `name` finds is no text a search could be, in a
+ * sentence of the condition's own: the rules are `checkSearch`'s, and the
+ * person typed a condition, not a search.
+ */
+function unfindable(name: string, code: 'search-too-long' | 'search-control-character' | 'ill-formed-text', length: number): { ok: false; code: 'not-filterable'; message: string } {
+  const finds = `What a contains condition on ${name} finds`
+  switch (code) {
+    case 'search-too-long':
+      return { ok: false, code: 'not-filterable', message: `${finds} is at most ${String(MAX_SEARCH_LENGTH)} characters, and this has ${String(length)}.` }
+    case 'search-control-character':
+      return { ok: false, code: 'not-filterable', message: `${finds} cannot contain a control character.` }
+    case 'ill-formed-text':
+      return { ok: false, code: 'not-filterable', message: `${finds} cannot contain an unpaired UTF-16 surrogate.` }
+  }
+}
+
 /** One condition's own properties, checked: text where text is asked for, a bound or `null`, and a search's own check on what `contains` finds. */
-function conditionOf(op: FilterOp, entry: Record<string, unknown>, name: string): { ok: true; condition: FilterCondition } | { ok: false; code: 'malformed' | SearchErrorCode; message: string } {
+function conditionOf(op: FilterOp, entry: Record<string, unknown>, name: string): { ok: true; condition: FilterCondition } | { ok: false; code: 'malformed' | 'not-filterable'; message: string } {
   switch (op) {
     case 'null':
     case 'not-null':
@@ -236,8 +259,9 @@ function conditionOf(op: FilterOp, entry: Record<string, unknown>, name: string)
       return { ok: true, condition: { op, from, to } }
     }
     case 'contains': {
-      const text = checkSearch(entry['text'])
-      if (!text.ok) return text
+      const given = entry['text']
+      const text = checkSearch(given)
+      if (!text.ok) return text.code === 'malformed' ? malformed(`The text a contains condition on ${name} finds is text.`) : unfindable(name, text.code, (given as string).length)
       if (text.search === '') return malformed(`A contains condition on ${name} has text to find.`)
       return { ok: true, condition: { op, text: text.search } }
     }

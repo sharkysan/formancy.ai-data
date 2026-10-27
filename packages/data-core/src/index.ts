@@ -203,6 +203,7 @@ export type {
   Deleting,
   FilterableField,
   FilterCondition,
+  FilterDays,
   FilterInput,
   FilterOffer,
   FilterOp,

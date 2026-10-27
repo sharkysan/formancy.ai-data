@@ -337,7 +337,7 @@ the one where the engines answer differently, `moved-parent`, included, each
 `UUID_PARITY` case (0056), `order` included, whose expectation is each
 engine's own order, each `EXPORT_PARITY` case (0079), a file's bytes,
 each `BROWSE_PARITY` case (0099, 0103), and each `COLUMN_FILTER_PARITY`
-case (0104).
+case ([0104](../../docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 The ids are derived from the shared data --
 `filterCase(entry)`, `displayCase(column)`, `temporalCase(column)`,
 `refusalCase(name)`, `edgeCase(name)`,

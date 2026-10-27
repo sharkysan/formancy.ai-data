@@ -423,7 +423,7 @@ own cascade never asks. Either rolls back what the cascade did
   READ_COMMITTED_SNAPSHOT off and on, where PostgreSQL writes it (the
   shared case `through: moved-parent`). The EXISTS's plan is not measured.
 - **A person's filter is spelled as a row filter and a search are**
-  (0104). Each condition of a list's or a browse's `filter` is one more
+  ([0104](../../docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)). Each condition of a list's or a browse's `filter` is one more
   predicate of the page's WHERE, beside the parent, the row filters, the
   throughs and the search (`records/filter.ts`). An equals on text, an
   integer, a decimal, a uuid or a date is a row filter's predicate above,

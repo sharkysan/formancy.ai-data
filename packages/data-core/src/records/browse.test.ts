@@ -232,7 +232,7 @@ describe('validateBrowseQuery', () => {
   test('reads a filter as conditions by column', () => {
     const filter = [{ column: 'name', op: 'contains', text: ' land ' }]
     expect(validateBrowseQuery({ object: { schema: 'sales', name: 'country' }, filter })).toEqual({ ok: true, query: query('country', { filter: [{ column: 'name', op: 'contains', text: 'land' }] }) })
-    expect(validateBrowseQuery({ object: ref('country'), filter: [{ column: 'name', op: 'contains', text: 'x'.repeat(201) }] })).toMatchObject({ ok: false, code: 'search-too-long' })
+    expect(validateBrowseQuery({ object: ref('country'), filter: [{ column: 'name', op: 'contains', text: 'x'.repeat(201) }] })).toMatchObject({ ok: false, code: 'not-filterable' })
   })
 
   // The page and the search are a list's own checks, so a browse can never ask for more rows at once than a list.

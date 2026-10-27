@@ -38,15 +38,15 @@ const definition = {
     searchable: ['carrier'],
     sortable: ['carrier'],
     filterable: [
-      { field: 'id', operators: ['equals'], input: 'uuid' },
-      { field: 'carrier', operators: ['equals', 'contains'], input: 'text' },
-      { field: 'shipped_at', operators: ['range', 'null', 'not-null'], input: 'date' },
-      { field: 'dispatched_at', operators: ['range', 'null', 'not-null'], input: 'date' },
-      { field: 'parcels', operators: ['equals', 'range'], input: 'integer' },
-      { field: 'weight', operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal' },
-      { field: 'due', operators: ['equals', 'range'], input: 'date' },
-      { field: 'insured', operators: ['equals'], input: 'boolean' },
-      { field: 'notes', operators: ['equals', 'contains', 'null', 'not-null'], input: 'text' },
+      { field: 'id', operators: ['equals'], input: 'uuid', days: null },
+      { field: 'carrier', operators: ['equals', 'contains'], input: 'text', days: null },
+      { field: 'shipped_at', operators: ['range', 'null', 'not-null'], input: 'date', days: 'utc' },
+      { field: 'dispatched_at', operators: ['range', 'null', 'not-null'], input: 'date', days: 'wall' },
+      { field: 'parcels', operators: ['equals', 'range'], input: 'integer', days: null },
+      { field: 'weight', operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal', days: null },
+      { field: 'due', operators: ['equals', 'range'], input: 'date', days: null },
+      { field: 'insured', operators: ['equals'], input: 'boolean', days: null },
+      { field: 'notes', operators: ['equals', 'contains', 'null', 'not-null'], input: 'text', days: null },
     ],
   },
 } as unknown as PublishedForm
@@ -56,23 +56,27 @@ const field = (key: string): PanelField => fields.find((offered) => offered.fiel
 const draft = (key: string, rest: Partial<Draft>): Draft => ({ ...draftFor(field(key)), ...rest })
 
 describe('the fields a panel offers', () => {
-  // The server's offers, in its order, each by the label the form gives it;
-  // and a timestamp told from a date by its form field, whose whole days are
-  // UTC's for an instant and the stored clock's for one in no zone (watched
-  // failing with every date input taken for a date: the hints of both
-  // timestamps lost).
+  // The server's offers, in its order, each by the label the form gives it,
+  // a timestamp's days on the clock the offer names -- UTC's for an instant,
+  // the stored clock's for one in no zone -- whatever control the form draws
+  // for it (watched failing with the clock guessed from the form's field
+  // again: the instant drawn as text below was said to be on the stored
+  // clock).
   test("are the server's, by their labels, a timestamp's days on its clock", () => {
     expect(fields.map((offered) => [offered.field, offered.label, offered.days])).toEqual([
       ['id', 'Id', null],
       ['carrier', 'Carrier', null],
       ['shipped_at', 'Shipped at', 'utc'],
-      ['dispatched_at', 'Dispatched at', 'stored'],
+      ['dispatched_at', 'Dispatched at', 'wall'],
       ['parcels', 'Parcels', null],
       ['weight', 'Weight', null],
       ['due', 'Due', null],
       ['insured', 'Insured', null],
       ['notes', 'Notes', null],
     ])
+    const drawnAsText = { ...definition.form.model.fields.find((given) => given.key === 'shipped_at'), type: 'text' }
+    const redrawn = { ...definition, form: { ...definition.form, model: { fields: [drawnAsText] } } } as unknown as PublishedForm
+    expect(panelFields(redrawn).find((offered) => offered.field === 'shipped_at')?.days).toBe('utc')
     expect(panelFields({ ...definition, list: null } as PublishedForm)).toEqual([])
   })
 })
@@ -136,7 +140,9 @@ describe('what a panel says', () => {
 
   // Under a draft, what its condition means where it is not obvious: a
   // timestamp's range is whole days, on the clock the grid shows it in; a
-  // date's or a number's bounds are included; contains ignores case; and
+  // date's or a number's bounds are included; contains matches as Search
+  // does, which on SQL Server is the column's collation, so it promises no
+  // case; and
   // text of no characters is a value, so "has no value" does not find it
   // (watched failing with one hint for every range: an instant's days not
   // said to be UTC's).
@@ -144,7 +150,7 @@ describe('what a panel says', () => {
     expect(draftHint(draft('shipped_at', {}), field('shipped_at'))).toBe('Whole days in UTC, as the grid shows times: from the start of From to the end of To. Either may be left empty.')
     expect(draftHint(draft('dispatched_at', {}), field('dispatched_at'))).toBe('Whole days, as the time is stored: from the start of From to the end of To. Either may be left empty.')
     expect(draftHint(draft('due', { op: 'range' }), field('due'))).toBe('From and To are included. Either may be left empty.')
-    expect(draftHint(draft('notes', { op: 'contains' }), field('notes'))).toBe('Found anywhere in the field, in any case.')
+    expect(draftHint(draft('notes', { op: 'contains' }), field('notes'))).toBe('Found anywhere in the field, as Search finds text.')
     expect(draftHint(draft('notes', { op: 'null' }), field('notes'))).toBe('Text of no characters is a value.')
     expect(draftHint(draft('weight', { op: 'null' }), field('weight'))).toBeNull()
     expect(draftHint(draft('parcels', {}), field('parcels'))).toBeNull()

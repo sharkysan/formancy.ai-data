@@ -15,13 +15,12 @@ import { sayValue } from './related.js'
 
 /**
  * A column the page shows that offers a filter: what `filterOffer` offers
- * it, and for a timestamp how its whole days are counted -- in UTC for an
- * instant, as its values are written for one in no zone.
+ * it, a timestamp's among it whose clock its whole days are on -- UTC for
+ * an instant, as its values are written for one in no zone.
  */
 export interface Filterable {
   column: string
   offer: FilterOffer
-  days: 'utc' | 'written' | null
 }
 
 /**
@@ -37,8 +36,7 @@ export function filterables(object: ObjectMeta | undefined, shown: readonly Reco
     const meta = byName.get(column.name)
     const offer = meta === undefined ? null : filterOffer(meta)
     if (meta === undefined || offer === null) return []
-    const days = meta.type.kind !== 'timestamp' ? null : meta.type.withTimeZone ? 'utc' : 'written'
-    return [{ column: column.name, offer, days }]
+    return [{ column: column.name, offer }]
   })
 }
 
@@ -99,8 +97,8 @@ function conditionOf(op: FilterOp, input: FilterInput | null, draft: Draft): Fil
 function hintOf(chosen: Filterable, op: FilterOp): string | null {
   const either = 'Either may be left empty.'
   const span = 'from the start of the day From names to the end of the day To names.'
-  if (op === 'range' && chosen.days === 'utc') return `${chosen.column} is filtered by whole days in UTC: ${span} ${either}`
-  if (op === 'range' && chosen.days === 'written') return `${chosen.column} holds no time zone, so it is filtered by whole days as its values are written: ${span} ${either}`
+  if (op === 'range' && chosen.offer.days === 'utc') return `${chosen.column} is filtered by whole days in UTC: ${span} ${either}`
+  if (op === 'range' && chosen.offer.days === 'wall') return `${chosen.column} holds no time zone, so it is filtered by whole days as its values are written: ${span} ${either}`
   if (op === 'range') return 'From and To are both included, and either may be left empty.'
   if (op === 'contains') return 'Found anywhere in the value, as the search finds it.'
   if (chosen.offer.input === 'text' && op === 'equals') return 'The whole value, exactly: case and spaces count.'

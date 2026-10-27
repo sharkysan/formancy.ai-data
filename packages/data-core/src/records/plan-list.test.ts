@@ -258,14 +258,14 @@ describe('planList', () => {
       searchable: ['id', 'status', 'notes', 'group', 'approved_by'],
       sortable: ['id', 'order_date', 'status', 'amount', 'notes', 'group', 'approved_by', 'paid'],
       filterable: [
-        { field: 'id', operators: ['equals', 'range'], input: 'integer' },
-        { field: 'order_date', operators: ['equals', 'range'], input: 'date' },
-        { field: 'status', operators: ['equals', 'contains'], input: 'text' },
-        { field: 'amount', operators: ['equals', 'range'], input: 'decimal' },
-        { field: 'notes', operators: ['equals', 'contains', ...NULLS], input: 'text' },
-        { field: 'group', operators: ['equals', 'contains', ...NULLS], input: 'text' },
-        { field: 'approved_by', operators: ['equals', 'range', ...NULLS], input: 'integer' },
-        { field: 'paid', operators: ['equals', ...NULLS], input: 'boolean' },
+        { field: 'id', operators: ['equals', 'range'], input: 'integer', days: null },
+        { field: 'order_date', operators: ['equals', 'range'], input: 'date', days: null },
+        { field: 'status', operators: ['equals', 'contains'], input: 'text', days: null },
+        { field: 'amount', operators: ['equals', 'range'], input: 'decimal', days: null },
+        { field: 'notes', operators: ['equals', 'contains', ...NULLS], input: 'text', days: null },
+        { field: 'group', operators: ['equals', 'contains', ...NULLS], input: 'text', days: null },
+        { field: 'approved_by', operators: ['equals', 'range', ...NULLS], input: 'integer', days: null },
+        { field: 'paid', operators: ['equals', ...NULLS], input: 'boolean', days: null },
       ],
     })
     expect(listColumns(PG_ORDER, ['id', 'order_date', 'status'])).toMatchObject({ searchable: ['id', 'status'], sortable: ['id', 'order_date', 'status'] })

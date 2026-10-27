@@ -60,16 +60,19 @@ same declarations. A form's `list`
 is `null` when the server would refuse this person a page, and otherwise
 says which fields a page may be searched, sorted and filtered by
 ([0044](../../docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md),
-0104): `filterable` is one `{ field, operators, input }` per field a
+[0104](../../docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)): `filterable` is one `{ field, operators, input, days }` per field a
 condition may name, the operators among `equals`, `range`, `contains`,
 `null` and `not-null`, and `input` what a value is typed as -- `text`,
 `integer`, `decimal`, `date`, `uuid` or `boolean`, a timestamp's range
-being days -- or `null` where only `null` and `not-null` are offered.
+being days -- or `null` where only `null` and `not-null` are offered, and
+`days` whose clock a timestamp's days are on, `utc` for an instant and
+`wall` for one in no zone, `null` for any other field.
 A `form` reply without `list` is `unexpected`, as from a server older than
 lists, and so is a list without `filterable`, as from a server older than
 filters, or with an offer a panel could not draw: no operator, one or an
-`input` this package's data-core does not name, or an `input` that does
-not fit the operators. `list` sends exactly `search`, `sort`, `parent`,
+`input` this package's data-core does not name, an `input` that does
+not fit the operators, or a `days` data-core does not name or on anything
+but a date. `list` sends exactly `search`, `sort`, `parent`,
 `filter`, `offset` and `limit` in a POST body, each left out the server's
 default, so the search and a filter's values are in no URL. `filter` is a
 list of `{ field, op, … }`, each field once, every condition holding:

@@ -211,7 +211,7 @@ export function browsePage(rows: ReadonlyArray<Omit<RecordRead, 'ok'>>, limit: n
   return { rows: rows.slice(0, limit).map((row) => row.values), hasMore: rows.length > limit }
 }
 
-export type BrowseQueryCheck = { ok: true; query: BrowseQuery } | { ok: false; code: 'malformed' | SearchErrorCode | PageErrorCode; message: string }
+export type BrowseQueryCheck = { ok: true; query: BrowseQuery } | { ok: false; code: 'malformed' | 'not-filterable' | SearchErrorCode | PageErrorCode; message: string }
 
 const PROPERTIES = new Set(['object', 'equal', 'filter', 'search', 'sort', 'offset', 'limit'])
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)

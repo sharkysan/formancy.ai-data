@@ -20,6 +20,7 @@ export type {
   FieldError,
   FilterableField,
   FilterCondition,
+  FilterDays,
   FilterInput,
   FilterOffer,
   FilterOp,

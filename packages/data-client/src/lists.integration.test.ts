@@ -82,8 +82,8 @@ describe.each(ENGINES)('lists on $engine', ({ connection }) => {
     const third = plane.client(plane.tokens.thirdClerk)
     expect(expectOk(await third.form(formId)).list?.filterable).toEqual(
       expect.arrayContaining([
-        { field: 'id', operators: ['equals', 'range'], input: 'integer' },
-        { field: 'notes', operators: ['equals', 'contains', 'null', 'not-null'], input: 'text' },
+        { field: 'id', operators: ['equals', 'range'], input: 'integer', days: null },
+        { field: 'notes', operators: ['equals', 'contains', 'null', 'not-null'], input: 'text', days: null },
       ]),
     )
     const pages = async (query: Partial<RecordListQuery>): Promise<FormRecord[]> => {

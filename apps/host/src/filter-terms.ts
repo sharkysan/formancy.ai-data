@@ -7,8 +7,8 @@ import type { FilterInput, FilterOp, FilterableField, ListFilterTerm, PublishedF
  * filter-panel.tsx; what a grid asks with its filter is grid-datasource.ts's.
  *
  * Everything offered is the server's `list.filterable`: a field, the
- * operators it offers in the order a panel lists them, and what a value is
- * typed as. A value is sent as the person typed it, never checked or
+ * operators it offers in the order a panel lists them, what a value is
+ * typed as, and whose clock a timestamp's days are on. A value is sent as the person typed it, never checked or
  * respelled here: whether it is one the column can hold is the server's to
  * say (`not-filterable`), in its own sentence. What is decided here is only
  * the shape a request must have: a range with a bound, text to find.
@@ -23,32 +23,20 @@ export const OPERATOR_WORDS: Readonly<Record<FilterOp, string>> = {
   'not-null': 'has a value',
 }
 
-/**
- * A field the panel offers: the server's offer, the field's label in the
- * form, and, for a timestamp, whose clock its whole days are on: `utc` for
- * an instant, which the page shows in UTC, `stored` for one in no zone, as
- * the database stores it. Null for every other field.
- */
+/** A field the panel offers: the server's offer, and the field's label in the form. */
 export interface PanelField extends FilterableField {
   label: string
-  days: 'utc' | 'stored' | null
 }
 
 /**
  * The fields of `definition`'s list a person may filter by, in the server's
- * order, each with its label. A timestamp is the one field whose value is
- * typed as a date and whose form field is not a date (0104's offer, and the
- * generator's controls): an instant is the form's `datetime`, a timestamp in
- * no zone its read-only text.
+ * order, each with its label. Whether a date input is a timestamp's, and
+ * on whose clock its days are, is the offer's `days`, which only the
+ * column's type knows: never guessed from the control the form draws.
  */
 export function panelFields(definition: PublishedForm): PanelField[] {
-  const fields = new Map(definition.form.model.fields.map((field) => [field.key, field]))
-  return (definition.list?.filterable ?? []).map((offer) => {
-    const field = fields.get(offer.field)
-    const type = field?.type
-    const days = offer.input !== 'date' || type === 'date' ? null : type === 'datetime' ? 'utc' : 'stored'
-    return { ...offer, label: String(field?.label ?? offer.field), days }
-  })
+  const labels = new Map(definition.form.model.fields.map((field) => [field.key, field.label]))
+  return (definition.list?.filterable ?? []).map((offer) => ({ ...offer, label: String(labels.get(offer.field) ?? offer.field) }))
 }
 
 /** What a person has chosen and typed in the panel, kept as typed. */
@@ -139,10 +127,10 @@ export function draftHint(draft: Draft, field: PanelField | undefined): string |
   if (field === undefined) return null
   if (draft.op === 'range') {
     if (field.days === 'utc') return 'Whole days in UTC, as the grid shows times: from the start of From to the end of To. Either may be left empty.'
-    if (field.days === 'stored') return 'Whole days, as the time is stored: from the start of From to the end of To. Either may be left empty.'
+    if (field.days === 'wall') return 'Whole days, as the time is stored: from the start of From to the end of To. Either may be left empty.'
     return 'From and To are included. Either may be left empty.'
   }
-  if (draft.op === 'contains') return 'Found anywhere in the field, in any case.'
+  if (draft.op === 'contains') return 'Found anywhere in the field, as Search finds text.'
   if ((draft.op === 'null' || draft.op === 'not-null') && field.input === 'text') return 'Text of no characters is a value.'
   return null
 }

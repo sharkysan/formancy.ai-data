@@ -37,10 +37,24 @@ export type FilterCondition =
 /** What a filter's value or bound is typed as. A timestamp's bounds are dates. */
 export type FilterInput = 'text' | 'integer' | 'decimal' | 'date' | 'uuid' | 'boolean'
 
-/** What one column offers a filter (0104): its operators, in the order a panel lists them, and what a value is typed as -- `null` when it offers only `null` and `not-null`. */
+/**
+ * Whose clock a timestamp's whole days are counted on (0104): `utc` for an
+ * instant, which a page shows in UTC, and `wall` for a timestamp in no
+ * zone, as its values are stored.
+ */
+export type FilterDays = 'utc' | 'wall'
+
+/**
+ * What one column offers a filter (0104): its operators, in the order a
+ * panel lists them, what a value is typed as -- `null` when it offers only
+ * `null` and `not-null` -- and, for a timestamp, whose clock its range's
+ * days are on, `null` for every other kind, so a page says it without
+ * guessing from the field it draws.
+ */
 export interface FilterOffer {
   operators: FilterOp[]
   input: FilterInput | null
+  days: FilterDays | null
 }
 
 /** A field a list may be filtered by, and what it offers. */

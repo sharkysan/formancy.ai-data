@@ -26,25 +26,27 @@ describe('filterOffer', () => {
   // The studio's panel and the host's grid offer what this says, and the
   // planners accept exactly that: one table, so an offer is never refused.
   test('offers each kind its own operators, and the NULL ones where the column holds NULLs', () => {
-    expect(filterOffer(column(text(20)))).toEqual({ operators: ['equals', 'contains'], input: 'text' })
-    expect(filterOffer(column(INT32))).toEqual({ operators: ['equals', 'range'], input: 'integer' })
-    expect(filterOffer(column(AMOUNT))).toEqual({ operators: ['equals', 'range'], input: 'decimal' })
-    expect(filterOffer(column(DATE))).toEqual({ operators: ['equals', 'range'], input: 'date' })
-    expect(filterOffer(column(UUID))).toEqual({ operators: ['equals'], input: 'uuid' })
-    expect(filterOffer(column(BOOLEAN, true))).toEqual({ operators: ['equals', 'null', 'not-null'], input: 'boolean' })
+    expect(filterOffer(column(text(20)))).toEqual({ operators: ['equals', 'contains'], input: 'text', days: null })
+    expect(filterOffer(column(INT32))).toEqual({ operators: ['equals', 'range'], input: 'integer', days: null })
+    expect(filterOffer(column(AMOUNT))).toEqual({ operators: ['equals', 'range'], input: 'decimal', days: null })
+    expect(filterOffer(column(DATE))).toEqual({ operators: ['equals', 'range'], input: 'date', days: null })
+    expect(filterOffer(column(UUID))).toEqual({ operators: ['equals'], input: 'uuid', days: null })
+    expect(filterOffer(column(BOOLEAN, true))).toEqual({ operators: ['equals', 'null', 'not-null'], input: 'boolean', days: null })
   })
 
   // A timestamp is shown cut to the second, so an equality with what a page
-  // shows would miss the row holding a fraction: it offers whole days.
-  test('offers a timestamp a range of days and no equality', () => {
-    expect(filterOffer(column(INSTANT))).toEqual({ operators: ['range'], input: 'date' })
-    expect(filterOffer(column(WALL_CLOCK, true))).toEqual({ operators: ['range', 'null', 'not-null'], input: 'date' })
+  // shows would miss the row holding a fraction: it offers whole days, and
+  // says whose clock they are on, which a page would otherwise guess from
+  // the field it draws.
+  test('offers a timestamp a range of days on its own clock, and no equality', () => {
+    expect(filterOffer(column(INSTANT))).toEqual({ operators: ['range'], input: 'date', days: 'utc' })
+    expect(filterOffer(column(WALL_CLOCK, true))).toEqual({ operators: ['range', 'null', 'not-null'], input: 'date', days: 'wall' })
   })
 
   // A float is not equal to the decimal a person types and a time is read
   // cut to the minute: neither offers a value, and without NULLs, nothing.
   test('offers a float or a time only its NULLs, and nothing when it holds none', () => {
-    expect(filterOffer(column(FLOAT, true))).toEqual({ operators: ['null', 'not-null'], input: null })
+    expect(filterOffer(column(FLOAT, true))).toEqual({ operators: ['null', 'not-null'], input: null, days: null })
     expect(filterOffer(column(TIME))).toBeNull()
     expect(filterOffer(column({ kind: 'binary', maxLength: null, fixedLength: false }))).toBeNull()
   })
@@ -203,9 +205,17 @@ describe('readFilter', () => {
     }
   })
 
-  // What contains finds is a search, held to a search's limits.
-  test('holds what contains finds to a search’s rules', () => {
-    expect(readFilter([{ field: 'name', op: 'contains', text: 'x'.repeat(201) }], 'field')).toMatchObject({ ok: false, code: 'search-too-long' })
-    expect(readFilter([{ field: 'name', op: 'contains', text: 'a\u0007b' }], 'field')).toMatchObject({ ok: false, code: 'search-control-character' })
+  // What contains finds is held to a search's limits, and refused as the
+  // condition it is: a page that heard a search's code would offer to ask
+  // again, or blame a search box the person never typed in.
+  test('holds what contains finds to a search’s rules, refused as a condition', () => {
+    expect(readFilter([{ field: 'name', op: 'contains', text: 'x'.repeat(201) }], 'field')).toEqual({
+      ok: false,
+      code: 'not-filterable',
+      message: 'What a contains condition on name finds is at most 200 characters, and this has 201.',
+    })
+    expect(readFilter([{ field: 'name', op: 'contains', text: 'a\u0007b' }], 'field')).toEqual({ ok: false, code: 'not-filterable', message: 'What a contains condition on name finds cannot contain a control character.' })
+    expect(readFilter([{ field: 'name', op: 'contains', text: 'a\ud800b' }], 'field')).toEqual({ ok: false, code: 'not-filterable', message: 'What a contains condition on name finds cannot contain an unpaired UTF-16 surrogate.' })
+    expect(readFilter([{ field: 'name', op: 'contains', text: 7 }], 'field')).toMatchObject({ ok: false, code: 'malformed' })
   })
 })

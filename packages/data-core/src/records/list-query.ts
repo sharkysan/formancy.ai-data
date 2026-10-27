@@ -17,13 +17,14 @@ import { readFilter } from './filter.js'
  * by the same checks, so a file is of the records the grid shows.
  */
 
-export type ListQueryErrorCode = SearchErrorCode | PageErrorCode
+/** A body's refusals: a search's, a page's, and `not-filterable` for what a filter's `contains` could not find (`readFilter`). */
+export type ListQueryErrorCode = SearchErrorCode | PageErrorCode | 'not-filterable'
 
 export type ListQueryRefusal = { ok: false; code: ListQueryErrorCode; message: string }
 
 export type ListQueryCheck = { ok: true; query: RecordListQuery } | ListQueryRefusal
 
-export type ExportQueryRefusal = { ok: false; code: SearchErrorCode; message: string }
+export type ExportQueryRefusal = { ok: false; code: SearchErrorCode | 'not-filterable'; message: string }
 
 export type ExportQueryCheck = { ok: true; query: RecordExportQuery } | ExportQueryRefusal
 

@@ -243,33 +243,37 @@ existed would be documented and inert.
   says `list`, as the audit does. `routes/runtime-lists.test.ts` holds the
   route over fake ports.
 
-  A list's `filter` is the person's own conditions on its fields (0104): a
+  A list's `filter` is the person's own conditions on its fields
+  ([0104](../../docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)): a
   list of `{ field, op, … }`, each field once, every condition holding --
   `{ op: 'equals', value }`, `{ op: 'range', from, to }` with either bound
   `null` and not both, each inclusive, `{ op: 'contains', text }`, and
   `{ op: 'null' }` or `{ op: 'not-null' }`, every value as text. What each
-  field offers is `list.filterable`, one `{ field, operators, input }` per
+  field offers is `list.filterable`, one `{ field, operators, input, days }` per
   readable column field, from data-core's `filterOffer`: equals and
   contains on text; equals and range on an integer, a decimal or a date;
   range alone on a timestamp, whose bounds are days and whose range is
   whole days, in UTC for an instant and on the wall clock for a timestamp
   in no zone; equals on a uuid or a boolean; and null and not-null where
   the snapshot says the column holds NULLs. `input` is what a value is
-  typed as, `null` where only null and not-null are offered. A lookup
+  typed as, `null` where only null and not-null are offered, and `days`
+  whose clock a timestamp's days are on -- `utc` or `wall` -- `null` for
+  any other field, so a page says it without guessing from the control the
+  form draws. A lookup
   field offers none -- it holds a token, not the label a person reads --
   and neither does a field the person may not read, which a condition at
   a time would disclose. Text equals unit for unit, as a row filter
   compares it (0028); contains matches as the search does, a `%` or a `_`
-  as itself and case folded; text of no characters is a value, not NULL.
+  as itself, folded as the search folds on each engine; text of no characters is a value, not NULL.
   The planner spells each value as its column holds it -- a number without
   a plus or a leading zero, a decimal padded to its scale -- and refuses
   one the column cannot hold rather than round it. A filter narrows and
   never permits: the read filter and the throughs still decide which rows
   exist. A filter of another shape -- a field named twice, a property its
-  operator has not got, a range with no bound -- is 400 `malformed`, text
-  to find that a search would refuse is the search's own code, and a
-  condition `list.filterable` does not offer, or a value or a bound its
-  column cannot hold, is 400 `not-filterable`, in a sentence that names the
+  operator has not got, a range with no bound -- is 400 `malformed`; and
+  a condition `list.filterable` does not offer, a value or a bound its
+  column cannot hold, or text to find that a search would refuse, is 400
+  `not-filterable`, in a sentence that names the
   field and never the value. No value of a filter reaches the log or the
   audit trail. `routes/runtime-lists.test.ts` holds what reaches the port,
   the refusals and the log over fake ports, and `e2e.integration.test.ts`

@@ -328,7 +328,7 @@ describe('the list route', () => {
       [{ filter: [{ field: 'name', op: 'contains', text: 'a', value: 'b' }] }, 'customer', 'malformed'],
       [{ filter: [{ field: 'credit_limit', op: 'range', from: null, to: null }] }, 'customer', 'malformed'],
       [{ filter: [{ field: 'name', op: 'like', value: 'a%' }] }, 'customer', 'malformed'],
-      [{ filter: [{ field: 'name', op: 'contains', text: 'x'.repeat(201) }] }, 'customer', 'search-too-long'],
+      [{ filter: [{ field: 'name', op: 'contains', text: 'x'.repeat(201) }] }, 'customer', 'not-filterable'],
       [{ sort: [{ field: 'name', direction: 'sideways' }] }, 'customer', 'malformed'],
       [{ search: 'x'.repeat(201) }, 'customer', 'search-too-long'],
       [{ search: 'a\u0000b' }, 'customer', 'search-control-character'],
@@ -389,10 +389,10 @@ describe('the list route', () => {
       searchable: ['tenant_id', 'customer_no', 'name'],
       sortable: ['tenant_id', 'customer_no', 'name', 'credit_limit'],
       filterable: [
-        { field: 'tenant_id', operators: ['equals', 'range'], input: 'integer' },
-        { field: 'customer_no', operators: ['equals', 'range'], input: 'integer' },
-        { field: 'name', operators: ['equals', 'contains'], input: 'text' },
-        { field: 'credit_limit', operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal' },
+        { field: 'tenant_id', operators: ['equals', 'range'], input: 'integer', days: null },
+        { field: 'customer_no', operators: ['equals', 'range'], input: 'integer', days: null },
+        { field: 'name', operators: ['equals', 'contains'], input: 'text', days: null },
+        { field: 'credit_limit', operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal', days: null },
       ],
     })
     const kept = (await app.inject({ method: 'GET', url: '/v1/forms/hidden-limit', headers: as('clerk') })).json()
