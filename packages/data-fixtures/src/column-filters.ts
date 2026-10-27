@@ -1,4 +1,5 @@
 import { LIST_ROWS } from './lists.js'
+import { FILTER_PARITY } from './parity.js'
 import { EDGE_VALUES } from './values.js'
 
 /*
@@ -20,6 +21,18 @@ import { EDGE_VALUES } from './values.js'
 const [[SECOND], [THEIRS]] = LIST_ROWS.orders
 /** The fixture's own order, tenant 1's, dated a day before the other two. */
 const OURS = EDGE_VALUES.beyondSafeInteger
+
+/**
+ * FILTER_PARITY's row filters that admit rows, each with the keys it admits:
+ * an equals on the same column and value is spelled as that row filter is,
+ * so it finds exactly those rows (0028). Derived, so the two cannot drift.
+ */
+const EXACT = FILTER_PARITY.flatMap((entry) => ('keys' in entry ? [{ column: entry.column, value: entry.value, keys: entry.keys }] : []))
+
+/** parity.tenant_item's four named rows, in item_no order: every row a tenant_code filter of FILTER_PARITY admits. */
+const NAMED = EXACT.filter((entry) => entry.column === 'tenant_code')
+  .flatMap((entry) => entry.keys)
+  .sort(([, left], [, right]) => Number(left) - Number(right))
 
 /**
  * What each suite gives the rows it filters, as the fixture's owner, after
@@ -103,6 +116,14 @@ export const COLUMN_FILTER_TENANT = '3'
  *   2's order, nothing.
  * - `follow`: a filter beside a follow's equal in a browse (0103): tenant
  *   1's customer 1001, followed to its orders, of one date or of the other.
+ * - `collation`: a browse of parity.tenant_item (0028), sorted by item_no,
+ *   whose tenant_code is under a case-insensitive collation on both engines
+ *   -- a nondeterministic ICU one on PostgreSQL, under which `=` calls
+ *   `acme` and `ACME` equal -- and whose fixed_code is char(3): an equals
+ *   finds exactly the rows FILTER_PARITY's row filter of that value admits,
+ *   case, accents and a trailing space counting; and a contains folds case
+ *   on that column as the search does, where PostgreSQL refuses LIKE under
+ *   a nondeterministic collation outright.
  */
 export const COLUMN_FILTER_PARITY = {
   text: {
@@ -218,6 +239,12 @@ export const COLUMN_FILTER_PARITY = {
       { filter: [{ column: 'order_date', op: 'equals', value: '2026-10-09' }], ids: [SECOND] },
       { filter: [{ column: 'order_date', op: 'equals', value: '2026-10-08' }], ids: [OURS] },
     ],
+  },
+  collation: {
+    object: { schema: 'parity', name: 'tenant_item' },
+    sort: [{ column: 'item_no', direction: 'asc' }],
+    equals: EXACT,
+    contains: { column: 'tenant_code', text: 'CM', keys: NAMED },
   },
 } as const
 

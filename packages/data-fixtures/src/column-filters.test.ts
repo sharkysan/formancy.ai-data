@@ -66,6 +66,18 @@ describe('COLUMN_FILTER_PARITY', () => {
     expect(COLUMN_FILTER_ROWS.shipments.filter(([, tracking]) => tracking === value.toLowerCase()).map(([reference]) => reference)).toEqual(references)
   })
 
+  // The four named rows' codes each hold `CM` case folded, the fillers'
+  // `fill-<n>` none; were a named row left out, or the text one an accent
+  // decides, both engines would agree on a smaller answer than the case
+  // claims. And every FILTER_PARITY value a row filter accepts is an equals
+  // here, the refused `AB ` alone left out.
+  test('collation: contains names every named row, and equals what FILTER_PARITY admits', () => {
+    const { equals, contains } = COLUMN_FILTER_PARITY.collation
+    expect(contains.keys.map(([, item]) => item)).toEqual(['1', '2', '3', '4'])
+    expect(contains.keys.filter(([code]) => !code.toLowerCase().includes(contains.text.toLowerCase()))).toEqual([])
+    expect(equals.map((entry) => `${entry.column}=${entry.value}`)).toEqual(['tenant_code=acme', 'tenant_code=acme ', 'tenant_code=ACME', 'tenant_code=Acmé', 'tenant_code=Acme', 'fixed_code=AB', 'fixed_code=ab'])
+  })
+
   // The flags are set by the update the instants are: an expectation typed
   // from memory of which customer is inactive would hold the adapters to it.
   test('boolean: each value names the customers that hold it', () => {

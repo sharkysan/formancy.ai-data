@@ -14,6 +14,7 @@ import {
   LIST_PARITY,
   LIST_ROWS,
   listCase,
+  PARITY_SCOPE,
   startSqlServerFixture,
 } from '@formancy/data-fixtures'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
@@ -554,20 +555,39 @@ describe('a filter beside a follow', covers('sqlserver', columnFilterCase('follo
   })
 })
 
+describe('a filter on a column under a case-insensitive collation', covers('sqlserver', columnFilterCase('collation')), () => {
+  // tenant_code is nvarchar under the database's case-insensitive
+  // collation, and fixed_code a char(3): by `=` alone `acme`, `ACME` and
+  // `acme ` are one value, and `ab` is `AB`, watched failing so. BIN2 and
+  // the byte lengths beside it find the one row (0028). A contains folds
+  // case as the column's collation does, the search's own way.
+  test('equals exactly what the row filter admits, and contains case folded', async () => {
+    const parity = await discoverSqlServer(owner, PARITY_SCOPE)
+    const { object, sort, equals, contains } = COLUMN_FILTER_PARITY.collation
+    const keysOf = (rows: ReadonlyArray<Record<string, ApiValue>>) => rows.map((row) => [row['tenant_code'], row['item_no']])
+    for (const entry of equals) {
+      const { page } = await browsed({ object, sort: [...sort], filter: [{ column: entry.column, op: 'equals', value: entry.value }] }, records, parity)
+      expect(keysOf(page.rows), `${entry.column} = ${JSON.stringify(entry.value)}`).toEqual(entry.keys)
+    }
+    const { page } = await browsed({ object, sort: [...sort], filter: [{ column: contains.column, op: 'contains', text: contains.text }] }, records, parity)
+    expect(keysOf(page.rows)).toEqual(contains.keys)
+  })
+})
+
 describe('a timestamp or a date, in the language the composition root chose', () => {
   let german: mssql.ConnectionPool
   let zoned: RecordAdapter
 
   // A session's language sets its DATEFORMAT, and German's is dmy, under
   // which a datetime read from `2026-03-01 00:00:00` is the third of
-  // January. tedious sends `set dateformat mdy` at login unless its
-  // `dateFormat` is null, so the language's own holds only then: with it
-  // left out, this session was German and mdy. Every bound here is read
-  // through an ISO 8601 style, which neither changes: watched failing here
-  // alone, the default session passing, with a zoneless bound read as
-  // datetime without its `T`.
+  // January. tedious sends `set dateformat` at login after the language,
+  // `mdy` unless told another, so the session is German and dmy only when
+  // told both: with the format left out, it was German and mdy. Every bound
+  // here is read through an ISO 8601 style, which neither changes: watched
+  // failing here alone, the default session passing, with a zoneless bound
+  // read as datetime without its `T`.
   beforeAll(async () => {
-    german = await new mssql.ConnectionPool({ ...fixture.admin, options: { ...fixture.admin.options, language: 'Deutsch', dateFormat: null } }).connect()
+    german = await new mssql.ConnectionPool({ ...fixture.admin, options: { ...fixture.admin.options, language: 'Deutsch', dateFormat: 'dmy' } }).connect()
     const settings = await german.request().query<{ language: string; format: string }>('select @@language as language, (select date_format from sys.dm_exec_sessions where session_id = @@spid) as format')
     expect(settings.recordset[0]).toEqual({ language: 'Deutsch', format: 'dmy' })
     zoned = createSqlServerRecords(german)

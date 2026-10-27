@@ -14,6 +14,7 @@ import {
   LIST_PARITY,
   LIST_ROWS,
   listCase,
+  PARITY_SCOPE,
   startPostgresFixture,
 } from '@formancy/data-fixtures'
 import type { PostgresFixture } from '@formancy/data-fixtures'
@@ -326,8 +327,8 @@ describe('a file of shipments', covers('postgres', exportCase('shipments')), () 
  * the server's browse route runs it. Every expectation is BROWSE_PARITY's,
  * written once for both engines.
  */
-async function browsed(query: Partial<BrowseQuery> & Pick<BrowseQuery, 'object'>, adapter = records) {
-  const plan = planBrowse(snapshot, { equal: [], filter: [], search: '', sort: [], offset: 0, limit: 50, ...query })
+async function browsed(query: Partial<BrowseQuery> & Pick<BrowseQuery, 'object'>, adapter = records, over = snapshot) {
+  const plan = planBrowse(over, { equal: [], filter: [], search: '', sort: [], offset: 0, limit: 50, ...query })
   if (!plan.ok) throw new Error(`expected a browse, got ${plan.code}: ${plan.message}`)
   const outcome = await adapter.list(plan.request)
   if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
@@ -538,6 +539,26 @@ describe('a filter beside a follow', covers('postgres', columnFilterCase('follow
     const [customer] = (await browsed({ object, equal: [...equal] })).page.rows
     if (customer === undefined) throw new Error('the customer followed from was not browsed')
     for (const entry of entries) expect((await followed(object, 'referred-by', key, customer, [...entry.filter])).page.rows.map((row) => row['id'])).toEqual(entry.ids)
+  })
+})
+
+describe('a filter on a column under a case-insensitive collation', covers('postgres', columnFilterCase('collation')), () => {
+  // tenant_code's collation is a nondeterministic ICU one that folds case,
+  // under which `=` calls `acme` and `ACME` equal: the column's own equality
+  // alone found both, watched failing so. The row filter's spelling, the
+  // same again under "C", finds the one. And PostgreSQL refuses LIKE under
+  // that collation outright (0A000): the search's spelling, collated to the
+  // database's default, is what lets a contains run on it at all.
+  test('equals exactly what the row filter admits, and contains case folded', async () => {
+    const parity = await discoverPostgres(owner, PARITY_SCOPE)
+    const { object, sort, equals, contains } = COLUMN_FILTER_PARITY.collation
+    const keysOf = (rows: ReadonlyArray<Record<string, ApiValue>>) => rows.map((row) => [row['tenant_code'], row['item_no']])
+    for (const entry of equals) {
+      const { page } = await browsed({ object, sort: [...sort], filter: [{ column: entry.column, op: 'equals', value: entry.value }] }, records, parity)
+      expect(keysOf(page.rows), `${entry.column} = ${JSON.stringify(entry.value)}`).toEqual(entry.keys)
+    }
+    const { page } = await browsed({ object, sort: [...sort], filter: [{ column: contains.column, op: 'contains', text: contains.text }] }, records, parity)
+    expect(keysOf(page.rows)).toEqual(contains.keys)
   })
 })
 
