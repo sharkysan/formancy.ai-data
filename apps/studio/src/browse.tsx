@@ -84,7 +84,7 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
     if (busy.current) return
     busy.current = true
     setRefusal(null)
-    const outcome = await client.browse(connection, { object: asked.object, equal: asked.equal, search: asked.search, sort: asked.sort === null ? [] : [asked.sort], offset: asked.offset, limit: LIST_PAGE_SIZE })
+    const outcome = await client.browse(connection, { object: asked.object, equal: asked.equal, filter: [], search: asked.search, sort: asked.sort === null ? [] : [asked.sort], offset: asked.offset, limit: LIST_PAGE_SIZE })
     busy.current = false
     if (!outcome.ok) {
       setRefusal(outcome.message)

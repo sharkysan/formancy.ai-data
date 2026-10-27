@@ -300,7 +300,7 @@ export function ChildSection({
             New {title}
           </button>
         ) : null}
-        {parent.kind === 'record' ? <DownloadCsv client={client} formId={child.form} idBase={`${headingId}-export`} query={() => ({ search: '', sort: grid.current?.sort() ?? [], parent: { field: child.field, record: parent.token } })} /> : null}
+        {parent.kind === 'record' ? <DownloadCsv client={client} formId={child.form} idBase={`${headingId}-export`} query={() => ({ search: '', sort: grid.current?.sort() ?? [], parent: { field: child.field, record: parent.token }, filter: [] })} /> : null}
       </div>
       {waiting ? (
         <p role="status" id={`${headingId}-waiting`} className="status" data-kind="loading">

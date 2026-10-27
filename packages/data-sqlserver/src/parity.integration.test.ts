@@ -209,6 +209,7 @@ describe('FILTER_PARITY: a row filter compares the canonical value exactly', () 
         filters,
         through: [],
         equal: [],
+        filter: [],
         search: null,
         sort: [{ column: 'tenant_code', direction: 'asc', nulls: null }, { column: 'item_no', direction: 'asc', nulls: null }],
         offset: 0,

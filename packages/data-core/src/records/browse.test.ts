@@ -34,7 +34,7 @@ const SNAPSHOT = createSnapshot({
   ],
 })
 
-const query = (name: string, extra: Partial<BrowseQuery> = {}): BrowseQuery => ({ object: ref(name), equal: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE, ...extra })
+const query = (name: string, extra: Partial<BrowseQuery> = {}): BrowseQuery => ({ object: ref(name), equal: [], filter: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE, ...extra })
 
 function planned(name: string, extra: Partial<BrowseQuery> = {}) {
   const plan = planBrowse(SNAPSHOT, query(name, extra))
@@ -166,6 +166,37 @@ describe('planBrowse, narrowed to equal values (0103)', () => {
   })
 })
 
+describe('planBrowse, filtered by a person (0104)', () => {
+  // A condition is planned by columnFilter, the form list's own, and reaches the adapter through listTerms beside a follow's equal: both narrow, together.
+  test('narrows by each condition on a shown column, beside a follow', () => {
+    const plan = planned('summary', { equal: [{ column: 'order_count', value: '2' }], filter: [{ column: 'customer_no', op: 'range', from: '1000', to: '1999' }, { column: 'name', op: 'null' }] })
+    expect(plan.request.filter).toEqual([
+      { op: 'range', column: 'customer_no', type: INT32, from: '1000', to: '1999', before: null },
+      { op: 'null', column: 'name' },
+    ])
+    expect(listTerms(plan.request).filter).toEqual(plan.request.filter)
+    expect(plan.request.equal).toEqual([{ name: 'order_count', type: INT32, value: '2' }])
+  })
+
+  // A column the page does not show is one the account may not read or the adapter cannot spell: a filter on it would find rows by what the person is not shown.
+  test('refuses a condition on a column the page does not show', () => {
+    expect(planBrowse(SNAPSHOT, query('customer', { filter: [{ column: 'id', op: 'equals', value: '1' }] }))).toEqual({
+      ok: false,
+      code: 'not-filterable',
+      message: 'id is not a column of sales.customer this page shows.',
+    })
+    expect(planBrowse(SNAPSHOT, query('country', { filter: [{ column: 'flag', op: 'null' }] }))).toMatchObject({ ok: false, code: 'not-filterable' })
+  })
+
+  // An operator the column does not offer, or a value it cannot hold, is refused as a form's list refuses it, naming the column and never the value.
+  test('refuses what the column does not offer, or cannot hold', () => {
+    expect(planBrowse(SNAPSHOT, query('country', { filter: [{ column: 'id', op: 'contains', text: '1' }] }))).toEqual({ ok: false, code: 'not-filterable', message: 'id offers no contains condition.' })
+    expect(planBrowse(SNAPSHOT, query('country', { filter: [{ column: 'id', op: 'null' }] }))).toEqual({ ok: false, code: 'not-filterable', message: 'id offers no null condition.' })
+    const refused = planBrowse(SNAPSHOT, query('country', { filter: [{ column: 'id', op: 'equals', value: '1e3' }] }))
+    expect(refused).toEqual({ ok: false, code: 'not-filterable', message: 'A value given for id is not one it can hold.' })
+  })
+})
+
 describe('validateBrowseQuery', () => {
   // Leaving properties out is how a first page is asked for.
   test('fills what is left out', () => {
@@ -180,7 +211,9 @@ describe('validateBrowseQuery', () => {
 
   // A property ignored today is one somebody reads tomorrow, and an object named by anything but its two parts is a name nobody approved.
   test.each([
-    ['an unknown property', { object: ref('country'), filter: 'x' }],
+    ['an unknown property', { object: ref('country'), where: 'x' }],
+    ['a filter that is not a list', { object: ref('country'), filter: 'x' }],
+    ['a filter condition by field rather than column', { object: ref('country'), filter: [{ field: 'name', op: 'null' }] }],
     ['no object', {}],
     ['an object with a third part', { object: { schema: 'sales', name: 'country', database: 'other' } }],
     ['an empty name', { object: { schema: 'sales', name: '' } }],
@@ -193,6 +226,13 @@ describe('validateBrowseQuery', () => {
     ['a column narrowed twice', { object: ref('country'), equal: [{ column: 'id', value: '1' }, { column: 'id', value: '2' }] }],
   ])('refuses %s as malformed', (_, body) => {
     expect(validateBrowseQuery(body)).toMatchObject({ ok: false, code: 'malformed' })
+  })
+
+  // A filter is read by column, by the same reader a form's list reads by field (0104), so the two take the same conditions.
+  test('reads a filter as conditions by column', () => {
+    const filter = [{ column: 'name', op: 'contains', text: ' land ' }]
+    expect(validateBrowseQuery({ object: { schema: 'sales', name: 'country' }, filter })).toEqual({ ok: true, query: query('country', { filter: [{ column: 'name', op: 'contains', text: 'land' }] }) })
+    expect(validateBrowseQuery({ object: ref('country'), filter: [{ column: 'name', op: 'contains', text: 'x'.repeat(201) }] })).toMatchObject({ ok: false, code: 'search-too-long' })
   })
 
   // The page and the search are a list's own checks, so a browse can never ask for more rows at once than a list.

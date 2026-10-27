@@ -18,6 +18,7 @@ const REQUEST: ListRequest = {
   filters: TENANT_ONE as unknown as ListRequest['filters'],
   through: [],
   equal: [{ name: 'customer_no', type: INT32, value: '1001' }],
+  filter: [],
   search: { text: 'Muster', columns: [{ name: 'status', type: text(20) as never }] },
   sort: [
     { column: 'notes', direction: 'desc', nulls: 'last' },
@@ -36,6 +37,7 @@ describe('listTerms', () => {
       terms: [{ column: 'tenant_id', type: INT32, value: '1' }],
       through: [],
       equal: [{ name: 'customer_no', type: INT32, value: '1001' }],
+      filter: [],
       search: { text: 'Muster', columns: [{ name: 'status', type: text(20) }] },
       sort: REQUEST.sort,
       offset: 50,
@@ -102,6 +104,62 @@ describe('listTerms', () => {
     ]) {
       expect(() => listTerms(altered({ equal })), JSON.stringify(equal)).toThrow(/A list request/)
     }
+  })
+
+  // The person's filter (0104) as columnFilter plans it reaches the
+  // adapter fresh: a caller still holding the request cannot change what
+  // was checked.
+  test('reads a planned filter, fresh', () => {
+    const INSTANT = { kind: 'timestamp', withTimeZone: true, precision: 6 }
+    const filter = [
+      { op: 'equals', column: 'paid', type: { kind: 'boolean' }, value: 'true' },
+      { op: 'equals', column: 'status', type: text(20), value: ' placed ' },
+      { op: 'range', column: 'amount', type: { kind: 'decimal', precision: 18, scale: 4 }, from: '10.0000', to: null, before: null },
+      { op: 'range', column: 'created_at', type: INSTANT, from: '2026-10-01T00:00:00Z', to: null, before: '2026-11-01T00:00:00Z' },
+      { op: 'contains', column: 'notes', type: text(null), text: 'urgent' },
+      { op: 'null', column: 'approved_by' },
+      { op: 'not-null', column: 'group' },
+    ]
+    const read = listTerms(altered({ filter }))
+    expect(read.filter).toEqual(filter)
+    expect(read.filter[0]).not.toBe(filter[0])
+    expect((read.filter[0] as { type: unknown }).type).not.toBe(filter[0]?.type)
+    expect(listTerms(altered({ filter: [{ op: 'null', column: 'notes' }, { op: 'not-null', column: 'notes' }] })).filter).toHaveLength(2)
+  })
+
+  // Each is what columnFilter never writes: an operator outside the set, a
+  // value one engine would convert and the other refuse, a contains on a
+  // number each spells apart, a timestamp's upper bound that is not the
+  // next midnight, a range that bounds nothing. Watched failing with the
+  // to-or-before check removed.
+  test('refuses a filter condition the planner would not plan', () => {
+    const INSTANT = { kind: 'timestamp', withTimeZone: true, precision: 6 }
+    const WALL_CLOCK = { kind: 'timestamp', withTimeZone: false, precision: 3 }
+    const AMOUNT = { kind: 'decimal', precision: 18, scale: 4 }
+    for (const filter of [
+      'paid',
+      [{ op: 'null' }],
+      [{ op: 'like', column: 'status', type: text(20), value: 'a%' }],
+      [{ op: 'equals', column: 'customer_no', type: INT32, value: '007' }],
+      [{ op: 'equals', column: 'paid', type: { kind: 'boolean' }, value: 'TRUE' }],
+      [{ op: 'equals', column: 'weight', type: { kind: 'float', bits: 64 }, value: '1.5' }],
+      [{ op: 'contains', column: 'customer_no', type: INT32, text: '7' }],
+      [{ op: 'contains', column: 'notes', type: text(null), text: ' urgent' }],
+      [{ op: 'contains', column: 'notes', type: text(null), text: '' }],
+      [{ op: 'range', column: 'status', type: text(20), from: 'a', to: null, before: null }],
+      [{ op: 'range', column: 'amount', type: AMOUNT, from: '10', to: null, before: null }],
+      [{ op: 'range', column: 'amount', type: AMOUNT, from: null, to: null, before: null }],
+      [{ op: 'range', column: 'amount', type: AMOUNT, from: null, to: null, before: '10.0000' }],
+      [{ op: 'range', column: 'created_at', type: INSTANT, from: null, to: '2026-10-31T00:00:00Z', before: null }],
+      [{ op: 'range', column: 'created_at', type: INSTANT, from: '2026-10-01T00:00:00', to: null, before: null }],
+      [{ op: 'range', column: 'created_at', type: INSTANT, from: '2026-10-01T12:00:00Z', to: null, before: null }],
+      [{ op: 'range', column: 'created_at', type: INSTANT, from: '2026-02-30T00:00:00Z', to: null, before: null }],
+      [{ op: 'range', column: 'dispatched_at', type: WALL_CLOCK, from: '2026-10-01T00:00:00Z', to: null, before: null }],
+      [{ op: 'range', column: 'dispatched_at', type: { ...WALL_CLOCK, precision: -1 }, from: '2026-10-01T00:00:00', to: null, before: null }],
+    ]) {
+      expect(() => listTerms(altered({ filter })), JSON.stringify(filter)).toThrow(/A list request/)
+    }
+    expect(() => listTerms(altered({ filter: undefined }))).toThrow(/A list request/)
   })
 
   // The filters and throughs are read as for every other request: a list

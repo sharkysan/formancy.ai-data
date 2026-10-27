@@ -28,6 +28,7 @@ const STATUS: Readonly<Record<BrowseRefusalCode, number>> = {
   'nothing-readable': 403,
   'not-sortable': 400,
   'not-comparable': 400,
+  'not-filterable': 400,
   'not-searchable': 400,
 }
 

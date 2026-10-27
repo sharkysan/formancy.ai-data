@@ -105,7 +105,7 @@ export function Records({
             New record
           </button>
         ) : null}
-        {definition.list === null ? null : <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort: grid.current?.sort() ?? [], parent: null })} />}
+        {definition.list === null ? null : <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort: grid.current?.sort() ?? [], parent: null, filter: [] })} />}
       </div>
       <RecordGrid
         ref={grid}

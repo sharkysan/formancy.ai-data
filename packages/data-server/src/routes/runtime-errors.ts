@@ -41,6 +41,7 @@ export function planRefusal(code: PlanRefusalCode, message: string): HttpRefusal
     case 'nothing-to-update':
     case 'not-sortable':
     case 'not-searchable':
+    case 'not-filterable':
       return { status: 400, body: { code, message } }
     case 'record-not-read':
       // The update route plans with the record it read and answers a read

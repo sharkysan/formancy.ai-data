@@ -92,7 +92,7 @@ const isSafeOrNull = (value: unknown): value is number | null => value === null 
  * when it is not one: a kind outside `RowFilterType`, or a field that kind
  * needs missing or of the wrong shape. Fresh, and holding nothing else.
  */
-function rowFilterType(type: unknown): RowFilterType | undefined {
+export function rowFilterType(type: unknown): RowFilterType | undefined {
   if (!isRecord(type)) return undefined
   switch (type.kind) {
     case 'text': {

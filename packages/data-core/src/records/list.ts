@@ -5,12 +5,13 @@ import type { ColumnMeta, MetadataSnapshot, NormalizedTypeKind } from '../metada
 import { readableFields } from '../policy/evaluate.js'
 import { unscopedLookups } from '../policy/through.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
-import type { ListColumns, RecordList, RecordListQuery } from '../runtime.js'
+import type { FilterableField, ListColumns, RecordList, RecordListQuery } from '../runtime.js'
 import { lookupAnswer, toFormAnswers } from './answers.js'
+import { columnFilter, filterOffer } from './filter.js'
 import type { PlannedList, PlanRefusal } from './plan-types.js'
 import { columnsOf, keyOrderProblem, prepare, type Prepared, refuse, unaddressable } from './prepare.js'
 import { filtersFor, readColumns, throughFor } from './scope.js'
-import type { ListRequest, RecordRead, RecordSort, RecordValue, Through } from './types.js'
+import type { ListRequest, RecordFilter, RecordRead, RecordSort, RecordValue, Through } from './types.js'
 
 /*
  * A form's records, a page at a time (0044): when a list is offered at all,
@@ -94,24 +95,32 @@ export function listable(snapshot: MetadataSnapshot, bindings: FormBindings, pol
   return { ok: true, prepared, filters: filters.filters, through: through.through, fields: readable.fields }
 }
 
-/** The readable column fields of the form, in the bindings' order: the only fields a list sorts or searches by. A lookup field holds a token, not the label a person reads. */
+/** The readable column fields of the form, in the bindings' order: the only fields a list sorts, searches or filters by. A lookup field holds a token, not the label a person reads. */
 function readableColumns(bindings: FormBindings, fields: readonly string[]): ColumnBinding[] {
   const wanted = new Set(fields)
   return bindings.fields.filter((binding): binding is ColumnBinding => binding.kind === 'column' && wanted.has(binding.field))
 }
 
 /**
- * What a list of this form may be sorted and searched by, for an actor who
- * may read `fields`: one decision, so what `GET /v1/forms/:id` offers is what
- * `planList` accepts. Sortable: every readable column field whose kind has
- * canonical text. Searchable: those whose kind is in `lookup/searchable.ts`'s
- * set, the kinds a lookup's search matches, matched as it matches (0028).
+ * What a list of this form may be sorted, searched and filtered by, for an
+ * actor who may read `fields`: one decision, so what `GET /v1/forms/:id`
+ * offers is what `planList` accepts. Sortable: every readable column field
+ * whose kind has canonical text. Searchable: those whose kind is in
+ * `lookup/searchable.ts`'s set, the kinds a lookup's search matches, matched
+ * as it matches (0028). Filterable: those `filterOffer` offers a condition
+ * on, with what it offers (0104).
  */
 export function listColumns(bindings: FormBindings, fields: readonly string[]): ListColumns {
   const columns = readableColumns(bindings, fields)
+  const filterable: FilterableField[] = []
+  for (const binding of columns) {
+    const offer = filterOffer(binding)
+    if (offer !== null) filterable.push({ field: binding.field, ...offer })
+  }
   return {
     searchable: columns.filter((binding) => SEARCHABLE_KINDS.has(binding.type.kind)).map((binding) => binding.field),
     sortable: columns.filter((binding) => !UNORDERED.has(binding.type.kind)).map((binding) => binding.field),
+    filterable,
   }
 }
 
@@ -160,10 +169,12 @@ function parentEqual(prepared: Prepared, bindings: FormBindings, fields: readonl
  * -- or why not.
  *
  * Checks, in this order: everything `listable` checks; that every sort field
- * is one `listColumns` calls sortable (`not-sortable`); that a search has a
- * field to match (`not-searchable`); and the parent. Each row the adapter
- * returns is read as `planRead` would read it, the key and the readable
- * fields' columns and nothing else.
+ * is one `listColumns` calls sortable (`not-sortable`); that every filter
+ * condition is on a readable column field, one its column offers, with
+ * values it can hold (`not-filterable`, 0104); that a search has a field to
+ * match (`not-searchable`); and the parent. Each row the adapter returns is
+ * read as `planRead` would read it, the key and the readable fields'
+ * columns and nothing else.
  */
 export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy, context: PolicyContext, query: RecordListQuery): PlannedList {
   const found = listable(snapshot, bindings, policy, context)
@@ -177,6 +188,14 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
     const binding = byField.get(term.field)
     if (binding === undefined || !offered.sortable.includes(term.field)) return refuse('not-sortable', `${term.field} is not a field you may sort this list by.`)
     requested.push({ column: binding.column, direction: term.direction })
+  }
+  const filter: RecordFilter[] = []
+  for (const term of query.filter) {
+    const binding = byField.get(term.field)
+    if (binding === undefined) return refuse('not-filterable', `${term.field} is not a field you may filter this list by.`)
+    const planned = columnFilter(prepared.columns.get(binding.column) as ColumnMeta, term, term.field)
+    if (!planned.ok) return refuse('not-filterable', planned.message)
+    filter.push(planned.filter)
   }
   if (query.search !== '' && offered.searchable.length === 0) return refuse('not-searchable', 'This form has no field you may read that a search can match.')
   const parent = parentEqual(prepared, bindings, fields, query.parent)
@@ -192,6 +211,7 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
     filters: found.filters,
     through: found.through,
     equal: parent.equal,
+    filter,
     search: query.search === '' ? null : { text: query.search, columns: search },
     sort: listOrder(prepared, requested),
     offset: query.offset,

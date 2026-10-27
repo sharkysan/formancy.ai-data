@@ -66,6 +66,7 @@ export function listQuery({
     search,
     sort: sortModel.map((item) => ({ field: item.colId, direction: item.sort })),
     parent,
+    filter: [],
     offset: startRow,
     limit: endRow - startRow,
   }

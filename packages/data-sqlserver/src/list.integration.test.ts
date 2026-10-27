@@ -49,7 +49,7 @@ const LINE_POLICY: FormPolicy = {
 }
 
 const CLARA: PolicyContext = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: { tenant: '1' } }
-const EVERY: RecordListQuery = { search: '', sort: [], parent: null, offset: 0, limit: 50 }
+const EVERY: RecordListQuery = { search: '', sort: [], parent: null, filter: [], offset: 0, limit: 50 }
 
 beforeAll(async () => {
   fixture = await startSqlServerFixture()
@@ -300,7 +300,7 @@ describe('a file of shipments', covers('sqlserver', exportCase('shipments')), ()
  * written once for both engines.
  */
 async function browsed(query: Partial<BrowseQuery> & Pick<BrowseQuery, 'object'>) {
-  const plan = planBrowse(snapshot, { equal: [], search: '', sort: [], offset: 0, limit: 50, ...query })
+  const plan = planBrowse(snapshot, { equal: [], filter: [], search: '', sort: [], offset: 0, limit: 50, ...query })
   if (!plan.ok) throw new Error(`expected a browse, got ${plan.code}: ${plan.message}`)
   const outcome = await records.list(plan.request)
   if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)

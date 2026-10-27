@@ -404,7 +404,7 @@ describe('an ALTER that commits while a request waits for it', () => {
           const stale = writes(entry, snapshot, '1', old)
           const read = { target: target(entry.table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const, through: [] }
           // A list is a read of a page, asked again after the lock as a read is (0044).
-          const list = { target: read.target, columns: read.columns, filters: read.filters, through: [], equal: [], search: null, sort: [{ column: 'id', direction: 'asc', nulls: null }], offset: 0, limit: 50 } as const
+          const list = { target: read.target, columns: read.columns, filters: read.filters, through: [], equal: [], filter: [], search: null, sort: [{ column: 'id', direction: 'asc', nulls: null }], offset: 0, limit: 50 } as const
           const altering = await holdAlter(entry)
           const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read), records.list(list), records.delete(stale.removal)] as const
           await waiting(entry.table, 5)

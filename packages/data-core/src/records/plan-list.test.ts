@@ -45,7 +45,7 @@ import {
 } from './test-support.js'
 
 /** A first page, in key order, with nothing narrowed: what a grid asks for when it opens. */
-const FIRST: RecordListQuery = { search: '', sort: [], parent: null, offset: 0, limit: 50 }
+const FIRST: RecordListQuery = { search: '', sort: [], parent: null, filter: [], offset: 0, limit: 50 }
 const query = (change: Partial<RecordListQuery>): RecordListQuery => ({ ...FIRST, ...change })
 
 const customers = customerForm(customerSource()).bindings
@@ -75,6 +75,7 @@ describe('planList', () => {
         filters: TENANT_ONE,
         through: [],
         equal: [],
+        filter: [],
         search: null,
         sort: [{ column: 'id', direction: 'asc', nulls: null }],
         offset: 0,
@@ -252,11 +253,22 @@ describe('planList', () => {
         },
       },
     })
+    const NULLS = ['null', 'not-null']
     expect(listColumns(PG_ORDER, CLERK_FIELDS)).toEqual({
       searchable: ['id', 'status', 'notes', 'group', 'approved_by'],
       sortable: ['id', 'order_date', 'status', 'amount', 'notes', 'group', 'approved_by', 'paid'],
+      filterable: [
+        { field: 'id', operators: ['equals', 'range'], input: 'integer' },
+        { field: 'order_date', operators: ['equals', 'range'], input: 'date' },
+        { field: 'status', operators: ['equals', 'contains'], input: 'text' },
+        { field: 'amount', operators: ['equals', 'range'], input: 'decimal' },
+        { field: 'notes', operators: ['equals', 'contains', ...NULLS], input: 'text' },
+        { field: 'group', operators: ['equals', 'contains', ...NULLS], input: 'text' },
+        { field: 'approved_by', operators: ['equals', 'range', ...NULLS], input: 'integer' },
+        { field: 'paid', operators: ['equals', ...NULLS], input: 'boolean' },
+      ],
     })
-    expect(listColumns(PG_ORDER, ['id', 'order_date', 'status'])).toEqual({ searchable: ['id', 'status'], sortable: ['id', 'order_date', 'status'] })
+    expect(listColumns(PG_ORDER, ['id', 'order_date', 'status'])).toMatchObject({ searchable: ['id', 'status'], sortable: ['id', 'order_date', 'status'] })
     for (const field of ['amount', 'customer', 'employee', 'nothing']) {
       expect(planList(PG, PG_ORDER, ORDER_POLICY, AUDITOR, query({ sort: [{ field, direction: 'asc' }] })), field).toEqual({
         ok: false,
@@ -289,6 +301,44 @@ describe('planList', () => {
     expect(listColumns(bindings, ['id', 'scan', 'stamp']).sortable).toEqual(['id'])
     for (const field of ['scan', 'stamp']) {
       expect(planList(source, bindings, policy, CLERK, query({ sort: [{ field, direction: 'asc' }] })), field).toMatchObject({ ok: false, code: 'not-sortable' })
+    }
+  })
+
+  // A condition is on the column a readable column field binds (0104),
+  // planned by columnFilter. A field the actor may not read, a lookup, an
+  // operator its column does not offer and a value it cannot hold are each
+  // refused before an adapter sees them, naming the field and never the
+  // value. Watched failing with the field read from the request rather
+  // than from the readable bindings.
+  test('filters only by readable column fields, by what their columns offer', () => {
+    const renamed = edited(PG_ORDER, (draft) => {
+      const amount = draft.fields.find((binding) => binding.field === 'amount')
+      if (amount !== undefined) amount.field = 'total'
+    })
+    const { amount: _, ...others } = ORDER_POLICY.fields
+    const policy: FormPolicy = { ...ORDER_POLICY, fields: { ...others, total: CLERK_RW } }
+    const filter: RecordListQuery['filter'] = [
+      { field: 'total', op: 'range', from: '10', to: null },
+      { field: 'paid', op: 'null' },
+    ]
+    expect(planList(PG, renamed, policy, CLERK, query({ filter }))).toMatchObject({
+      ok: true,
+      request: {
+        filter: [
+          { op: 'range', column: 'amount', type: AMOUNT, from: '10.0000', to: null, before: null },
+          { op: 'null', column: 'paid' },
+        ],
+      },
+    })
+    const refusals: Array<[typeof CLERK, RecordListQuery['filter'][number], string]> = [
+      [AUDITOR, { field: 'amount', op: 'range', from: '10', to: null }, 'amount is not a field you may filter this list by.'],
+      [CLERK, { field: 'customer', op: 'null' }, 'customer is not a field you may filter this list by.'],
+      [CLERK, { field: 'nothing', op: 'null' }, 'nothing is not a field you may filter this list by.'],
+      [CLERK, { field: 'amount', op: 'contains', text: '1' }, 'amount offers no contains condition.'],
+      [CLERK, { field: 'order_date', op: 'equals', value: '2026-02-30' }, 'A value given for order_date is not one it can hold.'],
+    ]
+    for (const [who, term, message] of refusals) {
+      expect(planList(PG, PG_ORDER, ORDER_POLICY, who, query({ filter: [term] })), term.field).toEqual({ ok: false, code: 'not-filterable', message })
     }
   })
 

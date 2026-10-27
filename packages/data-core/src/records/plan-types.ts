@@ -41,6 +41,9 @@ import type { DeleteRequest, InsertRequest, ListRequest, ReadRequest, UpdateRequ
  *   can rely on (0044).
  * - `not-searchable` — a list searched where this actor may read no field a
  *   search can match (0044).
+ * - `not-filterable` — a list filtered by a field this actor may not filter
+ *   it by: one they may not read, a lookup, an operator its column does not
+ *   offer, or a value its column cannot hold (0104).
  */
 export type PlanRefusalCode =
   | PolicyRefusalCode
@@ -54,6 +57,7 @@ export type PlanRefusalCode =
   | 'record-not-read'
   | 'not-sortable'
   | 'not-searchable'
+  | 'not-filterable'
 
 export interface PlanRefusal {
   ok: false

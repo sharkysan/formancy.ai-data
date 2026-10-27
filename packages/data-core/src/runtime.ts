@@ -17,16 +17,48 @@ import type { FieldError, FormRecord } from './records/plan-types.js'
  * other before it is a blank form.
  */
 
+/** What a filter's condition asks of its column (0104). */
+export type FilterOp = 'equals' | 'range' | 'contains' | 'null' | 'not-null'
+
 /**
- * What a list of a form's records may be searched and sorted by, for one
- * person (0044): field keys in the bindings' order, from `listColumns`.
- * `sortable` holds the readable column fields whose kind has canonical text,
- * `searchable` those of kind text or integer, matched as a lookup's search
- * matches. A lookup field is neither: a list holds its token, not its label.
+ * One condition on one column, as a request carries it (0104): values as
+ * the text a person typed, which the planner checks and spells as the
+ * column holds them (`records/filter.ts`). A range has a `from`, a `to` or
+ * both, each inclusive; a timestamp's are dates, and its range whole days.
+ * `null` is the column holding NULL, and text of no characters is a value.
+ */
+export type FilterCondition =
+  | { op: 'equals'; value: string }
+  | { op: 'range'; from: string | null; to: string | null }
+  | { op: 'contains'; text: string }
+  | { op: 'null' }
+  | { op: 'not-null' }
+
+/** What a filter's value or bound is typed as. A timestamp's bounds are dates. */
+export type FilterInput = 'text' | 'integer' | 'decimal' | 'date' | 'uuid' | 'boolean'
+
+/** What one column offers a filter (0104): its operators, in the order a panel lists them, and what a value is typed as -- `null` when it offers only `null` and `not-null`. */
+export interface FilterOffer {
+  operators: FilterOp[]
+  input: FilterInput | null
+}
+
+/** A field a list may be filtered by, and what it offers. */
+export type FilterableField = { field: string } & FilterOffer
+
+/**
+ * What a list of a form's records may be searched, sorted and filtered by,
+ * for one person (0044): field keys in the bindings' order, from
+ * `listColumns`. `sortable` holds the readable column fields whose kind has
+ * canonical text, `searchable` those of kind text or integer, matched as a
+ * lookup's search matches, and `filterable` those `filterOffer` offers a
+ * condition on (0104). A lookup field is none of them: a list holds its
+ * token, not its label.
  */
 export interface ListColumns {
   searchable: string[]
   sortable: string[]
+  filterable: FilterableField[]
 }
 
 /**
@@ -119,6 +151,9 @@ export interface ListSortTerm {
   direction: 'asc' | 'desc'
 }
 
+/** One condition of a list's filter (0104): a field key and what it asks of the field's column. */
+export type ListFilterTerm = { field: string } & FilterCondition
+
 /**
  * `POST /v1/forms/:id/records/list`: one page of a form's records (0044), as
  * `validateListQuery` returns it from a body. A POST, so the search never
@@ -128,27 +163,30 @@ export interface ListSortTerm {
  *
  * `parent` narrows the list to the rows whose lookup field `field` holds
  * `record`, a token of the row it references -- the children of one parent.
- * It is a narrowing and never a permission: the form's own read filter and
- * throughs still decide which rows exist.
+ * `filter` narrows it to the rows every condition holds for, each field
+ * named once (0104); `[]` when left out. Both are narrowings and never a
+ * permission: the form's own read filter and throughs still decide which
+ * rows exist.
  */
 export interface RecordListQuery {
   search: string
   sort: ListSortTerm[]
   parent: { field: string; record: string } | null
+  filter: ListFilterTerm[]
   offset: number
   limit: number
 }
 
 /**
  * `POST /v1/forms/:id/records/export`: one CSV file of every record a list
- * would page through for the same search, sort and parent (0079), as
- * `validateExportQuery` returns it from a body. No offset and no limit: the
- * server pages the list itself, from the first record to the last, under
- * the read right a list has and no other. A POST, so the search never
- * appears in a URL, as a list's does not. In a body every property may be
- * left out, as in a list's.
+ * would page through for the same search, sort, parent and filter (0079,
+ * 0104), as `validateExportQuery` returns it from a body. No offset and no
+ * limit: the server pages the list itself, from the first record to the
+ * last, under the read right a list has and no other. A POST, so the search
+ * never appears in a URL, as a list's does not. In a body every property
+ * may be left out, as in a list's.
  */
-export type RecordExportQuery = Pick<RecordListQuery, 'search' | 'sort' | 'parent'>
+export type RecordExportQuery = Pick<RecordListQuery, 'search' | 'sort' | 'parent' | 'filter'>
 
 /**
  * The most bytes an exported file may have (0079): 16 MiB of UTF-8, the

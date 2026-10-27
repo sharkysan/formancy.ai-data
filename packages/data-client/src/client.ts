@@ -267,7 +267,7 @@ export function createDataClient(options: DataClientOptions) {
         method: 'POST',
         names: [formId],
         route: ([form]) => `/v1/forms/${String(form)}/records/list`,
-        body: { search: query.search, sort: query.sort, parent: query.parent, offset: query.offset, limit: query.limit },
+        body: { search: query.search, sort: query.sort, parent: query.parent, filter: query.filter, offset: query.offset, limit: query.limit },
         read: (body) => (isRecordList(body) ? body : undefined),
         signal,
       }),
@@ -284,7 +284,7 @@ export function createDataClient(options: DataClientOptions) {
      * whole is `incomplete`, never a file.
      */
     exportRecords: async (formId: string, query: Partial<RecordExportQuery> = {}, signal?: AbortSignal): Promise<Outcome<RecordFile>> => {
-      const file = await download({ method: 'POST', names: [formId], route: ([form]) => `/v1/forms/${String(form)}/records/export`, body: { search: query.search, sort: query.sort, parent: query.parent }, signal })
+      const file = await download({ method: 'POST', names: [formId], route: ([form]) => `/v1/forms/${String(form)}/records/export`, body: { search: query.search, sort: query.sort, parent: query.parent, filter: query.filter }, signal })
       return file.ok ? { ok: true, value: { file: file.value, name: exportFileName(formId) } } : file
     },
 
