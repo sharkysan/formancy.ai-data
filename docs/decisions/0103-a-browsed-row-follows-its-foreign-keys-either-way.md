@@ -1,6 +1,6 @@
 # 0103 — A browsed row follows its foreign keys either way, each follow a browse narrowed to the row's values
 
-- **Status:** accepted; extends [0099](0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md): a browse may be narrowed to the rows equal to given values in shown columns of a key kind, and the studio's Browse step follows a row's foreign keys through it, to what the row refers to and to what refers to it
+- **Status:** accepted; extends [0099](0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md): a browse may be narrowed to the rows equal to given values in shown columns of a key kind, and the studio's Browse step follows a row's foreign keys through it, to what the row refers to and to what refers to it; extended by [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md): a browse, a follow's page among them, is filtered by a person's own conditions on its columns, and equality there is exact, where a follow's is the database's
 - **Date:** 2026-10-26
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/records/follow.test.ts` -- a

@@ -1198,7 +1198,7 @@
       ]
     },
     "0044": {
-      "reviewed": "sha256:86a57a8d24cf8ce33ccc0998a75de02398d465966e0e454406ec4b9eb3963424",
+      "reviewed": "sha256:ae4771a11a452145680eea8e34411927db7a98e780729eebedcac14d9eff1d73",
       "limitations": [
         {
           "area": "forms",
@@ -2593,7 +2593,7 @@
       ]
     },
     "0079": {
-      "reviewed": "sha256:60314f898cec6da5edd124d6417dc56bad45f7a945a20e5048e88b5bd227b421",
+      "reviewed": "sha256:102ceeaad97c926565b592e6405358eb1983e2ca681ec0e237fdaf990e751a4a",
       "limitations": [
         {
           "area": "server",
@@ -2976,7 +2976,7 @@
       ]
     },
     "0099": {
-      "reviewed": "sha256:e9d993a79c064041cca37c6d8c19b18926ebdfcc9b35b325870c754a2f93eb47",
+      "reviewed": "sha256:8bbcaafeddd5825ba19a79fdbb1c32d286a7014be77019311acb9b9ae54dbceb",
       "limitations": [
         {
           "area": "access",
@@ -3013,7 +3013,7 @@
       ]
     },
     "0103": {
-      "reviewed": "sha256:63bb2c0e81344778a9d6faa8387ee847487d9da4de920efd850a02d0d8cf571f",
+      "reviewed": "sha256:133682a5736a4d19289ea5abef8ef5c0b3478f47f1c201bcea08916571d265ef",
       "limitations": [
         {
           "area": "studio",
@@ -3081,6 +3081,61 @@
         {
           "area": "operations",
           "says": "The composed stack does not run the server on a read-only root, though the image starts on one; an operator who wants it adds read_only and keeps the store's volume."
+        }
+      ]
+    },
+    "0104": {
+      "reviewed": "sha256:6bc2810d8220662c5391e87b004a94cdae0c3613e323c70071646ef19614426a",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A filter's conditions are joined by AND: there is no OR, no not-equal, no starts-with and no range over text, and a field takes one condition, so a range is the way to say two things about one column.",
+          "heldBy": "packages/data-core/src/records/filter.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A float, a time, binary, a rowversion and an unsupported column can be filtered only by whether they are empty, and only where they hold NULLs; a lookup field and a field the person may not read cannot be filtered at all.",
+          "heldBy": "packages/data-core/src/records/plan-list.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "Equality on text is exact on both engines, so typing muster ag does not find Muster AG even under a case-insensitive collation; contains folds case on both engines, and accents too on SQL Server where the column's collation does, never on PostgreSQL."
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL an unconstrained numeric keeps the scale each value was given, so an equality with 12.5 does not find a stored 12.50; a range compares them as numbers."
+        },
+        {
+          "area": "forms",
+          "says": "A timestamp offers no equality, only a range of whole days, and an instant's days are UTC's, as the page shows them, so a person thinking of their own day in another zone gets a range shifted by their offset.",
+          "heldBy": "packages/data-core/src/records/filter.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A timestamp range to 9999-12-31 has no upper end, so on PostgreSQL it also holds a timestamp after the year 9999, which SQL Server cannot store."
+        },
+        {
+          "area": "forms",
+          "says": "A decimal with more fraction digits than its column holds, or a number outside its column's range or precision, is refused as not-filterable rather than rounded.",
+          "heldBy": "packages/data-core/src/records/filter.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "No plan of any filter is measured on either engine: contains reads every row the other conditions leave, and on SQL Server a datetime or smalldatetime column is converted to datetime2 to meet a day's bound, which may keep an index on it from being sought."
+        },
+        {
+          "area": "host",
+          "says": "A condition the server refused stays in the host's list of conditions, and so in its grid's request and its file's, until the person replaces or removes it.",
+          "heldBy": "apps/host/src/filter.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A filter is kept in no address and saved nowhere: a reload, another form, another parent for a child section and the studio's Show rows each start without one."
+        },
+        {
+          "area": "server",
+          "says": "@formancy/data-client refuses a form whose list says nothing of filters as unexpected, so a host upgrades its server before its client.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
         }
       ]
     }

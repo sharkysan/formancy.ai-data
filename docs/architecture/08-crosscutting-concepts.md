@@ -112,7 +112,11 @@ never as a predicate
 ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md));
 a browse narrowed to equal values names its columns in the body, and each
 reaches an adapter only as the server's own snapshot spells a column the
-page shows, its value bound (0103);
+page shows, its value bound (0103); a filter's condition names a field or a
+column and an operator from a closed set, and reaches an adapter as a
+column the snapshot spells, the operator's own predicate and values bound
+as the column's type, never as text of a query
+([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md));
 and a form names a connection only by an id the allowlist holds
 ([0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)).
 
@@ -305,6 +309,8 @@ for every other operation -- never the search or a row
 nor the values a follow of a foreign key narrowed the browse to, so the
 trail tells that a table was browsed and not which row led there
 ([0103](../decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
+No event has a field for a filter's conditions, on either plane
+([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 
 **It is operational, not evidence.** The event is written after the commit,
 by another system: a crash between the two loses it, and whoever runs the

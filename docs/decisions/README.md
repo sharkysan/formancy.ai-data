@@ -98,7 +98,7 @@ only enforcement is "we remember" says so plainly.
 | [0041](0041-the-runtime-refuses-what-drift-blocks.md) | The runtime refuses what drift blocks in the form's own table, decided over a description read in each request, and every write holds the table to it | accepted; extended by 0044, 0050, 0051 |
 | [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md) | Generated forms stay on spec 3 after spec 4 is released | accepted |
 | [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md) | A child form's rows are reached only through a parent its policy admits | accepted; extended by 0044, 0050, 0079 |
-| [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md) | A form's records are listed a page at a time under its read policy, searched and paged as a lookup is | accepted; narrowed by 0056; extended by 0079, 0099 |
+| [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md) | A form's records are listed a page at a time under its read policy, searched and paged as a lookup is | accepted; narrowed by 0056; extended by 0079, 0099, 0104 |
 | [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md) | The runtime plane lists the forms a person may read, and nothing about the others | accepted; extended by 0050 |
 | [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md) | A built app carries the licence and notice texts of everything it bundles | accepted; extended by 0069, 0072 |
 | [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md) | A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone | accepted; extended by 0050, 0058, 0070, 0080; narrowed by 0053; amended by 0097 |
@@ -133,7 +133,7 @@ only enforcement is "we remember" says so plainly.
 | [0076](0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md) | The architecture is documented as arc42 in docs/architecture, and every change updates the section it touches | accepted |
 | [0077](0077-a-not-null-added-not-valid-is-read-as-the-unvalidated-check-it-is.md) | A NOT NULL that PostgreSQL 18 added NOT VALID is read as the check it is: the column nullable, the constraint enforced and not validated | accepted |
 | [0078](0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md) | A PostgreSQL statement's rows are collected as the driver reads them, never taken from the array it resolves with | accepted |
-| [0079](0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md) | A person downloads the records a list shows them as one CSV file, made whole or not at all | accepted; extended by 0080 |
+| [0079](0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md) | A person downloads the records a list shows them as one CSV file, made whole or not at all | accepted; extended by 0080, 0104 |
 | [0080](0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md) | A host downloads the records its grid lists, and the browser saves the server's file | accepted |
 | [0081](0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md) | A SQL login that asks for TLS is refused when the server answers that it will not encrypt, before its login is sent | accepted; tedious 20.3.7 refuses too, the guard stays |
 | [0082](0082-a-sql-server-container-that-never-becomes-ready-says-how-it-ended-and-is-given-no-memory-bound.md) | A SQL Server container that never becomes ready fails its start with how Docker says it ended, and is given no memory bound | accepted |
@@ -153,8 +153,9 @@ only enforcement is "we remember" says so plainly.
 | [0096](0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md) | The apps wear formancy's `room.css` rather than a copy of `admin.css` | accepted |
 | [0097](0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md) | Back goes on past the open form's own entries in every layout | accepted |
 | [0098](0098-an-echo-the-record-moved-since-it-was-read-is-a-stale-save.md) | An echo the record moved since it was read is a stale save, not over-posting | accepted |
-| [0099](0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md) | A browse role reads any table or view's rows, a page at a time, as the connection's account reads them | accepted; extended by 0103 |
+| [0099](0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md) | A browse role reads any table or view's rows, a page at a time, as the connection's account reads them | accepted; extended by 0103, 0104 |
 | [0100](0100-a-proxy-list-whose-entries-together-trust-every-peer-is-refused.md) | A proxy list whose entries together trust every peer of a family is refused | accepted |
 | [0101](0101-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md) | A host token is refused unless it is its compact form exactly | accepted |
 | [0102](0102-the-server-image-gives-its-user-the-store-and-not-its-code.md) | The server image gives its user the store, and not its code | accepted |
-| [0103](0103-a-browsed-row-follows-its-foreign-keys-either-way.md) | A browsed row follows its foreign keys either way, each follow a browse narrowed to the row's values | accepted |
+| [0103](0103-a-browsed-row-follows-its-foreign-keys-either-way.md) | A browsed row follows its foreign keys either way, each follow a browse narrowed to the row's values | accepted; extended by 0104 |
+| [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md) | A list and a browse are filtered by a person's conditions on their columns, each value spelled as its column holds it | accepted |

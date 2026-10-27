@@ -41,6 +41,8 @@ One path runs through the packages, and most changes touch one step of it.
    `records/browse.ts` and run as a list (`routes/admin-browse.ts`; 0099),
    and follows a row's foreign keys either way, each follow a browse of the
    other end narrowed to the row's values (`records/follow.ts`; 0103).
+   A person's conditions on its columns filter a browse as they filter a
+   form's list and its export (`records/filter.ts`; 0104).
 2. **Generate.** `generateForm` (`data-core/src/generate/`) turns a snapshot
    and a `GenerationRequest` into a formancy form, its `FormBindings` — field
    to column — and notes saying what it inferred and what it refused (0009).
