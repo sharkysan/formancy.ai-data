@@ -257,7 +257,7 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
       )}
       <KeyHints name={name} kind={page.kind} relations={relations} />
       {/* Keyed apart from the related rows below, whose key is a row's place: two siblings with one key leave React keeping a stale one. */}
-      <FilterPanel key={`filter-${String(visit)}`}columns={filterables} active={asked.filter} onFilter={(filter, focus) => onLoad({ ...asked, filter, offset: 0 }, focus)} />
+      <FilterPanel key={`filter-${String(visit)}`} columns={filterables} active={asked.filter} onFilter={(filter, focus) => onLoad({ ...asked, filter, offset: 0 }, focus)} />
       <div className="rows" role="region" aria-labelledby="rows-caption" tabIndex={0}>
         <table>
           <caption id="rows-caption">
@@ -277,7 +277,7 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
                       type="button"
                       className="sort"
                       aria-label={`${column.name}, sort ${next.direction === 'asc' ? 'ascending' : 'descending'}`}
-                      onClick={() => onLoad({ ...asked, sort: next, offset: 0 })}
+                      onClick={() => void onLoad({ ...asked, sort: next, offset: 0 })}
                     >
                       {column.name}
                     </button>
@@ -319,10 +319,10 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
         <Related key={related} id="related" name={name} number={asked.offset + related + 1} row={open} relations={relations} onFollow={onFollow} />
       )}
       <p className="actions">
-        <button type="button" className="button" aria-disabled={atStart} onClick={() => (atStart ? undefined : onLoad({ ...asked, offset: Math.max(0, asked.offset - LIST_PAGE_SIZE) }))}>
+        <button type="button" className="button" aria-disabled={atStart} onClick={() => (atStart ? undefined : void onLoad({ ...asked, offset: Math.max(0, asked.offset - LIST_PAGE_SIZE) }))}>
           Previous page
         </button>
-        <button type="button" className="button" aria-disabled={!page.hasMore} onClick={() => (page.hasMore ? onLoad({ ...asked, offset: asked.offset + LIST_PAGE_SIZE }) : undefined)}>
+        <button type="button" className="button" aria-disabled={!page.hasMore} onClick={() => (page.hasMore ? void onLoad({ ...asked, offset: asked.offset + LIST_PAGE_SIZE }) : undefined)}>
           Next page
         </button>
       </p>
