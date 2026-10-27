@@ -4,7 +4,8 @@ import { PREFIX } from '@formancy/data-live-demo/worker'
 import { ROUTE_OPERATIONS } from '@formancy/data-server'
 import { demoSession } from './demo.js'
 import { demoDoor } from './test-demo.js'
-import { answer, answeredOnce, chooseCustomer, chooseForm, chooseRenderer, exportButton, exportLine, gridSection, keeping, load, loaded, mount, newRecord, rendered, said, save, searchRecords, shows, signIn, signInAs, stamp } from './test-host.js'
+import { applyCondition, listsApplied, listsSent } from './test-filter.js'
+import { answer, answeredOnce, chooseCustomer, chooseForm, chooseRenderer, exportButton, exportLine, gridSection, gridStatus, keeping, load, loaded, mount, newRecord, rendered, said, save, searchRecords, shows, signIn, signInAs, stamp } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane, Sent } from './test-plane.js'
 
@@ -83,9 +84,9 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     const { save: keep, saved } = keeping()
     const user = door === undefined ? mount(plane.fetch, { save: keep }) : mount(door.fetch, { base, session: demoSession(door.fetch, base), save: keep })
     // The whole journey: the menu, a form and its list, a create through a
-    // lookup's search, an update, a search for what the create typed, the
-    // file of what it found, and its row opened -- its lines listed, a label
-    // resolved -- and deleted.
+    // lookup's search, an update, a search for what the create typed, a
+    // filter on the same words (0104), the file of what they found, and its
+    // row opened -- its lines listed, a label resolved -- and deleted.
     if (door === undefined) await signIn(user, TOKENS.clerk)
     else await signInAs(user, 'Clara')
     await chooseForm(user, formId)
@@ -107,6 +108,9 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // Its own row, found by the words typed into it -- the grid shows a
     // page, and the database holds every file's orders -- and opened.
     await searchRecords(user, words, [record.slice(3)])
+    await applyCondition(user, 'Records', { field: 'Notes', condition: 'contains', value: words })
+    await listsApplied('Records', [`Notes contains “${words}”`])
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 1–1. Filtered by Notes.'), { timeout: 15_000 })
     await user.click(exportButton('Records'))
     await waitFor(() => expect(exportLine('Records').textContent).toBe(`Made ${formId}.csv; your browser saves it.`), { timeout: 15_000 })
     expect(saved.map((file) => file.name)).toEqual([`${formId}.csv`])
@@ -170,5 +174,15 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // names one, at any depth (0011, 0029).
     const tenants = page.flatMap((request) => keys(JSON.parse(request.body ?? '{}')).filter((key) => /tenant/i.test(key)).map((key) => `${line(request)}: ${key}`))
     expect(tenants).toEqual([])
+
+    // The filter travels as the search does (0104): in the body of the list
+    // that answered it and of the file made after it, and its words in no
+    // URL (watched failing with the export sent without it: no export body
+    // held the condition).
+    const condition = { field: 'notes', op: 'contains', text: words }
+    expect(listsSent(sent, formId).some(({ body }) => JSON.stringify(body.filter) === JSON.stringify([condition]))).toBe(true)
+    const files = sent.filter((request) => request.path === `/v1/forms/${formId}/records/export`).map((request) => JSON.parse(request.body ?? '{}') as { filter?: unknown })
+    expect(files.map((body) => body.filter)).toEqual([[condition]])
+    expect(page.filter((request) => request.url.includes(words)).map(line)).toEqual([])
   })
 })
