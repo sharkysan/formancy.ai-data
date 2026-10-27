@@ -1,10 +1,11 @@
 /* ------------------------------------------------------------- browse
  *
  * A connection's rows (0099): a page of a table or view in a grid of its
- * own, and a row's related rows below it (0103). Classes only, as review's
- * panes are. The grid scrolls sideways inside its own region, which takes
- * the keyboard's focus to scroll, so a wide table never scrolls the page;
- * the related rows are outside it, and wrap.
+ * own, its filter above it (0104), and a row's related rows below it
+ * (0103). Classes only, as review's panes are. The grid scrolls sideways
+ * inside its own region, which takes the keyboard's focus to scroll, so a
+ * wide table never scrolls the page; the filter and the related rows are
+ * outside it, and wrap.
  */
 
 .browsed {
@@ -160,4 +161,95 @@
 .no-row {
   padding: 0.25rem 0;
   color: var(--muted);
+}
+
+/* A page's filter (0104): the conditions it holds, each a chip with a
+   Remove of its own, and the form that adds one, a panel of its own
+   between the hints and the grid. A condition names a person's values,
+   which can be long, so a chip wraps rather than pushing past the edge. */
+.browse-filter {
+  margin: 0.75rem 0;
+}
+
+.filter-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.filter-conditions > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.filter-conditions > ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Violet, the colour of what a person acts on: a condition is the person's own, and narrows what the grid shows. */
+.filter-conditions li {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.25rem;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.125rem 0.125rem 0.125rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--client) 45%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--client) 10%, transparent);
+  font-size: 0.875rem;
+}
+
+.filter-conditions li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.filter-remove {
+  min-height: 1.75rem;
+  padding: 0 0.625rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--client);
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.filter-remove:hover {
+  background: color-mix(in srgb, var(--client) 16%, transparent);
+}
+
+.filter-remove:focus-visible {
+  outline: 2px solid var(--client);
+}
+
+/* Open, the button says so as a row's open related rows do. */
+.filter-toggle[aria-expanded='true'] {
+  border-color: var(--client);
+  color: var(--client);
+}
+
+.filter-add {
+  margin-top: 0.5rem;
+  padding: 0.25rem 1rem 0.75rem;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 2%);
+}
+
+.filter-add .hint {
+  max-width: 72ch;
 }

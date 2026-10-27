@@ -269,6 +269,22 @@ describe('applying a condition', () => {
     expect(unnamed()).toEqual([])
   })
 
+  // A range of days runs from the first day's midnight to the last day's end, and not into the next: a row a second before the next midnight is in, one at it is out, and one at a first day's midnight is in. The fake compares the server's midnights as `RecordFilter` says the adapters do; one that admitted the next midnight, or not the first, would show a page no adapter returns, and every test reading it would hold the studio to the wrong rows.
+  test('a range of days on an instant ends at the last day’s end, and starts at the first day’s midnight', async () => {
+    const user = await browsing()
+    await show(user, 'sales.customer')
+    await openPanel(user)
+    await addCondition(user, 'created_at', 'is in a range', { From: '2026-10-08', To: '2026-10-08' })
+    await statusSays('Filtered by created_at from 2026-10-08 to 2026-10-08, showing rows 1 to 1.')
+    expect(grid().map((row) => row[3])).toEqual(['name', 'Beispiel GmbH'])
+    await user.click(within(browseStep()).getByRole('button', { name: 'Remove created_at from 2026-10-08 to 2026-10-08' }))
+    await statusSays('Showing rows 1 to 3.')
+    await addCondition(user, 'created_at', 'is in a range', { From: '2026-10-09' })
+    await statusSays('Filtered by created_at from 2026-10-09, showing rows 1 to 1.')
+    expect(lastBody()).toEqual(body('sales.customer', [{ column: 'created_at', op: 'range', from: '2026-10-09', to: null }]))
+    expect(grid().map((row) => row[3])).toEqual(['name', 'Other Tenant GmbH'])
+  })
+
   // What a search finds, a contains finds: the text trimmed as the search box's is, so the page never says it looked for spaces it did not.
   test('a contains condition is trimmed as a search is, and said in quotes', async () => {
     const user = await browsing()

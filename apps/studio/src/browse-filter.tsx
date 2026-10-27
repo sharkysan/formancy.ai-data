@@ -215,9 +215,9 @@ export function FilterPanel({ columns, active, onFilter }: { columns: Filterable
   }
   const available = columns.filter((entry) => !active.some((term) => term.column === entry.column))
   return (
-    <div className="filter">
+    <div className="browse-filter">
       {active.length === 0 ? null : (
-        <div className="conditions">
+        <div className="filter-conditions">
           <p id="filtered-by">Filtered by</p>
           <ul aria-labelledby="filtered-by">
             {active.map((term, index) => {
@@ -225,7 +225,7 @@ export function FilterPanel({ columns, active, onFilter }: { columns: Filterable
               return (
                 <li key={term.column}>
                   <span>{said}</span>
-                  <button type="button" id={`filter-remove-${String(index)}`} className="remove" onClick={() => remove(index)}>
+                  <button type="button" id={`filter-remove-${String(index)}`} className="filter-remove" onClick={() => remove(index)}>
                     Remove{' '}<span className="visually-hidden">{said}</span>
                   </button>
                 </li>
@@ -238,7 +238,7 @@ export function FilterPanel({ columns, active, onFilter }: { columns: Filterable
         </div>
       )}
       <p className="actions">
-        <button type="button" id="filter-toggle" className="button" aria-expanded={open} aria-controls={open ? 'filter-add' : undefined} onClick={() => setOpen((was) => !was)}>
+        <button type="button" id="filter-toggle" className="button filter-toggle" aria-expanded={open} aria-controls={open ? 'filter-add' : undefined} onClick={() => setOpen((was) => !was)}>
           Filter rows
         </button>
       </p>
