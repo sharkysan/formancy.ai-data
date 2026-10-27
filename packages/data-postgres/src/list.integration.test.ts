@@ -1,6 +1,21 @@
 import { browsePage, browseRelations, driftRefusal, exportColumns, exportHeader, exportRecord, followTerms, generateForm, listTerms, planBrowse, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
-import type { ApiValue, BrowseQuery, BrowseRelation, FormBindings, FormPolicy, FormRecord, ListOutcome, MetadataSnapshot, ObjectRef, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
-import { BROWSE_PARITY, browseCase, covers, EXPORT_PARITY, exportCase, FIXTURE_SCOPE, LIST_PARITY, LIST_ROWS, listCase, startPostgresFixture } from '@formancy/data-fixtures'
+import type { ApiValue, BrowseFilterTerm, BrowseQuery, BrowseRelation, FormBindings, FormPolicy, FormRecord, ListFilterTerm, ListOutcome, MetadataSnapshot, ObjectRef, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
+import {
+  BROWSE_PARITY,
+  browseCase,
+  COLUMN_FILTER_PARITY,
+  COLUMN_FILTER_ROWS,
+  COLUMN_FILTER_TENANT,
+  columnFilterCase,
+  covers,
+  EXPORT_PARITY,
+  exportCase,
+  FIXTURE_SCOPE,
+  LIST_PARITY,
+  LIST_ROWS,
+  listCase,
+  startPostgresFixture,
+} from '@formancy/data-fixtures'
 import type { PostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
@@ -10,7 +25,8 @@ import { listStatement } from './records/list.js'
 
 /*
  * A form's records, a page at a time (0044), against REAL PostgreSQL loaded
- * with the shared fixture (0005) and LIST_ROWS, inserted by the owner.
+ * with the shared fixture (0005), LIST_ROWS and COLUMN_FILTER_ROWS, written
+ * by the owner.
  *
  * Every request is `planList`'s, from bindings generated over what discovery
  * reports and a clerk of tenant 1, so what reaches the adapter is what the
@@ -25,6 +41,7 @@ let records: RecordAdapter
 let snapshot: MetadataSnapshot
 let customers: FormBindings
 let lines: FormBindings
+let shipments: ReturnType<typeof generateForm>
 
 const TENANT = [{ column: 'tenant_id', attribute: 'tenant' }]
 const READ = { read: ['clerk'], write: [] }
@@ -49,7 +66,18 @@ const LINE_POLICY: FormPolicy = {
   through: ['order'],
 }
 
+/** A tenant's shipments, every field the generator makes readable, the tenant pinned. */
+const SHIPMENT_POLICY: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk'], create: [], update: [] },
+  fields: { id: READ, tenant_id: READ, tracking_no: READ, carrier_code: READ, reference: READ, pickup_time: READ, dispatched_at: READ, weight_kg: READ, temperature_c: READ },
+  rowFilters: TENANT,
+  lookups: {},
+}
+
 const CLARA: PolicyContext = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: { tenant: '1' } }
+/** The clerk of COLUMN_FILTER_ROWS' shipments' tenant, which no other case lists. */
+const SHIPPER: PolicyContext = { actor: { id: 'u-3', roles: ['clerk'] }, attributes: { tenant: COLUMN_FILTER_TENANT } }
 const EVERY: RecordListQuery = { search: '', sort: [], parent: null, filter: [], offset: 0, limit: 50 }
 
 beforeAll(async () => {
@@ -63,6 +91,18 @@ beforeAll(async () => {
   }
   for (const [order, line] of LIST_ROWS.lines) {
     await owner.unsafe('insert into sales.order_line (order_id, line_no, quantity, unit_price) values ($1::bigint, $2::int, 1, 1.00)', [order, line])
+  }
+  // Each value through text: postgres.js would send a parameter the server
+  // calls a timestamp through JavaScript's Date, in this machine's zone, and
+  // the text 'true' to a boolean as false (sql/statement.ts).
+  for (const [number, created, active] of COLUMN_FILTER_ROWS.customers) {
+    await owner.unsafe('update sales.customer set created_at = $2::text::timestamptz, active = $3::text::boolean where tenant_id = 1 and customer_no = $1::int', [number, created, String(active)])
+  }
+  for (const [reference, tracking, dispatched] of COLUMN_FILTER_ROWS.shipments) {
+    await owner.unsafe(
+      `insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pickup_time, dispatched_at) values ($1::int, $2::text::uuid, 1, $3, '08:00', $4::text::timestamp)`,
+      [COLUMN_FILTER_TENANT, tracking, reference, dispatched],
+    )
   }
   snapshot = await discoverPostgres(owner, FIXTURE_SCOPE)
   customers = generateForm(snapshot, {
@@ -81,6 +121,7 @@ beforeAll(async () => {
     lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
     versionColumn: 'row_version',
   }).bindings
+  shipments = generateForm(snapshot, { connection: 'test', root: { schema: 'sales', name: 'shipment' }, formId: 'shipments', title: 'Shipments', lookups: [], pinned: ['tenant_id'] })
   records = createPostgresRecords(owner)
 })
 
@@ -89,12 +130,12 @@ afterAll(async () => {
   await fixture?.stop()
 })
 
-/** One page as the server answers it: planned for Clara, listed by the adapter, and built by `recordPage`. */
-async function listed(bindings: FormBindings, policy: FormPolicy, change: Partial<RecordListQuery>): Promise<RecordList & { outcome: ListOutcome }> {
+/** One page as the server answers it: planned for Clara, or `context`, listed by the adapter, and built by `recordPage`. */
+async function listed(bindings: FormBindings, policy: FormPolicy, change: Partial<RecordListQuery>, context = CLARA, adapter = records): Promise<RecordList & { outcome: ListOutcome }> {
   const query = { ...EVERY, ...change }
-  const plan = planList(snapshot, bindings, policy, CLARA, query)
+  const plan = planList(snapshot, bindings, policy, context, query)
   if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
-  const outcome = await records.list(plan.request)
+  const outcome = await adapter.list(plan.request)
   if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
   return { ...recordPage(bindings, plan.fields, outcome.rows, query.limit), outcome }
 }
@@ -265,15 +306,7 @@ describe('a file of shipments', covers('postgres', exportCase('shipments')), () 
   // Watched failing with the timestamp written through displayText, which
   // cuts its half second.
   test("is the shipments' values as read, the same text on both engines", async () => {
-    const shipments = generateForm(snapshot, { connection: 'test', root: { schema: 'sales', name: 'shipment' }, formId: 'shipments', title: 'Shipments', lookups: [], pinned: ['tenant_id'] })
-    const policy: FormPolicy = {
-      version: 1,
-      operations: { read: ['clerk'], create: [], update: [] },
-      fields: { id: READ, tenant_id: READ, tracking_no: READ, carrier_code: READ, reference: READ, pickup_time: READ, dispatched_at: READ, weight_kg: READ, temperature_c: READ },
-      rowFilters: TENANT,
-      lookups: {},
-    }
-    const plan = planList(snapshot, shipments.bindings, policy, CLARA, EVERY)
+    const plan = planList(snapshot, shipments.bindings, SHIPMENT_POLICY, CLARA, EVERY)
     if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
     const outcome = await records.list(plan.request)
     if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
@@ -293,10 +326,10 @@ describe('a file of shipments', covers('postgres', exportCase('shipments')), () 
  * the server's browse route runs it. Every expectation is BROWSE_PARITY's,
  * written once for both engines.
  */
-async function browsed(query: Partial<BrowseQuery> & Pick<BrowseQuery, 'object'>) {
+async function browsed(query: Partial<BrowseQuery> & Pick<BrowseQuery, 'object'>, adapter = records) {
   const plan = planBrowse(snapshot, { equal: [], filter: [], search: '', sort: [], offset: 0, limit: 50, ...query })
   if (!plan.ok) throw new Error(`expected a browse, got ${plan.code}: ${plan.message}`)
-  const outcome = await records.list(plan.request)
+  const outcome = await adapter.list(plan.request)
   if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
   return { plan, page: browsePage(outcome.rows, plan.request.limit) }
 }
@@ -351,16 +384,16 @@ describe('a table with columns that have no text', covers('postgres', browseCase
 /**
  * A row followed through `key`, that way, as the studio offers it (0103):
  * the relation `browseRelations` derives from this suite's own discovery,
- * and the terms `followTerms` pairs from the row, browsed. Neither is
- * written here, so the key's columns are paired as this engine's catalog
- * reports them.
+ * and the terms `followTerms` pairs from the row, browsed, narrowed by
+ * `filter` too. Neither is written here, so the key's columns are paired as
+ * this engine's catalog reports them.
  */
-async function followed(from: ObjectRef, direction: BrowseRelation['direction'], key: string, row: Readonly<Record<string, ApiValue>>) {
+async function followed(from: ObjectRef, direction: BrowseRelation['direction'], key: string, row: Readonly<Record<string, ApiValue>>, filter: BrowseFilterTerm[] = []) {
   const relation = browseRelations(snapshot, from).relations.find((entry) => entry.direction === direction && entry.key === key)
   if (relation === undefined) throw new Error(`${key} cannot be followed ${direction} from ${from.schema}.${from.name}`)
   const equal = followTerms(relation, row)
   if (equal === null) throw new Error(`${key} holds a NULL in the row followed from ${from.schema}.${from.name}`)
-  return { relation, ...(await browsed({ object: relation.to.object, equal })) }
+  return { relation, ...(await browsed({ object: relation.to.object, equal, filter })) }
 }
 
 describe('a row followed through a foreign key', covers('postgres', browseCase('follows')), () => {
@@ -382,5 +415,196 @@ describe('a row followed through a foreign key', covers('postgres', browseCase('
       expect(back.relation.to.object).toEqual(object)
       expect(back.page.rows.map((row) => row['name'])).toEqual(names)
     }
+  })
+})
+
+/*
+ * A person's own conditions on a list's columns (0104), each case
+ * COLUMN_FILTER_PARITY's, written once for both engines: planned by
+ * `planList` or `planBrowse` and compared by this adapter's `list`, over
+ * the rows COLUMN_FILTER_ROWS gave known values. Watched failing, every
+ * case, with the filter left out of the list statement.
+ */
+
+/** Tenant 1's customers narrowed by `filter`, beside whatever else `change` asks. */
+const customersWhere = (filter: ListFilterTerm[], change: Partial<RecordListQuery> = {}, adapter = records) => listed(customers, CUSTOMER_POLICY, { ...change, filter }, CLARA, adapter)
+/** Tenant 3's shipments narrowed by `filter`, listed by its clerk. */
+const shipmentsWhere = (filter: ListFilterTerm[], adapter = records) => listed(shipments.bindings, SHIPMENT_POLICY, { filter }, SHIPPER, adapter)
+/** The references of a page of shipments, in its order. */
+const references = (page: RecordList): string[] => page.rows.map((row) => String(row.answers['reference']))
+
+describe('a filter that a text equals', covers('postgres', columnFilterCase('text')), () => {
+  // PostgreSQL's `=` under the fixture's deterministic collation already
+  // counts case and a trailing space; under a nondeterministic one it would
+  // not, and SQL Server's under its case-insensitive collation does not. The
+  // row filter's spelling, `"C"` beside the column's own equality, holds
+  // either way (0028).
+  test('finds the reference exactly as given: case and a trailing space count', async () => {
+    const { field, entries } = COLUMN_FILTER_PARITY.text
+    for (const entry of entries) expect(references(await shipmentsWhere([{ field, op: 'equals', value: entry.value }])), JSON.stringify(entry.value)).toEqual(entry.references)
+  })
+})
+
+describe('a filter on an integer', covers('postgres', columnFilterCase('integer')), () => {
+  // Tenant 2 has a customer 1001 too: a filter that admitted rows of its own
+  // would list it. A bound compared strictly would lose the row on it.
+  test("equals tenant 1's 1001 alone, and a range holds the rows on both its ends", async () => {
+    const { field, entries } = COLUMN_FILTER_PARITY.integer
+    for (const entry of entries) expect(numbers(await customersWhere([{ field, ...entry.condition }])), entry.condition.op).toEqual(entry.keys)
+  })
+})
+
+describe('a filter on a decimal', covers('postgres', columnFilterCase('decimal')), () => {
+  // `50` reaches the adapter as `50.00`, the column's own spelling, cast to
+  // numeric; a range from `-1` holds the customer at -1.00.
+  test('equals 50 as 50.00, and a range holds the rows on both its ends', async () => {
+    const { field, entries } = COLUMN_FILTER_PARITY.decimal
+    for (const entry of entries) expect(numbers(await customersWhere([{ field, ...entry.condition }])), entry.condition.op).toEqual(entry.keys)
+  })
+})
+
+describe('a filter on a boolean', covers('postgres', columnFilterCase('boolean')), () => {
+  // postgres.js sends the text 'true' to a parameter it is told is a boolean
+  // as false (sql/statement.ts): the value is text, cast to bool where it
+  // stands, or `true` would find the inactive customers.
+  test('finds the inactive customers, and the active ones', async () => {
+    const { field, entries } = COLUMN_FILTER_PARITY.boolean
+    for (const entry of entries) expect(numbers(await customersWhere([{ field, ...entry.condition }])), entry.condition.value).toEqual(entry.keys)
+  })
+})
+
+describe('a filter on a uuid', covers('postgres', columnFilterCase('uuid')), () => {
+  // Typed in upper case, the value is spelled in lower by the planner and
+  // cast to uuid; compared as text with the upper case it would find nothing.
+  test('finds the shipment whose tracking number it names, in either case', async () => {
+    const { field, value, references: expected } = COLUMN_FILTER_PARITY.uuid
+    expect(references(await shipmentsWhere([{ field, op: 'equals', value }]))).toEqual(expected)
+  })
+})
+
+describe('a filter that a text contains', covers('postgres', columnFilterCase('contains')), () => {
+  // `%` and `_` are LIKE's wildcards, and `[x]` SQL Server's character
+  // class: matched as patterns, each would find a name the person never
+  // typed. ILIKE folds case, as the list's search does.
+  test('matches %, _ and [x] as themselves, case folded', async () => {
+    const { field, entries } = COLUMN_FILTER_PARITY.contains
+    for (const entry of entries) expect(numbers(await customersWhere([{ field, op: 'contains', text: entry.text }])), entry.text).toEqual(entry.keys)
+  })
+})
+
+describe('a filter on NULL', covers('postgres', columnFilterCase('nulls')), () => {
+  // A NULL is in no range and equals nothing: only `null` finds it, and
+  // `not-null` everything else.
+  test('finds the customers with no credit limit, and those with one', async () => {
+    const { field } = COLUMN_FILTER_PARITY.nulls
+    expect(numbers(await customersWhere([{ field, op: 'null' }]))).toEqual(COLUMN_FILTER_PARITY.nulls.null)
+    expect(numbers(await customersWhere([{ field, op: 'not-null' }]))).toEqual(COLUMN_FILTER_PARITY.nulls['not-null'])
+  })
+})
+
+describe('several filters', covers('postgres', columnFilterCase('together')), () => {
+  // Joined by OR, or one replacing another, two conditions would find what
+  // either finds; every condition holds.
+  test('find the rows every condition holds for', async () => {
+    for (const entry of COLUMN_FILTER_PARITY.together) expect(numbers(await customersWhere([...entry.filter]))).toEqual(entry.keys)
+  })
+})
+
+describe('a filter beside a search', covers('postgres', columnFilterCase('search')), () => {
+  // The search and the filter are both conditions of the one statement:
+  // either alone would find more.
+  test('finds the rows both hold for', async () => {
+    for (const entry of COLUMN_FILTER_PARITY.search) expect(numbers(await customersWhere([...entry.filter], { search: entry.search })), entry.search).toEqual(entry.keys)
+  })
+})
+
+describe('a filter beside a parent', covers('postgres', columnFilterCase('parent')), () => {
+  // order_line has no tenant: a line number alone would find tenant 2's
+  // first line too, and a filter beside tenant 2's order would find it.
+  // The filter narrows within the parent and the throughs, never past them.
+  test("narrows a parent's lines, and never past the throughs", async () => {
+    for (const entry of COLUMN_FILTER_PARITY.parent) {
+      const parent = entry.order === null ? null : { field: 'order', record: `k1:${entry.order}` }
+      expect(tokens(await listed(lines, LINE_POLICY, { parent, filter: [...entry.filter] })), String(entry.order)).toEqual(entry.lines.map(lineToken))
+    }
+  })
+})
+
+describe('a filter beside a follow', covers('postgres', columnFilterCase('follow')), () => {
+  // A follow's equal and a filter are both narrowings of one browse: the
+  // customer's orders, of the one date.
+  test("narrows a customer's orders, followed, to those of one date", async () => {
+    const { object, equal, key, entries } = COLUMN_FILTER_PARITY.follow
+    const [customer] = (await browsed({ object, equal: [...equal] })).page.rows
+    if (customer === undefined) throw new Error('the customer followed from was not browsed')
+    for (const entry of entries) expect((await followed(object, 'referred-by', key, customer, [...entry.filter])).page.rows.map((row) => row['id'])).toEqual(entry.ids)
+  })
+})
+
+describe('a timestamp or a date, in the session the composition root chose', () => {
+  let zonedSql: Sql
+  let zoned: RecordAdapter
+
+  // The composition root may set TimeZone and DateStyle. Pacific/Chatham is
+  // +13:45 in March, so an instant's bound read on the session's clock lands
+  // in another day: watched failing here alone, the default session
+  // passing, with the bounds cast to a zoneless timestamp. `SQL, DMY` reads
+  // `01/03/2026` as the first of March.
+  beforeAll(async () => {
+    zonedSql = postgres(fixture.admin, { onnotice: () => {}, connection: { TimeZone: 'Pacific/Chatham', DateStyle: 'SQL, DMY' } })
+    const [settings] = await zonedSql<{ zone: string; style: string }[]>`select current_setting('TimeZone') as zone, current_setting('DateStyle') as style`
+    expect(settings).toEqual({ zone: 'Pacific/Chatham', style: 'SQL, DMY' })
+    zoned = createPostgresRecords(zonedSql)
+  })
+
+  afterAll(async () => {
+    await zonedSql?.end()
+  })
+
+  const sessions = (): Array<[string, RecordAdapter]> => [
+    ['the default session', records],
+    ['Pacific/Chatham, SQL, DMY', zoned],
+  ]
+
+  describe('a day range on an instant', covers('postgres', columnFilterCase('instant')), () => {
+    // The instants were written in three offsets. Compared in UTC, from the
+    // first midnight to below the next after the last day, the one at the
+    // last millisecond is inside and the next midnight outside, whatever
+    // day each one's own clock showed.
+    test('holds the instants in its days in UTC, in any session', async () => {
+      const { field, entries } = COLUMN_FILTER_PARITY.instant
+      for (const [session, adapter] of sessions()) {
+        for (const { from, to, keys } of entries) {
+          expect(numbers(await customersWhere([{ field, op: 'range', from, to }], {}, adapter)), `${session}: ${String(from)}..${String(to)}`).toEqual(keys)
+        }
+      }
+    })
+  })
+
+  describe('a day range on a timestamp in no zone', covers('postgres', columnFilterCase('zoneless')), () => {
+    // Compared on the column's own clock: 23:59:59.999 of the last day is
+    // inside and the next midnight outside, and a NULL is in no range.
+    test('holds the timestamps in its days on their own clock, in any session', async () => {
+      const { field, entries } = COLUMN_FILTER_PARITY.zoneless
+      for (const [session, adapter] of sessions()) {
+        for (const { from, to, references: expected } of entries) {
+          expect(references(await shipmentsWhere([{ field, op: 'range', from, to }], adapter)), `${session}: ${String(from)}..${String(to)}`).toEqual(expected)
+        }
+      }
+    })
+  })
+
+  describe('a filter on a date, browsed', covers('postgres', columnFilterCase('date')), () => {
+    // A browse's filter names a column. A date is bound as a date: one day's
+    // range holds the order on both its ends, a from alone what follows.
+    test('finds the orders of a day, and of a range, in any session', async () => {
+      const { object, column, entries } = COLUMN_FILTER_PARITY.date
+      for (const [session, adapter] of sessions()) {
+        for (const entry of entries) {
+          const { page } = await browsed({ object, filter: [{ column, ...entry.condition }] }, adapter)
+          expect(page.rows.map((row) => row['id']), `${session}: ${JSON.stringify(entry.condition)}`).toEqual(entry.ids)
+        }
+      }
+    })
   })
 })

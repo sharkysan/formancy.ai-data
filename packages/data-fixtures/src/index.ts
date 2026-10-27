@@ -4,6 +4,7 @@ export {
   browseCase,
   covers,
   cascadeCase,
+  columnFilterCase,
   deleteCase,
   displayCase,
   driftingCase,
@@ -24,6 +25,8 @@ export {
 export { DELETE_PARITY, deleteAnswer, UPDATE_RECREATED } from './deletes.js'
 export { BROWSE_PARITY } from './browse.js'
 export type { BrowseCase } from './browse.js'
+export { COLUMN_FILTER_PARITY, COLUMN_FILTER_ROWS, COLUMN_FILTER_TENANT } from './column-filters.js'
+export type { ColumnFilterCase } from './column-filters.js'
 export { CASCADE_PARITY, cascadeAnswer, PARITY_CASCADES, REACH_PRIVILEGE_LOSSES } from './cascades.js'
 export type { CascadeCase } from './cascades.js'
 export type { DeleteAnswer, DeleteCase, DeleteExpectation } from './deletes.js'

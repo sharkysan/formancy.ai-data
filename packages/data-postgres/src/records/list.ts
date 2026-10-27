@@ -5,6 +5,7 @@ import { quoteTable } from '../sql/identifiers.js'
 import { orderBy } from '../sql/order.js'
 import { searchSql } from '../sql/search.js'
 import { Statement } from '../sql/statement.js'
+import { recordFilterSql } from './filter.js'
 import { bound, column, described, outputs, ROW, throughSql } from './sql.js'
 import type { RecordStatement } from './sql.js'
 
@@ -16,7 +17,8 @@ import type { RecordStatement } from './sql.js'
  *   from (<the table's facts>) as "g"
  *   left join lateral (
  *     select true, <columns>, row_number() over (order by <order>) as "n"
- *     from <table> as "r" where <parent> and <filters> and <throughs> and <search>
+ *     from <table> as "r"
+ *     where <parent> and <filters> and <throughs> and <the person's filter> and <search>
  *     order by <order> limit <limit + 1> offset <offset>
  *   ) as "page" on true
  *   order by "page"."n"
@@ -32,9 +34,10 @@ import type { RecordStatement } from './sql.js'
  * The parent's columns compare with the database's equality, as the foreign
  * key does, through pg_catalog's operator, each value bound as its column's
  * type; the filters, the throughs and the search are a read's and a lookup's
- * own spellings (`sql.ts`, `sql/search.ts`). Where NULLs go is spelled only
- * for a column the request says is nullable (`sql/order.ts`). `limit + 1`,
- * so `recordPage` can tell whether more follow without a COUNT.
+ * own spellings (`sql.ts`, `sql/search.ts`), and the person's filter is
+ * spelled from them where it can be (`filter.ts`, 0104). Where NULLs go is
+ * spelled only for a column the request says is nullable (`sql/order.ts`).
+ * `limit + 1`, so `recordPage` can tell whether more follow without a COUNT.
  */
 export function listStatement(request: ListRequest, terms: ListTerms): RecordStatement {
   const statement = new Statement()
@@ -43,6 +46,7 @@ export function listStatement(request: ListRequest, terms: ListTerms): RecordSta
     ...terms.equal.map((value) => `${column(value.name)} ${op('=')} ${bound(statement, value)}`),
     ...filterSql(statement, ROW, terms.terms),
     ...terms.through.map((entry) => throughSql(statement, entry)),
+    ...terms.filter.map((entry) => recordFilterSql(statement, ROW, entry)),
   ]
   if (terms.search !== null) where.push(searchSql(statement, ROW, terms.search.columns, terms.search.text))
   const order = orderBy(ROW, terms.sort)
