@@ -49,6 +49,22 @@ function Box({ id, label, input, value, describedBy, onChange }: { id: string; l
   )
 }
 
+/** One choice of the panel's, labelled: a native select, whose keys are the browser's own. */
+function Choice({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: ReadonlyArray<{ value: string; label: string }>; onChange: (value: string) => void }): ReactElement {
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <select id={id} value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 /** What the draft's operator asks for: nothing, a value -- yes or no for a boolean -- the text contains finds, or a range's two bounds. */
 function Values({ idBase, field, draft, describedBy, onDraft }: { idBase: string; field: PanelField; draft: Draft; describedBy: string | undefined; onDraft: (next: Draft) => void }): ReactElement | null {
   const { op } = draft
@@ -153,26 +169,8 @@ export function FilterPanel({
       </button>
       <div id={`${idBase}-tool`} hidden={!open}>
         <form className="filter-form" noValidate onSubmit={apply}>
-          <div className="field">
-            <label htmlFor={`${idBase}-field`}>Field</label>
-            <select id={`${idBase}-field`} value={draft.field} onChange={(event) => chooseField(event.target.value)}>
-              {fields.map((offered) => (
-                <option key={offered.field} value={offered.field}>
-                  {offered.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor={`${idBase}-op`}>Condition</label>
-            <select id={`${idBase}-op`} value={draft.op} onChange={(event) => edit({ ...draft, op: event.target.value as Draft['op'] })}>
-              {field.operators.map((op) => (
-                <option key={op} value={op}>
-                  {OPERATOR_WORDS[op]}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Choice id={`${idBase}-field`} label="Field" value={draft.field} options={fields.map((offered) => ({ value: offered.field, label: offered.label }))} onChange={chooseField} />
+          <Choice id={`${idBase}-op`} label="Condition" value={draft.op} options={field.operators.map((op) => ({ value: op, label: OPERATOR_WORDS[op] }))} onChange={(op) => edit({ ...draft, op: op as Draft['op'] })} />
           <Values idBase={idBase} field={field} draft={draft} describedBy={described} onDraft={edit} />
           <button type="submit" className="button" id={`${idBase}-apply`} aria-describedby={[described, `${idBase}-problem`].filter((id) => id !== undefined).join(' ')}>
             Apply
@@ -192,38 +190,63 @@ export function FilterPanel({
           </p>
         </form>
       </div>
-      {filter.length === 0 ? null : (
-        <div className="filter-active">
-          <p className="filter-label" id={`${idBase}-active`}>
-            Filtered by
-          </p>
-          <ul className="filter-terms" aria-labelledby={`${idBase}-active`}>
-            {filter.map((term, index) => {
-              const offered = byField.get(term.field)
-              return (
-                <li key={term.field}>
-                  <span>{summaryOf(term, offered)}</span>
-                  <button
-                    type="button"
-                    className="button quiet"
-                    aria-label={`Remove the condition on ${offered?.label ?? term.field}`}
-                    ref={(element) => {
-                      if (element === null) removes.current.delete(term.field)
-                      else removes.current.set(term.field, element)
-                    }}
-                    onClick={() => remove(index)}
-                  >
-                    Remove
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-          <button type="button" className="button" onClick={clear}>
-            Clear filter
-          </button>
-        </div>
-      )}
+      <Applied idBase={idBase} byField={byField} filter={filter} removes={removes.current} onRemove={remove} onClear={clear} />
+    </div>
+  )
+}
+
+/**
+ * The conditions applied, drawn whether the panel is open or not: each as a
+ * sentence with its own Remove, named for its field -- one condition a
+ * field -- then Clear filter. Nothing when nothing is applied.
+ */
+function Applied({
+  idBase,
+  byField,
+  filter,
+  removes,
+  onRemove,
+  onClear,
+}: {
+  idBase: string
+  byField: ReadonlyMap<string, PanelField>
+  filter: readonly ListFilterTerm[]
+  /** Each Remove by its field, for the keyboard to be put on after a removal. */
+  removes: Map<string, HTMLButtonElement>
+  onRemove: (index: number) => void
+  onClear: () => void
+}): ReactElement | null {
+  if (filter.length === 0) return null
+  return (
+    <div className="filter-active">
+      <p className="filter-label" id={`${idBase}-active`}>
+        Filtered by
+      </p>
+      <ul className="filter-terms" aria-labelledby={`${idBase}-active`}>
+        {filter.map((term, index) => {
+          const offered = byField.get(term.field)
+          return (
+            <li key={term.field}>
+              <span>{summaryOf(term, offered)}</span>
+              <button
+                type="button"
+                className="button quiet"
+                aria-label={`Remove the condition on ${offered?.label ?? term.field}`}
+                ref={(element) => {
+                  if (element === null) removes.delete(term.field)
+                  else removes.set(term.field, element)
+                }}
+                onClick={() => onRemove(index)}
+              >
+                Remove
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      <button type="button" className="button" onClick={onClear}>
+        Clear filter
+      </button>
     </div>
   )
 }

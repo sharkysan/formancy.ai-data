@@ -33,6 +33,11 @@ export { DELETE_COLUMN } from './grid-options.js'
  * closed -- is said once, before the sentence of the page asked for again;
  * a page left empty that is not the first says nothing, and AG Grid shows
  * the page before it.
+ *
+ * What it lists is its section's: the search submitted, the parent, and the
+ * filter its panel applied (filter-panel.tsx, 0104), whose fields its line
+ * names. A filter the server refuses is said in the server's sentence with
+ * what to do instead of Ask again, which would be refused the same.
  */
 
 /** Where a row was asked for from, so the keyboard can be given back there. */
