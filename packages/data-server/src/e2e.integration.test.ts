@@ -565,6 +565,13 @@ const FILTER_CUSTOMERS = [
   { number: '4003', name: 'MUSTER Filter KG', creditLimit: '-2.50' },
 ] as const
 
+/**
+ * More of tenant 1's customers, `Filter page 01` to `Filter page 60`,
+ * numbered 4101 to 4160, none with a credit limit: a filter that keeps
+ * more than one page of a list of them, and leaves some out.
+ */
+const FILTER_PAGED = Array.from({ length: 60 }, (_, index) => ({ number: String(4101 + index), name: `Filter page ${String(index + 1).padStart(2, '0')}` }))
+
 type Listed = Awaited<ReturnType<typeof everyListed>>[number]
 
 describe.each([
@@ -578,11 +585,14 @@ describe.each([
   beforeAll(async () => {
     ddl = await owner(connection)
     await published(connection, customers, CUSTOMERS, customerPolicy)
-    await ddl.run(FILTER_CUSTOMERS.map((row) => `insert into sales.customer (tenant_id, customer_no, name, credit_limit) values (1, ${row.number}, ${literal(row.name)}, ${row.creditLimit ?? 'null'})`))
+    await ddl.run([
+      ...FILTER_CUSTOMERS.map((row) => `insert into sales.customer (tenant_id, customer_no, name, credit_limit) values (1, ${row.number}, ${literal(row.name)}, ${row.creditLimit ?? 'null'})`),
+      `insert into sales.customer (tenant_id, customer_no, name) values ${FILTER_PAGED.map((row) => `(1, ${row.number}, ${literal(row.name)})`).join(', ')}`,
+    ])
   })
 
   afterAll(async () => {
-    await ddl?.run([`delete from sales.customer where tenant_id = 1 and customer_no in (${FILTER_CUSTOMERS.map((row) => row.number).join(', ')})`])
+    await ddl?.run([`delete from sales.customer where tenant_id = 1 and (customer_no in (${FILTER_CUSTOMERS.map((row) => row.number).join(', ')}) or customer_no between 4101 and 4160)`])
     await ddl?.close()
   })
 
@@ -625,15 +635,23 @@ describe.each([
 
   // A file under a filter is every page of that filtered list, exactly,
   // in its order (0079, 0104): the same planner, the same conditions on
-  // every page. Watched failing on both engines with the export planning
+  // every page the server reads for it -- here two, fifty-five customers
+  // of the sixty a name finds, the range leaving five out and the name
+  // every other. Watched failing on both engines with the export planning
   // the body's query with its filter dropped: the file held every
-  // customer of tenant 1.
-  test("the same filter's file is that list, exactly", async () => {
-    const file = await exported(customers, clerk, { filter: [NAMED, LIMITED] })
+  // customer of tenant 1; and with the filter dropped from every page
+  // after the first: the file was refused 409, its second page repeating
+  // records of the first.
+  test("the same filter's file is every page of that list, exactly", async () => {
+    const filter = [{ field: 'name', op: 'contains', text: 'filter page' }, { field: 'customer_no', op: 'range', from: null, to: '4155' }]
+    const file = await exported(customers, clerk, { filter })
     expect([file.status, file.type]).toEqual([200, 'text/csv; charset=utf-8'])
-    const listed = numbers(await everyListed(customers, clerk, { filter: [NAMED, LIMITED] }))
+    const listed = numbers(await everyListed(customers, clerk, { filter }))
     expect(cellsUnder(csvCells(file.text), 'Customer no')).toEqual(listed)
-    expect(listed).toEqual(['1001', '4003'])
+    expect(listed).toEqual(FILTER_PAGED.slice(0, 55).map((row) => row.number))
+    expect(listed.length).toBeGreaterThan(50)
+    const named = csvCells((await exported(customers, clerk, { filter: [NAMED, LIMITED] })).text)
+    expect(cellsUnder(named, 'Customer no')).toEqual(numbers(await everyListed(customers, clerk, { filter: [NAMED, LIMITED] })))
   })
 
   // A browse is filtered as a list is, by column, as the connection's
