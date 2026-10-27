@@ -442,10 +442,11 @@ own cascade never asks. Either rolls back what the cascade did
   `datetime2` of the column's scale through style 126 -- never the
   column's own type when that is `datetime` or `smalldatetime`, which the
   snapshot calls `datetime2(3)` and `datetime2(0)`. It needs to be neither:
-  a midnight is exact at every scale and each type converts to `datetime2`
-  exactly, a `datetime`'s 23:59:59.997 below the next midnight, while a
-  bound converted to `smalldatetime` fails the statement outside 1900 to
-  2079. Every bound is read through an ISO 8601 style, which neither the
+  a midnight is exact at every scale and no value of either crosses a
+  midnight compared as `datetime2` -- a `datetime`'s 23:59:59.997 stays
+  below the next one -- while a bound of the column's own type fails the
+  statement for a day before 1753, or outside 1900 to 2079 for a
+  `smalldatetime`. Every bound is read through an ISO 8601 style, which neither the
   session's language nor its DATEFORMAT changes. The list suite holds a
   `datetime`, a `smalldatetime` and a `datetime2` of scale 7 and of scale 0
   at midnight exactly, and every timestamp and date case again in a German

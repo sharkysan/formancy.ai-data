@@ -22,7 +22,8 @@ import { sqlTypeOf } from '../sql/types.js'
  * - `range`: at least `from`, at most `to`, below `before`, each bound cast
  *   to the column's own type, so the comparison is that type's own
  *   operator, the one a btree index on the column is ordered by -- never
- *   the column converted to the bound's type. A timestamp's bounds are
+ *   the column converted to the bound's type. No plan of it is measured.
+ *   A timestamp's bounds are
  *   midnights, and mean the same in every session the composition root may
  *   configure: an instant's ends in `Z`, which `timestamptz` input reads
  *   over the session's TimeZone, and is compared with the column as an
@@ -34,7 +35,9 @@ import { sqlTypeOf } from '../sql/types.js'
  *   `01/03/2026`. The list suite runs its timestamp and date cases again in
  *   a session on Pacific/Chatham with `SQL, DMY`.
  * - `contains`: the list search's own spelling (`sql/search.ts`), ILIKE
- *   with LIKE's metacharacters escaped, so it matches as a search does.
+ *   with LIKE's metacharacters escaped, so it matches as a search does --
+ *   through the database's default collation, so it runs on a column
+ *   whose own collation is nondeterministic, which LIKE refuses (0A000).
  * - `null`, `not-null`: `is null`, `is not null`. Text of no characters is
  *   a value, as PostgreSQL always has it.
  */

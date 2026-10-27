@@ -17,16 +17,18 @@ const MAX_SCALE = 7
  *
  * datetime2, never the column's own type when that is datetime or
  * smalldatetime, which the snapshot cannot tell from datetime2(3) and
- * datetime2(0) (`discovery/types.ts`). It needs to be none of them: a
- * midnight is exact at every scale, and each of the three converts to
- * datetime2 exactly, a datetime's 1/300 s included -- 23:59:59.997 is
- * below the next midnight however it is carried -- so the comparison holds
- * at midnight on every column. A bound converted to the column's type
- * would round it to what that type keeps, and a smalldatetime would
- * overflow outside 1900 to 2079, failing the statement where datetime2
- * holds every day both engines store. The scale is the column's, so a
- * datetime2 column meets a bound of its own type; it is spliced, because
- * SQL Server takes no parameter there, and checked to be one before it is.
+ * datetime2(0) (`discovery/types.ts`). It needs to be neither: a midnight
+ * is exact at every scale, and no value of either crosses a midnight when
+ * it is compared as datetime2 -- a datetime's last tick of a day,
+ * 23:59:59.997, stays below the next midnight however it is carried -- so
+ * the comparison holds at midnight on every column. And a bound of the
+ * column's own type would have to be a day that type holds: a
+ * smalldatetime's are 1900 to 2079 and a datetime's from 1753, and a range
+ * past them would fail the statement (242), where datetime2 holds every
+ * day both engines store. The list suite holds all four at midnight and a
+ * range from 0001-01-01. The scale is the column's, so a datetime2 column
+ * meets a bound of its own type; it is spliced, because SQL Server takes
+ * no parameter there, and checked to be one before it is.
  */
 function zonelessBound(parameters: Parameters, type: Extract<NormalizedType, { kind: 'timestamp' }>, value: string): string {
   const scale = type.precision ?? MAX_SCALE
@@ -54,7 +56,9 @@ function boundOf(parameters: Parameters, type: Extract<RecordFilter, { op: 'rang
  * - `range`: at least `from`, at most `to`, below `before`, each bound
  *   typed as its column (`boundOf`). An instant's bound ends in `Z` and is
  *   a datetimeoffset in UTC; datetimeoffset compares instants, whatever
- *   offset each row was written in, as PostgreSQL's timestamptz does.
+ *   offset each row was written in, as PostgreSQL's timestamptz does. A
+ *   zoneless one is `zonelessBound`'s: SQL Server has three zoneless
+ *   types where PostgreSQL has one, and the snapshot names them alike.
  * - `contains`: the list search's own predicate (`sql/search.ts`), LIKE
  *   with `%`, `_` and `[` escaped. It folds case and accents as the
  *   column's collation does, where PostgreSQL's ILIKE folds case alone and
