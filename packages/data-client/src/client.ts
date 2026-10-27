@@ -258,9 +258,12 @@ export function createDataClient(options: DataClientOptions) {
      * `POST …/records/list` (0044): one page of the records this person may
      * read, each what `read` returns for its token, and whether more follow.
      * A property left out is the server's default -- no search, the key's
-     * order, no parent, the first page, the largest page -- and exactly the
-     * route's keys are sent, whatever else the object carries. A POST, so the
-     * search is never in a URL.
+     * order, no parent, no filter, the first page, the largest page -- and
+     * exactly the route's keys are sent, whatever else the object carries.
+     * `filter` is the person's conditions on the fields the form's
+     * `list.filterable` offers them on (0104), refused `not-filterable`
+     * otherwise. A POST, so the search and a filter's values are never in a
+     * URL.
      */
     list: (formId: string, query: Partial<RecordListQuery> = {}, signal?: AbortSignal): Promise<Outcome<RecordList>> =>
       call({
@@ -274,12 +277,13 @@ export function createDataClient(options: DataClientOptions) {
 
     /**
      * `POST …/records/export` (0079): one CSV file of every record `list`
-     * would page through for the same search, sort and parent, made whole
-     * by the server or refused -- `export-too-large`, `export-timeout`,
-     * `export-busy`, `moved`, `unencodable` among the server's codes -- and
-     * the name to save it under, `<form id>.csv`, from the form's id and
-     * not from a header another origin cannot read (0060). Exactly the
-     * three keys are sent, in a POST body, so the search is in no URL. A
+     * would page through for the same search, sort, parent and filter
+     * (0104), made whole by the server or refused -- `export-too-large`,
+     * `export-timeout`, `export-busy`, `moved`, `unencodable` among the
+     * server's codes -- and the name to save it under, `<form id>.csv`,
+     * from the form's id and not from a header another origin cannot read
+     * (0060). Exactly the four keys are sent, in a POST body, so the search
+     * and a filter's values are in no URL. A
      * 200 that is not CSV is `unexpected`; a body that did not arrive
      * whole is `incomplete`, never a file.
      */

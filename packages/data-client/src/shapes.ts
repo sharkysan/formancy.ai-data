@@ -1,4 +1,4 @@
-import type { FieldError, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordList } from '@formancy/data-core'
+import type { FieldError, FilterableField, FilterInput, FilterOp, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordList } from '@formancy/data-core'
 import type { Refusal } from './client.js'
 
 /*
@@ -31,9 +31,38 @@ function isStrings(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string')
 }
 
-/** What a form's list may be searched and sorted by, or `null` for no list (0044): a reply without one is from no server that has lists. */
+/**
+ * Every operator and every input a filter has (0104), keyed by data-core's
+ * own unions, so one added or removed there is a type error here before it
+ * is a reply this client refuses or an offer it passes unread.
+ */
+const FILTER_OPERATORS: Readonly<Record<FilterOp, true>> = { equals: true, range: true, contains: true, null: true, 'not-null': true }
+const FILTER_INPUTS: Readonly<Record<FilterInput, true>> = { text: true, integer: true, decimal: true, date: true, uuid: true, boolean: true }
+
+/**
+ * One field's filter offer: a field key, the operators it offers -- at
+ * least one, each one data-core names -- and what a value is typed as,
+ * `null` exactly when it offers only `null` and `not-null`. A panel draws
+ * its inputs from this, so an offer it could not draw is not the server's.
+ */
+function isFilterableField(value: unknown): value is FilterableField {
+  if (!isRecord(value) || typeof value['field'] !== 'string' || !isStrings(value['operators'])) return false
+  const operators = value['operators']
+  if (operators.length === 0 || !operators.every((op) => Object.hasOwn(FILTER_OPERATORS, op))) return false
+  const input = value['input']
+  const valued = operators.some((op) => op !== 'null' && op !== 'not-null')
+  return valued ? typeof input === 'string' && Object.hasOwn(FILTER_INPUTS, input) : input === null
+}
+
+/**
+ * What a form's list may be searched, sorted and filtered by, or `null` for
+ * no list (0044): a reply without one is from no server that has lists, and
+ * one without `filterable` from no server that has filters (0104), whose
+ * page would offer conditions the server cannot apply.
+ */
 function isListColumns(value: unknown): value is PublishedForm['list'] {
-  return value === null || (isRecord(value) && isStrings(value['searchable']) && isStrings(value['sortable']))
+  if (value === null) return true
+  return isRecord(value) && isStrings(value['searchable']) && isStrings(value['sortable']) && Array.isArray(value['filterable']) && value['filterable'].every(isFilterableField)
 }
 
 /**

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import type { Outcome, RecordFile } from './client.js'
+import type { RecordList } from './index.js'
 import { ENGINES, startPlane } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 
@@ -30,6 +31,11 @@ function expectFile(outcome: Outcome<RecordFile>): RecordFile {
   return outcome.value
 }
 
+function expectList(outcome: Outcome<RecordList>): RecordList {
+  if (!outcome.ok) throw new Error(`expected a page, got ${String(outcome.status)} ${outcome.code}: ${outcome.message}`)
+  return outcome.value
+}
+
 /** Tenant 1's seeded order, 2^53 + 1, as its Id cell. */
 const TENANT_ONES_ORDER = '9007199254740993'
 
@@ -51,31 +57,56 @@ describe.each(ENGINES)('exports on $engine', ({ connection }) => {
     expect(Buffer.from(await theirs.file.arrayBuffer()).toString('utf8')).not.toContain(TENANT_ONES_ORDER)
   })
 
-  // Exactly the route's three keys travel, in a POST body, so the search
-  // is in no URL a proxy logs, and the token is in the header and nowhere
-  // else -- whatever else the host's object carries. Watched failing on
-  // both with the whole object sent: the server refused it 400 malformed.
-  test('sends exactly the search, the sort and the parent, in the body of a POST, the token in the header only', async () => {
-    const query = { search: 'placed', sort: [{ field: 'order_date', direction: 'desc' as const }], parent: null, offset: 50, limit: 10 }
+  // Exactly the route's four keys travel, in a POST body, so the search
+  // and a filter's values are in no URL a proxy logs, and the token is in
+  // the header and nowhere else -- whatever else the host's object
+  // carries. Watched failing on both with the whole object sent: the
+  // server refused it 400 malformed; and with the filter left out of the
+  // body.
+  test('sends exactly the search, the sort, the parent and the filter, in the body of a POST, the token in the header only', async () => {
+    const filter = [{ field: 'notes', op: 'contains' as const, text: 'filter-marker-8e2f' }]
+    const query = { search: 'placed', sort: [{ field: 'order_date', direction: 'desc' as const }], parent: null, filter, offset: 50, limit: 10 }
     expectFile(await plane.client().exportRecords(formId, query))
     const [sent] = plane.sent
     expect(sent).toMatchObject({ method: 'POST', url: `${plane.base}/v1/forms/${formId}/records/export` })
-    expect(JSON.parse(sent?.body ?? 'null')).toEqual({ search: 'placed', sort: [{ field: 'order_date', direction: 'desc' }], parent: null })
-    expect(sent?.url).not.toContain('placed')
+    expect(JSON.parse(sent?.body ?? 'null')).toEqual({ search: 'placed', sort: [{ field: 'order_date', direction: 'desc' }], parent: null, filter })
+    expect(sent?.url).not.toMatch(/placed|filter-marker/)
     expect(sent?.headers).toEqual({ authorization: `Bearer ${plane.tokens.clerk}`, accept: 'text/csv, application/json', 'content-type': 'application/json' })
     expect(sent?.body).not.toContain(plane.tokens.clerk)
+  })
+
+  // A file under a filter holds the records the same filter's list does,
+  // and no other (0104): tenant 3's orders whose notes hold `paged 1` in
+  // any case, ten of fifty-one, in the list's order. Watched failing with
+  // the filter left out of the body the client builds: the file held all
+  // fifty-one.
+  test("a filtered file holds the filtered list's records, and no other", async () => {
+    const third = plane.client(plane.tokens.thirdClerk)
+    const filter = [{ field: 'notes', op: 'contains' as const, text: 'Paged 1' }]
+    const listed = expectList(await third.list(formId, { filter }))
+    const text = Buffer.from(await expectFile(await third.exportRecords(formId, { filter })).file.arrayBuffer()).toString('utf8')
+    const noted = text.split('\r\n').flatMap((line) => /\bpaged [0-9]+\b/.exec(line)?.[0] ?? [])
+    expect(noted).toEqual(listed.rows.map((row) => String(row.answers['notes'])))
+    expect(noted).toEqual(['paged 10', 'paged 11', 'paged 12', 'paged 13', 'paged 14', 'paged 15', 'paged 16', 'paged 17', 'paged 18', 'paged 19'])
   })
 
   // A refusal comes back as the server's code and sentence, which a page
   // shows as said. The export reads a 200 as bytes; a client that took a
   // refusal down that branch too would answer `unexpected`, and the person
-  // would never learn why.
+  // would never learn why. A filter a field does not offer is refused as
+  // a list refuses it (0104).
   test("a refusal comes back as the server's code and sentence", async () => {
     expect(await plane.client().exportRecords(formId, { sort: [{ field: 'customer', direction: 'asc' }] })).toEqual({
       ok: false,
       status: 400,
       code: 'not-sortable',
       message: 'customer is not a field you may sort this list by.',
+    })
+    expect(await plane.client().exportRecords(formId, { filter: [{ field: 'order_date', op: 'contains', text: '2026' }] })).toEqual({
+      ok: false,
+      status: 400,
+      code: 'not-filterable',
+      message: 'order_date offers no contains condition.',
     })
   })
 
