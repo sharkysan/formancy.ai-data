@@ -560,11 +560,14 @@ describe('a timestamp or a date, in the language the composition root chose', ()
 
   // A session's language sets its DATEFORMAT, and German's is dmy, under
   // which a datetime read from `2026-03-01 00:00:00` is the third of
-  // January. Every bound here is read through an ISO 8601 style, which no
-  // language changes: watched failing here alone, the default session
-  // passing, with a zoneless bound read as datetime without its `T`.
+  // January. tedious sends `set dateformat mdy` at login unless its
+  // `dateFormat` is null, so the language's own holds only then: with it
+  // left out, this session was German and mdy. Every bound here is read
+  // through an ISO 8601 style, which neither changes: watched failing here
+  // alone, the default session passing, with a zoneless bound read as
+  // datetime without its `T`.
   beforeAll(async () => {
-    german = await new mssql.ConnectionPool({ ...fixture.admin, options: { ...fixture.admin.options, language: 'Deutsch' } }).connect()
+    german = await new mssql.ConnectionPool({ ...fixture.admin, options: { ...fixture.admin.options, language: 'Deutsch', dateFormat: null } }).connect()
     const settings = await german.request().query<{ language: string; format: string }>('select @@language as language, (select date_format from sys.dm_exec_sessions where session_id = @@spid) as format')
     expect(settings.recordset[0]).toEqual({ language: 'Deutsch', format: 'dmy' })
     zoned = createSqlServerRecords(german)
