@@ -196,6 +196,22 @@ describe('the panel', () => {
     expect(within(browseStep()).queryByRole('button', { name: 'Filter rows' })).toBeNull()
     expect(within(browseStep()).getByText(/^No column/).textContent).toBe('No column this page shows can be filtered.')
   })
+
+  // The server discovers again for every page, so a page can show a column the studio's discovery has not seen: the panel cannot tell what it offers, or whether it holds NULLs, and offers nothing on it rather than a guess the server might refuse.
+  test('offers nothing on a column the studio has not discovered', async () => {
+    const user = await browsing()
+    const { fingerprint: _, ...contents } = structuredClone(OWNER_SNAPSHOT)
+    const country = contents.objects.find((object) => object.ref.name === 'country')
+    const name = country?.columns.find((column) => column.name === 'name')
+    if (country === undefined || name === undefined) throw new Error('the snapshot has no country name')
+    country.columns = [...country.columns, { ...name, name: 'capital', ordinal: country.columns.length + 1 }]
+    plane.databases.set('fixture', createSnapshot(contents))
+    plane.rows.set('sales.country', [{ id: '1', iso_code: 'CH', name: 'Switzerland', capital: 'Bern' }])
+    await show(user, 'sales.country')
+    expect(grid()[0]).toEqual(['Related', 'id', 'iso_code', 'name', 'capital'])
+    await openPanel(user)
+    expect(options('Column')).toEqual(['id', 'iso_code', 'name'])
+  })
 })
 
 describe('applying a condition', () => {
