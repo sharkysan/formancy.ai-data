@@ -183,10 +183,10 @@ A person's edits to a generated form are kept as a patch beside the base the
 generator wrote, and carried to the next base when the form is regenerated
 ([0030](../../docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
 The patch holds exactly the studio's edits — a field's label, a section's
-label, a field's place within its section's grid, full width, and the
+label, a field's place within its section's grid, full width, the
 generated section a field is placed in
-([0075](../../docs/decisions/0075-a-field-may-move-to-another-generated-section.md))
-— and nothing else.
+([0075](../../docs/decisions/0075-a-field-may-move-to-another-generated-section.md)),
+and the views a list of the form offers (below) — and nothing else.
 
 ```ts
 import { presentationOf, rebasePresentation } from '@formancy/data-core'
@@ -228,6 +228,28 @@ reported dropped (`section-gone`) rather than put on the wrong one; help
 text, translations, `required`, a numeric span, a section added and a move
 that empties a section are refused, not carried. A version-1 reader before
 0075 refuses a presentation holding a move, naming `/fields/N/section`.
+
+### List views
+
+A presentation may also name the views a list of the form's records offers
+([0105](../../docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)):
+`views`, left out when there are none, each `{ name, filter, sort }` with
+`default: true` on at most one, every term exactly what a list request
+carries.
+
+```ts
+import { listColumns, viewProblems, viewShapeProblems } from '@formancy/data-core'
+
+viewShapeProblems(presentation.views) // on every read: a name a picker shows, a filter and a sort a request carries
+viewProblems(presentation.views, bindings) // at a write: each view one a list of these bindings can run, named where not
+listColumns(bindings, readableFields, presentation.views).views // what one person is offered: the views they could have built
+```
+
+A view is offered whole or not at all: one naming a field the person may
+not read is not offered to them, and neither is a stored one a later
+release no longer runs. `rebasePresentation` carries each view by what its
+fields stand for, and drops one whose field is gone or no longer offers
+what it asks, as `view-dropped`.
 
 ## Lookups
 

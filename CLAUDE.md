@@ -49,7 +49,9 @@ One path runs through the packages, and most changes touch one step of it.
 3. **Govern and arrange.** A `FormPolicy` (`policy/`) says who may read,
    create and update which fields and which rows. A presentation
    (`presentation/`) is a patch over the generated base, rebased by what each
-   field stands for when the base is regenerated (0030).
+   field stands for when the base is regenerated (0030), and names the views
+   a list of the form offers, each a filter and a sort a person could have
+   built (`presentation/views.ts`; 0105).
 4. **Publish.** The administrator plane stores a bundle — snapshot, request,
    base, presentation, bindings, policy — in the file configuration store,
    where compare-and-swap is a hard link (0013). `validateBundle` checks it on

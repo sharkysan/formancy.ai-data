@@ -112,8 +112,11 @@ costs is 0009's and 0042's, under *Forms* in
 2. `storable` (`publishing.ts`) asks `validateBundle` (`bundle.ts`): the
    form against formancy's validator, the snapshot against its own
    fingerprint, the bindings against both, the policy against the bindings
-   (0019); then a listed connection, and that this server's generator
-   writes exactly this base and these bindings (`bundle-format2.ts`, 0030).
+   (0019); then a listed connection, that this server's generator
+   writes exactly this base and these bindings (`bundle-format2.ts`, 0030),
+   and that a list of these bindings can run every view the presentation
+   names (`viewProblems`,
+   [0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
    Otherwise 422 `invalid-bundle`, with the problems.
 3. `keysRefusal` answers 422 `keys-reassigned` while the policy grants on a
    key that now stands for another column and the body does not confirm it
@@ -205,7 +208,9 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    offers only what the database allows now
    ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)):
    `operations`, the readable fields, `list` -- what a page may be sorted,
-   searched and filtered by, or `null` -- and `deleting`.
+   searched and filtered by, and the published views this person could
+   have built from those (`listColumns`, 0105), or `null` -- and
+   `deleting`.
 2. The Records panel (`apps/host/src/record-grid.tsx`, `grid-datasource.ts`)
    asks one `POST /v1/forms/:id/records/list` per block of AG Grid's
    infinite row model, the search sent on Search or Enter, never per key
@@ -412,8 +417,10 @@ it (0085).
 4. `POST /v1/forms/:id/regenerations` (`routes/admin-evolution.ts`) writes
    nothing: it generates again from the stored request, trials each lookup
    through `buildLookupConfig`, carries the presentation by
-   `rebasePresentation`, and lists conflicts and reassigned keys (0030,
-   0039); the studio publishes the result as in 6.3.
+   `rebasePresentation` -- its list views by what their fields stand for,
+   each dropped whole, `view-dropped`, where a field is gone or no longer
+   offers what it asks (0105) -- and lists conflicts and reassigned keys
+   (0030, 0039); the studio publishes the result as in 6.3.
 5. `POST /v1/forms/:id/restorations` loads the version validated, discovers
    the database and asks `servable` (`publishing.ts`): another engine is
    422 `other-engine`, drift that blocks 409 `incompatible` with only those

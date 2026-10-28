@@ -68,7 +68,13 @@ existed would be documented and inert.
   with that presentation applied. Format 1 is still read and served, and no
   longer published. Publish also checks that this server's generator writes
   the stored base and bindings from the stored snapshot and request; reads
-  do not, so a later generator never makes a stored version corrupt. Reads
+  do not, so a later generator never makes a stored version corrupt. A
+  presentation may name a list's views
+  ([0105](../../docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)):
+  `views`, each `{ name, filter, sort }` and `default: true` on at most
+  one, every term what a list request carries. Every read checks their
+  shape, and publish, as with the base, that a list of these bindings
+  could run each one, naming a view it could not. Reads
   do check what the stored request alone decides — its title, root,
   confirmed version column, pins over written fields and lookups — against
   the base and bindings, because a regeneration generates from that request;
@@ -105,7 +111,8 @@ existed would be documented and inert.
   read versions, each validated as the latest is; `POST
   /v1/forms/:id/regenerations` rediscovers, regenerates from the stored
   request, carries the presentation by the column or lookup each edit was
-  chosen for, and reports what it could not carry, lookups the runtime would
+  chosen for, a list view's fields included, and reports what it could not
+  carry -- a list view among them, dropped whole (`view-dropped`, 0105) -- lookups the runtime would
   now refuse, keys that now name another column and the policy's problems
   with the new bindings — and writes nothing; `POST
   /v1/forms/:id/restorations` republishes an older version — the same
@@ -278,6 +285,15 @@ existed would be documented and inert.
   audit trail. `routes/runtime-lists.test.ts` holds what reaches the port,
   the refusals and the log over fake ports, and `e2e.integration.test.ts`
   what a filtered list holds on both engines.
+
+  `list.views` is the form's published views
+  ([0105](../../docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md))
+  this person could have built from what the rest of `list` offers them, in
+  their published order: each `{ name, filter, sort }`, with `default: true`
+  on the one a grid opens on. A view naming a field the person may not
+  read is left out whole, and so is its default; so is a stored view this
+  release would not run. A page sends a picked view's `filter` and `sort`
+  in a list's body, and the planner decides them as a person's own.
 
   `POST /v1/forms/:id/records/export` answers one CSV file of every record
   the list would page through for the same `search`, `sort`, `parent` and

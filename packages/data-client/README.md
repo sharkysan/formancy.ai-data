@@ -52,7 +52,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 The reply types — `FormMenu`, `FormMenuEntry`, `FormMenuChild`,
 `PublishedForm`, `FormRecord`, `RecordList`, `RecordListQuery`,
 `RecordExportQuery`, `ListSortTerm`, `ListFilterTerm`, `FilterCondition`,
-`FilterOp`, `FilterOffer`, `FilterInput`, `FilterableField`, `ListColumns`,
+`FilterOp`, `FilterOffer`, `FilterInput`, `FilterableField`, `ListColumns`, `ListView`,
 `LookupResult`, `LookupRow`, `FieldError` — and `LIST_PAGE_SIZE`,
 `EXPORT_MAX_BYTES` and `exportFileName` are re-exported from
 `@formancy/data-core`, where the server's handlers are checked against the
@@ -66,13 +66,20 @@ condition may name, the operators among `equals`, `range`, `contains`,
 `integer`, `decimal`, `date`, `uuid` or `boolean`, a timestamp's range
 being days -- or `null` where only `null` and `not-null` are offered, and
 `days` whose clock a timestamp's days are on, `utc` for an instant and
-`wall` for one in no zone, `null` for any other field.
+`wall` for one in no zone, `null` for any other field. `views` is the
+published views this person could have built from the rest
+([0105](../../docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)),
+each `{ name, filter, sort }` and `default: true` on the one a grid opens
+on, every term one `list` sends as it is.
 A `form` reply without `list` is `unexpected`, as from a server older than
 lists, and so is a list without `filterable`, as from a server older than
 filters, or with an offer a panel could not draw: no operator, one or an
 `input` this package's data-core does not name, an `input` that does
 not fit the operators, or a `days` data-core does not name or on anything
-but a date. `list` sends exactly `search`, `sort`, `parent`,
+but a date. So is a list without `views`, as from a server older than
+views, or with a view a page could not send: no name, a condition with no
+field or an operator data-core does not name, a direction other than `asc`
+or `desc`, or a `default` other than `true`. `list` sends exactly `search`, `sort`, `parent`,
 `filter`, `offset` and `limit` in a POST body, each left out the server's
 default, so the search and a filter's values are in no URL. `filter` is a
 list of `{ field, op, … }`, each field once, every condition holding:
