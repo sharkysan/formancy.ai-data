@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createSnapshot, describedOf, generateForm, LIST_PAGE_SIZE, listColumns } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, Described, DescribedTable, FormBindings, FormPolicy, ListOutcome, ListRequest, LookupAdapter, NormalizedType, ObjectRef, RecordAdapter } from '@formancy/data-core'
+import { createSnapshot, describedOf, EMPTY_PRESENTATION, generateForm, LIST_PAGE_SIZE, listColumns } from '@formancy/data-core'
+import type { ColumnMeta, DatabaseAdapter, Described, DescribedTable, FormBindings, FormPolicy, GenerationRequest, ListOutcome, ListRequest, ListView, LookupAdapter, NormalizedType, ObjectRef, RecordAdapter } from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -105,6 +105,9 @@ const DEFINITION = 'the definition the fake catalog described'
 const KEY = 'an-audit-key-the-operator-keeps-secret'
 /** Planted in a filter, where no audit event or log line may look. */
 const FILTERED = 'filter-marker-5b9e'
+/** The customer form's views (0105): one the grid opens on, by a credit limit, and one by name. */
+const LARGE: ListView = { name: 'Large accounts', filter: [{ field: 'credit_limit', op: 'range', from: '1000.00', to: null }], sort: [], default: true }
+const MUSTER: ListView = { name: 'Muster', filter: [{ field: 'name', op: 'contains', text: 'Muster' }], sort: [{ field: 'name', direction: 'asc' }] }
 
 const describedAs = (table: ObjectRef, edit: (columns: DescribedTable['columns']) => void = () => {}): DescribedTable => {
   const found = describedOf(SNAPSHOT, table)
@@ -171,10 +174,14 @@ beforeEach(async () => {
   events = []
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-lists-'))
   const store = createFileConfigurationStore(root)
-  const customer = generateForm(SNAPSHOT, { connection: 'erp', root: ref('customer'), formId: 'customer', title: 'Customer', lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }], pinned: ['tenant_id'] })
+  const generation: GenerationRequest = { connection: 'erp', root: ref('customer'), formId: 'customer', title: 'Customer', lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }], pinned: ['tenant_id'] }
+  const customer = generateForm(SNAPSHOT, generation)
   customers = customer.bindings
   const bundle: PublishedBundle = { format: 1, connection: 'erp', form: customer.form, bindings: customer.bindings, policy: POLICY, snapshot: SNAPSHOT }
   await store.publish('customer', null, bundle)
+  const viewed: PublishedBundle = { ...bundle, format: 2, generation, base: customer.form, presentation: { ...EMPTY_PRESENTATION, views: [LARGE, MUSTER] } }
+  await store.publish('viewed', null, viewed)
+  await store.publish('viewed-hidden-limit', null, { ...viewed, policy: HIDDEN_LIMIT })
   await store.publish('hidden', null, { ...bundle, policy: HIDDEN_KEY })
   await store.publish('hidden-limit', null, { ...bundle, policy: HIDDEN_LIMIT })
   const line = generateForm(SNAPSHOT, { connection: 'erp', root: ref('line'), formId: 'line', title: 'Line', lookups: [{ foreignKey: 'fk_line_order', display: ['placed'] }] })
@@ -384,7 +391,7 @@ describe('the list route', () => {
   // `GET` sending the list with `filterable` emptied.
   test('the form says what its list may search, sort and filter by, in the planner’s words', async () => {
     const served = (await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).json()
-    expect(served.list).toEqual(listColumns(customers, served.readable))
+    expect(served.list).toEqual(listColumns(customers, served.readable, []))
     expect(served.list).toEqual({
       searchable: ['tenant_id', 'customer_no', 'name'],
       sortable: ['tenant_id', 'customer_no', 'name', 'credit_limit'],
@@ -394,10 +401,25 @@ describe('the list route', () => {
         { field: 'name', operators: ['equals', 'contains'], input: 'text', days: null },
         { field: 'credit_limit', operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal', days: null },
       ],
+      views: [],
     })
     const kept = (await app.inject({ method: 'GET', url: '/v1/forms/hidden-limit', headers: as('clerk') })).json()
     expect(kept.list.filterable.map((offer: { field: string }) => offer.field)).toEqual(['tenant_id', 'customer_no', 'name'])
     expect(LIST_PAGE_SIZE).toBeLessThanOrEqual(MAX_RESOLVE)
+  })
+
+  // A view is offered to a person only when they could have built it from
+  // what their list offers them (0105): the clerk who may not read credit
+  // limits is not offered "Large accounts", which would sort out the large
+  // ones without showing a single limit -- not offered it without its
+  // condition either, which would be every account under that name -- and
+  // its default goes with it, so their grid opens on every record. Watched
+  // failing with `GET` offering the published views as they are stored.
+  test('the form offers the views this person could have built, and the default only with its view', async () => {
+    const all = (await app.inject({ method: 'GET', url: '/v1/forms/viewed', headers: as('clerk') })).json()
+    expect(all.list.views).toEqual([LARGE, MUSTER])
+    const withheld = (await app.inject({ method: 'GET', url: '/v1/forms/viewed-hidden-limit', headers: as('clerk') })).json()
+    expect(withheld.list.views).toEqual([MUSTER])
   })
 
   // The database's own answers are a read's: out of reach is 503, a grant it

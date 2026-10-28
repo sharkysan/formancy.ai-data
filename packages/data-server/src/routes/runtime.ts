@@ -461,7 +461,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     // over this description would be decided as, so the page never offers a
     // grid it would be refused (0044).
     const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, actor)
-    const list = listed.ok && driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'list') === undefined ? listColumns(bundle.bindings, listed.fields) : null
+    // The views among them this person could have built (0105); a version published before 0030 has none.
+    const views = bundle.format === 2 ? (bundle.presentation.views ?? []) : []
+    const list = listed.ok && driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'list') === undefined ? listColumns(bundle.bindings, listed.fields, views) : null
     // What a delete also does, for a page to word its confirmation by: only where one is offered (0050).
     const deleting = operations.includes('delete') ? deleteEffects(bundle.snapshot, bundle.bindings.root, bundle.policy) : null
     return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list, deleting } satisfies PublishedForm
