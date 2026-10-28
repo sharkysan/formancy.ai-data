@@ -128,7 +128,8 @@ export function columnsJourney(plane, { check }, run) {
       // Shown over a page with no rows, a column has nothing to be sized to:
       // it waits for the next page that has some, and is sized to it --
       // here to a group longer than the one the state before sized it to.
-      const wide = `waiting for rows ${String(run.customer)} northern loading bay, gate seven`
+      // At most 50 characters, the fixture's group column, and longer than the state before's.
+      const wide = `waited ${String(run.customer)} far northern loading bay, gate 7`
       await show(page, 'Group').focus()
       await page.keyboard.press('Space')
       await headed(page, generated.filter((label) => label !== 'Group'))
