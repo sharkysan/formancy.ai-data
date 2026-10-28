@@ -1,5 +1,5 @@
 import type { ApiValue } from '../codecs/codec.js'
-import type { LookupKeyColumn, LookupSearchColumn, RowFilters } from '../lookup/types.js'
+import type { LookupKeyColumn, LookupSearchColumn, LookupSearchType, RowFilters, RowFilterType } from '../lookup/types.js'
 import type { ColumnMeta, NormalizedType, ObjectMeta, ObjectRef } from '../metadata.js'
 
 /**
@@ -98,6 +98,36 @@ export interface ListSearch {
   columns: readonly LookupSearchColumn[]
 }
 
+/** What an equals filter compares (0104): a row filter's kinds, whose values have one spelling, and a boolean. */
+export type EqualsFilterType = RowFilterType | { kind: 'boolean' }
+
+/** What a range compares (0104): numbers and days, which both engines order alike. */
+export type RangeFilterType = Extract<NormalizedType, { kind: 'integer' | 'decimal' | 'date' | 'timestamp' }>
+
+/**
+ * One column a list is narrowed by at a person's request (0104), as
+ * `columnFilter` plans it from the column's type. Every value is canonical
+ * text, bound as its column's type.
+ *
+ * - `equals`: the column's canonical value is exactly `value`, as a row
+ *   filter compares it (0028) -- text unit for unit, whatever the column's
+ *   collation -- or the boolean `true` or `false`.
+ * - `range`: at least `from`, at most `to`, below `before`; a bound that is
+ *   `null` is not there. An integer, a decimal or a date has `from` and
+ *   `to`, values its column can hold. A timestamp has `from` and `before`,
+ *   midnights spelled `YYYY-MM-DDT00:00:00`, with `Z` for an instant: its
+ *   range is whole days, compared with the stored value, never with the
+ *   value cut to the second a page shows.
+ * - `contains`: the column holds `text`, matched as a search matches it.
+ * - `null`, `not-null`: the column is NULL, or not. Text of no characters
+ *   is a value.
+ */
+export type RecordFilter =
+  | { op: 'equals'; column: string; type: EqualsFilterType; value: string }
+  | { op: 'range'; column: string; type: RangeFilterType; from: string | null; to: string | null; before: string | null }
+  | { op: 'contains'; column: string; type: Extract<LookupSearchType, { kind: 'text' }>; text: string }
+  | { op: 'null' | 'not-null'; column: string }
+
 /**
  * One page of the records the trusted filters and every through admit
  * (0044): the rows a read by each one's token would find, in `sort`, which
@@ -106,10 +136,11 @@ export interface ListSearch {
  * `equal` narrows to one parent: the root's foreign-key columns a lookup
  * binds, each with the value the parent's token names, compared with the
  * database's own equality as the foreign key compares them; `[]` for none.
- * It adds no permission -- the filters and the throughs still decide which
- * rows exist. `search` is `null` for none. The adapter fetches `limit + 1`
- * rows from `offset`, so `recordPage` can tell whether more follow without
- * a COUNT.
+ * `filter` narrows by the person's own conditions, each column once (0104);
+ * `[]` for none. Neither adds a permission -- the filters and the throughs
+ * still decide which rows exist. `search` is `null` for none. The adapter
+ * fetches `limit + 1` rows from `offset`, so `recordPage` can tell whether
+ * more follow without a COUNT.
  */
 export interface ListRequest {
   target: RecordTarget
@@ -117,6 +148,7 @@ export interface ListRequest {
   filters: RowFilters
   through: readonly Through[]
   equal: readonly RecordValue[]
+  filter: readonly RecordFilter[]
   search: ListSearch | null
   sort: readonly RecordSort[]
   offset: number

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import type { DataClient, FormMenuChild, FormMenuEntry, PublishedForm } from '@formancy/data-client'
+import type { DataClient, FormMenuChild, FormMenuEntry, ListFilterTerm, PublishedForm } from '@formancy/data-client'
+import { FilterPanel } from './filter-panel.js'
+import { panelFields } from './filter-terms.js'
 import { columnsOf } from './grid-datasource.js'
 import { paneEntry, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
@@ -56,9 +58,12 @@ type ChildOpen = null | { kind: 'new' } | { kind: 'record'; token: string }
  * detail's header or from its row, after a confirmation in place, as the
  * record is (0053); then the keyboard goes to this section's heading.
  *
- * Under a saved parent its head offers Download CSV (0080): the child form's
- * file of that parent's rows, in the grid's sort, the parent's column kept,
- * so the file says whose rows they are. A new parent has no rows to give.
+ * Under a saved parent its grid has a filter panel of its own, over the
+ * fields the child form offers (0104), and its head offers Download CSV
+ * (0080): the child form's file of that parent's rows, under the section's
+ * filter, in the grid's sort, the parent's column kept, so the file says
+ * whose rows they are. A new parent has no rows to give. The filter is the
+ * section's, so another parent's section starts with none.
  * The section is drawn only for a child whose `list` this person is offered
  * -- the workspace leaves any other out when the form is chosen -- so the
  * button asks nothing more of the definition.
@@ -147,6 +152,8 @@ export function ChildSection({
   useRegistered(entries)
   const opening = useOpening({ client, formId: child.form, owner, sessions })
   const columns = useMemo(() => columnsOf(definition, child.field), [definition, child.field])
+  const filterable = useMemo(() => panelFields(definition), [definition])
+  const [filter, setFilter] = useState<ListFilterTerm[]>([])
   const canDelete = menu.operations.includes('delete') && definition.operations.includes('delete') && definition.deleting !== null
   const removal = useDeleteFlow({
     client,
@@ -300,7 +307,7 @@ export function ChildSection({
             New {title}
           </button>
         ) : null}
-        {parent.kind === 'record' ? <DownloadCsv client={client} formId={child.form} idBase={`${headingId}-export`} query={() => ({ search: '', sort: grid.current?.sort() ?? [], parent: { field: child.field, record: parent.token } })} /> : null}
+        {parent.kind === 'record' ? <DownloadCsv client={client} formId={child.form} idBase={`${headingId}-export`} query={() => ({ search: '', sort: grid.current?.sort() ?? [], parent: { field: child.field, record: parent.token }, filter })} /> : null}
       </div>
       {waiting ? (
         <p role="status" id={`${headingId}-waiting`} className="status" data-kind="loading">
@@ -321,9 +328,11 @@ export function ChildSection({
             noun={title}
             parent={{ field: child.field, record: parent.token }}
             search=""
+            filter={filter}
             openToken={drill !== undefined ? drill.held : open?.kind === 'record' ? open.token : null}
             canCreate={canCreate}
             quiet
+            toolbarStart={filterable.length === 0 ? undefined : <FilterPanel idBase={`${headingId}-filter`} fields={filterable} filter={filter} onFilter={setFilter} />}
             refit={refit}
             bench="child-bench"
             {...(canDelete ? { remove: { noun: title, press: deleteRow } } : {})}

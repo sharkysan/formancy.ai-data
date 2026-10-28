@@ -5,6 +5,7 @@ import { quoteTable } from '../sql/quote.js'
 import { searchPredicate } from '../sql/search.js'
 import { Parameters } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
+import { recordFilterPredicate } from './filter.js'
 import { described, filterPredicates, keyPredicates, ROW, selection, throughPredicate } from './statements.js'
 
 /**
@@ -17,7 +18,8 @@ import { described, filterPredicates, keyPredicates, ROW, selection, throughPred
  *   from (select <the table's facts> as [facts]) as [f]
  *   outer apply (
  *     select 1 as [found], [c0], …, [version], row_number() over (order by <order>) as [n]
- *     from <table> as [r] where <parent> and <filters> and <throughs> and <search>
+ *     from <table> as [r]
+ *     where <parent> and <filters> and <throughs> and <the person's filter> and <search>
  *     order by <order> offset @o rows fetch next @l rows only
  *   ) as [page]
  *   order by [page].[n]
@@ -33,7 +35,8 @@ import { described, filterPredicates, keyPredicates, ROW, selection, throughPred
  * The parent's columns compare with `=`, as the foreign key does, each value
  * bound as its column's type, as a key is; the filters, the throughs and the
  * search are a read's and a lookup's own spellings (`statements.ts`,
- * `sql/search.ts`). A nullable column's NULLs are placed by a CASE before it
+ * `sql/search.ts`), and the person's filter is spelled from them where it
+ * can be (`filter.ts`, 0104). A nullable column's NULLs are placed by a CASE before it
  * in the order, and a NOT NULL column is ordered bare, so an index on it can
  * serve the order (`sql/order.ts`). `limit + 1` rows, so `recordPage` can
  * tell whether more follow without a COUNT.
@@ -45,6 +48,7 @@ export function listStatement(request: ListRequest, terms: ListTerms): Statement
     ...keyPredicates(parameters, terms.equal),
     ...filterPredicates(parameters, terms.terms),
     ...terms.through.map((entry) => throughPredicate(parameters, entry)),
+    ...terms.filter.map((entry) => recordFilterPredicate(parameters, ROW, entry)),
   ]
   if (terms.search !== null) where.push(searchPredicate(parameters, ROW, terms.search.columns, terms.search.text))
   const order = orderBy(ROW, terms.sort)

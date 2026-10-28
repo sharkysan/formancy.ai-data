@@ -124,7 +124,7 @@ const ORDER_POLICY: FormPolicy = {
 const clerk = (tenant: string): PolicyContext => ({ actor: { id: `u-${tenant}`, roles: ['clerk'] }, attributes: { tenant } })
 const CLARA = clerk('1')
 const OTTO = clerk('2')
-const EVERY: RecordListQuery = { search: '', sort: [], parent: null, offset: 0, limit: 50 }
+const EVERY: RecordListQuery = { search: '', sort: [], parent: null, filter: [], offset: 0, limit: 50 }
 
 beforeAll(async () => {
   fixture = await startPostgresFixture()

@@ -198,37 +198,47 @@ form; a form it names can be 409 `drift` when opened, since only opening
 asks the database (0045); a host with no backend cannot hold a signing
 secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
 
-## 6.5 A page of records, sorted and searched
+## 6.5 A page of records, sorted, searched and filtered
 
 1. Opening a form, `GET /v1/forms/:id` (`routes/runtime.ts`), starts from
    what the policy grants (0045), describes the root in one statement, and
    offers only what the database allows now
    ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)):
-   `operations`, the readable fields, `list` -- what a page may be sorted
-   and searched by, or `null` -- and `deleting`.
+   `operations`, the readable fields, `list` -- what a page may be sorted,
+   searched and filtered by, or `null` -- and `deleting`.
 2. The Records panel (`apps/host/src/record-grid.tsx`, `grid-datasource.ts`)
    asks one `POST /v1/forms/:id/records/list` per block of AG Grid's
    infinite row model, the search sent on Search or Enter, never per key
-   (0047).
+   (0047), and with every block the conditions its Filter panel applied
+   (`apps/host/src/filter-panel.tsx`, over the fields `list.filterable`
+   names); a new filter starts the grid again from its first row.
 3. `routes/runtime-lists.ts` checks the body and asks `planList`
    (`packages/data-core/src/records/list.ts`) before any statement:
    `listable` puts the read policy first -- its filter, every through
    ([0043](../decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)),
    the readable fields -- then needs a key that is NOT NULL and readable;
    `listOrder` ends the order with every key column, so it is total
-   ([0044](../decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)).
+   ([0044](../decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md));
+   `columnFilter` plans each of the person's conditions on a readable
+   column field, its values spelled as the column holds them, or refuses it
+   400 `not-filterable`
+   ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 4. Each adapter's `records/list.ts` runs one statement: the description and
    `limit + 1` rows from the offset, searched through `sql/search.ts`,
    ordered through `sql/order.ts`, its filters compared exactly
-   ([0028](../decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)).
+   ([0028](../decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)),
+   and each condition of the person's filter one more predicate, its
+   values bound as the column's type (0104).
    A page drift stops is 409 `drift`, its rows never sent (0041).
    `recordPage` makes each row what a read by its token returns, the extra
    row saying whether more follow; the grid then resolves lookup labels.
 
 Held by each adapter's `list.integration.test.ts`, its shared cases in
-`LIST_PARITY`; `routes/runtime-lists.test.ts`; `plan-list.test.ts` in
+`LIST_PARITY` and `COLUMN_FILTER_PARITY`; `routes/runtime-lists.test.ts`;
+`plan-list.test.ts` and `filter.test.ts` in
 `packages/data-core/src/records`; `lists.integration.test.ts` in
-`packages/data-client/src`; and `apps/host/src/grid-datasource.test.ts`.
+`packages/data-client/src`; and `apps/host/src/grid-datasource.test.ts` and
+`filter.test.tsx`.
 What it costs: a page reads every row before it, by how the engines run an
 offset, not measured here; the rest is 0044's and 0061's, in
 [section 11.2](11-risks-and-debt.md#112-known-limitations-by-area).
@@ -428,14 +438,16 @@ and a publisher alone restores any version, unreviewed ones too (0065).
 ## 6.10 Downloading a form's records
 
 1. A client asks `POST /v1/forms/:id/records/export` with the search, the
-   sort and the parent its grid shows -- `exportRecords` in
+   sort, the parent and the filter its grid shows
+   ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)) -- `exportRecords` in
    `packages/data-client/src/client.ts`, accepting `text/csv,
    application/json` -- where the form's `list` is not `null`
    ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
    On the host page it is Download CSV, in the head of the Records panel
    or of a child section (`apps/host/src/download.tsx`): the panel's
-   submitted search, the sort `RecordGrid`'s handle says its datasource
-   last asked with, and a child section's record as the parent
+   submitted search and applied filter, the sort `RecordGrid`'s handle says
+   its datasource last asked with, and a child section's record as the
+   parent
    ([0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)). Its line says "Making <form id>.csv."; the button is
    `aria-disabled` and sends nothing more; the section leaving the page
    aborts the request.
@@ -555,10 +567,10 @@ comes from a rule over the form's fields (0090).
    ended by a key it shows or, for a view, by every shown column. The
    object is in the audit event from here, as `schema.name`.
 3. The request is a list's (6.5): the adapter's `list` runs it as one
-   statement, through its own `listTerms`, with no filter but what the
-   account's grants and row security apply, and `browsePage` keeps fifty
-   rows and whether more follow. The answer names the columns shown, those
-   left out and why, and how the page is ordered.
+   statement, through its own `listTerms`, with no row filter of a policy's,
+   only what the account's grants and row security apply, and `browsePage`
+   keeps fifty rows and whether more follow. The answer names the columns
+   shown, those left out and why, and how the page is ordered.
 4. A row follows its foreign keys either way
    ([0103](../decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
    From the snapshot the step holds, `browseRelations`
@@ -582,11 +594,24 @@ comes from a rule over the form's fields (0090).
    terms are the list's `equal`, bound as a child form's parent is (0044)
    and compared with the database's own equality, as the key compares
    them; the audit event names the object, never a value.
+6. A page is filtered by the administrator's own conditions on its columns
+   ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
+   The step's Filter rows (`apps/studio/src/browse-filter.tsx`) offers each
+   shown column what `filterOffer` gives it in the studio's discovery, and
+   sends `filter`, a list of `{ column, op, … }`, with page one;
+   `validateBrowseQuery` reads it (`readFilter`), and `planBrowse` plans
+   each condition through `columnFilter` for a column the page shows, or
+   refuses it 400 `not-filterable`, naming the column and never the value.
+   The conditions reach the adapter as the list's `filter`, as a form's do
+   (6.5), beside a follow's `equal`. Paging and sorting send the filter
+   again; a follow starts the other end without one, and Back sends the
+   page it left with its filter.
 
 Held by `routes/admin-browse.test.ts`, `browse-roles.test.ts`, data-core's
 `records/browse.test.ts` and `records/follow.test.ts`, both adapters'
 `list.integration.test.ts` (the shared `browse:` cases, `browse: follows`
-among them) and the studio's `browse.test.tsx`. What it costs:
+among them, and `column filter: date`, browsed) and the studio's
+`browse.test.tsx` and `browse-filter.test.tsx`. What it costs:
 whoever holds the role reads every row the connection's account can read;
 every page is a discovery and a statement; rows of a view equal in every
 shown column may trade places between pages; only keys over key kinds are

@@ -2,9 +2,9 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import type { ReactElement, ReactNode } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import type { GridApi, IRowNode } from 'ag-grid-community'
-import type { DataClient, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
+import type { DataClient, ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
-import { answered, CANNOT_OPEN, createDatasource, loading } from './grid-datasource.js'
+import { answered, CANNOT_OPEN, createDatasource, loading, REFUSED_FILTER_HELP } from './grid-datasource.js'
 import type { DatasourceHooks, GridColumn, GridRow } from './grid-datasource.js'
 import { columnDefsOf, gridOptionsFor } from './grid-options.js'
 import type { OpenHow, RowDelete } from './grid-options.js'
@@ -33,6 +33,11 @@ export { DELETE_COLUMN } from './grid-options.js'
  * closed -- is said once, before the sentence of the page asked for again;
  * a page left empty that is not the first says nothing, and AG Grid shows
  * the page before it.
+ *
+ * What it lists is its section's: the search submitted, the parent, and the
+ * filter its panel applied (filter-panel.tsx, 0104), whose fields its line
+ * names. A filter the server refuses is said in the server's sentence with
+ * what to do instead of Ask again, which would be refused the same.
  */
 
 /** Where a row was asked for from, so the keyboard can be given back there. */
@@ -68,6 +73,12 @@ export interface RecordGridProps {
   parent: RecordListQuery['parent']
   /** The search as submitted, never as typed. */
   search: string
+  /**
+   * The filter as applied (0104): each block is asked for with it, and a new
+   * one starts the list again from its first page, as a new search does.
+   * Compared by identity, so the caller keeps it as state.
+   */
+  filter: readonly ListFilterTerm[]
   openToken: string | null
   canCreate: boolean
   /** The first page is asked for without a word: a child reloaded because its parent changed, which the parent's line has just said. */
@@ -119,7 +130,7 @@ function wellHeight(header: number, rows: number, cap: number): number {
 }
 
 export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function RecordGrid(props, handle): ReactElement {
-  const { client, formId, columns, labelledBy, parent, search, openToken, quiet = false, toolbarStart, refit = 0, bench, after, onClearSearch } = props
+  const { client, formId, columns, labelledBy, parent, search, filter, openToken, quiet = false, toolbarStart, refit = 0, bench, after, onClearSearch } = props
   const api = useRef<GridApi<GridRow> | null>(null)
   const well = useRef<HTMLDivElement>(null)
   const retryButton = useRef<HTMLButtonElement>(null)
@@ -196,7 +207,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         setStatus((before) => ({ kind: 'loading', text: [words], help: null, clear: false, retry: before.retry && shown.current.retrying }))
         setPager((before) => ({ ...before, page: Math.floor(start / LIST_PAGE_SIZE) }))
       },
-      answered: (start, rows, hasMore) => {
+      answered: (start, rows, hasMore, asked) => {
         // A page left empty that is not the first -- its last row deleted --
         // says nothing: with fewer rows than the page starts at, AG Grid's
         // pagination moves to the last page there is and asks for it, which
@@ -206,8 +217,10 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         const fromRetry = shown.current.retrying && document.activeElement === retryButton.current
         shown.current = { ...shown.current, rows: rows.length, loaded: true, retrying: false }
         api.current?.setGridAriaProperty('busy', null)
-        const { noun, canCreate } = latest.current
-        const said = answered({ start, count: rows.length, hasMore, search: latest.current.search, untokened: rows.filter((row) => row.record === null).length, canCreate, ...(noun === undefined ? {} : { noun }) })
+        const { noun, canCreate, columns: shownColumns } = latest.current
+        // The fields the block's own filter is on, by the labels the grid's headers carry.
+        const filtered = asked.map((term) => shownColumns.find((column) => column.key === term.field)?.label ?? term.field)
+        const said = answered({ start, count: rows.length, hasMore, search: latest.current.search, filtered, untokened: rows.filter((row) => row.record === null).length, canCreate, ...(noun === undefined ? {} : { noun }) })
         setStatus({ kind: 'answer', text: first([said.text]), help: said.help, clear: said.clear, retry: false })
         setPager({ page: Math.floor(start / LIST_PAGE_SIZE), hasMore })
         applySelection()
@@ -216,10 +229,12 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         // Ask again stays where it was pressed until the answer; then the rows that came.
         if (fromRetry && rows.length > 0 && firstColumn !== '') api.current?.setFocusedCell(start, firstColumn)
       },
-      refused: (message) => {
+      refused: (message, code) => {
         shown.current = { ...shown.current, rows: 0, loaded: true, retrying: false }
         api.current?.setGridAriaProperty('busy', null)
-        setStatus({ kind: 'refused', text: first([message]), help: null, clear: false, retry: true })
+        // A filter the server cannot apply is refused again however often it is asked: its recovery is the condition.
+        const filterRefused = code === 'not-filterable'
+        setStatus({ kind: 'refused', text: first([message]), help: filterRefused ? REFUSED_FILTER_HELP : null, clear: false, retry: !filterRefused })
         setPager((before) => ({ ...before, hasMore: false }))
         fit()
       },
@@ -227,9 +242,9 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     [applySelection, fit, sizeOnce, firstColumn],
   )
 
-  // A new search or another parent is a new list, from its first page: a
-  // new datasource, which AG Grid starts again from row 0.
-  const datasource = useMemo(() => createDatasource({ client, formId, columns, search, parent, hooks }), [client, formId, columns, search, parent?.field, parent?.record, hooks])
+  // A new search, another parent or another filter is a new list, from its
+  // first page: a new datasource, which AG Grid starts again from row 0.
+  const datasource = useMemo(() => createDatasource({ client, formId, columns, search, parent, filter, hooks }), [client, formId, columns, search, parent?.field, parent?.record, filter, hooks])
   useEffect(() => () => datasource.abort(), [datasource])
   useEffect(() => {
     // The parent changed: its line has spoken, and this one waits for the answer.

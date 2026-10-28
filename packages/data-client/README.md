@@ -51,18 +51,39 @@ only for an abort the caller asked for, with the AbortError it raised.
 
 The reply types — `FormMenu`, `FormMenuEntry`, `FormMenuChild`,
 `PublishedForm`, `FormRecord`, `RecordList`, `RecordListQuery`,
-`RecordExportQuery`, `ListSortTerm`, `ListColumns`, `LookupResult`,
-`LookupRow`, `FieldError` — and `LIST_PAGE_SIZE`, `EXPORT_MAX_BYTES` and
-`exportFileName` are re-exported from
+`RecordExportQuery`, `ListSortTerm`, `ListFilterTerm`, `FilterCondition`,
+`FilterOp`, `FilterOffer`, `FilterInput`, `FilterableField`, `ListColumns`,
+`LookupResult`, `LookupRow`, `FieldError` — and `LIST_PAGE_SIZE`,
+`EXPORT_MAX_BYTES` and `exportFileName` are re-exported from
 `@formancy/data-core`, where the server's handlers are checked against the
 same declarations. A form's `list`
 is `null` when the server would refuse this person a page, and otherwise
-says which fields a page may be searched and sorted by
-([0044](../../docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md));
-a `form` reply without one is `unexpected`, as from a server older than
-lists. `list` sends exactly `search`, `sort`, `parent`, `offset` and `limit`
-in a POST body, each left out the server's default, so the search is in no
-URL. A form's `deleting` says what a delete also does -- whether it
+says which fields a page may be searched, sorted and filtered by
+([0044](../../docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md),
+[0104](../../docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)): `filterable` is one `{ field, operators, input, days }` per field a
+condition may name, the operators among `equals`, `range`, `contains`,
+`null` and `not-null`, and `input` what a value is typed as -- `text`,
+`integer`, `decimal`, `date`, `uuid` or `boolean`, a timestamp's range
+being days -- or `null` where only `null` and `not-null` are offered, and
+`days` whose clock a timestamp's days are on, `utc` for an instant and
+`wall` for one in no zone, `null` for any other field.
+A `form` reply without `list` is `unexpected`, as from a server older than
+lists, and so is a list without `filterable`, as from a server older than
+filters, or with an offer a panel could not draw: no operator, one or an
+`input` this package's data-core does not name, an `input` that does
+not fit the operators, or a `days` data-core does not name or on anything
+but a date. `list` sends exactly `search`, `sort`, `parent`,
+`filter`, `offset` and `limit` in a POST body, each left out the server's
+default, so the search and a filter's values are in no URL. `filter` is a
+list of `{ field, op, … }`, each field once, every condition holding:
+`{ op: 'equals', value }`, `{ op: 'range', from, to }` with either bound
+`null`, `{ op: 'contains', text }`, `{ op: 'null' }` or
+`{ op: 'not-null' }`, every value as the text a person typed. The server
+spells it as the column holds it, and refuses a condition `filterable`
+does not offer, or a value its column cannot hold, 400 `not-filterable`
+in a sentence that names the field and never the value; a filter
+narrows, and the policy still decides which records exist. A form's
+`deleting` says what a delete also does -- whether it
 cascades, clears references, or may be refused while other rows refer to
 the record -- for a page to word its confirmation by, and is `null`
 exactly when `operations` holds no `delete`; a reply that breaks that is
@@ -74,9 +95,10 @@ and is done only on the server's `{ record, deleted: true }`, whose token
 is the row the statement deleted.
 
 `exportRecords` is the file of every record `list` would page through for
-the same `search`, `sort` and `parent`, the three keys it sends, in a POST
-body
-([0079](../../docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+the same `search`, `sort`, `parent` and `filter`, the four keys it sends,
+in a POST body
+([0079](../../docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md),
+0104), refused `not-filterable` as `list` would be.
 It resolves to a `RecordFile`, `{ file, name }`: the server's bytes as a
 `Blob`, byte-order mark included, and `<form id>.csv`, taken from the form's
 id and not from `content-disposition`, which a page on another origin cannot

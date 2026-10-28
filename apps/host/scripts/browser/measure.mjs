@@ -207,10 +207,15 @@ export async function paintedWhere(page, locate) {
 
 /**
  * Decides what axe left undecided inside a grid -- a header or a cell whose
- * background axe "could not determine due to a pseudo element" (UX-SPEC F1)
- * -- by the text's computed colour against the background the browser painted
- * in that cell's padding, at 4.5:1 or more. Anything axe left undecided
- * outside a grid, or for another reason, stays undecided: the gate fails it.
+ * background axe "could not determine due to a pseudo element" (UX-SPEC F1),
+ * or because "it is overlapped by another element" -- by the text's computed
+ * colour against the background the browser painted in that cell's padding,
+ * at 4.5:1 or more. Anything axe left undecided outside a grid, or for
+ * another reason, stays undecided: the gate fails it. Overlapped is what axe
+ * says of a row the grid keeps drawn above its scroller's top, where the
+ * page's own toolbar lies over it: the same text scrolled out of view as
+ * below, found `hidden` the same way (seen 2026-10-28, when a grid's Filter
+ * row moved the Records panel's pager over row 23 at 1281 pixels).
  *
  * The background is read only where the cell itself is drawn. A cell its
  * grid has scrolled partly out of view is read inside the part its grid
@@ -241,7 +246,7 @@ export async function decide(page, undecided) {
   const scrolled = await page.evaluate(() => [window.scrollX, window.scrollY])
   try {
     for (const node of undecided) {
-      if (!/pseudo element/.test(node.reason)) {
+      if (!/pseudo element|overlapped by another element/.test(node.reason)) {
         left.push(node.html)
         continue
       }

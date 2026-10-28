@@ -136,6 +136,7 @@ export type {
   Described,
   DescribedRead,
   DescribedTable,
+  EqualsFilterType,
   InsertRequest,
   ListOutcome,
   ListRequest,
@@ -146,11 +147,13 @@ export type {
   RecordConcurrency,
   RecordFailure,
   RecordFailureCode,
+  RecordFilter,
   RecordOutcome,
   RecordRead,
   RecordTarget,
   RecordSort,
   RecordValue,
+  RangeFilterType,
   Through,
   UpdateRequest,
 } from './records/types.js'
@@ -170,7 +173,9 @@ export { exportColumns, exportHeader, exportRecord, exportText } from './records
 export type { ExportColumns, ExportField, ExportLabels } from './records/export.js'
 export type { CsvCell, CsvRefusal, CsvText } from './records/csv.js'
 export { browsePage, planBrowse, validateBrowseQuery } from './records/browse.js'
-export type { BrowseEqualTerm, BrowsePage, BrowseQuery, BrowseQueryCheck, BrowseRefusal, BrowseRefusalCode, BrowseSortTerm, OmittedColumn, PlannedBrowse } from './records/browse.js'
+export type { BrowseEqualTerm, BrowseFilterTerm, BrowsePage, BrowseQuery, BrowseQueryCheck, BrowseRefusal, BrowseRefusalCode, BrowseSortTerm, OmittedColumn, PlannedBrowse } from './records/browse.js'
+export { columnFilter, dayAfter, filterOffer, readFilter } from './records/filter.js'
+export type { FilterPlanning, FilterRead } from './records/filter.js'
 export { browseRelations, followTerms } from './records/follow.js'
 export type { BrowseRelation, BrowseRelations, UnfollowedKey } from './records/follow.js'
 export { listTerms } from './records/list-terms.js'
@@ -196,10 +201,17 @@ export type {
 } from './records/plan-types.js'
 export type {
   Deleting,
+  FilterableField,
+  FilterCondition,
+  FilterDays,
+  FilterInput,
+  FilterOffer,
+  FilterOp,
   FormMenu,
   FormMenuChild,
   FormMenuEntry,
   ListColumns,
+  ListFilterTerm,
   ListSortTerm,
   PublishedForm,
   RecordDeleted,

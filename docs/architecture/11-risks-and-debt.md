@@ -212,6 +212,18 @@ whose key is too long for a token, a row the grid shows; a header can
 repeat a label; and what a
 spreadsheet shows of the file -- its byte-order mark, a `;` locale, 17
 digits -- was not tried ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+A filter's conditions are joined by AND, one per field, with no OR, no
+"not equal", no "starts with" and no range over text; a float and a time
+are filtered by NULL alone, a timestamp by whole days, and a lookup field
+not at all.
+Equality on text is exact on both engines, so `muster ag` does not find
+`Muster AG` under a case-insensitive collation, where `contains` does. An
+instant's range is whole days of UTC, which is shifted for a person in
+another zone; a range to 9999-12-31 has no upper end, and on PostgreSQL
+holds a timestamp after that year; a decimal with more fraction digits
+than its column holds is refused, not rounded; and what a filter costs on
+a large table is not measured
+([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 
 **Writes.** On SQL Server, a table with an enabled INSTEAD OF trigger cannot
 be written that way through the adapter, `returning` is the row before an

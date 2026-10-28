@@ -78,6 +78,8 @@ const POLICY: FormPolicy = {
 }
 /** The same form with customer_no, half its key, kept from the clerk: a list would hand out tokens spelling it. */
 const HIDDEN_KEY: FormPolicy = { ...POLICY, fields: { ...POLICY.fields, customer_no: { read: [], write: ['clerk'] } } }
+/** The same form with the credit limit kept from the clerk, who may still write it: listed, but never by it. */
+const HIDDEN_LIMIT: FormPolicy = { ...POLICY, fields: { ...POLICY.fields, credit_limit: { read: [], write: ['clerk'] } } }
 /** An order's lines, through their order (0043). */
 const LINE_POLICY: FormPolicy = {
   version: 1,
@@ -101,6 +103,8 @@ const VERSION = '00000000000007d1'
 const STORED = { values: { tenant_id: '1', customer_no: '7', name: 'Muster AG', country_code: 'CH', credit_limit: null }, version: VERSION }
 const DEFINITION = 'the definition the fake catalog described'
 const KEY = 'an-audit-key-the-operator-keeps-secret'
+/** Planted in a filter, where no audit event or log line may look. */
+const FILTERED = 'filter-marker-5b9e'
 
 const describedAs = (table: ObjectRef, edit: (columns: DescribedTable['columns']) => void = () => {}): DescribedTable => {
   const found = describedOf(SNAPSHOT, table)
@@ -172,6 +176,7 @@ beforeEach(async () => {
   const bundle: PublishedBundle = { format: 1, connection: 'erp', form: customer.form, bindings: customer.bindings, policy: POLICY, snapshot: SNAPSHOT }
   await store.publish('customer', null, bundle)
   await store.publish('hidden', null, { ...bundle, policy: HIDDEN_KEY })
+  await store.publish('hidden-limit', null, { ...bundle, policy: HIDDEN_LIMIT })
   const line = generateForm(SNAPSHOT, { connection: 'erp', root: ref('line'), formId: 'line', title: 'Line', lookups: [{ foreignKey: 'fk_line_order', display: ['placed'] }] })
   await store.publish('line', null, { ...bundle, form: line.form, bindings: line.bindings, policy: LINE_POLICY })
   const { through: _through, ...unscoped } = LINE_POLICY
@@ -214,6 +219,7 @@ describe('the list route', () => {
         filters: { kind: 'restricted', equal: [{ column: 'tenant_id', type: INT32, value: '1' }] },
         through: [],
         equal: [],
+        filter: [],
         search: { text: 'Muster', columns: [{ name: 'tenant_id', type: INT32 }, { name: 'customer_no', type: INT32 }, { name: 'name', type: NAME }] },
         sort: [
           { column: 'credit_limit', direction: 'desc', nulls: 'last' },
@@ -242,6 +248,60 @@ describe('the list route', () => {
     })
   })
 
+  // A person's filter reaches the port as `columnFilter` plans each
+  // condition (0104): by the field's column, the text a contains finds
+  // trimmed, a number spelled as its column reads it back -- no plus, no
+  // leading zero, a decimal padded to its scale -- and beside the tenant's
+  // own filter, which it narrows and never replaces. Watched failing with
+  // the route planning the body's query with its filter dropped: the port
+  // was handed `filter: []`, a list of every customer.
+  test('hands the port each condition as the planner spells it, beside the tenant’s filter', async () => {
+    const response = await list('customer', {
+      filter: [
+        { field: 'name', op: 'contains', text: ' Muster ' },
+        { field: 'customer_no', op: 'equals', value: ' +007 ' },
+        { field: 'credit_limit', op: 'range', from: '-1.5', to: null },
+      ],
+    })
+    expect(response.statusCode, response.body).toBe(200)
+    expect(lists).toHaveLength(1)
+    expect(lists[0]?.filters).toEqual({ kind: 'restricted', equal: [{ column: 'tenant_id', type: INT32, value: '1' }] })
+    expect(lists[0]?.filter).toEqual([
+      { op: 'contains', column: 'name', type: NAME, text: 'Muster' },
+      { op: 'equals', column: 'customer_no', type: INT32, value: '7' },
+      { op: 'range', column: 'credit_limit', type: { kind: 'decimal', precision: 14, scale: 2 }, from: '-1.50', to: null, before: null },
+    ])
+    expect((await list('customer', { filter: [{ field: 'credit_limit', op: 'null' }] })).statusCode).toBe(200)
+    expect(lists[1]?.filter).toEqual([{ op: 'null', column: 'credit_limit' }])
+  })
+
+  // A condition the form does not offer is refused before any statement,
+  // 400 `not-filterable` in the planner's own sentence, which names the
+  // field and never the value: a lookup, which holds a token and not the
+  // label a person reads; an operator its kind has not got; NULL on a
+  // column that holds none; a value or a bound it cannot hold; a field the
+  // person may not read, which a filter would otherwise disclose one
+  // condition at a time; and a field the form does not have. Watched
+  // failing with `not-filterable` left out of `planRefusal`: every one
+  // was a 500.
+  test('refuses a condition the form does not offer 400 not-filterable, naming the field and never the value, and asks nothing', async () => {
+    const cases: Array<[string, unknown, string]> = [
+      ['customer', { field: 'country', op: 'equals', value: 'k1:CH' }, 'country is not a field you may filter this list by.'],
+      ['customer', { field: 'customer_no', op: 'contains', text: '7' }, 'customer_no offers no contains condition.'],
+      ['customer', { field: 'name', op: 'null' }, 'name offers no null condition.'],
+      ['customer', { field: 'credit_limit', op: 'equals', value: '98765.4321' }, 'A value given for credit_limit is not one it can hold.'],
+      ['customer', { field: 'customer_no', op: 'range', from: '98765x', to: null }, 'A value given for customer_no is not one it can hold.'],
+      ['hidden-limit', { field: 'credit_limit', op: 'not-null' }, 'credit_limit is not a field you may filter this list by.'],
+      ['customer', { field: 'row_version', op: 'not-null' }, 'row_version is not a field you may filter this list by.'],
+    ]
+    for (const [form, condition, message] of cases) {
+      const response = await list(form, { filter: [condition] })
+      expect({ condition, status: response.statusCode, body: response.json() }).toEqual({ condition, status: 400, body: { code: 'not-filterable', message } })
+      expect(response.body).not.toMatch(/98765|k1:CH/)
+    }
+    expect(lists).toEqual([])
+  })
+
   // Nothing is listed for a person the host has not vouched for, the policy
   // grants no read, or whose context cannot scope the read -- and the port is
   // never asked.
@@ -255,11 +315,20 @@ describe('the list route', () => {
 
   // Each refusal of what the browser sent has its own code and asks nothing
   // of the database: a body with a property this release does not read, a
-  // search or a page a lookup would refuse too, a sort by a lookup field, and
-  // a parent that is not a readable lookup or names no row it could.
+  // search or a page a lookup would refuse too, a filter of another shape
+  // -- a field named twice, an operator with a property it has not got, a
+  // range with no bound -- or text to find that a search would refuse, a
+  // sort by a lookup field, and a parent that is not a readable lookup or
+  // names no row it could.
   test('answers each malformed or unofferable request 400 with its code, and asks nothing', async () => {
     const cases: Array<[unknown, string, string]> = [
       [{ filters: [] }, 'customer', 'malformed'],
+      [{ filter: { name: 'Muster' } }, 'customer', 'malformed'],
+      [{ filter: [{ field: 'name', op: 'equals', value: 'a' }, { field: 'name', op: 'contains', text: 'b' }] }, 'customer', 'malformed'],
+      [{ filter: [{ field: 'name', op: 'contains', text: 'a', value: 'b' }] }, 'customer', 'malformed'],
+      [{ filter: [{ field: 'credit_limit', op: 'range', from: null, to: null }] }, 'customer', 'malformed'],
+      [{ filter: [{ field: 'name', op: 'like', value: 'a%' }] }, 'customer', 'malformed'],
+      [{ filter: [{ field: 'name', op: 'contains', text: 'x'.repeat(201) }] }, 'customer', 'not-filterable'],
       [{ sort: [{ field: 'name', direction: 'sideways' }] }, 'customer', 'malformed'],
       [{ search: 'x'.repeat(201) }, 'customer', 'search-too-long'],
       [{ search: 'a\u0000b' }, 'customer', 'search-control-character'],
@@ -305,13 +374,29 @@ describe('the list route', () => {
     expect({ status: form.statusCode, list: form.json().list }).toEqual({ status: 200, list: null })
   })
 
-  // What a page may search and sort by is the planner's own answer, sent with
-  // the form, so a grid offers exactly the headers and search the server
-  // accepts. And one page's tokens for one lookup fit one resolve.
-  test('the form says what its list may search and sort by, in the planner’s words', async () => {
+  // What a page may search, sort and filter by is the planner's own answer,
+  // sent with the form, so a grid offers exactly the headers, search and
+  // conditions the server accepts (0104): each readable column field with
+  // its kind's operators, `null` and `not-null` only where the column holds
+  // NULLs, never a lookup, and never a field the person may not read -- a
+  // filter on one would tell them its values a condition at a time. And
+  // one page's tokens for one lookup fit one resolve. Watched failing with
+  // `GET` sending the list with `filterable` emptied.
+  test('the form says what its list may search, sort and filter by, in the planner’s words', async () => {
     const served = (await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).json()
     expect(served.list).toEqual(listColumns(customers, served.readable))
-    expect(served.list).toEqual({ searchable: ['tenant_id', 'customer_no', 'name'], sortable: ['tenant_id', 'customer_no', 'name', 'credit_limit'] })
+    expect(served.list).toEqual({
+      searchable: ['tenant_id', 'customer_no', 'name'],
+      sortable: ['tenant_id', 'customer_no', 'name', 'credit_limit'],
+      filterable: [
+        { field: 'tenant_id', operators: ['equals', 'range'], input: 'integer', days: null },
+        { field: 'customer_no', operators: ['equals', 'range'], input: 'integer', days: null },
+        { field: 'name', operators: ['equals', 'contains'], input: 'text', days: null },
+        { field: 'credit_limit', operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal', days: null },
+      ],
+    })
+    const kept = (await app.inject({ method: 'GET', url: '/v1/forms/hidden-limit', headers: as('clerk') })).json()
+    expect(kept.list.filterable.map((offer: { field: string }) => offer.field)).toEqual(['tenant_id', 'customer_no', 'name'])
     expect(LIST_PAGE_SIZE).toBeLessThanOrEqual(MAX_RESOLVE)
   })
 
@@ -393,14 +478,42 @@ describe('the list route', () => {
   })
 
   // One event per list, named `list`, naming no record -- never the search,
-  // the sort or the parent, which are what the person typed and chose (0023).
+  // the sort, the parent or the filter, which are what the person typed and
+  // chose (0023): a filter's value is a person's data, as a search is.
   test('is audited as list, with no record and nothing the person sent', async () => {
-    await list('line', { search: 'Muster', sort: [{ field: 'quantity', direction: 'desc' }], parent: { field: 'order', record: 'k1:42' } })
+    await list('line', { search: 'Muster', sort: [{ field: 'quantity', direction: 'desc' }], parent: { field: 'order', record: 'k1:42' }, filter: [{ field: 'quantity', op: 'range', from: '31337', to: null }] })
     await list('customer', {}, 'stranger')
+    await list('customer', { filter: [{ field: 'name', op: 'contains', text: FILTERED }] })
+    await list('customer', { filter: [{ field: 'credit_limit', op: 'equals', value: '98765.4321' }] })
     expect(events).toEqual([
       { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'list', form: 'line', formVersion: 1, status: 200, outcome: 'ok', record: null, rows: null },
       { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 's', operation: 'list', form: 'customer', formVersion: 1, status: 403, outcome: 'operation-denied', record: null, rows: null },
+      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'list', form: 'customer', formVersion: 1, status: 200, outcome: 'ok', record: null, rows: null },
+      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'list', form: 'customer', formVersion: 1, status: 400, outcome: 'not-filterable', record: null, rows: null },
     ])
-    expect(JSON.stringify(events)).not.toMatch(/Muster|quantity|k1:/)
+    expect(JSON.stringify(events)).not.toMatch(/Muster|quantity|k1:|31337|98765|filter-marker/)
+  })
+
+  // The server's log is read by whoever runs the collector, and the audit
+  // events go to it too (0033): a filter's value -- found, compared, or
+  // refused as one its column cannot hold -- is in no line of it, and the
+  // body that carried it in no URL, since a list is a POST. Watched failing
+  // with the route logging the query it read at info.
+  test('writes no value of a filter to the log, whether the list is answered or refused', async () => {
+    const written: string[] = []
+    const logged = await createDataServer({
+      verifyIdentity,
+      logger: { stream: { write: (line: string) => void written.push(line) } },
+      runtime: { registry: registry(), store: createFileConfigurationStore(root), audit: { sink: (event) => void written.push(JSON.stringify(event)), key: KEY } },
+    })
+    const send = (payload: unknown) => logged.inject({ method: 'POST', url: '/v1/forms/customer/records/list', headers: as('clerk'), payload: payload as Record<string, unknown> })
+    const answers = [
+      await send({ filter: [{ field: 'name', op: 'contains', text: FILTERED }, { field: 'credit_limit', op: 'range', from: '31337', to: null }] }),
+      await send({ filter: [{ field: 'credit_limit', op: 'equals', value: '98765.4321' }] }),
+      await send({ filter: [{ field: 'name', op: 'like', value: FILTERED }] }),
+    ]
+    expect(answers.map((answer) => answer.statusCode)).toEqual([200, 400, 400])
+    expect(written.filter((line) => line.includes('"operation":"list"'))).toHaveLength(3)
+    expect(written.filter((line) => /filter-marker|31337|98765/.test(line))).toEqual([])
   })
 })

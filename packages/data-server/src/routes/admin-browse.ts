@@ -28,6 +28,7 @@ const STATUS: Readonly<Record<BrowseRefusalCode, number>> = {
   'nothing-readable': 403,
   'not-sortable': 400,
   'not-comparable': 400,
+  'not-filterable': 400,
   'not-searchable': 400,
 }
 
@@ -59,15 +60,18 @@ function browseFailure(failure: RecordFailure): { status: number; code: string; 
  * by `adminRoutes` after its role check and its governance gate, which
  * refuses the route to anybody without a browse role (governance.ts).
  *
- * A POST, so the search never appears in a URL a proxy logs. The body is
- * checked first; then the connection is discovered, as `GET …/metadata`
- * discovers it, so the object, its columns and its key are names the
- * server read from the catalog a moment ago and never the body's (0011).
- * The page is a list's statement (0044), with no filter but what the
- * account's grants and row security apply, and the equal values a follow
- * of a foreign key narrows it to (0103), each column one the snapshot
- * shows and each value checked against it. The audit names the object
- * once the snapshot holds it, never the search, the sort, a value or a row.
+ * A POST, so the search and a filter's values never appear in a URL a
+ * proxy logs. The body is checked first; then the connection is
+ * discovered, as `GET …/metadata` discovers it, so the object, its columns
+ * and its key are names the server read from the catalog a moment ago and
+ * never the body's (0011). The page is a list's statement (0044), with no
+ * row filter but what the account's grants and row security apply,
+ * narrowed only by the equal values a follow of a foreign key names (0103)
+ * and by the person's own conditions on its columns (0104): each column one
+ * the snapshot shows, each value checked against it before anything is
+ * bound, and a condition its column does not offer refused
+ * `not-filterable`. The audit names the object once the snapshot holds it,
+ * never the search, the sort, the filter, a value or a row.
  *
  * Each page costs a discovery and the page's statement: nothing is cached
  * between pages, so a page is never decided over a catalog older than the

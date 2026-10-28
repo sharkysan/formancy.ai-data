@@ -228,10 +228,13 @@ existed would be documented and inert.
   may read, `{ rows, hasMore }` and no total
   ([0044](../../docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)):
   a read of many, under the read filter and every through, each row what
-  `records/read` returns for its token, a POST so the search is in no URL,
-  and audited as `list` with no record and never the search, the sort or
-  the parent. `GET /v1/forms/:id` sends `list` -- what a page may be searched
-  and sorted by -- or `null` where the person would be refused one: a key
+  `records/read` returns for its token, a POST so the search and a filter's
+  values are in no URL, and audited as `list` with no record and never the
+  search, the sort, the parent or the filter. Its body is `{ search?, sort?,
+  parent?, filter?, offset?, limit? }`, and nothing else (400 `malformed`).
+  `GET /v1/forms/:id` sends `list` -- what a page may be searched, sorted
+  and filtered by, `{ searchable, sortable, filterable }` -- or `null` where
+  the person would be refused one: a key
   that can be NULL or that they may not read, rows nothing scopes though a
   lookup's options are filtered, or a table that no longer holds the key
   unique and NOT NULL. A page is decided over the description its own
@@ -240,13 +243,51 @@ existed would be documented and inert.
   says `list`, as the audit does. `routes/runtime-lists.test.ts` holds the
   route over fake ports.
 
+  A list's `filter` is the person's own conditions on its fields
+  ([0104](../../docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)): a
+  list of `{ field, op, … }`, each field once, every condition holding --
+  `{ op: 'equals', value }`, `{ op: 'range', from, to }` with either bound
+  `null` and not both, each inclusive, `{ op: 'contains', text }`, and
+  `{ op: 'null' }` or `{ op: 'not-null' }`, every value as text. What each
+  field offers is `list.filterable`, one `{ field, operators, input, days }` per
+  readable column field, from data-core's `filterOffer`: equals and
+  contains on text; equals and range on an integer, a decimal or a date;
+  range alone on a timestamp, whose bounds are days and whose range is
+  whole days, in UTC for an instant and on the wall clock for a timestamp
+  in no zone; equals on a uuid or a boolean; and null and not-null where
+  the snapshot says the column holds NULLs. `input` is what a value is
+  typed as, `null` where only null and not-null are offered, and `days`
+  whose clock a timestamp's days are on -- `utc` or `wall` -- `null` for
+  any other field, so a page says it without guessing from the control the
+  form draws. A lookup
+  field offers none -- it holds a token, not the label a person reads --
+  and neither does a field the person may not read, which a condition at
+  a time would disclose. Text equals unit for unit, as a row filter
+  compares it (0028); contains matches as the search does, a `%` or a `_`
+  as itself, folded as the search folds on each engine; text of no characters is a value, not NULL.
+  The planner spells each value as its column holds it -- a number without
+  a plus or a leading zero, a decimal padded to its scale -- and refuses
+  one the column cannot hold rather than round it. A filter narrows and
+  never permits: the read filter and the throughs still decide which rows
+  exist. A filter of another shape -- a field named twice, a property its
+  operator has not got, a range with no bound -- is 400 `malformed`; and
+  a condition `list.filterable` does not offer, a value or a bound its
+  column cannot hold, or text to find that a search would refuse, is 400
+  `not-filterable`, in a sentence that names the
+  field and never the value. No value of a filter reaches the log or the
+  audit trail. `routes/runtime-lists.test.ts` holds what reaches the port,
+  the refusals and the log over fake ports, and `e2e.integration.test.ts`
+  what a filtered list holds on both engines.
+
   `POST /v1/forms/:id/records/export` answers one CSV file of every record
-  the list would page through for the same `search`, `sort` and `parent`
-  ([0079](../../docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)),
-  under the read right a list has and no other: offered where `GET` sends
-  a `list`, and refused as a list is. Its body is those three keys and
-  nothing else (400 `malformed`). The server pages the list itself, the
-  list's own request at each offset, one guarded statement a page decided
+  the list would page through for the same `search`, `sort`, `parent` and
+  `filter`
+  ([0079](../../docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md),
+  0104), under the read right a list has and no other: offered where `GET`
+  sends a `list`, and refused as a list is, a filter it does not offer
+  `not-filterable` among them. Its body is those four keys and nothing else
+  (400 `malformed`). The server pages the list itself, the list's own
+  request -- the filter planned once -- at each offset, one guarded statement a page decided
   as a list page is, with one resolve a page per lookup field under the
   person's read filter for it, and builds the whole file before it sends
   a byte: 200 with `content-type: text/csv; charset=utf-8`,
@@ -269,9 +310,11 @@ existed would be documented and inert.
   label, a lookup as its label then its token under `<label> (key)`, each
   value as a read holds it, NULL an empty cell and `''` as `""`, after a
   byte-order mark, and a cell that starts as a formula behind one more
-  apostrophe. Audited as `export`, with `rows`, the records the file held.
-  `routes/runtime-exports.test.ts` holds the route over fake ports, and
-  `e2e.integration.test.ts` on both engines.
+  apostrophe. Audited as `export`, with `rows`, the records the file held,
+  and nothing the person sent.
+  `routes/runtime-exports.test.ts` holds the route over fake ports, the
+  filter on every page among it, and `e2e.integration.test.ts` on both
+  engines, a filtered file of two pages among it.
 
   `POST /v1/forms/:id/records/delete` deletes one record by its token and
   the version its person read, `{ record, version }` with a write id, under
@@ -988,11 +1031,12 @@ rule. It is a grant of its own, review or not: a publisher browses only if
 a role of theirs is a browse role too.
 
 **`POST /v1/connections/:id/browse`**, `{ object: { schema, name }, equal?,
-search?, sort?, offset?, limit? }`: one page of the rows of a table or view
-the connection's account can see, as that account reads them -- its grants
-and row security decide which rows and columns exist, and no form, policy or
-filter stands between but the `equal` the request names. A POST, so the
-search and the values are in no URL a proxy logs. The server discovers the
+filter?, search?, sort?, offset?, limit? }`: one page of the rows of a table
+or view the connection's account can see, as that account reads them -- its
+grants and row security decide which rows and columns exist, and no form,
+policy or filter stands between but the `equal` and the `filter` the
+request names. A POST, so the search and the values are in no URL a proxy
+logs. The server discovers the
 connection again for every page, and plans it over that snapshot
 (`planBrowse` in data-core), so the object, its columns and its key are the
 catalog's names, never the body's. The answer
@@ -1017,12 +1061,25 @@ follow, from a snapshot). Each column is one the page shows, of a key kind
 hold; the values are bound as a child form's parent is, and NULL is no
 value. Left out, nothing narrows the page.
 
+`filter` is a person's own conditions on the page's columns (0104), a
+form's list's `filter` by `column` instead of by field: a list of
+`{ column, op, … }`, each column once, every condition holding, each
+operator one data-core's `filterOffer` offers that column -- its kind's,
+and `null` and `not-null` where the snapshot says it holds NULLs -- and
+meaning what it means in a list (*The runtime plane*, above), its values
+spelled as the column holds them before anything is bound. Left out,
+nothing filters the page. The studio asks `filterOffer` of each column
+it shows; the answer carries no offer of its own.
+
 Refusals: 400 for a body of another shape, a NULL in `equal` or a column
-named twice in it among them (`malformed`), a sort by a column the page
-does not show (`not-sortable`), an `equal` naming a column the page does
-not show or one of another kind, or a value its column cannot hold
-(`not-comparable`, whose sentence names the
-column and never the value), or a search with no text or number column
+named twice in it or in `filter` among them (`malformed`), a sort by a
+column the page does not show (`not-sortable`), an `equal` naming a
+column the page does not show or one of another kind, or a value its
+column cannot hold (`not-comparable`, whose sentence names the column and
+never the value), a condition on a column the page does not show, one
+its column does not offer, or a value or a bound its column cannot hold
+(`not-filterable`, whose sentence names the column and never the value),
+or a search with no text or number column
 (`not-searchable`); 403 `browse-role-required`, before the body is read,
 for a caller without a browse role, and `nothing-readable` for an object
 with no column to show; 404 `unknown-object` for one the snapshot does not
@@ -1039,14 +1096,17 @@ foreign key's referring columns, which neither engine indexes by itself,
 may read the whole table; not measured either. The audit event, operation
 `browse`, names the connection and `object`, the table or view as
 `schema.name` once the snapshot holds it, and never the search, the sort,
-an `equal`'s values, a row or how many.
+an `equal`'s values, a filter, a row or how many. A filter on a column
+no index leads with may read the whole table, as a search may; not
+measured.
 
 `src/routes/admin-browse.test.ts` holds who may browse, what reaches the
-records port, an `equal` included, the refusals and the trail;
-`src/browse-roles.test.ts` the setting; and both adapters'
+records port, an `equal` and a filter included, the refusals and the
+trail; `src/browse-roles.test.ts` the setting; `src/e2e.integration.test.ts`
+a filtered browse on both engines; and both adapters'
 `list.integration.test.ts` what a browse reads on each engine, the shared
 `browse:` cases, `browse: follows` a row followed through a composite
-foreign key either way.
+foreign key either way, and the `column filter:` cases.
 
 ## Licence
 

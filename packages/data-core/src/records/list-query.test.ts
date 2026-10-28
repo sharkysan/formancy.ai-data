@@ -12,20 +12,24 @@ describe('validateListQuery', () => {
   // A grid opening sends almost nothing; what it leaves out is the first
   // page in key order, of the largest page the server serves.
   test('fills what a body leaves out, and returns a fresh query', () => {
-    expect(validateListQuery({})).toEqual({ ok: true, query: { search: '', sort: [], parent: null, offset: 0, limit: LIST_PAGE_SIZE } })
-    const body = { search: ' Muster ', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, offset: 50, limit: 25 }
+    expect(validateListQuery({})).toEqual({ ok: true, query: { search: '', sort: [], parent: null, filter: [], offset: 0, limit: LIST_PAGE_SIZE } })
+    const body = { search: ' Muster ', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'name', op: 'contains', text: ' AG ' }], offset: 50, limit: 25 }
     const checked = validateListQuery(body)
-    expect(checked).toEqual({ ok: true, query: { search: 'Muster', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, offset: 50, limit: 25 } })
+    expect(checked).toEqual({
+      ok: true,
+      query: { search: 'Muster', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'name', op: 'contains', text: 'AG' }], offset: 50, limit: 25 },
+    })
     if (checked.ok) {
       expect(checked.query.sort[0]).not.toBe(body.sort[0])
       expect(checked.query.parent).not.toBe(body.parent)
+      expect(checked.query.filter[0]).not.toBe(body.filter[0])
     }
     expect(validateListQuery({ parent: null })).toMatchObject({ ok: true, query: { parent: null } })
   })
 
   // A property ignored today is one somebody reads tomorrow: a `filters` or
   // a `columns` in a body must not reach a planner that may one day look.
-  test('refuses anything but an object of the five properties', () => {
+  test('refuses anything but an object of the six properties', () => {
     for (const body of [null, 'x', [], { filters: [] }, { search: '', columns: ['tenant_id'] }]) {
       expect(validateListQuery(body), JSON.stringify(body)).toMatchObject({ ok: false, code: 'malformed' })
     }
@@ -71,10 +75,10 @@ describe('validateExportQuery', () => {
   // let whoever still holds the body change what was checked after the
   // check passed.
   test('fills what a body leaves out, and returns a fresh query', () => {
-    expect(validateExportQuery({})).toEqual({ ok: true, query: { search: '', sort: [], parent: null } })
-    const body = { search: ' Muster ', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' } }
+    expect(validateExportQuery({})).toEqual({ ok: true, query: { search: '', sort: [], parent: null, filter: [] } })
+    const body = { search: ' Muster ', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'paid', op: 'null' }] }
     const checked = validateExportQuery(body)
-    expect(checked).toEqual({ ok: true, query: { search: 'Muster', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' } } })
+    expect(checked).toEqual({ ok: true, query: { search: 'Muster', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'paid', op: 'null' }] } })
     if (checked.ok) {
       expect(checked.query.sort[0]).not.toBe(body.sort[0])
       expect(checked.query.parent).not.toBe(body.parent)

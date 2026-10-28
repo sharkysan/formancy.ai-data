@@ -157,13 +157,15 @@ async function made(steps: ExportRouteSteps, making: Making, header: string): Pr
 
 /**
  * `POST /v1/forms/:id/records/export` (0079): one CSV file of every record
- * a list would page through for the same search, sort and parent, under
- * the read right a list has and no other -- `listable` decides.
+ * a list would page through for the same search, sort, parent and filter
+ * (0104), under the read right a list has and no other -- `listable`
+ * decides.
  *
  * Everything the policy decides is decided first, before any statement and
- * before the gate: the body, the plan, the file's columns and every
- * lookup's read filter, whose refusal refuses the file where the grid
- * would show tokens. Then one export at a time per connection in this
+ * before the gate: the body, the plan -- the person's filter among it,
+ * planned once and carried by every page's request -- the file's columns
+ * and every lookup's read filter, whose refusal refuses the file where the
+ * grid would show tokens. Then one export at a time per connection in this
  * server (`export-busy`), so an export holds at most one of the pool's
  * connections, and that only while a page runs.
  *

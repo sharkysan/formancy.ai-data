@@ -1,0 +1,134 @@
+/* ------------------------------------------------------------- the filter
+ *
+ * A grid's filter panel (0104, filter-panel.tsx): a row of its own in the
+ * grid's toolbar, under the search -- Filter, the conditions applied, and
+ * when open the panel's controls. Room variables and color-mix() of them
+ * only; every rule names a class of the panel's own, so nothing here selects
+ * inside .sheet or .grid-bench.
+ */
+
+.filter-block {
+  display: grid;
+  flex: 1 1 100%;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.filter-block > .disclosure {
+  justify-self: start;
+}
+
+/* Field, Condition and the value side by side where they fit, each down to
+   its own row on a phone, and Apply after them. An outlined group: glass is
+   never nested in glass. */
+.filter-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.25rem 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+}
+
+.filter-form .field {
+  flex: 1 1 10rem;
+  margin: 0;
+}
+
+/* As the page's inputs are drawn (controls.css), and 1rem, so a phone does
+   not zoom on focus. */
+.filter-form select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--edge-strong);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ground) 60%, transparent);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.filter-form select:focus-visible {
+  outline: 2px solid var(--server);
+  outline-offset: 2px;
+  border-color: var(--client);
+}
+
+.filter-form input {
+  font-size: 1rem;
+}
+
+.filter-form .button {
+  flex: none;
+}
+
+.filter-hint,
+.filter-problem {
+  flex: 1 0 100%;
+  margin: 0;
+}
+
+/* Why a draft is no condition yet: there before it speaks, out of the flow
+   while it says nothing, as Download CSV's line is (records.css). */
+.filter-problem:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* What is applied: each condition, violet as what the person chose, with
+   its own Remove, then Clear filter. A long value wraps inside its own
+   condition rather than widening the panel. */
+.filter-active {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+  min-width: 0;
+}
+
+.filter-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.filter-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.filter-terms li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  max-width: 100%;
+  padding-inline-start: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--client) 55%, transparent);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+}
+
+.filter-terms li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.filter-terms .button,
+.filter-active > .button {
+  flex: none;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+}

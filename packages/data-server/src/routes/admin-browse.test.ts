@@ -26,8 +26,9 @@ const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial
   name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
 })
 
-/** Planted where an event must never look: a search, and a value a row holds. */
+/** Planted where an event must never look: a search, a filter's value, and a value a row holds. */
 const SEARCH = 'search-marker-31f0'
+const FILTERED = 'filter-marker-9a64'
 const VALUE = 'value-marker-c4d2'
 
 const SNAPSHOT = createSnapshot({
@@ -206,6 +207,51 @@ describe('a page', () => {
     expect(requests).toEqual([])
   })
 
+  // A person's own conditions on the columns (0104) reach the port as `columnFilter` plans each: the column the server's snapshot names, the text a contains finds trimmed, a number spelled as the column reads it back. Watched failing with the route planning the body's query with its filter dropped.
+  test('filtered by its columns, reaches the port with each condition as the planner spells it', async () => {
+    const server = await serve()
+    const response = await browse(server, 'browser', {
+      ...EMPLOYEE,
+      filter: [
+        { column: 'name', op: 'contains', text: ' Ad ' },
+        { column: 'id', op: 'range', from: '+02', to: '0010' },
+      ],
+    })
+    expect(response.statusCode, response.body).toBe(200)
+    expect(requests[0]?.filter).toEqual([
+      { op: 'contains', column: 'name', type: TEXT, text: 'Ad' },
+      { op: 'range', column: 'id', type: INT32, from: '2', to: '10', before: null },
+    ])
+    expect(requests[0]?.filters).toEqual({ kind: 'unrestricted' })
+  })
+
+  // A condition a column does not offer would make the adapter's own check throw, or compare what the column cannot hold: refused 400 `not-filterable` before the page's statement, in the planner's sentence, which names the column and never the value. Watched failing with `not-filterable` left out of the route's statuses: each was a 500.
+  test.each([
+    ['a column the page does not show', { column: 'photo', op: 'null' }, 'photo is not a column of sales.employee this page shows.'],
+    ['an operator its kind has not got', { column: 'id', op: 'contains', text: '7' }, 'id offers no contains condition.'],
+    ['NULL on a column that holds none', { column: 'name', op: 'null' }, 'name offers no null condition.'],
+    ['a value its column cannot hold', { column: 'id', op: 'equals', value: 'two-98765' }, 'A value given for id is not one it can hold.'],
+  ])('filtered by %s is 400 not-filterable, and nothing is read', async (_, condition, message) => {
+    const server = await serve()
+    const response = await browse(server, 'browser', { ...EMPLOYEE, filter: [condition] })
+    expect({ status: response.statusCode, body: response.json() }).toEqual({ status: 400, body: { code: 'not-filterable', message } })
+    expect(response.body).not.toContain('98765')
+    expect(requests).toEqual([])
+  })
+
+  // A filter of another shape is the body's fault, refused with it before the discovery: a column named twice, an operator outside the closed set, a property its operator has not got.
+  test.each([
+    [[{ column: 'name', op: 'equals', value: 'a' }, { column: 'name', op: 'contains', text: 'b' }]],
+    [[{ column: 'name', op: 'like', value: 'A%' }]],
+    [[{ column: 'id', op: 'null', value: '1' }]],
+    [{ column: 'name', op: 'null' }],
+  ])('a filter of another shape is 400 malformed, and nothing is read: %j', async (filter) => {
+    const server = await serve()
+    const response = await browse(server, 'browser', { ...EMPLOYEE, filter })
+    expect([response.statusCode, response.json().code]).toEqual([400, 'malformed'])
+    expect(requests).toEqual([])
+  })
+
   // A body checked after the discovery would cost a catalog read for a request that was never going to run.
   test('a malformed body is 400 before the connection is opened', async () => {
     const server = await serve()
@@ -230,14 +276,17 @@ describe('a page', () => {
 })
 
 describe('the trail', () => {
-  // Who read which table is what an operator asks after the fact; the search and the rows are business data the trail must never copy.
-  test('names the connection and the object, never the search or a value', async () => {
+  // Who read which table is what an operator asks after the fact; the search, a filter's values and the rows are business data the trail must never copy, whether the page was read or its filter refused.
+  test('names the connection and the object, never the search, a filter or a value', async () => {
     const server = await serve()
-    await browse(server, 'browser', { ...EMPLOYEE, search: SEARCH })
+    await browse(server, 'browser', { ...EMPLOYEE, search: SEARCH, filter: [{ column: 'name', op: 'equals', value: FILTERED }] })
+    await browse(server, 'browser', { ...EMPLOYEE, filter: [{ column: 'id', op: 'equals', value: FILTERED }] })
     expect(events).toEqual([
       { at: 't', plane: 'admin', actor: 'b', operation: 'browse', connection: 'erp', form: null, formVersion: null, expectedBase: null, restoredFrom: null, draft: null, object: 'sales.employee', status: 200, outcome: 'ok' },
+      { at: 't', plane: 'admin', actor: 'b', operation: 'browse', connection: 'erp', form: null, formVersion: null, expectedBase: null, restoredFrom: null, draft: null, object: 'sales.employee', status: 400, outcome: 'not-filterable' },
     ])
     expect(JSON.stringify(events)).not.toContain(SEARCH)
+    expect(JSON.stringify(events)).not.toContain(FILTERED)
     expect(JSON.stringify(events)).not.toContain(VALUE)
   })
 

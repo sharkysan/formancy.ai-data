@@ -37,6 +37,9 @@ import { DRIVER_FACTORIES } from './drivers.js'
  * and as data a spreadsheet does not run; and on SQL Server, text UTF-8
  * cannot carry refused.
  *
+ * Then a person's filter (0104): a list, a file and a browse narrowed in
+ * the database to the rows every condition holds for, and no further.
+ *
  * Then again through the order form's own account, formancy_writer (0027):
  * what it may not UPDATE is written on create only, and the policy on
  * customer shows it tenant 1's rows only, whoever the clerk is.
@@ -118,8 +121,10 @@ beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'formancy-data-e2e-'))
   const store = createFileConfigurationStore(root)
   const verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: SECRET }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: 'tid' } })
-  // The administrator's trail is admin-audit.test.ts's subject; here it is required and discarded.
-  app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  // The administrator's trail is admin-audit.test.ts's subject; here it is
+  // required and discarded. Administrators browse too, for a filtered
+  // browse to be read from the databases (0099, 0104).
+  app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], browseRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
   admin = await token('admin-1', { roles: ['data-admin'] })
   clerk = await token('clerk-1', { roles: ['clerk'], tid: 1 })
   otherClerk = await token('clerk-2', { roles: ['clerk'], tid: 2 })
@@ -545,6 +550,139 @@ describe('a file of text UTF-8 cannot carry, on SQL Server alone (0079)', () => 
       await ddl.run(['delete from sales.customer where tenant_id = 1 and customer_no = 3005'])
       await ddl.close()
     }
+  })
+})
+
+/**
+ * Tenant 1's customers a filter suite inserts as the fixture's owner,
+ * beside the fixture's 1001 Muster AG, whose credit limit is the largest
+ * numeric(14,2), and tenant 2's 1001 at 0.01: a name a contains finds in
+ * another case, and one it does not find, each with a credit limit or none.
+ */
+const FILTER_CUSTOMERS = [
+  { number: '4001', name: 'muster filter ag', creditLimit: null },
+  { number: '4002', name: 'Filter GmbH', creditLimit: '5.00' },
+  { number: '4003', name: 'MUSTER Filter KG', creditLimit: '-2.50' },
+] as const
+
+/**
+ * More of tenant 1's customers, `Filter page 01` to `Filter page 60`,
+ * numbered 4101 to 4160, none with a credit limit: a filter that keeps
+ * more than one page of a list of them, and leaves some out.
+ */
+const FILTER_PAGED = Array.from({ length: 60 }, (_, index) => ({ number: String(4101 + index), name: `Filter page ${String(index + 1).padStart(2, '0')}` }))
+
+type Listed = Awaited<ReturnType<typeof everyListed>>[number]
+
+describe.each([
+  { engine: 'PostgreSQL', connection: 'pg' as const },
+  { engine: 'SQL Server', connection: 'ms' as const },
+])("a person's filter on $engine (0104)", ({ connection }) => {
+  const customers = `${connection}-filter-customer`
+  const literal = (text: string) => `${connection === 'ms' ? 'N' : ''}'${text.replaceAll("'", "''")}'`
+  let ddl: Awaited<ReturnType<typeof owner>> | undefined
+
+  beforeAll(async () => {
+    ddl = await owner(connection)
+    await published(connection, customers, CUSTOMERS, customerPolicy)
+    await ddl.run([
+      ...FILTER_CUSTOMERS.map((row) => `insert into sales.customer (tenant_id, customer_no, name, credit_limit) values (1, ${row.number}, ${literal(row.name)}, ${row.creditLimit ?? 'null'})`),
+      `insert into sales.customer (tenant_id, customer_no, name) values ${FILTER_PAGED.map((row) => `(1, ${row.number}, ${literal(row.name)})`).join(', ')}`,
+    ])
+  })
+
+  afterAll(async () => {
+    await ddl?.run([`delete from sales.customer where tenant_id = 1 and (customer_no in (${FILTER_CUSTOMERS.map((row) => row.number).join(', ')}) or customer_no between 4101 and 4160)`])
+    await ddl?.close()
+  })
+
+  const numbers = (rows: readonly Listed[]) => rows.map((row) => String(row.answers['customer_no']))
+  const named = (row: Listed) => String(row.answers['name']).toLowerCase().includes('muster')
+  const limited = (row: Listed) => row.answers['credit_limit'] !== null
+  const NAMED = { field: 'name', op: 'contains', text: ' MuStEr ' }
+  const LIMITED = { field: 'credit_limit', op: 'not-null' }
+
+  // A filter narrows in the database, through the same planner and the
+  // same statement a page is read with: each condition keeps exactly the
+  // customers it holds for, read here from the unfiltered list through
+  // the same server, so the expectation is the database's own rows; each
+  // leaves out one the other keeps; both together keep only what each
+  // does. A value spelled otherwise than its column holds it is spelled so
+  // by the server, and a range keeps its bounds. And the filter narrows
+  // and never permits: tenant 2's clerk, filtering alike, is listed none
+  // of tenant 1's customers. Watched failing on both engines with the
+  // list route planning the body's query with its filter dropped: every
+  // filtered list was the unfiltered one.
+  test('a filtered list holds only the customers every condition holds for', async () => {
+    const every = await everyListed(customers, clerk)
+    const byName = numbers(await everyListed(customers, clerk, { filter: [NAMED] }))
+    const byLimit = numbers(await everyListed(customers, clerk, { filter: [LIMITED] }))
+    const both = numbers(await everyListed(customers, clerk, { filter: [NAMED, LIMITED] }))
+    expect(byName).toEqual(numbers(every.filter(named)))
+    expect(byLimit).toEqual(numbers(every.filter(limited)))
+    expect(both).toEqual(numbers(every.filter((row) => named(row) && limited(row))))
+    expect(both).toEqual(['1001', '4003'])
+    expect([byName.filter((number) => !both.includes(number)), byLimit.filter((number) => !both.includes(number))]).toEqual([['4001'], ['4002']])
+
+    expect(numbers(await everyListed(customers, clerk, { filter: [{ field: 'customer_no', op: 'equals', value: ' +04002 ' }] }))).toEqual(['4002'])
+    const ranged = await everyListed(customers, clerk, { filter: [{ field: 'credit_limit', op: 'range', from: '-2.5', to: '5' }] })
+    expect(numbers(ranged)).toEqual(numbers(every.filter((row) => limited(row) && Number(row.answers['credit_limit']) >= -2.5 && Number(row.answers['credit_limit']) <= 5)))
+    expect(numbers(ranged)).toEqual(['4002', '4003'])
+
+    const theirs = await everyListed(customers, otherClerk, { filter: [NAMED] })
+    expect(theirs.filter((row) => String(row.answers['tenant_id']) !== '2')).toEqual([])
+  })
+
+  // A file under a filter is every page of that filtered list, exactly,
+  // in its order (0079, 0104): the same planner, the same conditions on
+  // every page the server reads for it -- here two, fifty-five customers
+  // of the sixty a name finds, the range leaving five out and the name
+  // every other. Watched failing on both engines with the export planning
+  // the body's query with its filter dropped: the file held every
+  // customer of tenant 1; and with the filter dropped from every page
+  // after the first: the file was refused 409, its second page repeating
+  // records of the first.
+  test("the same filter's file is every page of that list, exactly", async () => {
+    const filter = [{ field: 'name', op: 'contains', text: 'filter page' }, { field: 'customer_no', op: 'range', from: null, to: '4155' }]
+    const file = await exported(customers, clerk, { filter })
+    expect([file.status, file.type]).toEqual([200, 'text/csv; charset=utf-8'])
+    const listed = numbers(await everyListed(customers, clerk, { filter }))
+    expect(cellsUnder(csvCells(file.text), 'Customer no')).toEqual(listed)
+    expect(listed).toEqual(FILTER_PAGED.slice(0, 55).map((row) => row.number))
+    expect(listed.length).toBeGreaterThan(50)
+    const named = csvCells((await exported(customers, clerk, { filter: [NAMED, LIMITED] })).text)
+    expect(cellsUnder(named, 'Customer no')).toEqual(numbers(await everyListed(customers, clerk, { filter: [NAMED, LIMITED] })))
+  })
+
+  // A browse is filtered as a list is, by column, as the connection's
+  // account reads the table (0099, 0104): the rows each condition holds
+  // for, read here from the unfiltered pages through the same route --
+  // a range keeping tenant 2's customer too, a tenant keeping customers
+  // with no credit limit or a negative one, and both together only what
+  // each keeps. Watched failing on both engines with the browse route
+  // planning the body's query with its filter dropped.
+  test('a filtered browse holds only the rows every condition holds for', async () => {
+    const browsed = async (filter: readonly unknown[]): Promise<Array<Record<string, string | null>>> => {
+      const rows: Array<Record<string, string | null>> = []
+      for (let offset = 0; ; offset += 50) {
+        const page = await call('POST', `/v1/connections/${connection}/browse`, admin, { object: { schema: 'sales', name: 'customer' }, filter, offset })
+        expect(page.statusCode, page.body).toBe(200)
+        rows.push(...(page.json().rows as typeof rows))
+        if (page.json().hasMore !== true) return rows
+      }
+    }
+    const key = (row: Record<string, string | null>) => `${String(row['tenant_id'])},${String(row['customer_no'])}`
+    const every = await browsed([])
+    const positive = (row: Record<string, string | null>) => row['credit_limit'] !== null && Number(row['credit_limit']) >= 0
+    const ours = (row: Record<string, string | null>) => row['tenant_id'] === '1'
+    const RANGE = { column: 'credit_limit', op: 'range', from: '0', to: null }
+    const TENANT = { column: 'tenant_id', op: 'equals', value: '1' }
+    expect((await browsed([RANGE])).map(key)).toEqual(every.filter(positive).map(key))
+    expect((await browsed([TENANT])).map(key)).toEqual(every.filter(ours).map(key))
+    const both = (await browsed([RANGE, TENANT])).map(key)
+    expect(both).toEqual(every.filter((row) => positive(row) && ours(row)).map(key))
+    expect(both).toEqual(['1,1001', '1,4002'])
+    expect(every.filter(positive).map(key)).toContain('2,1001')
   })
 })
 

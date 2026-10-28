@@ -1,25 +1,24 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReactElement, ReactNode, RefObject } from 'react'
-import type { DataClient, PublishedForm } from '@formancy/data-client'
+import type { DataClient, ListFilterTerm, PublishedForm } from '@formancy/data-client'
 import { DownloadCsv } from './download.js'
+import { FilterPanel } from './filter-panel.js'
+import { panelFields } from './filter-terms.js'
+import { listed } from './grid-datasource.js'
 import type { GridColumn } from './grid-datasource.js'
 import { RecordGrid } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt, RowDelete } from './record-grid.js'
 
-/** `['Order number', 'Status', 'Notes']` as "Order number, Status and Notes". */
-function listed(words: readonly string[]): string {
-  return words.length < 2 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${String(words.at(-1))}`
-}
-
 /**
  * The Records panel (UX-SPEC §5.8): its heading, New record when the person
  * may create and Download CSV where the definition says the records can be
- * listed (0080), the search, and the grid with its pager. A search is
- * submitted with the Search button or Enter, never per keystroke, and the
- * hint names the fields it looks in -- the server's `list.searchable`, by
- * their labels. No search form when nothing is searchable. A file is of
- * what the grid lists: the search submitted, never what the box holds, and
- * the grid's sort.
+ * listed (0080), the search, the filter, and the grid with its pager. A
+ * search is submitted with the Search button or Enter, never per keystroke,
+ * and the hint names the fields it looks in -- the server's
+ * `list.searchable`, by their labels. No search form when nothing is
+ * searchable, and no filter panel when nothing is filterable (0104). A file
+ * is of what the grid lists: the search submitted, never what the box
+ * holds, the filter applied, and the grid's sort.
  */
 export function Records({
   client,
@@ -67,8 +66,11 @@ export function Records({
   drilling: boolean
 }): ReactElement {
   const [typed, setTyped] = useState(search)
+  /** The filter as applied: the grid's and the file's, for this form, which mounts the panel again (form-view.tsx). */
+  const [filter, setFilter] = useState<ListFilterTerm[]>([])
   const labels = new Map(columns.map((column) => [column.key, column.label]))
   const searchable = (definition.list?.searchable ?? []).map((key) => labels.get(key) ?? key)
+  const filterable = useMemo(() => panelFields(definition), [definition])
 
   const searchBlock =
     searchable.length === 0 ? null : (
@@ -105,7 +107,7 @@ export function Records({
             New record
           </button>
         ) : null}
-        {definition.list === null ? null : <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort: grid.current?.sort() ?? [], parent: null })} />}
+        {definition.list === null ? null : <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort: grid.current?.sort() ?? [], parent: null, filter })} />}
       </div>
       <RecordGrid
         ref={grid}
@@ -116,9 +118,15 @@ export function Records({
         labelledBy="records-heading"
         parent={null}
         search={search}
+        filter={filter}
         openToken={openToken}
         canCreate={canCreate}
-        toolbarStart={searchBlock}
+        toolbarStart={
+          <>
+            {searchBlock}
+            {filterable.length === 0 ? null : <FilterPanel idBase="records-filter" fields={filterable} filter={filter} onFilter={setFilter} />}
+          </>
+        }
         refit={refit}
         bench="master-bench"
         {...(remove === undefined ? {} : { remove })}

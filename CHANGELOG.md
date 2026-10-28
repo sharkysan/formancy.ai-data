@@ -64,6 +64,47 @@ later.
     key's columns, which neither engine indexes by itself; not measured.
     The trail lives in the page, and a reload loses it. The audit event is
     a browse's, naming the object and never a value.
+- **A form's list, its file and a browse are filtered by a person's own
+  conditions on their columns, in the host's grids and the studio's Browse
+  step** (0104). Why: a search matches its text in every text and integer
+  column at once, so it finds "Muster" and cannot find last month's orders,
+  the customers with no credit limit or the shipments over a weight; those
+  are what a person asks of a grid, and the answer was a database client.
+  What you notice:
+  - **`POST /v1/forms/:id/records/list` and `…/export` take `filter`**, a
+    list of `{ field, op, … }`, and `POST /v1/connections/:id/browse` one
+    of `{ column, op, … }`: `equals` with a `value`, `range` with a `from`
+    and a `to`, either `null`, `contains` with a `text`, `null` and
+    `not-null`. Every condition must hold, beside the search, the parent or
+    a follow, and inside the policy's row filters: a filter narrows and
+    never permits. Left out, nothing filters, as before.
+  - **`GET /v1/forms/:id`'s `list` has `filterable`**, each field a person
+    may filter by with its operators, what a value is typed as and, for a
+    timestamp, whose clock its days are on (`days`: `utc` or `wall`). A field
+    the person may not read and a lookup field are never there; a float, a
+    time, binary and a rowversion offer only empty or not.
+  - **A condition not offered, or a value its column cannot hold, is 400
+    `not-filterable`**, naming the field or column and never the value. A
+    value is spelled as its column holds it -- a decimal padded to its
+    scale, a uuid lowercased -- and refused rather than rounded: `10.005`
+    on a column of two decimals is refused.
+  - **Text equals exactly on both engines**, as a policy's row filter does:
+    `muster ag` does not find `Muster AG` even under SQL Server's
+    case-insensitive default, and `contains` is how to find it. A
+    timestamp offers no equality, only a range of whole days, in UTC for an
+    instant, on the wall clock for a timestamp in no zone.
+  - **The file holds what the filtered grid lists**: Download CSV sends the
+    grid's filter.
+  - **`@formancy/data-client` refuses a form whose `list` has no
+    `filterable`**, `unexpected`, as it refuses one with no `deleting`:
+    upgrade the server before a host's client. It re-exports the filter's
+    types.
+  - Values travel in the body of a POST, never a URL, and no log line or
+    audit event holds one. A filter is kept in no address: a reload,
+    another form or another parent starts without one. No plan is
+    measured; on SQL Server a `datetime` or `smalldatetime` column is
+    converted to `datetime2` to meet a day's bound, which may keep its
+    index from being sought.
 
 ### Changed
 

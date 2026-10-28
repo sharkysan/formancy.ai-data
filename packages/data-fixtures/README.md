@@ -335,15 +335,38 @@ the one where the engines answer differently, `moved-parent`, included, each
 `LIST_PARITY` case (0044), each `DELETE_PARITY` case and
 `update: recreated` (0050), each `CASCADE_PARITY` case (0051), and each
 `UUID_PARITY` case (0056), `order` included, whose expectation is each
-engine's own order, and each `EXPORT_PARITY` case (0079), a file's bytes.
+engine's own order, each `EXPORT_PARITY` case (0079), a file's bytes,
+each `BROWSE_PARITY` case (0099, 0103), and each `COLUMN_FILTER_PARITY`
+case ([0104](../../docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 The ids are derived from the shared data --
 `filterCase(entry)`, `displayCase(column)`, `temporalCase(column)`,
 `refusalCase(name)`, `edgeCase(name)`,
 `shipmentCase('first')`, `driftingCase(name)`, `throughCase(name)`,
 `listCase(name)`, `deleteCase(name)`, `UPDATE_RECREATED_CASE`,
 `cascadeCase(name)`, `uuidCase(name)`, `exportCase(name)`,
+`browseCase(name)`, `columnFilterCase(name)`,
 `MODEL_CASES.owner` -- so no test
 types one.
+
+`COLUMN_FILTER_PARITY` is what a person's own conditions on a list's or a
+browse's columns narrow it to (0104), on the rows `COLUMN_FILTER_ROWS`
+gives known values after `LIST_ROWS`: tenant 1's customers updated to a
+`created_at` -- some written in another offset than UTC -- and an
+`active`, and tenant `COLUMN_FILTER_TENANT`'s shipments inserted with a
+reference, a uuid and a zoneless `dispatched_at`. Each request is planned
+by `planList` or `planBrowse`, so what both list suites prove is the
+planner and the adapter together: text equal exactly, case and a trailing
+space counting, and under the parity schema's case-insensitive collation
+the very rows `FILTER_PARITY`'s row filter of the value admits, derived
+from it; an integer, a decimal typed `50` for a `numeric(14, 2)`, a
+boolean, a uuid typed in upper case and a date; ranges holding the rows on
+their bounds; a day range on an instant and on a zoneless timestamp, where
+the last millisecond of the last day is inside and the next midnight
+outside; a literal, case-folded contains; NULL and not NULL; and
+conditions together, beside a search, beside a parent and beside a
+follow. `column-filters.test.ts` works the instants' days, the zoneless
+days and the customer cases out from the rows themselves, and fails a
+`together` entry with a condition that leaves no customer out.
 
 `DRIFTING` is the table of changes to a form's own table after it was
 published ([0041](../../docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)):

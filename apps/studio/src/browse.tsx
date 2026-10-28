@@ -1,18 +1,22 @@
 import { useRef, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
-import { browseRelations, LIST_PAGE_SIZE } from '@formancy/data-core'
-import type { ApiValue, BrowseEqualTerm, BrowseRelations, BrowseSortTerm, MetadataSnapshot, ObjectRef, OmittedColumn } from '@formancy/data-core'
+import { browseRelations, findObject, LIST_PAGE_SIZE } from '@formancy/data-core'
+import type { ApiValue, BrowseEqualTerm, BrowseFilterTerm, BrowseRelations, BrowseSortTerm, MetadataSnapshot, ObjectRef, OmittedColumn } from '@formancy/data-core'
 import type { BrowseAnswer } from '@formancy/data-server'
 import type { AdminClient } from './api.js'
+import { FilterPanel, filterables, sayCondition } from './browse-filter.js'
+import type { Filterable } from './browse-filter.js'
 import { describeRef } from './choice.js'
 import { useFocusAfterRender } from './focus.js'
 import { KeyHints, Related, sayTerms } from './related.js'
 
-/** What the page on screen was asked for, so the next and previous pages, a sort and a Back ask for the same object, values and search. */
+/** What the page on screen was asked for, so the next and previous pages, a sort and a Back ask for the same object, values, filter and search. */
 interface Asked {
   object: ObjectRef
   /** The columns and values the page is narrowed to: a follow's (0103), and `[]` for a page Show rows asked for. */
   equal: BrowseEqualTerm[]
+  /** The person's own conditions on the page's columns (0104): `[]` for a page Show rows or a follow asked for. */
+  filter: BrowseFilterTerm[]
   search: string
   sort: BrowseSortTerm | null
   offset: number
@@ -22,8 +26,8 @@ interface Asked {
  * What a page that arrives does to the way back: Show rows starts a new
  * trail; a follow adds the page it left, and Back takes off the page it
  * returns to, each of them `moved`, which puts the selector, the search
- * box and the keyboard on the page reached. A page or a sort is `null`,
- * and keeps the trail as it is.
+ * box and the keyboard on the page reached. A page, a sort or a filter is
+ * `null`, and keeps the trail as it is.
  */
 type Move = { trail: Asked[]; moved: boolean } | null
 
@@ -43,9 +47,14 @@ function nextSort(current: BrowseSortTerm | null, column: string): BrowseSortTer
   return { column, direction: current?.column === column && current.direction === 'asc' ? 'desc' : 'asc' }
 }
 
-/** How the status line begins: what narrows the page -- a follow's values, then a search -- before what it shows. */
+/** How the status line begins: what narrows the page -- a follow's values, then the filter, then a search -- before what it shows. */
 function narrowedBy(asked: Asked): string {
-  const lead = [...(asked.equal.length === 0 ? [] : [`where ${sayTerms(asked.equal)}`]), ...(asked.search === '' ? [] : [`matching “${asked.search}”`]), 'showing'].join(', ')
+  const lead = [
+    ...(asked.equal.length === 0 ? [] : [`where ${sayTerms(asked.equal)}`]),
+    ...(asked.filter.length === 0 ? [] : [`filtered by ${asked.filter.map(sayCondition).join(' and ')}`]),
+    ...(asked.search === '' ? [] : [`matching “${asked.search}”`]),
+    'showing',
+  ].join(', ')
   return `${lead.charAt(0).toUpperCase()}${lead.slice(1)}`
 }
 
@@ -55,6 +64,13 @@ function narrowedBy(asked: Asked): string {
  * time, with a search and a sort by any column the page shows; and a row's
  * foreign keys followed either way (0103), each follow a browse of the
  * other end narrowed to the row's values, with a Back to the page it left.
+ * A page is filtered by the person's own conditions on its columns (0104),
+ * which paging and sorting keep. Show rows asks for what its form says and
+ * nothing of the page on screen, so it drops the filter as it drops the
+ * sort; a follow starts the other end unfiltered, since the page left's
+ * conditions name its own columns; and Back returns to the page as it was
+ * asked, filter included, while the followed page's own filter goes with
+ * it.
  *
  * Read only: nothing here changes a row, and the server refuses the route
  * to anybody without a browse role, which the step list says before the
@@ -77,39 +93,45 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
   // The row on the page whose related rows are open, by its place on the page.
   const [related, setRelated] = useState<number | null>(null)
   const [refusal, setRefusal] = useState<string | null>(null)
+  // How many pages a move has reached: the filter's panel is mounted afresh for each.
+  const [visit, setVisit] = useState(0)
   const busy = useRef(false)
   const focusAfterRender = useFocusAfterRender()
 
-  async function load(asked: Asked, move: Move = null): Promise<void> {
-    if (busy.current) return
+  /** Asks for a page, and answers whether it arrived; `focus` names what takes the keyboard once it has, when the move does not. */
+  async function load(asked: Asked, move: Move = null, focus: string | null = null): Promise<boolean> {
+    if (busy.current) return false
     busy.current = true
     setRefusal(null)
-    const outcome = await client.browse(connection, { object: asked.object, equal: asked.equal, search: asked.search, sort: asked.sort === null ? [] : [asked.sort], offset: asked.offset, limit: LIST_PAGE_SIZE })
+    const outcome = await client.browse(connection, { object: asked.object, equal: asked.equal, filter: asked.filter, search: asked.search, sort: asked.sort === null ? [] : [asked.sort], offset: asked.offset, limit: LIST_PAGE_SIZE })
     busy.current = false
     if (!outcome.ok) {
       setRefusal(outcome.message)
-      return
+      return false
     }
     setShown({ asked, page: outcome.value })
     setRelated(null)
-    if (move === null) return
+    if (focus !== null) focusAfterRender(focus)
+    if (move === null) return true
     setTrail(move.trail)
-    if (!move.moved) return
+    setVisit((count) => count + 1)
+    if (!move.moved) return true
     setChosen(describeRef(asked.object))
     setSearch(asked.search)
     focusAfterRender('browsed-heading')
+    return true
   }
 
   function submit(event: FormEvent): void {
     event.preventDefault()
     const object = snapshot.objects.find((candidate) => describeRef(candidate.ref) === chosen)
     if (object === undefined) return
-    void load({ object: object.ref, equal: [], search: search.trim(), sort: null, offset: 0 }, { trail: [], moved: false })
+    void load({ object: object.ref, equal: [], filter: [], search: search.trim(), sort: null, offset: 0 }, { trail: [], moved: false })
   }
 
   function follow(object: ObjectRef, equal: BrowseEqualTerm[]): void {
     if (shown === null) return
-    void load({ object, equal, search: '', sort: null, offset: 0 }, { trail: [...trail, shown.asked], moved: true })
+    void load({ object, equal, filter: [], search: '', sort: null, offset: 0 }, { trail: [...trail, shown.asked], moved: true })
   }
 
   function back(): void {
@@ -160,9 +182,11 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
           asked={shown.asked}
           page={shown.page}
           relations={browseRelations(snapshot, shown.page.object)}
+          filterables={filterables(findObject(snapshot, shown.page.object), shown.page.columns)}
+          visit={visit}
           related={related}
           back={trail.at(-1)?.object ?? null}
-          onLoad={(asked) => void load(asked)}
+          onLoad={(asked, focus) => load(asked, null, focus ?? null)}
           onRelated={(index) => setRelated((open) => (open === index ? null : index))}
           onFollow={follow}
           onBack={back}
@@ -177,11 +201,16 @@ interface PageProps {
   page: BrowseAnswer
   /** The keys a row of this object can be followed through, from the studio's discovery. */
   relations: BrowseRelations
+  /** What each column the page shows offers a filter, from the studio's discovery. */
+  filterables: Filterable[]
+  /** How many pages a move has reached, which mounts the filter's panel afresh. */
+  visit: number
   /** The row whose related rows are open, by its place on the page. */
   related: number | null
   /** The object of the page a follow left, which Back returns to. */
   back: ObjectRef | null
-  onLoad: (asked: Asked) => void
+  /** Asks for a page, and answers whether it arrived; `focus` names what takes the keyboard once it has. */
+  onLoad: (asked: Asked, focus?: string) => Promise<boolean>
   onRelated: (index: number) => void
   onFollow: (object: ObjectRef, equal: BrowseEqualTerm[]) => void
   onBack: () => void
@@ -189,10 +218,11 @@ interface PageProps {
 
 /**
  * One page on screen: the way back, what narrows it, what it leaves out and
- * how it is ordered, the rows -- each with its related rows, where its
- * object has a key to follow -- and the way to the next and previous pages.
+ * how it is ordered, its filter, the rows -- each with its related rows,
+ * where its object has a key to follow -- and the way to the next and
+ * previous pages.
  */
-function Page({ asked, page, relations, related, back, onLoad, onRelated, onFollow, onBack }: PageProps): ReactElement {
+function Page({ asked, page, relations, filterables, visit, related, back, onLoad, onRelated, onFollow, onBack }: PageProps): ReactElement {
   const name = describeRef(page.object)
   const first = asked.offset + 1
   const last = asked.offset + page.rows.length
@@ -226,6 +256,8 @@ function Page({ asked, page, relations, related, back, onLoad, onRelated, onFoll
         </p>
       )}
       <KeyHints name={name} kind={page.kind} relations={relations} />
+      {/* Keyed apart from the related rows below, whose key is a row's place: two siblings with one key leave React keeping a stale one. */}
+      <FilterPanel key={`filter-${String(visit)}`} columns={filterables} active={asked.filter} onFilter={(filter, focus) => onLoad({ ...asked, filter, offset: 0 }, focus)} />
       <div className="rows" role="region" aria-labelledby="rows-caption" tabIndex={0}>
         <table>
           <caption id="rows-caption">
@@ -245,7 +277,7 @@ function Page({ asked, page, relations, related, back, onLoad, onRelated, onFoll
                       type="button"
                       className="sort"
                       aria-label={`${column.name}, sort ${next.direction === 'asc' ? 'ascending' : 'descending'}`}
-                      onClick={() => onLoad({ ...asked, sort: next, offset: 0 })}
+                      onClick={() => void onLoad({ ...asked, sort: next, offset: 0 })}
                     >
                       {column.name}
                     </button>
@@ -287,10 +319,10 @@ function Page({ asked, page, relations, related, back, onLoad, onRelated, onFoll
         <Related key={related} id="related" name={name} number={asked.offset + related + 1} row={open} relations={relations} onFollow={onFollow} />
       )}
       <p className="actions">
-        <button type="button" className="button" aria-disabled={atStart} onClick={() => (atStart ? undefined : onLoad({ ...asked, offset: Math.max(0, asked.offset - LIST_PAGE_SIZE) }))}>
+        <button type="button" className="button" aria-disabled={atStart} onClick={() => (atStart ? undefined : void onLoad({ ...asked, offset: Math.max(0, asked.offset - LIST_PAGE_SIZE) }))}>
           Previous page
         </button>
-        <button type="button" className="button" aria-disabled={!page.hasMore} onClick={() => (page.hasMore ? onLoad({ ...asked, offset: asked.offset + LIST_PAGE_SIZE }) : undefined)}>
+        <button type="button" className="button" aria-disabled={!page.hasMore} onClick={() => (page.hasMore ? void onLoad({ ...asked, offset: asked.offset + LIST_PAGE_SIZE }) : undefined)}>
           Next page
         </button>
       </p>

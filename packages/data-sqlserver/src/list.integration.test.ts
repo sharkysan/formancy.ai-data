@@ -1,6 +1,22 @@
 import { browsePage, browseRelations, driftRefusal, exportColumns, exportHeader, exportRecord, followTerms, generateForm, listTerms, planBrowse, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
-import type { ApiValue, BrowseQuery, BrowseRelation, FormBindings, FormPolicy, FormRecord, ListOutcome, MetadataSnapshot, ObjectRef, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
-import { BROWSE_PARITY, browseCase, covers, EXPORT_PARITY, exportCase, FIXTURE_SCOPE, LIST_PARITY, LIST_ROWS, listCase, startSqlServerFixture } from '@formancy/data-fixtures'
+import type { ApiValue, BrowseFilterTerm, BrowseQuery, BrowseRelation, FormBindings, FormPolicy, FormRecord, ListFilterTerm, ListOutcome, MetadataSnapshot, ObjectRef, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
+import {
+  BROWSE_PARITY,
+  browseCase,
+  COLUMN_FILTER_PARITY,
+  COLUMN_FILTER_ROWS,
+  COLUMN_FILTER_TENANT,
+  columnFilterCase,
+  covers,
+  EXPORT_PARITY,
+  exportCase,
+  FIXTURE_SCOPE,
+  LIST_PARITY,
+  LIST_ROWS,
+  listCase,
+  PARITY_SCOPE,
+  startSqlServerFixture,
+} from '@formancy/data-fixtures'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -9,7 +25,8 @@ import { listStatement } from './records/list.js'
 
 /*
  * A form's records, a page at a time (0044), against REAL SQL Server loaded
- * with the shared fixture (0005) and LIST_ROWS, inserted by the owner.
+ * with the shared fixture (0005), LIST_ROWS and COLUMN_FILTER_ROWS, written
+ * by the owner.
  *
  * Every request is `planList`'s, from bindings generated over what discovery
  * reports and a clerk of tenant 1, so what reaches the adapter is what the
@@ -24,6 +41,7 @@ let records: RecordAdapter
 let snapshot: MetadataSnapshot
 let customers: FormBindings
 let lines: FormBindings
+let shipments: ReturnType<typeof generateForm>
 
 const TENANT = [{ column: 'tenant_id', attribute: 'tenant' }]
 const READ = { read: ['clerk'], write: [] }
@@ -48,8 +66,19 @@ const LINE_POLICY: FormPolicy = {
   through: ['order'],
 }
 
+/** A tenant's shipments, every field the generator makes readable, the tenant pinned. */
+const SHIPMENT_POLICY: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk'], create: [], update: [] },
+  fields: { id: READ, tenant_id: READ, tracking_no: READ, carrier_code: READ, reference: READ, pickup_time: READ, dispatched_at: READ, weight_kg: READ, temperature_c: READ },
+  rowFilters: TENANT,
+  lookups: {},
+}
+
 const CLARA: PolicyContext = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: { tenant: '1' } }
-const EVERY: RecordListQuery = { search: '', sort: [], parent: null, offset: 0, limit: 50 }
+/** The clerk of COLUMN_FILTER_ROWS' shipments' tenant, which no other case lists. */
+const SHIPPER: PolicyContext = { actor: { id: 'u-3', roles: ['clerk'] }, attributes: { tenant: COLUMN_FILTER_TENANT } }
+const EVERY: RecordListQuery = { search: '', sort: [], parent: null, filter: [], offset: 0, limit: 50 }
 
 beforeAll(async () => {
   fixture = await startSqlServerFixture()
@@ -68,6 +97,25 @@ beforeAll(async () => {
   for (const [order, line] of LIST_ROWS.lines) {
     await owner.request().input('order', mssql.BigInt, order).input('line', mssql.Int, Number(line)).query('insert into sales.order_line (order_id, line_no, quantity, unit_price) values (@order, @line, 1, 1.00)')
   }
+  // Each timestamp as text, converted by the server through an ISO 8601
+  // style, never through a JavaScript Date in this machine's zone.
+  for (const [number, created, active] of COLUMN_FILTER_ROWS.customers) {
+    await owner
+      .request()
+      .input('number', mssql.Int, Number(number))
+      .input('created', mssql.NVarChar(40), created)
+      .input('active', mssql.Bit, active)
+      .query('update sales.customer set created_at = convert(datetimeoffset, @created, 127), active = @active where tenant_id = 1 and customer_no = @number')
+  }
+  for (const [reference, tracking, dispatched] of COLUMN_FILTER_ROWS.shipments) {
+    await owner
+      .request()
+      .input('tenant', mssql.Int, Number(COLUMN_FILTER_TENANT))
+      .input('tracking', mssql.NVarChar(36), tracking)
+      .input('reference', mssql.NVarChar(20), reference)
+      .input('dispatched', mssql.NVarChar(40), dispatched)
+      .query(`insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pickup_time, dispatched_at) values (@tenant, convert(uniqueidentifier, @tracking), 1, @reference, '08:00', convert(datetime2(3), @dispatched, 126))`)
+  }
   snapshot = await discoverSqlServer(owner, FIXTURE_SCOPE)
   customers = generateForm(snapshot, {
     connection: 'test',
@@ -84,6 +132,7 @@ beforeAll(async () => {
     title: 'Order line',
     lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
   }).bindings
+  shipments = generateForm(snapshot, { connection: 'test', root: { schema: 'sales', name: 'shipment' }, formId: 'shipments', title: 'Shipments', lookups: [], pinned: ['tenant_id'] })
   records = createSqlServerRecords(owner)
 })
 
@@ -92,12 +141,12 @@ afterAll(async () => {
   await fixture?.stop()
 })
 
-/** One page as the server answers it: planned for Clara, listed by the adapter, and built by `recordPage`. */
-async function listed(bindings: FormBindings, policy: FormPolicy, change: Partial<RecordListQuery>): Promise<RecordList & { outcome: ListOutcome }> {
+/** One page as the server answers it: planned for Clara, or `context`, listed by the adapter, and built by `recordPage`. */
+async function listed(bindings: FormBindings, policy: FormPolicy, change: Partial<RecordListQuery>, context = CLARA, adapter = records): Promise<RecordList & { outcome: ListOutcome }> {
   const query = { ...EVERY, ...change }
-  const plan = planList(snapshot, bindings, policy, CLARA, query)
+  const plan = planList(snapshot, bindings, policy, context, query)
   if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
-  const outcome = await records.list(plan.request)
+  const outcome = await adapter.list(plan.request)
   if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
   return { ...recordPage(bindings, plan.fields, outcome.rows, query.limit), outcome }
 }
@@ -271,15 +320,7 @@ describe('a file of shipments', covers('sqlserver', exportCase('shipments')), ()
   // Watched failing with the timestamp written through displayText, which
   // cuts its half second.
   test("is the shipments' values as read, the same text on both engines", async () => {
-    const shipments = generateForm(snapshot, { connection: 'test', root: { schema: 'sales', name: 'shipment' }, formId: 'shipments', title: 'Shipments', lookups: [], pinned: ['tenant_id'] })
-    const policy: FormPolicy = {
-      version: 1,
-      operations: { read: ['clerk'], create: [], update: [] },
-      fields: { id: READ, tenant_id: READ, tracking_no: READ, carrier_code: READ, reference: READ, pickup_time: READ, dispatched_at: READ, weight_kg: READ, temperature_c: READ },
-      rowFilters: TENANT,
-      lookups: {},
-    }
-    const plan = planList(snapshot, shipments.bindings, policy, CLARA, EVERY)
+    const plan = planList(snapshot, shipments.bindings, SHIPMENT_POLICY, CLARA, EVERY)
     if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
     const outcome = await records.list(plan.request)
     if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
@@ -299,10 +340,10 @@ describe('a file of shipments', covers('sqlserver', exportCase('shipments')), ()
  * the server's browse route runs it. Every expectation is BROWSE_PARITY's,
  * written once for both engines.
  */
-async function browsed(query: Partial<BrowseQuery> & Pick<BrowseQuery, 'object'>) {
-  const plan = planBrowse(snapshot, { equal: [], search: '', sort: [], offset: 0, limit: 50, ...query })
+async function browsed(query: Partial<BrowseQuery> & Pick<BrowseQuery, 'object'>, adapter = records, over = snapshot) {
+  const plan = planBrowse(over, { equal: [], filter: [], search: '', sort: [], offset: 0, limit: 50, ...query })
   if (!plan.ok) throw new Error(`expected a browse, got ${plan.code}: ${plan.message}`)
-  const outcome = await records.list(plan.request)
+  const outcome = await adapter.list(plan.request)
   if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
   return { plan, page: browsePage(outcome.rows, plan.request.limit) }
 }
@@ -357,16 +398,16 @@ describe('a table with columns that have no text', covers('sqlserver', browseCas
 /**
  * A row followed through `key`, that way, as the studio offers it (0103):
  * the relation `browseRelations` derives from this suite's own discovery,
- * and the terms `followTerms` pairs from the row, browsed. Neither is
- * written here, so the key's columns are paired as this engine's catalog
- * reports them.
+ * and the terms `followTerms` pairs from the row, browsed, narrowed by
+ * `filter` too. Neither is written here, so the key's columns are paired as
+ * this engine's catalog reports them.
  */
-async function followed(from: ObjectRef, direction: BrowseRelation['direction'], key: string, row: Readonly<Record<string, ApiValue>>) {
+async function followed(from: ObjectRef, direction: BrowseRelation['direction'], key: string, row: Readonly<Record<string, ApiValue>>, filter: BrowseFilterTerm[] = []) {
   const relation = browseRelations(snapshot, from).relations.find((entry) => entry.direction === direction && entry.key === key)
   if (relation === undefined) throw new Error(`${key} cannot be followed ${direction} from ${from.schema}.${from.name}`)
   const equal = followTerms(relation, row)
   if (equal === null) throw new Error(`${key} holds a NULL in the row followed from ${from.schema}.${from.name}`)
-  return { relation, ...(await browsed({ object: relation.to.object, equal })) }
+  return { relation, ...(await browsed({ object: relation.to.object, equal, filter })) }
 }
 
 describe('a row followed through a foreign key', covers('sqlserver', browseCase('follows')), () => {
@@ -387,6 +428,251 @@ describe('a row followed through a foreign key', covers('sqlserver', browseCase(
       const back = await followed(orders.object, 'refers-to', key, order)
       expect(back.relation.to.object).toEqual(object)
       expect(back.page.rows.map((row) => row['name'])).toEqual(names)
+    }
+  })
+})
+
+/*
+ * A person's own conditions on a list's columns (0104), each case
+ * COLUMN_FILTER_PARITY's, written once for both engines: planned by
+ * `planList` or `planBrowse` and compared by this adapter's `list`, over
+ * the rows COLUMN_FILTER_ROWS gave known values. Watched failing, every
+ * case, with the filter left out of the list statement.
+ */
+
+/** Tenant 1's customers narrowed by `filter`, beside whatever else `change` asks. */
+const customersWhere = (filter: ListFilterTerm[], change: Partial<RecordListQuery> = {}, adapter = records) => listed(customers, CUSTOMER_POLICY, { ...change, filter }, CLARA, adapter)
+/** Tenant 3's shipments narrowed by `filter`, listed by its clerk. */
+const shipmentsWhere = (filter: ListFilterTerm[], adapter = records) => listed(shipments.bindings, SHIPMENT_POLICY, { filter }, SHIPPER, adapter)
+/** The references of a page of shipments, in its order. */
+const references = (page: RecordList): string[] => page.rows.map((row) => String(row.answers['reference']))
+
+describe('a filter that a text equals', covers('sqlserver', columnFilterCase('text')), () => {
+  // The reference's collation is case-insensitive, and SQL Server's `=`
+  // ignores trailing spaces under every collation: by `=` alone `AG`, `ag`
+  // and `AG ` are one value, and `Ag` finds all three. The row filter's
+  // predicate, BIN2 and the byte lengths beside the column's own `=`,
+  // counts both (0028). Watched failing with `=` alone.
+  test('finds the reference exactly as given: case and a trailing space count', async () => {
+    const { field, entries } = COLUMN_FILTER_PARITY.text
+    for (const entry of entries) expect(references(await shipmentsWhere([{ field, op: 'equals', value: entry.value }])), JSON.stringify(entry.value)).toEqual(entry.references)
+  })
+})
+
+describe('a filter on an integer', covers('sqlserver', columnFilterCase('integer')), () => {
+  // Tenant 2 has a customer 1001 too: a filter that admitted rows of its own
+  // would list it. A bound compared strictly would lose the row on it.
+  test("equals tenant 1's 1001 alone, and a range holds the rows on both its ends", async () => {
+    const { field, entries } = COLUMN_FILTER_PARITY.integer
+    for (const entry of entries) expect(numbers(await customersWhere([{ field, ...entry.condition }])), entry.condition.op).toEqual(entry.keys)
+  })
+})
+
+describe('a filter on a decimal', covers('sqlserver', columnFilterCase('decimal')), () => {
+  // `50` reaches the adapter as `50.00`, the column's own spelling, and is
+  // converted by the server to decimal(14, 2), never carried as a JavaScript
+  // number; a range from `-1` holds the customer at -1.00.
+  test('equals 50 as 50.00, and a range holds the rows on both its ends', async () => {
+    const { field, entries } = COLUMN_FILTER_PARITY.decimal
+    for (const entry of entries) expect(numbers(await customersWhere([{ field, ...entry.condition }])), entry.condition.op).toEqual(entry.keys)
+  })
+})
+
+describe('a filter on a boolean', covers('sqlserver', columnFilterCase('boolean')), () => {
+  // The planner's `true` or `false` is a bit parameter of its own. A flag
+  // compared with nothing lists every customer, inactive or not, and an
+  // inverted one the other half: either fails one of the two.
+  test('finds the inactive customers, and the active ones', async () => {
+    const { field, entries } = COLUMN_FILTER_PARITY.boolean
+    for (const entry of entries) expect(numbers(await customersWhere([{ field, ...entry.condition }])), entry.condition.value).toEqual(entry.keys)
+  })
+})
+
+describe('a filter on a uuid', covers('sqlserver', columnFilterCase('uuid')), () => {
+  // Typed in upper case, the value is spelled in lower by the planner and
+  // converted to uniqueidentifier, which compares the value, not its text.
+  test('finds the shipment whose tracking number it names, in either case', async () => {
+    const { field, value, references: expected } = COLUMN_FILTER_PARITY.uuid
+    expect(references(await shipmentsWhere([{ field, op: 'equals', value }]))).toEqual(expected)
+  })
+})
+
+describe('a filter that a text contains', covers('sqlserver', columnFilterCase('contains')), () => {
+  // `%` and `_` are LIKE's wildcards, and SQL Server's LIKE reads `[x]` as a
+  // character class: unescaped, it would find "x Labs". The column's
+  // case-insensitive collation folds `LABS`, as the list's search does.
+  test('matches %, _ and [x] as themselves, case folded', async () => {
+    const { field, entries } = COLUMN_FILTER_PARITY.contains
+    for (const entry of entries) expect(numbers(await customersWhere([{ field, op: 'contains', text: entry.text }])), entry.text).toEqual(entry.keys)
+  })
+})
+
+describe('a filter on NULL', covers('sqlserver', columnFilterCase('nulls')), () => {
+  // A NULL is in no range and equals nothing: only `null` finds it, and
+  // `not-null` everything else.
+  test('finds the customers with no credit limit, and those with one', async () => {
+    const { field } = COLUMN_FILTER_PARITY.nulls
+    expect(numbers(await customersWhere([{ field, op: 'null' }]))).toEqual(COLUMN_FILTER_PARITY.nulls.null)
+    expect(numbers(await customersWhere([{ field, op: 'not-null' }]))).toEqual(COLUMN_FILTER_PARITY.nulls['not-null'])
+  })
+})
+
+describe('several filters', covers('sqlserver', columnFilterCase('together')), () => {
+  // Joined by OR, or one replacing another, two conditions would find what
+  // either finds; every condition holds.
+  test('find the rows every condition holds for', async () => {
+    for (const entry of COLUMN_FILTER_PARITY.together) expect(numbers(await customersWhere([...entry.filter]))).toEqual(entry.keys)
+  })
+})
+
+describe('a filter beside a search', covers('sqlserver', columnFilterCase('search')), () => {
+  // The search and the filter are both predicates of the one statement:
+  // either alone would find more.
+  test('finds the rows both hold for', async () => {
+    for (const entry of COLUMN_FILTER_PARITY.search) expect(numbers(await customersWhere([...entry.filter], { search: entry.search })), entry.search).toEqual(entry.keys)
+  })
+})
+
+describe('a filter beside a parent', covers('sqlserver', columnFilterCase('parent')), () => {
+  // order_line has no tenant: a line number alone would find tenant 2's
+  // first line too, and a filter beside tenant 2's order would find it.
+  // The filter narrows within the parent and the throughs, never past them.
+  test("narrows a parent's lines, and never past the throughs", async () => {
+    for (const entry of COLUMN_FILTER_PARITY.parent) {
+      const parent = entry.order === null ? null : { field: 'order', record: `k1:${entry.order}` }
+      expect(tokens(await listed(lines, LINE_POLICY, { parent, filter: [...entry.filter] })), String(entry.order)).toEqual(entry.lines.map(lineToken))
+    }
+  })
+})
+
+describe('a filter beside a follow', covers('sqlserver', columnFilterCase('follow')), () => {
+  // A follow's equal and a filter are both narrowings of one browse: the
+  // customer's orders, of the one date.
+  test("narrows a customer's orders, followed, to those of one date", async () => {
+    const { object, equal, key, entries } = COLUMN_FILTER_PARITY.follow
+    const [customer] = (await browsed({ object, equal: [...equal] })).page.rows
+    if (customer === undefined) throw new Error('the customer followed from was not browsed')
+    for (const entry of entries) expect((await followed(object, 'referred-by', key, customer, [...entry.filter])).page.rows.map((row) => row['id'])).toEqual(entry.ids)
+  })
+})
+
+describe('a filter on a column under a case-insensitive collation', covers('sqlserver', columnFilterCase('collation')), () => {
+  // tenant_code is nvarchar under the database's case-insensitive
+  // collation, and fixed_code a char(3): by `=` alone `acme`, `ACME` and
+  // `acme ` are one value, and `ab` is `AB`, watched failing so. BIN2 and
+  // the byte lengths beside it find the one row (0028). A contains folds
+  // case as the column's collation does, the search's own way.
+  test('equals exactly what the row filter admits, and contains case folded', async () => {
+    const parity = await discoverSqlServer(owner, PARITY_SCOPE)
+    const { object, sort, equals, contains } = COLUMN_FILTER_PARITY.collation
+    const keysOf = (rows: ReadonlyArray<Record<string, ApiValue>>) => rows.map((row) => [row['tenant_code'], row['item_no']])
+    for (const entry of equals) {
+      const { page } = await browsed({ object, sort: [...sort], filter: [{ column: entry.column, op: 'equals', value: entry.value }] }, records, parity)
+      expect(keysOf(page.rows), `${entry.column} = ${JSON.stringify(entry.value)}`).toEqual(entry.keys)
+    }
+    const { page } = await browsed({ object, sort: [...sort], filter: [{ column: contains.column, op: 'contains', text: contains.text }] }, records, parity)
+    expect(keysOf(page.rows)).toEqual(contains.keys)
+  })
+})
+
+describe('a timestamp or a date, in the language the composition root chose', () => {
+  let german: mssql.ConnectionPool
+  let zoned: RecordAdapter
+
+  // A session's language sets its DATEFORMAT, and German's is dmy, under
+  // which a datetime read from `2026-03-01 00:00:00` is the third of
+  // January. tedious sends `set dateformat` at login after the language,
+  // `mdy` unless told another, so the session is German and dmy only when
+  // told both: with the format left out, it was German and mdy. Every bound
+  // here is read through an ISO 8601 style, which neither changes: watched
+  // failing here alone, the default session passing, with a zoneless bound
+  // read as datetime without its `T`.
+  beforeAll(async () => {
+    german = await new mssql.ConnectionPool({ ...fixture.admin, options: { ...fixture.admin.options, language: 'Deutsch', dateFormat: 'dmy' } }).connect()
+    const settings = await german.request().query<{ language: string; format: string }>('select @@language as language, (select date_format from sys.dm_exec_sessions where session_id = @@spid) as format')
+    expect(settings.recordset[0]).toEqual({ language: 'Deutsch', format: 'dmy' })
+    zoned = createSqlServerRecords(german)
+  })
+
+  afterAll(async () => {
+    await german?.close()
+  })
+
+  const sessions = (): Array<[string, RecordAdapter]> => [
+    ['the default session', records],
+    ['Deutsch, dmy', zoned],
+  ]
+
+  describe('a day range on an instant', covers('sqlserver', columnFilterCase('instant')), () => {
+    // datetimeoffset keeps the offset each instant was written in, and
+    // compares instants, as PostgreSQL's timestamptz does: 2005, written at
+    // 01:30 on the third at +02:00, is inside a range ending on the second.
+    // Watched failing with the column compared on its own clock, as a
+    // datetime2.
+    test('holds the instants in its days in UTC, in any session', async () => {
+      const { field, entries } = COLUMN_FILTER_PARITY.instant
+      for (const [session, adapter] of sessions()) {
+        for (const { from, to, keys } of entries) {
+          expect(numbers(await customersWhere([{ field, op: 'range', from, to }], {}, adapter)), `${session}: ${String(from)}..${String(to)}`).toEqual(keys)
+        }
+      }
+    })
+  })
+
+  describe('a day range on a timestamp in no zone', covers('sqlserver', columnFilterCase('zoneless')), () => {
+    // Compared on the column's own clock: 23:59:59.999 of the last day is
+    // inside and the next midnight outside, and a NULL is in no range.
+    test('holds the timestamps in its days on their own clock, in any session', async () => {
+      const { field, entries } = COLUMN_FILTER_PARITY.zoneless
+      for (const [session, adapter] of sessions()) {
+        for (const { from, to, references: expected } of entries) {
+          expect(references(await shipmentsWhere([{ field, op: 'range', from, to }], adapter)), `${session}: ${String(from)}..${String(to)}`).toEqual(expected)
+        }
+      }
+    })
+  })
+
+  describe('a filter on a date, browsed', covers('sqlserver', columnFilterCase('date')), () => {
+    // A browse's filter names a column. A date is bound as a date, through
+    // style 23: one day's range holds the order on both its ends, a from
+    // alone what follows.
+    test('finds the orders of a day, and of a range, in any session', async () => {
+      const { object, column, entries } = COLUMN_FILTER_PARITY.date
+      for (const [session, adapter] of sessions()) {
+        for (const entry of entries) {
+          const { page } = await browsed({ object, filter: [{ column, ...entry.condition }] }, adapter)
+          expect(page.rows.map((row) => row['id']), `${session}: ${JSON.stringify(entry.condition)}`).toEqual(entry.ids)
+        }
+      }
+    })
+  })
+})
+
+describe("a day range on each of SQL Server's zoneless clocks", () => {
+  // SQL Server's alone: PostgreSQL has one zoneless timestamp, of any
+  // precision. The snapshot calls a datetime a datetime2(3) and a
+  // smalldatetime a datetime2(0), so a bound is a datetime2 of that scale,
+  // and each column is compared with it exactly at midnight: the last tick
+  // of the last day each type keeps -- 23:59:59.997, 23:59, 23:59:59.9999999
+  // and 23:59:59 -- is inside, the next midnight outside. And a range wider
+  // than smalldatetime's 1900 to 2079, or datetime's from 1753, is a range,
+  // where a bound converted to the column's own type would fail the
+  // statement: watched failing with the bound read as datetime.
+  test('holds the days of a datetime, a smalldatetime and a datetime2 of either scale, at midnight exactly', async () => {
+    const object = { schema: 'sales', name: 'filter_clock' }
+    await owner.request().batch('create table sales.filter_clock (id int not null constraint pk_filter_clock primary key, legacy datetime null, minute smalldatetime null, precise datetime2(7) null, whole datetime2(0) null)')
+    await owner.request().batch(`insert into sales.filter_clock (id, legacy, minute, precise, whole) values
+      (1, '2026-02-28T23:59:59.997', '2026-02-28T23:59:00', '2026-02-28T23:59:59.9999999', '2026-02-28T23:59:59'),
+      (2, '2026-03-01T00:00:00', '2026-03-01T00:00:00', '2026-03-01T00:00:00', '2026-03-01T00:00:00'),
+      (3, '2026-03-02T23:59:59.997', '2026-03-02T23:59:00', '2026-03-02T23:59:59.9999999', '2026-03-02T23:59:59'),
+      (4, '2026-03-03T00:00:00', '2026-03-03T00:00:00', '2026-03-03T00:00:00', '2026-03-03T00:00:00'),
+      (5, null, null, null, null)`)
+    const clocked = await discoverSqlServer(owner, FIXTURE_SCOPE)
+    for (const column of ['legacy', 'minute', 'precise', 'whole']) {
+      const days = await browsed({ object, filter: [{ column, op: 'range', from: '2026-03-01', to: '2026-03-02' }] }, records, clocked)
+      expect(days.page.rows.map((row) => row['id']), column).toEqual(['2', '3'])
+      const wide = await browsed({ object, filter: [{ column, op: 'range', from: '0001-01-01', to: '9999-12-30' }] }, records, clocked)
+      expect(wide.page.rows.map((row) => row['id']), column).toEqual(['1', '2', '3', '4'])
     }
   })
 })

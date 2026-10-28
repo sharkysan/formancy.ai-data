@@ -265,14 +265,20 @@ describe('the export route', () => {
   })
 
   // An export is every page a list would page through for the same search,
-  // sort and parent, from the first: each page the list's own request at
-  // the next offset, the body's terms on every one. Watched failing with
-  // every page asked at offset 0 (a file of the first page, repeated, until
-  // the moved check refused it), and with the sort dropped after the first
-  // page.
-  test('pages the list from offset 0 with the body’s search, sort and parent on every page', async () => {
+  // sort, parent and filter, from the first: each page the list's own
+  // request at the next offset, the body's terms on every one -- the
+  // filter's conditions as the planner spells them (0104). Watched failing
+  // with every page asked at offset 0 (a file of the first page, repeated,
+  // until the moved check refused it), with the sort dropped after the
+  // first page, and with the filter dropped after the first page.
+  test('pages the list from offset 0 with the body’s search, sort, parent and filter on every page', async () => {
     table = many(120)
-    const body = { search: ' Customer ', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'country', record: 'k1:CH' } }
+    const body = {
+      search: ' Customer ',
+      sort: [{ field: 'name', direction: 'desc' }],
+      parent: { field: 'country', record: 'k1:CH' },
+      filter: [{ field: 'notes', op: 'null' }, { field: 'customer_no', op: 'range', from: '+01', to: '0200' }],
+    }
     const response = await exported('customer', body)
     expect(response.statusCode, response.body).toBe(200)
     expect(lists.map(({ offset, limit }) => [offset, limit])).toEqual([[0, LIST_PAGE_SIZE], [50, LIST_PAGE_SIZE], [100, LIST_PAGE_SIZE]])
@@ -281,6 +287,10 @@ describe('the export route', () => {
         search: { text: 'Customer' },
         sort: [{ column: 'name', direction: 'desc' }, { column: 'tenant_id' }, { column: 'customer_no' }],
         equal: [{ name: 'country_code', value: 'CH' }],
+        filter: [
+          { op: 'null', column: 'notes' },
+          { op: 'range', column: 'customer_no', type: INT32, from: '1', to: '200', before: null },
+        ],
         filters: { kind: 'restricted', equal: [{ column: 'tenant_id', value: '1' }] },
       })
     }
@@ -331,13 +341,28 @@ describe('the export route', () => {
   })
 
   // The server pages from the first record to the last; a body that names
-  // a page, or anything else, is a request this route does not read.
-  test('refuses an offset, a limit or anything else in the body 400, asking nothing', async () => {
-    for (const body of [{ offset: 0 }, { limit: 10 }, { columns: ['name'] }, { sort: [{ field: 'notes', direction: 'sideways' }] }]) {
+  // a page, or anything else, is a request this route does not read. A
+  // filter is a list's, refused as a list refuses it: one of another shape
+  // `malformed`, and a condition the form does not offer `not-filterable`
+  // in the planner's sentence, which names the field and never the value
+  // (0104) -- before any statement, so no page of a file is made under a
+  // filter a grid would have been refused. Watched failing with
+  // `not-filterable` left out of `planRefusal`: each was a 500.
+  test('refuses an offset, a limit, a filter not offered or anything else in the body 400, asking nothing', async () => {
+    for (const body of [{ offset: 0 }, { limit: 10 }, { columns: ['name'] }, { sort: [{ field: 'notes', direction: 'sideways' }] }, { filter: [{ field: 'name', op: 'like', value: 'M%' }] }]) {
       const response = await exported('customer', body)
       expect({ body, status: response.statusCode, code: response.json().code }).toEqual({ body, status: 400, code: 'malformed' })
     }
     expect((await exported('customer', { sort: [{ field: 'country', direction: 'asc' }] })).json()).toMatchObject({ code: 'not-sortable' })
+    for (const [condition, message] of [
+      [{ field: 'country', op: 'equals', value: 'k1:CH' }, 'country is not a field you may filter this list by.'],
+      [{ field: 'customer_no', op: 'equals', value: '98765x' }, 'A value given for customer_no is not one it can hold.'],
+      [{ field: 'name', op: 'not-null' }, 'name offers no not-null condition.'],
+    ] as const) {
+      const response = await exported('customer', { filter: [condition] })
+      expect({ condition, answer: answerOf(response) }).toEqual({ condition, answer: { status: 400, body: { code: 'not-filterable', message } } })
+      expect(response.body).not.toMatch(/98765|k1:CH/)
+    }
     expect(lists).toEqual([])
   })
 
@@ -615,15 +640,18 @@ describe('the export route', () => {
   })
 
   // One event per export, named `export`, naming no record, with how many
-  // records the file holds -- never the search, the sort, the parent or a
-  // value (0023). Watched failing with `rows` left null for an export.
+  // records the file holds -- never the search, the sort, the parent, the
+  // filter or a value (0023): a filter's value is a person's data, as a
+  // search is. Watched failing with `rows` left null for an export.
   test('is audited as export, with the rows and nothing the person sent', async () => {
-    await exported('customer', { search: 'Muster', sort: [{ field: 'name', direction: 'asc' }], parent: { field: 'country', record: 'k1:CH' } })
+    await exported('customer', { search: 'Muster', sort: [{ field: 'name', direction: 'asc' }], parent: { field: 'country', record: 'k1:CH' }, filter: [{ field: 'notes', op: 'contains', text: 'filter-marker-0c7a' }] })
     await exported('customer', {}, 'stranger')
+    await exported('customer', { filter: [{ field: 'customer_no', op: 'equals', value: '98765x' }] })
     expect(events).toEqual([
       { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'export', form: 'customer', formVersion: 1, status: 200, outcome: 'ok', record: null, rows: 2 },
       { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 's', operation: 'export', form: 'customer', formVersion: 1, status: 403, outcome: 'operation-denied', record: null, rows: 0 },
+      { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'export', form: 'customer', formVersion: 1, status: 400, outcome: 'not-filterable', record: null, rows: 0 },
     ])
-    expect(JSON.stringify(events)).not.toMatch(/Muster|k1:|"name"/)
+    expect(JSON.stringify(events)).not.toMatch(/Muster|k1:|"name"|filter-marker|98765|notes/)
   })
 })

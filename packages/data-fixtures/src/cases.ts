@@ -6,6 +6,8 @@ import { BROWSE_PARITY } from './browse.js'
 import type { BrowseCase } from './browse.js'
 import { CASCADE_PARITY } from './cascades.js'
 import type { CascadeCase } from './cascades.js'
+import { COLUMN_FILTER_PARITY } from './column-filters.js'
+import type { ColumnFilterCase } from './column-filters.js'
 import { DELETE_PARITY } from './deletes.js'
 import type { DeleteCase } from './deletes.js'
 import { sharedDrifting } from './drifting.js'
@@ -96,6 +98,9 @@ export const exportCase = (name: ExportCase): string => `export: ${name}`
 /** What a browse of a table or view shows on each engine (0099), by the name of its entry in BROWSE_PARITY. */
 export const browseCase = (name: BrowseCase): string => `browse: ${name}`
 
+/** What a person's conditions on a list's or a browse's columns narrow it to on each engine (0104), by the name of its entry in COLUMN_FILTER_PARITY. */
+export const columnFilterCase = (name: ColumnFilterCase): string => `column filter: ${name}`
+
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
  * every filter, label, temporal read, refusal and edge value, then the two
@@ -103,7 +108,8 @@ export const browseCase = (name: BrowseCase): string => `browse: ${name}`
  * then what a form scoped through a parent shows (0043), then what a list of
  * a form's records shows (0044), then what a delete does (0050) and what it
  * does past its record (0051), then what a uuid key does (0056), then what a
- * file of a form's records holds (0079), then what a browse shows (0099).
+ * file of a form's records holds (0079), then what a browse shows (0099),
+ * then what a person's conditions on its columns narrow a list to (0104).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -126,6 +132,7 @@ export function sharedCases(): string[] {
     ...(Object.keys(UUID_PARITY) as UuidCase[]).map(uuidCase),
     ...(Object.keys(EXPORT_PARITY) as ExportCase[]).map(exportCase),
     ...(Object.keys(BROWSE_PARITY) as BrowseCase[]).map(browseCase),
+    ...(Object.keys(COLUMN_FILTER_PARITY) as ColumnFilterCase[]).map(columnFilterCase),
   ]
   const seen = new Set<string>()
   for (const id of ids) {

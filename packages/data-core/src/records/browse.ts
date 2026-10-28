@@ -6,9 +6,11 @@ import type { LookupSearchColumn } from '../lookup/types.js'
 import { isKeyValue, isLookupKeyType } from '../lookup/values.js'
 import type { ColumnMeta, MetadataSnapshot, NormalizedTypeKind, ObjectMeta, ObjectRef } from '../metadata.js'
 import { LIST_PAGE_SIZE } from '../runtime.js'
+import type { FilterCondition } from '../runtime.js'
 import { findObject } from '../snapshot.js'
+import { columnFilter, readFilter } from './filter.js'
 import { keyOrderProblem } from './prepare.js'
-import type { ListRequest, RecordColumn, RecordRead, RecordSort, RecordValue } from './types.js'
+import type { ListRequest, RecordColumn, RecordFilter, RecordRead, RecordSort, RecordValue } from './types.js'
 
 /*
  * A table or view's rows, a page at a time, as the connection's account
@@ -19,7 +21,8 @@ import type { ListRequest, RecordColumn, RecordRead, RecordSort, RecordValue } f
  * (0044), so an adapter runs it as the statement it runs for a form's page,
  * through the same `listTerms` check. A browse narrowed to the rows equal
  * to given values in some columns is how a row's foreign key is followed,
- * either way (`follow.ts`, 0103).
+ * either way (`follow.ts`, 0103); one narrowed by a person's own conditions
+ * on its columns is filtered, as a form's list is (`filter.ts`, 0104).
  *
  * Every name reaching SQL is one the server's own snapshot holds -- the
  * object, each column, the key -- never one the browser typed (0011).
@@ -46,10 +49,14 @@ export interface BrowseEqualTerm {
   value: string
 }
 
-/** What a browser asks for: the object, the columns it is narrowed by, and a list's search, order and page. */
+/** One condition of a browse's filter (0104): a column the page shows, and what it asks of it. */
+export type BrowseFilterTerm = { column: string } & FilterCondition
+
+/** What a browser asks for: the object, the columns a follow narrows it by, the person's filter, and a list's search, order and page. */
 export interface BrowseQuery {
   object: ObjectRef
   equal: BrowseEqualTerm[]
+  filter: BrowseFilterTerm[]
   search: string
   sort: BrowseSortTerm[]
   offset: number
@@ -62,7 +69,7 @@ export interface OmittedColumn {
   reason: 'not-readable' | 'no-text'
 }
 
-export type BrowseRefusalCode = 'unknown-object' | 'nothing-readable' | 'not-sortable' | 'not-comparable' | 'not-searchable'
+export type BrowseRefusalCode = 'unknown-object' | 'nothing-readable' | 'not-sortable' | 'not-comparable' | 'not-filterable' | 'not-searchable'
 
 export interface BrowseRefusal {
   ok: false
@@ -139,8 +146,9 @@ function equalTerms(object: ObjectMeta, byName: ReadonlyMap<string, ColumnMeta>,
  * it has a column the account may select with a text form
  * (`nothing-readable`); every sort term names a shown column
  * (`not-sortable`); every equal term a shown column of a key kind, once,
- * with a value it can hold (`not-comparable`); a search has a text or
- * integer column to match (`not-searchable`). The order is the requested terms, then the key's
+ * with a value it can hold (`not-comparable`); every filter condition one
+ * a shown column offers, with values it can hold (`not-filterable`, 0104);
+ * a search has a text or integer column to match (`not-searchable`). The order is the requested terms, then the key's
  * columns -- or, without a key it may read, every shown column -- each
  * ascending, NULLs last where the snapshot says a column holds them.
  */
@@ -164,6 +172,14 @@ export function planBrowse(snapshot: MetadataSnapshot, query: BrowseQuery): Plan
   }
   const equal = equalTerms(object, byName, query.equal)
   if (!equal.ok) return equal
+  const filter: RecordFilter[] = []
+  for (const term of query.filter) {
+    const column = byName.get(term.column)
+    if (column === undefined) return refuse('not-filterable', `${term.column} is not a column of ${nameOf(object.ref)} this page shows.`)
+    const planned = columnFilter(column, term, term.column)
+    if (!planned.ok) return refuse('not-filterable', planned.message)
+    filter.push(planned.filter)
+  }
   const searchable = shown.filter((column) => SEARCHABLE_KINDS.has(column.type.kind))
   if (query.search !== '' && searchable.length === 0) return refuse('not-searchable', `${nameOf(object.ref)} has no text or number column a search can match.`)
 
@@ -181,6 +197,7 @@ export function planBrowse(snapshot: MetadataSnapshot, query: BrowseQuery): Plan
     filters: { kind: 'unrestricted' },
     through: [],
     equal: equal.equal,
+    filter,
     search: query.search === '' ? null : { text: query.search, columns: searchable.map((column) => ({ name: column.name, type: column.type }) as LookupSearchColumn) },
     sort,
     offset: query.offset,
@@ -194,9 +211,9 @@ export function browsePage(rows: ReadonlyArray<Omit<RecordRead, 'ok'>>, limit: n
   return { rows: rows.slice(0, limit).map((row) => row.values), hasMore: rows.length > limit }
 }
 
-export type BrowseQueryCheck = { ok: true; query: BrowseQuery } | { ok: false; code: 'malformed' | SearchErrorCode | PageErrorCode; message: string }
+export type BrowseQueryCheck = { ok: true; query: BrowseQuery } | { ok: false; code: 'malformed' | 'not-filterable' | SearchErrorCode | PageErrorCode; message: string }
 
-const PROPERTIES = new Set(['object', 'equal', 'search', 'sort', 'offset', 'limit'])
+const PROPERTIES = new Set(['object', 'equal', 'filter', 'search', 'sort', 'offset', 'limit'])
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const isName = (value: unknown): value is string => typeof value === 'string' && value !== ''
 const malformed = (message: string): BrowseQueryCheck => ({ ok: false, code: 'malformed', message })
@@ -244,29 +261,41 @@ function equalOf(equal: unknown): { ok: true; equal: BrowseEqualTerm[] } | { ok:
 
 /**
  * The query a browse is planned from, from a request's body: the object as
- * `{ schema, name }` and nothing else, the columns and values it is
- * narrowed by, then a list's search and page, read by a list's own checks,
- * and a sort by column. Everything but the object may be left out -- the
- * equal and the sort are then `[]`, the search `''`, the offset 0 and the
+ * `{ schema, name }` and nothing else, the columns and values a follow
+ * narrows it by, the person's filter by column (`readFilter`, 0104), then a
+ * list's search and page, read by a list's own checks, and a sort by
+ * column. Everything but the object may be left out -- the equal, the
+ * filter and the sort are then `[]`, the search `''`, the offset 0 and the
  * limit `LIST_PAGE_SIZE` -- and any other property is refused. Which
- * columns may narrow it is the planner's question, over the server's own
- * snapshot.
+ * columns may narrow or filter it is the planner's question, over the
+ * server's own snapshot.
  */
 export function validateBrowseQuery(body: unknown): BrowseQueryCheck {
   if (!isRecord(body)) return malformed('A browse query is an object.')
   const unknown = Object.keys(body).filter((key) => !PROPERTIES.has(key))
-  if (unknown.length > 0) return malformed(`A browse query has an object, an equal, a search, a sort, an offset and a limit, and not ${unknown.join(', ')}.`)
+  if (unknown.length > 0) return malformed(`A browse query has an object, an equal, a filter, a search, a sort, an offset and a limit, and not ${unknown.join(', ')}.`)
   const object = body['object']
   if (!isRecord(object) || !hasExactly(object, ['schema', 'name']) || !isName(object['schema']) || !isName(object['name'])) {
     return malformed('The object is { schema, name }, both named.')
   }
   const equal = equalOf(body['equal'])
   if (!equal.ok) return malformed(equal.message)
+  const filter = readFilter(body['filter'], 'column')
+  if (!filter.ok) return filter
   const search = checkSearch(body['search'] === undefined ? '' : body['search'])
   if (!search.ok) return search
   const sort = sortOf(body['sort'])
   if (!sort.ok) return malformed(sort.message)
   const page = checkPage(body['offset'] ?? 0, body['limit'] ?? LIST_PAGE_SIZE, LIST_PAGE_SIZE)
   if (!page.ok) return page
-  return { ok: true, query: { object: { schema: object['schema'], name: object['name'] }, equal: equal.equal, search: search.search, sort: sort.sort, offset: page.offset, limit: page.limit } }
+  const query: BrowseQuery = {
+    object: { schema: object['schema'], name: object['name'] },
+    equal: equal.equal,
+    filter: filter.filter,
+    search: search.search,
+    sort: sort.sort,
+    offset: page.offset,
+    limit: page.limit,
+  }
+  return { ok: true, query }
 }

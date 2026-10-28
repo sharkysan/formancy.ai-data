@@ -1,5 +1,5 @@
 import type { IDatasource, IGetRowsParams, SortModelItem } from 'ag-grid-community'
-import type { DataClient, FormRecord, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
+import type { DataClient, FormRecord, ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
 
 /*
  * What a record grid asks the runtime plane for, and what it says about the
@@ -36,6 +36,13 @@ export interface GridRow {
 /** What a press on a row with no token says. */
 export const CANNOT_OPEN = 'This row cannot be opened: its key does not fit in a record token.'
 
+/**
+ * What the line adds under the server's sentence when it refuses a filter
+ * (`not-filterable`, 0104): asking again would be refused again, so the
+ * recovery is the condition, which the panel still holds as typed.
+ */
+export const REFUSED_FILTER_HELP = 'Change the condition under Filter and apply it again, or remove it.'
+
 /** The readable fields of `definition`, in the form's order, without the parent's field in a child grid. */
 export function columnsOf(definition: PublishedForm, parentField: string | null): GridColumn[] {
   const readable = new Set(definition.readable)
@@ -48,17 +55,19 @@ export function columnsOf(definition: PublishedForm, parentField: string | null)
     })
 }
 
-/** The list request for one block: the submitted search, the grid's sort, the parent, and the block as offset and limit. */
+/** The list request for one block: the submitted search, the grid's sort, the parent, the applied filter (0104), and the block as offset and limit. */
 export function listQuery({
   search,
   sortModel,
   parent,
+  filter,
   startRow,
   endRow,
 }: {
   search: string
   sortModel: readonly SortModelItem[]
   parent: RecordListQuery['parent']
+  filter: readonly ListFilterTerm[]
   startRow: number
   endRow: number
 }): RecordListQuery {
@@ -66,6 +75,7 @@ export function listQuery({
     search,
     sort: sortModel.map((item) => ({ field: item.colId, direction: item.sort })),
     parent,
+    filter: [...filter],
     offset: startRow,
     limit: endRow - startRow,
   }
@@ -87,17 +97,29 @@ export function cellText(row: GridRow | undefined, column: GridColumn): string {
 
 const range = (from: number, to: number): string => `${String(from)}–${String(to)}`
 
+/** `['Order number', 'Status', 'Notes']` as "Order number, Status and Notes". */
+export function listed(words: readonly string[]): string {
+  return words.length < 2 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${String(words.at(-1))}`
+}
+
 /** What the line says while a block is asked for. */
 export function loading(start: number, size: number, noun?: string): string {
   return noun === undefined ? `Loading rows ${range(start + 1, start + size)}.` : `Loading ${noun} rows ${range(start + 1, start + size)}.`
 }
 
-/** What the line says once a block has answered: the range, whether more follow, and the help and recovery that belong to it. */
+/**
+ * What the line says once a block has answered: the range, whether more
+ * follow, the fields its filter is on (0104), and the help and recovery that
+ * belong to it. A list nothing matches says what narrowed it -- the search,
+ * the filter or both -- so "No records." never reads as an empty table when
+ * it is an empty search or an empty filter.
+ */
 export function answered({
   start,
   count,
   hasMore,
   search,
+  filtered = [],
   untokened,
   canCreate,
   noun,
@@ -106,33 +128,43 @@ export function answered({
   count: number
   hasMore: boolean
   search: string
+  /** The labels of the fields the block's filter has a condition on, in its order. */
+  filtered?: readonly string[]
   untokened: number
   canCreate: boolean
   noun?: string
 }): { text: string; help: string | null; clear: boolean } {
+  const filter = filtered.length === 0 ? null : `the filter on ${listed(filtered)}`
   if (count === 0 && start === 0) {
     const searched = search.trim()
-    if (searched !== '') return { text: `No records match “${searched}”.`, help: null, clear: true }
+    const rows = noun === undefined ? 'records' : `${noun} rows`
+    if (searched !== '') return { text: `No ${rows} match “${searched}”${filter === null ? '' : ` and ${filter}`}.`, help: null, clear: true }
+    if (filter !== null) return { text: `No ${rows} match ${filter}.`, help: null, clear: false }
     if (noun !== undefined) return { text: `No ${noun} rows.`, help: canCreate ? `New ${noun} starts the first one.` : null, clear: false }
     return { text: 'No records.', help: canCreate ? 'New record starts the first one.' : null, clear: false }
   }
   const shown = noun === undefined ? `Rows ${range(start + 1, start + count)}` : `${noun} rows ${range(start + 1, start + count)}`
+  const narrowed = filtered.length === 0 ? '' : ` Filtered by ${listed(filtered)}.`
   const tail = untokened > 0 ? ` ${String(untokened)} of these rows cannot be opened.` : ''
-  return { text: `${shown}${hasMore ? '; more follow.' : '.'}${tail}`, help: null, clear: false }
+  return { text: `${shown}${hasMore ? '; more follow.' : '.'}${narrowed}${tail}`, help: null, clear: false }
 }
 
 /** What the datasource tells the grid component as it goes. */
 export interface DatasourceHooks {
   /** A block asked for, in this order: the grid keeps the sort, which a file of its records is sorted by (0080). */
   loading(start: number, end: number, sort: ListSortTerm[]): void
-  answered(start: number, rows: readonly GridRow[], hasMore: boolean): void
-  refused(message: string): void
+  /** A block answered, for the filter it was asked with: the line names the fields that filter is on. */
+  answered(start: number, rows: readonly GridRow[], hasMore: boolean, filter: readonly ListFilterTerm[]): void
+  /** A block refused, in the server's sentence, and its code: a filter the server cannot apply is not one to ask for again (0104). */
+  refused(message: string, code: string): void
 }
 
 /**
- * The infinite row model's datasource over `records/list` for one search and
- * one parent: a new one is made when either changes, and AG Grid starts
- * again from the first page. One request at a time, the grid's own
+ * The infinite row model's datasource over `records/list` for one search,
+ * one parent and one filter: a new one is made when any of them changes, and
+ * AG Grid starts again from the first page. Every block carries the same
+ * filter, in the request's body, so its values are in no URL (0104). One
+ * request at a time, the grid's own
  * `maxConcurrentDatasourceRequests`; a block AG Grid no longer wants is
  * answered as failed and says nothing.
  */
@@ -142,6 +174,7 @@ export function createDatasource({
   columns,
   search,
   parent,
+  filter,
   hooks,
 }: {
   client: DataClient
@@ -149,15 +182,16 @@ export function createDatasource({
   columns: readonly GridColumn[]
   search: string
   parent: RecordListQuery['parent']
+  filter: readonly ListFilterTerm[]
   hooks: DatasourceHooks
 }): IDatasource & { abort(): void } {
   let current: AbortController | undefined
   const lookups = columns.filter((column) => column.source !== null)
 
-  async function rowsFor(params: IGetRowsParams, query: RecordListQuery, signal: AbortSignal): Promise<{ rows: GridRow[]; hasMore: boolean } | string> {
-    const listed = await client.list(formId, query, signal)
-    if (!listed.ok) return listed.message
-    const rows = rowsOf(listed.value.rows, params.startRow)
+  async function rowsFor(params: IGetRowsParams, query: RecordListQuery, signal: AbortSignal): Promise<{ rows: GridRow[]; hasMore: boolean } | { refused: string; code: string }> {
+    const page = await client.list(formId, query, signal)
+    if (!page.ok) return { refused: page.message, code: page.code }
+    const rows = rowsOf(page.value.rows, params.startRow)
     // One resolve per lookup column for the whole page; a label it does not
     // give is shown as the stored token.
     for (const column of lookups) {
@@ -171,7 +205,7 @@ export function createDatasource({
         if (label !== undefined) row.labels = { ...row.labels, [column.key]: label }
       }
     }
-    return { rows, hasMore: listed.value.hasMore }
+    return { rows, hasMore: page.value.hasMore }
   }
 
   return {
@@ -179,18 +213,18 @@ export function createDatasource({
       current?.abort()
       const controller = new AbortController()
       current = controller
-      const query = listQuery({ search, sortModel: params.sortModel, parent, startRow: params.startRow, endRow: params.endRow })
+      const query = listQuery({ search, sortModel: params.sortModel, parent, filter, startRow: params.startRow, endRow: params.endRow })
       hooks.loading(params.startRow, params.endRow, query.sort)
       rowsFor(params, query, controller.signal).then(
         (answer) => {
           if (controller.signal.aborted) return params.failCallback()
-          if (typeof answer === 'string') {
+          if ('refused' in answer) {
             params.failCallback()
-            hooks.refused(answer)
+            hooks.refused(answer.refused, answer.code)
             return
           }
           params.successCallback(answer.rows, answer.hasMore ? undefined : params.startRow + answer.rows.length)
-          hooks.answered(params.startRow, answer.rows, answer.hasMore)
+          hooks.answered(params.startRow, answer.rows, answer.hasMore, filter)
         },
         () => params.failCallback(),
       )

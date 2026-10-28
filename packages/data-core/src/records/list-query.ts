@@ -2,32 +2,34 @@ import { checkPage, checkSearch } from '../lookup/search.js'
 import type { PageErrorCode, SearchErrorCode } from '../lookup/search.js'
 import { LIST_PAGE_SIZE } from '../runtime.js'
 import type { ListSortTerm, RecordExportQuery, RecordListQuery } from '../runtime.js'
+import { readFilter } from './filter.js'
 
 /*
  * A list request's body, read at the boundary (0044): what the browser sent,
  * as `unknown`, becomes a fresh `RecordListQuery` holding exactly the checked
  * properties, or the refusal that says which is wrong. Nothing here knows the
- * form: which fields may sort, search or name a parent is the planner's
- * (`planList`), against the policy.
+ * form: which fields may sort, search, filter or name a parent is the
+ * planner's (`planList`), against the policy.
  *
  * The search and the page are a lookup's (`checkSearch`, `checkPage`), so
  * the same text and the same page mean the same in a select and in a grid.
- * An export's body (0079) is a list's search, sort and parent, read by the
- * same checks, so a file is of the records the grid shows.
+ * An export's body (0079) is a list's search, sort, parent and filter, read
+ * by the same checks, so a file is of the records the grid shows.
  */
 
-export type ListQueryErrorCode = SearchErrorCode | PageErrorCode
+/** A body's refusals: a search's, a page's, and `not-filterable` for what a filter's `contains` could not find (`readFilter`). */
+export type ListQueryErrorCode = SearchErrorCode | PageErrorCode | 'not-filterable'
 
 export type ListQueryRefusal = { ok: false; code: ListQueryErrorCode; message: string }
 
 export type ListQueryCheck = { ok: true; query: RecordListQuery } | ListQueryRefusal
 
-export type ExportQueryRefusal = { ok: false; code: SearchErrorCode; message: string }
+export type ExportQueryRefusal = { ok: false; code: SearchErrorCode | 'not-filterable'; message: string }
 
 export type ExportQueryCheck = { ok: true; query: RecordExportQuery } | ExportQueryRefusal
 
-const LIST_PROPERTIES = new Set(['search', 'sort', 'parent', 'offset', 'limit'])
-const EXPORT_PROPERTIES = new Set(['search', 'sort', 'parent'])
+const LIST_PROPERTIES = new Set(['search', 'sort', 'parent', 'filter', 'offset', 'limit'])
+const EXPORT_PROPERTIES = new Set(['search', 'sort', 'parent', 'filter'])
 const DIRECTIONS: ReadonlySet<unknown> = new Set(['asc', 'desc'])
 
 type Malformed = { ok: false; code: 'malformed'; message: string }
@@ -71,7 +73,7 @@ function parentOf(parent: unknown): { ok: true; parent: RecordListQuery['parent'
   return { ok: true, parent: { field, record } }
 }
 
-/** What a list and an export both read from a body: the search, the order and the parent, each checked as `validateListQuery` says. */
+/** What a list and an export both read from a body: the search, the order, the parent and the filter, each checked as `validateListQuery` says. */
 function selection(query: Record<string, unknown>): ({ ok: true } & RecordExportQuery) | ExportQueryRefusal {
   const search = checkSearch(query['search'] === undefined ? '' : query['search'])
   if (!search.ok) return search
@@ -79,7 +81,9 @@ function selection(query: Record<string, unknown>): ({ ok: true } & RecordExport
   if (!sort.ok) return sort
   const parent = parentOf(query['parent'])
   if (!parent.ok) return parent
-  return { ok: true, search: search.search, sort: sort.sort, parent: parent.parent }
+  const filter = readFilter(query['filter'], 'field')
+  if (!filter.ok) return filter
+  return { ok: true, search: search.search, sort: sort.sort, parent: parent.parent, filter: filter.filter }
 }
 
 /** The properties of `query` outside `allowed`. */
@@ -89,29 +93,30 @@ const others = (query: Record<string, unknown>, allowed: ReadonlySet<string>): s
  * The list query an adapter may be planned from, from a request's body.
  *
  * Every property may be left out -- `search` is then `''`, `sort` `[]`,
- * `parent` `null`, `offset` 0 and `limit` `LIST_PAGE_SIZE` -- and any other
- * is refused: a property ignored today is one somebody reads tomorrow.
+ * `parent` `null`, `filter` `[]`, `offset` 0 and `limit` `LIST_PAGE_SIZE`
+ * -- and any other is refused: a property ignored today is one somebody
+ * reads tomorrow. A filter is `readFilter`'s, by field (0104).
  */
 export function validateListQuery(query: unknown): ListQueryCheck {
   if (!isRecord(query)) return malformed('A list query is an object.')
-  if (others(query, LIST_PROPERTIES).length > 0) return malformed('A list query has a search, a sort, a parent, an offset and a limit, and nothing else.')
+  if (others(query, LIST_PROPERTIES).length > 0) return malformed('A list query has a search, a sort, a parent, a filter, an offset and a limit, and nothing else.')
   const selected = selection(query)
   if (!selected.ok) return selected
   const page = checkPage(query['offset'] === undefined ? 0 : query['offset'], query['limit'] === undefined ? LIST_PAGE_SIZE : query['limit'], LIST_PAGE_SIZE)
   if (!page.ok) return page
-  return { ok: true, query: { search: selected.search, sort: selected.sort, parent: selected.parent, offset: page.offset, limit: page.limit } }
+  return { ok: true, query: { search: selected.search, sort: selected.sort, parent: selected.parent, filter: selected.filter, offset: page.offset, limit: page.limit } }
 }
 
 /**
  * The query an export pages the list by (0079), from a request's body: a
- * list's search, sort and parent, each left out as a list's may be, and
- * nothing else. An offset or a limit is refused with the rest: the server
+ * list's search, sort, parent and filter, each left out as a list's may
+ * be, and nothing else. An offset or a limit is refused with the rest: the server
  * reads every page, from the first record to the last.
  */
 export function validateExportQuery(query: unknown): ExportQueryCheck {
   if (!isRecord(query)) return malformed('An export query is an object.')
-  if (others(query, EXPORT_PROPERTIES).length > 0) return malformed('An export query has a search, a sort and a parent, and nothing else: the file holds every page.')
+  if (others(query, EXPORT_PROPERTIES).length > 0) return malformed('An export query has a search, a sort, a parent and a filter, and nothing else: the file holds every page.')
   const selected = selection(query)
   if (!selected.ok) return selected
-  return { ok: true, query: { search: selected.search, sort: selected.sort, parent: selected.parent } }
+  return { ok: true, query: { search: selected.search, sort: selected.sort, parent: selected.parent, filter: selected.filter } }
 }

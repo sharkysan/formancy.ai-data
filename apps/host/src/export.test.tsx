@@ -179,7 +179,8 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     await waitFor(() => expect(exportLine('Records').textContent).toBe(made(engine.formId)), ARRIVES)
     expect(focusedName()).toBe('Download CSV')
     const sent = exportsSent(plane.sent, engine.formId)
-    expect(sent.map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([{ search: notes, sort: [{ field: 'id', direction: 'desc' }], parent: null }])
+    // No condition applied, so an empty filter: filter.test.tsx holds a filtered file (0104).
+    expect(sent.map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([{ search: notes, sort: [{ field: 'id', direction: 'desc' }], parent: null, filter: [] }])
     expect(kept.saved).toHaveLength(1)
     const [saved] = kept.saved
     if (saved === undefined) throw new Error('nothing was saved')
@@ -313,7 +314,7 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     await waitFor(() => expect(exportLine('Order line').textContent).toBe(made(engine.lines)), ARRIVES)
     const parent = { field: 'order', record: order }
     const sort = [{ field: 'line_no', direction: 'desc' as const }]
-    expect(exportsSent(plane.sent, engine.lines).map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([{ search: '', sort, parent }])
+    expect(exportsSent(plane.sent, engine.lines).map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([{ search: '', sort, parent, filter: [] }])
     const [saved] = kept.saved
     if (saved === undefined) throw new Error('nothing was saved')
     expect({ name: saved.name, bytes: await bytesOf(saved.file) }).toEqual({ name: `${engine.lines}.csv`, bytes: (await serversFile(engine.lines, { parent, sort })).bytes })

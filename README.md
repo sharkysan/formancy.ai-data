@@ -201,6 +201,8 @@ until then the address is formancy.ai's 404
   narrowed to the row's values, with a trail back; a key holding a NULL
   follows nothing, and one the step cannot follow is named with why
   ([0103](./docs/decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
+  A page is filtered by the person's own conditions on its columns, as a
+  form's list is ([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 - **Reviews drift** against what a published form's bindings and lookups rest
   on, and says which operations each change blocks
   ([0010](./docs/decisions/0010-drift-is-classified-against-the-bindings.md))
@@ -267,9 +269,16 @@ until then the address is formancy.ai's 404
   PostgreSQL's bytes in turn, SQL Server's byte groups -- total and stable on
   both, and not the same
   ([0056](./docs/decisions/0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md)).
+  A list is filtered by a person's conditions on its fields -- equals, a
+  range, contains, empty or not, as each field's kind offers -- every one
+  of which must hold, inside the read policy, never widening it. A value is
+  spelled as its column holds it and refused rather than rounded; text
+  equals exactly on both engines, whatever the collation; and a
+  timestamp's range is whole days, in UTC for an instant
+  ([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 - **A person can download the records a list would show them as one CSV
-  file**, for the same search, sort and parent and under the same read
-  policy, with no right of its own, through the runtime plane and
+  file**, for the same search, sort, parent and filter and under the same
+  read policy, with no right of its own, through the runtime plane and
   `@formancy/data-client`'s `exportRecords`. The server makes the whole
   file before it sends a byte, so a file is whole or refused with its own
   code, never cut short: refused past 16 MiB or 30 seconds, and while
@@ -514,6 +523,13 @@ a row's Related button lists the foreign keys it can be followed through,
 either way, from the discovery the studio holds, and a follow pages the
 other end narrowed to the row's values, with Back to the page it left
 ([0103](./docs/decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
+Filter rows filters a page by conditions on its columns, each offered what
+its type and the discovery's nullability allow, typed as its column takes
+it -- a timestamp's as days. Every condition must hold, each is listed and
+removed on its own, and paging and sorting keep them; a follow starts the
+other end unfiltered, and Back returns the page it left with its filter. A
+refusal is the step's alert, with what was typed kept
+([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 
 Its suite runs the real server in the test — `createDataServer` with a fake
 connection registry over snapshots captured from the shared fixture, as every
@@ -577,10 +593,25 @@ In every layout Back goes on past the open form's earlier views and
 levels, one press each, to the form before
 ([0097](./docs/decisions/0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md)).
 
+Filter, under the search and in each child section, opens the grid's own
+panel over the fields the server offers a filter on, by their labels: a
+field, a condition it offers -- is, is between, contains, has no value,
+has a value -- and a value, or a range's From and To, as the field takes
+them; a timestamp's range is whole days, in UTC for an instant, as the grid
+shows times. Apply puts the condition in place of the one its field had and
+lists the grid again from its first row, and the grid's line says which
+fields filter it. Each condition is listed with its own Remove, and Clear
+filter removes them all. A value the server cannot hold is its sentence on
+the grid's line, with what you typed still in its box. A child section's
+filter is its own, and opening another parent starts without one; the
+filter is in no address, so a reload or another form starts without one too
+([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
+
 Download CSV, beside New record in the Records panel and beside each child
 section's New, saves one file of the records that grid lists, as the server
 makes it: the search you submitted, not what the box holds, the grid's
-sort and, in a child section, its record, whose column the file keeps
+filter and sort and, in a child section, its record, whose column the file
+keeps
 ([0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md),
 [0080](./docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)). It is there wherever the form's records can be listed,
 and not under a record not saved yet. While the file is made its line says
@@ -1040,10 +1071,11 @@ says what an author and a publisher may each do, and what it costs).
 Reading rows is a role of its own. With `FORMANCY_DATA_BROWSE_ROLES` set,
 each role also an administrator role, its holders read every row the
 connection's account can read, through the studio's Browse step, and
-follow a row's foreign keys there either way; unset, as in the composed
-stack, nobody does
+follow a row's foreign keys there either way and filter a page by its
+columns; unset, as in the composed stack, nobody does
 ([0099](./docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md),
-[0103](./docs/decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md);
+[0103](./docs/decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md),
+[0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md);
 [the data server's README](./packages/data-server/README.md#browsing-rows)
 says what it reads and what it costs).
 

@@ -4,9 +4,12 @@ import { BROWSE_PARITY } from './browse.js'
 import type { BrowseCase } from './browse.js'
 import { CASCADE_PARITY } from './cascades.js'
 import type { CascadeCase } from './cascades.js'
+import { COLUMN_FILTER_PARITY } from './column-filters.js'
+import type { ColumnFilterCase } from './column-filters.js'
 import {
   browseCase,
   cascadeCase,
+  columnFilterCase,
   covers,
   deleteCase,
   displayCase,
@@ -70,6 +73,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   UUID_PARITY: (Object.keys(UUID_PARITY) as UuidCase[]).map(uuidCase),
   EXPORT_PARITY: (Object.keys(EXPORT_PARITY) as ExportCase[]).map(exportCase),
   BROWSE_PARITY: (Object.keys(BROWSE_PARITY) as BrowseCase[]).map(browseCase),
+  COLUMN_FILTER_PARITY: (Object.keys(COLUMN_FILTER_PARITY) as ColumnFilterCase[]).map(columnFilterCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
@@ -96,6 +100,8 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   SIZED_CHUNK_ROWS: 'how many rows one statement of the sized load carries',
   LIST_ROWS: "the rows the list suites insert; what a list shows of them is LIST_PARITY's",
   UUID_ROWS: "the rows the uuid suites insert; what the suites show of them is UUID_PARITY's",
+  COLUMN_FILTER_ROWS: "what the list suites give the rows they filter; what a filter narrows them to is COLUMN_FILTER_PARITY's",
+  COLUMN_FILTER_TENANT: "the tenant of COLUMN_FILTER_ROWS' shipments, whose clerk lists them",
   EXPORT_ROWS: "the customers the server's export suite inserts, each with the cell a file writes for its name; a file's text is data-core's, the same on both engines once EXPORT_PARITY's values are",
   DELIVERIES: "the fixture's delivery keys, which UUID_PARITY's cases name",
   PARITY_CASCADES: "the keys CASCADE_PARITY's policy names; what a delete does through them is CASCADE_PARITY's",

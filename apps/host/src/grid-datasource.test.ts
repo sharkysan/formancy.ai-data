@@ -34,6 +34,23 @@ describe('the status line', () => {
     expect(loading(0, 50)).toBe('Loading rows 1–50.')
   })
 
+  // A filtered list says so, naming the fields the filter is on, after the
+  // range and before the rows that cannot be opened; and a filtered list
+  // nothing matches names what narrowed it -- the filter, or the search and
+  // the filter -- so it never reads as an empty table, and offers to clear
+  // the search only where there is one (watched failing with the filter
+  // left out of the sentence: "Rows 1–3." for a filtered page, and "No
+  // records." for an empty one).
+  test('says the filter is on, and by which fields', () => {
+    const filtered = ['Notes', 'Amount']
+    expect(answered({ start: 0, count: 3, hasMore: false, search: '', filtered, untokened: 1, canCreate: true }).text).toBe('Rows 1–3. Filtered by Notes and Amount. 1 of these rows cannot be opened.')
+    expect(answered({ start: 50, count: 50, hasMore: true, search: '', filtered: ['Order date'], untokened: 0, canCreate: true }).text).toBe('Rows 51–100; more follow. Filtered by Order date.')
+    expect(answered({ start: 0, count: 0, hasMore: false, search: '', filtered, untokened: 0, canCreate: true })).toEqual({ text: 'No records match the filter on Notes and Amount.', help: null, clear: false })
+    expect(answered({ start: 0, count: 0, hasMore: false, search: 'Zug', filtered, untokened: 0, canCreate: true })).toEqual({ text: 'No records match “Zug” and the filter on Notes and Amount.', help: null, clear: true })
+    expect(answered({ start: 0, count: 0, hasMore: false, search: '', filtered: ['Carrier'], untokened: 0, canCreate: true, noun: 'Delivery' })).toEqual({ text: 'No Delivery rows match the filter on Carrier.', help: null, clear: false })
+    expect(answered({ start: 0, count: 2, hasMore: false, search: '', filtered: [], untokened: 0, canCreate: true }).text).toBe('Rows 1–2.')
+  })
+
   // A row whose key does not fit in a token cannot be opened; said in the
   // page's words, a click on it would otherwise do nothing a person can hear.
   test('says why a row without a token does not open', () => {
@@ -44,16 +61,23 @@ describe('the status line', () => {
 describe('what a grid asks for', () => {
   // The grid's own numbers become the route's: its sort model becomes the
   // sort, its start row the offset and the block the limit; the search is
-  // the one submitted, never per keystroke.
-  test('is the sort, the page and the parent the grid shows', () => {
-    expect(listQuery({ search: 'Zug', sortModel: [{ colId: 'order_date', sort: 'desc' }], parent: null, startRow: 50, endRow: 100 })).toEqual({
+  // the one submitted, never per keystroke, and the filter the one applied,
+  // on every block, not only the first (watched failing with the filter
+  // left out of the request: "filter": []).
+  test('is the sort, the page, the parent and the filter the grid shows', () => {
+    const filter = [
+      { field: 'notes', op: 'contains' as const, text: 'Zug' },
+      { field: 'amount', op: 'range' as const, from: '2', to: null },
+    ]
+    expect(listQuery({ search: 'Zug', sortModel: [{ colId: 'order_date', sort: 'desc' }], parent: null, filter, startRow: 50, endRow: 100 })).toEqual({
       search: 'Zug',
       sort: [{ field: 'order_date', direction: 'desc' }],
       parent: null,
+      filter,
       offset: 50,
       limit: 50,
     })
-    expect(listQuery({ search: '', sortModel: [], parent: { field: 'order', record: 'k1:1' }, startRow: 0, endRow: 50 }).parent).toEqual({ field: 'order', record: 'k1:1' })
+    expect(listQuery({ search: '', sortModel: [], parent: { field: 'order', record: 'k1:1' }, filter: [], startRow: 0, endRow: 50 })).toMatchObject({ parent: { field: 'order', record: 'k1:1' }, filter: [] })
   })
 
   // A row's id is its token, so the page can find the open record's row;
