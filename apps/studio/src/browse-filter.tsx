@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { filterOffer } from '@formancy/data-core'
-import type { BrowseFilterTerm, FilterCondition, FilterInput, FilterOffer, FilterOp, ObjectMeta, RecordColumn } from '@formancy/data-core'
-import { sayValue } from './related.js'
+import type { BrowseFilterTerm, FilterOffer, FilterOp, ObjectMeta, RecordColumn } from '@formancy/data-core'
+import { chosenOp, ConditionValues, conditionOf, EMPTY_VALUES, hintOf, OPS, sayCondition } from './condition-draft.js'
+import type { ValueDraft } from './condition-draft.js'
 
 /*
  * A browsed page's filter (0104): the person's own conditions on the
@@ -40,89 +41,12 @@ export function filterables(object: ObjectMeta | undefined, shown: readonly Reco
   })
 }
 
-/** A condition as a page says it: `status = shipped`, `amount from 1 to 5`, `name contains “gmbh”`, `notes is NULL`. */
-export function sayCondition(term: BrowseFilterTerm): string {
-  switch (term.op) {
-    case 'equals':
-      return `${term.column} = ${sayValue(term.value)}`
-    case 'contains':
-      return `${term.column} contains “${term.text}”`
-    case 'null':
-      return `${term.column} is NULL`
-    case 'not-null':
-      return `${term.column} is not NULL`
-    case 'range':
-      if (term.from !== null && term.to !== null) return `${term.column} from ${sayValue(term.from)} to ${sayValue(term.to)}`
-      return term.from !== null ? `${term.column} from ${sayValue(term.from)}` : `${term.column} up to ${sayValue(term.to ?? '')}`
-  }
-}
-
-/** What the Condition select calls each operator. */
-const OPS: Readonly<Record<FilterOp, string>> = { equals: 'equals', range: 'is in a range', contains: 'contains', null: 'is NULL', 'not-null': 'is not NULL' }
-
-/** What the person has typed or chosen and not yet applied. An empty column or operator is the first one offered. */
-interface Draft {
+/** What the person has typed or chosen and not yet applied. An empty column is the first one offered. */
+interface Draft extends ValueDraft {
   column: string
-  op: FilterOp | null
-  value: string
-  from: string
-  to: string
 }
 
-const EMPTY: Draft = { column: '', op: null, value: '', from: '', to: '' }
-
-/**
- * The condition a draft asks for. Text is sent exactly as typed: equality
- * is the whole value, spaces included. Anything else is trimmed, as the
- * server trims it, so the page says the value compared; a contains is
- * trimmed as the search box is; and an empty bound is no bound.
- */
-function conditionOf(op: FilterOp, input: FilterInput | null, draft: Draft): FilterCondition {
-  const typed = (given: string) => (input === 'text' ? given : given.trim())
-  const bound = (given: string) => (given.trim() === '' ? null : given.trim())
-  switch (op) {
-    case 'equals':
-      return { op, value: input === 'boolean' ? (draft.value === 'false' ? 'false' : 'true') : typed(draft.value) }
-    case 'contains':
-      return { op, text: draft.value.trim() }
-    case 'range':
-      return { op, from: bound(draft.from), to: bound(draft.to) }
-    case 'null':
-    case 'not-null':
-      return { op }
-  }
-}
-
-/** What the form says under its boxes about the condition chosen, or nothing. */
-function hintOf(chosen: Filterable, op: FilterOp): string | null {
-  const either = 'Either may be left empty.'
-  const span = 'from the start of the day From names to the end of the day To names.'
-  if (op === 'range' && chosen.offer.days === 'utc') return `${chosen.column} is filtered by whole days in UTC: ${span} ${either}`
-  if (op === 'range' && chosen.offer.days === 'wall') return `${chosen.column} holds no time zone, so it is filtered by whole days as its values are written: ${span} ${either}`
-  if (op === 'range') return 'From and To are both included, and either may be left empty.'
-  if (op === 'contains') return 'Found anywhere in the value, as the search finds it.'
-  if (chosen.offer.input === 'text' && op === 'equals') return 'The whole value, exactly: case and spaces count.'
-  if (chosen.offer.input === 'text' && op === 'null') return 'Text of no characters is a value, not NULL.'
-  return null
-}
-
-/** One box of the form, typed as its input asks: a day as a date, anything else as text, a boolean chosen. */
-function Box({ id, label, input, value, hint, onChange }: { id: string; label: string; input: FilterInput | null; value: string; hint: string | null; onChange: (value: string) => void }): ReactElement {
-  const described = hint === null ? undefined : 'filter-hint'
-  return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
-      {input === 'boolean' ? (
-        <select id={id} value={value === 'false' ? 'false' : 'true'} aria-describedby={described} onChange={(event) => onChange(event.target.value)}>
-          <option value="true">true</option>
-          <option value="false">false</option>
-        </select>
-      ) : (
-        <input id={id} type={input === 'date' ? 'date' : 'text'} value={value} autoComplete="off" spellCheck={false} aria-describedby={described} onChange={(event) => onChange(event.target.value)} />
-      )}
-    </div>
-  )
-}
+const EMPTY: Draft = { column: '', ...EMPTY_VALUES }
 
 /**
  * The form that adds one condition: a column without one, an operator it
@@ -135,8 +59,8 @@ function AddCondition({ available, onAdd }: { available: Filterable[]; onAdd: (t
   const chosen = available.find((entry) => entry.column === draft.column) ?? available[0]
   if (chosen === undefined) return <p className="none">Every column this page can be filtered by has a condition.</p>
   const { operators, input } = chosen.offer
-  const op = draft.op !== null && operators.includes(draft.op) ? draft.op : (operators[0] as FilterOp)
-  const hint = hintOf(chosen, op)
+  const op = chosenOp(chosen.offer, draft.op)
+  const hint = hintOf(chosen.column, chosen.offer, op)
 
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault()
@@ -169,20 +93,7 @@ function AddCondition({ available, onAdd }: { available: Filterable[]; onAdd: (t
           </select>
         </div>
       </div>
-      {op === 'equals' || op === 'contains' ? (
-        <Box id="filter-value" label={op === 'equals' ? 'Value' : 'Text'} input={op === 'contains' ? 'text' : input} value={draft.value} hint={hint} onChange={(value) => setDraft({ ...draft, column: chosen.column, value })} />
-      ) : null}
-      {op === 'range' ? (
-        <div className="pair">
-          <Box id="filter-from" label="From" input={input} value={draft.from} hint={hint} onChange={(from) => setDraft({ ...draft, column: chosen.column, from })} />
-          <Box id="filter-to" label="To" input={input} value={draft.to} hint={hint} onChange={(to) => setDraft({ ...draft, column: chosen.column, to })} />
-        </div>
-      ) : null}
-      {hint === null ? null : (
-        <p id="filter-hint" className="hint">
-          {hint}
-        </p>
-      )}
+      <ConditionValues prefix="filter" op={op} input={input} draft={draft} hint={hint} onChange={(values) => setDraft({ ...draft, ...values, column: chosen.column })} />
       <div className="actions">
         <button type="submit" id="filter-apply" className="button">
           Apply
@@ -219,7 +130,7 @@ export function FilterPanel({ columns, active, onFilter }: { columns: Filterable
           <p id="filtered-by">Filtered by</p>
           <ul aria-labelledby="filtered-by">
             {active.map((term, index) => {
-              const said = sayCondition(term)
+              const said = sayCondition(term.column, term)
               return (
                 <li key={term.column}>
                   <span>{said}</span>

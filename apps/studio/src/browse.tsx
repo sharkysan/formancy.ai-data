@@ -4,9 +4,10 @@ import { browseRelations, findObject, LIST_PAGE_SIZE } from '@formancy/data-core
 import type { ApiValue, BrowseEqualTerm, BrowseFilterTerm, BrowseRelations, BrowseSortTerm, MetadataSnapshot, ObjectRef, OmittedColumn } from '@formancy/data-core'
 import type { BrowseAnswer } from '@formancy/data-server'
 import type { AdminClient } from './api.js'
-import { FilterPanel, filterables, sayCondition } from './browse-filter.js'
+import { FilterPanel, filterables } from './browse-filter.js'
 import type { Filterable } from './browse-filter.js'
 import { describeRef } from './choice.js'
+import { sayCondition } from './condition-draft.js'
 import { useFocusAfterRender } from './focus.js'
 import { KeyHints, Related, sayTerms } from './related.js'
 
@@ -51,7 +52,7 @@ function nextSort(current: BrowseSortTerm | null, column: string): BrowseSortTer
 function narrowedBy(asked: Asked): string {
   const lead = [
     ...(asked.equal.length === 0 ? [] : [`where ${sayTerms(asked.equal)}`]),
-    ...(asked.filter.length === 0 ? [] : [`filtered by ${asked.filter.map(sayCondition).join(' and ')}`]),
+    ...(asked.filter.length === 0 ? [] : [`filtered by ${asked.filter.map((term) => sayCondition(term.column, term)).join(' and ')}`]),
     ...(asked.search === '' ? [] : [`matching “${asked.search}”`]),
     'showing',
   ].join(', ')
