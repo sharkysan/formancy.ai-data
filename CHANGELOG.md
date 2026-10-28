@@ -134,6 +134,10 @@ later.
   - **`@formancy/data-client` refuses a form whose `list` has no `views`**,
     `unexpected`: upgrade the server before a host's client. It re-exports
     `ListView`.
+  - **`@formancy/data-core`'s `listColumns` takes the published views as a
+    third argument** and its `ListColumns` has `views`; `ListView`,
+    `viewShapeProblems`, `viewProblems` and `readSort` are new exports. A
+    caller of `listColumns(bindings, fields)` passes `[]` for no views.
   - A view holds no value relative to the day or the person, is kept to no
     role, and is not remembered across a reload; a person cannot save one of
     their own. Nothing says that a stored view a later release no longer

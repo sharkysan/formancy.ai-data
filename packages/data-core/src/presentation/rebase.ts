@@ -271,7 +271,11 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
     oldFields,
     newFields,
     anchorOf,
-    follow: (key) => newKeys.get(canonicalize(anchorOf.get(key))),
+    // A key the published bindings do not hold follows to nothing: a stored list view names one only by a hand edit (0105).
+    follow: (key) => {
+      const anchor = anchorOf.get(key)
+      return anchor === undefined ? undefined : newKeys.get(canonicalize(anchor))
+    },
     told: (anchor) => !unmatched.has(anchor.label),
     subjectOf: (key) => oldFields.findIndex((field) => field.key === key),
     add: (subject, conflict) => conflicts.push({ subject, rank: RANK[conflict.kind], conflict }),

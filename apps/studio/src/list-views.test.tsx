@@ -200,7 +200,7 @@ describe('a view refused', () => {
     expect(refusal()).toEqual(['The view was not saved:', '/views/1: says nothing; leave the view out'])
     await addCondition(user, 'Amount', 'is in a range')
     await pressSave(user)
-    expect(refusal()).toEqual(['The view was not saved:', '/views/1/filter: A range on amount has a from, a to or both.'])
+    expect(refusal()).toEqual(['The view was not saved:', '/views/1/filter/0: A range on amount has a from, a to or both.'])
     expect(savedViews()).toEqual(['Large: where Amount from 1000.'])
     expect(await audit()).toEqual([])
     expect(unnamed()).toEqual([])

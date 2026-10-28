@@ -41,24 +41,68 @@ function nameProblem(name: unknown): string | null {
   return null
 }
 
-/** Every reason one view is not shaped as one, at `at`; its name, when it has one, for the caller's uniqueness check. */
-function viewShape(view: unknown, at: string): { problems: string[]; name: string | null; isDefault: boolean } {
-  if (!isRecord(view)) return { problems: [`${at} must be an object`], name: null, isDefault: false }
+/**
+ * Every reason a view's filter is not one a list request could carry, at
+ * `at`: a list of conditions, each read on its own by `readFilter`, and each
+ * field once. One at a time, because what a `contains` may find is the
+ * view's fit and not its shape (a later release's search rules must not make
+ * a stored version unreadable), and `readFilter` stops at the first refusal:
+ * read whole, a contains it refuses would hide every malformed condition
+ * after it.
+ */
+function filterShape(filter: unknown, at: string): string[] {
+  if (!Array.isArray(filter)) return [`${at}/filter must be a list of conditions, [] for none`]
+  const problems: string[] = []
+  const fields = new Set<string>()
+  for (const [index, term] of filter.entries()) {
+    const read = readFilter([term], 'field')
+    if (!read.ok && read.code === 'malformed') {
+      problems.push(`${at}/filter/${String(index)}: ${read.message}`)
+      continue
+    }
+    const field = (term as Record<string, unknown>)['field'] as string
+    if (fields.has(field)) problems.push(`${at}/filter: ${field} is named twice in the filter.`)
+    fields.add(field)
+  }
+  return problems
+}
+
+/**
+ * What a view asks, as one text: its conditions in the order of their
+ * fields, since every one must hold whatever their order, and its sort as
+ * it runs. Two views that ask the same are one choice a picker cannot tell
+ * apart: the host shows the first for both.
+ */
+function asked(filter: readonly unknown[], sort: readonly unknown[]): string {
+  const byField = [...filter].sort((left, right) => {
+    const [a, b] = [(left as { field: string }).field, (right as { field: string }).field]
+    return a < b ? -1 : a > b ? 1 : 0
+  })
+  return canonicalize({ filter: byField, sort })
+}
+
+/** Every reason one view is not shaped as one, at `at`; its name and what it asks, when it has them, for the caller's checks across views. */
+function viewShape(view: unknown, at: string): { problems: string[]; name: string | null; asks: string | null; isDefault: boolean } {
+  if (!isRecord(view)) return { problems: [`${at} must be an object`], name: null, asks: null, isDefault: false }
   const problems: string[] = []
   for (const key of Object.keys(view)) if (!PROPERTIES.includes(key)) problems.push(`${at}/${key} is not a property of a list view`)
   const named = nameProblem(view['name'])
   if (named !== null) problems.push(`${at}/name ${named}`)
-  // A contains a search could not run is the view's fit, not its shape: a later release's search rules must not make a stored version unreadable.
-  const filter = Object.hasOwn(view, 'filter') ? readFilter(view['filter'], 'field') : null
-  if (filter === null) problems.push(`${at}/filter must be a list of conditions, [] for none`)
-  else if (!filter.ok && filter.code === 'malformed') problems.push(`${at}/filter: ${filter.message}`)
+  const filter = Object.hasOwn(view, 'filter') ? filterShape(view['filter'], at) : [`${at}/filter must be a list of conditions, [] for none`]
+  problems.push(...filter)
   const sort = Object.hasOwn(view, 'sort') ? readSort(view['sort']) : null
   if (sort === null) problems.push(`${at}/sort must be a list of { field, direction }, [] for none`)
   else if (!sort.ok) problems.push(`${at}/sort: ${sort.message}`)
   const isDefault = Object.hasOwn(view, 'default')
   if (isDefault && view['default'] !== true) problems.push(`${at}/default must be true, or left out`)
-  if (Array.isArray(view['filter']) && view['filter'].length === 0 && Array.isArray(view['sort']) && view['sort'].length === 0) problems.push(`${at}: says nothing; leave the view out`)
-  return { problems, name: named === null ? (view['name'] as string) : null, isDefault: isDefault && view['default'] === true }
+  const shaped = filter.length === 0 && sort?.ok === true
+  if (shaped && (view['filter'] as unknown[]).length === 0 && (view['sort'] as unknown[]).length === 0) problems.push(`${at}: says nothing; leave the view out`)
+  return {
+    problems,
+    name: named === null ? (view['name'] as string) : null,
+    asks: shaped ? asked(view['filter'] as unknown[], view['sort'] as unknown[]) : null,
+    isDefault: isDefault && view['default'] === true,
+  }
 }
 
 /**
@@ -67,14 +111,17 @@ function viewShape(view: unknown, at: string): { problems: string[]; name: strin
  * property left out, so a presentation has one spelling -- of `{ name,
  * filter, sort }` with `default: true` on at most one; a name a person can
  * read, no two alike but for case; a filter and a sort a list request
- * could carry, each field once; and not both empty, which is the list
- * itself. Whether the fields it names offer what it asks is `viewFit`'s.
+ * could carry, each field once; not both empty, which is the list itself;
+ * and no two views asking the same, which a picker could not tell apart.
+ * Whether the fields it names offer what it asks is `viewFit`'s.
  */
 export function viewShapeProblems(value: unknown): string[] {
   if (!Array.isArray(value)) return ['views must be a list']
   if (value.length === 0) return ['views: names none; leave it out']
   const problems: string[] = []
   const names = new Set<string>()
+  /** What each view seen so far asks, and its name, which a later one asking the same is told apart from. */
+  const asks = new Map<string, string>()
   let defaults = 0
   for (const [index, view] of value.entries()) {
     const at = `/views/${String(index)}`
@@ -84,6 +131,11 @@ export function viewShapeProblems(value: unknown): string[] {
       const folded = shape.name.toLowerCase()
       if (names.has(folded)) problems.push(`${at}/name: “${shape.name}” is another view’s name`)
       names.add(folded)
+    }
+    if (shape.asks !== null) {
+      const same = asks.get(shape.asks)
+      if (same !== undefined) problems.push(`${at}: asks what “${same}” asks, so a picker could not tell them apart`)
+      else asks.set(shape.asks, shape.name ?? `view ${String(index)}`)
     }
     if (shape.isDefault) defaults += 1
   }

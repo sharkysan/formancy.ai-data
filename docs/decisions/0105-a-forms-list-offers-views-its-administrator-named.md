@@ -5,15 +5,16 @@
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/presentation/views.test.ts` --
   a view's shape read on every read, a name a picker can show and two
-  alike but for case refused, `views: []` refused, and a contains a search
-  could not run left to the fit; the fit refusing a value its column cannot
+  alike but for case refused, two views asking the same refused, `views:
+  []` refused, and a contains a search could not run left to the fit
+  without hiding a malformed condition after it; the fit refusing a value its column cannot
   hold, a field a list neither filters nor sorts by, an operator not
   offered and a contains stored untrimmed; `listColumns` withholding a view
   naming a field the person may not read, and its default with it, and a
   stored view that no longer fits, and every view it offers accepted by
   `planList`; and the rebase following a renumbered key and dropping,
-  after the fields' and sections' conflicts, a view whose column is gone or
-  no longer answers. `packages/data-server/src/bundle.test.ts` -- views
+  after the fields' and sections' conflicts, a view whose column is gone,
+  no longer answers or was never bound. `packages/data-server/src/bundle.test.ts` -- views
   read by shape and their fit not asked on read;
   `routes/admin.test.ts` -- a publish refusing a view its bindings cannot
   run, naming it, and storing one they can; `routes/runtime-lists.test.ts`
@@ -85,12 +86,16 @@ The shape is a non-empty list of `{ name, filter, sort }` with an optional
 character and no lone surrogate, and no two names are alike but for case.
 A filter and a sort are read by the request's own readers, `readFilter`
 and `readSort`, each field named once. Filter and sort are not both empty,
-which would be the list itself. At most one view is the default.
+which would be the list itself. No two views ask the same -- the same
+conditions, in whatever order, and the same sort -- since a picker shows
+a grid's filter and sort as the first view that asks them, and could never
+show the second. At most one view is the default.
 
 What `contains` may find is a search's rule (0104), which a later release
 may tighten. A view whose text a search could not be is therefore a fit
 problem, not a shape problem: the version stays readable, and that view is
-not offered.
+not offered. Each condition is read on its own, so a contains of that kind
+hides no malformed condition after it.
 
 The fit, `viewFit`, is one decision for a write and for an offer:
 - its filter reads as a request's does, and is stored as it reads, with a
