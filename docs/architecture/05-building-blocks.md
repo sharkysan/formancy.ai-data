@@ -409,8 +409,12 @@ else ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-i
 save's answer does — framework-neutral, so both renderers show one decision
 (0029). `src/forms-nav.tsx` draws the menu (0045); `src/record-grid.tsx`,
 `src/grid-datasource.ts` and `src/grid-options.tsx` put a page of records
-at a time in AG Grid Community (0044), the grid's handle giving the sort
-its datasource last asked with; `src/filter-panel.tsx` is a grid's Filter
+at a time in AG Grid Community (0044), its sort the section's, held beside
+its filter, which its headers show and a press on one tells back;
+`src/view-picker.tsx` is a grid's View picker and `src/views.ts` which view
+a filter and a sort are, if any, and which one a grid opens on
+([0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md));
+`src/filter-panel.tsx` is a grid's Filter
 panel and `src/filter-terms.ts` what it offers, sends and says
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md));
 `src/children.tsx` lists a record's child rows; Drill down, a layout of one level at a time, is

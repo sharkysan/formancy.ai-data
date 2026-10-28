@@ -632,6 +632,18 @@ filter is its own, and opening another parent starts without one; the
 filter is in no address, so a reload or another form starts without one too
 ([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 
+Where the form's administrator named list views, View, after the search
+and first in a child section, offers All records and each view the server
+offers you by its name. Picking one sets the grid's filter and sort at
+once, in one request: the Filter panel lists its conditions and the
+headers show its order. Any condition you add or header you press makes it
+Your own filter and sort, and the view's own conditions and order show the
+view again. A grid opens on the view marked to open it, and on every record
+where that view names a field you may not read, which is then not offered
+to you at all. No view is kept in the address, so a reload starts on that
+view again
+([0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
+
 Download CSV, beside New record in the Records panel and beside each child
 section's New, saves one file of the records that grid lists, as the server
 makes it: the search you submitted, not what the box holds, the grid's

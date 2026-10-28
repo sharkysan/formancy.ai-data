@@ -216,7 +216,10 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    infinite row model, the search sent on Search or Enter, never per key
    (0047), and with every block the conditions its Filter panel applied
    (`apps/host/src/filter-panel.tsx`, over the fields `list.filterable`
-   names); a new filter starts the grid again from its first row.
+   names) and the section's sort; a new filter or sort starts the grid again
+   from its first row. A View picker (`apps/host/src/view-picker.tsx`) offers
+   `list.views` and sets both at once, as one first page; the grid opens on
+   the view marked `default`, when it is offered (0105).
 3. `routes/runtime-lists.ts` checks the body and asks `planList`
    (`packages/data-core/src/records/list.ts`) before any statement:
    `listable` puts the read policy first -- its filter, every through
@@ -241,9 +244,10 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
 Held by each adapter's `list.integration.test.ts`, its shared cases in
 `LIST_PARITY` and `COLUMN_FILTER_PARITY`; `routes/runtime-lists.test.ts`;
 `plan-list.test.ts` and `filter.test.ts` in
-`packages/data-core/src/records`; `lists.integration.test.ts` in
-`packages/data-client/src`; and `apps/host/src/grid-datasource.test.ts` and
-`filter.test.tsx`.
+`packages/data-core/src/records`, and `views.test.ts` in
+`packages/data-core/src/presentation`; `lists.integration.test.ts` in
+`packages/data-client/src`; and `apps/host/src/grid-datasource.test.ts`,
+`filter.test.tsx`, `views.test.ts` and `view-picker.test.tsx`.
 What it costs: a page reads every row before it, by how the engines run an
 offset, not measured here; the rest is 0044's and 0061's, in
 [section 11.2](11-risks-and-debt.md#112-known-limitations-by-area).
@@ -452,9 +456,10 @@ and a publisher alone restores any version, unreviewed ones too (0065).
    ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
    On the host page it is Download CSV, in the head of the Records panel
    or of a child section (`apps/host/src/download.tsx`): the panel's
-   submitted search and applied filter, the sort `RecordGrid`'s handle says
-   its datasource last asked with, and a child section's record as the
-   parent
+   submitted search, and the filter and sort the section holds and its
+   grid's headers show
+   ([0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md)),
+   and a child section's record as the parent
    ([0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)). Its line says "Making <form id>.csv."; the button is
    `aria-disabled` and sends nothing more; the section leaving the page
    aborts the request.

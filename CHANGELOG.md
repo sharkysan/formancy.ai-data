@@ -105,6 +105,39 @@ later.
     measured; on SQL Server a `datetime` or `smalldatetime` column is
     converted to `datetime2` to meet a day's bound, which may keep its
     index from being sought.
+- **An administrator names a form's list views in the studio, and a person
+  picks one above the host's grid** (0105). Why: the questions a team asks
+  of one form are mostly the same few -- the orders still open, the
+  customers with no credit limit -- and every person built each again,
+  condition by condition, and lost it with the next reload. What you notice:
+  - **A presentation may hold `views`**, each `{ name, filter, sort }`,
+    every term what a list request carries, and `default: true` on the one
+    a grid opens on. Left out when there are none; `views: []` is refused.
+    Every read checks their shape, and a publish, an import and a draft's
+    submit and approval refuse a view a list of the form could not run, 422
+    `invalid-bundle`, naming it. A regeneration carries each view by the
+    columns it names and drops one whose column is gone or no longer offers
+    what it asks, as the conflict `view-dropped`.
+  - **`GET /v1/forms/:id`'s `list` has `views`**: those this person could
+    have built from the rest of `list`. A view naming a field they may not
+    read is not offered at all, nor its default, and nor is a stored view
+    this release would not run.
+  - **The studio's Presentation step has List views**, which makes, edits,
+    moves and removes views by keyboard, checked as the server checks them
+    before they are saved; Generate again carries them, and the Review step
+    shows a draft's.
+  - **The host has a View picker** before each grid's Filter panel: All
+    records, each view, and Your own filter and sort once a condition or a
+    header changes a picked view. A pick is one request in the view's
+    filter and sort; a grid opens on the default view. Download CSV sends
+    the section's filter and sort, which its headers show.
+  - **`@formancy/data-client` refuses a form whose `list` has no `views`**,
+    `unexpected`: upgrade the server before a host's client. It re-exports
+    `ListView`.
+  - A view holds no value relative to the day or the person, is kept to no
+    role, and is not remembered across a reload; a person cannot save one of
+    their own. Nothing says that a stored view a later release no longer
+    runs is not offered, until a publish refuses it.
 
 ### Changed
 

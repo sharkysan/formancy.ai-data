@@ -3,7 +3,38 @@
 - **Status:** accepted; extends [0030](0030-presentation-is-a-patch-over-the-generated-base.md): a presentation names a list's views, carried by the rebase; extends [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md): a view is a person's filter and sort, named and published
 - **Date:** 2026-10-28
 - **Deciders:** Daniel Bacher
-- **Verified by:** VERIFIED-BY
+- **Verified by:** `packages/data-core/src/presentation/views.test.ts` --
+  a view's shape read on every read, a name a picker can show and two
+  alike but for case refused, `views: []` refused, and a contains a search
+  could not run left to the fit; the fit refusing a value its column cannot
+  hold, a field a list neither filters nor sorts by, an operator not
+  offered and a contains stored untrimmed; `listColumns` withholding a view
+  naming a field the person may not read, and its default with it, and a
+  stored view that no longer fits, and every view it offers accepted by
+  `planList`; and the rebase following a renumbered key and dropping,
+  after the fields' and sections' conflicts, a view whose column is gone or
+  no longer answers. `packages/data-server/src/bundle.test.ts` -- views
+  read by shape and their fit not asked on read;
+  `routes/admin.test.ts` -- a publish refusing a view its bindings cannot
+  run, naming it, and storing one they can; `routes/runtime-lists.test.ts`
+  -- `GET` offering a clerk only the views they could have built;
+  `routes/admin-evolution.test.ts` -- a regeneration answering
+  `view-dropped`. `packages/data-client/src/transport.test.ts` -- a list
+  without views, or with one a picker could not send, refused.
+  `apps/studio/src/list-views.test.tsx`, `carry.test.ts`,
+  `publish.test.tsx`, `regenerate.test.tsx` and `review.test.tsx` -- a
+  view defined by keyboard published, refused before saving as the server
+  would refuse it, edited, moved and removed, carried by Generate again
+  and a regeneration with a dropped one said, held back from a publish
+  when it no longer fits, and shown to a reviewer.
+  `apps/host/src/views.test.ts` and `view-picker.test.tsx`, on both engines
+  -- a grid opening on its default in one request, a view picked as one
+  first page in its filter and its sort, a condition or a header making the
+  section the person's own, All records, a default on a field the person
+  may not read leaving the grid on every record, the file in the view's
+  filter and sort, a child section's own views, and no picker without
+  views. The browser gates' `apps/studio/scripts/browser/journey.mjs` and
+  `apps/host/scripts/browser/viewing.mjs`.
 
 ## Context
 
@@ -88,7 +119,32 @@ timestamp has no equality, 0104), is dropped whole and said as
 `view-dropped`, after the fields' and sections' conflicts, and its default
 goes with it.
 
-**The studio defines them, and the host offers them.** HOST-STUDIO
+**The studio defines them, and the host offers them.** The Presentation
+step's List views (`apps/studio/src/list-views.tsx`, `view-form.tsx`)
+makes, edits, removes and moves views by keyboard. Its fields are offered
+by their labels, from `listColumns` over every field, and its conditions
+are typed with the Browse step's boxes and hints, one module both use
+(`condition-draft.tsx`). Before a view is saved it is checked by
+`viewShapeProblems` and `viewProblems`, the server's own checks. Generate
+again and a regeneration carry the views through `rebasePresentation`;
+the Publish step sends them in the presentation; and the Review step shows
+a draft's views under its policy, so a publisher approves what they can
+see.
+
+The host's View picker (`apps/host/src/view-picker.tsx`) is a native select
+before a grid's Filter panel, in the Records panel and in each child
+section, shown only where the server offers a view. Its choices are "All
+records", each view by name, and "Your own filter and sort". The last is
+there only while the section's filter and sort match no view and are not
+both empty. What it shows is derived from the filter and the sort
+(`views.ts`) and never kept, so a condition added or a header pressed
+after a pick is the person's own, and the view's exact conditions and
+order show the view again.
+
+The grid's sort is the section's, held beside its filter, as Download CSV
+sends it. Picking a view sets both at once and asks for one first page.
+A grid opens on the view offered as the default, and no view enters the
+address, as no filter does (0104).
 
 ## Consequences
 
