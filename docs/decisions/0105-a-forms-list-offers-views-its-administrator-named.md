@@ -1,6 +1,6 @@
 # 0105 — A form's list offers views its administrator named, each one a filter and a sort a person could have built
 
-- **Status:** accepted; extends [0030](0030-presentation-is-a-patch-over-the-generated-base.md): a presentation names a list's views, carried by the rebase; extends [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md): a view is a person's filter and sort, named and published
+- **Status:** accepted; extends [0030](0030-presentation-is-a-patch-over-the-generated-base.md): a presentation names a list's views, carried by the rebase; extends [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md): a view is a person's filter and sort, named and published; extended by [0106](0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md): a grid opens on the view its viewer last picked, kept by name in their browser, before the default
 - **Date:** 2026-10-28
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/presentation/views.test.ts` --

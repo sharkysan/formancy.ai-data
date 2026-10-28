@@ -144,6 +144,25 @@ later.
     their own. Nothing says that a stored view a later release no longer
     runs is not offered, until a publish refuses it.
 
+- **A host's grid lets a person choose its columns, and keeps them, its
+  sort and its view in the viewer's browser** (0106). Why: a form over a
+  wide table showed every readable field in the generator's order, and a
+  sort or a picked view was gone with the next reload. What you notice:
+  - **Columns**, between View and Filter on every grid, lists its columns:
+    "Show <label>", "Move <label> up" and "Move <label> down", and Reset
+    columns. By keyboard; the last shown column stays; Delete stays last.
+    A hidden column is hidden, not removed, so a view sorting by it still
+    lists.
+  - **The browser keeps, per form and kind of grid**, under
+    `formancy-data-host.grid.<records|child>.<form id>`, the arranged
+    columns and the list's state: a view by name, or the sort, `[]` being
+    All records over the default view. A person's own filter conditions,
+    and so no typed value, are never kept. Opening a form writes nothing.
+  - Kept by the browser, not the person: another device starts afresh, and
+    a shared browser is shared. Every child section of one form shares one
+    arrangement. Widths, search and page are not kept; Download CSV still
+    holds every readable field.
+
 ### Changed
 
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's

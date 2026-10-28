@@ -231,6 +231,12 @@ choice of one across a reload. A person who may not read a field a view
 names is not offered it; a stored view a later release no longer runs is
 not offered either, and nothing says so until a publish refuses it
 ([0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
+A grid's columns, sort and view are kept by the viewer's browser, not the
+person: they follow nobody to another device, everybody signed in on one
+browser shares them, every child section of one form shares one
+arrangement, and a person's own filter conditions are never kept; a
+hidden column is still read, and its width is still its content's
+([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
 
 **Writes.** On SQL Server, a table with an enabled INSTEAD OF trigger cannot
 be written that way through the adapter, `returning` is the row before an
