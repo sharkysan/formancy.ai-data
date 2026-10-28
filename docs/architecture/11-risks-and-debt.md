@@ -226,15 +226,15 @@ a large table is not measured
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 A list view an administrator named is only what a person could have built,
 so no view is relative to the day or the person; it is the same for every
-person who may read its fields, kept to no role, and the host remembers no
-choice of one across a reload. A person who may not read a field a view
+person who may read its fields and kept to no role, and the host keeps a
+picked one in the viewer's browser alone (0106). A person who may not read a field a view
 names is not offered it; a stored view a later release no longer runs is
 not offered either, and nothing says so until a publish refuses it
 ([0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
 A grid's columns, sort and view are kept by the viewer's browser, not the
 person: they follow nobody to another device, everybody signed in on one
-browser shares them, every child section of one form shares one
-arrangement, and a person's own filter conditions are never kept; a
+browser shares them, every child section of one form under one field
+shares one arrangement, and a person's own filter conditions are never kept; a
 hidden column is still read, and its width is still its content's
 ([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
 

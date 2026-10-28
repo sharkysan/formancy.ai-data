@@ -94,17 +94,24 @@ describe('the split', () => {
 })
 
 describe("a grid's key", () => {
-  // One value per form and kind of section, under the prefix a test can
-  // name: the Records panel's and a child section's of one form are two
-  // grids -- the child's leaves out its parent's field -- and the kind goes
-  // first, so no form id spells another form's key (watched failing with
-  // the form id alone: one key for the Records panel's grid and a child
-  // section's).
-  test('is one per form and kind of section, under the grid prefix', () => {
-    const keys = [gridKey('records', 'pg-order'), gridKey('child', 'pg-order'), gridKey('records', 'pg-delivery')]
-    expect(new Set(keys).size).toBe(3)
+  // One value per form in its Records panel, and per form and parent field
+  // in a child section, under the prefix a test can name: the Records
+  // panel's grid and a child section's are two grids -- the child's leaves
+  // out its parent's field -- and an employee's orders created and
+  // approved, both on screen, are two child sections, each keeping its own
+  // (watched failing with one key per form and kind: the second section's
+  // change wrote over the first's view). The kind goes first, so no form id
+  // spells another form's key.
+  test('is one per form and section, a child section by its field, under the grid prefix', () => {
+    const keys = [
+      gridKey({ kind: 'records' }, 'pg-order'),
+      gridKey({ kind: 'child', field: 'created_by' }, 'pg-order'),
+      gridKey({ kind: 'child', field: 'approved_by' }, 'pg-order'),
+      gridKey({ kind: 'records' }, 'pg-delivery'),
+    ]
+    expect(new Set(keys).size).toBe(4)
     for (const key of keys) expect(key.startsWith(PREFERENCES.grid)).toBe(true)
-    expect(gridKey('records', 'pg-order')).toBe('formancy-data-host.grid.records.pg-order')
+    expect(keys.slice(0, 2)).toEqual(['formancy-data-host.grid.records.pg-order', 'formancy-data-host.grid.child.pg-order/created_by'])
   })
 
   // Reset columns with no list kept leaves nothing to keep, and the key
@@ -112,9 +119,10 @@ describe("a grid's key", () => {
   // that did nothing: the value read back).
   test('is removed when nothing is left to keep', () => {
     const storage = memory()
-    writePreference(storage, gridKey('child', 'pg-delivery'), '{"version":1,"sort":[]}')
-    removePreference(storage, gridKey('child', 'pg-delivery'))
-    expect(readPreference(storage, gridKey('child', 'pg-delivery'))).toBeNull()
+    const key = gridKey({ kind: 'child', field: 'order' }, 'pg-delivery')
+    writePreference(storage, key, '{"version":1,"sort":[]}')
+    removePreference(storage, key)
+    expect(readPreference(storage, key)).toBeNull()
     expect(storage.length).toBe(0)
   })
 })
@@ -127,7 +135,7 @@ test('works when storage throws', () => {
   expect(() => writeRenderer(refusing, 'both')).not.toThrow()
   expect(() => writeSplit(refusing, 60)).not.toThrow()
   expect(readRenderer(undefined)).toBe('react')
-  expect(readPreference(refusing, gridKey('records', 'pg-order'))).toBeNull()
-  expect(() => writePreference(refusing, gridKey('records', 'pg-order'), '{}')).not.toThrow()
-  expect(() => removePreference(refusing, gridKey('records', 'pg-order'))).not.toThrow()
+  expect(readPreference(refusing, gridKey({ kind: 'records' }, 'pg-order'))).toBeNull()
+  expect(() => writePreference(refusing, gridKey({ kind: 'records' }, 'pg-order'), '{}')).not.toThrow()
+  expect(() => removePreference(refusing, gridKey({ kind: 'records' }, 'pg-order'))).not.toThrow()
 })

@@ -38,6 +38,16 @@ export function viewMatching(views: readonly ListView[], filter: readonly ListFi
   return views.find((view) => sameSort(view.sort, sort) && sameFilter(view.filter, filter)) ?? null
 }
 
+/**
+ * The first of `views` whose conditions are exactly `filter`, whatever its
+ * sort, or null; null for no conditions, which are every view's that only
+ * sorts. A view's conditions sorted another way are still the view's, not
+ * the person's: their values are the administrator's (0106).
+ */
+export function viewFiltering(views: readonly ListView[], filter: readonly ListFilterTerm[]): ListView | null {
+  return filter.length === 0 ? null : (views.find((view) => sameFilter(view.filter, filter)) ?? null)
+}
+
 /** The view a grid opens on: the one the server offered as the default, or null for every record. */
 export function openingView(views: readonly ListView[]): ListView | null {
   return views.find((view) => view.default === true) ?? null

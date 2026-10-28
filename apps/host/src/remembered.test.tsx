@@ -7,7 +7,7 @@ import { applied, applyCondition, listsSent } from './test-filter.js'
 import { ORDER_VIEWS, VIEWED } from './test-forms.js'
 import { answeredOnce, chooseForm, gridSection, gridStatus, load, loaded, mount, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
-import { headed, headers, keptFor, listed, moveButton, openColumns, showBox } from './test-columns.js'
+import { childGrid, headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
@@ -170,7 +170,7 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     await waitFor(() => expect(shown('Records')).toBe(NEWEST.name), ARRIVES)
     await pick(user, 'Records', 'All records')
     await says('Records', /^Rows 1–\d+(; more follow)?\.$/)
-    expect(keptFor('records', engine.formId)).toEqual({ version: 1, sort: [] })
+    expect(keptFor(RECORDS_GRID, engine.formId)).toEqual({ version: 1, sort: [] })
 
     const again = await reopen(engine.formId)
     await says('Records', /^Rows 1–\d+(; more follow)?\.$/)
@@ -183,7 +183,7 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     within(grid).getByRole('columnheader', { name: /^Order date/ }).focus()
     await again.keyboard('{Enter}')
     const byDate: ListSortTerm[] = [{ field: 'order_date', direction: 'asc' }]
-    await waitFor(() => expect(keptFor('records', engine.formId)).toEqual({ version: 1, sort: byDate }), ARRIVES)
+    await waitFor(() => expect(keptFor(RECORDS_GRID, engine.formId)).toEqual({ version: 1, sort: byDate }), ARRIVES)
     await says('Records', /^Rows 1–\d+(; more follow)?\.$/)
 
     await reopen(engine.formId)
@@ -206,7 +206,7 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     await applyCondition(user, 'Records', { field: 'Notes', condition: 'contains', value: words })
     await says('Records', /^No records match the filter on Notes\.$/)
     expect(shown('Records')).toBe(OWN)
-    expect(keptFor('records', engine.formId)).toEqual({ version: 1, sort: NEWEST.sort })
+    expect(keptFor(RECORDS_GRID, engine.formId)).toEqual({ version: 1, sort: NEWEST.sort })
     expect(everythingKept()).not.toContain(words)
     expect(everythingKept()).not.toContain(VIEWED)
 
@@ -222,21 +222,42 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
   // What was kept is read over what the form offers now: a column it no
   // longer offers dropped, the ones not named appended in the form's
   // order, a view no longer offered by its name leaving the default view;
-  // and a value of another shape is nothing kept (watched failing with the
-  // columns not named left out: Notes drawn alone; and with nothing read
-  // back: every column, in the form's order).
+  // and a value of another shape is nothing kept -- here one holding a
+  // filter, which this release never writes, beside columns that would
+  // hide Id if they were read (watched failing with the columns not named
+  // left out: Notes drawn alone; with nothing read back: every column, in
+  // the form's order; and with the reader's exact keys taken out: Id
+  // hidden by the value of another shape).
   test('reads what was kept over what the form offers now', async () => {
     const labels = await labelsOf(engine.formId)
-    localStorage.setItem(gridKey('records', engine.formId), JSON.stringify({ version: 1, columns: [{ field: 'gone', shown: true }, { field: 'notes', shown: true }, { field: 'id', shown: false }], view: 'A view since renamed' }))
+    localStorage.setItem(gridKey(RECORDS_GRID, engine.formId), JSON.stringify({ version: 1, columns: [{ field: 'gone', shown: true }, { field: 'notes', shown: true }, { field: 'id', shown: false }], view: 'A view since renamed' }))
     await workspace(engine.formId)
     await headed('Records', ['Notes', ...labels.filter((label) => label !== 'Notes' && label !== 'Id')])
     expect(shown('Records')).toBe(NEWEST.name)
 
-    localStorage.setItem(gridKey('records', engine.formId), JSON.stringify({ version: 1, columns: [{ field: 'notes', shown: false }], filter: [{ field: 'notes', op: 'contains', text: 'x' }] }))
+    localStorage.setItem(gridKey(RECORDS_GRID, engine.formId), JSON.stringify({ version: 1, columns: [{ field: 'notes', shown: true }, { field: 'id', shown: false }], filter: [{ field: 'notes', op: 'contains', text: 'x' }] }))
     await reopen(engine.formId)
     await headed('Records', labels)
     expect(shown('Records')).toBe(NEWEST.name)
     expect(applied('Records')).toEqual([`Notes contains “${VIEWED}”Remove`])
+  })
+
+  // Reset columns where no list was ever chosen leaves nothing to keep:
+  // the key goes, so the form opens as it is given, its default view
+  // included, rather than on a value that keeps nothing (watched failing
+  // with the value written as it is: { version: 1 } left under the key).
+  test('Reset columns with no list chosen keeps nothing', async () => {
+    const user = await workspace(engine.formId)
+    const labels = await labelsOf(engine.formId)
+    await headed('Records', labels)
+    await openColumns(user, 'Records')
+    await user.click(showBox('Records', 'Notes'))
+    await headed('Records', labels.filter((label) => label !== 'Notes'))
+    expect(keptFor(RECORDS_GRID, engine.formId)).toEqual({ version: 1, columns: expect.any(Array) })
+    await user.click(within(gridSection('Records')).getByRole('button', { name: 'Reset columns' }))
+    await headed('Records', labels)
+    expect(keptFor(RECORDS_GRID, engine.formId)).toBeNull()
+    expect(localStorage.length).toBe(0)
   })
 
   // A browser with site data blocked throws on every call to storage: the
@@ -289,7 +310,7 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     await user.click(moveButton('Delivery', 'Shipped at', 'up'))
     const arranged = headers('Delivery')
     expect(arranged).not.toContain('Carrier')
-    expect(keptFor('records', engine.formId)).toBeNull()
+    expect(keptFor(RECORDS_GRID, engine.formId)).toBeNull()
 
     await load(user, String(records[1]))
     await loaded(String(records[1]))

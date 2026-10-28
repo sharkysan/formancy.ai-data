@@ -175,6 +175,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   const [status, setStatus] = useState<Status>({ kind: 'loading', text: [quiet ? '' : loading(0, LIST_PAGE_SIZE, props.noun)], help: null, clear: false, retry: false })
   const [pager, setPager] = useState({ page: 0, hasMore: false })
   const shown = useRef({ rows: 0, loaded: false, sized: false, quiet, retrying: false })
+  /** Columns shown while nothing was listed, waiting for a page with rows to be sized to (below). */
+  const unsized = useRef(new Set<string>())
   /** What a record gone from the grid says before the next page's sentence, once. */
   const removedLine = useRef<Said | null>(null)
   /** The sentence of a page, after the removal said first if there is one -- which it then is not again. */
@@ -285,6 +287,17 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         applySelection()
         fit()
         sizeOnce()
+        // Columns shown while nothing was listed: sized to these rows, once they are drawn.
+        if (rows.length > 0 && unsized.current.size > 0) {
+          const waiting = [...unsized.current]
+          unsized.current.clear()
+          setTimeout(() => {
+            const grid = api.current
+            if (grid === null || grid.isDestroyed()) return
+            grid.autoSizeColumns(waiting, true)
+            fit()
+          }, 0)
+        }
         // Ask again stays where it was pressed until the answer; then the rows that came.
         if (fromRetry && rows.length > 0 && firstShown.current !== '') api.current?.setFocusedCell(start, firstShown.current)
       },
@@ -355,18 +368,26 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
 
   // A column shown that was hidden when the page was sized: sized now, to
   // the rows shown, and the well fitted to a header the change may have
-  // made taller or shorter. Nothing to size while a page loads.
+  // made taller or shorter. Shown while a page loads, or over a page with no
+  // rows, it waits in `unsized` for the next page that has some, which
+  // `answered` sizes it to: with nothing to size it to, it would keep AG
+  // Grid's width until the separator is let go, and Stacked has none.
   const drawn = useRef(arranged)
   useEffect(() => {
     if (drawn.current === arranged) return
     const before = new Set(drawn.current.filter((column) => column.shown).map((column) => column.key))
     drawn.current = arranged
-    const grid = api.current
-    if (grid === null || grid.isDestroyed() || !shown.current.loaded) return
     const added = arranged.filter((column) => column.shown && !before.has(column.key)).map((column) => column.key)
+    const grid = api.current
+    if (grid === null || grid.isDestroyed()) return
+    if (!shown.current.loaded || shown.current.rows === 0) {
+      for (const key of added) unsized.current.add(key)
+      if (shown.current.loaded) setTimeout(() => (grid.isDestroyed() ? undefined : fit()), 0)
+      return
+    }
     setTimeout(() => {
       if (grid.isDestroyed()) return
-      if (added.length > 0 && shown.current.rows > 0) grid.autoSizeColumns(added, true)
+      if (added.length > 0) grid.autoSizeColumns(added, true)
       fit()
     }, 0)
   }, [arranged, fit])

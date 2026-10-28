@@ -1,6 +1,6 @@
 import type { ListFilterTerm, ListSortTerm, ListView, PublishedForm } from '@formancy/data-client'
 import type { GridColumn } from './grid-datasource.js'
-import { openingView, viewMatching } from './views.js'
+import { openingView, viewFiltering, viewMatching } from './views.js'
 
 /*
  * A grid's columns as a person arranges them, and what one viewer's browser
@@ -79,10 +79,11 @@ export function showChoice(choices: readonly ColumnChoice[], field: string, show
 }
 
 /**
- * What one viewer's browser keeps of a form's grid in one kind of section:
- * the person's columns, when they arranged them, and the list, when they
- * chose one -- a view by its name, or a sort, where `[]` is every record,
- * whatever the form's default view is. Never both a view and a sort.
+ * What one viewer's browser keeps of a form's grid in one section: the
+ * person's columns, when they arranged them, and the list, when they chose
+ * one -- a view by its name, its own sort with it or the person's in its
+ * place; or a sort with no view, where `[]` is every record, whatever the
+ * form's default view is.
  */
 export interface KeptGrid {
   version: 1
@@ -105,9 +106,9 @@ const isSortTerm = (value: unknown): value is ListSortTerm =>
 
 /**
  * The value kept, read: null for anything but exactly `KeptGrid` -- another
- * release's, a hand edit, text that is not JSON, a field named twice, a
- * view and a sort at once -- which is then as if nothing were kept, so the
- * grid opens as the form gives it.
+ * release's, a hand edit, text that is not JSON, a field named twice --
+ * which is then as if nothing were kept, so the grid opens as the form
+ * gives it.
  */
 export function parseKept(text: string | null): KeptGrid | null {
   if (text === null) return null
@@ -122,7 +123,6 @@ export function parseKept(text: string | null): KeptGrid | null {
   if (columns !== undefined && !(Array.isArray(columns) && columns.every(isChoice) && distinct(columns.map((choice) => choice.field)))) return null
   if (view !== undefined && !(typeof view === 'string' && view !== '')) return null
   if (sort !== undefined && !(Array.isArray(sort) && sort.every(isSortTerm) && distinct(sort.map((term) => term.field)))) return null
-  if (view !== undefined && sort !== undefined) return null
   return { version: 1, ...(columns === undefined ? {} : { columns }), ...(view === undefined ? {} : { view }), ...(sort === undefined ? {} : { sort }) }
 }
 
@@ -138,33 +138,70 @@ export interface GridState {
 /**
  * What a section opens on, from what was kept and what the form offers now
  * (`list`): the kept columns over the form's (`mergeChoices`), or the
- * form's; a kept view where one is still offered by that name; a kept sort's
- * terms that are still in `list.sortable`, with no filter; and otherwise
- * the default view (0105). One opening, so the grid asks one first page.
+ * form's; and the list --
+ *
+ * - a kept view still offered by that name: its conditions, and its sort or
+ *   the kept one;
+ * - a kept view no longer offered: the default view (0105), as if nothing
+ *   were kept, since the conditions it stood for are gone;
+ * - a kept sort with no view: no conditions, and the sort;
+ * - nothing kept: the default view.
+ *
+ * A kept sort keeps only its terms still in `list.sortable`, without a
+ * word: what is left of the order the person chose, never the default
+ * view's in its place. One opening, so the grid asks one first page.
  */
 export function openGrid(kept: KeptGrid | null, columns: readonly GridColumn[], list: PublishedForm['list']): GridState {
   const merged = kept?.columns === undefined ? null : mergeChoices(kept.columns, columns)
   const arranged = merged === null ? { choices: defaultChoices(columns), columnsKept: false } : { choices: merged, columnsKept: true }
-  if (kept?.sort !== undefined) {
-    const sortable = new Set(list?.sortable ?? [])
-    return { ...arranged, filter: [], sort: kept.sort.filter((term) => sortable.has(term.field)), listKept: true }
-  }
+  const sortable = new Set(list?.sortable ?? [])
+  const sort = kept?.sort?.filter((term) => sortable.has(term.field))
   const views = list?.views ?? []
   const named = kept?.view === undefined ? undefined : views.find((view) => view.name === kept.view)
-  const view = named ?? openingView(views)
-  return { ...arranged, filter: view?.filter ?? [], sort: view?.sort ?? [], listKept: named !== undefined }
+  if (named !== undefined) return { ...arranged, filter: named.filter, sort: sort ?? named.sort, listKept: true }
+  if (kept?.view === undefined && sort !== undefined) return { ...arranged, filter: [], sort, listKept: true }
+  const opening = openingView(views)
+  return { ...arranged, filter: opening?.filter ?? [], sort: opening?.sort ?? [], listKept: false }
+}
+
+/**
+ * What is kept of a section's list in `state`: the view its filter and
+ * sort are, by name; a view's conditions sorted another way, as the view's
+ * name and the sort -- its conditions are the administrator's, not typed;
+ * otherwise the sort alone, whether the filter is empty or the person's own
+ * conditions, which are not kept (0104).
+ */
+function listOf(state: GridState, views: readonly ListView[]): Pick<KeptGrid, 'view' | 'sort'> {
+  const sort = state.sort.map(({ field, direction }) => ({ field, direction }))
+  const view = viewMatching(views, state.filter, state.sort)
+  if (view !== null) return { view: view.name }
+  const conditions = viewFiltering(views, state.filter)
+  return conditions === null ? { sort } : { view: conditions.name, sort }
 }
 
 /**
  * What is kept of a section's grid in `state`, or null for nothing: its
- * columns when they are the person's, and its list when that is -- the
- * view its filter and sort are, by name; otherwise its sort alone, whether
- * the filter is empty or the person's own conditions, which are not kept.
+ * columns when they are the person's, and its list when that is
+ * (`listOf`).
  */
 export function keptOf(state: GridState, views: readonly ListView[]): KeptGrid | null {
   if (!state.columnsKept && !state.listKept) return null
   const columns = state.columnsKept ? { columns: state.choices.map(({ field, shown }) => ({ field, shown })) } : {}
-  const view = state.listKept ? viewMatching(views, state.filter, state.sort) : null
-  const list = !state.listKept ? {} : view !== null ? { view: view.name } : { sort: state.sort.map(({ field, direction }) => ({ field, direction })) }
-  return { version: 1, ...columns, ...list }
+  return { version: 1, ...columns, ...(state.listKept ? listOf(state, views) : {}) }
+}
+
+/**
+ * What to write when a section changes one part of its grid -- its
+ * `columns` or its `list` -- over what is `stored` under its key: that part
+ * as the section has it now (`ours`), the other as stored. A section reads
+ * storage only when it opens, so another on screen under the same key --
+ * a form that is its own child, at two levels of Drill down -- may have
+ * kept the other part since, and a change of columns here must not undo a
+ * view picked there. Null when neither part is left.
+ */
+export function withKept(stored: KeptGrid | null, ours: KeptGrid | null, changed: 'columns' | 'list'): KeptGrid | null {
+  const columns = (changed === 'columns' ? ours : stored)?.columns
+  const { view, sort } = (changed === 'list' ? ours : stored) ?? {}
+  if (columns === undefined && view === undefined && sort === undefined) return null
+  return { version: 1, ...(columns === undefined ? {} : { columns }), ...(view === undefined ? {} : { view }), ...(sort === undefined ? {} : { sort }) }
 }

@@ -6,7 +6,7 @@ import { listsSent } from './test-filter.js'
 import { ORDER_VIEWS, VIEWED } from './test-forms.js'
 import { answeredOnce, chooseForm, gridSection, gridStatus, load, mount, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
-import { columnsButton, headed, headers, keptFor, listed, moveButton, openColumns, showBox } from './test-columns.js'
+import { childGrid, columnsButton, headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
@@ -232,7 +232,7 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
     await openColumns(user, 'Records')
     await user.click(showBox('Records', 'Id'))
     await user.click(moveButton('Records', 'Notes', 'up'))
-    expect(keptFor('records', engine.formId)).toEqual({ version: 1, columns: expect.any(Array), view: LARGE.name })
+    expect(keptFor(RECORDS_GRID, engine.formId)).toEqual({ version: 1, columns: expect.any(Array), view: LARGE.name })
     expect(await floor('columns of your own')).toEqual(CLEAN('columns of your own'))
 
     const reset = within(gridSection('Records')).getByRole('button', { name: 'Reset columns' })
@@ -240,7 +240,7 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
     await headed('Records', [...labels, 'Delete'])
     expect(listed('Records')).toEqual(labels.map((label) => ({ label, shown: true })))
     expect(focusedName()).toBe('Reset columns')
-    expect(keptFor('records', engine.formId)).toEqual({ version: 1, view: LARGE.name })
+    expect(keptFor(RECORDS_GRID, engine.formId)).toEqual({ version: 1, view: LARGE.name })
   })
 
   // A view sorting by a column nobody sees still lists: the hidden column
@@ -290,14 +290,14 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
     expect(listed('Delivery')).toEqual(labels.map((label) => ({ label, shown: true })))
     await press(user, showBox('Delivery', 'Carrier'), ' ')
     await headed('Delivery', labels.filter((label) => label !== 'Carrier'))
-    expect(keptFor('child', engine.deliveries)?.columns?.find((column) => column.field === 'carrier')).toEqual({ field: 'carrier', shown: false })
-    expect(keptFor('records', engine.formId)).toBeNull()
+    expect(keptFor(childGrid('order'), engine.deliveries)?.columns?.find((column) => column.field === 'carrier')).toEqual({ field: 'carrier', shown: false })
+    expect(keptFor(RECORDS_GRID, engine.formId)).toBeNull()
     expect(headers('Records')).toContain('Notes')
     expect(await floor('a child section’s columns')).toEqual(CLEAN('a child section’s columns'))
 
     await chooseForm(user, engine.deliveries)
     await headed('Records', await labelsOf(engine.deliveries))
-    expect(keptFor('records', engine.deliveries)).toBeNull()
+    expect(keptFor(RECORDS_GRID, engine.deliveries)).toBeNull()
   })
 })
 

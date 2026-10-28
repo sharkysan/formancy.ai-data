@@ -9,6 +9,7 @@ import { listed } from './grid-datasource.js'
 import type { GridColumn } from './grid-datasource.js'
 import { RecordGrid } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt, RowDelete } from './record-grid.js'
+import type { GridSection } from './prefs.js'
 import { useGridState } from './use-grid-state.js'
 import { ViewPicker } from './view-picker.js'
 
@@ -30,6 +31,9 @@ import { ViewPicker } from './view-picker.js'
  * the sort, with every column whatever the grid hides. None of it is
  * written into the address, as no filter is (0104).
  */
+/** The Records panel's grid, kept apart from every child section's (0106). */
+const RECORDS: GridSection = { kind: 'records' }
+
 export function Records({
   client,
   formId,
@@ -78,7 +82,7 @@ export function Records({
   const [typed, setTyped] = useState(search)
   const views = definition.list?.views ?? []
   /** The filter as applied, the sort and the columns: the grid's, and the file's but for the columns, for this form, which mounts the panel again (form-view.tsx). */
-  const state = useGridState({ formId, section: 'records', columns, list: definition.list })
+  const state = useGridState({ formId, section: RECORDS, columns, list: definition.list })
   const { filter, sort } = state
   const labels = new Map(columns.map((column) => [column.key, column.label]))
   const searchable = (definition.list?.searchable ?? []).map((key) => labels.get(key) ?? key)

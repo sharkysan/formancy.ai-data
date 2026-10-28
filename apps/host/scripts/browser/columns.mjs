@@ -6,7 +6,8 @@
 // nothing; a column shown again is sized to the rows shown then, so a value
 // longer than any its column held when the page was sized is whole -- the
 // run's order given a group that long, beside the page, found by a search,
-// then put back; Enter on a move moves its column, the header following,
+// then put back -- and one shown over a search that finds nothing is sized
+// to the next page that has rows; Enter on a move moves its column, the header following,
 // and the keyboard stays on the button pressed though React moved it with
 // its line -- at the top too, where the move is aria-disabled and does
 // nothing; the row's Delete stays the grid's last header; and Reset
@@ -120,6 +121,29 @@ export function columnsJourney(plane, { check }, run) {
         () => true,
       )
       check('a column shown again: sized to the rows shown, its value whole', cut ? 'its value is cut' : null)
+      await plane.setGroup(run.record, null)
+      await search(page, '', /^Rows 1–(?!1\.)/)
+    }],
+    ['A column shown while nothing is listed (Records)', async (page) => {
+      // Shown over a page with no rows, a column has nothing to be sized to:
+      // it waits for the next page that has some, and is sized to it --
+      // here to a group longer than the one the state before sized it to.
+      const wide = `waiting for rows ${String(run.customer)} northern loading bay, gate seven`
+      await show(page, 'Group').focus()
+      await page.keyboard.press('Space')
+      await headed(page, generated.filter((label) => label !== 'Group'))
+      await search(page, `nothing at all ${String(run.customer)}`, /^No .* match /)
+      await show(page, 'Group').focus()
+      await page.keyboard.press('Space')
+      await headed(page, generated)
+      await plane.setGroup(run.record, wide)
+      await search(page, wide, /^Rows 1–1\.$/)
+      const cell = page.getByRole('grid', { name: 'Records', exact: true }).getByRole('gridcell', { name: wide, exact: true })
+      const cut = await until(async () => !(await cell.evaluate((element) => element.scrollWidth > element.clientWidth)), 'the cell stayed cut').then(
+        () => false,
+        () => true,
+      )
+      check('a column shown while nothing is listed: sized to the next rows, its value whole', cut ? 'its value is cut' : null)
       await plane.setGroup(run.record, null)
       await search(page, '', /^Rows 1–(?!1\.)/)
     }],

@@ -16,17 +16,24 @@ export const RENDERER_CHOICES: readonly RendererChoice[] = ['react', 'angular', 
 
 /**
  * The keys, said once, so a test can name every key the page may write:
- * `grid` is the prefix of a grid's, one per form and kind of section
- * (`gridKey`).
+ * `grid` is the prefix of a grid's, one per form in its Records panel and
+ * one per form and parent field in a child section (`gridKey`).
  */
 export const PREFERENCES = { renderer: 'formancy-data-host.renderer', split: 'formancy-data-host.split', grid: 'formancy-data-host.grid.' } as const
 
-/** Which grid of a form a kept value is for: its Records panel's, or the one every child section of it shares. */
-export type GridSection = 'records' | 'child'
+/** Which grid of a form a kept value is for: its Records panel's, or a child section's, narrowed by one of its lookup fields. */
+export type GridSection = { kind: 'records' } | { kind: 'child'; field: string }
 
-/** The key of a form's grid in one kind of section: the kind first, so no form id can spell another's. */
+/**
+ * The key of a form's grid in one kind of section: the kind first, so no
+ * form id can spell another's; a child section's by the field its rows are
+ * narrowed by too, so an employee's orders created and approved, both on
+ * screen, keep two arrangements and neither writes over the other. A form
+ * id is `[a-z0-9][a-z0-9._-]*` and a field key letters, digits and
+ * underscores, so the slash between them is no one's.
+ */
 export function gridKey(section: GridSection, formId: string): string {
-  return `${PREFERENCES.grid}${section}.${formId}`
+  return section.kind === 'records' ? `${PREFERENCES.grid}records.${formId}` : `${PREFERENCES.grid}child.${formId}/${section.field}`
 }
 
 /**

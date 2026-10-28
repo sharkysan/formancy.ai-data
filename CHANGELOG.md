@@ -153,14 +153,17 @@ later.
     columns. By keyboard; the last shown column stays; Delete stays last.
     A hidden column is hidden, not removed, so a view sorting by it still
     lists.
-  - **The browser keeps, per form and kind of grid**, under
-    `formancy-data-host.grid.<records|child>.<form id>`, the arranged
-    columns and the list's state: a view by name, or the sort, `[]` being
-    All records over the default view. A person's own filter conditions,
-    and so no typed value, are never kept. Opening a form writes nothing.
+  - **The browser keeps, per form, and per form and parent field in a
+    child section**, under `formancy-data-host.grid.records.<form id>` or
+    `formancy-data-host.grid.child.<form id>/<field>`, the arranged columns
+    and the list's state: a view by name, with the person's sort where a
+    header sorted it another way, or the sort, `[]` being All records over
+    the default view. A person's own filter conditions, and so no typed
+    value, are never kept. Opening a form writes nothing, and a change
+    writes only the part it changed.
   - Kept by the browser, not the person: another device starts afresh, and
-    a shared browser is shared. Every child section of one form shares one
-    arrangement. Widths, search and page are not kept; Download CSV still
+    a shared browser is shared. Every child section of one form under one
+    field shares one arrangement. Widths, search and page are not kept; Download CSV still
     holds every readable field.
 
 ### Changed

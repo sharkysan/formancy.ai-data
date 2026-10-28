@@ -3153,7 +3153,7 @@
         },
         {
           "area": "host",
-          "says": "Views are the same for everyone who may read their fields: none can be kept to a role, a person cannot save a view of their own, and nothing remembers a picked view across a reload, which opens on the default view again."
+          "says": "Views are the same for everyone who may read their fields: none can be kept to a role, a person cannot save a view of their own, and only the viewer's browser remembers a picked one across a reload (0106)."
         },
         {
           "area": "access",
@@ -3187,7 +3187,7 @@
       ]
     },
     "0106": {
-      "reviewed": "sha256:96047bf5f4017461f9ff5bbf58940ef54a5cacd709c62ad53a69cb004a82d0af",
+      "reviewed": "sha256:9463f163468eb403809aed9ec8350a883c37c44ebdeb6ed36e54b9b14ef24631",
       "limitations": [
         {
           "area": "host",
@@ -3201,7 +3201,7 @@
         },
         {
           "area": "host",
-          "says": "Every child section of one form shares one arrangement of columns, under every parent and in Drill down."
+          "says": "Every child section of one form under one field shares one arrangement of columns, under every parent and at every level of Drill down."
         },
         {
           "area": "host",
@@ -3213,7 +3213,7 @@
         },
         {
           "area": "host",
-          "says": "A kept sort term no longer sortable, or a kept view no longer offered, is dropped without a word, and a browser that keeps nothing says nothing of it.",
+          "says": "A kept sort term no longer sortable is dropped and the rest kept, a kept view no longer offered gives the default view, both without a word, and a browser that keeps nothing says nothing of it.",
           "heldBy": "apps/host/src/columns.test.ts"
         }
       ]

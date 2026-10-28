@@ -56,6 +56,10 @@ export async function headed(heading: string, labels: readonly string[]): Promis
   await waitFor(() => expect(headers(heading)).toEqual(labels), { timeout: 15_000 })
 }
 
+/** The Records panel's grid, and a child section's by the field its rows are narrowed by: what `keptFor` and `gridKey` name. */
+export const RECORDS_GRID: GridSection = { kind: 'records' }
+export const childGrid = (field: string): GridSection => ({ kind: 'child', field })
+
 /** What this browser kept for a form's grid in one kind of section, as written: null when nothing. */
 export function keptFor(section: GridSection, formId: string): KeptGrid | null {
   const text = localStorage.getItem(gridKey(section, formId))

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { ListFilterTerm, ListSortTerm, PublishedForm } from '@formancy/data-client'
-import { defaultChoices, keptOf, openGrid, parseKept } from './columns.js'
+import { defaultChoices, keptOf, openGrid, parseKept, withKept } from './columns.js'
 import type { ColumnChoice, GridState } from './columns.js'
 import type { GridColumn } from './grid-datasource.js'
 import { browserStorage, gridKey, readPreference, removePreference, writePreference } from './prefs.js'
@@ -12,10 +12,11 @@ import type { GridSection } from './prefs.js'
  * columns as the person arranged them. The Records panel holds one, and
  * every child section its own.
  *
- * It opens on what this browser kept for the form and the kind of section
+ * It opens on what this browser kept for the form and the section
  * (columns.ts's `openGrid`), and every change is kept as it is made --
  * columns, filter or sort, through prefs.ts's wrapped calls, so a browser
- * that keeps nothing changes nothing here. Kept in the change itself, not
+ * that keeps nothing changes nothing here -- the part changed written over
+ * what is stored, the other left as it is (`withKept`). Kept in the change itself, not
  * after a render: an opening writes nothing, and a list nobody chose is
  * never kept, so a form's default view stays the form's.
  */
@@ -46,10 +47,12 @@ export function useGridState({ formId, section, columns, list }: { formId: strin
   // and a change made in between is kept with it, not lost.
   const now = useRef(state)
 
-  const change = (patch: Partial<GridState>): void => {
+  // Only the part changed is written over what is stored: another section
+  // under this key may have kept the other part since this one opened.
+  const change = (patch: Partial<GridState>, part: 'columns' | 'list'): void => {
     const next = { ...now.current, ...patch }
     now.current = next
-    const kept = keptOf(next, list?.views ?? [])
+    const kept = withKept(parseKept(readPreference(storage, key)), keptOf(next, list?.views ?? []), part)
     if (kept === null) removePreference(storage, key)
     else writePreference(storage, key, JSON.stringify(kept))
     setState(next)
@@ -59,10 +62,10 @@ export function useGridState({ formId, section, columns, list }: { formId: strin
     filter: state.filter,
     sort: state.sort,
     choices: state.choices,
-    setFilter: (filter) => change({ filter, listKept: true }),
-    setSort: (sort) => change({ sort, listKept: true }),
-    pick: (filter, sort) => change({ filter, sort, listKept: true }),
-    setChoices: (choices) => change({ choices, columnsKept: true }),
-    resetChoices: () => change({ choices: defaultChoices(columns), columnsKept: false }),
+    setFilter: (filter) => change({ filter, listKept: true }, 'list'),
+    setSort: (sort) => change({ sort, listKept: true }, 'list'),
+    pick: (filter, sort) => change({ filter, sort, listKept: true }, 'list'),
+    setChoices: (choices) => change({ choices, columnsKept: true }, 'columns'),
+    resetChoices: () => change({ choices: defaultChoices(columns), columnsKept: false }, 'columns'),
   }
 }

@@ -7,9 +7,11 @@
   to what the form offers, columns dropped and appended and the defaults
   when nothing kept is shown, no move past an end, the last shown column
   kept, every kept shape read back as written and every other refused, a
-  view kept by name, an empty filter's sort kept, `[]` included, a filter
-  of the person's own kept as its sort alone, and what a section opens on.
-  `prefs.test.ts` -- one key per form and kind of section, removed when
+  view kept by name and with the person's sort where a header sorted it
+  another way, an empty filter's sort kept, `[]` included, a filter of the
+  person's own kept as its sort alone, only the part changed written over
+  what is stored, and what a section opens on. `prefs.test.ts` -- one key
+  per form and section, a child section's by its field, removed when
   nothing is left, and every call surviving storage that throws.
   `columns-panel.test.tsx`, on both engines -- the grid's columns listed
   and never Delete, a column hidden, shown and moved by keyboard with the
@@ -21,9 +23,11 @@
   columns and a picked view in one first page, All records over the
   default and a header's sort; a filter of the person's own not brought
   back, and no value typed into one under any key; what was kept read over
-  what the form offers now; storage that throws; and a child section's
-  arrangement under another parent. The browser gate's
-  `apps/host/scripts/browser/columns.mjs`.
+  what the form offers now, and a value of another shape read as nothing;
+  Reset columns with no list chosen keeping nothing; storage that throws;
+  and a child section's arrangement under another parent. The browser
+  gate's `apps/host/scripts/browser/columns.mjs`, a column shown over a
+  page with no rows sized to the next one that has some among it.
 
 ## Context
 
@@ -63,32 +67,42 @@ view or a remembered sort may order by it, and the grid asks for a block
 only when its headers hold the section's sort (0105), which a column the
 grid did not have could never hold.
 
-**The viewer's browser keeps, per form and per kind of grid -- the Records
-panel's, or a child section's -- the columns and the list's state.** In
-`localStorage`, like the renderer and the split, and read through the same
-wrapped calls, so a browser that refuses site data shows the defaults and
-loses nothing else. The key is
-`formancy-data-host.grid.<records|child>.<form id>` (`prefs.ts`'s
+**The viewer's browser keeps, per form in its Records panel and per form
+and parent field in a child section, the columns and the list's state.**
+A child section is keyed by the field its rows are narrowed by too, so an
+employee's orders created and approved, both on screen, keep two
+arrangements. In `localStorage`, like the renderer and the split, and read
+through the same wrapped calls, so a browser that refuses site data shows
+the defaults and loses nothing else. The key is
+`formancy-data-host.grid.records.<form id>` or
+`formancy-data-host.grid.child.<form id>/<field>` (`prefs.ts`'s
 `gridKey`), its value one JSON object of version 1: the columns, in their
 order and each shown or not, once the person has arranged them, and the
 list's state once they have chosen one, and the key goes when neither is
 left. A value of any other shape is read as nothing kept. Opening a form
 writes nothing, so a form's default view stays the form's until its
-viewer picks another.
+viewer picks another. A change writes only the part changed, the columns
+or the list, over what is stored (`withKept`): two sections under one key
+-- a form that is its own child, at two levels of Drill down -- do not undo
+each other's choices.
 
 The list's state is kept as a view's name when the filter and the sort are
-that view, as the sort when the filter is empty -- an empty sort being
-All records, which then wins over the default view -- and as the sort
-alone when the person has conditions of their own. A person's own
-conditions are never kept, so no value they typed is stored: 0104 keeps a
-filter in no address for the same reason.
+that view; as the view's name and the sort when the filter is a view's
+and a header sorted it another way, since those conditions are the
+administrator's and not typed; as the sort when the filter is empty -- an
+empty sort being All records, which then wins over the default view --
+and as the sort alone when the person has conditions of their own. A
+person's own conditions are never kept, so no value they typed is stored:
+0104 keeps a filter in no address for the same reason.
 
 **What is kept is fitted to what the form offers when it is read.** A
 column no longer offered is dropped, one new to the form is shown at the
-end, and nothing shown leaves the defaults; a view no longer offered by
-that name, or a sort on a field no longer sortable, gives the default
-view. Restored, the grid asks for one first page, as it does when it
-opens.
+end, and nothing shown leaves the defaults. A view no longer offered by
+that name gives the default view, its sort with it, since the conditions
+it stood for are gone. A sort's terms no longer sortable are dropped and
+the rest kept -- with no terms left, every record -- never the default
+view in its place, which the person had chosen away from. Restored, the
+grid asks for one first page, as it does when it opens.
 
 ## Consequences
 
@@ -111,8 +125,8 @@ view they picked, or their sort, without the conditions they typed.
 Download CSV holds every readable field, hidden or not: the file is the
 server's (0079, 0080).
 
-Every child section of one form shares one arrangement, under every
-parent and in Drill down. A view is kept by its name: renamed, the grid
+Every child section of one form under one field shares one arrangement,
+under every parent and at every level of Drill down. A view is kept by its name: renamed, the grid
 opens on the default; changed, on its new conditions. A sort term no
 longer sortable is dropped without a word, and so is a view no longer
 offered. A browser that keeps nothing says nothing of it.
