@@ -5,7 +5,8 @@ import type { ColumnMeta, MetadataSnapshot, NormalizedTypeKind } from '../metada
 import { readableFields } from '../policy/evaluate.js'
 import { unscopedLookups } from '../policy/through.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
-import type { FilterableField, ListColumns, RecordList, RecordListQuery } from '../runtime.js'
+import { viewFit } from '../presentation/views.js'
+import type { FilterableField, ListColumns, ListView, RecordList, RecordListQuery } from '../runtime.js'
 import { lookupAnswer, toFormAnswers } from './answers.js'
 import { columnFilter, filterOffer } from './filter.js'
 import type { PlannedList, PlanRefusal } from './plan-types.js'
@@ -109,19 +110,41 @@ function readableColumns(bindings: FormBindings, fields: readonly string[]): Col
  * `lookup/searchable.ts`'s set, the kinds a lookup's search matches, matched
  * as it matches (0028). Filterable: those `filterOffer` offers a condition
  * on, with what it offers (0104).
+ *
+ * Views: those of `views`, the published ones, that this actor could have
+ * built from the rest (`viewFit`, 0105), in their published order. A view
+ * naming a field they may not read is not offered at all, never offered
+ * without that condition, which would show a wider list under the view's
+ * name; and a default whose view is not offered leaves the list with none.
  */
-export function listColumns(bindings: FormBindings, fields: readonly string[]): ListColumns {
+export function listColumns(bindings: FormBindings, fields: readonly string[], views: readonly ListView[]): ListColumns {
   const columns = readableColumns(bindings, fields)
   const filterable: FilterableField[] = []
   for (const binding of columns) {
     const offer = filterOffer(binding)
     if (offer !== null) filterable.push({ field: binding.field, ...offer })
   }
+  const sortable = columns.filter((binding) => !UNORDERED.has(binding.type.kind)).map((binding) => binding.field)
   return {
     searchable: columns.filter((binding) => SEARCHABLE_KINDS.has(binding.type.kind)).map((binding) => binding.field),
-    sortable: columns.filter((binding) => !UNORDERED.has(binding.type.kind)).map((binding) => binding.field),
+    sortable,
     filterable,
+    views: views.filter((view) => viewFit(view, bindings, { filterable, sortable }) === null),
   }
+}
+
+/**
+ * Every view of `views` that no actor could build from this form's list, each
+ * with why, prefixed by where it is: what a write refuses (0105). A view is
+ * fitted against every field the bindings hold, so one only a few may read
+ * is stored, and offered to those few.
+ */
+export function viewProblems(views: readonly ListView[], bindings: FormBindings): string[] {
+  const all = listColumns(bindings, bindings.fields.map((binding) => binding.field), [])
+  return views.flatMap((view, index) => {
+    const why = viewFit(view, bindings, all)
+    return why === null ? [] : [`/views/${String(index)} (“${view.name}”): ${why}`]
+  })
 }
 
 /**
@@ -180,7 +203,7 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
   const found = listable(snapshot, bindings, policy, context)
   if (!found.ok) return found
   const { prepared, fields } = found
-  const offered = listColumns(bindings, fields)
+  const offered = listColumns(bindings, fields, [])
   const byField = new Map(readableColumns(bindings, fields).map((binding) => [binding.field, binding]))
 
   const requested: Array<{ column: string; direction: 'asc' | 'desc' }> = []

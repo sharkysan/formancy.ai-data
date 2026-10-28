@@ -49,6 +49,7 @@ export { applyPresentation, presentationShapeProblems } from './presentation/app
 export { presentationOf } from './presentation/derive.js'
 export { describeReassigned, grantsOnKey, reassignedKeys, rebasePresentation } from './presentation/rebase.js'
 export { EMPTY_PRESENTATION, fieldAnchor, PRESENTATION_VERSION } from './presentation/types.js'
+export { viewShapeProblems } from './presentation/views.js'
 export type {
   FieldAnchor,
   FieldPresentation,
@@ -161,13 +162,13 @@ export { planCreate, planRead, planUpdate } from './records/plan.js'
 export { planDelete } from './records/delete.js'
 export { deleteTerms, reachesPast } from './records/delete-terms.js'
 export type { DeleteTerms, ReachTerms } from './records/delete-terms.js'
-export { listable, listColumns, listOrder, planList, recordPage } from './records/list.js'
+export { listable, listColumns, listOrder, planList, recordPage, viewProblems } from './records/list.js'
 export { childFields } from './records/children.js'
 export type { ChildLookup, ParentKey, PublishedTable } from './records/children.js'
 export { formMenu, grantedOperations, menuForm } from './records/menu.js'
 export type { MenuBundle, MenuForm } from './records/menu.js'
 export type { Listable } from './records/list.js'
-export { validateExportQuery, validateListQuery } from './records/list-query.js'
+export { readSort, validateExportQuery, validateListQuery } from './records/list-query.js'
 export type { ExportQueryCheck, ExportQueryRefusal, ListQueryCheck, ListQueryErrorCode, ListQueryRefusal } from './records/list-query.js'
 export { exportColumns, exportHeader, exportRecord, exportText } from './records/export.js'
 export type { ExportColumns, ExportField, ExportLabels } from './records/export.js'
@@ -213,6 +214,7 @@ export type {
   ListColumns,
   ListFilterTerm,
   ListSortTerm,
+  ListView,
   PublishedForm,
   RecordDeleted,
   RecordExportQuery,

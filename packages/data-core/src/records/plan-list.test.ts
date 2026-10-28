@@ -254,7 +254,7 @@ describe('planList', () => {
       },
     })
     const NULLS = ['null', 'not-null']
-    expect(listColumns(PG_ORDER, CLERK_FIELDS)).toEqual({
+    expect(listColumns(PG_ORDER, CLERK_FIELDS, [])).toEqual({
       searchable: ['id', 'status', 'notes', 'group', 'approved_by'],
       sortable: ['id', 'order_date', 'status', 'amount', 'notes', 'group', 'approved_by', 'paid'],
       filterable: [
@@ -267,8 +267,9 @@ describe('planList', () => {
         { field: 'approved_by', operators: ['equals', 'range', ...NULLS], input: 'integer', days: null },
         { field: 'paid', operators: ['equals', ...NULLS], input: 'boolean', days: null },
       ],
+      views: [],
     })
-    expect(listColumns(PG_ORDER, ['id', 'order_date', 'status'])).toMatchObject({ searchable: ['id', 'status'], sortable: ['id', 'order_date', 'status'] })
+    expect(listColumns(PG_ORDER, ['id', 'order_date', 'status'], [])).toMatchObject({ searchable: ['id', 'status'], sortable: ['id', 'order_date', 'status'] })
     for (const field of ['amount', 'customer', 'employee', 'nothing']) {
       expect(planList(PG, PG_ORDER, ORDER_POLICY, AUDITOR, query({ sort: [{ field, direction: 'asc' }] })), field).toEqual({
         ok: false,
@@ -298,7 +299,7 @@ describe('planList', () => {
     })
     const READ_ONLY = { read: ['clerk'], write: [] }
     const policy: FormPolicy = { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, scan: READ_ONLY, stamp: READ_ONLY } }
-    expect(listColumns(bindings, ['id', 'scan', 'stamp']).sortable).toEqual(['id'])
+    expect(listColumns(bindings, ['id', 'scan', 'stamp'], []).sortable).toEqual(['id'])
     for (const field of ['scan', 'stamp']) {
       expect(planList(source, bindings, policy, CLERK, query({ sort: [{ field, direction: 'asc' }] })), field).toMatchObject({ ok: false, code: 'not-sortable' })
     }
@@ -351,7 +352,7 @@ describe('planList', () => {
     })
     const { bindings } = generateForm(source, { connection: 'erp', root: sales('tag'), formId: 'tag', title: 'Tag', lookups: [] })
     const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: { id: CLERK_RW, day: CLERK_RW, weight: CLERK_RW, done: CLERK_RW }, rowFilters: [], lookups: {} }
-    expect(listColumns(bindings, ['id', 'day', 'weight', 'done']).searchable).toEqual([])
+    expect(listColumns(bindings, ['id', 'day', 'weight', 'done'], []).searchable).toEqual([])
     expect(planList(source, bindings, policy, CLERK, query({ search: 'x' }))).toEqual({ ok: false, code: 'not-searchable', message: 'This form has no field you may read that a search can match.' })
     expect(planList(source, bindings, policy, CLERK, FIRST)).toMatchObject({ ok: true, request: { search: null } })
   })

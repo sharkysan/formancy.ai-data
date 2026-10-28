@@ -1,5 +1,6 @@
 import type { FormSchema, Text } from '@formancy/spec'
 import type { FieldBinding } from '../generate/types.js'
+import type { ListView } from '../runtime.js'
 
 /**
  * The version of `PresentationOverrides` this release writes and reads. A
@@ -54,9 +55,10 @@ export interface SectionPresentation {
  * `__proto__`.
  *
  * Exactly the studio's edits — a field's label, a section's label, a
- * field's place within its section's grid and full width (0030), and the
- * generated section a field is placed in (0075). Each entry holds only what
- * differs from the base, so a presentation has one spelling.
+ * field's place within its section's grid and full width (0030), the
+ * generated section a field is placed in (0075), and the views a list of
+ * the form's records offers (0105). Each entry holds only what differs from
+ * the base, so a presentation has one spelling.
  */
 export interface PresentationOverrides {
   version: typeof PRESENTATION_VERSION
@@ -64,6 +66,8 @@ export interface PresentationOverrides {
   fields: FieldPresentation[]
   /** In the base's section order. */
   sections: SectionPresentation[]
+  /** In the order a picker lists them; left out when there are none, never `[]` (`views.ts`). */
+  views?: ListView[]
 }
 
 export type PresentationCheck = { ok: true; presentation: PresentationOverrides } | { ok: false; problems: string[] }
@@ -87,6 +91,12 @@ export type PresentationConflict =
   | { kind: 'move-dropped'; field: string; anchor: FieldAnchor; section: SectionAnchor; to: SectionAnchor; resolution: 'dropped'; message: string }
   /** A section the rebase cannot find in the new base: gone, or one of two sharing a label whose number changed. */
   | { kind: 'section-gone'; section: SectionAnchor; property: 'label' | 'order'; yours: Text | string[]; resolution: 'dropped'; message: string }
+  /**
+   * A list view the rebase could not carry (0105): a field it names is gone,
+   * or no longer offers what it asks. Dropped whole, never carried without
+   * the condition, which would show a wider list under the view's name.
+   */
+  | { kind: 'view-dropped'; view: string; resolution: 'dropped'; message: string }
 
 export interface RebasedPresentation {
   presentation: PresentationOverrides

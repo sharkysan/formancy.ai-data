@@ -61,18 +61,34 @@ export interface FilterOffer {
 export type FilterableField = { field: string } & FilterOffer
 
 /**
+ * A view of a form's list its administrator named (0105): conditions and an
+ * order a person picks together, each term exactly what a list request
+ * carries (`ListFilterTerm`, `ListSortTerm`), so a picked view is a list
+ * request and nothing else. `default` is `true` on the one view a grid opens
+ * on, and absent on every other.
+ */
+export interface ListView {
+  name: string
+  filter: ListFilterTerm[]
+  sort: ListSortTerm[]
+  default?: true
+}
+
+/**
  * What a list of a form's records may be searched, sorted and filtered by,
  * for one person (0044): field keys in the bindings' order, from
  * `listColumns`. `sortable` holds the readable column fields whose kind has
  * canonical text, `searchable` those of kind text or integer, matched as a
  * lookup's search matches, and `filterable` those `filterOffer` offers a
  * condition on (0104). A lookup field is none of them: a list holds its
- * token, not its label.
+ * token, not its label. `views` holds the published views this person
+ * could have built from the rest, in their published order (0105).
  */
 export interface ListColumns {
   searchable: string[]
   sortable: string[]
   filterable: FilterableField[]
+  views: ListView[]
 }
 
 /**
