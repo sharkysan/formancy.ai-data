@@ -91,6 +91,15 @@
 //     by the person is "Your own filter and sort", in one request, and a
 //     step off it and back keeps it; and "All records" one first page with
 //     neither;
+//   - a grid's Columns (0106): Enter on Columns opens its panel and keeps
+//     the keyboard there, the next Tab on the first column's Show; Space on
+//     a Show hides its column and asks the server nothing, and a column
+//     shown again is sized to the rows shown then, a value longer than any
+//     it held when the page was sized whole; Enter on a move moves its
+//     column, the headers following, and keeps the keyboard on the button
+//     pressed, at the top too, where it does nothing; the row's Delete stays
+//     the last header; and Reset columns puts the form's order back with
+//     the keyboard on it;
 //   - Drill down (0090): a customer, one of its orders and that order's
 //     line three levels down, the trail naming each; Tab reaches the
 //     trail's buttons in order, Enter on a crumb puts the keyboard on its
@@ -139,8 +148,8 @@
 // One module per reason to change, under scripts/browser/: the plane, the
 // server of the built page, the stylesheet's reads, the measurements, the
 // workspace's states, the record's journey, a delete's states, Download
-// CSV's, the filter's, the views', Drill down's, a customer list that goes
-// on, and the policy's allowance.
+// CSV's, the filter's, the views', the columns', Drill down's, a customer
+// list that goes on, and the policy's allowance.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
 // scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
@@ -157,6 +166,7 @@ import { startTcpHop } from '@formancy/data-fixtures'
 import { afterEveryPass, agGridRowProblem, canary, canaryProblem, environmentOf, focusScrollProblem, guardRequests, hearPolicy, policyRefused, rowUnmeasured } from '../../../scripts/browser-gate.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { allowanceProblem } from './browser/allowance.mjs'
+import { columnsJourney } from './browser/columns.mjs'
 import { deleteJourney } from './browser/deleting.mjs'
 import { drillJourney } from './browser/drilling.mjs'
 import { exportJourney } from './browser/exporting.mjs'
@@ -268,7 +278,7 @@ async function run(gate, browser) {
 
         const run = { record: await plane.order(2), customer: 9000 + pass, reached }
         // The list that goes on last, since it signs in as another clerk.
-        for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run), ...exportJourney(plane, gate, run), ...filterJourney(plane, gate), ...viewJourney(plane, gate), ...drillJourney(plane, gate, run), ...moreJourney(plane, gate)]) {
+        for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run), ...exportJourney(plane, gate, run), ...filterJourney(plane, gate), ...viewJourney(plane, gate), ...columnsJourney(plane, gate, run), ...drillJourney(plane, gate, run), ...moreJourney(plane, gate)]) {
           await act(page)
           await measured(page, state)
         }
@@ -307,7 +317,7 @@ async function run(gate, browser) {
   // A failed check fails the run in recordedPerBrowser, which says so.
   if (gate.failures().length > 0) return
   console.log(
-    `browser checks passed: the host page's workspace, journey, deletes, downloads, filter, views, Drill down and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
+    `browser checks passed: the host page's workspace, journey, deletes, downloads, filter, views, columns, Drill down and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
   )
 }
 

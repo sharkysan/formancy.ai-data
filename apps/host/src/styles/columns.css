@@ -1,0 +1,85 @@
+/* ------------------------------------------------------------ the columns
+ *
+ * A grid's Columns (0106, columns-panel.tsx): its button among the
+ * toolbar's items beside View and Filter, and its panel, when open, a row
+ * of its own under them -- each column a line of Show, its label and its
+ * two moves, then Reset columns. Room variables only, and every rule names
+ * a class of the panel's own, so nothing here selects inside .sheet or
+ * .grid-bench.
+ */
+
+/* A row of the toolbar's own, as the filter's panel is: the whole row, so
+   it never sits beside the button that opened it. */
+.columns-tool {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+/* Outlined, as the filter's form is: glass is never nested in glass. No
+   wider than its lines need, so a move stays near the label it moves. */
+.columns-box {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+  min-width: 0;
+  max-width: 32rem;
+  padding: 0.75rem;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+}
+
+.columns-list {
+  display: grid;
+  gap: 0.25rem;
+  justify-self: stretch;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Show and the label at the start, the moves at the end of each line; a
+   long label wraps in its place rather than widening the panel. */
+.columns-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+/* A checkbox, not the page's text box (controls.css): 24 pixels, the
+   least WCAG 2.5.8 allows a target, violet as what the person chose. */
+.columns-list input[type='checkbox'] {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--client);
+}
+
+.columns-list input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--server);
+  outline-offset: 2px;
+}
+
+.columns-list input[type='checkbox'][aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.columns-list label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.columns-list .button {
+  flex: none;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+}
+
+.columns-hint {
+  margin: 0;
+}

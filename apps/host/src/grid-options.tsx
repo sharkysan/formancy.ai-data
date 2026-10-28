@@ -3,8 +3,9 @@ import type { CSSProperties, ReactElement } from 'react'
 import { ColumnApiModule, ColumnAutoSizeModule, InfiniteRowModelModule, LocaleModule, ModuleRegistry, PaginationModule, RenderApiModule, RowApiModule, RowSelectionModule, ScrollApiModule } from 'ag-grid-community'
 import type { CellKeyDownEvent, ColDef, GridApi, GridOptions, ICellRendererParams, Module, RowClickedEvent } from 'ag-grid-community'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
+import type { ArrangedColumn } from './columns.js'
 import { cellText } from './grid-datasource.js'
-import type { GridColumn, GridRow } from './grid-datasource.js'
+import type { GridRow } from './grid-datasource.js'
 import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
 
 /*
@@ -23,7 +24,10 @@ import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
  * - **A page no longer shown is asked for again**, never reused: one block
  *   in the cache (0022, 0029). No count is asked for, so no paging panel.
  * - **Nothing edits, moves or resizes**, so Delete and Backspace clear
- *   nothing and nothing is sent from here but the page's list.
+ *   nothing and nothing is sent from here but the page's list. A person
+ *   orders and hides columns in the section's Columns panel instead
+ *   (columns-panel.tsx, 0106), whose every change is a key's: a header
+ *   dragged has no keyboard path (formancy.ai 0046).
  * - **A row's Delete is a real button** (0053), in a last column where the
  *   form offers delete: a cell the arrow keys reach, whose button takes the
  *   keyboard when the cell does. It is out of the Tab order, so the grid
@@ -67,8 +71,8 @@ function EmptyCell(): null {
 }
 
 /**
- * The first column's cell: the value after a slot that holds a violet bar on
- * the open row, the shape that says "open" (UX-SPEC §5.9). SVG attributes,
+ * The first shown column's cell: the value after a slot that holds a violet
+ * bar on the open row, the shape that says "open" (UX-SPEC §5.9). SVG attributes,
  * no CSS rule: nothing inside the grid is styled by the host. Hidden from
  * the accessibility tree, where `aria-selected` says it.
  */
@@ -161,21 +165,26 @@ function headerMinWidth(label: string, sortable: boolean): number {
 }
 
 /**
- * One column per field the person may read, in the form's order: its label,
- * sortable where the server says, sized to the first page's content, never
- * below what its header needs, and capped so one long note does not take
- * the well. The first carries the open row's bar.
+ * One column per field the person may read, in the order the section
+ * arranged them (0106): its label, sortable where the server says, sized to
+ * the first page's content, never below what its header needs, and capped
+ * so one long note does not take the well. A column the person hid is
+ * there, `hide`, with whatever sort it holds: the sort a view or the
+ * section gives it is the headers' still, so the datasource asks for it
+ * (grid-datasource.ts). The first shown carries the open row's bar.
  */
-export function columnDefsOf(columns: readonly GridColumn[], remove?: RowDelete): ColDef<GridRow>[] {
-  const fields: ColDef<GridRow>[] = columns.map((column, index) => ({
+export function columnDefsOf(columns: readonly ArrangedColumn[], remove?: RowDelete): ColDef<GridRow>[] {
+  const first = columns.find((column) => column.shown)?.key
+  const fields: ColDef<GridRow>[] = columns.map((column) => ({
     colId: column.key,
     headerName: column.label,
     valueGetter: (params) => cellText(params.data, column),
     sortable: column.sortable,
     unSortIcon: column.sortable,
+    hide: !column.shown,
     minWidth: headerMinWidth(column.label, column.sortable),
     maxWidth: 320,
-    ...(index === 0 ? { cellRenderer: OpenCell } : {}),
+    ...(column.key === first ? { cellRenderer: OpenCell } : {}),
   }))
   if (remove === undefined) return fields
   // Last, so Tab into the grid still lands on the open row's first column, and the bar stays first.
@@ -196,8 +205,8 @@ export interface GridCallbacks {
   sorted(): void
 }
 
-/** The options of a grid named by the heading `labelledBy`, for its whole life. */
-export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: string; firstColumn: string; on: GridCallbacks }): GridOptions<GridRow> {
+/** The options of a grid named by the heading `labelledBy`, for its whole life: `firstColumn` is read each time, since a person moves and hides columns under them (0106). */
+export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: string; firstColumn: () => string; on: GridCallbacks }): GridOptions<GridRow> {
   return {
     theme: roomGrid,
     // The theme's rows, said again: a grid made inside a hidden view cannot measure its theme.
@@ -242,7 +251,7 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
       const node = token === null ? undefined : params.api.getRowNode(token)
       if (node === undefined || node.rowIndex === null) return false
       params.api.ensureIndexVisible(node.rowIndex)
-      params.api.setFocusedCell(node.rowIndex, firstColumn)
+      params.api.setFocusedCell(node.rowIndex, firstColumn())
       return true
     },
     onGridReady: (event) => {
@@ -254,7 +263,7 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
     onRowClicked: (event: RowClickedEvent<GridRow>) => {
       // A press of the row's Delete is the button's, never the row's: it does not open the record it asks about.
       if (event.event?.target instanceof Element && event.event.target.closest('button') !== null) return
-      on.asked(event.data, 'click', event.rowIndex, firstColumn)
+      on.asked(event.data, 'click', event.rowIndex, firstColumn())
     },
     onCellKeyDown: (event: CellKeyDownEvent<GridRow>) => {
       const key = (event.event as KeyboardEvent | null | undefined)?.key ?? ''

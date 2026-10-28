@@ -163,12 +163,13 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
   // first page asked for in its filter and its sort -- never a page of
   // every record before it -- the picker naming it, the panel listing its
   // condition and the Id header sorted descending; and the picker and Show
-  // view sit between Search and Filter in the keyboard's order (watched
-  // failing with
+  // view sit between Search and Filter in the keyboard's order, Columns
+  // after them (0106) (watched failing with
   // the grid opening on nothing: every record listed, by key ascending; with
   // the datasource asking for whatever block AG Grid asks for: two first
   // pages, one asked before the headers showed the view's sort; and with
-  // the picker after the Filter panel: Tab from Search reached Filter).
+  // the picker after the Filter panel: Tab from Search reached Filter; and
+  // with Columns after the Filter panel: Tab from Show view reached Filter).
   test('opens the grid on the default view, with one first page in its filter and its sort', async () => {
     await freshOrders(engine, `${VIEWED} ${stamp('opened')}`, ['5', '7'])
     const user = mount(plane.fetch)
@@ -189,6 +190,8 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     expect(focusedName()).toBe('View')
     await user.tab()
     expect(focusedName()).toBe('Show view')
+    await user.tab()
+    expect(focusedName()).toBe('Columns')
     await user.tab()
     expect(focusedName()).toBe('Filter')
   })
