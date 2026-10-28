@@ -16,10 +16,11 @@ const KIND = { idle: 'answer', making: 'loading', made: 'answer', refused: 'refu
  * (`records/export`, 0079) and saved by the browser.
  *
  * `query` is asked when the button is pressed: the search as submitted, the
- * grid's sort -- the last its datasource asked with -- and a child's parent,
- * so the file is of the records the grid shows. Not a link: the token is in
- * the Authorization header and nowhere else (0029), so the page fetches the
- * file and hands the browser its bytes (save-file.ts).
+ * section's filter and sort -- what its grid lists by and its headers show
+ * (0104, 0105) -- and a child's parent, so the file is of the records the
+ * grid shows. Not a link: the token is in the Authorization header and
+ * nowhere else (0029), so the page fetches the file and hands the browser
+ * its bytes (save-file.ts).
  *
  * While the file is made the button is `aria-disabled`, never `disabled`,
  * which would drop the keyboard (0029), and a press sends nothing; its line,

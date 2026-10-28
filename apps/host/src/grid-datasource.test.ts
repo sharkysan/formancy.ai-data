@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { answered, CANNOT_OPEN, columnsOf, listQuery, loading, rowsOf } from './grid-datasource.js'
+import { answered, CANNOT_OPEN, columnsOf, listQuery, loading, rowsOf, sortOfModel } from './grid-datasource.js'
 import type { PublishedForm } from '@formancy/data-client'
 
 /*
@@ -59,25 +59,41 @@ describe('the status line', () => {
 })
 
 describe('what a grid asks for', () => {
-  // The grid's own numbers become the route's: its sort model becomes the
-  // sort, its start row the offset and the block the limit; the search is
-  // the one submitted, never per keystroke, and the filter the one applied,
-  // on every block, not only the first (watched failing with the filter
-  // left out of the request: "filter": []).
+  // The grid's own numbers become the route's: its start row the offset and
+  // the block the limit; the sort is the section's, which the headers show
+  // (0105); the search is the one submitted, never per keystroke, and the
+  // filter the one applied, on every block, not only the first (watched
+  // failing with the filter left out of the request: "filter": []).
   test('is the sort, the page, the parent and the filter the grid shows', () => {
     const filter = [
       { field: 'notes', op: 'contains' as const, text: 'Zug' },
       { field: 'amount', op: 'range' as const, from: '2', to: null },
     ]
-    expect(listQuery({ search: 'Zug', sortModel: [{ colId: 'order_date', sort: 'desc' }], parent: null, filter, startRow: 50, endRow: 100 })).toEqual({
+    const sort = [
+      { field: 'order_date', direction: 'desc' as const },
+      { field: 'id', direction: 'asc' as const },
+    ]
+    expect(listQuery({ search: 'Zug', sort, parent: null, filter, startRow: 50, endRow: 100 })).toEqual({
       search: 'Zug',
-      sort: [{ field: 'order_date', direction: 'desc' }],
+      sort,
       parent: null,
       filter,
       offset: 50,
       limit: 50,
     })
-    expect(listQuery({ search: '', sortModel: [], parent: { field: 'order', record: 'k1:1' }, filter: [], startRow: 0, endRow: 50 })).toMatchObject({ parent: { field: 'order', record: 'k1:1' }, filter: [] })
+    expect(listQuery({ search: '', sort: [], parent: { field: 'order', record: 'k1:1' }, filter: [], startRow: 0, endRow: 50 })).toMatchObject({ parent: { field: 'order', record: 'k1:1' }, filter: [] })
+  })
+
+  // AG Grid's sort model, in its order, is what the datasource holds to the
+  // section's sort before it asks: a column and its direction each (watched
+  // failing with the direction read as AG Grid's sort type: "direction":
+  // undefined).
+  test("reads AG Grid's sort model as a list request's sort", () => {
+    expect(sortOfModel([{ colId: 'amount', sort: 'desc' }, { colId: 'id', sort: 'asc' }])).toEqual([
+      { field: 'amount', direction: 'desc' },
+      { field: 'id', direction: 'asc' },
+    ])
+    expect(sortOfModel([])).toEqual([])
   })
 
   // A row's id is its token, so the page can find the open record's row;

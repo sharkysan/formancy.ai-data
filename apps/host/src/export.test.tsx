@@ -151,7 +151,7 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
   const made = (formId: string): string => `Made ${formId}.csv; your browser saves it.`
 
   // One press, one request: the search the grid lists, never what the box
-  // holds now, and the grid's sort, the last its datasource asked with. The
+  // holds now, and the grid's sort, the one its headers show (0105). The
   // file is the server's, byte for byte, under the form's name, and its
   // header is the grid's headers with each lookup's key after it (watched
   // failing with the box's text sent: "search": "<stamp> typed"; with the
@@ -288,8 +288,8 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
   })
 
   // A child section's file is its parent's rows, in its grid's order: the
-  // parent travels, the search is none, the sort is the one the grid last
-  // asked with, and the file -- the child form's, whole -- keeps the
+  // parent travels, the search is none, the sort is the one its headers
+  // show, and the file -- the child form's, whole -- keeps the
   // parent's column the grid leaves out, so it says whose rows they are
   // (watched failing with the parent left out of the request: "parent":
   // null; with the section's sort left out: "sort": []; and with the grid's

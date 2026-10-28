@@ -12,6 +12,7 @@ import { ROW_HEIGHT } from './grid-theme.js'
 import type { Said } from './leave.js'
 import { Pager } from './pager.js'
 import type { Status } from './pager.js'
+import { sameSort } from './views.js'
 
 export type { OpenHow, RowDelete } from './grid-options.js'
 export { DELETE_COLUMN } from './grid-options.js'
@@ -34,10 +35,18 @@ export { DELETE_COLUMN } from './grid-options.js'
  * a page left empty that is not the first says nothing, and AG Grid shows
  * the page before it.
  *
- * What it lists is its section's: the search submitted, the parent, and the
+ * What it lists is its section's: the search submitted, the parent, the
  * filter its panel applied (filter-panel.tsx, 0104), whose fields its line
- * names. A filter the server refuses is said in the server's sentence with
- * what to do instead of Ask again, which would be refused the same.
+ * names, and the sort. A filter the server refuses is said in the server's
+ * sentence with what to do instead of Ask again, which would be refused the
+ * same.
+ *
+ * The sort is the section's too (0105), so a view picked can set it with
+ * the filter: the headers are made to show it whenever they show another,
+ * and a header the person sorts by is told to the section, which then
+ * holds that sort. Its datasource asks for a block only once the headers
+ * show the section's sort (grid-datasource.ts), so a new filter and a new
+ * sort together are one first page.
  */
 
 /** Where a row was asked for from, so the keyboard can be given back there. */
@@ -57,8 +66,6 @@ export interface RecordGridHandle {
   say(line: Said): void
   /** A record gone from the grid: the page asked for again, and `line` said once, before its sentence. */
   removed(line: Said): void
-  /** The sort the grid last asked for a page in: what a file of its records is sorted by, so the file is in the order the grid shows (0080). */
-  sort(): ListSortTerm[]
 }
 
 export interface RecordGridProps {
@@ -79,6 +86,12 @@ export interface RecordGridProps {
    * Compared by identity, so the caller keeps it as state.
    */
   filter: readonly ListFilterTerm[]
+  /**
+   * The sort (0105): each block is asked for in it and the headers show it,
+   * and a new one starts the list again from its first page, as a new filter
+   * does. Compared by identity, so the caller keeps it as state.
+   */
+  sort: readonly ListSortTerm[]
   openToken: string | null
   canCreate: boolean
   /** The first page is asked for without a word: a child reloaded because its parent changed, which the parent's line has just said. */
@@ -99,6 +112,8 @@ export interface RecordGridProps {
   /** Shown in Drill down, where every open goes down a level: what the grid says of a row follows (0090). */
   drilling?: boolean
   onOpen(token: string, how: OpenHow, at: RowAt): void
+  /** A header sorted by the person: the grid's sort now, in its order, for the section to hold as given -- the grid knows its own report by identity. */
+  onSort(sort: ListSortTerm[]): void
   onClearSearch?(): void
 }
 
@@ -116,6 +131,15 @@ function select(grid: GridApi<GridRow>, open: string | null): IRowNode<GridRow>[
   return changed
 }
 
+/** The sort the grid's headers show, in its order: what a header press leaves, or what was applied to them. */
+function headerSort(grid: GridApi<GridRow>): ListSortTerm[] {
+  return grid
+    .getColumnState()
+    .filter((column) => column.sort === 'asc' || column.sort === 'desc')
+    .sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
+    .map((column) => ({ field: column.colId, direction: column.sort as ListSortTerm['direction'] }))
+}
+
 /**
  * How tall a well is for `rows` rows: the header, a 36px band each (two
  * when there are none), the 16px scrollbar AG Grid keeps, and the frame --
@@ -130,7 +154,7 @@ function wellHeight(header: number, rows: number, cap: number): number {
 }
 
 export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function RecordGrid(props, handle): ReactElement {
-  const { client, formId, columns, labelledBy, parent, search, filter, openToken, quiet = false, toolbarStart, refit = 0, bench, after, onClearSearch } = props
+  const { client, formId, columns, labelledBy, parent, search, filter, sort, openToken, quiet = false, toolbarStart, refit = 0, bench, after, onClearSearch } = props
   const api = useRef<GridApi<GridRow> | null>(null)
   const well = useRef<HTMLDivElement>(null)
   const retryButton = useRef<HTMLButtonElement>(null)
@@ -140,8 +164,6 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   const [status, setStatus] = useState<Status>({ kind: 'loading', text: [quiet ? '' : loading(0, LIST_PAGE_SIZE, props.noun)], help: null, clear: false, retry: false })
   const [pager, setPager] = useState({ page: 0, hasMore: false })
   const shown = useRef({ rows: 0, loaded: false, sized: false, quiet, retrying: false })
-  /** The sort of the last page asked for: AG Grid's, as the datasource sent it. */
-  const sorted = useRef<ListSortTerm[]>([])
   /** What a record gone from the grid says before the next page's sentence, once. */
   const removedLine = useRef<Said | null>(null)
   /** The sentence of a page, after the removal said first if there is one -- which it then is not again. */
@@ -196,10 +218,31 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     fit()
   }, [refit, fit])
 
+  /**
+   * The section's sort on the headers, where they show another: they follow
+   * it, and lead it only by a press. Every field a view sorts by is a
+   * column here: a view is offered only when each is in `list.sortable`,
+   * whose fields `columnsOf` draws, leaving out only a child's parent field,
+   * a lookup, which no list sorts by.
+   */
+  const showSort = useCallback(() => {
+    const grid = api.current
+    if (grid === null || grid.isDestroyed()) return
+    const wanted = latest.current.sort
+    if (sameSort(headerSort(grid), wanted)) return
+    grid.applyColumnState({ state: wanted.map((term, index) => ({ colId: term.field, sort: term.direction, sortIndex: index })), defaultState: { sort: null, sortIndex: null } })
+  }, [])
+  /**
+   * The last sort the headers told the section of. AG Grid tells a press a
+   * task late, so when the section holds what a press told it, the headers
+   * may already show a later press on its way: showing the told one again
+   * would undo it, as two quick Enters on a header did (export.test.tsx).
+   */
+  const told = useRef<readonly ListSortTerm[] | null>(null)
+
   const hooks = useMemo<DatasourceHooks>(
     () => ({
-      loading: (start, end, sort) => {
-        sorted.current = sort
+      loading: (start, end) => {
         shown.current.loaded = false
         api.current?.setGridAriaProperty('busy', 'true')
         const words = shown.current.quiet ? '' : loading(start, end - start, latest.current.noun)
@@ -242,10 +285,14 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     [applySelection, fit, sizeOnce, firstColumn],
   )
 
-  // A new search, another parent or another filter is a new list, from its
-  // first page: a new datasource, which AG Grid starts again from row 0.
-  const datasource = useMemo(() => createDatasource({ client, formId, columns, search, parent, filter, hooks }), [client, formId, columns, search, parent?.field, parent?.record, filter, hooks])
+  // A new search, another parent, another filter or another sort is a new
+  // list, from its first page: a new datasource, which AG Grid starts again
+  // from row 0, and asks once the headers show the sort.
+  const datasource = useMemo(() => createDatasource({ client, formId, columns, search, parent, filter, sort, hooks }), [client, formId, columns, search, parent?.field, parent?.record, filter, sort, hooks])
   useEffect(() => () => datasource.abort(), [datasource])
+  useEffect(() => {
+    if (sort !== told.current) showSort()
+  }, [sort, showSort])
   useEffect(() => {
     // The parent changed: its line has spoken, and this one waits for the answer.
     if (quiet) shown.current.quiet = true
@@ -279,7 +326,6 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         removedLine.current = line
         api.current?.purgeInfiniteCache()
       },
-      sort: () => sorted.current,
     }),
     [firstColumn],
   )
@@ -300,6 +346,17 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           ready: (ready) => {
             api.current = ready
             if (!shown.current.loaded) ready.setGridAriaProperty('busy', 'true')
+            // The sort the section opens on: a default view's (0105).
+            showSort()
+          },
+          sorted: () => {
+            const grid = api.current
+            if (grid === null || grid.isDestroyed()) return
+            const now = headerSort(grid)
+            // Only a sort the section does not hold yet: the one it holds was put on the headers by showSort.
+            if (sameSort(now, latest.current.sort)) return
+            told.current = now
+            latest.current.onSort(now)
           },
           resized: fit,
           asked: (row, how, rowIndex, colId) => {
@@ -311,7 +368,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         },
       }),
     // The options are the grid's for its life; what changes is read through `latest`.
-    [labelledBy, firstColumn, fit],
+    [labelledBy, firstColumn, fit, showSort],
   )
 
   return (

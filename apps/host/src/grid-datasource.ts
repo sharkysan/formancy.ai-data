@@ -1,5 +1,6 @@
 import type { IDatasource, IGetRowsParams, SortModelItem } from 'ag-grid-community'
 import type { DataClient, FormRecord, ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
+import { sameSort } from './views.js'
 
 /*
  * What a record grid asks the runtime plane for, and what it says about the
@@ -55,17 +56,22 @@ export function columnsOf(definition: PublishedForm, parentField: string | null)
     })
 }
 
-/** The list request for one block: the submitted search, the grid's sort, the parent, the applied filter (0104), and the block as offset and limit. */
+/** AG Grid's sort model as a list request's sort: its columns in their order, each one way. */
+export function sortOfModel(sortModel: readonly SortModelItem[]): ListSortTerm[] {
+  return sortModel.map((item) => ({ field: item.colId, direction: item.sort }))
+}
+
+/** The list request for one block: the submitted search, the section's sort (0105), the parent, the applied filter (0104), and the block as offset and limit. */
 export function listQuery({
   search,
-  sortModel,
+  sort,
   parent,
   filter,
   startRow,
   endRow,
 }: {
   search: string
-  sortModel: readonly SortModelItem[]
+  sort: readonly ListSortTerm[]
   parent: RecordListQuery['parent']
   filter: readonly ListFilterTerm[]
   startRow: number
@@ -73,7 +79,7 @@ export function listQuery({
 }): RecordListQuery {
   return {
     search,
-    sort: sortModel.map((item) => ({ field: item.colId, direction: item.sort })),
+    sort: [...sort],
     parent,
     filter: [...filter],
     offset: startRow,
@@ -151,8 +157,8 @@ export function answered({
 
 /** What the datasource tells the grid component as it goes. */
 export interface DatasourceHooks {
-  /** A block asked for, in this order: the grid keeps the sort, which a file of its records is sorted by (0080). */
-  loading(start: number, end: number, sort: ListSortTerm[]): void
+  /** A block asked for. */
+  loading(start: number, end: number): void
   /** A block answered, for the filter it was asked with: the line names the fields that filter is on. */
   answered(start: number, rows: readonly GridRow[], hasMore: boolean, filter: readonly ListFilterTerm[]): void
   /** A block refused, in the server's sentence, and its code: a filter the server cannot apply is not one to ask for again (0104). */
@@ -161,12 +167,20 @@ export interface DatasourceHooks {
 
 /**
  * The infinite row model's datasource over `records/list` for one search,
- * one parent and one filter: a new one is made when any of them changes, and
- * AG Grid starts again from the first page. Every block carries the same
- * filter, in the request's body, so its values are in no URL (0104). One
- * request at a time, the grid's own
- * `maxConcurrentDatasourceRequests`; a block AG Grid no longer wants is
- * answered as failed and says nothing.
+ * one parent, one filter and one sort: a new one is made when any of them
+ * changes, and AG Grid starts again from the first page. Every block carries
+ * the same filter, in the request's body, so its values are in no URL
+ * (0104), and the same sort, the section's (0105). One request at a time,
+ * the grid's own `maxConcurrentDatasourceRequests`; a block AG Grid no
+ * longer wants is answered as failed and says nothing.
+ *
+ * A block AG Grid asks for under another order than this list's is
+ * answered as failed too, and asks the server nothing: the grid's headers
+ * have not caught up with the section's sort yet (record-grid.tsx), or a
+ * press on one has not reached the section, whose new list then asks. The
+ * block asked for once they agree is the one that is sent, so a view
+ * picked -- a new filter and a new sort at once -- is one first page, never
+ * one in the old order first.
  */
 export function createDatasource({
   client,
@@ -175,6 +189,7 @@ export function createDatasource({
   search,
   parent,
   filter,
+  sort,
   hooks,
 }: {
   client: DataClient
@@ -183,6 +198,7 @@ export function createDatasource({
   search: string
   parent: RecordListQuery['parent']
   filter: readonly ListFilterTerm[]
+  sort: readonly ListSortTerm[]
   hooks: DatasourceHooks
 }): IDatasource & { abort(): void } {
   let current: AbortController | undefined
@@ -211,10 +227,14 @@ export function createDatasource({
   return {
     getRows(params) {
       current?.abort()
+      if (!sameSort(sortOfModel(params.sortModel), sort)) {
+        params.failCallback()
+        return
+      }
       const controller = new AbortController()
       current = controller
-      const query = listQuery({ search, sortModel: params.sortModel, parent, filter, startRow: params.startRow, endRow: params.endRow })
-      hooks.loading(params.startRow, params.endRow, query.sort)
+      const query = listQuery({ search, sort, parent, filter, startRow: params.startRow, endRow: params.endRow })
+      hooks.loading(params.startRow, params.endRow)
       rowsFor(params, query, controller.signal).then(
         (answer) => {
           if (controller.signal.aborted) return params.failCallback()

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties, ReactElement } from 'react'
-import { ColumnAutoSizeModule, InfiniteRowModelModule, LocaleModule, ModuleRegistry, PaginationModule, RenderApiModule, RowApiModule, RowSelectionModule, ScrollApiModule } from 'ag-grid-community'
+import { ColumnApiModule, ColumnAutoSizeModule, InfiniteRowModelModule, LocaleModule, ModuleRegistry, PaginationModule, RenderApiModule, RowApiModule, RowSelectionModule, ScrollApiModule } from 'ag-grid-community'
 import type { CellKeyDownEvent, ColDef, GridApi, GridOptions, ICellRendererParams, Module, RowClickedEvent } from 'ag-grid-community'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { cellText } from './grid-datasource.js'
@@ -35,11 +35,12 @@ import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
  * Every module the options below use, and no other: `AllCommunityModule`
  * would ship code nothing calls. RowApiModule is for finding the open row,
  * ColumnAutoSizeModule for sizing columns to the first page, LocaleModule
- * for the page's own words in AG Grid's live region; grid-keys.test.tsx
- * fails on the console error AG Grid writes for an option whose module is
- * missing.
+ * for the page's own words in AG Grid's live region, ColumnApiModule for
+ * reading the headers' sort and showing the section's on them (0105);
+ * grid-keys.test.tsx fails on the console error AG Grid writes for an
+ * option whose module is missing.
  */
-export const GRID_MODULES: readonly Module[] = [InfiniteRowModelModule, PaginationModule, RowSelectionModule, RenderApiModule, ScrollApiModule, RowApiModule, ColumnAutoSizeModule, LocaleModule]
+export const GRID_MODULES: readonly Module[] = [InfiniteRowModelModule, PaginationModule, RowSelectionModule, RenderApiModule, ScrollApiModule, RowApiModule, ColumnAutoSizeModule, LocaleModule, ColumnApiModule]
 ModuleRegistry.registerModules([...GRID_MODULES])
 
 export type OpenHow = 'click' | 'space' | 'enter'
@@ -191,6 +192,8 @@ export interface GridCallbacks {
   asked(row: GridRow | undefined, how: OpenHow, rowIndex: number | null, colId: string): void
   /** Whether the grid is shown in Drill down, where Space and Enter both go down: read every time AG Grid words a row. */
   drilling(): boolean
+  /** The headers' sort changed: by a press on one, or by the page showing the section's (0105). */
+  sorted(): void
 }
 
 /** The options of a grid named by the heading `labelledBy`, for its whole life. */
@@ -247,6 +250,7 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
       on.ready(event.api)
     },
     onGridSizeChanged: () => on.resized(),
+    onSortChanged: () => on.sorted(),
     onRowClicked: (event: RowClickedEvent<GridRow>) => {
       // A press of the row's Delete is the button's, never the row's: it does not open the record it asks about.
       if (event.event?.target instanceof Element && event.event.target.closest('button') !== null) return
