@@ -13,7 +13,7 @@ import { AUDIENCE, ISSUER, TENANT_CLAIM } from '@formancy/data-live-demo/worker'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import { inject } from 'vitest'
-import { childForms, clerkPolicy, lookupsOf, offered, ORDER_CASCADES } from './test-forms.js'
+import { childForms, clerkPolicy, lookupsOf, offered, ORDER_CASCADES, ORDER_VIEWS, WITHHELD_VIEWS } from './test-forms.js'
 import type { Proposed } from './test-forms.js'
 
 /*
@@ -73,11 +73,13 @@ export const PAGED = inject('paged')
  * `startPlane({ children: true, deliveries: true })`, an order's deliveries
  * too, named by their carrier (test-forms.ts). `read` is the order form
  * again, which `startPlane({ paged: true })` publishes for the clerk to
- * read only (0085).
+ * read only (0085); `withheld` the order form again, which
+ * `startPlane({ views: true })` publishes for the clerk to read without
+ * Amount, with views whose default is on Amount (0105).
  */
 export const ENGINES = [
-  { engine: 'PostgreSQL', connection: 'pg', formId: 'pg-order', versionColumn: 'row_version' as string | undefined, lines: 'pg-order-line', employees: 'pg-employee', staff: 'pg-order-staff', deliveries: 'pg-delivery', parity: 'pg-parity', removable: 'pg-removable', read: 'pg-order-read' },
-  { engine: 'SQL Server', connection: 'ms', formId: 'ms-order', versionColumn: undefined, lines: 'ms-order-line', employees: 'ms-employee', staff: 'ms-order-staff', deliveries: 'ms-delivery', parity: 'ms-parity', removable: 'ms-removable', read: 'ms-order-read' },
+  { engine: 'PostgreSQL', connection: 'pg', formId: 'pg-order', versionColumn: 'row_version' as string | undefined, lines: 'pg-order-line', employees: 'pg-employee', staff: 'pg-order-staff', deliveries: 'pg-delivery', parity: 'pg-parity', removable: 'pg-removable', read: 'pg-order-read', withheld: 'pg-order-withheld' },
+  { engine: 'SQL Server', connection: 'ms', formId: 'ms-order', versionColumn: undefined, lines: 'ms-order-line', employees: 'ms-employee', staff: 'ms-order-staff', deliveries: 'ms-delivery', parity: 'ms-parity', removable: 'ms-removable', read: 'ms-order-read', withheld: 'ms-order-withheld' },
 ] as const
 
 export type Engine = (typeof ENGINES)[number]
@@ -332,8 +334,12 @@ export function losingWrites(fetch: typeof globalThis.fetch, { when, times = 1, 
  * scoped to `parity`. With `demo`, the server also accepts the live demo's
  * tokens, signed with `demoKey` (0070). With `paged`, the order form is
  * published again as `read` of `ENGINES`, which the clerk may only read.
+ * With `views` (0105), the order form is published with `ORDER_VIEWS`, the
+ * deliveries with `DELIVERY_VIEWS`, and the order form again as `withheld`
+ * of `ENGINES`, which the clerk may read but for Amount, with
+ * `WITHHELD_VIEWS` (test-forms.ts).
  */
-export async function startPlane(options: { children?: boolean; deletes?: boolean; deliveries?: boolean; demo?: boolean; paged?: boolean } = {}): Promise<Plane> {
+export async function startPlane(options: { children?: boolean; deletes?: boolean; deliveries?: boolean; demo?: boolean; paged?: boolean; views?: boolean } = {}): Promise<Plane> {
   const { pg, ms } = inject('databases')
   // 32 random bytes as base64url: the shape of the key a Durable Object starts its container with.
   const demoKey = options.demo === true ? randomBytes(32).toString('base64url') : undefined
@@ -383,8 +389,9 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
     if (reply.statusCode >= 300) throw new Error(`${url} answered ${String(reply.statusCode)}: ${reply.body}`)
     return reply.json<Record<string, unknown>>()
   }
-  for (const { connection, formId: order, versionColumn, read } of ENGINES) {
-    for (const formId of options.paged === true ? [order, read] : [order]) {
+  const views = options.views === true
+  for (const { connection, formId: order, versionColumn, read, withheld } of ENGINES) {
+    for (const formId of [order, ...(options.paged === true ? [read] : []), ...(views ? [withheld] : [])]) {
       const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
         connection,
         root: { schema: 'sales', name: 'order' },
@@ -394,9 +401,15 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
         ...(versionColumn === undefined ? {} : { versionColumn }),
       })
       const base = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
-      // `read` the clerk may only read, so a record of it is drawn with every field disabled.
-      const policy: FormPolicy = formId === read ? { ...base, operations: offered(bindings as unknown as Proposed, true) } : deletes ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES } : base
-      await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+      // `read` the clerk may only read, so a record of it is drawn with every field disabled;
+      // `withheld` they may read too, but for Amount, which its default view is on.
+      const readOnly = { ...base, operations: offered(bindings as unknown as Proposed, true) }
+      const policy: FormPolicy =
+        formId === read ? readOnly : formId === withheld ? { ...readOnly, fields: { ...base.fields, amount: { read: [], write: [] } } } : deletes ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES } : base
+      // A presentation of views alone: the form is its base (0030, 0105).
+      const named = !views ? undefined : formId === order ? ORDER_VIEWS : formId === withheld ? WITHHELD_VIEWS : undefined
+      const presentation: PresentationOverrides = named === undefined ? EMPTY_PRESENTATION : { ...EMPTY_PRESENTATION, views: named }
+      await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation, form, bindings, policy, snapshot } })
     }
   }
   for (const { parity: connection, removable: formId } of deletes ? ENGINES : []) {
@@ -412,7 +425,7 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
     await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
   }
   for (const engine of options.children === true ? ENGINES : []) {
-    for (const child of childForms(engine, { deletes, deliveries: options.deliveries === true })) {
+    for (const child of childForms(engine, { deletes, deliveries: options.deliveries === true, views })) {
       const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
         connection: engine.connection,
         root: { schema: 'sales', name: child.table },
@@ -429,6 +442,7 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
           const label = child.labels?.[foreignKey]
           return label === undefined ? [] : [{ field, anchor: { kind: 'lookup' as const, foreignKey }, label }]
         }),
+        ...(child.views === undefined ? {} : { views: child.views }),
       }
       const presented = applyPresentation(form as FormSchema, presentation, proposed)
       if (!presented.ok) throw new Error(presented.problems.join('; '))

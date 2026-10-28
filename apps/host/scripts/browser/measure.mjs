@@ -206,6 +206,47 @@ export async function paintedWhere(page, locate) {
 }
 
 /**
+ * A text axe called partially obscured, shown whole inside the pane that cuts
+ * it, asked of axe again, and the pane put back: `passes`, a `violation` with
+ * axe's ratio, or `left` with why it could not be shown. The pane is the
+ * text's nearest ancestor that scrolls up and down, and only its own scroll
+ * moves -- never the window's, never a grid's -- and only when the text's box
+ * runs past the pane's edge and fits inside it, and the pane lies wholly in
+ * the window. Its colours are the text's own and the pane's, which do not
+ * change when the pane scrolls: a pane that scrolls inside itself stays where
+ * it is drawn, so what lies behind its glass does not move. Anything else
+ * that covers part of a text is not this, and stays undecided.
+ */
+async function reveal(page, at) {
+  return page.evaluate(async (index) => {
+    const element = window.formancyGateUndecided?.[index]
+    if (element === undefined || !element.isConnected) return { verdict: 'left', why: 'gone from the page' }
+    // A grid scrolls itself, and its scroll is part of the state measured.
+    if (element.closest('.grid-bench') !== null) return { verdict: 'left', why: 'partially obscured, inside a grid' }
+    let pane = element.parentElement
+    while (pane !== null && !/auto|scroll/.test(getComputedStyle(pane).overflowY)) pane = pane.parentElement
+    if (pane === null) return { verdict: 'left', why: 'partially obscured, in no pane that scrolls' }
+    const frame = pane.getBoundingClientRect()
+    const top = frame.top + pane.clientTop
+    const bottom = top + pane.clientHeight
+    const box = element.getBoundingClientRect()
+    if (box.top >= top && box.bottom <= bottom) return { verdict: 'left', why: 'partially obscured, and not by the edge of its pane' }
+    if (box.height > pane.clientHeight || frame.top < 0 || frame.bottom > window.innerHeight) return { verdict: 'left', why: 'cut by a pane it does not fit in, or one the window cuts' }
+    const before = pane.scrollTop
+    try {
+      pane.scrollTop = before + (box.top < top ? box.top - top : box.bottom - bottom)
+      const results = await window.axe.run(element, { runOnly: { type: 'rule', values: ['color-contrast'] } })
+      const ratio = (outcome) => outcome[0]?.nodes[0]?.any[0]?.data?.contrastRatio
+      if (results.violations.length > 0) return { verdict: 'violation', ratio: ratio(results.violations) }
+      if (results.incomplete.length > 0) return { verdict: 'left', why: `shown whole in the pane that cut it, and still undecided: ${results.incomplete[0]?.nodes[0]?.any[0]?.message ?? ''}` }
+      return results.passes.length > 0 ? { verdict: 'passes' } : { verdict: 'left', why: 'shown whole in the pane that cut it, and axe measured nothing' }
+    } finally {
+      pane.scrollTop = before
+    }
+  }, at)
+}
+
+/**
  * Decides what axe left undecided inside a grid -- a header or a cell whose
  * background axe "could not determine due to a pseudo element" (UX-SPEC F1),
  * or because "it is overlapped by another element" -- by the text's computed
@@ -238,6 +279,15 @@ export async function paintedWhere(page, locate) {
  * read as 4.49:1 and 4.47:1, and left of the window in Chromium, where a
  * screenshot has no pixel and the gate read black -- and every cell below
  * the window was read against that black too (0058).
+ *
+ * Partially obscured is what axe says of a text its own scrolling pane cuts
+ * at an edge: side by side, the Records panel scrolls inside itself, so a
+ * focused control is never covered (records.css), and a text at its top or
+ * bottom edge is half shown. Such a text outside a grid is decided by
+ * `reveal`. Seen 2026-10-28, when a grid's View row (0105) made
+ * the panel's content taller than a window 900 pixels high: the panel's
+ * heading after a row's Delete scrolled it, and a refused filter's lines at
+ * its foot, in all three browsers.
  */
 export async function decide(page, undecided) {
   const left = []
@@ -246,6 +296,12 @@ export async function decide(page, undecided) {
   const scrolled = await page.evaluate(() => [window.scrollX, window.scrollY])
   try {
     for (const node of undecided) {
+      if (/partially obscured/.test(node.reason)) {
+        const revealed = await reveal(page, node.at)
+        if (revealed.verdict === 'passes') continue
+        left.push(`${node.html} (${revealed.verdict === 'violation' ? `shown whole in the pane that cut it, at ${String(revealed.ratio)}:1` : revealed.why})`)
+        continue
+      }
       if (!/pseudo element|overlapped by another element/.test(node.reason)) {
         left.push(node.html)
         continue

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
-import { presentationOf } from '@formancy/data-core'
-import type { DriftChange, DriftReport, FormPolicy, ReassignedKey } from '@formancy/data-core'
+import { presentationOf, viewProblems } from '@formancy/data-core'
+import type { DriftChange, DriftReport, FormPolicy, ListView, ReassignedKey } from '@formancy/data-core'
 import type { AdminClient, Bundle, Failure, Proposal, Published } from './api.js'
 import { describeRef } from './choice.js'
 import { useDocument } from './document.js'
@@ -105,9 +105,12 @@ function describePublished(published: Published): string {
  *
  * The bundle is format 2 (0030): the generated base, the request it came
  * from, and the presentation chosen over it, derived here by
- * `presentationOf` from the session's document. A draft holding anything
- * else -- builder-core accepts a required flag or a numeric span -- waits,
- * with each reason, rather than being refused at the last step.
+ * `presentationOf` from the session's document, with the list views beside
+ * it (0105) -- left out when there are none, which is the one spelling the
+ * server reads. A draft holding anything else -- builder-core accepts a
+ * required flag or a numeric span -- waits, with each reason, rather than
+ * being refused at the last step; so does a view these bindings cannot
+ * run, by `viewProblems`, the server's own check of one.
  *
  * Publication is compare-and-swap (0013). The base is read when the step
  * opens and named in the request; if somebody published in between, the
@@ -130,6 +133,7 @@ export function PublishStep({
   connection,
   proposal,
   session,
+  views = [],
   policy,
   stale,
   regeneratedFrom = null,
@@ -144,6 +148,8 @@ export function PublishStep({
   connection: string
   proposal: Proposal
   session: BuilderSession
+  /** The list views chosen in the Presentation step (0105), in their order. */
+  views?: readonly ListView[]
   policy: FormPolicy
   stale: boolean
   /** The version the draft was regenerated from, which is its base; `null` for a draft generated afresh. */
@@ -192,6 +198,7 @@ export function PublishStep({
       ? null
       : `Grants for ${undecided.join(', ')} were written for another column or lookup: keep or remove them in the Policy step.`,
     ...(derived.ok ? [] : derived.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`)),
+    ...viewProblems(views, proposal.bindings).map((problem) => `A list view the server refuses: ${problem}`),
   ].filter((blocker): blocker is string => blocker !== null)
   const expected = base.state === 'known' ? base.version : null
   const next = (expected ?? 0) + 1
@@ -219,7 +226,9 @@ export function PublishStep({
     if (pending) return
     if (!derived.ok) return
     const { form, bindings, snapshot, generation } = proposal
-    const bundle: Bundle = { format: 2, connection, generation, base: form, presentation: derived.presentation, form: session.exportDocument(), bindings, policy, snapshot }
+    // No views is the property left out: the server refuses `views: []`, a second spelling of none.
+    const presentation = views.length === 0 ? derived.presentation : { ...derived.presentation, views: [...views] }
+    const bundle: Bundle = { format: 2, connection, generation, base: form, presentation, form: session.exportDocument(), bindings, policy, snapshot }
     const sent: Published = { version: expected ?? 0, bundle }
     setPending(true)
     setResult(null)

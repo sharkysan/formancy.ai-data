@@ -46,8 +46,13 @@ function hasExactly(record: Record<string, unknown>, keys: readonly string[]): b
   return present.length === keys.length && keys.every((key) => Object.hasOwn(record, key))
 }
 
-/** The requested order: a list of `{ field, direction }`, each field once. A field twice would order by its first mention and say nothing with the second. */
-function sortOf(sort: unknown): { ok: true; sort: ListSortTerm[] } | Malformed {
+/**
+ * The requested order: a list of `{ field, direction }`, each field once. A
+ * field twice would order by its first mention and say nothing with the
+ * second. A list's body and an export's are read by it, and so is a list
+ * view's sort (0105), so a view's order is one a request may carry.
+ */
+export function readSort(sort: unknown): { ok: true; sort: ListSortTerm[] } | Malformed {
   if (sort === undefined) return { ok: true, sort: [] }
   if (!Array.isArray(sort)) return malformed('The sort is a list of { field, direction }.')
   const terms: ListSortTerm[] = []
@@ -77,7 +82,7 @@ function parentOf(parent: unknown): { ok: true; parent: RecordListQuery['parent'
 function selection(query: Record<string, unknown>): ({ ok: true } & RecordExportQuery) | ExportQueryRefusal {
   const search = checkSearch(query['search'] === undefined ? '' : query['search'])
   if (!search.ok) return search
-  const sort = sortOf(query['sort'])
+  const sort = readSort(query['sort'])
   if (!sort.ok) return sort
   const parent = parentOf(query['parent'])
   if (!parent.ok) return parent

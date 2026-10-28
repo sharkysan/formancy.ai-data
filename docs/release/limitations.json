@@ -624,7 +624,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:1c785f351ffc5f21b7c9f9b0536b3101f4abfad2adc5017023baf917abc2131e",
+      "reviewed": "sha256:2f13441db58f2369c8174ed6f9e541aecf99ca4265cf8a23d9e2c8bfe7d8d9d4",
       "limitations": [
         {
           "area": "studio",
@@ -2668,7 +2668,7 @@
       ]
     },
     "0080": {
-      "reviewed": "sha256:74a314eda667963e010d2a4ac03e6414ae1d3d0823277dfc3fd57ca23de88c58",
+      "reviewed": "sha256:ba0687252abf9c675021eb4e93481d522b4d1e68809e337c7ac1e479d6b0588b",
       "limitations": [
         {
           "area": "host",
@@ -3085,7 +3085,7 @@
       ]
     },
     "0104": {
-      "reviewed": "sha256:6bc2810d8220662c5391e87b004a94cdae0c3613e323c70071646ef19614426a",
+      "reviewed": "sha256:a59d4a1f553214e236fb1a490aa8511774dd937973a1068a88a922868ce417e9",
       "limitations": [
         {
           "area": "forms",
@@ -3135,6 +3135,53 @@
         {
           "area": "server",
           "says": "@formancy/data-client refuses a form whose list says nothing of filters as unexpected, so a host upgrades its server before its client.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0105": {
+      "reviewed": "sha256:05b978d0a0804f15ec193721e1bdc063b57091838807a4f94ef6ba22177d3545",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A list view is only what a person could have built: conditions joined by AND and an order, with no value relative to the day or to the person, so overdue or assigned to me cannot be a view.",
+          "heldBy": "packages/data-core/src/presentation/views.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A view's name is text in one language, not a translatable message."
+        },
+        {
+          "area": "host",
+          "says": "Views are the same for everyone who may read their fields: none can be kept to a role, a person cannot save a view of their own, and nothing remembers a picked view across a reload, which opens on the default view again."
+        },
+        {
+          "area": "access",
+          "says": "A person who may not read a field a view names is not offered that view at all, not even without that condition, and a default view they are not offered leaves their grid opening on every record.",
+          "heldBy": "apps/host/src/view-picker.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "A view on a field nobody may read is stored and offered to nobody, and the studio says nothing of which roles will be offered which view.",
+          "heldBy": "packages/data-server/src/routes/runtime-lists.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "Saving, removing and moving a view are not on the Presentation step's Undo and Redo, a view being defined and not saved is lost when the step is left, and a refusal is said with data-core's path counted from 0 and the field's key."
+        },
+        {
+          "area": "operations",
+          "says": "A stored view this release would not run, such as one a later release's tighter rule refuses, is not offered, and nothing says so to the person or in the log until a publish refuses it.",
+          "heldBy": "packages/data-core/src/presentation/views.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "A regeneration or Generate again drops a view whose column is gone or no longer offers what it asks, rather than carrying it without that condition, and it has to be made again.",
+          "heldBy": "packages/data-core/src/presentation/views.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "@formancy/data-client refuses a form whose list says nothing of views as unexpected, so a host upgrades its server before its client.",
           "heldBy": "packages/data-client/src/transport.test.ts"
         }
       ]

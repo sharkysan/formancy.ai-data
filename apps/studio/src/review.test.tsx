@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { describeReassigned } from '@formancy/data-core'
-import type { FormPolicy } from '@formancy/data-core'
+import type { FormPolicy, ListView } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import { ReviewStep } from './review.js'
 import { audit, focusedName, goTo, mount, paragraphs, pressEnter, servedDocument, signIn, unnamed } from './test-studio.js'
@@ -277,6 +277,30 @@ describe('what a draft shows its reviewer', () => {
     ])
     expect(within(reached).queryByRole('list', { name: 'What a delete also does' })).toBeNull()
     expect(await audit()).toEqual([])
+  })
+
+  // A list view (0105) is what a person's grid offers above it, and the
+  // view the grid opens on: approving the draft puts it in force as much
+  // as the form. Said in words beside the policy -- its conditions by the
+  // fields' labels, its order, and which view opens the grid -- so what is
+  // approved is what was read; a draft without views says nothing of them.
+  // Watched failing with the views left out of the draft's view.
+  test('shows the list views approving it would offer, in words', async () => {
+    const bundle = await orderBundle(plane)
+    if (bundle.format !== 2) throw new Error('the order bundle is not format 2')
+    const views: ListView[] = [
+      { name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [{ field: 'order_date', direction: 'desc' }], default: true },
+      { name: 'Large', filter: [{ field: 'amount', op: 'range', from: '1000', to: null }], sort: [] },
+    ]
+    await submit(plane, TOKENS.admin, null, { ...bundle, presentation: { ...bundle.presentation, views } })
+    await submit(plane, TOKENS.admin, null, await orderBundle(plane, readOnly(['auditor'])))
+    const { user, review } = await reviewAs(TOKENS.publisher)
+
+    const region = await open(user, review, 1)
+    expect(items(region, 'List views')).toEqual(['Placed: where Status = placed; sorted by Order date descending; opens the grid.', 'Large: where Amount from 1000.'])
+    expect(await audit()).toEqual([])
+    const without = await open(user, review, 2)
+    expect(within(without).queryByRole('list', { name: 'List views' })).toBeNull()
   })
 })
 

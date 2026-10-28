@@ -213,7 +213,9 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
   })
 
   // A sortable header sends its field and direction; the grid shows the
-  // server's order, and says so with aria-sort.
+  // server's order, and says so with aria-sort. The header says so at the
+  // press, and the request leaves once the section holds the sort, which AG
+  // Grid tells it a task later (0105): so the request is waited for.
   test('sorts by a sortable header, in the server', async () => {
     const user = await workspace(engine.formId)
     const definition = await plane.clerk.form(engine.formId)
@@ -226,8 +228,8 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     for (let column = 0; column < headersOf().indexOf('Order date'); column += 1) await user.keyboard('{ArrowRight}')
     await user.keyboard('{ArrowUp}{Enter}')
     await waitFor(() => expect(date.getAttribute('aria-sort')).toBe('ascending'), { timeout: 15_000 })
-    const sent = plane.sent.filter((request) => request.path === `/v1/forms/${engine.formId}/records/list`).at(-1)
-    expect(JSON.parse(sent?.body ?? '{}')).toMatchObject({ sort: [{ field: 'order_date', direction: 'asc' }] })
+    const last = () => JSON.parse(plane.sent.filter((request) => request.path === `/v1/forms/${engine.formId}/records/list`).at(-1)?.body ?? '{}') as unknown
+    await waitFor(() => expect(last()).toMatchObject({ sort: [{ field: 'order_date', direction: 'asc' }] }), { timeout: 15_000 })
     // A lookup's label is not the server's to sort by: its header has no sort.
     const customer = within(records()).getByRole('columnheader', { name: /Customer/ })
     expect(customer.getAttribute('aria-sort')).toBeNull()

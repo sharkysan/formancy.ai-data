@@ -86,7 +86,11 @@ describe('when the data server is not what answers', () => {
   // either: a page would offer conditions the server refuses, or say a
   // timestamp's days are on a clock they are not.
   // Watched failing with `filterable` left unchecked: every one of those
-  // lists was taken for the server's.
+  // lists was taken for the server's. So is one without `views`, a server
+  // older than views (0105), or with a view a picker could not send as a
+  // list request: no name, a condition with no field or an operator
+  // data-core does not name, a direction but ascending or descending, a
+  // default but `true`. Watched failing with `views` left unchecked.
   test("a form without the server's list is unexpected, and a list of null or columns is the server's", async () => {
     const FORM = { form: { model: {} }, operations: ['read'], readable: ['id'], deleting: null }
     let body: unknown = FORM
@@ -94,7 +98,9 @@ describe('when the data server is not what answers', () => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
     })
     const client = createDataClient({ token: () => 't', base })
-    const columns = { searchable: [], sortable: ['id'] }
+    const columns = { searchable: [], sortable: ['id'], views: [] }
+    const VIEW = { name: 'Newest', filter: [{ field: 'id', op: 'range', from: '10', to: null }], sort: [{ field: 'id', direction: 'desc' }] }
+    const viewed = (view: Record<string, unknown>) => ({ ...columns, filterable: [], views: [{ ...VIEW, ...view }] })
     const offer = (operators: unknown, input: unknown, days: unknown = null) => ({ ...columns, filterable: [{ field: 'id', operators, input, days }] })
     for (const list of [
       undefined,
@@ -113,11 +119,19 @@ describe('when the data server is not what answers', () => {
       offer(['null', 'not-null'], 'text'),
       offer(['range'], 'date', 'local'),
       offer(['equals', 'range'], 'integer', 'utc'),
+      { searchable: [], sortable: ['id'], filterable: [] },
+      { ...columns, filterable: [], views: {} },
+      viewed({ name: 7 }),
+      viewed({ filter: [{ op: 'null' }] }),
+      viewed({ filter: [{ field: 'id', op: 'like', text: '1' }] }),
+      viewed({ sort: [{ field: 'id', direction: 'up' }] }),
+      viewed({ sort: {} }),
+      viewed({ default: false }),
     ]) {
       body = { ...FORM, list }
       expect(await client.form('pg-order'), JSON.stringify(list)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
     }
-    for (const list of [null, { ...columns, filterable: [] }, offer(['equals', 'range'], 'integer'), offer(['null', 'not-null'], null), offer(['equals', 'contains', 'null', 'not-null'], 'text'), offer(['range'], 'date', 'utc'), offer(['range', 'null', 'not-null'], 'date', 'wall')]) {
+    for (const list of [null, { ...columns, filterable: [] }, offer(['equals', 'range'], 'integer'), offer(['null', 'not-null'], null), offer(['equals', 'contains', 'null', 'not-null'], 'text'), offer(['range'], 'date', 'utc'), offer(['range', 'null', 'not-null'], 'date', 'wall'), viewed({}), viewed({ default: true })]) {
       body = { ...FORM, list }
       expect(await client.form('pg-order'), JSON.stringify(list)).toEqual({ ok: true, value: body })
     }

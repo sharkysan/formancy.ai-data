@@ -101,12 +101,20 @@ export function describeFocus(page) {
  *
  * In a browser because what happens to the focus of an element React moves
  * or unmounts is the browser's to say, and jsdom has an answer of its own.
+ *
+ * The studio moves the focus in an effect that runs after the render that
+ * `settled` waits for has been painted (`src/focus.ts`), so the focus is
+ * waited for as the steps' headings are, up to 15 seconds, and only then
+ * read. Read at once, WebKit was once seen between the two on 2026-10-28:
+ * the Browse step's rows said, and the keyboard not yet on Filter rows.
  */
 export async function focusAfterEnter(page, pressed, settled, expected) {
   await pressed.focus()
   await page.keyboard.press('Enter')
   await settled()
-  return (await expected.evaluate((element) => element === document.activeElement)) ? null : `the focus is on ${await describeFocus(page)}`
+  const element = await expected.elementHandle()
+  await page.waitForFunction((target) => target === document.activeElement, element, { timeout: 15_000 }).catch(() => undefined)
+  return (await expected.evaluate((target) => target === document.activeElement)) ? null : `the focus is on ${await describeFocus(page)}`
 }
 
 /** A state measured: no sideways scroll, nothing past either edge, and axe -- contrast and target size included -- over the whole page. */

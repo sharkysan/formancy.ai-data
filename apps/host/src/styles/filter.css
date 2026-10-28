@@ -2,10 +2,28 @@
  *
  * A grid's filter panel (0104, filter-panel.tsx): a row of its own in the
  * grid's toolbar, under the search -- Filter, the conditions applied, and
- * when open the panel's controls. Room variables and color-mix() of them
- * only; every rule names a class of the panel's own, so nothing here selects
- * inside .sheet or .grid-bench.
+ * when open the panel's controls -- and the View picker before it, where the
+ * server offers views (0105, view-picker.tsx). Room variables and
+ * color-mix() of them only; every rule names a class of the panel's or the
+ * picker's own, so nothing here selects inside .sheet or .grid-bench.
  */
+
+/* View beside its select and Show view after it, as Search is beside its
+   box and its button: in the search's row where it fits, and on a row of
+   its own where it does not, Show view under the select on the narrowest. */
+.view-picker {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.view-picker label,
+.view-picker .button {
+  flex: none;
+}
 
 .filter-block {
   display: grid;
@@ -37,8 +55,9 @@
 }
 
 /* As the page's inputs are drawn (controls.css), and 1rem, so a phone does
-   not zoom on focus. */
-.filter-form select {
+   not zoom on focus. The picker's as the panel's. */
+.filter-form select,
+.view-picker select {
   width: 100%;
   min-width: 0;
   min-height: 2.5rem;
@@ -51,10 +70,19 @@
   font-size: 1rem;
 }
 
-.filter-form select:focus-visible {
+.filter-form select:focus-visible,
+.view-picker select:focus-visible {
   outline: 2px solid var(--server);
   outline-offset: 2px;
   border-color: var(--client);
+}
+
+/* The picker's select as wide as its longest choice, and never wider than
+   its row: after the rule above, whose width it replaces. */
+.view-picker select {
+  flex: 1 1 auto;
+  width: auto;
+  max-width: 100%;
 }
 
 .filter-form input {

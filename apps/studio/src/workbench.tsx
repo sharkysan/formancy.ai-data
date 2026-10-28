@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { createBuilderSession } from '@formancy/builder-core'
 import type { BuilderSession } from '@formancy/builder-core'
-import type { FormPolicy, MetadataSnapshot } from '@formancy/data-core'
+import type { FormPolicy, ListView, MetadataSnapshot } from '@formancy/data-core'
 import type { Regeneration } from '@formancy/data-server'
 import { reviewedBy } from './api.js'
 import { BrowseStep } from './browse.js'
@@ -61,13 +61,17 @@ interface Chosen {
 
 /**
  * A proposal, the request that produced it, and the session its presentation
- * is edited in; and, for a draft carried from another (0030), what came
- * across and what did not.
+ * is edited in; the list views chosen over it (0105), which are presentation
+ * but no part of the session's document, so Undo and Redo leave them be;
+ * and, for a draft carried from another (0030), what came across and what
+ * did not.
  */
 interface Generated {
   request: ProposalRequest
   proposal: Proposal
   session: BuilderSession
+  /** In the order a picker lists them; `[]` for none, which the publish leaves out. */
+  views: ListView[]
   carried: Carried | null
 }
 
@@ -142,7 +146,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   async function generate(request: ProposalRequest): Promise<Failure | null> {
     const outcome = await client.propose(request)
     if (!outcome.ok) return outcome
-    setGenerated({ request, proposal: outcome.value, session: createBuilderSession(outcome.value.form), carried: null })
+    setGenerated({ request, proposal: outcome.value, session: createBuilderSession(outcome.value.form), views: [], carried: null })
     setPolicy((previous) => withRequiredLookupPins(previous, outcome.value.bindings))
     setCurrent('generate')
     return null
@@ -150,19 +154,21 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
 
   /**
    * The Policy step's "Generate again": a new proposal with the draft's
-   * presentation carried onto it, as a regeneration carries a published one.
-   * A draft regenerated from a version keeps that version as its base, and
-   * its reassigned keys, decided or not.
+   * presentation carried onto it, its list views included, as a
+   * regeneration carries a published one. A draft regenerated from a
+   * version keeps that version as its base, and its reassigned keys,
+   * decided or not.
    */
   async function generateAgain(previous: Generated, request: ProposalRequest): Promise<string | null> {
     const outcome = await client.propose(request)
     if (!outcome.ok) return outcome.message
-    const carried = carryDraft({ proposal: previous.proposal, edited: previous.session.exportDocument() }, outcome.value)
+    const carried = carryDraft({ proposal: previous.proposal, edited: previous.session.exportDocument(), views: previous.views }, outcome.value)
     if (!carried.ok) return carried.message
     setGenerated({
       request,
       proposal: outcome.value,
       session: createBuilderSession(carried.form),
+      views: carried.views,
       carried: carriedAgain(previous.carried, previous.proposal.bindings, carried, outcome.value.bindings),
     })
     setPolicy((current) => withRequiredLookupPins(current, outcome.value.bindings))
@@ -172,9 +178,10 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
 
   /**
    * A regeneration taken up as the draft: its base as the proposal, the
-   * carried form in a new session, the published policy, and the choice and
-   * discovery rebuilt from its request and snapshot, so the Choose step and
-   * "Generate again" work on it as on any draft.
+   * carried form in a new session, the list views the server carried, the
+   * published policy, and the choice and discovery rebuilt from its request
+   * and snapshot, so the Choose step and "Generate again" work on it as on
+   * any draft.
    */
   function takeUp(regeneration: Regeneration, fresh: string[]): void {
     const { generation, snapshot, base, bindings, notes, form, version } = regeneration
@@ -188,6 +195,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       request,
       proposal: { form: base, bindings, notes, snapshot, generation },
       session: createBuilderSession(form),
+      views: regeneration.presentation.views ?? [],
       carried: { from: `version ${String(version)}`, version, conflicts: regeneration.conflicts, fresh, undecided: regeneration.keysReassigned, kept: [], removed: [] },
     })
     setPublishedId(formId)
@@ -197,6 +205,11 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   /** A reassigned key kept or removed: one fewer for the Publish step to wait on; kept, one more for it to confirm. */
   function decided(key: string, decision: 'keep' | 'remove'): void {
     setGenerated((previous) => (previous === null || previous.carried === null ? previous : { ...previous, carried: decide(previous.carried, key, decision) }))
+  }
+
+  /** The list views saved, removed or moved in the Presentation step. */
+  function viewed(views: ListView[]): void {
+    setGenerated((previous) => (previous === null ? previous : { ...previous, views }))
   }
 
   /** Published: the draft's base is now whatever is newest, read when the Publish step opens again. */
@@ -243,7 +256,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         )
     }
     if (generated === null) return null
-    const { proposal, session, request, carried } = generated
+    const { proposal, session, request, views, carried } = generated
     const open = asked(carried, policy)
     switch (current) {
       case 'generate':
@@ -266,7 +279,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
           />
         )
       case 'presentation':
-        return <PresentationStep session={session} carried={carried} />
+        return <PresentationStep session={session} bindings={proposal.bindings} views={views} onViews={viewed} carried={carried} />
       case 'preview':
         return <PreviewStep session={session} bindings={proposal.bindings} />
       case 'publish':
@@ -276,6 +289,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             connection={request.connection}
             proposal={proposal}
             session={session}
+            views={views}
             policy={policy}
             stale={stale}
             regeneratedFrom={carried?.version ?? null}

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ReactElement, ReactNode, RefObject } from 'react'
-import type { DataClient, ListFilterTerm, PublishedForm } from '@formancy/data-client'
+import type { DataClient, ListFilterTerm, ListSortTerm, PublishedForm } from '@formancy/data-client'
 import { DownloadCsv } from './download.js'
 import { FilterPanel } from './filter-panel.js'
 import { panelFields } from './filter-terms.js'
@@ -8,6 +8,8 @@ import { listed } from './grid-datasource.js'
 import type { GridColumn } from './grid-datasource.js'
 import { RecordGrid } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt, RowDelete } from './record-grid.js'
+import { ViewPicker } from './view-picker.js'
+import { openingView } from './views.js'
 
 /**
  * The Records panel (UX-SPEC §5.8): its heading, New record when the person
@@ -16,9 +18,12 @@ import type { OpenHow, RecordGridHandle, RowAt, RowDelete } from './record-grid.
  * search is submitted with the Search button or Enter, never per keystroke,
  * and the hint names the fields it looks in -- the server's
  * `list.searchable`, by their labels. No search form when nothing is
- * searchable, and no filter panel when nothing is filterable (0104). A file
- * is of what the grid lists: the search submitted, never what the box
- * holds, the filter applied, and the grid's sort.
+ * searchable, and no filter panel when nothing is filterable (0104). The
+ * View picker before the filter, where the server offers views (0105): the
+ * filter and the sort start as the default view's, or empty, and a view
+ * picked sets both. A file is of what the grid lists: the search submitted,
+ * never what the box holds, the filter applied, and the sort. Neither is
+ * written into the address, as no filter is (0104).
  */
 export function Records({
   client,
@@ -66,8 +71,10 @@ export function Records({
   drilling: boolean
 }): ReactElement {
   const [typed, setTyped] = useState(search)
-  /** The filter as applied: the grid's and the file's, for this form, which mounts the panel again (form-view.tsx). */
-  const [filter, setFilter] = useState<ListFilterTerm[]>([])
+  const views = definition.list?.views ?? []
+  /** The filter as applied and the sort: the grid's and the file's, for this form, which mounts the panel again (form-view.tsx); from the view it opens on. */
+  const [filter, setFilter] = useState<ListFilterTerm[]>(() => openingView(views)?.filter ?? [])
+  const [sort, setSort] = useState<ListSortTerm[]>(() => openingView(views)?.sort ?? [])
   const labels = new Map(columns.map((column) => [column.key, column.label]))
   const searchable = (definition.list?.searchable ?? []).map((key) => labels.get(key) ?? key)
   const filterable = useMemo(() => panelFields(definition), [definition])
@@ -107,7 +114,7 @@ export function Records({
             New record
           </button>
         ) : null}
-        {definition.list === null ? null : <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort: grid.current?.sort() ?? [], parent: null, filter })} />}
+        {definition.list === null ? null : <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort, parent: null, filter })} />}
       </div>
       <RecordGrid
         ref={grid}
@@ -119,11 +126,22 @@ export function Records({
         parent={null}
         search={search}
         filter={filter}
+        sort={sort}
         openToken={openToken}
         canCreate={canCreate}
         toolbarStart={
           <>
             {searchBlock}
+            <ViewPicker
+              idBase="records"
+              views={views}
+              filter={filter}
+              sort={sort}
+              onPick={(picked, sorted) => {
+                setFilter(picked)
+                setSort(sorted)
+              }}
+            />
             {filterable.length === 0 ? null : <FilterPanel idBase="records-filter" fields={filterable} filter={filter} onFilter={setFilter} />}
           </>
         }
@@ -133,6 +151,7 @@ export function Records({
         after={after}
         drilling={drilling}
         onOpen={onOpen}
+        onSort={setSort}
         onClearSearch={() => {
           setTyped('')
           onSearch('')

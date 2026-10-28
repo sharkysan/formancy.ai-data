@@ -8,6 +8,7 @@ import { describeSection, describeText, readGeneratedLayout, same } from './layo
 import { placements } from './placement.js'
 import type { CarriedMoves } from './rebase-moves.js'
 import { carryMoves } from './rebase-moves.js'
+import { carryViews } from './rebase-views.js'
 import type { FieldAnchor, FieldPresentation, PresentationConflict, PresentationOverrides, ReassignedKey, RebasedPresentation, SectionAnchor, SectionPresentation } from './types.js'
 import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
 
@@ -26,9 +27,9 @@ interface Regenerated {
  * Where a conflict sorts within its subject: what the field now is first,
  * then label, span and order, as the presentation's own properties run.
  */
-const RANK: Record<PresentationConflict['kind'], number> = { 'field-rekeyed': 0, 'both-changed': 1, 'field-gone': 1, 'moved-section': 3, 'move-dropped': 3, 'section-gone': 1 }
+const RANK: Record<PresentationConflict['kind'], number> = { 'field-rekeyed': 0, 'both-changed': 1, 'field-gone': 1, 'moved-section': 3, 'move-dropped': 3, 'section-gone': 1, 'view-dropped': 1 }
 
-/** A conflict with where it sorts: field subjects in old-base field order, then sections in old-base order. */
+/** A conflict with where it sorts: field subjects in old-base field order, then sections in old-base order, then views in their order. */
 interface Ranked {
   subject: number
   rank: number
@@ -239,11 +240,14 @@ function carrySections(rebase: Rebase, ordered: ReadonlyMap<string, SectionPrese
  * - a section the new base does not have takes its overrides with it
  *   (`section-gone`), and so does one of two sections sharing a label when
  *   their number changed, because occurrence no longer says which is which;
- *   no field is said to move between sections that cannot be told apart.
+ *   no field is said to move between sections that cannot be told apart;
+ * - a list view (0105) follows the fields it names by what they stand for,
+ *   and is dropped whole where one is gone or no longer offers what it asks
+ *   (`view-dropped`, `rebase-views.ts`).
  *
  * Each rule is one step below, run in that order: the moves, what each
- * field now is, labels and spans, then sections. Conflicts tied on subject
- * and rank are said in the order the steps found them.
+ * field now is, labels and spans, sections, then views. Conflicts tied on
+ * subject and rank are said in the order the steps found them.
  *
  * Pure and deterministic. It throws when the published presentation does
  * not apply to its own base, or the merged one to the new base: both are
@@ -267,7 +271,11 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
     oldFields,
     newFields,
     anchorOf,
-    follow: (key) => newKeys.get(canonicalize(anchorOf.get(key))),
+    // A key the published bindings do not hold follows to nothing: a stored list view names one only by a hand edit (0105).
+    follow: (key) => {
+      const anchor = anchorOf.get(key)
+      return anchor === undefined ? undefined : newKeys.get(canonicalize(anchor))
+    },
     told: (anchor) => !unmatched.has(anchor.label),
     subjectOf: (key) => oldFields.findIndex((field) => field.key === key),
     add: (subject, conflict) => conflicts.push({ subject, rank: RANK[conflict.kind], conflict }),
@@ -291,7 +299,13 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
   }
   const position = (key: string) => newFields.findIndex((field) => field.key === key)
   fields.sort((left, right) => position(left.field) - position(right.field))
-  const presentation: PresentationOverrides = { version: PRESENTATION_VERSION, fields, sections }
+  const views = carryViews({
+    views: published.presentation.views ?? [],
+    follow: rebase.follow,
+    bindings: regenerated.bindings,
+    report: (index, conflict) => rebase.add(oldFields.length + before.sections.length + index, conflict),
+  })
+  const presentation: PresentationOverrides = { version: PRESENTATION_VERSION, fields, sections, ...(views.length === 0 ? {} : { views }) }
 
   const applied = applyPresentation(regenerated.base, presentation, regenerated.bindings)
   if (!applied.ok) throw new Error(`the carried presentation does not apply to the regenerated base: ${applied.problems.join('; ')}`)

@@ -82,6 +82,15 @@
 //     body and its words in no URL; a value the server refuses is its
 //     sentence on the grid's line, the value still in its box and no Ask
 //     again; and Clear filter puts the keyboard back on Filter;
+//   - a form's list views (0105): the View picker and Show view between
+//     Search and Filter in the keyboard's order; a choice in the select,
+//     the change an arrow fires on a closed select, sends nothing; Show
+//     view asks for exactly one first page, its filter and its sort in the
+//     body and nothing of it in the address, the keyboard staying on Show
+//     view and the headers showing both its sorted columns; a header sorted
+//     by the person is "Your own filter and sort", in one request, and a
+//     step off it and back keeps it; and "All records" one first page with
+//     neither;
 //   - Drill down (0090): a customer, one of its orders and that order's
 //     line three levels down, the trail naming each; Tab reaches the
 //     trail's buttons in order, Enter on a crumb puts the keyboard on its
@@ -130,8 +139,8 @@
 // One module per reason to change, under scripts/browser/: the plane, the
 // server of the built page, the stylesheet's reads, the measurements, the
 // workspace's states, the record's journey, a delete's states, Download
-// CSV's, the filter's, Drill down's, a customer list that goes on, and the
-// policy's allowance.
+// CSV's, the filter's, the views', Drill down's, a customer list that goes
+// on, and the policy's allowance.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
 // scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
@@ -158,6 +167,7 @@ import { moreJourney } from './browser/more.mjs'
 import { startPlane } from './browser/plane.mjs'
 import { DIST, POLICY, serve } from './browser/serve.mjs'
 import { widths } from './browser/styles.mjs'
+import { viewJourney } from './browser/viewing.mjs'
 import { workspaceJourney } from './browser/workspace.mjs'
 
 /** Playwright, for recordedPerBrowser to launch each browser with: the one import of playwright, here where the app declares it. */
@@ -258,7 +268,7 @@ async function run(gate, browser) {
 
         const run = { record: await plane.order(2), customer: 9000 + pass, reached }
         // The list that goes on last, since it signs in as another clerk.
-        for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run), ...exportJourney(plane, gate, run), ...filterJourney(plane, gate), ...drillJourney(plane, gate, run), ...moreJourney(plane, gate)]) {
+        for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run), ...exportJourney(plane, gate, run), ...filterJourney(plane, gate), ...viewJourney(plane, gate), ...drillJourney(plane, gate, run), ...moreJourney(plane, gate)]) {
           await act(page)
           await measured(page, state)
         }
@@ -297,7 +307,7 @@ async function run(gate, browser) {
   // A failed check fails the run in recordedPerBrowser, which says so.
   if (gate.failures().length > 0) return
   console.log(
-    `browser checks passed: the host page's workspace, journey, deletes, downloads, filter, Drill down and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
+    `browser checks passed: the host page's workspace, journey, deletes, downloads, filter, views, Drill down and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
   )
 }
 

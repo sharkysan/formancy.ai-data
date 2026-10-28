@@ -1,0 +1,75 @@
+/* --------------------------------------------------------- list views
+ *
+ * A form's list views (0105), below the Presentation step's arrangement:
+ * the views saved, each in words with what may be done to it, and the
+ * form that makes or edits one, a fieldset per condition and per sort.
+ * Classes only, as review's panes are. A view's name and values are a
+ * person's words, which can be long, so they wrap.
+ */
+
+.list-views {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 2%);
+}
+
+.list-views > h3 {
+  margin-top: 0;
+}
+
+/* A saved view is something the person acts on: violet at its edge, as a carried conflict is. */
+.views {
+  margin: 0.5rem 0 0;
+  padding-inline-start: 1.5rem;
+}
+
+.views > li {
+  padding-inline-start: 0.5rem;
+  border-inline-start: 2px solid var(--client);
+}
+
+.views > li + li {
+  margin-top: 0.75rem;
+}
+
+.views > li > p {
+  margin: 0.25rem 0;
+  overflow-wrap: anywhere;
+}
+
+.view-form {
+  margin-top: 0.75rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--edge);
+}
+
+.view-form > h4 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.view-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.view-term {
+  margin: 0.5rem 0;
+  padding: 0.25rem 0.75rem 0.625rem;
+}
+
+.view-term > legend {
+  font-size: 0.875rem;
+}
+
+.view-form .hint {
+  max-width: 72ch;
+}
+
+.view-form .check {
+  margin: 0.5rem 0;
+}

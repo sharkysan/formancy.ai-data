@@ -71,8 +71,9 @@
   font-size: 0.9375rem;
 }
 
-/* The draft's policy, in words: what approving it grants, below the paper and never on it. */
-.draft-policy h4 {
+/* The draft's policy and its list views (0105), in words: what approving it grants and offers, below the paper and never on it. */
+.draft-policy h4,
+.draft-views h4 {
   margin: 1rem 0 0.25rem;
   font-size: 0.9375rem;
 }
@@ -83,7 +84,8 @@
   font-size: 0.875rem;
 }
 
-.draft-policy ul {
+.draft-policy ul,
+.draft-views ol {
   margin: 0;
   padding-inline-start: 1.25rem;
   font-size: 0.875rem;

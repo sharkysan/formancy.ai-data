@@ -112,8 +112,11 @@ costs is 0009's and 0042's, under *Forms* in
 2. `storable` (`publishing.ts`) asks `validateBundle` (`bundle.ts`): the
    form against formancy's validator, the snapshot against its own
    fingerprint, the bindings against both, the policy against the bindings
-   (0019); then a listed connection, and that this server's generator
-   writes exactly this base and these bindings (`bundle-format2.ts`, 0030).
+   (0019); then a listed connection, that this server's generator
+   writes exactly this base and these bindings (`bundle-format2.ts`, 0030),
+   and that a list of these bindings can run every view the presentation
+   names (`viewProblems`,
+   [0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
    Otherwise 422 `invalid-bundle`, with the problems.
 3. `keysRefusal` answers 422 `keys-reassigned` while the policy grants on a
    key that now stands for another column and the body does not confirm it
@@ -205,13 +208,19 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    offers only what the database allows now
    ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)):
    `operations`, the readable fields, `list` -- what a page may be sorted,
-   searched and filtered by, or `null` -- and `deleting`.
+   searched and filtered by, and the published views this person could
+   have built from those (`listColumns`, 0105), or `null` -- and
+   `deleting`.
 2. The Records panel (`apps/host/src/record-grid.tsx`, `grid-datasource.ts`)
    asks one `POST /v1/forms/:id/records/list` per block of AG Grid's
    infinite row model, the search sent on Search or Enter, never per key
    (0047), and with every block the conditions its Filter panel applied
    (`apps/host/src/filter-panel.tsx`, over the fields `list.filterable`
-   names); a new filter starts the grid again from its first row.
+   names) and the section's sort; a new filter or sort starts the grid again
+   from its first row. A View picker (`apps/host/src/view-picker.tsx`) offers
+   `list.views`, and its Show view sets both at once, as one first page; a
+   choice in its select alone sends nothing. The grid opens on the view
+   marked `default`, when it is offered (0105).
 3. `routes/runtime-lists.ts` checks the body and asks `planList`
    (`packages/data-core/src/records/list.ts`) before any statement:
    `listable` puts the read policy first -- its filter, every through
@@ -236,9 +245,10 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
 Held by each adapter's `list.integration.test.ts`, its shared cases in
 `LIST_PARITY` and `COLUMN_FILTER_PARITY`; `routes/runtime-lists.test.ts`;
 `plan-list.test.ts` and `filter.test.ts` in
-`packages/data-core/src/records`; `lists.integration.test.ts` in
-`packages/data-client/src`; and `apps/host/src/grid-datasource.test.ts` and
-`filter.test.tsx`.
+`packages/data-core/src/records`, and `views.test.ts` in
+`packages/data-core/src/presentation`; `lists.integration.test.ts` in
+`packages/data-client/src`; and `apps/host/src/grid-datasource.test.ts`,
+`filter.test.tsx`, `views.test.ts` and `view-picker.test.tsx`.
 What it costs: a page reads every row before it, by how the engines run an
 offset, not measured here; the rest is 0044's and 0061's, in
 [section 11.2](11-risks-and-debt.md#112-known-limitations-by-area).
@@ -412,8 +422,10 @@ it (0085).
 4. `POST /v1/forms/:id/regenerations` (`routes/admin-evolution.ts`) writes
    nothing: it generates again from the stored request, trials each lookup
    through `buildLookupConfig`, carries the presentation by
-   `rebasePresentation`, and lists conflicts and reassigned keys (0030,
-   0039); the studio publishes the result as in 6.3.
+   `rebasePresentation` -- its list views by what their fields stand for,
+   each dropped whole, `view-dropped`, where a field is gone or no longer
+   offers what it asks (0105) -- and lists conflicts and reassigned keys
+   (0030, 0039); the studio publishes the result as in 6.3.
 5. `POST /v1/forms/:id/restorations` loads the version validated, discovers
    the database and asks `servable` (`publishing.ts`): another engine is
    422 `other-engine`, drift that blocks 409 `incompatible` with only those
@@ -445,9 +457,10 @@ and a publisher alone restores any version, unreviewed ones too (0065).
    ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
    On the host page it is Download CSV, in the head of the Records panel
    or of a child section (`apps/host/src/download.tsx`): the panel's
-   submitted search and applied filter, the sort `RecordGrid`'s handle says
-   its datasource last asked with, and a child section's record as the
-   parent
+   submitted search, and the filter and sort the section holds and its
+   grid's headers show
+   ([0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md)),
+   and a child section's record as the parent
    ([0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)). Its line says "Making <form id>.csv."; the button is
    `aria-disabled` and sends nothing more; the section leaving the page
    aborts the request.

@@ -5,7 +5,7 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { createBuilderSession } from '@formancy/builder-core'
 import { applyPresentation, presentationOf } from '@formancy/data-core'
-import type { FormPolicy, PresentationOverrides } from '@formancy/data-core'
+import type { FormPolicy, ListView, PresentationOverrides } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { AdminClient, Bundle, Proposal } from './api.js'
 import { PublishStep } from './publish.js'
@@ -243,6 +243,29 @@ describe('publishing', () => {
     expect(button).toHaveProperty('disabled', true)
     const note = screen.getByRole('note')
     expect(within(note).getAllByRole('listitem').map((item) => item.textContent)).toEqual(said.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`))
+    expect(plane.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/versions'))).toEqual([])
+    expect(await audit()).toEqual([])
+  })
+
+  // A list view (0105) is fitted to the bindings when the panel saves it,
+  // and again by every regeneration; this is the last check before the
+  // server's, which would answer 422. A view a later rule refuses -- a
+  // contains past the search's limit, which its shape lets through -- waits
+  // with the fit's own words, and nothing is sent. Watched failing with the
+  // fit left out of the blockers: the button was enabled.
+  test('holds back a list view the bindings cannot run, in the fit’s words', async () => {
+    servedDocument()
+    const generated = await proposal()
+    const long: ListView = { name: 'Long', filter: [{ field: 'notes', op: 'contains', text: 'x'.repeat(201) }], sort: [] }
+    render(
+      <main aria-label="Publish">
+        <PublishStep client={other} connection="fixture" proposal={generated} session={createBuilderSession(generated.form)} views={[long]} policy={POLICY} stale={false} onPublished={() => {}} onDrift={() => {}} />
+      </main>,
+    )
+    expect(await screen.findByRole('button', { name: 'Publish version 1' })).toHaveProperty('disabled', true)
+    expect(within(screen.getByRole('note')).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'A list view the server refuses: /views/0 (“Long”): What a contains condition on notes finds is at most 200 characters, and this has 201.',
+    ])
     expect(plane.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/versions'))).toEqual([])
     expect(await audit()).toEqual([])
   })

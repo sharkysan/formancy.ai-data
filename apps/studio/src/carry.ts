@@ -1,5 +1,5 @@
 import { fieldAnchor, grantsOnKey, presentationOf, rebasePresentation } from '@formancy/data-core'
-import type { FormBindings, FormPolicy, PresentationConflict, ReassignedKey } from '@formancy/data-core'
+import type { FormBindings, FormPolicy, ListView, PresentationConflict, ReassignedKey } from '@formancy/data-core'
 import { canonicalize } from '@formancy/spec'
 import type { FormSchema } from '@formancy/spec'
 import type { Proposal } from './api.js'
@@ -61,35 +61,37 @@ export function freshFields(before: FormBindings, after: FormBindings): string[]
   return after.fields.filter((binding) => !known.has(canonicalize(fieldAnchor(binding)))).map((binding) => binding.field)
 }
 
-export type CarriedDraft = { ok: true; form: FormSchema; conflicts: PresentationConflict[]; fresh: string[] } | { ok: false; message: string }
+export type CarriedDraft = { ok: true; form: FormSchema; conflicts: PresentationConflict[]; fresh: string[]; views: ListView[] } | { ok: false; message: string }
 
 /**
  * A draft's presentation carried to a new proposal of the same form: derived
- * from the old proposal's base exactly as a publish derives it, then rebased
- * by data-core onto the new base -- the rebase the server's regeneration
- * runs, so "Generate again" and a regeneration carry alike.
+ * from the old proposal's base exactly as a publish derives it, its list
+ * views with it (0105), then rebased by data-core onto the new base -- the
+ * rebase the server's regeneration runs, so "Generate again" and a
+ * regeneration carry alike: a view follows the fields it names, and one
+ * whose field is gone, or no longer offers what it asks, is dropped and
+ * said among the conflicts.
  *
  * A draft that is not only presentation is refused, saying why, rather than
  * carried without what does not fit.
  */
-export function carryDraft(from: { proposal: Proposal; edited: FormSchema }, to: Proposal): CarriedDraft {
+export function carryDraft(from: { proposal: Proposal; edited: FormSchema; views: readonly ListView[] }, to: Proposal): CarriedDraft {
   const derived = presentationOf(from.proposal.form, from.edited, from.proposal.bindings)
   if (!derived.ok) return { ok: false, message: `the draft holds edits that are not presentation: ${derived.problems.join('; ')}` }
+  // No views is the property left out, as a publish sends it.
+  const presentation = from.views.length === 0 ? derived.presentation : { ...derived.presentation, views: [...from.views] }
   // The rebase throws only for a base the generator did not write, which a
   // proposal never is and the derivation above has already read.
-  const rebased = rebasePresentation(
-    { base: from.proposal.form, presentation: derived.presentation, bindings: from.proposal.bindings },
-    { base: to.form, bindings: to.bindings },
-  )
-  return { ok: true, form: rebased.form, conflicts: rebased.conflicts, fresh: freshFields(from.proposal.bindings, to.bindings) }
+  const rebased = rebasePresentation({ base: from.proposal.form, presentation, bindings: from.proposal.bindings }, { base: to.form, bindings: to.bindings })
+  return { ok: true, form: rebased.form, conflicts: rebased.conflicts, fresh: freshFields(from.proposal.bindings, to.bindings), views: rebased.presentation.views ?? [] }
 }
 
 /**
  * What a draft carries after "Generate again" (0030). The new rebase reports
  * what this proposal could not carry from the draft; what the draft had
  * already lost -- whatever a regeneration or an earlier "Generate again"
- * dropped: a label, a span, a move between sections (0075) or a section's
- * override -- is no longer in it to report, so every conflict whose
+ * dropped: a label, a span, a move between sections (0075), a section's
+ * override or a list view (0105) -- is no longer in it to report, so every conflict whose
  * resolution was to drop something is kept, earlier first. The fields a
  * dropped label may be given to are the earlier ones, followed to their
  * keys in the new proposal by what they stand for, and those new in it.

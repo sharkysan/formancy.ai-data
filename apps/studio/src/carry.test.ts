@@ -4,7 +4,7 @@
 // proposal to the next, with proposals the real server generated.
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createBuilderSession } from '@formancy/builder-core'
-import type { FormBindings, FormPolicy, PresentationConflict } from '@formancy/data-core'
+import type { FormBindings, FormPolicy, ListView, PresentationConflict } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { AdminClient, Proposal, ProposalRequest } from './api.js'
 import { asked, carriedAgain, carryDraft, freshFields } from './carry.js'
@@ -59,11 +59,31 @@ describe('carrying a draft to a new proposal', () => {
     expect(session.setFieldProperty(['notes'], 'label', 'Delivery notes').ok).toBe(true)
     expect(session.setFieldProperty(['order_date'], 'label', 'Ordered on').ok).toBe(true)
     plane.databases.set('fixture', notesRenamed())
-    const carried = carryDraft({ proposal: before, edited: session.exportDocument() }, await propose())
+    const carried = carryDraft({ proposal: before, edited: session.exportDocument(), views: [] }, await propose())
     if (!carried.ok) throw new Error(carried.message)
     expect(carried.form.model.fields.find((field) => field.key === 'order_date')?.label).toBe('Ordered on')
     expect(carried.conflicts.map((conflict) => [conflict.kind, 'field' in conflict ? conflict.field : null])).toEqual([['field-gone', 'notes']])
     expect(carried.fresh).toEqual(['remarks'])
+  })
+
+  // A draft's list views (0105) go through the same rebase as its labels:
+  // carried to a proposal of the same database unchanged, and the one
+  // naming a column the new proposal does not have dropped whole and said,
+  // its default with it. Watched failing with the views left out of the
+  // carry: "Generate again" came back with none, and said nothing.
+  test('carries the draft’s list views, and drops and reports one whose column is gone', async () => {
+    const before = await propose()
+    const edited = createBuilderSession(before.form).exportDocument()
+    const noted: ListView = { name: 'Noted', filter: [{ field: 'notes', op: 'not-null' }], sort: [], default: true }
+    const placed: ListView = { name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [{ field: 'order_date', direction: 'desc' }] }
+    const same = carryDraft({ proposal: before, edited, views: [noted, placed] }, await propose())
+    expect(same.ok && same.views).toEqual([noted, placed])
+    expect(same.ok && same.conflicts).toEqual([])
+    plane.databases.set('fixture', withoutColumn(OWNER_SNAPSHOT, 'order', 'notes'))
+    const carried = carryDraft({ proposal: before, edited, views: [noted, placed] }, await propose())
+    if (!carried.ok) throw new Error(carried.message)
+    expect(carried.views).toEqual([placed])
+    expect(carried.conflicts).toEqual([{ kind: 'view-dropped', view: 'Noted', resolution: 'dropped', message: 'View “Noted” names notes, which is not in the regenerated form, so it was dropped.' }])
   })
 
   // builder-core accepts a required flag, which is not presentation. A draft
@@ -74,7 +94,7 @@ describe('carrying a draft to a new proposal', () => {
     const before = await propose()
     const session = createBuilderSession(before.form)
     expect(session.setFieldProperty(['notes'], 'required', true).ok).toBe(true)
-    const carried = carryDraft({ proposal: before, edited: session.exportDocument() }, before)
+    const carried = carryDraft({ proposal: before, edited: session.exportDocument(), views: [] }, before)
     expect(carried.ok).toBe(false)
     expect(!carried.ok && carried.message).toMatch(/^the draft holds edits that are not presentation: \/model\/fields\/\d+\/required: /)
   })
@@ -127,5 +147,16 @@ describe('what "Generate again" keeps', () => {
   test('keeps every conflict that dropped something, a dropped move and a moved field gone included', () => {
     const earlier: Carried = { from: 'version 1', version: 1, conflicts: [moveDropped, sectionGone, followed], fresh: [], undecided: [], kept: [], removed: [] }
     expect(carriedAgain(earlier, NO_FIELDS, { conflicts: [], fresh: [] }, NO_FIELDS).conflicts).toEqual([moveDropped, sectionGone])
+  })
+
+  // A list view a regeneration dropped (0105) is no longer in the draft
+  // for the next rebase to report either: kept with the rest of what was
+  // dropped, or the carried panel would say everything was carried after
+  // "Generate again" while the view was gone. Watched failing with the
+  // conflicts kept by a list of kinds that left view-dropped out.
+  test('keeps a dropped list view reported', () => {
+    const viewDropped: PresentationConflict = { kind: 'view-dropped', view: 'Noted', resolution: 'dropped', message: 'View “Noted” names notes, which is not in the regenerated form, so it was dropped.' }
+    const earlier: Carried = { from: 'version 1', version: 1, conflicts: [viewDropped], fresh: [], undecided: [], kept: [], removed: [] }
+    expect(carriedAgain(earlier, NO_FIELDS, { conflicts: [], fresh: [] }, NO_FIELDS).conflicts).toEqual([viewDropped])
   })
 })

@@ -262,6 +262,27 @@ describe('the administrator plane', () => {
     expect(grids(served.bundle.form).map((grid) => grid.map((node) => node.path))).toEqual([['id'], ['stamp', 'name']])
   })
 
+  // A list view (0105) is stored for later: one whose value its column
+  // cannot hold would be refused every time a person picked it, so the
+  // write refuses it, naming the view, and writes nothing. One the bindings
+  // can run publishes and reads back as it was sent. Watched failing with
+  // the fit left out of `storable`.
+  test('publishes list views a list can run, and refuses one it cannot', async () => {
+    const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
+    const bundle = bundleOf(proposal)
+    const misfit = { ...EMPTY_PRESENTATION, views: [{ name: 'Seventh', filter: [{ field: 'id', op: 'equals', value: 'seven' }], sort: [] }] }
+    const refused = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, presentation: misfit } } })
+    expect(refused.statusCode).toBe(422)
+    expect(refused.json()).toMatchObject({ code: 'invalid-bundle', problems: [expect.stringMatching(/^presentation: \/views\/0 \(“Seventh”\): .*id/)] })
+    expect(await store.latest('employee')).toBeNull()
+
+    const views = [{ name: 'By name', filter: [{ field: 'name', op: 'contains', text: 'Ada' }], sort: [{ field: 'name', direction: 'asc' }], default: true }]
+    const published = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, presentation: { ...EMPTY_PRESENTATION, views } } } })
+    expect(published.statusCode, published.body).toBe(201)
+    const served = (await app.inject({ method: 'GET', url: '/v1/forms/employee/versions/latest', headers: as('admin') })).json()
+    expect(served.bundle.presentation.views).toEqual(views)
+  })
+
   // A base the generator would not write is a database fact somebody typed:
   // a name of 4000 characters into a column of 200 would be offered and then
   // refused by the database on every save. Checked at publish against this

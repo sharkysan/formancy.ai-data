@@ -141,14 +141,18 @@ describe('presentation', () => {
   // no list of places to put it, no field from elsewhere. And what the
   // controls produce is a bundle the server publishes and serves back, its
   // presentation kept apart from the generated base (0030), the move
-  // recorded on the field's entry.
+  // recorded on the field's entry. The list views below the arrangement
+  // (0105) are counted out: a view names fields by key and changes none of
+  // them, which list-views.test.tsx holds, publishing what it makes.
   test('offers nothing that could break a binding, and what it edits publishes', async () => {
     const user = await signIn(plane)
     await generateOrder(user)
     const presentation = await goTo(user, 'Presentation')
-    const named = (role: string) => within(presentation).queryAllByRole(role).map((element) => computeAccessibleName(element))
+    const views = within(presentation).getByRole('region', { name: 'List views' })
+    const outside = (role: string) => within(presentation).queryAllByRole(role).filter((element) => !views.contains(element))
+    const named = (role: string) => outside(role).map((element) => computeAccessibleName(element))
     expect(named('button').filter((name) => !/^(Undo|Redo|Move (up|down|to) .+)$/.test(name))).toEqual([])
-    const regions = within(presentation).getAllByRole('region').map((region) => computeAccessibleName(region))
+    const regions = outside('region').map((region) => computeAccessibleName(region))
     expect(regions).toEqual(['Order', 'Record'])
     const labelled = (region: string) =>
       within(within(presentation).getByRole('region', { name: region }))

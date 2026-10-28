@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, EMPTY_PRESENTATION, presentationOf } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, FormBindings, LookupAdapter, MetadataSnapshot, NormalizedType, ObjectMeta, PresentationOverrides, RecordAdapter } from '@formancy/data-core'
+import type { ColumnMeta, DatabaseAdapter, FormBindings, ListView, LookupAdapter, MetadataSnapshot, NormalizedType, ObjectMeta, PresentationOverrides, RecordAdapter } from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FormSchema, LayoutNode } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
@@ -116,8 +116,8 @@ async function propose(extra: Record<string, unknown> = {}): Promise<Proposal> {
   return response.json() as Proposal
 }
 
-/** Propose, label `name` "Full name" and put it first, derive, publish: as the studio does. */
-async function publish(expectedBase: number | null = null, extra: Record<string, unknown> = {}, label = 'Full name') {
+/** Propose, label `name` "Full name" and put it first, derive, publish with `views`: as the studio does. */
+async function publish(expectedBase: number | null = null, extra: Record<string, unknown> = {}, label = 'Full name', views: ListView[] = []) {
   const proposal = await propose(extra)
   const edited = JSON.parse(JSON.stringify(proposal.form)) as FormSchema
   const name = edited.model.fields.find((field) => field.key === 'name')
@@ -126,10 +126,11 @@ async function publish(expectedBase: number | null = null, extra: Record<string,
   nodes.unshift(...nodes.splice(nodes.findIndex((node) => node.path === 'name'), 1))
   const derived = presentationOf(proposal.form, edited, proposal.bindings)
   if (!derived.ok) throw new Error(derived.problems.join('; '))
-  const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: derived.presentation, form: edited, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
+  const presentation: PresentationOverrides = views.length === 0 ? derived.presentation : { ...derived.presentation, views }
+  const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation, form: edited, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
   const response = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase, bundle } })
   expect(response.statusCode, response.body).toBe(201)
-  return { bundle, presentation: derived.presentation as PresentationOverrides }
+  return { bundle, presentation }
 }
 
 const regenerate = () => app.inject({ method: 'POST', url: '/v1/forms/employee/regenerations', headers: ADMIN })
@@ -199,6 +200,19 @@ describe('regeneration', () => {
     expect(regeneration.conflicts).toEqual([expect.objectContaining({ kind: 'field-gone', field: 'name', property: 'label', yours: 'Full name' })])
     expect(regeneration.policyProblems).toEqual(['policy: fields.name: the form has no field name'])
     expect(regeneration.policy).toEqual(policyFor((JSON.parse(await file(1)) as { bindings: FormBindings }).bindings))
+  })
+
+  // A list view naming a dropped column is dropped whole and said with the
+  // other conflicts (0105); one that still fits is carried. Carried without
+  // its condition, "Ada" would list every employee under that name.
+  test('a list view naming a dropped column is view-dropped, and the others are carried', async () => {
+    const ada: ListView = { name: 'Ada', filter: [{ field: 'name', op: 'contains', text: 'Ada' }], sort: [] }
+    const byId: ListView = { name: 'Newest', filter: [], sort: [{ field: 'id', direction: 'desc' }], default: true }
+    await publish(null, {}, 'Full name', [ada, byId])
+    columns = columns.filter((entry) => entry.name !== 'name')
+    const regeneration = (await regenerate()).json()
+    expect(regeneration.conflicts).toContainEqual({ kind: 'view-dropped', view: 'Ada', resolution: 'dropped', message: 'View “Ada” names name, which is not in the regenerated form, so it was dropped.' })
+    expect(regeneration.presentation.views).toEqual([byId])
   })
 
   // A lookup the runtime would now refuse — its foreign key gone, or its

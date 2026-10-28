@@ -31,6 +31,7 @@ export type {
   ListColumns,
   ListFilterTerm,
   ListSortTerm,
+  ListView,
   LookupResult,
   LookupRow,
   PublishedForm,

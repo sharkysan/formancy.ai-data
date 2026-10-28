@@ -276,6 +276,17 @@ until then the address is formancy.ai's 404
   equals exactly on both engines, whatever the collation; and a
   timestamp's range is whole days, in UTC for an instant
   ([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
+- **An administrator names a form's list views**, each a filter and a sort,
+  one of them perhaps the view the grid opens on, in the studio's
+  Presentation step; they are published, reviewed, restored and carried
+  through a regeneration with the rest of the presentation. A person picks
+  one above the grid and may then change it, and is offered only the views
+  they could have built themselves: one naming a field they may not read
+  is not offered to them at all. A view is sent as the person's own filter
+  and sort, so it narrows and never permits; it holds no value relative to
+  the day or the person, and a regeneration that removes a field a view
+  names drops that view and says so
+  ([0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
 - **A person can download the records a list would show them as one CSV
   file**, for the same search, sort, parent and filter and under the same
   read policy, with no right of its own, through the runtime plane and
@@ -531,6 +542,20 @@ other end unfiltered, and Back returns the page it left with its filter. A
 refusal is the step's alert, with what was typed kept
 ([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 
+Under the Presentation step's arrangement, List views names the form's
+list views: each a name, conditions on the fields the form's list can be
+filtered by, offered by their labels with the Browse step's boxes and
+hints, an order of fields each ascending or descending, and "The grid
+opens on this view" on at most one. A view is checked as the server checks
+it before it is saved, and refused with the server's sentence with what
+was typed kept; each saved view is said in words, and edited, removed and
+moved by keyboard. Generate again and a regeneration carry the views by
+the columns they name, and list one they had to drop; the Publish step
+sends them in the presentation, and a reviewer sees them under the draft's
+policy. Saving, removing and moving a view are not on Undo and Redo, and
+the step says nothing of which roles will be offered which view
+([0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
+
 Its suite runs the real server in the test — `createDataServer` with a fake
 connection registry over snapshots captured from the shared fixture, as every
 account `apps/studio/scripts/capture-snapshots.mjs` captures — behind a fake
@@ -606,6 +631,19 @@ the grid's line, with what you typed still in its box. A child section's
 filter is its own, and opening another parent starts without one; the
 filter is in no address, so a reload or another form starts without one too
 ([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
+
+Where the form's administrator named list views, View, after the search
+and first in a child section, offers All records and each view the server
+offers you by its name. Choosing one sends nothing; Show view sets the
+grid's filter and sort at once, in one request, and keeps the keyboard on
+the button: the Filter panel lists its conditions and the headers show its
+order. Any condition you add or header you press makes it
+Your own filter and sort, and the view's own conditions and order show the
+view again. A grid opens on the view marked to open it, and on every record
+where that view names a field you may not read, which is then not offered
+to you at all. No view is kept in the address, so a reload starts on that
+view again
+([0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
 
 Download CSV, beside New record in the Records panel and beside each child
 section's New, saves one file of the records that grid lists, as the server

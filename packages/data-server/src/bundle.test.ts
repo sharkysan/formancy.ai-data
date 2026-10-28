@@ -430,6 +430,20 @@ describe('a format-2 bundle (0030)', () => {
     expect(validateBundle(unread)).toEqual({ ok: false, problems: ['presentation: version must be 1'] })
   })
 
+  // A list view (0105) is read by shape on every read, as the rest of a
+  // presentation is: an empty list is refused, since no views is the
+  // property left out. Its fit to the bindings is asked at write alone, so a
+  // view a later release would no longer run -- a value its column can no
+  // longer hold, written here as one it never could -- leaves the version
+  // readable and served; it is only not offered. Watched failing with the
+  // fit asked on read.
+  test('list views are read by shape, and their fit is not asked on read', () => {
+    const empty = { ...copy(good()), presentation: { ...EMPTY_PRESENTATION, views: [] } }
+    expect(validateBundle(empty)).toEqual({ ok: false, problems: ['presentation: views: names none; leave it out'] })
+    const misfit = { ...copy(good()), presentation: { ...EMPTY_PRESENTATION, views: [{ name: 'Seventh', filter: [{ field: 'id', op: 'equals' as const, value: 'seven' }], sort: [] }] } }
+    expect(validateBundle(misfit).ok).toBe(true)
+  })
+
   // A field moved to another generated section (0075) is recorded in the
   // presentation, and the check is the one above: the form is the base with
   // the presentation applied. Watched failing with that comparison taken out

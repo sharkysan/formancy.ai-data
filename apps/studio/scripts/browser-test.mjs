@@ -14,7 +14,8 @@
 //     corner and then Tab reaches the skip link in the browsers 0058's
 //     FACTS.clickThenTab says it does, and not in Firefox, which starts from
 //     the caret the click left; and where Enter moves or removes the button
-//     it was pressed on -- a field moved down, a filter removed, a conflict
+//     it was pressed on -- a field moved down, a filter removed, a list
+//     view's condition row removed and the view saved (0105), a conflict
 //     rebased, a restore refused, an import refused, a dropped label given,
 //     a draft approved, a browse's condition applied or removed -- the
 //     keyboard is somewhere deliberate afterwards, not on the page;

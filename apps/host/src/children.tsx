@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import type { DataClient, FormMenuChild, FormMenuEntry, ListFilterTerm, PublishedForm } from '@formancy/data-client'
+import type { DataClient, FormMenuChild, FormMenuEntry, ListFilterTerm, ListSortTerm, PublishedForm } from '@formancy/data-client'
 import { FilterPanel } from './filter-panel.js'
 import { panelFields } from './filter-terms.js'
 import { columnsOf } from './grid-datasource.js'
@@ -24,6 +24,8 @@ import type { DeleteTarget } from './deletion.js'
 import type { GridRow } from './grid-datasource.js'
 import { Words } from './words.js'
 import type { HeldLevels, SectionDrill } from './use-drill.js'
+import { ViewPicker } from './view-picker.js'
+import { openingView } from './views.js'
 
 /** What the record above a child section is: a saved record, or a new one not saved yet. */
 export type ParentOpen = { kind: 'new' } | { kind: 'record'; token: string }
@@ -63,7 +65,10 @@ type ChildOpen = null | { kind: 'new' } | { kind: 'record'; token: string }
  * (0080): the child form's file of that parent's rows, under the section's
  * filter, in the grid's sort, the parent's column kept, so the file says
  * whose rows they are. A new parent has no rows to give. The filter is the
- * section's, so another parent's section starts with none.
+ * section's, so another parent's section starts with none -- or, where the
+ * server offers the child form's views, with its default view's filter and
+ * sort, which its View picker before the filter panel sets as the Records
+ * panel's does (0105).
  * The section is drawn only for a child whose `list` this person is offered
  * -- the workspace leaves any other out when the form is chosen -- so the
  * button asks nothing more of the definition.
@@ -153,7 +158,9 @@ export function ChildSection({
   const opening = useOpening({ client, formId: child.form, owner, sessions })
   const columns = useMemo(() => columnsOf(definition, child.field), [definition, child.field])
   const filterable = useMemo(() => panelFields(definition), [definition])
-  const [filter, setFilter] = useState<ListFilterTerm[]>([])
+  const views = definition.list?.views ?? []
+  const [filter, setFilter] = useState<ListFilterTerm[]>(() => openingView(views)?.filter ?? [])
+  const [sort, setSort] = useState<ListSortTerm[]>(() => openingView(views)?.sort ?? [])
   const canDelete = menu.operations.includes('delete') && definition.operations.includes('delete') && definition.deleting !== null
   const removal = useDeleteFlow({
     client,
@@ -307,7 +314,7 @@ export function ChildSection({
             New {title}
           </button>
         ) : null}
-        {parent.kind === 'record' ? <DownloadCsv client={client} formId={child.form} idBase={`${headingId}-export`} query={() => ({ search: '', sort: grid.current?.sort() ?? [], parent: { field: child.field, record: parent.token }, filter })} /> : null}
+        {parent.kind === 'record' ? <DownloadCsv client={client} formId={child.form} idBase={`${headingId}-export`} query={() => ({ search: '', sort, parent: { field: child.field, record: parent.token }, filter })} /> : null}
       </div>
       {waiting ? (
         <p role="status" id={`${headingId}-waiting`} className="status" data-kind="loading">
@@ -329,16 +336,32 @@ export function ChildSection({
             parent={{ field: child.field, record: parent.token }}
             search=""
             filter={filter}
+            sort={sort}
             openToken={drill !== undefined ? drill.held : open?.kind === 'record' ? open.token : null}
             canCreate={canCreate}
             quiet
-            toolbarStart={filterable.length === 0 ? undefined : <FilterPanel idBase={`${headingId}-filter`} fields={filterable} filter={filter} onFilter={setFilter} />}
+            toolbarStart={
+              <>
+                <ViewPicker
+                  idBase={headingId}
+                  views={views}
+                  filter={filter}
+                  sort={sort}
+                  onPick={(picked, sorted) => {
+                    setFilter(picked)
+                    setSort(sorted)
+                  }}
+                />
+                {filterable.length === 0 ? null : <FilterPanel idBase={`${headingId}-filter`} fields={filterable} filter={filter} onFilter={setFilter} />}
+              </>
+            }
             refit={refit}
             bench="child-bench"
             {...(canDelete ? { remove: { noun: title, press: deleteRow } } : {})}
             after={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={5} idBase={`${headingId}-row-delete`} /> : null}
             drilling={drill !== undefined}
             onOpen={askRow}
+            onSort={setSort}
           />
         </>
       )}

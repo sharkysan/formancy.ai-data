@@ -1,4 +1,4 @@
-import type { FieldError, FilterableField, FilterDays, FilterInput, FilterOp, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordList } from '@formancy/data-core'
+import type { FieldError, FilterableField, FilterDays, FilterInput, FilterOp, FormMenu, FormRecord, ListView, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordList } from '@formancy/data-core'
 import type { Refusal } from './client.js'
 
 /*
@@ -59,14 +59,39 @@ function isFilterableField(value: unknown): value is FilterableField {
 }
 
 /**
+ * One list view (0105): a name, conditions that each name a field and an
+ * operator data-core names, an order of fields each ascending or
+ * descending, and `default` absent or `true`. A picker sends what a view
+ * holds as a list request, so one it could not send is not the server's.
+ * Each condition's values are the server's to check, as a person's are.
+ */
+function isListView(value: unknown): value is ListView {
+  if (!isRecord(value) || typeof value['name'] !== 'string') return false
+  const { filter, sort } = value
+  const isCondition = (term: unknown) => isRecord(term) && typeof term['field'] === 'string' && typeof term['op'] === 'string' && Object.hasOwn(FILTER_OPERATORS, term['op'])
+  const isOrder = (term: unknown) => isRecord(term) && typeof term['field'] === 'string' && (term['direction'] === 'asc' || term['direction'] === 'desc')
+  if (!Array.isArray(filter) || !filter.every(isCondition) || !Array.isArray(sort) || !sort.every(isOrder)) return false
+  return !Object.hasOwn(value, 'default') || value['default'] === true
+}
+
+/**
  * What a form's list may be searched, sorted and filtered by, or `null` for
- * no list (0044): a reply without one is from no server that has lists, and
- * one without `filterable` from no server that has filters (0104), whose
- * page would offer conditions the server cannot apply.
+ * no list (0044): a reply without one is from no server that has lists, one
+ * without `filterable` from no server that has filters (0104), whose page
+ * would offer conditions the server cannot apply, and one without `views`
+ * from no server that has views (0105).
  */
 function isListColumns(value: unknown): value is PublishedForm['list'] {
   if (value === null) return true
-  return isRecord(value) && isStrings(value['searchable']) && isStrings(value['sortable']) && Array.isArray(value['filterable']) && value['filterable'].every(isFilterableField)
+  return (
+    isRecord(value) &&
+    isStrings(value['searchable']) &&
+    isStrings(value['sortable']) &&
+    Array.isArray(value['filterable']) &&
+    value['filterable'].every(isFilterableField) &&
+    Array.isArray(value['views']) &&
+    value['views'].every(isListView)
+  )
 }
 
 /**

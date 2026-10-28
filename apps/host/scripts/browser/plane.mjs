@@ -10,7 +10,9 @@
 // and of tenant 3, whose customers are the paged ones, one lookup page and
 // ten more, inserted beside the fixture's (0085). And the customer form,
 // read only, which Drill down goes down from: a customer, its orders, their
-// lines (0090).
+// lines (0090). The order form is published with two list views and no
+// default (0105), so its grid opens on every record, as every state before
+// the views' found it, and offers the View picker in all of them.
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -24,6 +26,24 @@ export const FORM = 'pg-order'
 export const LINES = 'pg-order-line'
 export const CUSTOMERS = 'pg-customer'
 export const TOKENS = { admin: 'browser-gate-administrator', clerk: 'browser-gate-clerk', thirdClerk: 'browser-gate-clerk-tenant-3' }
+
+/**
+ * The order form's list views (0105): neither the default, so the grid
+ * opens on every record. They differ in their filter and their sort, and
+ * the second sorts by two columns, so picking one changes both at once and
+ * the headers show two sorted columns.
+ */
+export const ORDER_VIEWS = [
+  { name: 'Placed, newest first', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [{ field: 'id', direction: 'desc' }] },
+  {
+    name: 'Noted, largest first',
+    filter: [{ field: 'notes', op: 'not-null' }],
+    sort: [
+      { field: 'amount', direction: 'desc' },
+      { field: 'id', direction: 'asc' },
+    ],
+  },
+]
 
 /** The keys a delete of an order acts through on the fixture, with their actions: its lines and deliveries, and the deliveries' parcels. */
 const ORDER_CASCADES = [
@@ -81,13 +101,15 @@ export async function startPlane() {
     if (reply.statusCode >= 300) throw new Error(`${path} answered ${String(reply.statusCode)}: ${reply.body}`)
     return reply.json()
   }
-  const publish = async ({ formId, title, table, lookups, policy, versionColumn = 'row_version' }) => {
+  const publish = async ({ formId, title, table, lookups, policy, versionColumn = 'row_version', views }) => {
     const proposal = await call(TOKENS.admin, '/v1/form-proposals', { connection: 'pg', root: { schema: 'sales', name: table }, formId, title, lookups, ...(versionColumn === null ? {} : { versionColumn }) })
     // Published as the generator made it (0030 refuses anything but
     // presentation over the generated base), which draws a lookup as a
-    // typeahead where it can be searched (0066).
+    // typeahead where it can be searched (0066); views alone leave the form
+    // its base.
     const form = proposal.form
-    await call(TOKENS.admin, `/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection: 'pg', generation: proposal.generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings: proposal.bindings, policy: policy(proposal.bindings), snapshot: proposal.snapshot } })
+    const presentation = views === undefined ? EMPTY_PRESENTATION : { ...EMPTY_PRESENTATION, views }
+    await call(TOKENS.admin, `/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection: 'pg', generation: proposal.generation, base: form, presentation, form, bindings: proposal.bindings, policy: policy(proposal.bindings), snapshot: proposal.snapshot } })
     return form
   }
   const form = await publish({
@@ -96,6 +118,7 @@ export async function startPlane() {
     table: 'order',
     lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
     policy: (bindings) => clerkPolicy(bindings, { operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'], delete: ['clerk'] }, cascades: ORDER_CASCADES }),
+    views: ORDER_VIEWS,
   })
   // No tenant column of its own: its rows are its tenant's orders' lines, through the order lookup's filter (0043).
   await publish({
