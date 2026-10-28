@@ -390,7 +390,11 @@ and a page is filtered by conditions on its columns from
 `src/browse-filter.tsx`
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)). Presentation edits, a field's move to another section
 among them (0075), go through `@formancy/builder-core`'s session with
-controls of the studio's own (`src/presentation.tsx`, 0030);
+controls of the studio's own (`src/presentation.tsx`, 0030), and below them
+`src/list-views.tsx` lists a form's list views and `src/view-form.tsx` makes
+or edits one, its conditions typed as the Browse step's are, through the
+one module both use, `src/condition-draft.tsx`
+([0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md));
 the Policy step asks `validatePolicy` and `deleteProblems` as the server
 does and names each key a delete acts through
 ([0052](../decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md));

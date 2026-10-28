@@ -110,7 +110,14 @@ Views are the same for everyone who may read their fields. A view cannot
 be kept to a role. A person cannot save a view of their own, and the host
 remembers no choice across a reload.
 
-A view on a field nobody may read is stored and offered to nobody. STUDIO-WARNS
+A view on a field nobody may read is stored and offered to nobody, and the
+studio says nothing of which roles will be offered which view: its panel
+says only that a person is offered a view if they may read every field it
+names. Saving, removing and moving a view are not on the Presentation
+step's Undo and Redo, which are the form document's, and a view being
+defined and not saved is lost when the step is left. A refusal is said in
+data-core's sentence, with its path counted from 0 and the field's key,
+where the panel counts from 1 and names labels.
 
 A stored view that a later release no longer runs is not offered, and
 nothing says so to the person or in the log. It is found by publishing
