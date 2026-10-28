@@ -14,16 +14,21 @@ import type { Engine, Plane, Sent } from './test-plane.js'
  * the real server: the View picker above a grid, offering the views the
  * server offered this person and nothing when it offered none; the grid
  * opening on the default, or on every record when the default is not
- * offered; a picked view asking for exactly one first page, carrying both
- * its filter and its sort, which the Filter panel lists and the headers
- * show; the picker saying "Your own filter and sort" for anything else and
- * the view again once the conditions are the view's; "All records"
- * clearing both; a file of the view's records; a child section's views of
- * its own; and no view in the address. Every state is held to axe at WCAG
- * 2.2 AA and to a name on every control.
+ * offered; a choice in the select sending nothing until Show view; a view
+ * shown asking for exactly one first page, carrying both its filter and
+ * its sort, which the Filter panel lists and the headers show; the picker
+ * saying "Your own filter and sort" for anything else and the view again
+ * once the conditions are the view's; "All records" clearing both; a file
+ * of the view's records; a child section's views of its own; and no view
+ * in the address. Every state is held to axe at WCAG 2.2 AA and to a name
+ * on every control.
  *
  * Found by role and accessible name (formancy.ai 0034): the picker is a
- * combobox named View, its choices options, the one shown the selected one.
+ * combobox named View, its choices options, the one it holds the selected
+ * one, and Show view a button. A choice is made with user-event's
+ * selectOptions, which fires the change a browser fires when an arrow steps
+ * a closed select (Chromium on Windows and Linux, Firefox): jsdom's select
+ * answers no arrow, so the keys themselves are not what is pressed.
  */
 
 let plane: Plane
@@ -72,11 +77,20 @@ function shown(heading: string): string {
   return within(view).getByRole('option', { selected: true }).textContent ?? ''
 }
 
-/** Choose `name` in the grid's picker. Nothing is waited for. */
-async function pick(user: User, heading: string, name: string): Promise<void> {
+/** Show view in the grid `heading` names. */
+const showButton = (heading: string): HTMLElement => within(gridSection(heading)).getByRole('button', { name: 'Show view' })
+
+/** Choose `name` in the grid's picker and nothing more: the change a browser fires for a click on a choice or an arrow on a closed select. */
+async function choose(user: User, heading: string, name: string): Promise<void> {
   const view = picker(heading)
   if (view === null) throw new Error(`the ${heading} grid offers no View`)
   await user.selectOptions(view, name)
+}
+
+/** Choose `name` in the grid's picker and press Show view. Nothing is waited for. */
+async function pick(user: User, heading: string, name: string): Promise<void> {
+  await choose(user, heading, name)
+  await user.click(showButton(heading))
 }
 
 /** What a header of the grid `heading` names says of its sort: `aria-sort`, or null for a column that is not sorted. A sorted header's name holds its sort's number too, so it is found by how it starts. */
@@ -148,8 +162,9 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
   // The grid opens on the view the server offered as the default, with one
   // first page asked for in its filter and its sort -- never a page of
   // every record before it -- the picker naming it, the panel listing its
-  // condition and the Id header sorted descending; and the picker sits
-  // between Search and Filter in the keyboard's order (watched failing with
+  // condition and the Id header sorted descending; and the picker and Show
+  // view sit between Search and Filter in the keyboard's order (watched
+  // failing with
   // the grid opening on nothing: every record listed, by key ascending; with
   // the datasource asking for whatever block AG Grid asks for: two first
   // pages, one asked before the headers showed the view's sort; and with
@@ -173,14 +188,48 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     await user.tab()
     expect(focusedName()).toBe('View')
     await user.tab()
+    expect(focusedName()).toBe('Show view')
+    await user.tab()
     expect(focusedName()).toBe('Filter')
   })
 
-  // Picking a view asks for exactly one first page, carrying both its
+  // A choice in the select is a draft: it sends nothing and changes neither
+  // the filter nor the sort, however many a person steps through, until
+  // Show view -- which then asks one first page, for the choice it shows --
+  // and Show view on the choice the grid already lists sends nothing
+  // (watched failing with the choice applied on its change, as the picker
+  // first did: the filter emptied by a step onto "All records" before Show
+  // view was pressed, its condition no longer listed; and with Show view
+  // sending whatever the select holds: a second first page for the choice
+  // the grid already listed).
+  test('sends nothing for a choice until Show view, and nothing for the choice the grid lists', async () => {
+    const user = await workspace(engine.formId)
+    await lists('Records', engine.formId, NEWEST, `Rows 1–${String((await serverLists(engine.formId, NEWEST)).length)}. Filtered by Notes.`)
+    plane.sent.length = 0
+
+    await choose(user, 'Records', LARGE.name)
+    await choose(user, 'Records', 'All records')
+    expect(shown('Records')).toBe('All records')
+    await listsApplied('Records', [`Notes contains “${VIEWED}”`])
+    expect(sortOf('Records', 'Id')).toBe('descending')
+    expect(asked(plane.sent, engine.formId)).toEqual([])
+    expect(await floor('a choice not shown yet')).toEqual(CLEAN('a choice not shown yet'))
+
+    await user.click(showButton('Records'))
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toMatch(/^Rows 1–\d+(; more follow)?\.$/), ARRIVES)
+    expect(applied('Records')).toEqual([])
+    // Again, on the choice the grid now lists; then another, whose one page is the next request asked.
+    await user.click(showButton('Records'))
+    await pick(user, 'Records', NEWEST.name)
+    await lists('Records', engine.formId, NEWEST, `Rows 1–${String((await serverLists(engine.formId, NEWEST)).length)}. Filtered by Notes.`)
+    expect(asked(plane.sent, engine.formId)).toEqual([firstPage({ filter: [], sort: [] }), firstPage(NEWEST)])
+  })
+
+  // Showing a view asks for exactly one first page, carrying both its
   // filter and its sort -- not a page under the old sort and then another
   // -- lists what the server lists for it, says its conditions in the
-  // panel and its order on the headers, keeps the keyboard on View, and
-  // writes nothing of it into the address (0104's rule for a filter)
+  // panel and its order on the headers, keeps the keyboard on Show view,
+  // and writes nothing of it into the address (0104's rule for a filter)
   // (watched failing with the datasource asking for whatever block AG Grid
   // asks for: two first pages for one pick, one asked before the headers
   // showed the view's sort -- whether it sent the view's sort or AG Grid's).
@@ -192,25 +241,32 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     plane.sent.length = 0
 
     picker('Records')?.focus()
-    await pick(user, 'Records', LARGE.name)
+    await choose(user, 'Records', LARGE.name)
+    await user.tab()
+    expect(focusedName()).toBe('Show view')
+    await user.keyboard('{Enter}')
     const large = await serverLists(engine.formId, LARGE)
     await lists('Records', engine.formId, LARGE, `Rows 1–${String(large.length)}. Filtered by Notes and Amount.`)
     expect(asked(plane.sent, engine.formId)).toEqual([firstPage(LARGE)])
     expect(shown('Records')).toBe(LARGE.name)
     await listsApplied('Records', [`Notes contains “${VIEWED}”`, 'Amount is at least 100'])
     expect([sortOf('Records', 'Amount'), sortOf('Records', 'Id')]).toEqual(['descending', 'ascending'])
-    expect(focusedName()).toBe('View')
+    expect(focusedName()).toBe('Show view')
     expect(window.location.href).toBe(before)
     expect(await floor('a view picked')).toEqual(CLEAN('a view picked'))
   })
 
   // The picker's choice is derived from the filter and the sort, never
   // kept: a condition of the person's own is "Your own filter and sort",
-  // offered only while it is so; the view's own condition applied again is
-  // the view again; and a header sorted by the person is their own too,
+  // offered only while it is so, and a step off it in the select and back
+  // keeps the person's conditions; the view's own condition applied again
+  // is the view again; and a header sorted by the person is their own too,
   // asked for once, and two quick presses on a header keep the second
-  // (watched failing with the picked view kept as state: "Marked and large"
-  // shown over a filter on Amount between 1 and 50; with the grid's header
+  // (watched failing with the select's choice never following the section:
+  // "Marked and large" shown over a filter on Amount between 1 and 50; with
+  // the choice applied on its change: the step onto "Marked, newest first"
+  // replaced the person's conditions, and no "Your own filter and sort" was
+  // left to step back to; with the grid's header
   // sort never told to the section: the grid never asked for the page it
   // showed sorted, its cells left empty; and with every sort the section
   // holds put back on the headers, the one a press told it too: two quick
@@ -229,9 +285,20 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     expect(choices('Records')).toEqual(['All records', NEWEST.name, LARGE.name, OWN])
     expect(await floor('a filter of your own')).toEqual(CLEAN('a filter of your own'))
 
+    // Off it and back, as arrows step a closed select, and Show view on it: the conditions stay, and nothing is asked.
+    plane.sent.length = 0
+    await choose(user, 'Records', NEWEST.name)
+    await choose(user, 'Records', OWN)
+    await user.click(showButton('Records'))
+    await listsApplied('Records', [`Notes contains “${VIEWED}”`, 'Amount is between 1 and 50'])
+    expect(shown('Records')).toBe(OWN)
+
     await applyCondition(user, 'Records', { field: 'Amount', condition: 'is between', from: '100', to: '' })
     await waitFor(() => expect(shown('Records')).toBe(LARGE.name), ARRIVES)
     expect(choices('Records')).not.toContain(OWN)
+    await lists('Records', engine.formId, LARGE, `Rows 1–${String((await serverLists(engine.formId, LARGE)).length)}. Filtered by Notes and Amount.`)
+    // One request since the steps: the condition's, for the view's list.
+    expect(asked(plane.sent, engine.formId)).toEqual([firstPage(LARGE)])
 
     // The Id header, sorted by the keyboard: from the view's second order, ascending, to descending alone.
     plane.sent.length = 0

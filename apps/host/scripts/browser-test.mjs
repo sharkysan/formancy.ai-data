@@ -82,12 +82,14 @@
 //     body and its words in no URL; a value the server refuses is its
 //     sentence on the grid's line, the value still in its box and no Ask
 //     again; and Clear filter puts the keyboard back on Filter;
-//   - a form's list views (0105): the View picker between Search and Filter
-//     in the keyboard's order; a view picked asks for exactly one first
-//     page, its filter and its sort in the body and nothing of it in the
-//     address, the keyboard staying on View and the headers showing both
-//     its sorted columns; a header sorted by the person is "Your own filter
-//     and sort", in one request; and "All records" one first page with
+//   - a form's list views (0105): the View picker and Show view between
+//     Search and Filter in the keyboard's order; a choice in the select,
+//     the change an arrow fires on a closed select, sends nothing; Show
+//     view asks for exactly one first page, its filter and its sort in the
+//     body and nothing of it in the address, the keyboard staying on Show
+//     view and the headers showing both its sorted columns; a header sorted
+//     by the person is "Your own filter and sort", in one request, and a
+//     step off it and back keeps it; and "All records" one first page with
 //     neither;
 //   - Drill down (0090): a customer, one of its orders and that order's
 //     line three levels down, the trail naming each; Tab reaches the

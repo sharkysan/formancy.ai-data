@@ -8,17 +8,20 @@
  * picker's own, so nothing here selects inside .sheet or .grid-bench.
  */
 
-/* View beside its select, as Search is beside its box: in the search's row
-   where it fits, and on a row of its own where it does not. */
+/* View beside its select and Show view after it, as Search is beside its
+   box and its button: in the search's row where it fits, and on a row of
+   its own where it does not, Show view under the select on the narrowest. */
 .view-picker {
   display: flex;
   flex: 0 1 auto;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
 }
 
-.view-picker label {
+.view-picker label,
+.view-picker .button {
   flex: none;
 }
 
