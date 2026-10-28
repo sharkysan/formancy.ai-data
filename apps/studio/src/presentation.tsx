@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import { isLayoutContainer } from '@formancy/builder-core'
 import type { BuilderSession, CommandOutcome } from '@formancy/builder-core'
+import type { FormBindings, ListView } from '@formancy/data-core'
 import type { LayoutNode } from '@formancy/spec'
 import { CarriedPanel } from './carried.js'
 import type { Carried } from './carry.js'
 import { labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
+import { ListViewsPanel } from './list-views.js'
 
 type Said = { ok: boolean; message: string }
 
@@ -67,9 +69,23 @@ function LabelInput({ id, label, value, commit }: { id: string; label: ReactElem
  * removes, renames or retypes a field, because a field is a column the
  * bindings name, and the generator is what decides those. A draft carried
  * from another (0030) lists what could not be carried above the controls,
- * and what it offers is a label too.
+ * and what it offers is a label too. Below them, the list views (0105):
+ * presentation of the form's list rather than of the form, named by the
+ * fields' labels as this step has them.
  */
-export function PresentationStep({ session, carried = null }: { session: BuilderSession; carried?: Carried | null }): ReactElement {
+export function PresentationStep({
+  session,
+  bindings,
+  views,
+  onViews,
+  carried = null,
+}: {
+  session: BuilderSession
+  bindings: FormBindings
+  views: readonly ListView[]
+  onViews: (views: ListView[]) => void
+  carried?: Carried | null
+}): ReactElement {
   const document = useDocument(session)
   const [said, setSaid] = useState<Said | null>(null)
   const focusAfter = useFocusAfterRender()
@@ -222,6 +238,7 @@ export function PresentationStep({ session, carried = null }: { session: Builder
         </p>
       </div>
       {layout === undefined ? <p className="none">The form has no arrangement to edit.</p> : nodes(layout.nodes, [], false)}
+      <ListViewsPanel bindings={bindings} document={document} views={views} onViews={onViews} />
     </>
   )
 }

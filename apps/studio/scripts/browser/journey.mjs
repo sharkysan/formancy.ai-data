@@ -1,10 +1,10 @@
 // The studio's journey in the browser, state by state, on a plane where every
 // administrator publishes: from a restricted connection discovered, and a
 // server this release was not tested on (0068), to a
-// version restored, through the policy, the presentation, the preview's
-// paper, a publish and its conflict, drift, a download, a refused restore and
-// import, and a regeneration and what it carried (0030, 0052, 0062). Each
-// state is measured on the way by the gate.
+// version restored, through the policy, the presentation and a list view
+// made in it (0105), the preview's paper, a publish and its conflict, drift,
+// a download, a refused restore and import, and a regeneration and what it
+// carried (0030, 0052, 0062). Each state is measured on the way by the gate.
 
 import { createSnapshot } from '@formancy/data-core'
 import { renamedColumn } from '@formancy/data-fixtures'
@@ -136,6 +136,42 @@ export function journey(plane, check) {
       const there = presentation.getByRole('button', { name: 'Move to Record Customer' })
       const back = presentation.getByRole('button', { name: 'Move to Order Customer' })
       check('Move to keeps the keyboard on the field moved back', await focusAfterEnter(page, back, () => presentation.getByText('Moved Customer to Order.').waitFor(), there))
+    }],
+    // 0105: a list view made below the arrangement -- a condition on a
+    // text, one on a date's range, whose boxes are dates the hint
+    // describes, an order, and the grid opening on it. A condition row
+    // removed by keyboard takes its button with it, and after the last the
+    // keyboard goes to the button that adds one.
+    ['Presentation, a list view being defined', async (page) => {
+      const form = step(page, 'Presentation').getByRole('region', { name: 'List views' }).getByRole('form', { name: 'New view' })
+      await form.getByRole('textbox', { name: 'Name' }).fill('Placed this year')
+      const add = form.getByRole('button', { name: 'Add condition' })
+      await add.click()
+      const status = form.getByRole('group', { name: 'Condition 1' })
+      await status.getByRole('combobox', { name: 'Field' }).selectOption({ label: 'Status' })
+      await status.getByRole('textbox', { name: 'Value' }).fill('placed')
+      await add.click()
+      const dated = form.getByRole('group', { name: 'Condition 2' })
+      await dated.getByRole('combobox', { name: 'Field' }).selectOption({ label: 'Order date' })
+      await dated.getByRole('combobox', { name: 'Condition' }).selectOption({ label: 'is in a range' })
+      await dated.getByLabel('From').fill('2026-01-01')
+      await add.click()
+      const third = form.getByRole('group', { name: 'Condition 3' })
+      const remove = third.getByRole('button', { name: 'Remove condition 3' })
+      check('removing the last condition row leaves the keyboard on Add condition', await focusAfterEnter(page, remove, () => third.waitFor({ state: 'detached' }), add))
+      await form.getByRole('button', { name: 'Add sort' }).click()
+      const sort = form.getByRole('group', { name: 'Sort 1' })
+      await sort.getByRole('combobox', { name: 'Sort by' }).selectOption({ label: 'Order date' })
+      await sort.getByRole('combobox', { name: 'Direction' }).selectOption({ label: 'Descending' })
+      await form.getByRole('checkbox', { name: 'The grid opens on this view' }).check()
+    }],
+    // Saved by Enter in a condition's box, which goes with the emptied
+    // form: the keyboard is given to Save view rather than to the page.
+    ['Presentation, a list view saved by keyboard', async (page) => {
+      const views = step(page, 'Presentation').getByRole('region', { name: 'List views' })
+      const value = views.getByRole('group', { name: 'Condition 1' }).getByRole('textbox', { name: 'Value' })
+      const save = views.getByRole('button', { name: 'Save view' })
+      check('saving a view from a condition’s box leaves the keyboard on Save view', await focusAfterEnter(page, value, () => views.getByText('Saved view 1, “Placed this year”.').waitFor(), save))
     }],
     ['Presentation, a label refused', async (page) => {
       await step(page, 'Presentation').getByLabel('Label of notes').fill('')

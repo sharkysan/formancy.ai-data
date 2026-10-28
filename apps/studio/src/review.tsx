@@ -5,9 +5,11 @@ import type { DriftChange, DriftReport } from '@formancy/data-core'
 import type { DraftQueue, DraftRead } from '@formancy/data-server'
 import type { AdminClient, Failure, Published } from './api.js'
 import { describeRef } from './choice.js'
+import { labelOf } from './document.js'
 import { Changes } from './drift-change.js'
 import { DraftPolicy } from './draft-policy.js'
 import { useFocusAfterRender } from './focus.js'
+import { SavedView } from './list-views.js'
 import { FormPaper } from './preview.js'
 
 /** The opened draft's heading, where the keyboard goes when it is read, and when a decision takes its buttons away. */
@@ -64,7 +66,7 @@ function decidedBy(outcome: Failure): Decided {
  * draft. Opened, a draft is described, and its form drawn on the paper the
  * Preview step draws -- what the people filling it in would see if it were
  * approved -- and its policy below it: who they are, and what approving it
- * grants them (`DraftPolicy`). Its decisions are the server's `refuses`
+ * grants them (`DraftPolicy`); then its list views in words (0105). Its decisions are the server's `refuses`
  * for this reader and nothing else: Approve and publish where approval is
  * not refused; Reject, or Withdraw on one's own draft, where rejection is
  * not; and the server's sentence for each it refuses. The studio decides
@@ -248,6 +250,19 @@ function DraftView({
       )}
       <FormPaper document={bundle.form} bindings={bundle.bindings} label={`${title}, draft ${String(draft.draft)}`} revision={revision} />
       <DraftPolicy policy={bundle.policy} bindings={bundle.bindings} document={bundle.form} />
+      {bundle.presentation.views === undefined ? null : (
+        // What a person's grid is offered above it (0105), in words, so what is approved is what was read.
+        <div className="draft-views">
+          <h4 id="draft-views">List views</h4>
+          <ol aria-labelledby="draft-views">
+            {bundle.presentation.views.map((view) => (
+              <li key={view.name}>
+                <SavedView view={view} label={(key) => labelOf(bundle.form, key)} />
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
       {!pending ? null : (
         <div className="decide">
           {draft.refuses.approve !== undefined && draft.refuses.reject !== undefined ? null : (

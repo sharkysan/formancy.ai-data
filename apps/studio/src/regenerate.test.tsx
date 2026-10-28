@@ -9,6 +9,7 @@ import type { User } from './test-studio.js'
 import { OWNER_SNAPSHOT, startPlane, TOKENS, withColumn, withoutColumn } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 import { regenerateForm } from './regenerate.js'
+import { addCondition, savedViews, saveView } from './test-views.js'
 
 /**
  * Regenerating a published form from the Drift step (0030): the newest
@@ -406,6 +407,68 @@ describe('regenerating a published form', () => {
     expect(within(report).getByRole('status').textContent).toBe(`${String(server.drift.changes.length)} ${server.drift.changes.length === 1 ? 'change' : 'changes'}, ${String(blocking)} blocking.`)
     expect(within(report).getAllByRole('listitem').some((item) => /concurrency-changed/.test(item.textContent ?? ''))).toBe(true)
     expect(within(drift).queryByRole('button', { name: 'Continue to presentation' })).toBeNull()
+    expect(await audit()).toEqual([])
+  })
+
+  // A list view (0105) is carried by the regeneration as a label is, and
+  // one naming a column that is gone is dropped whole -- carried without
+  // its condition, "Noted" would show every order -- and said where the
+  // label's drop is said: in the regeneration's list, and in the carried
+  // panel the draft opens with. The rest is the draft's, and what is
+  // published. Watched failing with the regeneration's views left behind
+  // when the draft was taken up: the panel was empty and version 2 had
+  // none.
+  test('a view naming a dropped column is listed as dropped, and the rest are carried and published', async () => {
+    const user = await signIn(plane)
+    await generateOrder(user)
+    await goTo(user, 'Presentation')
+    await saveView(user, 'Placed', () => addCondition(user, 'Status', 'equals', { Value: 'placed' }), true)
+    await saveView(user, 'Noted', () => addCondition(user, 'Notes', 'is not NULL'))
+    await writeOrderPolicy(user)
+    const publish = await goTo(user, 'Publish')
+    await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
+    await within(publish).findByText('Published version 1 of sales-order.')
+
+    plane.databases.set('fixture', withoutColumn(OWNER_SNAPSHOT, 'order', 'notes'))
+    const regenerated = await regenerate(user)
+    const dropped = 'View “Noted” names notes, which is not in the regenerated form, so it was dropped.'
+    const server = await admin.regenerate('sales-order')
+    if (!server.ok) throw new Error(server.message)
+    expect(server.value.conflicts).toEqual([{ kind: 'view-dropped', view: 'Noted', resolution: 'dropped', message: dropped }])
+    expect(items(regenerated, 'Presentation not carried as it was')).toEqual([dropped])
+    await user.click(within(regenerated).getByRole('button', { name: 'Continue to presentation' }))
+    const presentation = await screen.findByRole('main', { name: 'Presentation' })
+    expect(items(presentation, 'Carried from version 1')).toEqual([dropped])
+    expect(savedViews()).toEqual(['Placed: where Status = placed; opens the grid.'])
+    expect(await audit()).toEqual([])
+
+    await publishDraft(user, ['notes'], [])
+    const latest = await admin.latest('sales-order')
+    if (!latest.ok || latest.value.bundle.format !== 2) throw new Error('version 2 is not a format-2 bundle')
+    expect(latest.value.bundle.presentation.views).toEqual([{ name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [], default: true }])
+  })
+
+  // "Generate again" carries a draft's views through the same rebase, so a
+  // view whose column the new proposal no longer has is dropped and said
+  // in the carried panel, as a regeneration says it, and the others stay.
+  // Watched failing with the views left out of the carry: the panel came
+  // back empty and said everything was carried.
+  test('generating again carries the draft’s views, and lists one it drops', async () => {
+    const user = await signIn(plane)
+    await generateOrder(user)
+    await goTo(user, 'Presentation')
+    await saveView(user, 'Placed', () => addCondition(user, 'Status', 'equals', { Value: 'placed' }), true)
+    await saveView(user, 'Noted', () => addCondition(user, 'Notes', 'is not NULL'))
+    plane.databases.set('fixture', withoutColumn(OWNER_SNAPSHOT, 'order', 'notes'))
+    const policy = await goTo(user, 'Policy')
+    await user.click(within(policy).getByRole('button', { name: 'Add a row filter' }))
+    await user.selectOptions(within(policy).getByLabelText('Column of row filter 2'), 'group')
+    await user.click(within(policy).getByRole('button', { name: 'Generate again with these pins' }))
+    await screen.findByRole('main', { name: 'Generate' })
+
+    const presentation = await goTo(user, 'Presentation')
+    expect(items(presentation, 'Carried from your earlier draft')).toEqual(['View “Noted” names notes, which is not in the regenerated form, so it was dropped.'])
+    expect(savedViews()).toEqual(['Placed: where Status = placed; opens the grid.'])
     expect(await audit()).toEqual([])
   })
 
