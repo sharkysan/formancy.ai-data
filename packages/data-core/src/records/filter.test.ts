@@ -99,6 +99,21 @@ describe('columnFilter', () => {
     }
   })
 
+  // A value is the body's, as long as the body may be: spelling one must
+  // take time in proportion to it. A pattern that could match a run of
+  // zeros two ways took 4.4 s for 100,000 of them before a stray letter, and
+  // a body holds ten times that, so one request would hold the server's
+  // CPU for minutes. Watched failing, past the timeout, with `0*([0-9]+)`
+  // for an integer and `/0+$/` for a fraction's trailing zeros.
+  test('spells a value of any length in time proportional to it', { timeout: 2_000 }, () => {
+    const zeros = '0'.repeat(200_000)
+    expect(equals(INT32, `${zeros}x`)).toMatchObject({ ok: false })
+    expect(equals(INT32, `-${zeros}7`)).toMatchObject({ ok: true, filter: { value: '-7' } })
+    expect(equals(AMOUNT, `1.${zeros}1`)).toMatchObject({ ok: false })
+    expect(equals(AMOUNT, `1.5${zeros}`)).toMatchObject({ ok: true, filter: { value: '1.5000' } })
+    expect(planned(UNSCALED, { op: 'range', from: `${zeros}x`, to: null })).toMatchObject({ ok: false })
+  })
+
   // A planner that let an operator through on a kind that does not offer it
   // would hand an adapter a contains on a number, which each spells apart.
   test('refuses an operator the column does not offer', () => {

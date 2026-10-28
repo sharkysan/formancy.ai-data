@@ -54,14 +54,33 @@ export function filterOffer(column: Pick<ColumnMeta, 'type' | 'nullable'>): Filt
   return { operators: [...own.operators, ...nulls], input: own.input, days }
 }
 
-const INTEGER = /^([+-]?)0*([0-9]+)$/
+/*
+ * Each pattern matches its text one way only, and the zeros a number may
+ * lead or trail with are cut by `withoutZeros` rather than by a pattern
+ * that could match them twice: a value is the body's, as long as the body,
+ * and a run of zeros a pattern backtracks over is time squared.
+ */
+const INTEGER = /^([+-]?)([0-9]+)$/
 const DECIMAL = /^([+-]?)([0-9]*)(?:\.([0-9]*))?$/
+
+/** `digits` without the zeros it leads with (`start`) or trails with (`end`), in one pass. */
+function withoutZeros(digits: string, from: 'start' | 'end'): string {
+  if (from === 'start') {
+    let first = 0
+    while (first < digits.length && digits[first] === '0') first += 1
+    return digits.slice(first)
+  }
+  let last = digits.length
+  while (last > 0 && digits[last - 1] === '0') last -= 1
+  return digits.slice(0, last)
+}
 
 /** An integer as a column reads it back: no plus, no leading zero, no negative zero. */
 function integerText(given: string): string | null {
   const match = INTEGER.exec(given)
   if (match === null) return null
-  const [, sign = '', digits = ''] = match
+  const [, sign = '', typed = ''] = match
+  const digits = withoutZeros(typed, 'start') || '0'
   return digits === '0' || sign !== '-' ? digits : `-${digits}`
 }
 
@@ -81,12 +100,12 @@ function decimalText(given: string, scale: number | null): string | null {
   if (whole === '' && typed === '') return null
   let fraction = typed
   if (scale !== null) {
-    fraction = fraction.replace(/0+$/, '')
+    fraction = withoutZeros(fraction, 'end')
     if (fraction.length > scale) return null
     fraction = fraction.padEnd(scale, '0')
   }
-  const digits = whole.replace(/^0+(?=[0-9])/, '') || '0'
-  const zero = digits === '0' && /^0*$/.test(fraction)
+  const digits = withoutZeros(whole, 'start') || '0'
+  const zero = digits === '0' && withoutZeros(fraction, 'start') === ''
   return `${sign === '-' && !zero ? '-' : ''}${digits}${fraction === '' ? '' : `.${fraction}`}`
 }
 
