@@ -128,8 +128,9 @@ later.
     shows a draft's.
   - **The host has a View picker** before each grid's Filter panel: All
     records, each view, and Your own filter and sort once a condition or a
-    header changes a picked view. A pick is one request in the view's
-    filter and sort; a grid opens on the default view. Download CSV sends
+    header changes a shown view. A choice in its select sends nothing until
+    Show view, which is one request in the view's filter and sort; a grid
+    opens on the default view. Download CSV sends
     the section's filter and sort, which its headers show.
   - **`@formancy/data-client` refuses a form whose `list` has no `views`**,
     `unexpected`: upgrade the server before a host's client. It re-exports

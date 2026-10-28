@@ -218,8 +218,9 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    (`apps/host/src/filter-panel.tsx`, over the fields `list.filterable`
    names) and the section's sort; a new filter or sort starts the grid again
    from its first row. A View picker (`apps/host/src/view-picker.tsx`) offers
-   `list.views` and sets both at once, as one first page; the grid opens on
-   the view marked `default`, when it is offered (0105).
+   `list.views`, and its Show view sets both at once, as one first page; a
+   choice in its select alone sends nothing. The grid opens on the view
+   marked `default`, when it is offered (0105).
 3. `routes/runtime-lists.ts` checks the body and asks `planList`
    (`packages/data-core/src/records/list.ts`) before any statement:
    `listable` puts the read policy first -- its filter, every through

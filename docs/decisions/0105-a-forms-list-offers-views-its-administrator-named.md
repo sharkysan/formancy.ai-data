@@ -29,8 +29,9 @@
   and a regeneration with a dropped one said, held back from a publish
   when it no longer fits, and shown to a reviewer.
   `apps/host/src/views.test.ts` and `view-picker.test.tsx`, on both engines
-  -- a grid opening on its default in one request, a view picked as one
-  first page in its filter and its sort, a condition or a header making the
+  -- a grid opening on its default in one request, a choice sending
+  nothing until Show view, a view shown as one first page in its filter and
+  its sort, a condition or a header making the
   section the person's own, All records, a default on a field the person
   may not read leaving the grid on every record, the file in the view's
   filter and sort, a child section's own views, and no picker without
@@ -136,18 +137,25 @@ the Publish step sends them in the presentation; and the Review step shows
 a draft's views under its policy, so a publisher approves what they can
 see.
 
-The host's View picker (`apps/host/src/view-picker.tsx`) is a native select
-before a grid's Filter panel, in the Records panel and in each child
-section, shown only where the server offers a view. Its choices are "All
-records", each view by name, and "Your own filter and sort". The last is
-there only while the section's filter and sort match no view and are not
-both empty. What it shows is derived from the filter and the sort
-(`views.ts`) and never kept, so a condition added or a header pressed
-after a pick is the person's own, and the view's exact conditions and
-order show the view again.
+The host's View picker (`apps/host/src/view-picker.tsx`) is a form before
+a grid's Filter panel, in the Records panel and in each child section,
+shown only where the server offers a view: a native select and Show view,
+as the search is a box and Search. Its choices are "All records", each
+view by name, and "Your own filter and sort". The last is there only while
+the section's filter and sort match no view and are not both empty.
+
+A choice in the select sends nothing. A browser may change a closed
+select's value with each arrow key, firing `change` each time, and applied
+on change, each step would be a request and would throw away the person's
+own conditions on the way past; nothing here measured which browsers do. What the select starts at is derived from the filter and the
+sort (`views.ts`) and never kept, so a condition added or a header pressed
+after a view is shown is the person's own, and the view's exact conditions
+and order show the view again.
 
 The grid's sort is the section's, held beside its filter, as Download CSV
-sends it. Picking a view sets both at once and asks for one first page.
+sends it. Show view sets both at once and asks for one first page, or
+nothing for the choice the grid already lists, and leaves the keyboard on
+the button.
 A grid opens on the view offered as the default, and no view enters the
 address, as no filter does (0104).
 

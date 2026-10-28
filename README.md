@@ -634,9 +634,10 @@ filter is in no address, so a reload or another form starts without one too
 
 Where the form's administrator named list views, View, after the search
 and first in a child section, offers All records and each view the server
-offers you by its name. Picking one sets the grid's filter and sort at
-once, in one request: the Filter panel lists its conditions and the
-headers show its order. Any condition you add or header you press makes it
+offers you by its name. Choosing one sends nothing; Show view sets the
+grid's filter and sort at once, in one request, and keeps the keyboard on
+the button: the Filter panel lists its conditions and the headers show its
+order. Any condition you add or header you press makes it
 Your own filter and sort, and the view's own conditions and order show the
 view again. A grid opens on the view marked to open it, and on every record
 where that view names a field you may not read, which is then not offered
