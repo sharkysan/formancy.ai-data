@@ -273,8 +273,10 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
   // the Records grid and what is kept for it are untouched -- the order
   // form's, and the delivery form's own when it is chosen under Forms
   // (watched failing with the section given the form's columns: "Show
-  // Order" listed in the Delivery section; and with the section's kept as
-  // a Records panel's: nothing kept as a child section's).
+  // Order" listed in the Delivery section; with the section's kept as a
+  // Records panel's: nothing kept as a child section's; and with it kept
+  // by the child form rather than the field its rows are narrowed by:
+  // nothing kept under that field's key).
   test('a child section has Columns of its own, without its parent’s field', async () => {
     const [record] = await freshOrders(engine, stamp('columns'), ['1'])
     const made = await plane.clerk.create(engine.deliveries, { order: record, carrier: stamp('carrier'), shipped_at: '2026-10-07T08:00:00Z' })
