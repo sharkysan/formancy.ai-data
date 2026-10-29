@@ -1,18 +1,18 @@
 // A form's list views in the browser (0105), on the workspace the filter's
 // states left: every record, no condition, the panel closed. The order form
 // offers two views and opens on neither (plane.mjs). The View picker and
-// Show view are reached by Tab between Search and Filter; a choice in the
-// select sends nothing and changes nothing, as the change a browser fires
-// for an arrow on a closed select must not; Show view then asks for exactly
-// one first page, with the view's filter and its sort in the request's body
-// and nothing of it in the address, the keyboard staying on Show view and
-// the headers showing its two sorted columns; a header the person sorts by
-// makes the picker say "Your own filter and sort", in one request, and a
-// step off it in the select and back keeps that sort; and "All records"
-// asks one first page with neither. Each state is measured by the gate's
-// `measured` on the way: the picker's colours and target sizes, the sorted
-// headers' text decided on the pixels, and no sideways scroll, down to 320
-// px.
+// Show view are reached by Tab between Search and Filter, Columns after
+// them (0106); a choice in the select sends nothing and changes nothing, as
+// the change a browser fires for an arrow on a closed select must not; Show
+// view then asks for exactly one first page, with the view's filter and its
+// sort in the request's body and nothing of it in the address, the keyboard
+// staying on Show view and the headers showing its two sorted columns; a
+// header the person sorts by makes the picker say "Your own filter and
+// sort", in one request, and a step off it in the select and back keeps
+// that sort; and "All records" asks one first page with neither. Each state
+// is measured by the gate's `measured` on the way: the picker's colours and
+// target sizes, the sorted headers' text decided on the pixels, and no
+// sideways scroll, down to 320 px.
 //
 // A select is chosen with Playwright's selectOption, not its keys, for the
 // reason filtering.mjs gives: how a closed select answers an arrow differs
@@ -106,12 +106,14 @@ async function pressShowView(page) {
 export function viewJourney(plane, { check }) {
   return [
     ['Views offered (Records)', async (page) => {
-      // From Search, as the filter's states left it: the next Tab is View, then Show view, then Filter.
+      // From Search, as the filter's states left it: the next Tab is View, then Show view, then Columns, then Filter.
       await records(page).getByRole('button', { name: 'Search', exact: true }).focus()
       await page.keyboard.press('Tab')
       check('Tab from Search reaches View', await focusedOn(page, picker(page)))
       await page.keyboard.press('Tab')
       check('the next Tab Show view', await focusedOn(page, showView(page)))
+      await page.keyboard.press('Tab')
+      check('the next Tab Columns', await focusedOn(page, records(page).getByRole('button', { name: 'Columns', exact: true })))
       await page.keyboard.press('Tab')
       check('and the next Tab Filter', await focusedOn(page, records(page).getByRole('button', { name: 'Filter', exact: true })))
       check('views offered: every view, and the grid on every record', same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name], shown: 'All records' }))

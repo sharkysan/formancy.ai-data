@@ -219,8 +219,11 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    names) and the section's sort; a new filter or sort starts the grid again
    from its first row. A View picker (`apps/host/src/view-picker.tsx`) offers
    `list.views`, and its Show view sets both at once, as one first page; a
-   choice in its select alone sends nothing. The grid opens on the view
-   marked `default`, when it is offered (0105).
+   choice in its select alone sends nothing. The grid opens on what the
+   viewer's browser kept for the form -- a view by name, or a sort -- else
+   on the view marked `default`, when it is offered (0105), with the
+   columns that browser kept shown and in its order
+   ([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
 3. `routes/runtime-lists.ts` checks the body and asks `planList`
    (`packages/data-core/src/records/list.ts`) before any statement:
    `listable` puts the read policy first -- its filter, every through
@@ -248,7 +251,8 @@ Held by each adapter's `list.integration.test.ts`, its shared cases in
 `packages/data-core/src/records`, and `views.test.ts` in
 `packages/data-core/src/presentation`; `lists.integration.test.ts` in
 `packages/data-client/src`; and `apps/host/src/grid-datasource.test.ts`,
-`filter.test.tsx`, `views.test.ts` and `view-picker.test.tsx`.
+`filter.test.tsx`, `views.test.ts`, `view-picker.test.tsx`,
+`columns.test.ts`, `columns-panel.test.tsx` and `remembered.test.tsx`.
 What it costs: a page reads every row before it, by how the engines run an
 offset, not measured here; the rest is 0044's and 0061's, in
 [section 11.2](11-risks-and-debt.md#112-known-limitations-by-area).

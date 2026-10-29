@@ -414,6 +414,11 @@ its filter, which its headers show and a press on one tells back;
 `src/view-picker.tsx` is a grid's View picker and `src/views.ts` which view
 a filter and a sort are, if any, and which one a grid opens on
 ([0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md));
+`src/columns-panel.tsx` is a grid's Columns panel, `src/columns.ts` a
+grid's columns as arranged and what a browser keeps of a grid, and
+`src/use-grid-state.ts` where a section holds its filter, sort and columns
+and keeps them through `src/prefs.ts`
+([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md));
 `src/filter-panel.tsx` is a grid's Filter
 panel and `src/filter-terms.ts` what it offers, sends and says
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md));

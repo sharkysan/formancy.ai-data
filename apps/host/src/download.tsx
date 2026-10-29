@@ -18,7 +18,10 @@ const KIND = { idle: 'answer', making: 'loading', made: 'answer', refused: 'refu
  * `query` is asked when the button is pressed: the search as submitted, the
  * section's filter and sort -- what its grid lists by and its headers show
  * (0104, 0105) -- and a child's parent, so the file is of the records the
- * grid shows. Not a link: the token is in the Authorization header and
+ * grid shows. Its columns are the server's: every field the person may
+ * read, in the form's order (0079, 0080), whatever the grid's Columns hides
+ * or moves (0106), which is how the grid is drawn and nothing the request
+ * carries. Not a link: the token is in the Authorization header and
  * nowhere else (0029), so the page fetches the file and hands the browser
  * its bytes (save-file.ts).
  *

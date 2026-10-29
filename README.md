@@ -629,7 +629,8 @@ fields filter it. Each condition is listed with its own Remove, and Clear
 filter removes them all. A value the server cannot hold is its sentence on
 the grid's line, with what you typed still in its box. A child section's
 filter is its own, and opening another parent starts without one; the
-filter is in no address, so a reload or another form starts without one too
+filter is in no address, so a reload or another form starts without the
+conditions you typed
 ([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 
 Where the form's administrator named list views, View, after the search
@@ -641,9 +642,19 @@ order. Any condition you add or header you press makes it
 Your own filter and sort, and the view's own conditions and order show the
 view again. A grid opens on the view marked to open it, and on every record
 where that view names a field you may not read, which is then not offered
-to you at all. No view is kept in the address, so a reload starts on that
-view again
+to you at all. No view is kept in the address
 ([0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
+
+Columns, beside View and Filter, lists the grid's columns: Show one or not,
+move it up or down, all by keyboard, or Reset columns for the form's
+order; the last one shown stays, since a row opens through its cells. Your
+browser keeps, for each form, the columns you arranged, the view you
+showed by its name or else your sort -- All records included, over the
+form's default -- and opens the grid on them next time. It keeps no value
+you typed into a condition of your own, so your sort comes back without
+them; it is this browser's, not yours on another device, and anyone else
+signed in on it shares it. A hidden column is still in Download CSV
+([0106](./docs/decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
 
 Download CSV, beside New record in the Records panel and beside each child
 section's New, saves one file of the records that grid lists, as the server

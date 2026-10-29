@@ -1,12 +1,13 @@
 import { describe, expect, test } from 'vitest'
-import { PREFERENCES, readRenderer, readSplit, SPLIT, splitLimits, stepSplit, writeRenderer, writeSplit } from './prefs.js'
+import { gridKey, PREFERENCES, readPreference, readRenderer, readSplit, removePreference, SPLIT, splitLimits, stepSplit, writePreference, writeRenderer, writeSplit } from './prefs.js'
 
 /*
  * What one viewer's browser keeps of the workspace (0047): which renderer
  * the record is drawn with, and where the split between the records and the
- * record sits -- the person's two decisions of 2026-10-10. Nothing else is
- * kept, and the page works when the browser keeps nothing: storage can be
- * refused, full or throw.
+ * record sits -- the person's two decisions of 2026-10-10 -- and under one
+ * key per form and kind of section, a grid's columns and list (0106,
+ * columns.test.ts). Nothing else is kept, and the page works when the
+ * browser keeps nothing: storage can be refused, full or throw.
  */
 
 /** A Storage that holds what it is given, for one test. */
@@ -92,6 +93,40 @@ describe('the split', () => {
   })
 })
 
+describe("a grid's key", () => {
+  // One value per form in its Records panel, and per form and parent field
+  // in a child section, under the prefix a test can name: the Records
+  // panel's grid and a child section's are two grids -- the child's leaves
+  // out its parent's field -- and an employee's orders created and
+  // approved, both on screen, are two child sections, each keeping its own
+  // (watched failing with one key per form and kind: the second section's
+  // change wrote over the first's view). The kind goes first, so no form id
+  // spells another form's key.
+  test('is one per form and section, a child section by its field, under the grid prefix', () => {
+    const keys = [
+      gridKey({ kind: 'records' }, 'pg-order'),
+      gridKey({ kind: 'child', field: 'created_by' }, 'pg-order'),
+      gridKey({ kind: 'child', field: 'approved_by' }, 'pg-order'),
+      gridKey({ kind: 'records' }, 'pg-delivery'),
+    ]
+    expect(new Set(keys).size).toBe(4)
+    for (const key of keys) expect(key.startsWith(PREFERENCES.grid)).toBe(true)
+    expect(keys.slice(0, 2)).toEqual(['formancy-data-host.grid.records.pg-order', 'formancy-data-host.grid.child.pg-order/created_by'])
+  })
+
+  // Reset columns with no list kept leaves nothing to keep, and the key
+  // goes rather than a value saying nothing (watched failing with a remove
+  // that did nothing: the value read back).
+  test('is removed when nothing is left to keep', () => {
+    const storage = memory()
+    const key = gridKey({ kind: 'child', field: 'order' }, 'pg-delivery')
+    writePreference(storage, key, '{"version":1,"sort":[]}')
+    removePreference(storage, key)
+    expect(readPreference(storage, key)).toBeNull()
+    expect(storage.length).toBe(0)
+  })
+})
+
 // A browser with site data blocked throws on every call to storage. The page
 // must still draw, with the defaults, and saving a choice must not break it.
 test('works when storage throws', () => {
@@ -100,4 +135,7 @@ test('works when storage throws', () => {
   expect(() => writeRenderer(refusing, 'both')).not.toThrow()
   expect(() => writeSplit(refusing, 60)).not.toThrow()
   expect(readRenderer(undefined)).toBe('react')
+  expect(readPreference(refusing, gridKey({ kind: 'records' }, 'pg-order'))).toBeNull()
+  expect(() => writePreference(refusing, gridKey({ kind: 'records' }, 'pg-order'), '{}')).not.toThrow()
+  expect(() => removePreference(refusing, gridKey({ kind: 'records' }, 'pg-order'))).not.toThrow()
 })

@@ -1321,7 +1321,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:db69c856f20063ec131497d3e8102ded2544964992446560fe63caf5a446a08e",
+      "reviewed": "sha256:e1c6971c62c70edc348986a60c95efe366fda6c16511249c32ff22aec2da4912",
       "limitations": [
         {
           "area": "host",
@@ -3085,7 +3085,7 @@
       ]
     },
     "0104": {
-      "reviewed": "sha256:a59d4a1f553214e236fb1a490aa8511774dd937973a1068a88a922868ce417e9",
+      "reviewed": "sha256:53b43dcd9669786dbfc0c0a48dafe68cda41cabf88a8c66488164e173e79bd4b",
       "limitations": [
         {
           "area": "forms",
@@ -3130,7 +3130,7 @@
         },
         {
           "area": "host",
-          "says": "A filter is kept in no address and saved nowhere: a reload, another form, another parent for a child section and the studio's Show rows each start without one."
+          "says": "A person's own filter conditions are kept in no address and saved nowhere: a reload, another form, another parent for a child section and the studio's Show rows each start without them, though the host brings back a view the browser kept (0106)."
         },
         {
           "area": "server",
@@ -3140,7 +3140,7 @@
       ]
     },
     "0105": {
-      "reviewed": "sha256:05b978d0a0804f15ec193721e1bdc063b57091838807a4f94ef6ba22177d3545",
+      "reviewed": "sha256:bf19869aa07758eeb88094dc27d77699121703cacdc9595f917d8fe4ac763a79",
       "limitations": [
         {
           "area": "forms",
@@ -3153,7 +3153,7 @@
         },
         {
           "area": "host",
-          "says": "Views are the same for everyone who may read their fields: none can be kept to a role, a person cannot save a view of their own, and nothing remembers a picked view across a reload, which opens on the default view again."
+          "says": "Views are the same for everyone who may read their fields: none can be kept to a role, a person cannot save a view of their own, and only the viewer's browser remembers a picked one across a reload (0106)."
         },
         {
           "area": "access",
@@ -3183,6 +3183,38 @@
           "area": "server",
           "says": "@formancy/data-client refuses a form whose list says nothing of views as unexpected, so a host upgrades its server before its client.",
           "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0106": {
+      "reviewed": "sha256:9463f163468eb403809aed9ec8350a883c37c44ebdeb6ed36e54b9b14ef24631",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A grid's columns, sort and view are kept by the viewer's browser, not by the person: they follow nobody to another device, and everybody signed in on one browser profile shares them.",
+          "heldBy": "apps/host/src/remembered.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A person's own filter conditions are never kept, so a reload brings back their sort without them; a view is kept by its name, so a renamed one gives way to the default view.",
+          "heldBy": "apps/host/src/columns.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "Every child section of one form under one field shares one arrangement of columns, under every parent and at every level of Drill down."
+        },
+        {
+          "area": "host",
+          "says": "A column's width is still its content's, and nothing is moved or resized by hand; search and page are not kept."
+        },
+        {
+          "area": "host",
+          "says": "A hidden column is still read, its lookups resolved, and Download CSV holds every readable field whatever the grid hides."
+        },
+        {
+          "area": "host",
+          "says": "A kept sort term no longer sortable is dropped and the rest kept, a kept view no longer offered gives the default view, both without a word, and a browser that keeps nothing says nothing of it.",
+          "heldBy": "apps/host/src/columns.test.ts"
         }
       ]
     }

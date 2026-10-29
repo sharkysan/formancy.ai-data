@@ -1,10 +1,12 @@
 /*
  * What one viewer's browser keeps of the workspace, and nothing else: which
  * renderer draws the record, and where the split between the records and
- * the record sits (0047, the person's decisions of 2026-10-10). Kept in
- * `localStorage` for that viewer alone; every call is wrapped, because a
- * browser with site data blocked throws on each one, and the page then works
- * with the defaults. The token is never kept (0029).
+ * the record sits (0047, the person's decisions of 2026-10-10), and for
+ * each form a grid's columns and the list it shows, one value per kind of
+ * section (0106, columns.ts). Kept in `localStorage` for that viewer alone;
+ * every call is wrapped, because a browser with site data blocked throws on
+ * each one, and the page then works with the defaults. The token is never
+ * kept (0029), and no condition of a filter is (0104).
  */
 
 /** The renderers a person may have the record drawn with: one of the two, or both side by side. */
@@ -12,8 +14,27 @@ export type RendererChoice = 'react' | 'angular' | 'both'
 
 export const RENDERER_CHOICES: readonly RendererChoice[] = ['react', 'angular', 'both']
 
-/** The keys, said once, so a test can name every key the page may write. */
-export const PREFERENCES = { renderer: 'formancy-data-host.renderer', split: 'formancy-data-host.split' } as const
+/**
+ * The keys, said once, so a test can name every key the page may write:
+ * `grid` is the prefix of a grid's, one per form in its Records panel and
+ * one per form and parent field in a child section (`gridKey`).
+ */
+export const PREFERENCES = { renderer: 'formancy-data-host.renderer', split: 'formancy-data-host.split', grid: 'formancy-data-host.grid.' } as const
+
+/** Which grid of a form a kept value is for: its Records panel's, or a child section's, narrowed by one of its lookup fields. */
+export type GridSection = { kind: 'records' } | { kind: 'child'; field: string }
+
+/**
+ * The key of a form's grid in one kind of section: the kind first, so no
+ * form id can spell another's; a child section's by the field its rows are
+ * narrowed by too, so an employee's orders created and approved, both on
+ * screen, keep two arrangements and neither writes over the other. A form
+ * id is `[a-z0-9][a-z0-9._-]*` and a field key letters, digits and
+ * underscores, so the slash between them is no one's.
+ */
+export function gridKey(section: GridSection, formId: string): string {
+  return section.kind === 'records' ? `${PREFERENCES.grid}records.${formId}` : `${PREFERENCES.grid}child.${formId}/${section.field}`
+}
 
 /**
  * The split, as the records' share of the width in percent. 55 is the
@@ -36,7 +57,8 @@ export function browserStorage(): Storage | undefined {
   }
 }
 
-function read(storage: Storage | undefined, key: string): string | null {
+/** What `storage` holds under `key`, or null where it holds nothing or throws. */
+export function readPreference(storage: Storage | undefined, key: string): string | null {
   try {
     return storage?.getItem(key) ?? null
   } catch {
@@ -44,7 +66,8 @@ function read(storage: Storage | undefined, key: string): string | null {
   }
 }
 
-function write(storage: Storage | undefined, key: string, value: string): void {
+/** `value` kept under `key`, where `storage` keeps anything. */
+export function writePreference(storage: Storage | undefined, key: string, value: string): void {
   try {
     storage?.setItem(key, value)
   } catch {
@@ -52,22 +75,31 @@ function write(storage: Storage | undefined, key: string, value: string): void {
   }
 }
 
+/** Nothing kept under `key` any more, where `storage` can be asked. */
+export function removePreference(storage: Storage | undefined, key: string): void {
+  try {
+    storage?.removeItem(key)
+  } catch {
+    // Not removed: what was kept comes back on the next opening, as it would have.
+  }
+}
+
 export function readRenderer(storage: Storage | undefined): RendererChoice {
-  const kept = read(storage, PREFERENCES.renderer)
+  const kept = readPreference(storage, PREFERENCES.renderer)
   return RENDERER_CHOICES.find((choice) => choice === kept) ?? 'react'
 }
 
 export function writeRenderer(storage: Storage | undefined, choice: RendererChoice): void {
-  write(storage, PREFERENCES.renderer, choice)
+  writePreference(storage, PREFERENCES.renderer, choice)
 }
 
 export function readSplit(storage: Storage | undefined): number {
-  const kept = Number(read(storage, PREFERENCES.split))
+  const kept = Number(readPreference(storage, PREFERENCES.split))
   return Number.isInteger(kept) && kept >= SPLIT.outer.min && kept <= SPLIT.outer.max ? kept : SPLIT.initial
 }
 
 export function writeSplit(storage: Storage | undefined, share: number): void {
-  write(storage, PREFERENCES.split, String(share))
+  writePreference(storage, PREFERENCES.split, String(share))
 }
 
 /**

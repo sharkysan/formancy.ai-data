@@ -4,6 +4,8 @@ import { AgGridReact } from 'ag-grid-react'
 import type { GridApi, IRowNode } from 'ag-grid-community'
 import type { DataClient, ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
+import { arrange } from './columns.js'
+import type { ColumnChoice } from './columns.js'
 import { answered, CANNOT_OPEN, createDatasource, loading, REFUSED_FILTER_HELP } from './grid-datasource.js'
 import type { DatasourceHooks, GridColumn, GridRow } from './grid-datasource.js'
 import { columnDefsOf, gridOptionsFor } from './grid-options.js'
@@ -47,6 +49,13 @@ export { DELETE_COLUMN } from './grid-options.js'
  * holds that sort. Its datasource asks for a block only once the headers
  * show the section's sort (grid-datasource.ts), so a new filter and a new
  * sort together are one first page.
+ *
+ * The columns are the section's too (0106): in its order, and those it hid
+ * kept in the grid, hidden, with their sort. A change of them is drawn by
+ * the grid and asks nothing: the datasource and the options never depend
+ * on them, and the open row's bar and the keyboard's way into the grid
+ * follow the first column shown. A column shown again is sized to the
+ * rows on the page, as the first page sized the rest.
  */
 
 /** Where a row was asked for from, so the keyboard can be given back there. */
@@ -73,6 +82,8 @@ export interface RecordGridProps {
   formId: string
   definition: PublishedForm
   columns: readonly GridColumn[]
+  /** The section's arrangement of `columns`: their order, and which are shown (0106). */
+  choices: readonly ColumnChoice[]
   /** The heading that names the grid. */
   labelledBy: string
   /** A child grid's title: its sentences name its rows. The master has none. */
@@ -154,7 +165,7 @@ function wellHeight(header: number, rows: number, cap: number): number {
 }
 
 export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function RecordGrid(props, handle): ReactElement {
-  const { client, formId, columns, labelledBy, parent, search, filter, sort, openToken, quiet = false, toolbarStart, refit = 0, bench, after, onClearSearch } = props
+  const { client, formId, columns, choices, labelledBy, parent, search, filter, sort, openToken, quiet = false, toolbarStart, refit = 0, bench, after, onClearSearch } = props
   const api = useRef<GridApi<GridRow> | null>(null)
   const well = useRef<HTMLDivElement>(null)
   const retryButton = useRef<HTMLButtonElement>(null)
@@ -164,6 +175,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   const [status, setStatus] = useState<Status>({ kind: 'loading', text: [quiet ? '' : loading(0, LIST_PAGE_SIZE, props.noun)], help: null, clear: false, retry: false })
   const [pager, setPager] = useState({ page: 0, hasMore: false })
   const shown = useRef({ rows: 0, loaded: false, sized: false, quiet, retrying: false })
+  /** Columns shown while nothing was listed, waiting for a page with rows to be sized to (below). */
+  const unsized = useRef(new Set<string>())
   /** What a record gone from the grid says before the next page's sentence, once. */
   const removedLine = useRef<Said | null>(null)
   /** The sentence of a page, after the removal said first if there is one -- which it then is not again. */
@@ -172,15 +185,19 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     removedLine.current = null
     return before === null ? said : [...before, ' ', ...said]
   }
-  const firstColumn = columns[0]?.key ?? ''
+  const arranged = useMemo(() => arrange(columns, choices), [columns, choices])
+  /** The first column shown: where the open row's bar is, and the keyboard goes into a row. Read when needed, so a column moved or hidden asks nothing again. */
+  const firstShown = useRef('')
+  firstShown.current = arranged.find((column) => column.shown)?.key ?? ''
 
   const applySelection = useCallback(() => {
     const grid = api.current
     if (grid === null || grid.isDestroyed()) return
     const changed = select(grid, latest.current.openToken)
-    // The bar is drawn by the first column's cell, from the row's selection.
-    if (changed.length > 0 && firstColumn !== '') grid.refreshCells({ rowNodes: changed, columns: [firstColumn], force: true })
-  }, [firstColumn])
+    // The bar is drawn by the first shown column's cell, from the row's selection.
+    const first = firstShown.current
+    if (changed.length > 0 && first !== '') grid.refreshCells({ rowNodes: changed, columns: [first], force: true })
+  }, [])
 
   /** The well as tall as its page, never past its cap. A DOM read: the header's height is laid out by AG Grid. */
   const fit = useCallback(() => {
@@ -220,10 +237,11 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
 
   /**
    * The section's sort on the headers, where they show another: they follow
-   * it, and lead it only by a press. Every field a view sorts by is a
-   * column here: a view is offered only when each is in `list.sortable`,
-   * whose fields `columnsOf` draws, leaving out only a child's parent field,
-   * a lookup, which no list sorts by.
+   * it, and lead it only by a press. Every field a view or a kept sort
+   * sorts by is a column here, shown or hidden (0106): a view is offered,
+   * and a kept sort restored, only with fields in `list.sortable`, whose
+   * fields `columnsOf` draws, leaving out only a child's parent field, a
+   * lookup, which no list sorts by.
    */
   const showSort = useCallback(() => {
     const grid = api.current
@@ -269,8 +287,19 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         applySelection()
         fit()
         sizeOnce()
+        // Columns shown while nothing was listed: sized to these rows, once they are drawn.
+        if (rows.length > 0 && unsized.current.size > 0) {
+          const waiting = [...unsized.current]
+          unsized.current.clear()
+          setTimeout(() => {
+            const grid = api.current
+            if (grid === null || grid.isDestroyed()) return
+            grid.autoSizeColumns(waiting, true)
+            fit()
+          }, 0)
+        }
         // Ask again stays where it was pressed until the answer; then the rows that came.
-        if (fromRetry && rows.length > 0 && firstColumn !== '') api.current?.setFocusedCell(start, firstColumn)
+        if (fromRetry && rows.length > 0 && firstShown.current !== '') api.current?.setFocusedCell(start, firstShown.current)
       },
       refused: (message, code) => {
         shown.current = { ...shown.current, rows: 0, loaded: true, retrying: false }
@@ -282,7 +311,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         fit()
       },
     }),
-    [applySelection, fit, sizeOnce, firstColumn],
+    [applySelection, fit, sizeOnce],
   )
 
   // A new search, another parent, another filter or another sort is a new
@@ -302,7 +331,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   useImperativeHandle(
     handle,
     () => ({
-      focusRecord(token, colId = firstColumn) {
+      focusRecord(token, colId = firstShown.current) {
         const grid = api.current
         const node = grid?.getRowNode(token)
         if (grid === null || grid === undefined || grid.isDestroyed() || node === undefined || node.rowIndex === null) return false
@@ -327,20 +356,46 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         api.current?.purgeInfiniteCache()
       },
     }),
-    [firstColumn],
+    [],
   )
 
   // A row's Delete reads the page's handler when pressed: the column is made once per noun.
   const removeNoun = props.remove?.noun
   const columnDefs = useMemo(
-    () => columnDefsOf(columns, removeNoun === undefined ? undefined : { noun: removeNoun, press: (row) => latest.current.remove?.press(row) }),
-    [columns, removeNoun],
+    () => columnDefsOf(arranged, removeNoun === undefined ? undefined : { noun: removeNoun, press: (row) => latest.current.remove?.press(row) }),
+    [arranged, removeNoun],
   )
+
+  // A column shown that was hidden when the page was sized: sized now, to
+  // the rows shown, and the well fitted to a header the change may have
+  // made taller or shorter. Shown while a page loads, or over a page with no
+  // rows, it waits in `unsized` for the next page that has some, which
+  // `answered` sizes it to: with nothing to size it to, it would keep AG
+  // Grid's width until the separator is let go, and Stacked has none.
+  const drawn = useRef(arranged)
+  useEffect(() => {
+    if (drawn.current === arranged) return
+    const before = new Set(drawn.current.filter((column) => column.shown).map((column) => column.key))
+    drawn.current = arranged
+    const added = arranged.filter((column) => column.shown && !before.has(column.key)).map((column) => column.key)
+    const grid = api.current
+    if (grid === null || grid.isDestroyed()) return
+    if (!shown.current.loaded || shown.current.rows === 0) {
+      for (const key of added) unsized.current.add(key)
+      if (shown.current.loaded) setTimeout(() => (grid.isDestroyed() ? undefined : fit()), 0)
+      return
+    }
+    setTimeout(() => {
+      if (grid.isDestroyed()) return
+      if (added.length > 0) grid.autoSizeColumns(added, true)
+      fit()
+    }, 0)
+  }, [arranged, fit])
   const options = useMemo(
     () =>
       gridOptionsFor({
         labelledBy,
-        firstColumn,
+        firstColumn: () => firstShown.current,
         on: {
           openToken: () => latest.current.openToken,
           ready: (ready) => {
@@ -367,8 +422,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           drilling: () => latest.current.drilling === true,
         },
       }),
-    // The options are the grid's for its life; what changes is read through `latest`.
-    [labelledBy, firstColumn, fit, showSort],
+    // The options are the grid's for its life; what changes is read through `latest` and `firstShown`.
+    [labelledBy, fit, showSort],
   )
 
   return (

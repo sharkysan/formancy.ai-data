@@ -36,5 +36,6 @@
 @import './styles/workspace.css';
 @import './styles/records.css';
 @import './styles/filter.css';
+@import './styles/columns.css';
 @import './styles/drill.css';
 @import './styles/narrow.css';

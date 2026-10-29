@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactElement, ReactNode, RefObject } from 'react'
-import type { DataClient, ListFilterTerm, ListSortTerm, PublishedForm } from '@formancy/data-client'
+import type { DataClient, PublishedForm } from '@formancy/data-client'
+import { ColumnsPanel } from './columns-panel.js'
 import { DownloadCsv } from './download.js'
 import { FilterPanel } from './filter-panel.js'
 import { panelFields } from './filter-terms.js'
@@ -8,8 +9,9 @@ import { listed } from './grid-datasource.js'
 import type { GridColumn } from './grid-datasource.js'
 import { RecordGrid } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt, RowDelete } from './record-grid.js'
+import type { GridSection } from './prefs.js'
+import { useGridState } from './use-grid-state.js'
 import { ViewPicker } from './view-picker.js'
-import { openingView } from './views.js'
 
 /**
  * The Records panel (UX-SPEC §5.8): its heading, New record when the person
@@ -21,10 +23,17 @@ import { openingView } from './views.js'
  * searchable, and no filter panel when nothing is filterable (0104). The
  * View picker before the filter, where the server offers views (0105): the
  * filter and the sort start as the default view's, or empty, and a view
- * picked sets both. A file is of what the grid lists: the search submitted,
- * never what the box holds, the filter applied, and the sort. Neither is
+ * picked sets both. Columns between them (0106), where the person orders
+ * and hides the grid's columns. The columns, and the list as a view or a
+ * sort, are kept in this browser for the form and start the panel the next
+ * time it is opened (use-grid-state.ts). A file is of what the grid lists:
+ * the search submitted, never what the box holds, the filter applied, and
+ * the sort, with every column whatever the grid hides. None of it is
  * written into the address, as no filter is (0104).
  */
+/** The Records panel's grid, kept apart from every child section's (0106). */
+const RECORDS: GridSection = { kind: 'records' }
+
 export function Records({
   client,
   formId,
@@ -72,9 +81,9 @@ export function Records({
 }): ReactElement {
   const [typed, setTyped] = useState(search)
   const views = definition.list?.views ?? []
-  /** The filter as applied and the sort: the grid's and the file's, for this form, which mounts the panel again (form-view.tsx); from the view it opens on. */
-  const [filter, setFilter] = useState<ListFilterTerm[]>(() => openingView(views)?.filter ?? [])
-  const [sort, setSort] = useState<ListSortTerm[]>(() => openingView(views)?.sort ?? [])
+  /** The filter as applied, the sort and the columns: the grid's, and the file's but for the columns, for this form, which mounts the panel again (form-view.tsx). */
+  const state = useGridState({ formId, section: RECORDS, columns, list: definition.list })
+  const { filter, sort } = state
   const labels = new Map(columns.map((column) => [column.key, column.label]))
   const searchable = (definition.list?.searchable ?? []).map((key) => labels.get(key) ?? key)
   const filterable = useMemo(() => panelFields(definition), [definition])
@@ -122,6 +131,7 @@ export function Records({
         formId={formId}
         definition={definition}
         columns={columns}
+        choices={state.choices}
         labelledBy="records-heading"
         parent={null}
         search={search}
@@ -132,17 +142,9 @@ export function Records({
         toolbarStart={
           <>
             {searchBlock}
-            <ViewPicker
-              idBase="records"
-              views={views}
-              filter={filter}
-              sort={sort}
-              onPick={(picked, sorted) => {
-                setFilter(picked)
-                setSort(sorted)
-              }}
-            />
-            {filterable.length === 0 ? null : <FilterPanel idBase="records-filter" fields={filterable} filter={filter} onFilter={setFilter} />}
+            <ViewPicker idBase="records" views={views} filter={filter} sort={sort} onPick={state.pick} />
+            <ColumnsPanel idBase="records-columns" columns={columns} choices={state.choices} onChoices={state.setChoices} onReset={state.resetChoices} />
+            {filterable.length === 0 ? null : <FilterPanel idBase="records-filter" fields={filterable} filter={filter} onFilter={state.setFilter} />}
           </>
         }
         refit={refit}
@@ -151,7 +153,7 @@ export function Records({
         after={after}
         drilling={drilling}
         onOpen={onOpen}
-        onSort={setSort}
+        onSort={state.setSort}
         onClearSearch={() => {
           setTyped('')
           onSearch('')

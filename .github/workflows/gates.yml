@@ -127,8 +127,12 @@ jobs:
     name: test (${{ matrix.package }})
     runs-on: ubuntu-latest
     # The suites start a real SQL Server, and its image is close to a gigabyte
-    # and a half; the pull is not cached between runs.
-    timeout-minutes: 25
+    # and a half; the pull is not cached between runs. The host's suite is
+    # the longest: 1292 s under coverage in run 40776296021 on 2026-10-28,
+    # its job 22 minutes, and in the next, run 40937568548, still running
+    # when 25 minutes cancelled it. 40 leaves it room to grow and is still a
+    # limit a hung suite reaches.
+    timeout-minutes: 40
     strategy:
       # Every suite reports, rather than the first failure cancelling the rest.
       fail-fast: false

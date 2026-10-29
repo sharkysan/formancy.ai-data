@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import type { DataClient, FormMenuChild, FormMenuEntry, ListFilterTerm, ListSortTerm, PublishedForm } from '@formancy/data-client'
+import type { DataClient, FormMenuChild, FormMenuEntry, PublishedForm } from '@formancy/data-client'
+import { ColumnsPanel } from './columns-panel.js'
 import { FilterPanel } from './filter-panel.js'
 import { panelFields } from './filter-terms.js'
 import { columnsOf } from './grid-datasource.js'
@@ -24,8 +25,8 @@ import type { DeleteTarget } from './deletion.js'
 import type { GridRow } from './grid-datasource.js'
 import { Words } from './words.js'
 import type { HeldLevels, SectionDrill } from './use-drill.js'
+import { useGridState } from './use-grid-state.js'
 import { ViewPicker } from './view-picker.js'
-import { openingView } from './views.js'
 
 /** What the record above a child section is: a saved record, or a new one not saved yet. */
 export type ParentOpen = { kind: 'new' } | { kind: 'record'; token: string }
@@ -68,7 +69,10 @@ type ChildOpen = null | { kind: 'new' } | { kind: 'record'; token: string }
  * section's, so another parent's section starts with none -- or, where the
  * server offers the child form's views, with its default view's filter and
  * sort, which its View picker before the filter panel sets as the Records
- * panel's does (0105).
+ * panel's does (0105). Its Columns orders and hides its grid's columns,
+ * never offering the parent's (0106). Its columns and its list are kept in
+ * this browser for the child form, one value every section of it shares,
+ * and start each section of it opened after (use-grid-state.ts).
  * The section is drawn only for a child whose `list` this person is offered
  * -- the workspace leaves any other out when the form is chosen -- so the
  * button asks nothing more of the definition.
@@ -159,8 +163,8 @@ export function ChildSection({
   const columns = useMemo(() => columnsOf(definition, child.field), [definition, child.field])
   const filterable = useMemo(() => panelFields(definition), [definition])
   const views = definition.list?.views ?? []
-  const [filter, setFilter] = useState<ListFilterTerm[]>(() => openingView(views)?.filter ?? [])
-  const [sort, setSort] = useState<ListSortTerm[]>(() => openingView(views)?.sort ?? [])
+  const state = useGridState({ formId: child.form, section: { kind: 'child', field: child.field }, columns, list: definition.list })
+  const { filter, sort } = state
   const canDelete = menu.operations.includes('delete') && definition.operations.includes('delete') && definition.deleting !== null
   const removal = useDeleteFlow({
     client,
@@ -331,6 +335,7 @@ export function ChildSection({
             formId={child.form}
             definition={definition}
             columns={columns}
+            choices={state.choices}
             labelledBy={headingId}
             noun={title}
             parent={{ field: child.field, record: parent.token }}
@@ -342,17 +347,9 @@ export function ChildSection({
             quiet
             toolbarStart={
               <>
-                <ViewPicker
-                  idBase={headingId}
-                  views={views}
-                  filter={filter}
-                  sort={sort}
-                  onPick={(picked, sorted) => {
-                    setFilter(picked)
-                    setSort(sorted)
-                  }}
-                />
-                {filterable.length === 0 ? null : <FilterPanel idBase={`${headingId}-filter`} fields={filterable} filter={filter} onFilter={setFilter} />}
+                <ViewPicker idBase={headingId} views={views} filter={filter} sort={sort} onPick={state.pick} />
+                <ColumnsPanel idBase={`${headingId}-columns`} columns={columns} choices={state.choices} onChoices={state.setChoices} onReset={state.resetChoices} />
+                {filterable.length === 0 ? null : <FilterPanel idBase={`${headingId}-filter`} fields={filterable} filter={filter} onFilter={state.setFilter} />}
               </>
             }
             refit={refit}
@@ -361,7 +358,7 @@ export function ChildSection({
             after={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={5} idBase={`${headingId}-row-delete`} /> : null}
             drilling={drill !== undefined}
             onOpen={askRow}
-            onSort={setSort}
+            onSort={state.setSort}
           />
         </>
       )}
