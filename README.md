@@ -302,6 +302,14 @@ until then the address is formancy.ai's 404
   ([0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
   The host page saves it from the grid that lists the records, with
   Download CSV ([0080](./docs/decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)).
+- **A record can be duplicated into a new one** of the answers the server
+  names for its person: what they may read and give on create, and never a
+  column of a key, primary or unique, a value the database fills, a pinned
+  tenant or a field they may not write. Nothing is written until they save,
+  and the save is a create, checked as every create is. The host page
+  copies the open record from its header, as stored, and says which values
+  stayed behind
+  ([0107](./docs/decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
 - **A record can be deleted, one at a time, by its token and the version its
   person read**, under the policy's `operations.delete`, granted only to
   roles that may read and scoped as an update is, in one guarded statement
@@ -689,6 +697,16 @@ done, is checked by reading the record, and is repeated only after asking
 again
 ([0053](./docs/decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
 
+Where the server offers you create, the open record's header also has
+Duplicate record. It reads the record again and opens a new record in every
+form holding its answers, but for its key and whatever the database fills
+or you may not give, with the keyboard on the new record's heading, and the
+line names the values that were not copied. It asks first, as New record
+does, when a form holds unsaved work, and copies what is stored, not what
+you typed. Nothing is saved until you save; the copy's child sections list
+rows once it is, and a child row has no Duplicate of its own
+([0107](./docs/decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
+
 Each form keeps its own draft and version, so loading one record into both
 renderers, saving in one and then in the other is the stale case: the
 second keeps what was typed, says so, and offers to load the saved record. A
@@ -704,7 +722,7 @@ only change was such a field says it was not saved, because nothing changed
 
 Anything on the page that would drop a form holding unsaved changes, a save
 still out or a save that may have been stored -- another row, New record,
-Load, another form, Back, Sign out, a child row, hiding a renderer, or a
+Load, Duplicate record, another form, Back, Sign out, a child row, hiding a renderer, or a
 record created in one renderer, which the other then opens -- asks first,
 and names what was typed while it waited before discarding it; a record
 whose read answers after you have moved on is not opened over what you
@@ -718,7 +736,7 @@ the page to it, and on PostgreSQL alone
 ([0038](./docs/decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 
 What it does not do yet: no bulk delete and no undo, no file of a record
-and all its children at once; and on a loaded
+and all its children at once, no copy of a record with its children; and on a loaded
 record it draws the fields an update may not write --
 Customer, Order date, Amount and Created by for the order form's own
 account -- as editable, and the server refuses a changed one, which is

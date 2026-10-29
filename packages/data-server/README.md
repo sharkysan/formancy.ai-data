@@ -351,7 +351,11 @@ existed would be documented and inert.
   lists `delete` where the bindings offer it, the policy grants it and the
   database allows it, with `deleting: { cascades, clears, restricted }` --
   whether a key the policy accepts deletes or clears other rows, and
-  whether one may refuse the delete -- `null` otherwise. `routes/runtime-deletes.test.ts` holds the route over
+  whether one may refuse the delete -- `null` otherwise. Where it lists
+  `create`, it adds `copied`, the fields a copy of a record carries into a
+  new one for this person, from `copiedFields`, and `null` otherwise
+  ([0107](../../docs/decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
+  `routes/runtime-deletes.test.ts` holds the route over
   fake ports, and `e2e.integration.test.ts` and
   `e2e-lost-answer.integration.test.ts` on both engines.
 

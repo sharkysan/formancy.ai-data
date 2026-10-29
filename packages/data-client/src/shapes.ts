@@ -106,6 +106,18 @@ function isDeleting(value: unknown, operations: readonly unknown[]): value is Pu
   return isRecord(value) && typeof value['cascades'] === 'boolean' && typeof value['clears'] === 'boolean' && typeof value['restricted'] === 'boolean'
 }
 
+/**
+ * What a copy of a record carries (0107): `null` exactly when the form
+ * offers no create, otherwise field keys. A reply that offers create without
+ * them -- a server older than copies -- or names them without create is no
+ * form this server sent, and a page that copied by it would offer a copy
+ * nobody decided.
+ */
+function isCopied(value: unknown, operations: readonly unknown[]): value is PublishedForm['copied'] {
+  if (!operations.includes('create')) return value === null
+  return isStrings(value)
+}
+
 export function isPublishedForm(body: unknown): body is PublishedForm {
   return (
     isRecord(body) &&
@@ -114,7 +126,8 @@ export function isPublishedForm(body: unknown): body is PublishedForm {
     Array.isArray(body['operations']) &&
     Array.isArray(body['readable']) &&
     isListColumns(body['list']) &&
-    isDeleting(body['deleting'], body['operations'] as unknown[])
+    isDeleting(body['deleting'], body['operations'] as unknown[]) &&
+    isCopied(body['copied'], body['operations'] as unknown[])
   )
 }
 

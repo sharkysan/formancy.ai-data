@@ -1321,7 +1321,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:e1c6971c62c70edc348986a60c95efe366fda6c16511249c32ff22aec2da4912",
+      "reviewed": "sha256:abc8fdd78f53f293441395c39cd579ab6b6be5f649b3ff51c8145451b0c0bf38",
       "limitations": [
         {
           "area": "host",
@@ -3215,6 +3215,30 @@
           "area": "host",
           "says": "A kept sort term no longer sortable is dropped and the rest kept, a kept view no longer offered gives the default view, both without a word, and a browser that keeps nothing says nothing of it.",
           "heldBy": "apps/host/src/columns.test.ts"
+        }
+      ]
+    },
+    "0107": {
+      "reviewed": "sha256:45e34e1057fe04cd4df2622623ff626da93e1f6d7e6cf27ec270e617de8dbc27",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "Duplicate record copies a record alone, never its child rows, and a child row or a level of Drill down below the record offers none.",
+          "heldBy": "apps/host/src/duplicate.test.tsx"
+        },
+        {
+          "area": "writes",
+          "says": "A copy leaves out every column of a primary or unique key, a part a person would keep included -- an order line's order beside its number -- which is chosen again.",
+          "heldBy": "packages/data-core/src/records/copy.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A copy holds what a read returns: an instant to the second and a time to the minute are stored as shown, and a value no write accepts -- PostgreSQL's infinity, a 24:00 time -- has its create refused on that field until the person changes it."
+        },
+        {
+          "area": "server",
+          "says": "@formancy/data-client refuses a form that offers create without saying what a copy carries as unexpected, so a host upgrades its server before its client.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
         }
       ]
     }

@@ -227,6 +227,27 @@ describe.each([
     expect(stale.json()).toMatchObject({ code: 'stale' })
   })
 
+  // A copy (0107): the form names the fields a copy carries -- everything the
+  // clerk may give on create, and not the key the database numbers -- and a
+  // create of exactly those answers, as read, is accepted as a second order
+  // holding them. Watched failing with both of `copiedFields`' rules left
+  // out -- the key and the create check, either of which keeps an identity
+  // out -- on both engines: the key copied, the create is refused 403
+  // over-posting.
+  test("a copy of an order is a create the server accepts, of every field it names and not the key", async () => {
+    const definition = (await call('GET', `/v1/forms/${formId}`, clerk)).json()
+    const source = definition.form.model.fields.find((field: { key: string }) => field.key === 'customer').optionsSource as string
+    const customer = (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json().rows[0].token as string
+    const created = await call('POST', `/v1/forms/${formId}/records/create`, clerk, { answers: { customer, order_date: '2026-10-29', status: 'placed', amount: '7.25', notes: 'copied from' } })
+    const read = (await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record: created.json().record })).json()
+    const copy = Object.fromEntries((definition.copied as string[]).map((field) => [field, read.answers[field]]))
+    const second = await call('POST', `/v1/forms/${formId}/records/create`, clerk, { answers: copy })
+    expect(second.statusCode, second.body).toBe(201)
+    expect(second.json().record).not.toBe(read.record)
+    expect(second.json().answers).toMatchObject(copy)
+    expect(definition.copied).toEqual(['customer', 'order_date', 'status', 'amount', 'notes', 'group', 'created_by', 'approved_by'])
+  })
+
   // Another tenant's order does not exist for this clerk — not "forbidden",
   // which would say it does — and their lookup offers none of tenant 1's customers.
   test('another tenant can neither see the order nor pick its customer', async () => {

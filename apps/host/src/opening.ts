@@ -29,9 +29,9 @@ export interface Opened {
   discarded: boolean
 }
 
-/** What a detail does around a read: once it opened, once the server refused it, and where the keyboard goes when the person keeps editing. */
+/** What a detail does around a read: once it opened -- with the record as read -- once the server refused it, and where the keyboard goes when the person keeps editing. */
 export interface ReadHandlers {
-  opened(opened: Opened): void
+  opened(opened: Opened, record: FormRecord): void
   refused(message: string, discarded: boolean): void
   back(): void
 }
@@ -41,9 +41,10 @@ export interface Opening {
    * Read `token` for `request`, which the guard has already let through
    * (`discarded` says whether work was dropped for it), and open it in every
    * pane once it answers -- unless the detail was asked for something else
-   * meanwhile.
+   * meanwhile. `as` makes what the panes open of the record read: Duplicate
+   * record's copy of it (0107); the record itself otherwise.
    */
-  read(request: LeaveRequest, token: string, discarded: boolean, then: ReadHandlers): void
+  read(request: LeaveRequest, token: string, discarded: boolean, then: ReadHandlers, as?: (record: FormRecord) => FormRecord): void
   /** A request that replaces what the detail shows without a read -- New: an answer still out is dropped. */
   replaced(): void
   /** A save one of the panes answered: a record it created is the detail's, and `opened` says so once the other panes hold it. */
@@ -56,7 +57,7 @@ export function useOpening({ client, formId, owner, sessions }: { client: DataCl
   // answer for an earlier request is not the person's latest.
   const asked = useRef(0)
 
-  function read(request: LeaveRequest, token: string, discarded: boolean, then: ReadHandlers): void {
+  function read(request: LeaveRequest, token: string, discarded: boolean, then: ReadHandlers, as: (record: FormRecord) => FormRecord = (record) => record): void {
     asked.current += 1
     const mine = asked.current
     void client.read(formId, token).then((answer) => {
@@ -73,8 +74,8 @@ export function useOpening({ client, formId, owner, sessions }: { client: DataCl
       guard.askOnAnswer(
         request,
         (again) => {
-          for (const session of sessions) session.open(structuredClone(record))
-          then.opened({ token: record.record ?? token, discarded: discarded || again })
+          for (const session of sessions) session.open(structuredClone(as(record)))
+          then.opened({ token: record.record ?? token, discarded: discarded || again }, record)
         },
         then.back,
       )

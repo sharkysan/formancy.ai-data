@@ -237,6 +237,12 @@ browser shares them, every child section of one form under one field
 shares one arrangement, and a person's own filter conditions are never kept; a
 hidden column is still read, and its width is still its content's
 ([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
+Duplicate record copies a record alone, never its child rows, and is
+offered on the record and not on a child row or a level below it; every
+column of a key is left out of a copy, a part a person would keep
+included; and a copy holds what a read returns, an instant to the second
+and a time to the minute
+([0107](../decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
 
 **Writes.** On SQL Server, a table with an enabled INSTEAD OF trigger cannot
 be written that way through the adapter, `returning` is the row before an

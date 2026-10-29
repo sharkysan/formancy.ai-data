@@ -12,6 +12,7 @@ import { detailTarget, gone, rowTarget, SAVE_OUT } from './deletion.js'
 import type { DeleteTarget } from './deletion.js'
 import { Detail } from './detail.js'
 import type { MasterOpen } from './detail.js'
+import { copiedLine, copyOf, leftOut } from './duplicate.js'
 import { DrillLevel } from './drill-level.js'
 import { columnsOf } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
@@ -170,9 +171,12 @@ export function FormView({
   /** How many times the separator has been let go: each grid in the lanes fits its columns again. */
   const [released, setReleased] = useState(0)
   const deleteButton = useRef<HTMLButtonElement>(null)
+  const duplicateButton = useRef<HTMLButtonElement>(null)
 
   const title = entry.title
   const canCreate = definition.operations.includes('create')
+  /** What a copy carries (0107): `null` from the server where it offers no create, and then no Duplicate record. */
+  const copied = definition.copied ?? []
   const columns = useMemo(() => columnsOf(definition, null), [definition])
   const sessions = useMemo(() => (['react', 'angular'] as const).map((which) => createSession({ client, formId, definition, renderer: which })), [client, formId, definition])
   const entries = useMemo<PaneEntry[]>(
@@ -294,6 +298,42 @@ export function FormView({
         toDetail()
       },
       () => newRef.current?.focus(),
+    )
+  }
+
+  /**
+   * Duplicate record (0107): the open record read again, and every pane
+   * opened on a copy of it as a new record -- the answers the server names,
+   * no token, no version -- after asking, as New does, about work the
+   * detail holds. The line says what was copied and what was not.
+   */
+  function startDuplicate(): void {
+    const now = openRef.current
+    if (now?.kind !== 'record') return
+    const request = { kind: 'duplicate', record: now.token } as const
+    const back = (): void => duplicateButton.current?.focus()
+    ask(
+      request,
+      (discarded) =>
+        opening.read(
+          request,
+          now.token,
+          discarded,
+          {
+            opened: (done, record) => {
+              drill.dropAll()
+              setOpen({ kind: 'new' })
+              setMasterName(null)
+              setLoadRefusal(null)
+              say([...(done.discarded ? DISCARDED : []), ...copiedLine(done.token, leftOut(definition.form.model.fields, record, copied), both)])
+              toDetail()
+            },
+            refused: (message) => say([message], 'refused'),
+            back,
+          },
+          (record) => copyOf(record, copied),
+        ),
+      back,
     )
   }
 
@@ -491,6 +531,9 @@ export function FormView({
           sessions={sessions}
           onAnswer={answered}
           onLoaded={loadedSaved}
+          canDuplicate={copied.length > 0}
+          duplicateRef={duplicateButton}
+          onDuplicate={startDuplicate}
           canDelete={canDelete}
           saving={saving}
           deleteRef={deleteButton}

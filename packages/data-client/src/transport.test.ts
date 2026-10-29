@@ -92,7 +92,7 @@ describe('when the data server is not what answers', () => {
   // data-core does not name, a direction but ascending or descending, a
   // default but `true`. Watched failing with `views` left unchecked.
   test("a form without the server's list is unexpected, and a list of null or columns is the server's", async () => {
-    const FORM = { form: { model: {} }, operations: ['read'], readable: ['id'], deleting: null }
+    const FORM = { form: { model: {} }, operations: ['read'], readable: ['id'], deleting: null, copied: null }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
@@ -578,7 +578,7 @@ describe('a delete (0050)', () => {
   // all, is no form this server sent, as a form without `list` is not
   // (watched failing with `deleting` left unchecked).
   test("a form's deleting is null exactly when it offers no delete", async () => {
-    const FORM = { form: { model: {} }, readable: ['id'], list: null }
+    const FORM = { form: { model: {} }, readable: ['id'], list: null, copied: null }
     const DELETING = { cascades: false, clears: false, restricted: true }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -600,6 +600,40 @@ describe('a delete (0050)', () => {
       [['read', 'delete'], DELETING],
     ] as const) {
       body = { ...FORM, operations, deleting }
+      expect(await client.form('pg-ticket')).toEqual({ ok: true, value: body })
+    }
+  })
+
+  // `copied` is the server's list exactly when `operations` holds create,
+  // and null exactly when it does not (0107): a reply that offers create
+  // without it, a list without create, or a list that is not field keys is
+  // no form this server sent, and a page that copied from it would offer a
+  // copy nobody decided -- as one from a server older than 0107, which
+  // sends nothing, would.
+  test("a form's copied is null exactly when it offers no create, and field keys when it does", async () => {
+    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null }
+    let body: unknown = FORM
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    for (const [operations, copied] of [
+      [['read', 'create'], undefined],
+      [['read', 'create'], null],
+      [['read'], ['note']],
+      [['read'], []],
+      [['read', 'create'], 'note'],
+      [['read', 'create'], ['note', 7]],
+    ] as const) {
+      body = { ...FORM, operations, copied }
+      expect(await client.form('pg-ticket'), JSON.stringify(body)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
+    for (const [operations, copied] of [
+      [['read'], null],
+      [['read', 'create'], ['note']],
+      [['read', 'create'], []],
+    ] as const) {
+      body = { ...FORM, operations, copied }
       expect(await client.form('pg-ticket')).toEqual({ ok: true, value: body })
     }
   })

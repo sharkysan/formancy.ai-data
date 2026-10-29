@@ -462,6 +462,13 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   apostrophe, unless it is a number. `EXPORT_MAX_BYTES`, 16 MiB, is the
   budget server and client share, and `exportFileName(formId)` the name a
   file is saved under, `<form id>.csv`.
+- **A copy of a record** (0107). `copiedFields(snapshot, bindings, policy,
+  context)` is the fields a copy of one of the form's records carries into
+  a new one, which `GET /v1/forms/:id` sends as `copied` where it offers
+  create: the fields this person may read whose answer a create accepts
+  from them -- `checkSubmittedFields` asked one field at a time -- less
+  every field over a column of the root's primary or unique keys, in the
+  bindings' order. Empty when the person may not read or may not create.
 - **A delete** (0050). `planDelete(snapshot, bindings, policy, context,
   recordToken, expectedVersion, described)` asks the policy first -- its
   filters and throughs scope a delete as an update's do -- then whether the
