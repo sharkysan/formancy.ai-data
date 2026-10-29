@@ -165,6 +165,27 @@ later.
     a shared browser is shared. Every child section of one form under one
     field shares one arrangement. Widths, search and page are not kept; Download CSV still
     holds every readable field.
+- **A record is duplicated into a new one, of the fields the server names,
+  without its key** (0107). Why: a person entering records that differ in a
+  field or two typed every field again, and a page cannot copy a record by
+  itself -- the create refuses a value in any field this person may not
+  give, which the form does not say. What you notice:
+  - **`GET /v1/forms/:id` adds `copied`**, where it offers create: the
+    fields a copy carries for this person, from `copiedFields` -- what they
+    may read and a create accepts from them, less every column of a
+    primary or unique key -- and `null` without create. This release's
+    `@formancy/data-client` answers `unexpected` to a form from a server
+    older than this, which sends none, so a host upgrades its server first.
+  - **The host page's record header has Duplicate record.** It asks first,
+    as New record does, reads the record again, and opens a new record in
+    every form holding the named answers, with no token and no version; the
+    line says "Copied `<token>` into the form, for a new record. Not copied:
+    Id." Nothing is written until the person saves, and the save is a
+    create.
+  - A copy is of the record alone: no child rows, and no Duplicate on a
+    child row or a level below the record. Every part of a key is left out,
+    and a copy holds what a read returns, an instant to the second and a
+    time to the minute.
 
 ### Changed
 

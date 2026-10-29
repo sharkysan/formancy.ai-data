@@ -209,8 +209,8 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)):
    `operations`, the readable fields, `list` -- what a page may be sorted,
    searched and filtered by, and the published views this person could
-   have built from those (`listColumns`, 0105), or `null` -- and
-   `deleting`.
+   have built from those (`listColumns`, 0105), or `null` -- `deleting`
+   and `copied`.
 2. The Records panel (`apps/host/src/record-grid.tsx`, `grid-datasource.ts`)
    asks one `POST /v1/forms/:id/records/list` per block of AG Grid's
    infinite row model, the search sent on Search or Enter, never per key
@@ -306,13 +306,25 @@ offset, not measured here; the rest is 0044's and 0061's, in
    resend gets the first answer, and which browser resends is named
    ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
 
+7. Duplicate record, in the host's record header, asks the guard as New
+   record does, reads the record again through step 1, and opens every
+   pane on a new record holding the answers `GET /v1/forms/:id` names in
+   `copied` -- `copiedFields` (`packages/data-core/src/records/copy.ts`):
+   what this person may read and a create accepts from them, less every
+   column of a key -- with no token and no version, so its save is step 3's
+   create
+   ([0107](../decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
+
 Held by each adapter's `records.integration.test.ts`, where two updates
 from one version give one winner and one `stale`; `routes/runtime.test.ts`
 and `routes/write-once.test.ts`; `e2e-lost-answer.integration.test.ts`, on
 both engines through a TCP hop that drops the answer: a create stored once,
 an update's resend 409 `stale`;
-`packages/data-client/src/lost-answer.integration.test.ts`; and
-`apps/host/src/session.test.ts`. What it costs is
+`packages/data-client/src/lost-answer.integration.test.ts`;
+`apps/host/src/session.test.ts`; and for a copy,
+`packages/data-core/src/records/copy.test.ts`,
+`packages/data-server/src/e2e.integration.test.ts`'s create of exactly
+`copied` on both engines, and `apps/host/src/duplicate.test.tsx`. What it costs is
 [section 8.6](08-crosscutting-concepts.md#86-optimistic-concurrency-and-write-ids)'s,
 and SQL Server over-reports a trigger's ROLLBACK and raise as unknown (0031).
 

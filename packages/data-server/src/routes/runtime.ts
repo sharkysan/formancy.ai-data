@@ -1,6 +1,7 @@
 import {
   authorizeOperation,
   checkSubmittedFields,
+  copiedFields,
   deleteEffects,
   driftRefusal,
   grantedOperations,
@@ -466,7 +467,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const list = listed.ok && driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'list') === undefined ? listColumns(bundle.bindings, listed.fields, views) : null
     // What a delete also does, for a page to word its confirmation by: only where one is offered (0050).
     const deleting = operations.includes('delete') ? deleteEffects(bundle.snapshot, bundle.bindings.root, bundle.policy) : null
-    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list, deleting } satisfies PublishedForm
+    // What a copy of a record carries into a new one: only where a create is offered (0107).
+    const copied = operations.includes('create') ? copiedFields(bundle.snapshot, bundle.bindings, bundle.policy, actor) : null
+    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list, deleting, copied } satisfies PublishedForm
   })
 
   /**

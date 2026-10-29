@@ -38,7 +38,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 | Function | Route |
 |---|---|
 | `forms(signal?)` | `GET /v1/forms` → `{ forms: [{ id, title, operations, children }] }` |
-| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting }` |
+| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting, copied }` |
 | `read(formId, record)` | `POST /v1/forms/:id/records/read` |
 | `list(formId, query?, signal?)` | `POST /v1/forms/:id/records/list` → `{ rows, hasMore }` |
 | `exportRecords(formId, query?, signal?)` | `POST /v1/forms/:id/records/export` → `{ file, name }`, a `Blob` of CSV and `<form id>.csv` |
@@ -97,6 +97,13 @@ exactly when `operations` holds no `delete`; a reply that breaks that is
 `unexpected`, as is one without `deleting` from a server older than
 deletes, so a host upgrades its server first
 ([0050](../../docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md)).
+A form's `copied` names the fields a copy of one of its records carries
+into a new one -- what this person may read and give on create, less every
+column of a key -- for a page to open a new record holding those answers,
+as read, and send them to `create`; it is `null` exactly when `operations`
+holds no `create`, and a reply that breaks that, or one from a server older
+than copies, which sends none, is `unexpected`
+([0107](../../docs/decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
 `delete` sends exactly `record` and `version`, with a write id of its own,
 and is done only on the server's `{ record, deleted: true }`, whose token
 is the row the statement deleted.

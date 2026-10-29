@@ -8,7 +8,7 @@ import type { Renderer } from './session.js'
  *
  * | Request                                                        | Discards                                 |
  * |----------------------------------------------------------------|------------------------------------------|
- * | another record row; New record; Load                           | the record's panes and every child's     |
+ * | another record row; New record; Load; Duplicate record         | the record's panes and every child's     |
  * | another form; Back or Forward; Sign out                        | those, and the records grid's deletion   |
  * | another child row; New <child>                                 | that child's panes                       |
  * | a record created in one of the record's panes                  | the record's other panes and every       |
@@ -60,6 +60,8 @@ export type LeaveRequest =
   | { kind: 'row'; record: string }
   | { kind: 'new' }
   | { kind: 'load'; record: string }
+  /** Duplicate record (0107): a new record copied from `record`, which replaces the detail's. */
+  | { kind: 'duplicate'; record: string }
   | { kind: 'form'; title: string }
   | { kind: 'history'; direction: 'back' | 'forward' }
   | { kind: 'sign-out' }
@@ -147,6 +149,7 @@ export function discards(request: LeaveRequest): Discarded | null {
     case 'row':
     case 'new':
     case 'load':
+    case 'duplicate':
       return { owners: 'all', spares: RECORDS_GRID, renderers: 'all' }
     case 'form':
     case 'history':
@@ -204,6 +207,8 @@ export function lead(request: LeaveRequest): Said {
       return ['Deleting ', { code: request.record }, closes]
     case 'load':
       return ['Loading ', { code: request.record }, closes]
+    case 'duplicate':
+      return ['Copying ', { code: request.record }, ` into a new record${closes}`]
     case 'created':
       return ['Opening ', { code: request.record }, `, just created in ${RENDERER_NAMES[request.by]},${closes}`]
     case 'new':

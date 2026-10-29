@@ -175,6 +175,44 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=records`)
   })
 
+  // Duplicate record replaces the record at level 1, as another record
+  // does, so the levels below are its and go with it: their work is asked
+  // about, and once it is discarded the trail ends at the new record and
+  // the line's level is gone, not held under a record it is no row of
+  // (0107; watched failing with the levels kept: Back onto the line's entry
+  // showed the old order's line under the copy).
+  test('Duplicate record at level 1 asks about the levels below, and drops them', async () => {
+    const words = stamp('drill-copy')
+    const { order, lines } = await orderWithLines(engine, words, [1])
+    const line = `Order line ${lines[0] ?? ''}`
+    const user = await drilling(engine.formId)
+    await searchRecords(user, words, [order.slice(3)])
+    await pressOn(user, 'Records', order.slice(3), '{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    await answeredOnce('Order line')
+    await pressOn(user, 'Order line', '1', '{Enter}')
+    await waitFor(() => expect(focusedName()).toBe(line), ARRIVES)
+    const quantity = await field(line, /^Quantity\b/)
+    await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
+    await user.type(quantity, '7')
+
+    await crumb(user, `Order ${order}`)
+    await user.click(screen.getByRole('button', { name: 'Duplicate record' }))
+    const notice = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
+    expect(listed(notice)).toEqual([`${line}, React: changes that are not saved.`])
+    await user.click(within(notice).getByRole('button', { name: 'Discard and continue' }))
+    await waitFor(() => expect(focusedName()).toBe('New record'), ARRIVES)
+    expect(trail()).toEqual(['Records', 'New Order'])
+
+    // Back past the crumb's entry onto the line's: the line went with the
+    // order copied from, so the copy, the deepest level held, is shown and
+    // the entry says so -- never the old order's line under the new record.
+    await back()
+    await back()
+    await waitFor(() => expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=1`), ARRIVES)
+    expect(trail()).toEqual(['Records', 'New Order'])
+  })
+
   // Every way a grid opens a row goes down in Drill down: Space too, and a
   // click, so a mouse visitor who clicks a row sees it (the design's third
   // call). A Space that only marked the row would leave the person on a

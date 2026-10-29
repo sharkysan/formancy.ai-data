@@ -15,8 +15,9 @@ export type MasterOpen = null | { kind: 'new' } | { kind: 'record'; token: strin
 
 /**
  * The detail (UX-SPEC §5.10, §5.11): the open record's heading, the way back
- * to its row, Delete record where the form offers it and its confirmation
- * in place (0053), a status line, the renderer switch, opening by token, the
+ * to its row, Duplicate record where the form offers a copy (0107), Delete
+ * record where it offers delete and its confirmation in place (0053), a
+ * status line, the renderer switch, opening by token, the
  * record's form in the renderers chosen, and the child sections below.
  *
  * Only the chosen renderer's form is mounted (the person's decision of
@@ -45,6 +46,9 @@ export function Detail({
   sessions,
   onAnswer,
   onLoaded,
+  canDuplicate,
+  duplicateRef,
+  onDuplicate,
   canDelete,
   saving,
   deleteRef,
@@ -72,6 +76,10 @@ export function Detail({
   onAnswer: (result: SaveResult, session: Session) => void
   /** A pane's "Load the saved record" replaced its draft with what is stored. */
   onLoaded: (session: Session) => void
+  /** The form offers this person a copy (0107): Duplicate record in the header of an open record. */
+  canDuplicate: boolean
+  duplicateRef: RefObject<HTMLButtonElement | null>
+  onDuplicate: () => void
   /** The form offers this person delete (0053): Delete record in the header of an open record. */
   canDelete: boolean
   /** A save of the record is out: Delete record waits for its answer. */
@@ -102,6 +110,11 @@ export function Detail({
                 </svg>
               ) : null}
               {separate ? 'Back to the records' : 'Go to its row'}
+            </button>
+          ) : null}
+          {canDuplicate && open?.kind === 'record' ? (
+            <button type="button" className="button" ref={duplicateRef} onClick={onDuplicate}>
+              Duplicate record
             </button>
           ) : null}
           {canDelete && open?.kind === 'record' ? (

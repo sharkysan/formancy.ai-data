@@ -30,6 +30,7 @@ describe('what each way of leaving a form discards', () => {
     { kind: 'row', record: 'k1:2' },
     { kind: 'new' },
     { kind: 'load', record: 'k1:3' },
+    { kind: 'duplicate', record: 'k1:4' },
     { kind: 'form', title: 'Customer' },
     { kind: 'history', direction: 'back' },
     { kind: 'history', direction: 'forward' },
@@ -96,7 +97,7 @@ describe('what each way of leaving a form discards', () => {
       { owner: gridOwner('lines'), renderer: null, name: ['Order line ', { code: 'k1:1,3' }], work: 'delete-unknown' },
     ]
     const of = (request: LeaveRequest): string[] => atRisk(request, grids).map((pane) => pane.owner)
-    const keeps: LeaveRequest[] = [{ kind: 'row', record: 'k1:2' }, { kind: 'new' }, { kind: 'load', record: 'k1:3' }, { kind: 'created', owner: 'master', record: 'k1:5', by: 'react' }]
+    const keeps: LeaveRequest[] = [{ kind: 'row', record: 'k1:2' }, { kind: 'new' }, { kind: 'load', record: 'k1:3' }, { kind: 'duplicate', record: 'k1:4' }, { kind: 'created', owner: 'master', record: 'k1:5', by: 'react' }]
     for (const request of keeps) expect({ request: request.kind, asks: of(request) }).toEqual({ request: request.kind, asks: [gridOwner('lines')] })
     const takes: LeaveRequest[] = [{ kind: 'form', title: 'Customer' }, { kind: 'history', direction: 'back' }, { kind: 'sign-out' }]
     for (const request of takes) expect({ request: request.kind, asks: of(request) }).toEqual({ request: request.kind, asks: [gridOwner('master'), gridOwner('lines')] })
@@ -201,6 +202,7 @@ describe('what the notice says', () => {
     expect(text({ kind: 'row', record: 'k1:1004' })).toBe('Opening `k1:1004` closes these forms:')
     expect(text({ kind: 'new' })).toBe('Starting a new record closes these forms:')
     expect(text({ kind: 'load', record: 'k1:1999' })).toBe('Loading `k1:1999` closes these forms:')
+    expect(text({ kind: 'duplicate', record: 'k1:1004' })).toBe('Copying `k1:1004` into a new record closes these forms:')
     expect(text({ kind: 'form', title: 'Customer' })).toBe('Opening Customer closes these forms:')
     expect(text({ kind: 'history', direction: 'back' })).toBe('Going back closes these forms:')
     expect(text({ kind: 'history', direction: 'forward' })).toBe('Going forward closes these forms:')

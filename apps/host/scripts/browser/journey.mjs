@@ -4,8 +4,9 @@
 // refused selection, a save whose answer was lost and its check, a create
 // the network lost after the server stored it -- which the browser sends
 // again on its own, or not, as 0058's table says of it and the connection
-// it took -- and the confirmation of an unknown create (0029, 0031). Each
-// state is measured on the way by the gate.
+// it took -- the confirmation of an unknown create (0029, 0031), and the
+// record loaded again and copied into a new one (0107). Each state is
+// measured on the way by the gate.
 
 import { fromTheTop, lostCreate } from '../../../../scripts/browser-gate.mjs'
 import { carryOn } from './workspace.mjs'
@@ -247,6 +248,21 @@ export function recordJourney(plane, hop, { check, measure, asked }, run) {
       const allow = unknownNotice(page).getByRole('button', { name: 'Allow saving it again' })
       await allow.waitFor(WITHIN)
       check('after "Enter it again anyway", the keyboard is on "Allow saving it again"', await focusedOn(page, allow))
+    }],
+    ['Copied', async (page) => {
+      // Duplicate record (0107): the record loaded again -- over the
+      // unknown create the state before left, which the page asks about and
+      // the journey discards -- and copied into a new record in both
+      // renderers, with the keyboard on the new record's heading.
+      const disclosure = page.getByRole('button', { name: 'Open by record token' })
+      if ((await disclosure.getAttribute('aria-expanded')) !== 'true') await disclosure.click()
+      await page.getByRole('textbox', { name: 'Record token' }).fill(run.record)
+      await carryOn(page, page.getByRole('button', { name: 'Load', exact: true }))
+      await page.getByRole('region', { name: `Order ${run.record}`, exact: true }).getByRole('status').filter({ hasText: 'Loaded record' }).waitFor(WITHIN)
+      await page.getByRole('button', { name: 'Duplicate record' }).click()
+      await page.getByRole('region', { name: 'New record', exact: true }).getByRole('status').filter({ hasText: `Copied ${run.record}` }).waitFor(WITHIN)
+      for (const name of ['React', 'Angular']) await until(async () => (await customer(page, name).inputValue()) === 'Muster AG', `the ${name} copy never showed Muster AG`)
+      check("after Duplicate record, the keyboard is on the new record's heading", await focusedOn(page, page.getByRole('heading', { level: 3, name: 'New record', exact: true })))
     }],
   ]
 }

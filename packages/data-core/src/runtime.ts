@@ -119,7 +119,9 @@ export interface Deleting {
  * key that can be NULL, or one held in a field they may not read -- so a
  * page never offers a grid the server would refuse (0044). `deleting` is
  * what a delete also does, exactly when `operations` holds `delete`, and
- * `null` otherwise (0050).
+ * `null` otherwise (0050). `copied` is the fields a copy of a record carries
+ * into a new one, from `copiedFields`, exactly when `operations` holds
+ * `create`, and `null` otherwise (0107).
  */
 export interface PublishedForm {
   form: FormSchema
@@ -127,6 +129,7 @@ export interface PublishedForm {
   readable: string[]
   list: ListColumns | null
   deleting: Deleting | null
+  copied: string[] | null
 }
 
 /**
