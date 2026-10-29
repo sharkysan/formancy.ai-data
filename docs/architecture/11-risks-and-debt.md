@@ -551,6 +551,13 @@ red pull request from being merged is the maintainer reading it
 (`GOVERNANCE.md`; 0058 names `report` as the check to require if that ever
 changes). That is repository configuration, and no file here can assert it.
 
+**The host page's suite is the longest a pull request waits for.** Each of
+its page tests mounts both renderers against the real server on both
+engines, so the suite grows by minutes with a feature: 1292 s under
+coverage on 2026-10-28, its job 22 minutes. The job's limit was raised
+from 25 to 40 minutes (`.github/workflows/gates.yml`) rather than the suite
+split across runners, which is the next step when that is not enough.
+
 **A merged branch is deleted by a repository setting** that nothing here
 reads ([0036](../decisions/0036-a-merged-branch-is-deleted-by-the-merge.md)).
 
