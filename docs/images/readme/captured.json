@@ -1,7 +1,7 @@
 {
   "host-loaded": {
     "file": "docs/images/readme/host-loaded.webp",
-    "captured": "2026-10-27",
+    "captured": "2026-10-29",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -13,8 +13,8 @@
       "width": 1425,
       "height": 1503
     },
-    "bytes": 172940,
-    "sha256": "f0127dd03a5aad4e4e390a90d703ebd5fa762bee4dbcc06405e548ec6b9b7b8f",
+    "bytes": 173966,
+    "sha256": "92f7fe13039ec94bba51ca7c947e8aecbe5393bb42bc0ef469ff608a94f9c3cd",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -26,10 +26,10 @@
       }
     },
     "database": "PostgreSQL 17.11 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 547799dcb3d5f90c4a22f1e1c691c83ca146aef4bd4aee1a69e7426c6e5be7e6 of src/host.css with its imports, and @formancy/themes 0.7.0",
+    "stylesheet": "sha256 e7b1f1ebb08cb601d719618815d2f0ab7ca5a3163e2b922d2c9490447a3347b4 of src/host.css with its imports, and @formancy/themes 0.7.0",
     "text": {
       "Forms": "- navigation \"Forms\":\n  - heading \"Forms\" [level=2]\n  - list:\n    - listitem:\n      - link \"Order pg-order\":\n        - /url: \"#form=pg-order&layout=stacked&view=records\"\n        - text: Order\n        - code: pg-order\n  - button \"Sign out\"",
-      "Workspace": "- main \"Order pg-order\":\n  - heading \"Order pg-order\" [level=2]:\n    - text: Order\n    - code: pg-order\n  - list \"Operations\":\n    - listitem: Read\n    - listitem: Create\n    - listitem: Update\n  - group \"Layout\":\n    - text: Layout\n    - radio \"Side by side\"\n    - text: Side by side\n    - radio \"Stacked\" [checked]\n    - text: Stacked\n    - radio \"Separate views\"\n    - text: Separate views\n    - radio \"Drill down\"\n    - text: Drill down\n  - region \"Records\":\n    - heading \"Records\" [level=3]\n    - button \"New record\"\n    - button \"Download CSV\"\n    - status \"Download CSV\"\n    - search \"Search records\":\n      - text: Search\n      - textbox \"Search\"\n      - button \"Search\"\n    - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n    - button \"Filter\"\n    - status: Rows 1–1.\n    - button \"Previous rows\" [disabled]\n    - button \"Next rows\" [disabled]\n    - grid \"Records\":\n      - rowgroup:\n        - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n          - columnheader \"Id\"\n          - columnheader \"Customer\"\n          - columnheader \"Order date\"\n          - columnheader \"Status\"\n          - columnheader \"Amount\"\n          - columnheader \"Notes\"\n          - columnheader \"Group\"\n          - columnheader \"Created by\"\n          - columnheader \"Approved by\"\n        - row \"9007199254740993 Muster AG 2026-10-08 placed 99999999999999.9999 A 1\" [selected]:\n          - gridcell \"9007199254740993\"\n          - gridcell \"Muster AG\"\n          - gridcell \"2026-10-08\"\n          - gridcell \"placed\"\n          - gridcell \"99999999999999.9999\"\n          - gridcell\n          - gridcell \"A\"\n          - gridcell \"1\"\n          - gridcell\n  - region \"Order k1:9007199254740993\":\n    - heading \"Order k1:9007199254740993\" [level=3]:\n      - text: Order\n      - code: k1:9007199254740993\n    - button \"Go to its row\"\n    - status:\n      - text: Loaded record\n      - code: k1:9007199254740993\n      - text: into both forms.\n    - group \"Renderer\":\n      - text: Renderer\n      - radio \"React\"\n      - text: React\n      - radio \"Angular\"\n      - text: Angular\n      - radio \"Both\" [checked]\n      - text: Both\n    - button \"Open by record token\" [expanded]\n    - text: Record token\n    - textbox \"Record token\": k1:9007199254740993\n    - button \"Load\"\n    - region \"React\":\n      - heading \"React\" [level=4]\n      - form \"Order, React\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\": Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\": 2026-10-08\n          - text: Status\n          - textbox \"Status\": placed\n          - text: Amount*\n          - textbox \"Amount*\": \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - text: Created by\n          - spinbutton \"Created by\": \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\"\n    - region \"Angular\":\n      - heading \"Angular\" [level=4]\n      - form \"Order, Angular\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\": Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\": 2026-10-08\n          - text: Status\n          - textbox \"Status\": placed\n          - text: Amount*\n          - textbox \"Amount*\": \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - text: Created by\n          - spinbutton \"Created by\": \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\""
+      "Workspace": "- main \"Order pg-order\":\n  - heading \"Order pg-order\" [level=2]:\n    - text: Order\n    - code: pg-order\n  - list \"Operations\":\n    - listitem: Read\n    - listitem: Create\n    - listitem: Update\n  - group \"Layout\":\n    - text: Layout\n    - radio \"Side by side\"\n    - text: Side by side\n    - radio \"Stacked\" [checked]\n    - text: Stacked\n    - radio \"Separate views\"\n    - text: Separate views\n    - radio \"Drill down\"\n    - text: Drill down\n  - region \"Records\":\n    - heading \"Records\" [level=3]\n    - button \"New record\"\n    - button \"Download CSV\"\n    - status \"Download CSV\"\n    - search \"Search records\":\n      - text: Search\n      - textbox \"Search\"\n      - button \"Search\"\n    - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n    - button \"Columns\"\n    - button \"Filter\"\n    - status: Rows 1–1.\n    - button \"Previous rows\" [disabled]\n    - button \"Next rows\" [disabled]\n    - grid \"Records\":\n      - rowgroup:\n        - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n          - columnheader \"Id\"\n          - columnheader \"Customer\"\n          - columnheader \"Order date\"\n          - columnheader \"Status\"\n          - columnheader \"Amount\"\n          - columnheader \"Notes\"\n          - columnheader \"Group\"\n          - columnheader \"Created by\"\n          - columnheader \"Approved by\"\n        - row \"9007199254740993 Muster AG 2026-10-08 placed 99999999999999.9999 A 1\" [selected]:\n          - gridcell \"9007199254740993\"\n          - gridcell \"Muster AG\"\n          - gridcell \"2026-10-08\"\n          - gridcell \"placed\"\n          - gridcell \"99999999999999.9999\"\n          - gridcell\n          - gridcell \"A\"\n          - gridcell \"1\"\n          - gridcell\n  - region \"Order k1:9007199254740993\":\n    - heading \"Order k1:9007199254740993\" [level=3]:\n      - text: Order\n      - code: k1:9007199254740993\n    - button \"Go to its row\"\n    - status:\n      - text: Loaded record\n      - code: k1:9007199254740993\n      - text: into both forms.\n    - group \"Renderer\":\n      - text: Renderer\n      - radio \"React\"\n      - text: React\n      - radio \"Angular\"\n      - text: Angular\n      - radio \"Both\" [checked]\n      - text: Both\n    - button \"Open by record token\" [expanded]\n    - text: Record token\n    - textbox \"Record token\": k1:9007199254740993\n    - button \"Load\"\n    - region \"React\":\n      - heading \"React\" [level=4]\n      - form \"Order, React\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\": Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\": 2026-10-08\n          - text: Status\n          - textbox \"Status\": placed\n          - text: Amount*\n          - textbox \"Amount*\": \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - text: Created by\n          - spinbutton \"Created by\": \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\"\n    - region \"Angular\":\n      - heading \"Angular\" [level=4]\n      - form \"Order, Angular\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\": Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\": 2026-10-08\n          - text: Status\n          - textbox \"Status\": placed\n          - text: Amount*\n          - textbox \"Amount*\": \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - text: Created by\n          - spinbutton \"Created by\": \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\""
     }
   },
   "examples-order": {
@@ -649,7 +649,7 @@
   },
   "host-delete": {
     "file": "docs/images/readme/host-delete.webp",
-    "captured": "2026-10-27",
+    "captured": "2026-10-29",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -659,10 +659,10 @@
     "timezone": "UTC",
     "css": {
       "width": 1165,
-      "height": 574
+      "height": 570
     },
-    "bytes": 78048,
-    "sha256": "e9825e2274fb88126390d7db9f5dc9e13e16e046ca105ab57573c054bbd8d265",
+    "bytes": 79684,
+    "sha256": "d699b37ebf262a86a8d6159bcebd2a64e02d932a07664d3fd8a6e9d3cccff229",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -674,9 +674,9 @@
       }
     },
     "database": "PostgreSQL 17.11 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 547799dcb3d5f90c4a22f1e1c691c83ca146aef4bd4aee1a69e7426c6e5be7e6 of src/host.css with its imports, and @formancy/themes 0.7.0",
+    "stylesheet": "sha256 e7b1f1ebb08cb601d719618815d2f0ab7ca5a3163e2b922d2c9490447a3347b4 of src/host.css with its imports, and @formancy/themes 0.7.0",
     "text": {
-      "Records": "- region \"Records\":\n  - heading \"Records\" [level=3]\n  - button \"New record\"\n  - button \"Download CSV\"\n  - status \"Download CSV\"\n  - search \"Search records\":\n    - text: Search\n    - textbox \"Search\"\n    - button \"Search\"\n  - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n  - button \"Filter\"\n  - status: Rows 1–1.\n  - button \"Previous rows\" [disabled]\n  - button \"Next rows\" [disabled]\n  - text: Space opens this record. Enter opens it and moves to it.\n  - grid \"Records\":\n    - rowgroup:\n      - row \"Id Customer Order date Status Amount Notes Group Created by Approved by Delete\":\n        - columnheader \"Id\"\n        - columnheader \"Customer\"\n        - columnheader \"Order date\"\n        - columnheader \"Status\"\n        - columnheader \"Amount\"\n        - columnheader \"Notes\"\n        - columnheader \"Group\"\n        - columnheader \"Created by\"\n        - columnheader \"Approved by\"\n        - columnheader \"Delete\"\n      - row \"9007199254740993 Muster AG 2026-10-08 shipped 99999999999999.9999 Deliver to the side door A 1 Delete Order k1:9007199254740993\":\n        - gridcell \"9007199254740993\"\n        - gridcell \"Muster AG\"\n        - gridcell \"2026-10-08\"\n        - gridcell \"shipped\"\n        - gridcell \"99999999999999.9999\"\n        - gridcell \"Deliver to the side door\"\n        - gridcell \"A\"\n        - gridcell \"1\"\n        - gridcell\n        - gridcell \"Delete Order k1:9007199254740993\":\n          - button \"Delete Order k1:9007199254740993\": Delete\n  - region \"Delete Order k1:9007199254740993?\":\n    - heading \"Delete Order k1:9007199254740993?\" [level=4]:\n      - text: Delete Order\n      - code: k1:9007199254740993\n      - text: \"?\"\n    - paragraph: It is removed from the database for everyone who can see it. This page cannot bring it back.\n    - paragraph: Other records that refer to it are deleted with it.\n    - status\n    - button \"Keep it\"\n    - button \"Delete it\""
+      "Records": "- region \"Records\":\n  - heading \"Records\" [level=3]\n  - button \"New record\"\n  - button \"Download CSV\"\n  - status \"Download CSV\"\n  - search \"Search records\":\n    - text: Search\n    - textbox \"Search\"\n    - button \"Search\"\n  - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n  - button \"Columns\"\n  - button \"Filter\"\n  - status: Rows 1–1.\n  - button \"Previous rows\" [disabled]\n  - button \"Next rows\" [disabled]\n  - text: Space opens this record. Enter opens it and moves to it.\n  - grid \"Records\":\n    - rowgroup:\n      - row \"Id Customer Order date Status Amount Notes Group Created by Approved by Delete\":\n        - columnheader \"Id\"\n        - columnheader \"Customer\"\n        - columnheader \"Order date\"\n        - columnheader \"Status\"\n        - columnheader \"Amount\"\n        - columnheader \"Notes\"\n        - columnheader \"Group\"\n        - columnheader \"Created by\"\n        - columnheader \"Approved by\"\n        - columnheader \"Delete\"\n      - row \"9007199254740993 Muster AG 2026-10-08 shipped 99999999999999.9999 Deliver to the side door A 1 Delete Order k1:9007199254740993\":\n        - gridcell \"9007199254740993\"\n        - gridcell \"Muster AG\"\n        - gridcell \"2026-10-08\"\n        - gridcell \"shipped\"\n        - gridcell \"99999999999999.9999\"\n        - gridcell \"Deliver to the side door\"\n        - gridcell \"A\"\n        - gridcell \"1\"\n        - gridcell\n        - gridcell \"Delete Order k1:9007199254740993\":\n          - button \"Delete Order k1:9007199254740993\": Delete\n  - region \"Delete Order k1:9007199254740993?\":\n    - heading \"Delete Order k1:9007199254740993?\" [level=4]:\n      - text: Delete Order\n      - code: k1:9007199254740993\n      - text: \"?\"\n    - paragraph: It is removed from the database for everyone who can see it. This page cannot bring it back.\n    - paragraph: Other records that refer to it are deleted with it.\n    - status\n    - button \"Keep it\"\n    - button \"Delete it\""
     }
   },
   "host-drift": {
@@ -713,7 +713,7 @@
   },
   "host-other-tenant": {
     "file": "docs/images/readme/host-other-tenant.webp",
-    "captured": "2026-10-27",
+    "captured": "2026-10-29",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -725,8 +725,8 @@
       "width": 1165,
       "height": 891
     },
-    "bytes": 76774,
-    "sha256": "1814632767d8e3f30f2a9c4573d55425203f3e4ac8e83036cfd491fa83e71ad0",
+    "bytes": 78630,
+    "sha256": "9ddbc8fa4931945a1496a686f20ec4290dfc22cd1493e932c071fba5f0458249",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -738,9 +738,9 @@
       }
     },
     "database": "PostgreSQL 17.11 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 547799dcb3d5f90c4a22f1e1c691c83ca146aef4bd4aee1a69e7426c6e5be7e6 of src/host.css with its imports, and @formancy/themes 0.7.0",
+    "stylesheet": "sha256 e7b1f1ebb08cb601d719618815d2f0ab7ca5a3163e2b922d2c9490447a3347b4 of src/host.css with its imports, and @formancy/themes 0.7.0",
     "text": {
-      "Records": "- region \"Records\":\n  - heading \"Records\" [level=3]\n  - button \"New record\"\n  - button \"Download CSV\"\n  - status \"Download CSV\"\n  - search \"Search records\":\n    - text: Search\n    - textbox \"Search\"\n    - button \"Search\"\n  - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n  - button \"Filter\"\n  - status: No records.\n  - paragraph: New record starts the first one.\n  - button \"Previous rows\" [disabled]\n  - button \"Next rows\" [disabled]\n  - grid \"Records\":\n    - rowgroup:\n      - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n        - columnheader \"Id\"\n        - columnheader \"Customer\"\n        - columnheader \"Order date\"\n        - columnheader \"Status\"\n        - columnheader \"Amount\"\n        - columnheader \"Notes\"\n        - columnheader \"Group\"\n        - columnheader \"Created by\"\n        - columnheader \"Approved by\"",
+      "Records": "- region \"Records\":\n  - heading \"Records\" [level=3]\n  - button \"New record\"\n  - button \"Download CSV\"\n  - status \"Download CSV\"\n  - search \"Search records\":\n    - text: Search\n    - textbox \"Search\"\n    - button \"Search\"\n  - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n  - button \"Columns\"\n  - button \"Filter\"\n  - status: No records.\n  - paragraph: New record starts the first one.\n  - button \"Previous rows\" [disabled]\n  - button \"Next rows\" [disabled]\n  - grid \"Records\":\n    - rowgroup:\n      - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n        - columnheader \"Id\"\n        - columnheader \"Customer\"\n        - columnheader \"Order date\"\n        - columnheader \"Status\"\n        - columnheader \"Amount\"\n        - columnheader \"Notes\"\n        - columnheader \"Group\"\n        - columnheader \"Created by\"\n        - columnheader \"Approved by\"",
       "Record": "- region \"No record open\":\n  - heading \"No record open\" [level=3]\n  - status\n  - paragraph: Choose a row under Records, or press New record.\n  - paragraph: Space opens a row. Enter opens it and moves here.\n  - group \"Renderer\":\n    - text: Renderer\n    - radio \"React\"\n    - text: React\n    - radio \"Angular\"\n    - text: Angular\n    - radio \"Both\" [checked]\n    - text: Both\n  - button \"Open by record token\" [expanded]\n  - text: Record token\n  - textbox \"Record token\": k1:9007199254740993\n  - button \"Load\"\n  - alert: No such record."
     }
   }
