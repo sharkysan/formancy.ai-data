@@ -100,6 +100,8 @@ describe('the fixture files', () => {
       'guarded',
       'item_use',
       'keyed',
+      'party',
+      'party_company',
       'removable',
       'removable_cascade',
       'removable_child',

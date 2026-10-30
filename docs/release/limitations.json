@@ -96,7 +96,7 @@
       ]
     },
     "0009": {
-      "reviewed": "sha256:db9ffe17065d989267aebdb2b3bd0b220a2ea5e1c5f57e5d4d2514578d8d4bd4",
+      "reviewed": "sha256:31d6cdb8bb4e61fcff6f25cecf4f0de1741829abd658abb5c93c84ba271ec1e2",
       "limitations": [
         {
           "area": "forms",
@@ -1256,7 +1256,7 @@
       ]
     },
     "0045": {
-      "reviewed": "sha256:2793225d9e048aac53f111fb1bebef4ab5a83dd07ade67bb30ba1ad73a4b24d1",
+      "reviewed": "sha256:5651601c8ffd25f46730cd105ce9172c4a073901f6cddfeb20331a8c65370084",
       "limitations": [
         {
           "area": "server",
@@ -1321,7 +1321,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:b413606a0a63136ff3439015d5d13f282be6b2b8e51cddb705e4632f6de5b47b",
+      "reviewed": "sha256:b40508613cad8289fba1b46565a242962eca95827b0d28193358a43ce5e4ae99",
       "limitations": [
         {
           "area": "host",
@@ -3267,6 +3267,35 @@
         {
           "area": "server",
           "says": "The server refuses an older client's offset as malformed, and @formancy/data-client refuses an older server's page, which has no cursor, as unexpected, so a host and its server are upgraded together.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0109": {
+      "reviewed": "sha256:a3970c7527f54120a24ed638d529311584bb7e35b1d16b9c39114f6070ef3f9b",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A record and its section are two forms with two saves, never one transaction, and the section is shown by the record as stored: a kind changed and not yet saved shows the section as it was.",
+          "heldBy": "apps/host/src/sections.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A record whose kind changes away hides its section and keeps the section's row in the database, and a section offers no Delete; the section's own form, opened on its own, deletes it.",
+          "heldBy": "apps/host/src/sections.test.tsx"
+        },
+        {
+          "area": "forms",
+          "says": "A section is shown by one column holding one value, or always; one whose column the parent's form does not show the person is shown always.",
+          "heldBy": "packages/data-core/src/records/menu.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "Drift review does not name a section's condition column: dropped or retyped, the section is shown always, and regenerating its form is refused until the condition is chosen again."
+        },
+        {
+          "area": "server",
+          "says": "@formancy/data-client refuses a menu without its children's one and when as unexpected, so a host and its server are upgraded together.",
           "heldBy": "packages/data-client/src/transport.test.ts"
         }
       ]

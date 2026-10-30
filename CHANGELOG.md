@@ -187,6 +187,30 @@ later.
     and a copy holds what a read returns, an instant to the second and a
     time to the minute.
 
+- **A form whose key is its foreign key onto its parent's is shown under
+  the parent's record as one section, while the record holds a value**
+  (0109). Why: a record's details often live in a second table holding at
+  most one row per record -- a party's company details -- which the page
+  showed under every record as a grid of one row, whatever its kind. What
+  you notice:
+  - **A lookup choice may say `section: { when }`**: in the studio's Choose
+    step, "Show it under each <table> as one form", offered where the
+    foreign key is the root's whole key, then "Shown while" a column of the
+    referenced table "holds" a value, or always. The generator refuses a
+    section over any other key, on a column it cannot read, or by a value
+    the column could not hold.
+  - **The menu's children gain `one` and `when`**: the field of the parent
+    whose answer shows the section, and that answer as the record holds
+    it, or `null` to show it always. This release's `@formancy/data-client`
+    answers `unexpected` to an older server's menu, so the host and the
+    server are upgraded together.
+  - **The host draws such a child as the record's own section**: its one
+    row in its own form, or a line saying it has none and Add, which a
+    save creates under the record -- shown while the record as stored holds
+    the value, so a kind is saved before its details are added.
+  - The extension is still its own form, with its own Save: a record and
+    its section are never one transaction, and a section offers no Delete.
+
 ### Changed
 
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's

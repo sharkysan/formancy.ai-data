@@ -1,7 +1,7 @@
 import type { DatabaseKind } from '../adapter.js'
 import { describedOf } from '../drift/diff.js'
 import { generateForm } from '../generate/generate.js'
-import type { FieldBinding, FormBindings, GeneratedForm } from '../generate/types.js'
+import type { FieldBinding, FormBindings, GeneratedForm, LookupChoice } from '../generate/types.js'
 import type { ColumnAccess, ColumnMeta, DiscoveryAccount, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { createSnapshot } from '../snapshot.js'
@@ -155,6 +155,35 @@ export function lineForm(source: MetadataSnapshot): GeneratedForm {
 export function customerSource(): MetadataSnapshot {
   return snapshot('sqlserver', (objects) => {
     objects.find((object) => object.ref.name === 'customer')?.columns.push(col('row_version', 8, { kind: 'rowversion' }, { generated: 'rowversion' }))
+  })
+}
+
+/**
+ * The snapshot with a customer's `kind` and its company details: a table
+ * whose key is its foreign key onto the customer's, in another order, which
+ * a form can be generated as a section of (0109).
+ */
+export function sectioned(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}): MetadataSnapshot {
+  return snapshot(kind, (objects) => {
+    ;(objects.find((object) => object.ref.name === 'customer') as ObjectMeta).columns.push(col('kind', 8, text(20), { hasDefault: true }))
+    objects.push(
+      table('customer_company', [col('tenant_id', 1, INT32), col('customer_no', 2, INT32), col('vat_no', 3, text(20)), col('rating', 4, { kind: 'float', bits: 64 }, { nullable: true })], {
+        primaryKey: { name: 'pk_customer_company', columns: ['customer_no', 'tenant_id'] },
+        foreignKeys: [fk('fk_customer_company_customer', ['tenant_id', 'customer_no'], 'customer', ['tenant_id', 'customer_no'])],
+      }),
+    )
+    edit(objects)
+  })
+}
+
+/** A customer's company details, generated as a section of the customer shown while its kind is `company` -- or under `section`, or as no section for `null`. */
+export function companyForm(source: MetadataSnapshot, section: LookupChoice['section'] | null = { when: { column: 'kind', value: 'company' } }): GeneratedForm {
+  return generateForm(source, {
+    connection: 'erp',
+    root: sales('customer_company'),
+    formId: 'sales-customer-company',
+    title: 'Company',
+    lookups: [{ foreignKey: 'fk_customer_company_customer', display: ['name'], ...(section === null || section === undefined ? {} : { section }) }],
   })
 }
 

@@ -104,7 +104,7 @@ if (page.ok || page.code !== 'invalid-name' || fetched !== 0 || !Number.isSafeIn
 const menuClient = createDataClient({
   token: () => 'unused',
   base: 'http://127.0.0.1:9',
-  fetch: async () => new Response(JSON.stringify({ forms: [{ id: 'order', title: 'Order', operations: ['read'], children: [{ form: 'order-line', field: 'order' }] }] }), { status: 200, headers: { 'content-type': 'application/json' } }),
+  fetch: async () => new Response(JSON.stringify({ forms: [{ id: 'order', title: 'Order', operations: ['read'], children: [{ form: 'order-line', field: 'order', one: false, when: null }] }] }), { status: 200, headers: { 'content-type': 'application/json' } }),
 })
 const menu: Outcome<FormMenu> = await menuClient.forms()
 if (!menu.ok || menu.value.forms[0]?.children[0]?.field !== 'order') throw new Error('forms() did not read the menu')

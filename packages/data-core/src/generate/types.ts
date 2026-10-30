@@ -5,6 +5,27 @@ import type { ForeignKeyTarget, NormalizedType, ObjectRef } from '../metadata.js
 export interface LookupChoice {
   foreignKey: string
   display: string[]
+  /**
+   * This form's rows are sections of the records the foreign key references
+   * (0109): its columns are the root's whole key, so each referenced record
+   * has at most one row here, which a page shows under that record as a
+   * form of its own rather than a grid. `when` names a column of the
+   * referenced table and a value spelled as it holds it: the section is
+   * shown only while the record holds that value there -- a customer's
+   * company details while its kind is `company`. `null` shows it always.
+   */
+  section?: { when: SectionCondition | null }
+}
+
+/** A column of the table a section's lookup references, and the value it holds while the section is shown (0109). */
+export interface SectionCondition {
+  column: string
+  value: string
+}
+
+/** What a section's lookup binding carries (0109): its condition, the column typed as the referenced table holds it. */
+export interface SectionBinding {
+  when: (SectionCondition & { type: NormalizedType }) | null
 }
 
 export interface GenerationRequest {
@@ -69,6 +90,12 @@ export type FieldBinding =
       source: string
       nullable: boolean
       writes: FieldWrites
+      /**
+       * The choice's `section` (0109), its condition's column typed as the
+       * target holds it; absent for a lookup that is not one. At most one
+       * lookup of a form is.
+       */
+      section?: SectionBinding
     }
 
 export interface ConcurrencyBinding {

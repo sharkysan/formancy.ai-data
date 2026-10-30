@@ -65,7 +65,11 @@ existed would be documented and inert.
   Since [0030](../../docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)
   a bundle is format 2: it also keeps the generation request, the generated
   base and the presentation chosen over it, and its form must be that base
-  with that presentation applied. Format 1 is still read and served, and no
+  with that presentation applied. A lookup of the request may be a section
+  of the records it references, `section: { when: { column, value } | null }`
+  ([0109](../../docs/decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md)),
+  and a request and bindings that disagree about it are refused, as for any
+  part of a lookup choice. Format 1 is still read and served, and no
   longer published. Publish also checks that this server's generator writes
   the stored base and bindings from the stored snapshot and request; reads
   do not, so a later generator never makes a stored version corrupt. A

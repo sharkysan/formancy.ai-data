@@ -609,7 +609,12 @@ the record is drawn by `@formancy/react`, `@formancy/angular` or both, as you
 choose, and the choice is kept in this browser with where you left the
 separator between the records and the record. Below the record, each form
 whose rows reference it lists them -- an order's lines -- and each child row
-opens in its own form; a new one is created under the open record. The
+opens in its own form; a new one is created under the open record. A form
+generated as a section of the record -- a table whose key is its foreign
+key onto the record's, holding at most one row of it -- is its one row in
+its own form instead, or Add, shown while the record as stored holds the
+value its generation names
+([0109](./docs/decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md)). The
 records and the record are side by side, stacked, or separate views, and
 the address says which form and layout, never which record. Open by record
 token loads one by its token.

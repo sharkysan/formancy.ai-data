@@ -13,8 +13,8 @@ describe('what the journey expects', () => {
       for (const form of menu) expect(form.operations, `${role} ${form.id}`).toEqual(may[form.id])
     }
     expect(expectedMenu('clerk').find((form) => form.id === 'order').children).toEqual([
-      { form: 'delivery', field: 'order' },
-      { form: 'order-line', field: 'order' },
+      { form: 'delivery', field: 'order', one: false, when: null },
+      { form: 'order-line', field: 'order', one: false, when: null },
     ])
     expect(() => expectedMenu('administrator')).toThrow(/no role administrator/)
   })

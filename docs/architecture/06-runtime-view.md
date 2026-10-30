@@ -183,7 +183,10 @@ moment can both succeed, and nothing deletes a draft (0065).
    allowlist lacks, saying so in the log, and reads each bundle alone into
    `menuForm`; `formMenu` (`packages/data-core/src/records/menu.ts`) names
    the forms the policy lets this person read, with the children
-   `records/children.ts` derives. No database is asked
+   `records/children.ts` derives -- each saying whether it is a section of
+   the record, and under which of the record's answers it shows
+   ([0109](../decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md)).
+   No database is asked
    ([0045](../decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)),
    and Forms (`apps/host/src/forms-nav.tsx`) draws the menu
    ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).

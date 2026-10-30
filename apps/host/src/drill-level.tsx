@@ -11,10 +11,12 @@ import { paneEntry, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
 import { drillBase, drillOwner } from './leave.js'
 import type { Said } from './leave.js'
+import { OneChild } from './one-child.js'
 import { useOpening } from './opening.js'
 import { Pane } from './pane.js'
 import { renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
+import { sectionShown } from './section.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
 import type { Drill, DrillStep } from './use-drill.js'
@@ -63,6 +65,8 @@ export function DrillLevel({
   const openRef = useRef(open)
   openRef.current = open
   const [line, setLine] = useState<Said>(step.said)
+  /** The level's record as stored, which a section's condition is read from (0109); null while it is new. */
+  const [stored, setStored] = useState<Readonly<Record<string, unknown>> | null>(step.record === null ? null : step.record.answers)
 
   // Opened once, as the level is placed: with the record read, or new under the parent.
   const sessions = useMemo(
@@ -102,7 +106,10 @@ export function DrillLevel({
       // The stored record read again into this level's forms: what it replaces is this level's own.
       const request = { kind: 'child-row', owner, record: target.record } as const
       opening.read(request, target.record, false, {
-        opened: (now) => setLine(['Opened ', { code: now.token }, '.']),
+        opened: (now, record) => {
+          setLine(['Opened ', { code: now.token }, '.'])
+          setStored(record.answers)
+        },
         refused: (message) => setLine([message]),
         back: () => deleteButton.current?.focus(),
       })
@@ -116,6 +123,7 @@ export function DrillLevel({
 
   /** A save one of this level's forms answered: a created row is the level's, and its crumb names what is stored. */
   function answered(result: SaveResult, from: Session): void {
+    if (result.kind === 'saved' || result.kind === 'created') setStored(from.saved().answers)
     opening.answered(result, from, (now) => {
       setOpen({ kind: 'record', token: now.token })
       if (now.discarded) setLine(['Discarded the unsaved changes. ', 'Opened ', { code: now.token }, '.'])
@@ -127,6 +135,7 @@ export function DrillLevel({
 
   /** A form's "Load the saved record": the crumb and the section above say what is stored, as after a save. */
   function loaded(from: Session): void {
+    setStored(from.saved().answers)
     const now = openRef.current
     if (now.kind === 'record') drill.saved(step, now.token, nameOf(from))
   }
@@ -176,6 +185,12 @@ export function DrillLevel({
       </div>
       {(childForms ?? []).map((each, index) => {
         const sectionOwner = `${drillBase(level)}${each.child.form}~${each.child.field}`
+        // A section is this level's own form under its record, never a level below (0109).
+        if (each.child.one) {
+          return sectionShown(each.child, stored) ? (
+            <OneChild key={`${each.child.form}~${each.child.field} ${parentNow.kind === 'record' ? parentNow.token : 'new'}`} client={client} form={each} index={index} parentNoun={title} parent={parentNow} renderer={renderer} ownerBase={drillBase(level)} idBase={`${idBase}-child`} />
+          ) : null
+        }
         return (
           <ChildSection
             key={`${each.child.form}~${each.child.field} ${parentNow.kind === 'record' ? parentNow.token : 'new'}`}

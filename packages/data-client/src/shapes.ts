@@ -132,8 +132,21 @@ export function isPublishedForm(body: unknown): body is PublishedForm {
 }
 
 /** A child in a menu: the child form, and the field its list is narrowed by. */
+/**
+ * A section's condition (0109): `null`, or a field and the answer that shows
+ * the section -- text, a number or a yes/no, as a record's answers hold it.
+ */
+function isSectionWhen(value: unknown): boolean {
+  if (value === null) return true
+  if (!isRecord(value) || typeof value['field'] !== 'string') return false
+  const equals = value['equals']
+  return typeof equals === 'string' || typeof equals === 'number' || typeof equals === 'boolean'
+}
+
+/** One child: its form and field, whether it is a section (0109), and only a section with a condition. */
 function isMenuChild(value: unknown): boolean {
-  return isRecord(value) && typeof value['form'] === 'string' && typeof value['field'] === 'string'
+  if (!isRecord(value) || typeof value['form'] !== 'string' || typeof value['field'] !== 'string' || typeof value['one'] !== 'boolean') return false
+  return value['one'] ? isSectionWhen(value['when']) : value['when'] === null
 }
 
 /** One menu entry: a page draws a link from it, and a grid per child. */

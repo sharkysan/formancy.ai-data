@@ -1,4 +1,5 @@
 import type { FormSchema } from '@formancy/spec'
+import type { ApiValue } from './codecs/codec.js'
 import { DEFAULT_MAX_PAGE_SIZE } from './lookup/config.js'
 import type { LookupRow } from './lookup/types.js'
 import type { PolicyOperation } from './policy/types.js'
@@ -141,6 +142,21 @@ export interface PublishedForm {
 export interface FormMenuChild {
   form: string
   field: string
+  /**
+   * Whether the child form is a section of this form's records (0109): its
+   * rows' key is the field's foreign key, so a record has at most one of
+   * them, which a page shows under the record as a form of its own rather
+   * than a grid.
+   */
+  one: boolean
+  /**
+   * Where `one`, the field of this form whose answer shows the section and
+   * the answer that does, as the record's own answers hold it; `null` shows
+   * it always -- a section with no condition, and one whose condition is on
+   * a column this person may not read here, since what a page shows is
+   * never a permission.
+   */
+  when: { field: string; equals: ApiValue } | null
 }
 
 /**

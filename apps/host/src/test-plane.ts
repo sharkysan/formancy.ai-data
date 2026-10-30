@@ -78,8 +78,8 @@ export const PAGED = inject('paged')
  * Amount, with views whose default is on Amount (0105).
  */
 export const ENGINES = [
-  { engine: 'PostgreSQL', connection: 'pg', formId: 'pg-order', versionColumn: 'row_version' as string | undefined, lines: 'pg-order-line', employees: 'pg-employee', staff: 'pg-order-staff', deliveries: 'pg-delivery', parity: 'pg-parity', removable: 'pg-removable', read: 'pg-order-read', withheld: 'pg-order-withheld' },
-  { engine: 'SQL Server', connection: 'ms', formId: 'ms-order', versionColumn: undefined, lines: 'ms-order-line', employees: 'ms-employee', staff: 'ms-order-staff', deliveries: 'ms-delivery', parity: 'ms-parity', removable: 'ms-removable', read: 'ms-order-read', withheld: 'ms-order-withheld' },
+  { engine: 'PostgreSQL', connection: 'pg', formId: 'pg-order', versionColumn: 'row_version' as string | undefined, lines: 'pg-order-line', employees: 'pg-employee', staff: 'pg-order-staff', deliveries: 'pg-delivery', parity: 'pg-parity', removable: 'pg-removable', read: 'pg-order-read', withheld: 'pg-order-withheld', party: 'pg-party', company: 'pg-party-company' },
+  { engine: 'SQL Server', connection: 'ms', formId: 'ms-order', versionColumn: undefined, lines: 'ms-order-line', employees: 'ms-employee', staff: 'ms-order-staff', deliveries: 'ms-delivery', parity: 'ms-parity', removable: 'ms-removable', read: 'ms-order-read', withheld: 'ms-order-withheld', party: 'ms-party', company: 'ms-party-company' },
 ] as const
 
 export type Engine = (typeof ENGINES)[number]
@@ -339,9 +339,12 @@ export function losingWrites(fetch: typeof globalThis.fetch, { when, times = 1, 
  * With `views` (0105), the order form is published with `ORDER_VIEWS`, the
  * deliveries with `DELIVERY_VIEWS`, and the order form again as `withheld`
  * of `ENGINES`, which the clerk may read but for Amount, with
- * `WITHHELD_VIEWS` (test-forms.ts).
+ * `WITHHELD_VIEWS` (test-forms.ts). With `sections` (0109), `party` of
+ * `ENGINES` is published over `parity.party`, and `company` over
+ * `parity.party_company` as a section of it, shown while its kind is
+ * `company`.
  */
-export async function startPlane(options: { children?: boolean; deletes?: boolean; deliveries?: boolean; demo?: boolean; paged?: boolean; views?: boolean } = {}): Promise<Plane> {
+export async function startPlane(options: { children?: boolean; deletes?: boolean; deliveries?: boolean; demo?: boolean; paged?: boolean; sections?: boolean; views?: boolean } = {}): Promise<Plane> {
   const { pg, ms } = inject('databases')
   // 32 random bytes as base64url: the shape of the key a Durable Object starts its container with.
   const demoKey = options.demo === true ? randomBytes(32).toString('base64url') : undefined
@@ -425,6 +428,41 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
       lookups: {},
     }
     await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+  }
+  for (const { parity: connection, party, company } of options.sections === true ? ENGINES : []) {
+    // A party, its tenant pinned to the clerk's, and its company details as a section of it while its kind is company (0109).
+    const CLERK_RW = { read: ['clerk'], write: ['clerk'] }
+    const parties = await admin('/v1/form-proposals', { connection, root: { schema: 'parity', name: 'party' }, formId: party, title: 'Party', lookups: [], versionColumn: 'version', pinned: ['tenant_id'] })
+    const partyPolicy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+      fields: { id: { read: ['clerk'], write: [] }, tenant_id: { read: ['clerk'], write: [] }, name: CLERK_RW, kind: CLERK_RW },
+      rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+      lookups: {},
+    }
+    const companies = await admin('/v1/form-proposals', {
+      connection,
+      root: { schema: 'parity', name: 'party_company' },
+      formId: company,
+      title: 'Company details',
+      lookups: [{ foreignKey: 'fk_party_company_party', display: ['name'], section: { when: { column: 'kind', value: 'company' } } }],
+      versionColumn: 'version',
+    })
+    const companyPolicy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+      fields: { party: CLERK_RW, vat_no: CLERK_RW },
+      rowFilters: [],
+      lookups: { party: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      through: ['party'],
+    }
+    for (const [formId, proposed, policy] of [
+      [party, parties, partyPolicy],
+      [company, companies, companyPolicy],
+    ] as const) {
+      const { form, bindings, snapshot, generation } = proposed
+      await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+    }
   }
   for (const engine of options.children === true ? ENGINES : []) {
     for (const child of childForms(engine, { deletes, deliveries: options.deliveries === true, views })) {

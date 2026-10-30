@@ -40,6 +40,8 @@ export type {
   GenerationNote,
   GenerationRequest,
   LookupChoice,
+  SectionBinding,
+  SectionCondition,
 } from './generate/types.js'
 export { describedOf, diffRootDefinition, diffSnapshots, ROOT_DEFINITION } from './drift/diff.js'
 export type { DescribedRoot } from './drift/diff.js'
