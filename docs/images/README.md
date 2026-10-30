@@ -100,7 +100,10 @@ listens on a port.
 - **Settled text.** A part's text is read once no element in the parts has
   been `aria-busy` -- a lookup's search out -- for 500 ms, after the blur,
   and again after the shot; a capture whose text differs between the two is
-  refused, because the act did not wait for the state it pictures.
+  refused, because the act did not wait for the state it pictures. So an
+  act types into a form's field through `fillField`
+  (`scripts/pictures/session.mjs`), which waits for a field with a limit to
+  say its count, as formancy does a second after typing pauses.
 - **Encoding.** WebP at quality 0.9, through Chromium's canvas, refused if the
   canvas answers with another type.
 - **Secrets.** It refuses a part whose text holds a token, password or
@@ -221,7 +224,7 @@ Filed, not hidden, because a picture is the product as it is:
   administrator plane -- it draws a sentence in place of the control, so
   nothing in the field carries `aria-required`, which is what the Blueprint
   theme draws the `*` from; the field still says "required" after Validate.
-  That is `@formancy/react`'s fallback, at 0.3.0 to 0.7.0 alike,
+  That is `@formancy/react`'s fallback, at 0.3.0 to 0.11.0 alike,
   and the themes, upstream.
 
 ## What nothing checks

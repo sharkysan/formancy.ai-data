@@ -107,7 +107,7 @@ async function tabTo(user: User, target: () => HTMLElement, name: string): Promi
 
 /**
  * Both renderers ask a search 250 ms after it is wanted (`DEBOUNCE_MS` in
- * `@formancy/react` and `@formancy/angular` 0.6.0 and 0.7.0), so a field that searched
+ * `@formancy/react` and `@formancy/angular` 0.6.0 to 0.11.0), so a field that searched
  * by itself when it was drawn has sent its search within this.
  */
 const PAST_THE_DEBOUNCE_MS = 1_000
@@ -195,7 +195,7 @@ describe.each(ENGINES)('a lookup whose list goes on, on $engine', (engine) => {
   })
 
   // A record the person may only read draws its Customer disabled, which
-  // asks only for the name of what it holds (formancy 0.6.0 and 0.7.0): tenant 3's
+  // asks only for the name of what it holds (formancy 0.6.0 to 0.11.0): tenant 3's
   // order shows First 01, the page sends no lookup search for the form once
   // it is open, and neither pane says the list goes on, though it does --
   // nobody can choose from it. Before a record is open the page holds each

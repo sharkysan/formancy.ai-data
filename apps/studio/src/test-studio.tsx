@@ -161,6 +161,28 @@ export function focusedName(): string {
   return element === null || element === document.body ? 'the page itself' : computeAccessibleName(element)
 }
 
+/**
+ * The studio's status lines in `container`, leaving out the paper's: from
+ * formancy 0.8.0 a field with a limit draws a status region of its own for
+ * its count (formancy.ai 0203), and a draft's paper has such fields. The
+ * paper is told apart as the form it is, by its role.
+ */
+export function statuses(container: HTMLElement): HTMLElement[] {
+  const papers = within(container).queryAllByRole('form')
+  return within(container)
+    .queryAllByRole('status')
+    .filter((status) => !papers.some((paper) => paper.contains(status)))
+}
+
+/** The studio's one status line in `container`, once it is there: `statuses`, waited for. */
+export async function findStatus(container: HTMLElement): Promise<HTMLElement> {
+  return waitFor(() => {
+    const [only, ...more] = statuses(container)
+    expect({ found: only === undefined ? 0 : 1 + more.length }).toEqual({ found: 1 })
+    return only as HTMLElement
+  })
+}
+
 /** What the paragraphs in `container` say, in order: prose has a role and no name. */
 export function paragraphs(container: HTMLElement): string[] {
   return within(container)

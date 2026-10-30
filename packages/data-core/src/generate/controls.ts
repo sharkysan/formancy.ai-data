@@ -77,7 +77,8 @@ export function controlFor(type: NormalizedType, nullable: boolean): ControlPlan
       // would silently mean false where the database holds "unknown". A select,
       // not a radio group: its empty choice takes an answer back to "unknown",
       // which a radio group never can, and a rule disables it, which no
-      // renderer does for a radio group through formancy 0.7.0 (0095).
+      // renderer did for a radio group through formancy 0.8.0 (0095; fixed
+      // in 0.9.0, formancy.ai 0210).
       return nullable
         ? {
             field: {
