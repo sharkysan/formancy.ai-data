@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DataClient, FormMenuChild, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { ColumnsPanel } from './columns-panel.js'
-import { fieldHeading } from './field-heading.js'
 import { FilterPanel } from './filter-panel.js'
 import { panelFields } from './filter-terms.js'
 import { columnsOf } from './grid-datasource.js'
@@ -28,6 +27,7 @@ import { Words } from './words.js'
 import type { HeldLevels, SectionDrill } from './use-drill.js'
 import { useGridState } from './use-grid-state.js'
 import { ViewPicker } from './view-picker.js'
+import { childTitle } from './child-title.js'
 
 /** What the record above a child section is: a saved record, or a new one not saved yet. */
 export type ParentOpen = { kind: 'new' } | { kind: 'record'; token: string }
@@ -139,7 +139,6 @@ export function ChildSection({
   openRef.current = open
 
   const title = menu.title
-  const fieldLabel = fieldHeading(definition.form.model.fields.find((field) => field.key === child.field) ?? { key: child.field })
   const headingId = `${idBase}-${String(index)}-heading`
   const canCreate = menu.operations.includes('create') && definition.operations.includes('create')
   const waiting = parent.kind === 'new'
@@ -321,7 +320,7 @@ export function ChildSection({
     <section className="child" aria-labelledby={headingId}>
       <div className="section-head">
         <h4 id={headingId} className="child-heading" tabIndex={-1} ref={sectionHeading}>
-          {twice ? `${title}, ${fieldLabel}` : title}
+          {childTitle(title, twice, definition, child.field)}
         </h4>
         {canCreate ? (
           <button

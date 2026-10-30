@@ -11,11 +11,11 @@ import type { GenerationNote } from '@formancy/data-core'
 import { App } from './app.js'
 import { generateExamples } from './examples.js'
 import type { Example } from './examples.js'
-import { fieldHeading } from './field-heading.js'
 import { NOTE_KINDS } from './notes.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
 import { ANSWERING_ROLES, answerable, paragraphs } from './test-accessible.js'
 import { ANGULAR_ARRIVES } from './test-timing.js'
+import { fieldHeading } from '@formancy/data-core'
 
 /**
  * The page around the previews: what it says, and whether it can be used.

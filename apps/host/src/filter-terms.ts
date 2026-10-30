@@ -1,5 +1,5 @@
 import type { FilterInput, FilterOp, FilterableField, ListFilterTerm, PublishedForm } from '@formancy/data-client'
-import { fieldHeading } from './field-heading.js'
+import { fieldHeading } from '@formancy/data-client'
 
 /*
  * What a grid's filter panel offers and says (0104), as data: the fields a

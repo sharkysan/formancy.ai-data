@@ -282,7 +282,10 @@ later.
   child's title and the line that says what a copy left out. A form stored
   with a `{ $t }` label is served as stored (0079), and the CSV export
   already headed its column with the key; the page wrote `String(label)`.
-  Found by the linter's `no-base-to-string`.
+  The rule is now one function, `fieldHeading`, exported by
+  `@formancy/data-core` and re-exported by `@formancy/data-client`, which
+  the export, the host and the examples page all call. Found by the
+  linter's `no-base-to-string`.
 - **A grid's row says what Space and Enter do in Drill down**: both open
   the record and move the keyboard to it. AG Grid's live region said what
   the other layouts do -- Space opens it and keeps the keyboard in the

@@ -7,10 +7,10 @@ import { ACCESSIBILITY_EXCLUSIONS, ACCESSIBILITY_TAGS, ACCESSIBILITY_UNMEASURABL
 import { App } from './app.js'
 import { generateExamples } from './examples.js'
 import type { Example } from './examples.js'
-import { fieldHeading } from './field-heading.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
 import { answerable, paragraphs } from './test-accessible.js'
 import { ANGULAR_ARRIVES } from './test-timing.js'
+import { fieldHeading } from '@formancy/data-core'
 
 /**
  * One generated document, two renderers, and the claim that they agree.

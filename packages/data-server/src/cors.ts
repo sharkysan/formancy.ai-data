@@ -300,7 +300,7 @@ export function crossOrigin(app: FastifyInstance, options: CrossOriginOptions): 
     // registered after this call, it holds only a route registered before
     // it, which createDataServer has none of; and it asks for the method
     // asked alone: another riding the grant is the check at ready's.
-    const reached = app.findRoute({ method: method, url: request.url })
+    const reached = app.findRoute({ method, url: request.url })
     if (reached === null || !sameParameters(reached.params, request.params as Record<string, unknown>))
       return { granted: false, reason: 'method reaches another route' }
     const asked = String(request.headers['access-control-request-headers'] ?? '')

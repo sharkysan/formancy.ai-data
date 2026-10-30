@@ -221,7 +221,7 @@ async function lockedTransaction(
       sent = true
       return untilLost(run(tx, statement.text, statement.params))
     })
-    return { ok: true, result: result }
+    return { ok: true, result }
   } catch (error) {
     return { ok: false, error, sent }
   }

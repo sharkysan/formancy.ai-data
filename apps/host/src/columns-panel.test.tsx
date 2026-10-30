@@ -9,7 +9,7 @@ import type { User } from './test-host.js'
 import { childGrid, columnsButton, headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
-import { fieldHeading } from './field-heading.js'
+import { fieldHeading } from '@formancy/data-client'
 
 /*
  * A grid's Columns on the host page (0106), on both engines, against the

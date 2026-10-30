@@ -54,7 +54,7 @@ The reply types — `FormMenu`, `FormMenuEntry`, `FormMenuChild`,
 `RecordExportQuery`, `ListSortTerm`, `ListFilterTerm`, `FilterCondition`,
 `FilterOp`, `FilterOffer`, `FilterInput`, `FilterableField`, `ListColumns`, `ListView`,
 `LookupResult`, `LookupRow`, `FieldError` — and `LIST_PAGE_SIZE`,
-`EXPORT_MAX_BYTES` and `exportFileName` are re-exported from
+`EXPORT_MAX_BYTES`, `exportFileName` and `fieldHeading` are re-exported from
 `@formancy/data-core`, where the server's handlers are checked against the
 same declarations. A form's `list`
 is `null` when the server would refuse this person a page, and otherwise

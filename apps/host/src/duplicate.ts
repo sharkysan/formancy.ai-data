@@ -1,7 +1,7 @@
 import type { FormRecord } from '@formancy/data-client'
 import type { FieldDef } from '@formancy/spec'
-import { fieldHeading } from './field-heading.js'
 import type { Said } from './leave.js'
+import { fieldHeading } from '@formancy/data-client'
 
 /*
  * Duplicate record (0107): a new record holding a copy of a saved one's

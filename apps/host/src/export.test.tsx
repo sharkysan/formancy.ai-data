@@ -24,7 +24,7 @@ import type { User } from './test-host.js'
 import { holdingRequests } from './test-network.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane, Sent } from './test-plane.js'
-import { fieldHeading } from './field-heading.js'
+import { fieldHeading } from '@formancy/data-client'
 
 /*
  * Download CSV on the host page (0080), on both engines, against the real

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription as computeDescription } from 'dom-accessibility-api'
-import { createDataClient } from '@formancy/data-client'
+import { createDataClient, fieldHeading } from '@formancy/data-client'
 import { focusedName } from './test-accessible.js'
 import {
   answer,
@@ -23,7 +23,6 @@ import {
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
-import { fieldHeading } from './field-heading.js'
 
 /*
  * The workspace (0047) on both engines, against the real server: the Forms

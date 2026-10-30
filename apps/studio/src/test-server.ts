@@ -89,8 +89,7 @@ export const ADMIN_ROLE = 'data-admin'
 export const PUBLISHER_ROLE = 'data-publisher'
 export const BROWSE_ROLE = 'data-browser'
 
-// eslint-disable-next-line @typescript-eslint/require-await -- a double of an async interface: a throw in it must reject, as the real one's does, and a returning branch must resolve
-const verifyIdentity: IdentityVerifier = async (token) => {
+const verified = (token: string): Awaited<ReturnType<IdentityVerifier>> => {
   if (token === TOKENS.admin) return { ok: true, identity: { actor: { id: 'ada', roles: [ADMIN_ROLE] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-7', roles: ['clerk'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.publisher) return { ok: true, identity: { actor: { id: 'grace', roles: [PUBLISHER_ROLE] }, attributes: { tenant: '1' } } }
@@ -98,6 +97,7 @@ const verifyIdentity: IdentityVerifier = async (token) => {
   if (token === TOKENS.browser) return { ok: true, identity: { actor: { id: 'bo', roles: [ADMIN_ROLE, BROWSE_ROLE] }, attributes: { tenant: '1' } } }
   return { ok: false, reason: 'ERR_JWS_INVALID' }
 }
+const verifyIdentity: IdentityVerifier = (token) => Promise.resolve(verified(token))
 
 export interface TestPlane {
   /** The `fetch` the studio is given: every call is answered by the real server. */

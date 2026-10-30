@@ -170,8 +170,7 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- a Fastify handler is async by contract: it answers by returning
-  app.get('/v1/connections', async () => ({ connections: registry.ids() }))
+  app.get('/v1/connections', () => ({ connections: registry.ids() }))
 
   app.post<{ Params: { id: string } }>('/v1/connections/:id/test', async (request, reply) => {
     const open = await connection(request.params.id, reply)

@@ -10,7 +10,7 @@ import type { User } from './test-host.js'
 import { headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
-import { fieldHeading } from './field-heading.js'
+import { fieldHeading } from '@formancy/data-client'
 
 /*
  * What this browser keeps of a grid, and what it brings back (0106), on

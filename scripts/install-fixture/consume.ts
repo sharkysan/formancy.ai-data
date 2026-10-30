@@ -7,7 +7,16 @@
  * shipped. Connecting to a database is the integration suites' business.
  */
 import { createHmac, randomBytes } from 'node:crypto'
-import { createDataClient, EXPORT_MAX_BYTES, exportFileName, fieldProblems, LIST_PAGE_SIZE, lookupSources, sourceNames } from '@formancy/data-client'
+import {
+  createDataClient,
+  EXPORT_MAX_BYTES,
+  exportFileName,
+  fieldHeading,
+  fieldProblems,
+  LIST_PAGE_SIZE,
+  lookupSources,
+  sourceNames,
+} from '@formancy/data-client'
 import type { DeleteOutcome, FormMenu, Outcome, PublishedForm, RecordFile, RecordList, Refusal } from '@formancy/data-client'
 import { DATABASE_KINDS, isDatabaseKind, reachesPast } from '@formancy/data-core'
 import type { CascadeRule, DatabaseAdapter, DatabaseKind, FormPolicy } from '@formancy/data-core'
@@ -177,6 +186,9 @@ const bytes = file.ok ? Buffer.from(await file.value.file.arrayBuffer()) : Buffe
 if (!file.ok || file.value.name !== 'order.csv' || !bytes.equals(Buffer.from(csv, 'utf8')) || !Number.isSafeInteger(EXPORT_MAX_BYTES))
   throw new Error('exportRecords() did not read the file')
 if (exportFileName('order') !== file.value.name) throw new Error('exportFileName() is not the name exportRecords() saves under')
+
+if (fieldHeading({ key: 'order', label: { $t: 'order.label' } }) !== 'order')
+  throw new Error('fieldHeading() named a message reference by anything but its key')
 
 // What a delete may act through (0051): a policy that names a key with its
 // action, typed by what the published core declares, and the core's own

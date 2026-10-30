@@ -39,14 +39,14 @@ export const TOKENS = {
   thirdClerk: 'host-test-clerk-tenant-3',
 } as const
 
-// eslint-disable-next-line @typescript-eslint/require-await -- a double of an async interface: a throw in it must reject, as the real one's does, and a returning branch must resolve
-const verifyIdentity: IdentityVerifier = async (token) => {
+const verified = (token: string): Awaited<ReturnType<IdentityVerifier>> => {
   if (token === TOKENS.admin) return { ok: true, identity: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-1', roles: ['clerk'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.otherClerk) return { ok: true, identity: { actor: { id: 'clerk-2', roles: ['clerk'] }, attributes: { tenant: '2' } } }
   if (token === TOKENS.thirdClerk) return { ok: true, identity: { actor: { id: 'clerk-3', roles: ['clerk'] }, attributes: { tenant: '3' } } }
   return { ok: false, reason: 'ERR_JWS_INVALID' }
 }
+const verifyIdentity: IdentityVerifier = (token) => Promise.resolve(verified(token))
 
 /**
  * With `demoKey`, the literal tokens and the live demo's (0070): a token

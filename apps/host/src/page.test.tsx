@@ -37,7 +37,7 @@ import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 import { PREFERENCES } from './prefs.js'
 import { CHANGED_SINCE_UNKNOWN } from './session.js'
-import { fieldHeading } from './field-heading.js'
+import { fieldHeading } from '@formancy/data-client'
 
 /*
  * The page around the forms: that it opens what the server publishes, says

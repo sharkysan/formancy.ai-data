@@ -228,6 +228,17 @@ describe('createSnapshot', () => {
     )
   })
 
+  // The facts come from an embedder and are untrusted: a refusal that names
+  // one must say what it was. A bigint made JSON.stringify throw its own
+  // TypeError, NaN was written as "null", and an object as "[object Object]".
+  test('names a server fact it refuses as it was given, whatever it was', () => {
+    const objects = [table('a', [column('x', 1)])]
+    const major = (value: unknown) => () => snapshot(objects, { server: { product: 'postgresql', major: value as never } })
+    expect(major(10n)).toThrow(/the server's major 10 is neither/)
+    expect(major(Number.NaN)).toThrow(/the server's major NaN is neither/)
+    expect(major({ v: 1 })).toThrow(/the server's major \{"v":1\} is neither/)
+  })
+
   // A revoked column grant is a change to what a form bound to the column can
   // do, so it must move the fingerprint, or drift's fast path would never look.
   // So must row security starting to apply.
@@ -458,6 +469,8 @@ describe('what a snapshot says about deleting (0049)', () => {
     expect(refused({ ...outside, columns: [42] })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy names a column that is not a name/)
     expect(refused({ ...outside, columns: [''] })).toThrow(/names a column that is not a name/)
     expect(refused({ ...outside, columns: [null] })).toThrow(/names a column that is not a name/)
+    // A referenced column that is no name is said as what it is, not "[object Object]".
+    expect(refused({ ...outside, columns: ['x'], referencedColumns: [{ v: 1 }] })).toThrow(/refers to \{"v":1\}, which the table does not have/)
     const wide = table('a', [column('id', 1), column('n', 2)], { primaryKey: { name: 'pk_a', columns: ['id', 'n'] } })
     expect(() => snapshot([{ ...wide, ...withFacts(true, { referencedBy: [{ ...outside, columns: ['x', 'y'], referencedColumns: ['id', 'id'] }] }) }])).toThrow(
       /sales\.a: inbound key fk_b_a of audit\.copy refers to id twice/,

@@ -166,14 +166,15 @@ export function FilterPanel({
 }): ReactElement {
   const byField = new Map(fields.map((field) => [field.field, field]))
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState<Draft>(() => draftFor(fields[0] as PanelField))
+  // The panel is drawn only for a list with a field to filter by.
+  const first = fields[0] as PanelField
+  const [draft, setDraft] = useState<Draft>(() => draftFor(first))
   /** Why the draft is not a condition yet, until it changes. */
   const [problem, setProblem] = useState('')
   const toggle = useRef<HTMLButtonElement>(null)
   const removes = useRef(new Map<string, HTMLButtonElement>())
   const after = useAfterRender()
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- the rule misses noUncheckedIndexedAccess here: without the assertion fields[0] is possibly undefined and tsc refuses four uses, and the panel is drawn only for a list with a field
-  const field = byField.get(draft.field) ?? (fields[0] as PanelField)
+  const field = byField.get(draft.field) ?? first
   const hint = draftHint(draft, field)
   const held = filter.some((term) => term.field === draft.field)
   /** What describes the draft's controls: the hint and the field's condition already applied, when there are any. */

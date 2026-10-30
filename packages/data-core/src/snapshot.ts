@@ -162,8 +162,12 @@ function assertAccount(input: Omit<MetadataSnapshot, 'fingerprint'>): void {
   if (typeof account.login !== 'string' || account.login === '') throw new Error('the account names no login')
 }
 
-/** A value a refusal names: text as it is, anything else as JSON, never "[object Object]". */
-const shown = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value))
+/**
+ * A value a refusal names, as it was given: a primitive as `String` spells it
+ * (JSON throws on a bigint and writes NaN as null), an object as JSON, never
+ * "[object Object]". The values are an embedder's, so nothing here may throw.
+ */
+const shown = (value: unknown): string => (typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value))
 
 /**
  * The server facts (0068), when there are any, as the contract names them:
@@ -271,7 +275,7 @@ function assertInboundKey(object: ObjectMeta, key: InboundKey): void {
   const twice: unknown = referenced.find((name, index) => referenced.indexOf(name) !== index)
   if (twice !== undefined) throw new Error(`${at} refers to ${shown(twice)} twice`)
   for (const name of referenced) {
-    if (!object.columns.some((column) => column.name === name)) throw new Error(`${at} refers to ${String(name)}, which the table does not have`)
+    if (!object.columns.some((column) => column.name === name)) throw new Error(`${at} refers to ${shown(name)}, which the table does not have`)
   }
   if (!isListed(ACTIONS, key.onDelete) || !isListed(ACTIONS, key.onUpdate)) throw new Error(`${at} has an action that is not one the contract names`)
   if (typeof (key.enforced as unknown) !== 'boolean') throw new Error(`${at} has no enforced flag`)

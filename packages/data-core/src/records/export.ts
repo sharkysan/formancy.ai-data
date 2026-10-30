@@ -5,6 +5,7 @@ import { displayText, isDisplayType } from '../lookup/display.js'
 import type { NormalizedType } from '../metadata.js'
 import { canonicalValue } from './answers.js'
 import { csvHeader, csvRecord } from './csv.js'
+import { fieldHeading } from './heading.js'
 import type { CsvCell, CsvText } from './csv.js'
 import type { FormRecord } from './plan-types.js'
 
@@ -58,7 +59,7 @@ export function exportColumns(form: FormSchema, bindings: FormBindings, readable
   for (const field of form.model.fields) {
     const binding = bound.get(field.key)
     if (binding === undefined || !wanted.has(field.key)) continue
-    fields.push({ header: typeof field.label === 'string' ? field.label : field.key, binding })
+    fields.push({ header: fieldHeading(field), binding })
   }
   if (fields.length !== wanted.size) throw new Error('A readable field is not a bound field of the form, so the file cannot place it.')
   const headers = fields.flatMap(({ header, binding }) => (binding.kind === 'lookup' ? [header, `${header} (key)`] : [header]))

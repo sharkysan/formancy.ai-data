@@ -1,7 +1,7 @@
 import type { IDatasource, IGetRowsParams, SortModelItem } from 'ag-grid-community'
 import type { DataClient, FormRecord, ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
-import { fieldHeading } from './field-heading.js'
 import { sameSort } from './views.js'
+import { fieldHeading } from '@formancy/data-client'
 
 /*
  * What a record grid asks the runtime plane for, and what it says about the
