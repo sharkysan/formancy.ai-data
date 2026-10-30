@@ -232,7 +232,7 @@ export function insertStatement(request: InsertRequest, definition: Definition, 
   const columns = request.values.length === 0 ? '' : ` (${request.values.map((value) => quoteIdentifier(value.name)).join(', ')})`
   const values = request.values.map((value) => bound(statement, value)).join(', ')
   const fresh = freshSql(statement, request)
-  const body = `select ${values}\nwhere ${[...guard(statement, request.target.table, definition, path)].join(' and ')}`
+  const body = `select ${values}\nwhere ${[...guard(statement, request.target.table, definition, path), ...(fresh === undefined ? [] : [fresh])].join(' and ')}`
   const returning = outputs(request.target, request.returning)
   const text = [`${table}${columns}`, body, returning.length > 0 ? `returning ${returning.join(', ')}` : ''].filter((part) => part !== '').join('\n')
   return { text, params: statement.params }
@@ -251,7 +251,7 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
   const version = request.target.concurrency.column
   const set = request.set.map((value) => `${quoteIdentifier(value.name)} = ${bound(statement, value)}`)
   set.push(`${quoteIdentifier(version)} = ${column(version)} ${op('+')} 1`)
-  const where = [...located(statement, request.key, terms, through), versionIs(statement, request), ...guard(statement, request.target.table, definition, path)]
+  const where = [...located(statement, request.key, terms, through), versionIs(statement, request), ...openSql(request), ...guard(statement, request.target.table, definition, path)]
   const text = [
     `update ${quoteTable(request.target.table)} as ${ROW}`,
     `set ${set.join(', ')}`,

@@ -43,7 +43,7 @@ export function supersedeStatement(request: SupersedeRequest, terms: readonly Ro
   const table = request.target.table
   const version = request.target.concurrency.column
   const set = [`${quoteIdentifier(request.ends)} = ${bound(statement, request.start)}`, `${quoteIdentifier(version)} = ${column(version)} ${op('+')} 1`]
-  const where = [...located(statement, request.key, terms, through), versionIs(statement, request), ...guard(statement, table, definition, path)]
+  const where = [...located(statement, request.key, terms, through), versionIs(statement, request), `${column(request.ends)} is null`, ...guard(statement, table, definition, path)]
   const names = [...request.chain.map((entry) => entry.name), request.start.name, ...request.values.map((value) => value.name)]
   const selected = [...request.chain.map((entry) => `${ENDED}.${quoteIdentifier(entry.name)}`), bound(statement, request.start), ...request.values.map((value) => bound(statement, value))]
   const text = [
@@ -57,7 +57,7 @@ export function supersedeStatement(request: SupersedeRequest, terms: readonly Ro
     `select ${selected.join(', ')} from ${ENDED}`,
     `returning ${outputs(request.target, request.returning).join(', ')}`,
     ')',
-    `select (select true from ${ENDED})::pg_catalog.text as "one", ${NEXT}.*`,
+    `select (select true from ${ENDED} union all select true from ${ENDED} where not exists (select from ${NEXT}))::pg_catalog.text as "one", ${NEXT}.*`,
     `from (select) as "g" left join ${NEXT} on true`,
   ].join('\n')
   return { text, params: statement.params }
