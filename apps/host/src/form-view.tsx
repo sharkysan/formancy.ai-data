@@ -21,6 +21,7 @@ import { paneEntry, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
 import type { Said } from './leave.js'
 import type { Layout, View } from './layout.js'
+import { isOpen, nextLine, nextOf } from './next-version.js'
 import { OneChild } from './one-child.js'
 import { useOpening } from './opening.js'
 import { renderersOf } from './panes.js'
@@ -127,11 +128,14 @@ export function FormView({
   const [released, setReleased] = useState(0)
   const deleteButton = useRef<HTMLButtonElement>(null)
   const duplicateButton = useRef<HTMLButtonElement>(null)
+  const changeButton = useRef<HTMLButtonElement>(null)
 
   const title = entry.title
   const canCreate = definition.operations.includes('create')
   /** What a copy carries (0107): `null` from the server where it offers no create, and then no Duplicate record. */
   const copied = definition.copied ?? []
+  /** Where a version may be changed from a date (0113): the fields it starts and ends at, and the chain's key; else null. */
+  const versions = definition.versions
   const columns = useMemo(() => columnsOf(definition, null), [definition])
   const sessions = useMemo(
     () => (['react', 'angular'] as const).map((which) => createSession({ client, formId, definition, renderer: which })),
@@ -142,7 +146,7 @@ export function FormView({
       sessions.map((session) =>
         paneEntry('master', session, (): Said => {
           const now = openRef.current
-          return now?.kind === 'record' ? [`${title} `, { code: now.token }] : ['New record']
+          return now?.kind === 'record' ? [`${title} `, { code: now.token }] : now?.kind === 'next' ? ['Next version of ', { code: now.of }] : ['New record']
         }),
       ),
     [sessions, title],
@@ -269,13 +273,15 @@ export function FormView({
    * Duplicate record (0107): the open record read again, and every pane
    * opened on a copy of it as a new record -- the answers the server names,
    * no token, no version -- after asking, as New does, about work the
-   * detail holds. The line says what was copied and what was not.
+   * detail holds. The line says what was copied and what was not. Change
+   * from a date (0115) is the same read, every pane opened on the next
+   * version of the open one, which its save ends.
    */
-  function startDuplicate(): void {
+  function startCopy(kind: 'duplicate' | 'change'): void {
     const now = openRef.current
-    if (now?.kind !== 'record') return
-    const request = { kind: 'duplicate', record: now.token } as const
-    const back = (): void => duplicateButton.current?.focus()
+    if (now?.kind !== 'record' || (kind === 'change' && versions === null)) return
+    const request = { kind, record: now.token } as const
+    const back = (): void => (kind === 'duplicate' ? duplicateButton : changeButton).current?.focus()
     ask(
       request,
       (discarded) =>
@@ -286,17 +292,20 @@ export function FormView({
           {
             opened: (done, record) => {
               drill.dropAll()
-              setOpen({ kind: 'new' })
+              setOpen(kind === 'duplicate' ? { kind: 'new' } : { kind: 'next', of: done.token })
               setMasterName(null)
               setStored(null)
               setLoadRefusal(null)
-              say([...(done.discarded ? DISCARDED : []), ...copiedLine(done.token, leftOut(definition.form.model.fields, record, copied), both)])
+              const line =
+                kind === 'duplicate' ? copiedLine(done.token, leftOut(definition.form.model.fields, record, copied), both) : nextLine(done.token, both)
+              say([...(done.discarded ? DISCARDED : []), ...line])
               toDetail()
             },
             refused: (message) => say([message], 'refused'),
             back,
           },
-          (record) => copyOf(record, copied),
+          (record) => (kind === 'duplicate' || versions === null ? copyOf(record, copied) : nextOf(record, versions)),
+          (record) => (kind === 'change' && record.record !== null && record.version !== null ? { record: record.record, version: record.version } : undefined),
         ),
       back,
     )
@@ -509,7 +518,10 @@ export function FormView({
           onLoaded={loadedSaved}
           canDuplicate={copied.length > 0}
           duplicateRef={duplicateButton}
-          onDuplicate={startDuplicate}
+          onDuplicate={() => startCopy('duplicate')}
+          canChange={open?.kind === 'record' && isOpen(stored, versions)}
+          changeRef={changeButton}
+          onChange={() => startCopy('change')}
           canDelete={canDelete}
           saving={saving}
           deleteRef={deleteButton}

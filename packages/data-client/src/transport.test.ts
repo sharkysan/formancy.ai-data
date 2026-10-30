@@ -769,7 +769,7 @@ describe('a delete (0050)', () => {
   // that offered a change from it would offer one nobody decided.
   test("a form's versions are null, or the start and end where it offers create and update", async () => {
     const FORM = { form: { model: {} }, readable: ['id', 'valid_from', 'valid_to'], list: null, deleting: null, copied: [] }
-    const VERSIONS = { from: 'valid_from', to: 'valid_to' }
+    const VERSIONS = { from: 'valid_from', to: 'valid_to', key: ['product_no'] }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
@@ -779,6 +779,7 @@ describe('a delete (0050)', () => {
       [['read', 'create', 'update'], undefined],
       [['read', 'create'], VERSIONS],
       [['read', 'create', 'update'], { from: 'valid_from' }],
+      [['read', 'create', 'update'], { from: 'valid_from', to: 'valid_to' }],
       [['read', 'create', 'update'], 'valid_from'],
     ] as const) {
       body = { ...FORM, operations, versions }

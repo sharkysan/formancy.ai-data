@@ -103,6 +103,7 @@ export const ENGINES = [
     withheld: 'pg-order-withheld',
     party: 'pg-party',
     company: 'pg-party-company',
+    price: 'pg-price',
   },
   {
     engine: 'SQL Server',
@@ -119,6 +120,7 @@ export const ENGINES = [
     withheld: 'ms-order-withheld',
     party: 'ms-party',
     company: 'ms-party-company',
+    price: 'ms-price',
   },
 ] as const
 
@@ -259,10 +261,20 @@ function injectingFetch(app: Awaited<ReturnType<typeof createDataServer>>, pendi
  * `WITHHELD_VIEWS` (test-forms.ts). With `sections` (0109), `party` of
  * `ENGINES` is published over `parity.party`, and `company` over
  * `parity.party_company` as a section of it, shown while its kind is
- * `company`.
+ * `company`. With `versions` (0113, 0115), `price` of `ENGINES` is
+ * published over `parity.price`, a chain of versions.
  */
 export async function startPlane(
-  options: { children?: boolean; deletes?: boolean; deliveries?: boolean; demo?: boolean; paged?: boolean; sections?: boolean; views?: boolean } = {},
+  options: {
+    children?: boolean
+    deletes?: boolean
+    deliveries?: boolean
+    demo?: boolean
+    paged?: boolean
+    sections?: boolean
+    versions?: boolean
+    views?: boolean
+  } = {},
 ): Promise<Plane> {
   const { pg, ms } = inject('databases')
   // 32 random bytes as base64url: the shape of the key a Durable Object starts its container with.
@@ -420,6 +432,32 @@ export async function startPlane(
         bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
       })
     }
+  }
+  for (const { parity: connection, price } of options.versions === true ? ENGINES : []) {
+    // A product's prices, each a version valid from one date until the next starts, the tenant pinned to the clerk's (0113, 0115).
+    const CLERK_RW = { read: ['clerk'], write: ['clerk'] }
+    const READS = { read: ['clerk'], write: [] }
+    const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
+      connection,
+      root: { schema: 'parity', name: 'price' },
+      formId: price,
+      title: 'Price',
+      lookups: [],
+      versionColumn: 'version',
+      pinned: ['tenant_id'],
+      validity: { from: 'valid_from', to: 'valid_to' },
+    })
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+      fields: { tenant_id: READS, product_no: CLERK_RW, valid_from: CLERK_RW, valid_to: READS, amount: CLERK_RW, note: CLERK_RW },
+      rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+      lookups: {},
+    }
+    await admin(`/v1/forms/${price}/versions`, {
+      expectedBase: null,
+      bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+    })
   }
   for (const engine of options.children === true ? ENGINES : []) {
     for (const child of childForms(engine, { deletes, deliveries: options.deliveries === true, views })) {

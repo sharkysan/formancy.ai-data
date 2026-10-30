@@ -35,6 +35,7 @@ function definition(operations: PublishedForm['operations']): PublishedForm {
     operations,
     readable: ['order', 'line_no', 'notes'],
     list: null,
+    versions: null,
   } as unknown as PublishedForm
 }
 

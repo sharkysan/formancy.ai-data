@@ -31,6 +31,7 @@ describe('what each way of leaving a form discards', () => {
     { kind: 'new' },
     { kind: 'load', record: 'k1:3' },
     { kind: 'duplicate', record: 'k1:4' },
+    { kind: 'change', record: 'k1:4' },
     { kind: 'form', title: 'Customer' },
     { kind: 'history', direction: 'back' },
     { kind: 'history', direction: 'forward' },
@@ -106,6 +107,7 @@ describe('what each way of leaving a form discards', () => {
       { kind: 'new' },
       { kind: 'load', record: 'k1:3' },
       { kind: 'duplicate', record: 'k1:4' },
+      { kind: 'change', record: 'k1:4' },
       { kind: 'created', owner: 'master', record: 'k1:5', by: 'react' },
     ]
     for (const request of keeps) expect({ request: request.kind, asks: of(request) }).toEqual({ request: request.kind, asks: [gridOwner('lines')] })
@@ -227,6 +229,7 @@ describe('what the notice says', () => {
     expect(text({ kind: 'new' })).toBe('Starting a new record closes these forms:')
     expect(text({ kind: 'load', record: 'k1:1999' })).toBe('Loading `k1:1999` closes these forms:')
     expect(text({ kind: 'duplicate', record: 'k1:1004' })).toBe('Copying `k1:1004` into a new record closes these forms:')
+    expect(text({ kind: 'change', record: 'k1:1,7,2026-01-01' })).toBe('Starting the next version of `k1:1,7,2026-01-01` closes these forms:')
     expect(text({ kind: 'form', title: 'Customer' })).toBe('Opening Customer closes these forms:')
     expect(text({ kind: 'history', direction: 'back' })).toBe('Going back closes these forms:')
     expect(text({ kind: 'history', direction: 'forward' })).toBe('Going forward closes these forms:')

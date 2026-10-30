@@ -432,7 +432,11 @@ panel and `src/filter-terms.ts` what it offers, sends and says
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md));
 `src/duplicate.ts` is Duplicate record's copy of a record and what its
 line says, the record read through `src/opening.ts`
-([0107](../decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md));
+([0107](../decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)),
+and `src/next-version.ts` Change from a date's next version of an open one,
+which the session saves with `supersede`
+([0115](../decisions/0115-a-host-page-changes-an-open-version-from-a-date.md));
+`src/form-head.tsx` is an open form's header;
 `src/children.tsx` lists a record's child rows, and `src/one-child.tsx`
 draws a child that is a section of the record -- its one row in a form, or
 Add -- shown by `src/section.ts` while the record as stored holds its
