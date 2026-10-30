@@ -121,12 +121,12 @@ function isCopied(value: unknown, operations: readonly unknown[]): value is Publ
 /**
  * Where a version may be changed from a date (0113): `null` unless the
  * form offers both create and update, otherwise `null` or the fields a
- * version starts and ends at. A reply without it -- a server older than
- * chains -- is no form this server sent.
+ * version starts and ends at, and the chain's key fields (0115). A reply
+ * without it -- a server older than chains -- is no form this server sent.
  */
 function isVersions(value: unknown, operations: readonly unknown[]): value is PublishedForm['versions'] {
   if (value === null) return true
-  return operations.includes('create') && operations.includes('update') && isRecord(value) && typeof value['from'] === 'string' && typeof value['to'] === 'string'
+  return operations.includes('create') && operations.includes('update') && isRecord(value) && typeof value['from'] === 'string' && typeof value['to'] === 'string' && isStrings(value['key'])
 }
 
 export function isPublishedForm(body: unknown): body is PublishedForm {

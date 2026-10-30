@@ -285,12 +285,16 @@ later.
     and ends at, or `null`. This release's `@formancy/data-client` reads a
     form without it as unexpected, so a host and its server are upgraded
     together. The audit names the operation `supersede`.
-  - Append only: an ended version is not edited through the form. The
-    host page does not yet offer a change; it follows.
+  - Append only: an ended version is not edited through the form, and the
+    host page draws it read-only.
   - **The studio's Choose step offers Versions** (0114) where the root has
     a column that could start a version and one that could end it: a box,
     then "Valid from" and "Valid until, empty while open". Generating a
     published form again keeps its chain.
+  - **The host page offers Change from a date** (0115) in the header of an
+    open version: every pane opens on its next version, the start to give
+    and the chain's key and end drawn unwritable, and a save ends the open
+    version on that date. `versions` names the chain's key fields too.
 
 ### Changed
 

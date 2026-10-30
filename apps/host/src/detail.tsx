@@ -11,7 +11,8 @@ import type { SaveResult, Session } from './session.js'
 import { Words } from './words.js'
 
 /** What the detail shows: nothing yet, a new record, or a saved one by its token. */
-export type MasterOpen = null | { kind: 'new' } | { kind: 'record'; token: string }
+/** What the detail holds: nothing, a new record, a record, or the next version of one (0115). */
+export type MasterOpen = null | { kind: 'new' } | { kind: 'record'; token: string } | { kind: 'next'; of: string }
 
 /**
  * The detail (UX-SPEC §5.10, §5.11): the open record's heading, the way back
@@ -49,6 +50,9 @@ export function Detail({
   canDuplicate,
   duplicateRef,
   onDuplicate,
+  canChange,
+  changeRef,
+  onChange,
   canDelete,
   saving,
   deleteRef,
@@ -80,6 +84,10 @@ export function Detail({
   canDuplicate: boolean
   duplicateRef: RefObject<HTMLButtonElement | null>
   onDuplicate: () => void
+  /** The open record is an open version this person may change from a date (0115): Change from a date in its header. */
+  canChange: boolean
+  changeRef: RefObject<HTMLButtonElement | null>
+  onChange: () => void
   /** The form offers this person delete (0053): Delete record in the header of an open record. */
   canDelete: boolean
   /** A save of the record is out: Delete record waits for its answer. */
@@ -92,7 +100,7 @@ export function Detail({
 }): ReactElement {
   const separate = layout === 'separate'
   const shown = renderersOf(renderer)
-  const heading: Said = open === null ? ['No record open'] : open.kind === 'new' ? ['New record'] : [`${formTitle} `, { code: open.token }]
+  const heading: Said = open === null ? ['No record open'] : open.kind === 'new' ? ['New record'] : open.kind === 'next' ? ['Next version of ', { code: open.of }] : [`${formTitle} `, { code: open.token }]
 
   return (
     <section className="detail" id="detail" aria-labelledby="detail-heading" hidden={hidden}>
@@ -115,6 +123,11 @@ export function Detail({
           {canDuplicate && open?.kind === 'record' ? (
             <button type="button" className="button" ref={duplicateRef} onClick={onDuplicate}>
               Duplicate record
+            </button>
+          ) : null}
+          {canChange && open?.kind === 'record' ? (
+            <button type="button" className="button" ref={changeRef} onClick={onChange}>
+              Change from a date
             </button>
           ) : null}
           {canDelete && open?.kind === 'record' ? (

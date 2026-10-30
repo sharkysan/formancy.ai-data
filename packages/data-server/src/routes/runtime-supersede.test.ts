@@ -189,7 +189,7 @@ describe('a form over versions (0113)', () => {
   // statement's to enforce, and each refusal answered for the person.
   test('names its versions’ fields, and guards its create and its update', async () => {
     const opened = await app.inject({ method: 'GET', url: '/v1/forms/price', headers: { authorization: 'Bearer clerk' } })
-    expect(opened.json()).toMatchObject({ versions: { from: 'valid_from', to: 'valid_to' }, operations: ['read', 'create', 'update'] })
+    expect(opened.json()).toMatchObject({ versions: { from: 'valid_from', to: 'valid_to', key: ['tenant_id', 'product_no'] }, operations: ['read', 'create', 'update'] })
     const read = await app.inject({ method: 'GET', url: '/v1/forms/price', headers: { authorization: 'Bearer auditor' } })
     expect(read.json()).toMatchObject({ versions: null })
 

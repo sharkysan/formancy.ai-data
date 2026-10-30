@@ -708,8 +708,13 @@ is lost on a reload
    a version is 409 `chain-exists`, and an update of an ended version 409
    `version-ended`, each decided in its own statement.
 
+On the host page, Change from a date in an open version's header reads it
+again and opens every pane on its next version, the start to give; the
+session sends the save as `supersede` with the version it follows
+([0115](../decisions/0115-a-host-page-changes-an-open-version-from-a-date.md)).
+
 Held by `packages/data-core/src/generate/validity.test.ts` and
 `records/supersede.test.ts`; each adapter's
-`versions.integration.test.ts`; `routes/runtime-supersede.test.ts`. What it
-costs: one spelling of a chain, append only, and no studio control or host
-page offer yet.
+`versions.integration.test.ts`; `routes/runtime-supersede.test.ts`;
+`apps/host/src/change.test.tsx`. What it costs: one spelling of a chain,
+append only.
