@@ -60,7 +60,7 @@ const TEST = /\.(test|spec)(\.[cm]?[jt]sx?)$/
 /** The install fixtures, which import the packed tarballs and are linted without types. */
 const UNTYPED = 'scripts/install-fixture/'
 
-/** What the shared rules relax in a test, and nothing else (0114). */
+/** What the shared rules relax in a test, and nothing else (0116). */
 const RELAXED_IN_TESTS = [
   '@typescript-eslint/no-unsafe-assignment',
   '@typescript-eslint/no-unsafe-member-access',
@@ -73,7 +73,7 @@ const RELAXED_IN_TESTS = [
 
 /**
  * What the shared rules turn off in every file (formancy.ai-health 0017,
- * 0114): a synchronous implementation of an async contract keeps its
+ * 0116): a synchronous implementation of an async contract keeps its
  * throws as rejections by being `async`.
  */
 const OFF_EVERYWHERE = ['@typescript-eslint/require-await']

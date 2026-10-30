@@ -115,7 +115,7 @@ of them in different SQL dialects, by somebody who knows both.
 
 | Job | Runs | What it proves |
 |---|---|---|
-| `verify` | `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm check:pkg`, `node scripts/verify-licenses.mjs`, `pnpm test:repo` | The tree builds and type-checks, the vitest, Vite and tsdown configs with it through `tsconfig.tools.json`; every TypeScript and JavaScript file git does not ignore holds to the shared lint rules -- `@eslint/js`'s recommended set and typescript-eslint's type-aware one, every rule at error, a disable comment only with its reason -- and is as Prettier writes it, which the check reads and never writes; each was watched failing on 30 October 2026, on a floating promise and a double-quoted string planted in `packages/data-core/src/records/heading.ts`, the file put back byte for byte ([0114](../decisions/0114-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)); each published package passes `publint` and `attw`; every tarball declares the source-available licence and carries `LICENSE.md` and `NOTICE` ([0001](../decisions/0001-a-paid-module-in-its-own-repository.md)); the repository's own guards (§10.4) |
+| `verify` | `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm check:pkg`, `node scripts/verify-licenses.mjs`, `pnpm test:repo` | The tree builds and type-checks, the vitest, Vite and tsdown configs with it through `tsconfig.tools.json`; every TypeScript and JavaScript file git does not ignore holds to the shared lint rules -- `@eslint/js`'s recommended set and typescript-eslint's type-aware one, every rule at error, a disable comment only with its reason -- and is as Prettier writes it, which the check reads and never writes; each was watched failing on 30 October 2026, on a floating promise and a double-quoted string planted in `packages/data-core/src/records/heading.ts`, the file put back byte for byte ([0116](../decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)); each published package passes `publint` and `attw`; every tarball declares the source-available licence and carries `LICENSE.md` and `NOTICE` ([0001](../decisions/0001-a-paid-module-in-its-own-repository.md)); the repository's own guards (§10.4) |
 | `test`, one per package | `turbo run test:coverage --force --summarize` | Each package's suite, its databases included, on a runner of its own; `--force` so a cached result is never reported as this run's |
 | `test-images`, one per image of the matrix but the defaults | the `test` job's command, `FORMANCY_IMAGES` set to the leg's image | data-fixtures and that engine's adapter suite on that image (0067); no coverage is uploaded |
 | `browser`, one per browser | `pnpm test:browser` | §10.5 |
@@ -200,7 +200,7 @@ and each of these fails on the change that breaks what it holds:
   same lines without a conflict, still conflicts where both sides changed
   what a line says, and merges a side Prettier cannot parse unformatted,
   as a conflict that keeps both sides
-  ([0114](../decisions/0114-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+  ([0116](../decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
   What a rule reports is no defect until somebody reads it, and a disable
   comment's reason is review's.
 - **Derived files.** `scripts/codecov-config.test.mjs`: `codecov.yml` is
@@ -483,7 +483,7 @@ and a number typed here would drift from the next run.
   and that the pull request bringing the format merges with a merge commit,
   so that `.git-blame-ignore-revs` names commits on `main`, and that the
   lint rules are Formancy Health's and those formancy.ai publishes, which
-  nothing compares ([0114](../decisions/0114-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+  nothing compares ([0116](../decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 - **"Tested on" is not "accepted by".** Nothing in the product refuses a
   server version no test ran but SQL Server discovery before 2019; a
   snapshot records the server it was read from, and the studio and drift

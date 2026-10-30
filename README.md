@@ -1295,7 +1295,7 @@ CI fails a TypeScript or JavaScript file that breaks a lint rule or that
 Prettier would write otherwise; the rules and the style are the four
 formancy repositories' shared ones, a copy until formancy.ai publishes
 them
-([0114](./docs/decisions/0114-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+([0116](./docs/decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 A branch begun before the format takes `main` through
 `scripts/prettier-merge.mjs`, as
 [`CONTRIBUTING.md`](./CONTRIBUTING.md#a-branch-begun-before-the-format)

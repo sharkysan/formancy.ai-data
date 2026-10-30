@@ -9,7 +9,7 @@ import { prettierConfig } from './code-style/code-style.mjs'
 
 /**
  * The merge a branch begun before the format takes main through
- * (`scripts/prettier-merge.mjs`, 0114), run as CONTRIBUTING.md runs it, in a
+ * (`scripts/prettier-merge.mjs`, 0116), run as CONTRIBUTING.md runs it, in a
  * repository of its own written under the system's temporary directory:
  * `base` in the style before the format, `main` the format of it with what
  * main changed, and `feature` the branch's change in the style it was

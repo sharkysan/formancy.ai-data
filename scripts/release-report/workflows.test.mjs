@@ -263,7 +263,7 @@ describe('gates.yml', () => {
     expect(filtered).not.toContain(undefined)
   })
 
-  // The lint rules and the format are held by CI alone (0114): a step
+  // The lint rules and the format are held by CI alone (0116): a step
   // dropped from verify lets a change that breaks either merge green. After
   // the build and the typecheck, since the type-aware rules read the
   // packages' built declarations, and before the guards, so that a guard

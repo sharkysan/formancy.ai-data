@@ -1,4 +1,4 @@
-# 0114 — Every TypeScript and JavaScript file is linted and formatted by the rules the four formancy repositories share, a copy of Formancy Health's until formancy.ai publishes them, and `verify` fails a change that breaks either; the change merges with a merge commit, so that blame can skip the format
+# 0116 — Every TypeScript and JavaScript file is linted and formatted by the rules the four formancy repositories share, a copy of Formancy Health's until formancy.ai publishes them, and `verify` fails a change that breaks either; the change merges with a merge commit, so that blame can skip the format
 
 - **Status:** accepted; narrows [0002](0002-depend-on-upstream-never-copy-it.md): its wait for a release, for the lint and format rules, which are a byte-for-byte copy of Formancy Health's until formancy.ai releases them as `@formancy/code-style`, and go when this repository pins it
 - **Date:** 2026-10-30

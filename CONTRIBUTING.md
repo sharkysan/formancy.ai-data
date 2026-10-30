@@ -53,7 +53,7 @@ updated in the same pull request as the code. Run `pnpm format` before you
 commit and `pnpm lint` after `pnpm build`: CI fails a TypeScript or
 JavaScript file that breaks a lint rule or that Prettier would write
 otherwise
-([0114](docs/decisions/0114-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+([0116](docs/decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 
 ### A branch begun before the format
 
