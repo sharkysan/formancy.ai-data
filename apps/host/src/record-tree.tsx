@@ -118,6 +118,7 @@ export function RecordTree({
       current = false
     }
     // Mounted again for another form or field.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- page, known and the definition are made from the client, the form and the field, and a form's view is mounted again whenever a form is opened, so none of them changes under the tree
   }, [client, formId, field])
 
   const shown = roots === null ? [] : visible(roots, nodes)

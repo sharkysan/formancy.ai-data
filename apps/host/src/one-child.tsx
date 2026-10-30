@@ -113,6 +113,7 @@ export function OneChild({
     )
     return () => controller.abort()
     // The section is mounted again for every record; nothing else asks again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the section is mounted again for every record and level, so its owner is fixed, and the mount's opening reads only its sessions, a ref and the guard's stable callbacks, which are current
   }, [client, child.form, child.field, parentToken])
 
   function startNew(): void {

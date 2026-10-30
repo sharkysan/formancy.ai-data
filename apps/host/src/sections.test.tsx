@@ -56,11 +56,11 @@ const section = (): HTMLElement | null => screen.queryByRole('region', { name: S
 const sectionPaper = (): HTMLElement => within(section() as HTMLElement).getByRole('form', { name: /, React$/ })
 
 /** A control of the section's React paper, by its name. */
-const sectionControl = (name: string): HTMLInputElement => within(sectionPaper()).getByLabelText(name, { exact: true }) as HTMLInputElement
+const sectionControl = (name: string): HTMLInputElement => within(sectionPaper()).getByLabelText<HTMLInputElement>(name, { exact: true })
 
 /** A control of the party's own React paper, by its name. */
 const partyControl = (name: string): HTMLInputElement =>
-  within(screen.getByRole('form', { name: 'Party, React' })).getByLabelText(name, { exact: true }) as HTMLInputElement
+  within(screen.getByRole('form', { name: 'Party, React' })).getByLabelText<HTMLInputElement>(name, { exact: true })
 
 describe.each(ENGINES)('a section on $engine', (engine) => {
   // A company party's details: none yet, so the section says so and offers
