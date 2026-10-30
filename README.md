@@ -331,10 +331,12 @@ until then the address is formancy.ai's 404
   SQL Server -- so the module never leaves a gap, an overlap or two open
   versions. Append only: an ended version is read-only through the form,
   no delete is offered, and on PostgreSQL two creates of one chain at once
-  need the table's own unique index to stay one chain. Through the runtime
-  plane and `@formancy/data-client` for now; the studio's control and the
-  host page's change are not built yet
-  ([0113](./docs/decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md)).
+  need the table's own unique index to stay one chain. The studio's Choose
+  step names the chain, and keeps it through a regeneration; a change is
+  made through the runtime plane and `@formancy/data-client`, and the host
+  page does not offer one yet
+  ([0113](./docs/decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md),
+  [0114](./docs/decisions/0114-the-studio-names-a-chain-of-versions-in-the-choose-step.md)).
 - **A record can be deleted, one at a time, by its token and the version its
   person read**, under the policy's `operations.delete`, granted only to
   roles that may read and scoped as an update is, in one guarded statement

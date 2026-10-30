@@ -167,4 +167,5 @@ only enforcement is "we remember" says so plainly.
 | [0110](0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md) | A form that is its own child is shown as a tree of its records: its roots, and under each record those naming it | accepted |
 | [0111](0111-a-deploy-pipeline-checks-drift-with-a-command-that-fails-on-a-blocking-change.md) | A deploy pipeline checks drift with a command the image ships, which fails on a blocking change and never passes a form it could not check | accepted |
 | [0112](0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md) | A policy holds a state field to the moves it lists, each for named roles, checked from the record as read | accepted |
-| [0113](0113-a-form-over-versions-changes-the-open-one-from-a-date.md) | A form over a table of versions changes the open version from a date, ending it and starting the next in one write | accepted |
+| [0113](0113-a-form-over-versions-changes-the-open-one-from-a-date.md) | A form over a table of versions changes the open version from a date, ending it and starting the next in one write | accepted; extended by 0114 |
+| [0114](0114-the-studio-names-a-chain-of-versions-in-the-choose-step.md) | The studio names a chain of versions in the Choose step, and keeps it through a regeneration | accepted |

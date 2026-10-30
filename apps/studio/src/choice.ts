@@ -15,6 +15,8 @@ export interface Choice {
   lookups: LookupChoice[]
   /** A version column the administrator confirms, or `null` for none. */
   versionColumn: string | null
+  /** The columns a version starts and ends at, where the rows are versions of one thing (0113); `null` for records of their own. */
+  validity: { from: string; to: string } | null
 }
 
 /**
@@ -55,7 +57,7 @@ export function titleFor(ref: ObjectRef): string {
 
 /** A fresh choice for `ref`: nothing offered, nothing confirmed. */
 export function choiceFor(ref: ObjectRef): Choice {
-  return { root: { ...ref }, formId: formIdFor(ref), title: titleFor(ref), lookups: [], versionColumn: null }
+  return { root: { ...ref }, formId: formIdFor(ref), title: titleFor(ref), lookups: [], versionColumn: null, validity: null }
 }
 
 /** The gaps about one object itself, which are what "cannot tell" is made of (0004). */
@@ -214,7 +216,26 @@ export function proposalFor(connection: string, choice: Choice, rowFilters: read
     })),
     pinned: rowFilters.map((rule) => rule.column),
     ...(choice.versionColumn === null ? {} : { versionColumn: choice.versionColumn }),
+    ...(choice.validity === null ? {} : { validity: { ...choice.validity } }),
   }
+}
+
+/** Whether a column can hold where a version starts or ends: a date, or an instant (0113). */
+function isPoint(column: ColumnMeta): boolean {
+  return column.type.kind === 'date' || (column.type.kind === 'timestamp' && column.type.withTimeZone)
+}
+
+/**
+ * The columns a version of `root` could start and end at (0113): a start is
+ * a readable date or instant that may not be NULL and is part of a key of
+ * two columns or more; an end, one that may be NULL. What the generator
+ * accepts of a pair -- one kind, a key holding the start -- it says itself,
+ * in its words, when the form is generated.
+ */
+export function validityCandidates(root: ObjectMeta): { from: ColumnMeta[]; to: ColumnMeta[] } {
+  const keyed = new Set([...(root.primaryKey === null ? [] : [root.primaryKey]), ...root.uniqueKeys].filter((key) => key.columns.length > 1).flatMap((key) => key.columns))
+  const points = root.columns.filter((column) => column.access.select && column.generated === 'none' && isPoint(column))
+  return { from: points.filter((column) => !column.nullable && keyed.has(column.name)), to: points.filter((column) => column.nullable) }
 }
 
 /** What is wrong with a choice before it is sent, in words; the server and the generator check again. */

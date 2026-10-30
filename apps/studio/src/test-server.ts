@@ -93,6 +93,43 @@ export const SECTIONS_SNAPSHOT: MetadataSnapshot = (() => {
 })()
 
 /**
+ * The owner's snapshot with a product's prices per tenant: each row a
+ * version, valid from `valid_from` until the next starts, the open one
+ * NULL in `valid_to`, keyed by the chain and the start, which a form can be
+ * generated over as a chain of versions (0113). Made here, as
+ * `SECTIONS_SNAPSHOT` is: the sales fixture has no such table.
+ */
+export const VERSIONS_SNAPSHOT: MetadataSnapshot = (() => {
+  const { fingerprint: _fingerprint, ...contents } = OWNER_SNAPSHOT
+  const objects = structuredClone(contents.objects)
+  const order = objects.find((object) => object.ref.schema === 'sales' && object.ref.name === 'order')
+  if (order === undefined) throw new Error('the owner snapshot has no sales.order')
+  const named = (name: string): ColumnMeta => structuredClone(order.columns.find((column) => column.name === name) as ColumnMeta)
+  const date = { ...named('order_date'), defaultExpression: null, hasDefault: false }
+  objects.push({
+    ref: { schema: 'sales', name: 'price' },
+    kind: 'table',
+    comment: null,
+    columns: [
+      { ...named('tenant_id'), ordinal: 1 },
+      { ...named('customer_no'), name: 'product_no', ordinal: 2 },
+      { ...date, name: 'valid_from', ordinal: 3 },
+      { ...date, name: 'valid_to', ordinal: 4, nullable: true },
+      { ...named('amount'), ordinal: 5 },
+      { ...named('row_version'), ordinal: 6 },
+    ],
+    primaryKey: { name: 'pk_price', columns: ['tenant_id', 'product_no', 'valid_from'] },
+    uniqueKeys: [],
+    foreignKeys: [],
+    checks: [],
+    rowSecurity: 'none',
+    access: { delete: true },
+    referencedBy: [],
+  })
+  return createSnapshot({ ...contents, objects })
+})()
+
+/**
  * The tokens the fake verifier accepts, and who each one is. Under review
  * (0065), `admin` is an author -- an administrator without a publisher
  * role; `publisher` holds the publisher role alone, which a reviewed plane
@@ -210,9 +247,10 @@ function holds(values: Record<string, ApiValue>, condition: RecordFilter): boole
  * publishes directly, an administrator submits a draft, and a publisher
  * who did not submit it approves it. `browse: true` starts it as
  * `FORMANCY_DATA_BROWSE_ROLES=data-browser` would (0099). `sections: true`
- * adds `fixture-sections`, over `SECTIONS_SNAPSHOT` (0109).
+ * adds `fixture-sections`, over `SECTIONS_SNAPSHOT` (0109), and
+ * `versions: true` adds `fixture-versions`, over `VERSIONS_SNAPSHOT` (0113).
  */
-export async function startPlane(options: { administrator?: boolean; review?: boolean; browse?: boolean; sections?: boolean } = {}): Promise<TestPlane> {
+export async function startPlane(options: { administrator?: boolean; review?: boolean; browse?: boolean; sections?: boolean; versions?: boolean } = {}): Promise<TestPlane> {
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-studio-'))
   const store = createFileConfigurationStore(root)
   const databases = new Map<string, MetadataSnapshot>([
@@ -222,6 +260,7 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
     ['fixture-sqlserver-reader', SQLSERVER_READER_SNAPSHOT],
     ['fixture-writer', WRITER_SNAPSHOT],
     ...(options.sections === true ? [['fixture-sections', SECTIONS_SNAPSHOT] as const] : []),
+    ...(options.versions === true ? [['fixture-versions', VERSIONS_SNAPSHOT] as const] : []),
   ])
   const unreachable = new Set<string>()
   const rows = new Map<string, Array<Record<string, ApiValue>>>()

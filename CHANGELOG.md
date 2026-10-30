@@ -286,8 +286,11 @@ later.
     form without it as unexpected, so a host and its server are upgraded
     together. The audit names the operation `supersede`.
   - Append only: an ended version is not edited through the form. The
-    studio cannot yet name a chain and the host page does not yet offer a
-    change; both follow.
+    host page does not yet offer a change; it follows.
+  - **The studio's Choose step offers Versions** (0114) where the root has
+    a column that could start a version and one that could end it: a box,
+    then "Valid from" and "Valid until, empty while open". Generating a
+    published form again keeps its chain.
 
 ### Changed
 

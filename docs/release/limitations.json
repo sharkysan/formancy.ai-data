@@ -3378,7 +3378,7 @@
       ]
     },
     "0113": {
-      "reviewed": "sha256:a5e23fc0ada0332036fe7ffe0ba9e35117947d9817a871c403686765b5c1df20",
+      "reviewed": "sha256:7ef99c0ae6ad7888f281d89d054ac819253b16c4004caa22a9bac53db478f78e",
       "limitations": [
         {
           "area": "forms",
@@ -3409,13 +3409,28 @@
           "says": "A list of versions shows every version; which are open is a filter a person or a list view applies, and there is no list as of a date."
         },
         {
-          "area": "studio",
-          "says": "The studio has no control to name a chain of versions, and the host page offers no change from a date: a chain is named in a proposal's request through the administrator's plane, and changed through @formancy/data-client."
+          "area": "host",
+          "says": "The host page offers no change from a date: a chain is changed through @formancy/data-client."
         },
         {
           "area": "server",
           "says": "@formancy/data-client reads a form without versions as unexpected, so a host and its server are upgraded together.",
           "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0114": {
+      "reviewed": "sha256:42d660125261cd0dcc6c769a7d4944670bb37f025a88fb53557c295c512331ed",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "The Versions box is offered from what the snapshot says a column could be, not from whether the pair holds a chain; a pair the generator refuses is refused when the form is generated, in its words.",
+          "heldBy": "apps/studio/src/choose-versions.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "Ticked, Versions chooses the first column that could start a version and the first that could end one; a table with several is the administrator's to set.",
+          "heldBy": "apps/studio/src/choose-versions.test.tsx"
         }
       ]
     }

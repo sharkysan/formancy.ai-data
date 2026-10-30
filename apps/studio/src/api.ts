@@ -49,6 +49,8 @@ export interface ProposalRequest {
   lookups: LookupChoice[]
   pinned: string[]
   versionColumn?: string
+  /** The root's rows are versions of one thing, each valid from `from` until `to` (0113). */
+  validity?: { from: string; to: string }
 }
 
 /**
