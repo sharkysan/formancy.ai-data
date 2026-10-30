@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { planCreate, planUpdate } from './plan.js'
+import type { FormRecord } from './plan-types.js'
 import { planSupersede } from './supersede.js'
 import { AMOUNT, AUDITOR, CLERK, column, DATE, DEFINITION, described, INT32, orderForm, ORDER_POLICY, ORDER_TOKEN, sales, snapshot, TENANT_ONE, text, value } from './test-support.js'
 import { priced, priceForm, PRICE_POLICY } from './test-versions.js'
@@ -19,14 +20,14 @@ if (!encoded.ok) throw new Error(encoded.message)
 const TOKEN = encoded.token
 
 /** The open version as the clerk read it, at version 1: the price from New Year, open. */
-const asRead = (changes: Record<string, unknown> = {}, version = '1') => ({
+const asRead = (changes: FormRecord['answers'] = {}, version = '1'): FormRecord => ({
   record: TOKEN,
   version,
-  answers: { tenant_id: 1, product_no: 7, valid_from: '2026-01-01', valid_to: null, amount: '9.5000', note: null, ...changes } as Record<string, never>,
+  answers: { tenant_id: 1, product_no: 7, valid_from: '2026-01-01', valid_to: null, amount: '9.5000', note: null, ...changes },
 })
 const NEXT = { valid_from: '2026-07-01', amount: '10.0000', note: 'summer' }
 /** The change planned; `null` for a version that could not be read. */
-const change = (answers: Record<string, unknown> = NEXT, read: ReturnType<typeof asRead> | null = asRead(), who = CLERK, version = '1', bindings = PRICE) =>
+const change = (answers: Record<string, unknown> = NEXT, read: FormRecord | null = asRead(), who = CLERK, version = '1', bindings = PRICE) =>
   planSupersede(PG, bindings, PRICE_POLICY, who, TOKEN, version, answers, read ?? undefined, described(PG, bindings))
 
 describe('a change from a date', () => {
@@ -88,7 +89,7 @@ describe('a change from a date', () => {
   // a form over records of their own offers none.
   test('is refused without the version as read, without both operations, and on a form with no chain', () => {
     expect(change(NEXT, null)).toMatchObject({ ok: false, code: 'record-not-read' })
-    expect(change(NEXT, { ...asRead(), answers: { amount: '9.5000' } as Record<string, never> })).toMatchObject({ ok: false, code: 'field-denied' })
+    expect(change(NEXT, { ...asRead(), answers: { amount: '9.5000' } })).toMatchObject({ ok: false, code: 'field-denied' })
     expect(change(NEXT, asRead(), AUDITOR)).toMatchObject({ ok: false, code: 'operation-denied' })
     const updater = { ...PRICE_POLICY, operations: { ...PRICE_POLICY.operations, create: [] } }
     expect(planSupersede(PG, PRICE, updater, CLERK, TOKEN, '1', NEXT, asRead(), described(PG, PRICE))).toMatchObject({ ok: false, code: 'operation-denied' })
