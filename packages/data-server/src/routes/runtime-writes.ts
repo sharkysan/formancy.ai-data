@@ -207,7 +207,7 @@ async function updated(
   const actor = steps.context(request)
   const authorized = authorizeOperation(bundle.policy, actor, 'update')
   if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
-  const read = await readForWrite(steps.describedRoot, bundle, open, actor, record)
+  const read = await readForWrite(steps, bundle, open, actor, record)
   if (!read.ok) return read.answer
   const { current, unread, described } = read
   // The record as read now is newer than the one the person saved over: the
@@ -247,7 +247,7 @@ async function updated(
  * from a date's (0113).
  */
 export async function readForWrite(
-  describedRoot: WriteRouteSteps['describedRoot'],
+  steps: Pick<WriteRouteSteps, 'describedRoot'>,
   bundle: PublishedBundle,
   open: OpenConnection,
   actor: PolicyContext,
@@ -267,7 +267,7 @@ export async function readForWrite(
     }
   }
   if (described === undefined) {
-    const root = await describedRoot(bundle, open)
+    const root = await steps.describedRoot(bundle, open)
     if (!root.ok) return { ok: false, answer: root.answer }
     described = root.described
   }

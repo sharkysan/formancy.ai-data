@@ -16,7 +16,6 @@ import type {
   RecordRead,
   RecordTarget,
   RowFilterTerm,
-  SupersedeRequest,
   ThroughTerms,
   UpdateRequest,
 } from '@formancy/data-core'

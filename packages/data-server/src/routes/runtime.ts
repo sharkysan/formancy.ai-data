@@ -389,7 +389,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     lost,
     refusal,
     answered,
-    readForWrite: (bundle, open, actor, record) => readForWrite(describedRoot, bundle, open, actor, record),
+    readForWrite: (bundle, open, actor, record) => readForWrite({ describedRoot }, bundle, open, actor, record),
     withoutEchoes,
     memberships: (open, checks, log) => memberships(open, checks, log, options.lookupDeadlineMs),
   })
