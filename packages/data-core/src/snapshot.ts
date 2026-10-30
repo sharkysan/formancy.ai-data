@@ -162,6 +162,9 @@ function assertAccount(input: Omit<MetadataSnapshot, 'fingerprint'>): void {
   if (typeof account.login !== 'string' || account.login === '') throw new Error('the account names no login')
 }
 
+/** A value a refusal names: text as it is, anything else as JSON, never "[object Object]". */
+const shown = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value))
+
 /**
  * The server facts (0068), when there are any, as the contract names them:
  * outside the fingerprint, so a posted bundle's would otherwise hash to its
@@ -172,9 +175,9 @@ function checkedServer(server: ServerFacts): ServerFacts {
   const facts = server as unknown as Record<string, unknown>
   if (!isServerProduct(facts['product'])) throw new Error(`the server's product ${JSON.stringify(facts['product'])} is not one the contract names`)
   const { major, compatibility } = facts
-  if (major !== null && !Number.isInteger(major)) throw new Error(`the server's major ${String(major)} is neither a whole number nor null`)
+  if (major !== null && !Number.isInteger(major)) throw new Error(`the server's major ${shown(major)} is neither a whole number nor null`)
   if (compatibility !== undefined && !Number.isInteger(compatibility))
-    throw new Error(`the server's compatibility level ${String(compatibility)} is not a whole number`)
+    throw new Error(`the server's compatibility level ${shown(compatibility)} is not a whole number`)
   const checked: ServerFacts = { product: facts['product'], major: major as number | null }
   if (compatibility !== undefined) checked.compatibility = compatibility as number
   return checked
@@ -265,8 +268,8 @@ function assertInboundKey(object: ObjectMeta, key: InboundKey): void {
   // `foreign key (a, a)` -- so a repeat is not refused.
   if (!columns.every(isName)) throw new Error(`${at} names a column that is not a name`)
   // Neither engine lets a key refer to one column twice.
-  const twice = referenced.find((name, index) => referenced.indexOf(name) !== index)
-  if (twice !== undefined) throw new Error(`${at} refers to ${String(twice)} twice`)
+  const twice: unknown = referenced.find((name, index) => referenced.indexOf(name) !== index)
+  if (twice !== undefined) throw new Error(`${at} refers to ${shown(twice)} twice`)
   for (const name of referenced) {
     if (!object.columns.some((column) => column.name === name)) throw new Error(`${at} refers to ${String(name)}, which the table does not have`)
   }

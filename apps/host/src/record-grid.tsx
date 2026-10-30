@@ -125,7 +125,7 @@ export interface RecordGridProps {
   onOpen(token: string, how: OpenHow, at: RowAt): void
   /** A header sorted by the person: the grid's sort now, in its order, for the section to hold as given -- the grid knows its own report by identity. */
   onSort(sort: ListSortTerm[]): void
-  onClearSearch?(): void
+  onClearSearch?: () => void
 }
 
 /** Every row of the page selected exactly when it is the open record's; the rows whose selection changed. */
@@ -354,6 +354,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   // from row 0, and asks once the headers show the sort.
   const datasource = useMemo(
     () => createDatasource({ client, formId, columns, search, parent, filter, sort, hooks }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the parent is its field and its record: a new object holding the same two is the same list, and a new datasource would ask it again
     [client, formId, columns, search, parent?.field, parent?.record, filter, sort, hooks],
   )
   useEffect(() => () => datasource.abort(), [datasource])

@@ -106,7 +106,7 @@ function listSaysMore(name, { check }) {
 }
 
 /** The states, in order, after every other journey of the pass. */
-export function moreJourney(plane, gate) {
+export function moreJourney(_plane, gate) {
   return [
     [
       'A list that goes on (React)',

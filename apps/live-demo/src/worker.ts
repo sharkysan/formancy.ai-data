@@ -172,7 +172,7 @@ export class DemoServer extends DurableObject<Env> {
         if (refused !== undefined) {
           if (!noInstance(refused) || container.running) {
             failure = refused
-            throw new Error(`monitor() rejected: ${refused instanceof Error ? refused.message : String(refused)}`)
+            throw new Error(`monitor() rejected: ${refused instanceof Error ? refused.message : JSON.stringify(refused)}`)
           }
           restarts += 1
           launch()

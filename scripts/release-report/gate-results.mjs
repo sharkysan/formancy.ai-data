@@ -155,7 +155,9 @@ export async function recordedPerBrowser(app, { load, run, env = process.env, br
       try {
         instance = await playwright[asked].launch(options)
       } catch (error) {
-        throw new Error(`could not launch ${browserName(asked)} (${String(error)}).\nIf this machine does not have it, run \`${installCommand(asked)}\`.`)
+        throw new Error(`could not launch ${browserName(asked)} (${String(error)}).\nIf this machine does not have it, run \`${installCommand(asked)}\`.`, {
+          cause: error,
+        })
       }
       log(`\n${browserName(asked)} ${instance.version()}, ${launchedBuild({ name: asked, options, pwdebug: pwdebugOf(env) }).how}`)
       gate.launched(instance, options)

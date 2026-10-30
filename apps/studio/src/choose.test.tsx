@@ -179,7 +179,7 @@ describe('choosing', () => {
   test('suggests a display column, and sends the one confirmed', async () => {
     const user = await signIn(plane)
     const choose = await chooseOrder(user)
-    expect((within(choose).getByLabelText('Form id') as HTMLInputElement).value).toBe('sales-order')
+    expect(within(choose).getByLabelText<HTMLInputElement>('Form id').value).toBe('sales-order')
     const shown = within(choose).getByRole('group', { name: 'Columns to show for fk_order_customer' })
     expect(within(shown).getByRole('checkbox', { name: 'name' })).toHaveProperty('checked', true)
     await user.click(within(shown).getByRole('checkbox', { name: 'customer_no' }))
@@ -199,7 +199,7 @@ describe('choosing', () => {
     const choose = await toChoose(user)
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
     await user.click(within(choose).getByRole('checkbox', { name: 'Pin tenant_id' }))
-    expect((within(choose).getByLabelText('Attribute tenant_id is pinned to') as HTMLInputElement).value).toBe('tenant')
+    expect(within(choose).getByLabelText<HTMLInputElement>('Attribute tenant_id is pinned to').value).toBe('tenant')
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     const generated = await screen.findByRole('main', { name: 'Generate' })
     expect(list(generated, 'Read-only')).toContain(

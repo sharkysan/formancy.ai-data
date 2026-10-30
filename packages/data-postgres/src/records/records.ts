@@ -192,7 +192,10 @@ function describedBy(row: TextRow): { described: ReturnType<typeof describedFrom
  * same suite: 64 MB after four lost writes of 16 MB each).
  */
 function untilLost<T>(statement: Promise<T>): Promise<T> {
-  return statement.catch((error: unknown) => (connectionLost(error) ? new Promise<never>(() => {}) : Promise.reject(error)))
+  return statement.catch((error: unknown) => {
+    if (connectionLost(error)) return new Promise<never>(() => {})
+    throw error
+  })
 }
 
 /**

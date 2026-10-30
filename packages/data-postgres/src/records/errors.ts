@@ -97,7 +97,7 @@ export function connectionLost(error: unknown): boolean {
 
 const SQLSTATE = /^[0-9A-Z]{5}$/
 
-interface ServerError {
+interface ServerError extends Error {
   code: string
   constraint_name?: unknown
   column_name?: unknown

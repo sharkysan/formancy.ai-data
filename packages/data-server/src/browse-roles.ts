@@ -25,7 +25,9 @@ const SETTING: Names = { browse: 'FORMANCY_DATA_BROWSE_ROLES', admin: 'FORMANCY_
  * named in the sentence: it is a word in a token's claim, never a secret.
  */
 export function browseRolesProblem(roles: readonly string[], adminRoles: readonly string[], names: Names = EMBEDDED): string | undefined {
-  if (!Array.isArray(roles)) return `${names.browse} is not a list of roles.`
+  // `Array.isArray` narrows a readonly array to `any[]`, so it is asked of an `unknown` copy.
+  const listed: unknown = roles
+  if (!Array.isArray(listed)) return `${names.browse} is not a list of roles.`
   if (roles.length === 0) return `${names.browse} is set and names no role. Name the roles that may browse, or leave it unset so that nobody does.`
   const outside = roles.find((role) => !adminRoles.includes(role))
   if (outside !== undefined)

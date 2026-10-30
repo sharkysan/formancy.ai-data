@@ -316,7 +316,7 @@ describe('the delete route', () => {
     for (const [outcome, status, code, sentence] of cases) {
       deleteOutcome = outcome
       const response = await remove('ticket', { record: 'k1:7', version: VERSION })
-      expect({ status: response.statusCode, body: response.json() as unknown }).toEqual({ status, body: { code, message: expect.stringMatching(sentence) } })
+      expect({ status: response.statusCode, body: response.json<unknown>() }).toEqual({ status, body: { code, message: expect.stringMatching(sentence) } })
     }
     // The catalog that cannot be described now is a delete's refusal too.
     catalog = { ok: false, code: 'unavailable', message: 'm' }

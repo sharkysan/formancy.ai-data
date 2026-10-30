@@ -122,10 +122,10 @@ describe('presentation', () => {
     await user.type(box, 's')
     expect(within(presentation).getByRole('region', { name: 'Orders' })).toBeTruthy()
     await user.click(within(presentation).getByRole('button', { name: 'Undo' }))
-    expect((within(presentation).getByLabelText('Section label of Order') as HTMLInputElement).value).toBe('Order')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Section label of Order').value).toBe('Order')
     await user.click(within(presentation).getByRole('button', { name: 'Redo' }))
     expect(within(presentation).getByRole('status').textContent).toBe('Redone.')
-    expect((within(presentation).getByLabelText('Section label of Orders') as HTMLInputElement).value).toBe('Orders')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Section label of Orders').value).toBe('Orders')
     // At the end of the history the button stays, and keeps the keyboard:
     // it says there is nothing more rather than going dark under the focus.
     await user.click(within(presentation).getByRole('button', { name: 'Redo' }))

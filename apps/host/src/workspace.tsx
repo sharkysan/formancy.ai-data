@@ -120,6 +120,7 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     if (first.form !== null) void openForm(first.form, { focus: false, push: false })
     else write(placeRef.current, false)
     // Once, on arrival: what the address said when the person signed in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- it runs once on arrival, for what the address said when the person signed in
   }, [])
 
   const choose = (id: string, link: HTMLAnchorElement): void => {

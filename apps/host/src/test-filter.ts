@@ -36,7 +36,7 @@ export async function openFilter(user: User, heading: string): Promise<HTMLEleme
  * test-host.ts's `control` says.
  */
 export function filterBox(heading: string, label: 'Value' | 'Text' | 'From' | 'To'): HTMLInputElement {
-  return within(gridSection(heading)).getByLabelText(label, { exact: true }) as HTMLInputElement
+  return within(gridSection(heading)).getByLabelText<HTMLInputElement>(label, { exact: true })
 }
 
 /** Clear a box and type into it, where there is something to type. */

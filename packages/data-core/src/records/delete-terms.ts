@@ -49,7 +49,9 @@ const copy = (ref: ObjectRef): ObjectRef => ({ schema: ref.schema, name: ref.nam
 
 /** The key: exactly the identity's columns, in its order, each with a value. */
 function keyOf(request: DeleteRequest): RecordValue[] {
-  const identity = Array.isArray(request.target?.identity) ? request.target.identity.map((column) => column.name) : []
+  // `Array.isArray` narrows to `any[]`, so it is asked of an `unknown` copy.
+  const columns: unknown = request.target?.identity
+  const identity = Array.isArray(columns) ? request.target.identity.map((column) => column.name) : []
   const given: unknown = request.key
   if (identity.length === 0) throw refuse('deletes from a target with an identity')
   if (!Array.isArray(given) || given.length !== identity.length) throw refuse('names every column of the identity, in order')

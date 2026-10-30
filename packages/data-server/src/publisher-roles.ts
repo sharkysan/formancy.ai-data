@@ -28,7 +28,9 @@ const SETTING: Names = { publisher: 'FORMANCY_DATA_PUBLISHER_ROLES', admin: 'FOR
  * claim, never a secret.
  */
 export function publisherRolesProblem(roles: readonly string[], adminRoles: readonly string[], names: Names = EMBEDDED): string | undefined {
-  if (!Array.isArray(roles)) return `${names.publisher} is not a list of roles.`
+  // `Array.isArray` narrows a readonly array to `any[]`, so it is asked of an `unknown` copy.
+  const listed: unknown = roles
+  if (!Array.isArray(listed)) return `${names.publisher} is not a list of roles.`
   if (roles.length === 0) {
     return `${names.publisher} is set and names no role: a deployment under review that nobody can publish to is not one anybody meant. Name the roles that approve, or leave it unset for no review.`
   }

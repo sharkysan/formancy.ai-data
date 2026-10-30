@@ -178,7 +178,7 @@ export async function rendered(): Promise<void> {
  * in HTML-AAM); the name is the only handle the tree offers on it.
  */
 export function control(renderer: RendererName, name: string): HTMLInputElement {
-  return within(paper(renderer)).getByLabelText(name, { exact: true }) as HTMLInputElement
+  return within(paper(renderer)).getByLabelText<HTMLInputElement>(name, { exact: true })
 }
 
 /** Wait until a control shows `value`: Angular redraws on its own schedule. */

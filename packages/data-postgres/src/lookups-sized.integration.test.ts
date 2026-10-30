@@ -146,12 +146,12 @@ interface Explained {
 
 /** The captured statement, replayed exactly as the writer under EXPLAIN (ANALYZE), serially or under the defaults. */
 async function explain(statement: (typeof sent)[number], session: 'serial' | 'defaults'): Promise<Explained> {
-  return explainer.begin(async (tx) => {
+  return explainer.begin<Promise<Explained>>(async (tx) => {
     if (session === 'serial') await tx.unsafe('set local max_parallel_workers_per_gather = 0')
     const parameters = statement.parameters.map((value, index) => tx.typed(value as string, statement.types[index] as number))
     const [row] = await tx.unsafe<Array<{ 'QUERY PLAN': Explained[] }>>(`explain (analyze, format json) ${statement.text}`, parameters)
     return row?.['QUERY PLAN'][0] as Explained
-  }) as Promise<Explained>
+  })
 }
 
 function nodes(node: PlanNode): PlanNode[] {

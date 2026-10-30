@@ -169,7 +169,8 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   // made, and an embedder's array changed meanwhile would be granted
   // unchecked.
   const given = options.runtime?.origins ?? []
-  const origins = Array.isArray(given) ? Object.freeze([...given]) : given
+  const listed: unknown = given
+  const origins = Array.isArray(listed) ? Object.freeze([...given]) : given
   const refused = originsProblem(origins)
   if (refused !== undefined) throw new Error(refused)
   // The deadline by the variable's rule (lookup-deadline.ts): 0 or a value
@@ -183,7 +184,8 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   // that would believe every client about itself stops the server here. A
   // copy is checked and handed to Fastify, as the origins are.
   const offered = options.trustedProxies ?? []
-  const trustedProxies = Array.isArray(offered) ? Object.freeze([...offered]) : offered
+  const proxyList: unknown = offered
+  const trustedProxies = Array.isArray(proxyList) ? Object.freeze([...offered]) : offered
   const proxiesRefused = trustedProxiesProblem(trustedProxies)
   if (proxiesRefused !== undefined) throw new Error(proxiesRefused)
 
@@ -267,6 +269,7 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
 
   // An orchestrator polls this every few seconds; limiting it would mark a
   // healthy server unhealthy exactly when it is busiest.
+  // eslint-disable-next-line @typescript-eslint/require-await -- a Fastify handler is async by contract: it answers by returning, and a throw in it must reject
   app.get('/health', { config: { rateLimit: false } }, async () => ({ status: 'ok' }))
 
   app.get('/v1/whoami', async (request, reply) => {

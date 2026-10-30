@@ -31,9 +31,9 @@ export interface Opened {
 
 /** What a detail does around a read: once it opened -- with the record as read -- once the server refused it, and where the keyboard goes when the person keeps editing. */
 export interface ReadHandlers {
-  opened(opened: Opened, record: FormRecord): void
+  opened: (opened: Opened, record: FormRecord) => void
   refused(message: string, discarded: boolean): void
-  back(): void
+  back: () => void
 }
 
 export interface Opening {

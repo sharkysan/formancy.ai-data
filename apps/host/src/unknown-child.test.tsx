@@ -77,7 +77,7 @@ async function lostLine(engine: Engine, when: 'after' | 'before'): Promise<{ use
   await answeredOnce('Order line')
   await user.click(within(gridSection('Order line')).getByRole('button', { name: 'New Order line' }))
   const pane = await waitFor(() => screen.getByRole('region', { name: 'New Order line React' }), ARRIVES)
-  const field = (name: RegExp): HTMLInputElement => within(pane).getByLabelText(name) as HTMLInputElement
+  const field = (name: RegExp): HTMLInputElement => within(pane).getByLabelText<HTMLInputElement>(name)
   await waitFor(() => field(/^Line no\b/), ARRIVES)
   await user.type(field(/^Line no\b/), '5')
   await user.type(field(/^Quantity\b/), '2')

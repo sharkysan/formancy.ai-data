@@ -502,7 +502,10 @@ describe('an ALTER that commits while a request waits for it', () => {
     }
     const altering = batches(owner, entry.alter.sqlserver as readonly string[]).then(
       () => 'altered' as const,
-      (error: { number?: number }) => (error.number === 1205 ? ('victim' as const) : Promise.reject(error)),
+      (error: { number?: number }) => {
+        if (error.number === 1205) return 'victim' as const
+        throw error
+      },
     )
     const [written, alter] = await Promise.all([writing, altering])
     const amount = (await owner.request().query<{ amount: string }>(`select convert(nvarchar(40), amount) as amount from drifting.${entry.table} where id = 1`))

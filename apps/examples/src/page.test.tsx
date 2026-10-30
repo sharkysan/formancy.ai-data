@@ -11,6 +11,7 @@ import type { GenerationNote } from '@formancy/data-core'
 import { App } from './app.js'
 import { generateExamples } from './examples.js'
 import type { Example } from './examples.js'
+import { fieldHeading } from './field-heading.js'
 import { NOTE_KINDS } from './notes.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
 import { ANSWERING_ROLES, answerable, paragraphs } from './test-accessible.js'
@@ -69,7 +70,7 @@ beforeEach(() => {
  * and buttons, and every control in every preview.
  */
 function operable(): HTMLElement[] {
-  const names = EXAMPLES.flatMap((subject) => subject.generated.form.model.fields.map((field) => String(field.label)))
+  const names = EXAMPLES.flatMap((subject) => subject.generated.form.model.fields.map(fieldHeading))
   return [...screen.queryAllByRole('link'), ...screen.queryAllByRole('button'), ...answerable(document.body, names)]
 }
 
@@ -78,7 +79,7 @@ async function mounted(): Promise<void> {
   await waitFor(() => {
     for (const subject of EXAMPLES) {
       const angular = screen.getByRole('region', { name: `${tableOf(subject)} Angular` })
-      const first = String(subject.generated.form.model.fields[0]?.label ?? '')
+      const first = fieldHeading(subject.generated.form.model.fields[0] ?? { key: '' })
       expect(within(angular).queryByLabelText(first)).not.toBeNull()
     }
   }, ANGULAR_ARRIVES)

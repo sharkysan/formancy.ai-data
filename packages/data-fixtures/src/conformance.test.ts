@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { ColumnMeta, DatabaseKind, InboundKey, MetadataSnapshot, NormalizedType, ObjectMeta, RowSecurity } from '@formancy/data-core'
+import type { ColumnMeta, DatabaseKind, InboundKey, MetadataSnapshot, NormalizedType, ObjectMeta } from '@formancy/data-core'
 import { createSnapshot, findObject } from '@formancy/data-core'
 import { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
 import { restrictedDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'

@@ -86,6 +86,7 @@ describe('integers', () => {
   // been rounded to 2^53 by the time anything can look at it.
   test('beyond 2^53, a string is exact and a number is refused', () => {
     expect(accepted(INT64, '9007199254740993')).toBe('9007199254740993')
+    // eslint-disable-next-line no-loss-of-precision -- the literal is the test: a number past 2^53 has already lost the digit a string would keep
     expect(accepted(INT64, 9007199254740993)).toBe('refused:not-an-integer')
     expect(accepted(INT64, '9223372036854775807')).toBe('9223372036854775807')
     expect(accepted(INT64, '9223372036854775808')).toBe('refused:out-of-range')

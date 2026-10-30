@@ -93,13 +93,14 @@ export function registry(): ConnectionRegistry {
   }
   const adapter = {
     kind: 'sqlserver',
-    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    ping: () => Promise.resolve({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
     discover,
-    close: async () => {},
+    close: () => Promise.resolve(),
   } as DatabaseAdapter
   return {
     ids: () => [...db.allowlist],
     scope: (id) => (db.allowlist.includes(id) ? { schemas: ['sales'] } : undefined),
+    // eslint-disable-next-line @typescript-eslint/require-await -- a double of an async interface: a throw in it must reject, as the real one's does, and a returning branch must resolve
     open: async (id) => {
       if (!db.allowlist.includes(id)) return undefined
       if (!db.reachable) throw new Error('ECONNREFUSED 10.0.0.5:1433')
@@ -124,12 +125,12 @@ const IDENTITIES: Record<string, HostIdentity> = {
   submitter: { actor: { id: 'submitter', roles: ['data-admin', 'data-publisher'] }, attributes: {} },
   clerk: { actor: { id: 'clerk', roles: ['clerk'] }, attributes: {} },
 }
-export const verifyIdentity: IdentityVerifier = async (token) => {
+export const verifyIdentity: IdentityVerifier = (token) => {
   const identity = IDENTITIES[token]
-  return identity === undefined ? { ok: false, reason: 'bad' } : { ok: true, identity }
+  return Promise.resolve(identity === undefined ? { ok: false, reason: 'bad' } : { ok: true, identity })
 }
-async function authenticate(request: FastifyRequest): Promise<HostIdentity | undefined> {
-  return IDENTITIES[/^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1] ?? '']
+function authenticate(request: FastifyRequest): Promise<HostIdentity | undefined> {
+  return Promise.resolve(IDENTITIES[/^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1] ?? ''])
 }
 
 let roots: string[] = []
@@ -209,7 +210,7 @@ export async function proposed({ formId = 'employee', connection = 'erp', role =
     payload: { connection, root: { schema: 'sales', name: 'employee' }, formId, title },
   })
   expect(response.statusCode, response.body).toBe(200)
-  const proposal = response.json() as { form: unknown; bindings: FormBindings; snapshot: unknown; generation: unknown }
+  const proposal = response.json<{ form: unknown; bindings: FormBindings; snapshot: unknown; generation: unknown }>()
   return {
     format: 2,
     connection,
@@ -239,9 +240,9 @@ export const answer = (response: { statusCode: number; json: () => unknown }) =>
 export async function published(bundle: unknown, expectedBase: number | null = null, by = 'author'): Promise<number> {
   const submitted = await submit(by, { expectedBase, bundle })
   expect(submitted.statusCode, submitted.body).toBe(201)
-  const approved = await approve('publisher', (submitted.json() as { draft: number }).draft)
+  const approved = await approve('publisher', submitted.json<{ draft: number }>().draft)
   expect(approved.statusCode, approved.body).toBe(201)
-  return (approved.json() as { version: number }).version
+  return approved.json<{ version: number }>().version
 }
 
 export const INTERNAL = { code: 'internal', message: "This could not be completed; the operator's log says why." }

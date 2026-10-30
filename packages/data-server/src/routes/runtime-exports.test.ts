@@ -259,6 +259,7 @@ function registry(): ConnectionRegistry {
             'abort',
             () => {
               stopping(signal.reason, performance.now() - started)
+              // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the double rejects with the reason the caller gave the signal, as a driver that honours it does
               reject(signal.reason)
             },
             { once: true },
@@ -353,7 +354,7 @@ const exported = (form: string, payload: unknown = {}, token = 'clerk', on = app
 /** An answer's status and body, a refusal's read as JSON and a file's left as text: a file where a refusal was expected then fails as a file, not as JSON that does not parse. */
 const answerOf = (response: Awaited<ReturnType<typeof exported>>) => ({
   status: response.statusCode,
-  body: String(response.headers['content-type']).startsWith('application/json') ? (response.json() as unknown) : response.body,
+  body: String(response.headers['content-type']).startsWith('application/json') ? response.json<unknown>() : response.body,
 })
 
 /** The header row the clerk's file of customers starts with, after the byte-order mark. */
@@ -580,7 +581,7 @@ describe('the export route', () => {
     }))
     // A guard on the guard: these records have no token, and a file of them, moved by nothing, is whole.
     const listed = await app.inject({ method: 'POST', url: '/v1/forms/tag/records/list', headers: as('clerk'), payload: {} })
-    expect((listed.json() as { rows: Array<{ record: string | null }> }).rows.map(({ record }) => record)).toEqual(
+    expect(listed.json<{ rows: Array<{ record: string | null }> }>().rows.map(({ record }) => record)).toEqual(
       Array.from({ length: LIST_PAGE_SIZE }, () => null),
     )
     const whole = await exported('tag')

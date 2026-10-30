@@ -37,7 +37,7 @@ describe('throughTerms', () => {
   // read every tenant's lines.
   test('refuses throughs that are not a list', () => {
     for (const through of [undefined, null, {}, LINE_ORDER]) {
-      expect(() => throughTerms(through as Through[]), String(through)).toThrow(/A request's throughs are a list/)
+      expect(() => throughTerms(through as Through[]), JSON.stringify(through)).toThrow(/A request's throughs are a list/)
     }
   })
 

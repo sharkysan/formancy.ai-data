@@ -23,7 +23,7 @@ export const status = (): string | null => within(browseStep()).getByRole('statu
 export const statusSays = (text: string): Promise<void> => waitFor(() => expect(status()).toBe(text))
 
 /** The object the selector names. */
-export const chosen = (): string => (within(browseStep()).getByLabelText('Table or view') as HTMLSelectElement).value
+export const chosen = (): string => within(browseStep()).getByLabelText<HTMLSelectElement>('Table or view').value
 
 /** Every browse the studio asked the plane for, in order. */
 export const browseRequests = (plane: TestPlane): TestPlane['requests'] => plane.requests.filter((request) => request.path.endsWith('/browse'))

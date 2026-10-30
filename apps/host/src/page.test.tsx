@@ -37,6 +37,7 @@ import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 import { PREFERENCES } from './prefs.js'
 import { CHANGED_SINCE_UNKNOWN } from './session.js'
+import { fieldHeading } from './field-heading.js'
 
 /*
  * The page around the forms: that it opens what the server publishes, says
@@ -111,7 +112,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await openForm(plane, formId)
     const definition = await plane.clerk.form(formId)
     if (!definition.ok) throw new Error(definition.message)
-    const labels = definition.value.form.model.fields.map((field) => String(field.label)).sort()
+    const labels = definition.value.form.model.fields.map(fieldHeading).sort()
     for (const renderer of RENDERERS) {
       const names = answerable(paper(renderer), labels)
         .map((element) => computeAccessibleName(element))
@@ -533,14 +534,12 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await answer(user, 'React', 'Notes', notes)
     await save(user, 'React')
     await waitFor(() => expect(unknownNotice('React')).not.toBeNull(), { timeout: 15_000 })
-    let lost = unknownNotice('React') as HTMLElement
-
     // Saved again as the 502 invites, and stale by its own doing: still the
     // unknown notice, never a "Not saved" over a change that is stored.
     await save(user, 'React')
     await waitFor(() => expect(paragraphs(unknownNotice('React') as HTMLElement)[0]).toBe(CHANGED_SINCE_UNKNOWN))
     expect(notice('React')).toBeNull()
-    lost = unknownNotice('React') as HTMLElement
+    const lost = unknownNotice('React') as HTMLElement
 
     await user.click(within(lost).getByRole('button', { name: 'Check whether it was saved' }))
     await said('React', /^The record has changed since it was read, by this save or by someone else\.$/)
@@ -591,7 +590,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await user.click(screen.getByRole('button', { name: 'Sign out' }))
     await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Forms' })).toBeNull())
     expect(screen.queryByRole('region', { name: 'React' })).toBeNull()
-    expect((screen.getByLabelText('Host token') as HTMLInputElement).value).toBe('')
+    expect(screen.getByLabelText<HTMLInputElement>('Host token').value).toBe('')
     expect(focusedName()).toBe('Host token')
     expect(document.documentElement.outerHTML).not.toContain(TOKENS.clerk)
   })

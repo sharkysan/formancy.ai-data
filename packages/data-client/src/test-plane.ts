@@ -141,7 +141,7 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean; rem
   const owners = hops === undefined ? undefined : await openOwners(pg, ms)
   const registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: { PG_PASSWORD: pg.password, MS_PASSWORD: ms.password },
-    readFile: async () => '',
+    readFile: () => Promise.resolve(''),
   })
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-client-'))
   const store = createFileConfigurationStore(root)

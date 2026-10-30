@@ -622,7 +622,7 @@ test("a child row's stale delete loads the saved row, and its Deletes wait for a
   await waitFor(() => expect(focusedName()).toBe('Not deleted'), ARRIVES)
   expect(paragraphs(screen.getByRole('region', { name: 'Not deleted' }))).toEqual([STALE])
   await user.click(within(screen.getByRole('region', { name: 'Not deleted' })).getByRole('button', { name: 'Load the saved record' }))
-  await waitFor(() => expect((within(linePane()).getByRole('spinbutton', { name: /^Quantity/ }) as HTMLInputElement).value).toBe('4'), ARRIVES)
+  await waitFor(() => expect(within(linePane()).getByRole<HTMLInputElement>('spinbutton', { name: /^Quantity/ }).value).toBe('4'), ARRIVES)
 
   await user.clear(within(linePane()).getByRole('spinbutton', { name: /^Quantity/ }))
   await user.type(within(linePane()).getByRole('spinbutton', { name: /^Quantity/ }), '5')

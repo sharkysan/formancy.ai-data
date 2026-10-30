@@ -392,7 +392,7 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     const { session, holding } = await heldSession(formId)
     const data = submitted(session, { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '9' })
     plane.unreachable.add(connection)
-    let first: Promise<unknown> = Promise.resolve()
+    let first: Promise<unknown>
     try {
       first = session.save(data)
       await writesHeld(holding, 1)

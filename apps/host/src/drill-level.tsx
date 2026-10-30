@@ -73,6 +73,7 @@ export function DrillLevel({
         return session
       }),
     // A level is mounted again for another step: these never change under it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a level's sessions are made once as it is placed, and a level is mounted again for another step, so none of these changes under it
     [],
   )
   const entries = useMemo<PaneEntry[]>(

@@ -106,7 +106,7 @@ async function pressShowView(page) {
 }
 
 /** The states, in order. */
-export function viewJourney(plane, { check }) {
+export function viewJourney(_plane, { check }) {
   return [
     [
       'Views offered (Records)',

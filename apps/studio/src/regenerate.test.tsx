@@ -127,13 +127,13 @@ describe('regenerating a published form', () => {
     const give = within(carried).getByRole('button', { name: 'Give “Delivery notes”' })
     await user.selectOptions(target, 'total')
     await pressEnter(user, give)
-    expect((within(presentation).getByLabelText('Label of total') as HTMLInputElement).value).toBe('Delivery notes')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of total').value).toBe('Delivery notes')
     expect(focusedName()).toBe('Give “Delivery notes”')
     await user.click(within(presentation).getByRole('button', { name: 'Undo' }))
-    expect((within(presentation).getByLabelText('Label of total') as HTMLInputElement).value).toBe('Total')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of total').value).toBe('Total')
     await user.selectOptions(target, 'remarks')
     await user.click(give)
-    expect((within(presentation).getByLabelText('Label of remarks') as HTMLInputElement).value).toBe('Delivery notes')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of remarks').value).toBe('Delivery notes')
 
     await publishDraft(user, ['notes', 'amount'], [])
     const latest = await admin.latest('sales-order')
@@ -171,7 +171,7 @@ describe('regenerating a published form', () => {
         .map((option) => option.textContent),
     ).toEqual(['Remarks (remarks)'])
     await user.click(within(carried).getByRole('button', { name: 'Give “Delivery notes”' }))
-    expect((within(presentation).getByLabelText('Label of remarks') as HTMLInputElement).value).toBe('Delivery notes')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of remarks').value).toBe('Delivery notes')
     expect(await audit()).toEqual([])
   })
 
@@ -209,10 +209,10 @@ describe('regenerating a published form', () => {
 
     await user.click(within(regenerated).getByRole('button', { name: 'Continue to presentation' }))
     const presentation = await screen.findByRole('main', { name: 'Presentation' })
-    expect((within(presentation).getByLabelText('Label of client') as HTMLInputElement).value).toBe('Buyer')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of client').value).toBe('Buyer')
     const carried = within(presentation).getByRole('region', { name: 'Carried from version 1' })
     await pressEnter(user, within(carried).getByRole('button', { name: 'Use the generator’s label for client' }))
-    expect((within(presentation).getByLabelText('Label of client') as HTMLInputElement).value).toBe('Client')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of client').value).toBe('Client')
     expect(focusedName()).toBe('Use the generator’s label for client')
     expect(await audit()).toEqual([])
 
@@ -514,7 +514,9 @@ describe('regenerating a published form', () => {
     const unread = createAdminClient({
       token: TOKENS.admin,
       fetch: async (input, init) =>
-        String(input).endsWith('/v1/forms/sales-order/versions/1') ? new Response(null, { status: 503 }) : plane.fetch(input, init),
+        (input instanceof Request ? input.url : String(input)).endsWith('/v1/forms/sales-order/versions/1')
+          ? new Response(null, { status: 503 })
+          : plane.fetch(input, init),
     })
     const regenerated = await regenerateForm(unread, 'sales-order')
     if (!regenerated.ok) throw new Error(regenerated.message)

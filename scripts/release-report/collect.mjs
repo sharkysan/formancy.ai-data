@@ -128,7 +128,7 @@ function serverRecords(root, dir) {
       try {
         record = readJson(join(folder, name))
       } catch (error) {
-        throw new Error(`${file} is not a server record: ${error.message}`)
+        throw new Error(`${file} is not a server record: ${error.message}`, { cause: error })
       }
       return { ...checkedRecord(record, file), file }
     })

@@ -78,7 +78,7 @@ export async function nameView(user: User, name: string): Promise<void> {
 
 /** The default checked or unchecked by Space, as a keyboard user does. */
 export async function opensTheGrid(user: User, opens: boolean): Promise<void> {
-  const box = within(viewForm()).getByRole('checkbox', { name: 'The grid opens on this view' }) as HTMLInputElement
+  const box = within(viewForm()).getByRole<HTMLInputElement>('checkbox', { name: 'The grid opens on this view' })
   if (box.checked === opens) return
   box.focus()
   await user.keyboard(' ')

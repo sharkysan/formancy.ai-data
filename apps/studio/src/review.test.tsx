@@ -464,7 +464,7 @@ describe('a decision the server refuses', () => {
     await submit(plane, TOKENS.admin, null, await orderBundle(plane))
     let approved = false
     const fetch: typeof globalThis.fetch = async (input, init) => {
-      const url = String(input)
+      const url = input instanceof Request ? input.url : String(input)
       if (approved && (init?.method ?? 'GET') === 'GET' && url.endsWith('/v1/forms/sales-order/drafts/1')) throw new TypeError('Failed to fetch')
       const response = await plane.fetch(input, init)
       if (url.endsWith('/approval')) approved = true

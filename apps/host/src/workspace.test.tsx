@@ -23,6 +23,7 @@ import {
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
+import { fieldHeading } from './field-heading.js'
 
 /*
  * The workspace (0047) on both engines, against the real server: the Forms
@@ -225,7 +226,7 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     const user = await workspace(engine.formId)
     const definition = await plane.clerk.form(engine.formId)
     if (!definition.ok) throw new Error(definition.message)
-    const labels = new Map(definition.value.form.model.fields.map((field) => [field.key, String(field.label)]))
+    const labels = new Map(definition.value.form.model.fields.map((field) => [field.key, fieldHeading(field)]))
     const names = (definition.value.list?.searchable ?? []).map((key) => labels.get(key))
     const search = screen.getByRole('search', { name: 'Search records' })
     expect(computeDescription(within(search).getByRole('textbox', { name: 'Search' }))).toBe(
@@ -245,7 +246,7 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`No records match “${stamp}nothing”.`), { timeout: 15_000 })
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Clear search' }))
     expect(focusedName()).toBe('Search')
-    expect((within(search).getByRole('textbox', { name: 'Search' }) as HTMLInputElement).value).toBe('')
+    expect(within(search).getByRole<HTMLInputElement>('textbox', { name: 'Search' }).value).toBe('')
     await waitFor(() => expect(rowsOf(records()).length).toBeGreaterThan(1), { timeout: 15_000 })
   })
 

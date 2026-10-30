@@ -388,7 +388,7 @@ describe('when the server is not the one answering', () => {
     const spy = createAdminClient({
       token: TOKENS.admin,
       fetch: async (input, init) => {
-        seen.push({ url: String(input), authorization: new Headers(init?.headers).get('authorization') })
+        seen.push({ url: input instanceof Request ? input.url : String(input), authorization: new Headers(init?.headers).get('authorization') })
         return plane.fetch(input, init)
       },
     })

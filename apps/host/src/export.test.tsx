@@ -24,6 +24,7 @@ import type { User } from './test-host.js'
 import { holdingRequests } from './test-network.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane, Sent } from './test-plane.js'
+import { fieldHeading } from './field-heading.js'
 
 /*
  * Download CSV on the host page (0080), on both engines, against the real
@@ -116,9 +117,7 @@ async function definitionOf(formId: string): Promise<PublishedForm> {
  */
 function headerFor(gridHeaders: readonly string[], definition: PublishedForm): string[] {
   const lookups = new Set(
-    definition.form.model.fields
-      .filter((field) => typeof (field as { optionsSource?: unknown }).optionsSource === 'string')
-      .map((field) => String(field.label ?? field.key)),
+    definition.form.model.fields.filter((field) => typeof (field as { optionsSource?: unknown }).optionsSource === 'string').map(fieldHeading),
   )
   return gridHeaders.flatMap((header) => (lookups.has(header) ? [header, `${header} (key)`] : [header]))
 }
@@ -364,7 +363,7 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     })
     const definition = await definitionOf(engine.lines)
     const [header, ...rows] = records(await saved.file.text())
-    const label = String(definition.form.model.fields.find((field) => field.key === 'order')?.label)
+    const label = fieldHeading(definition.form.model.fields.find((field) => field.key === 'order') ?? { key: 'order' })
     expect(header?.filter((cell) => cell !== label && cell !== `${label} (key)`)).toEqual(headerFor(headers, definition))
     expect(rows.map((cells) => cells[(header ?? []).indexOf(`${label} (key)`)])).toEqual([order, order, order])
     expect(rows.map((cells) => cells[(header ?? []).indexOf('Line no')])).toEqual(['3', '2', '1'])

@@ -183,7 +183,7 @@ const keys = (form: FormSchema) => grid(form).map((node) => node.path)
 async function propose(extra: Record<string, unknown> = {}): Promise<Proposal> {
   const response = await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: ADMIN, payload: { ...PROPOSAL, ...extra } })
   expect(response.statusCode, response.body).toBe(200)
-  return response.json() as Proposal
+  return response.json<Proposal>()
 }
 
 /** Propose, label `name` "Full name" and put it first, derive, publish with `views`: as the studio does. */

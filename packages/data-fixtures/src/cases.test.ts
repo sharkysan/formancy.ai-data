@@ -28,7 +28,7 @@ import {
   UPDATE_RECREATED_CASE,
   uuidCase,
 } from './cases.js'
-import { DELETE_PARITY, UPDATE_RECREATED } from './deletes.js'
+import { DELETE_PARITY } from './deletes.js'
 import type { DeleteCase } from './deletes.js'
 import { sharedDrifting } from './drifting.js'
 import { EXPORT_PARITY } from './exports.js'

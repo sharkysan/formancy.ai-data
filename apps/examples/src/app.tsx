@@ -4,6 +4,7 @@ import type { DatabaseKind, FieldBinding } from '@formancy/data-core'
 import type { OptionsSources } from '@formancy/react'
 import { previewEngine } from './engines.js'
 import { generateExamples } from './examples.js'
+import { fieldHeading } from './field-heading.js'
 import type { Example } from './examples.js'
 import { CAPTURED, capturedRows, lookupSources } from './lookup-source.js'
 import type { CapturedTable } from './lookup-source.js'
@@ -32,18 +33,18 @@ function tableOf(example: Example): string {
  * counted, not written.
  */
 function LookupNote({ example, binding, captured }: { example: Example; binding: LookupBinding; captured: readonly CapturedTable[] }): ReactElement {
-  const label = example.generated.form.model.fields.find((field) => field.key === binding.field)?.label ?? binding.field
+  const label = fieldHeading(example.generated.form.model.fields.find((field) => field.key === binding.field) ?? { key: binding.field })
   const rows = capturedRows(captured, binding.target.table)
   return (
     <p role="note" className="lookup-note">
       {rows === undefined ? (
         <>
-          The <strong>{String(label)}</strong> list has no source on this page, so both renderers say so where the chooser would be.
+          The <strong>{label}</strong> list has no source on this page, so both renderers say so where the chooser would be.
         </>
       ) : (
         <>
-          The <strong>{String(label)}</strong> list is held in memory, because this page has no server: {rows.length} {binding.target.table.name} rows captured
-          with the snapshot, each offered under the key token the server decodes. A host gets the list from the server&rsquo;s runtime plane through{' '}
+          The <strong>{label}</strong> list is held in memory, because this page has no server: {rows.length} {binding.target.table.name} rows captured with the
+          snapshot, each offered under the key token the server decodes. A host gets the list from the server&rsquo;s runtime plane through{' '}
           <code>@formancy/data-client</code>, as apps/host shows.
         </>
       )}

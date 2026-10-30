@@ -74,7 +74,8 @@ function fromThePage(request: Request): boolean {
 /** The body as UTF-8 text, or undefined past `limit` bytes or for bytes that are not UTF-8: read no further than the limit, and the rest cancelled. */
 async function bodyText(request: Request, limit: number): Promise<string | undefined> {
   if (request.body === null) return ''
-  const reader = request.body.getReader()
+  // The Workers types read a body as `any` chunks; a request body's are bytes.
+  const reader = request.body.getReader() as ReadableStreamDefaultReader<Uint8Array>
   const chunks: Uint8Array[] = []
   let length = 0
   for (;;) {

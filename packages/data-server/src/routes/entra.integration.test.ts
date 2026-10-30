@@ -130,12 +130,12 @@ async function publishAsSqlLogin(): Promise<void> {
         },
       })
       expect(proposed.statusCode, proposed.body).toBe(200)
-      const { form, bindings, snapshot, generation } = proposed.json() as {
+      const { form, bindings, snapshot, generation } = proposed.json<{
         form: FormSchema
         bindings: FormBindings
         snapshot: MetadataSnapshot
         generation: GenerationRequest
-      }
+      }>()
       const bundle = {
         format: 2,
         connection: id,
@@ -209,7 +209,7 @@ afterAll(async () => {
 async function ask(method: 'GET' | 'POST', url: string, bearer: string, payload?: Record<string, unknown>): Promise<{ status: number; json: unknown }> {
   const answer = await app.inject({ method, url, headers: { authorization: `Bearer ${bearer}` }, ...(payload === undefined ? {} : { payload }) })
   answered.push(answer.body)
-  return { status: answer.statusCode, json: answer.json() as unknown }
+  return { status: answer.statusCode, json: answer.json<unknown>() }
 }
 
 /** stack.mjs's `leaks()`: where each value appears among `haystacks`, as sentences naming the value's name and the place, never the value. */

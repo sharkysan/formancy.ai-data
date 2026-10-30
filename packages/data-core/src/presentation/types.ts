@@ -81,7 +81,8 @@ export type PresentationConflict =
       field: string
       anchor: FieldAnchor
       property: 'label' | 'span' | 'section'
-      yours: Text | 'all' | 'one' | SectionAnchor
+      // A span's `all` or `one` is a string, which Text holds.
+      yours: Text | SectionAnchor
       resolution: 'dropped'
       message: string
     }

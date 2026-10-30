@@ -127,7 +127,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: `Order line ${engine.lines}` })).toBeTruthy(), ARRIVES)
     await answeredOnce('Records')
     expect(focusedName()).toBe('Forms')
-    expect((screen.getByRole('radio', { name: 'Stacked' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Stacked' }).checked).toBe(true)
     expect(window.location.hash).toBe(`#form=${engine.lines}&layout=stacked&view=records`)
     cleanup()
 
@@ -195,7 +195,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     // and Keep editing goes back again.
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'New record' }))
     await waitFor(() => expect(screen.getByRole('region', { name: 'React' })).toBeTruthy(), ARRIVES)
-    const name = await waitFor(() => within(screen.getByRole('region', { name: 'React' })).getByLabelText(/^Name\b/) as HTMLInputElement, ARRIVES)
+    const name = await waitFor(() => within(screen.getByRole('region', { name: 'React' })).getByLabelText<HTMLInputElement>(/^Name\b/), ARRIVES)
     await user.type(name, 'Hedy')
     window.history.forward()
     await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
@@ -246,7 +246,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     // written over with the place it shows.
     await user.click(screen.getByRole('radio', { name: 'Stacked' }))
     await backTo(window.location.hash, 1)
-    expect((screen.getByRole('radio', { name: 'Stacked' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Stacked' }).checked).toBe(true)
   })
 
   // Drill down's records and its record are levels 0 and 1 (0090), each an
@@ -277,7 +277,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
 
     await user.click(screen.getByRole('radio', { name: 'Stacked' }))
     await backTo(window.location.hash, 1)
-    expect((screen.getByRole('radio', { name: 'Stacked' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Stacked' }).checked).toBe(true)
   })
 
   // Back in a layout that moves between none of the open form's entries

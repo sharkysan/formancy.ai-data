@@ -39,6 +39,7 @@ export const TOKENS = {
   thirdClerk: 'host-test-clerk-tenant-3',
 } as const
 
+// eslint-disable-next-line @typescript-eslint/require-await -- a double of an async interface: a throw in it must reject, as the real one's does, and a returning branch must resolve
 const verifyIdentity: IdentityVerifier = async (token) => {
   if (token === TOKENS.admin) return { ok: true, identity: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-1', roles: ['clerk'] }, attributes: { tenant: '1' } } }
@@ -267,7 +268,7 @@ export async function startPlane(
   ]
   const real = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: { PG_PASSWORD: pg.password, MS_PASSWORD: ms.password },
-    readFile: async () => '',
+    readFile: () => Promise.resolve(''),
   })
   const unreachable = new Set<string>()
   const lose = new Map<string, 'after' | 'before'>()

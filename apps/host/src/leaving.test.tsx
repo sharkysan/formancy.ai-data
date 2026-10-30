@@ -139,7 +139,7 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
     expect(within(notice).getAllByRole('paragraph')[0]?.textContent).toBe('Showing React closes these forms:')
     await keep(user, notice)
     expect(focusedName()).toBe('Both')
-    expect((screen.getByRole('radio', { name: 'Both' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Both' }).checked).toBe(true)
     await user.click(screen.getByRole('radio', { name: 'React' }))
     notice = await asking()
     await discard(user, notice)
@@ -167,7 +167,7 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
     expect(within(notice).getByRole('list').textContent).toBe('New Order line, React: changes that are not saved.')
     await keep(user, notice)
     expect(document.activeElement?.getAttribute('role')).toBe('gridcell')
-    expect((within(pane).getByLabelText(/^Quantity\b/) as HTMLInputElement).value).toBe('3')
+    expect(within(pane).getByLabelText<HTMLInputElement>(/^Quantity\b/).value).toBe('3')
 
     // New Order line over the draft asks too, and Discard empties the line's form.
     await user.click(within(lines).getByRole('button', { name: 'New Order line' }))
@@ -175,7 +175,7 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
     expect(within(again).getAllByRole('paragraph')[0]?.textContent).toBe('Starting a new Order line closes these forms:')
     await discard(user, again)
     await waitFor(
-      () => expect((within(screen.getByRole('region', { name: 'New Order line React' })).getByLabelText(/^Quantity\b/) as HTMLInputElement).value).toBe(''),
+      () => expect(within(screen.getByRole('region', { name: 'New Order line React' })).getByLabelText<HTMLInputElement>(/^Quantity\b/).value).toBe(''),
       ARRIVES,
     )
 

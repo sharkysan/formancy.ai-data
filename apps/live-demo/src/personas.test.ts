@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { TENANTS } from './data/model.js'
 import { DEMO_FORMS, describeGrants, PERSONAS, ROLE_GRANTS } from './personas.js'
-import type { DemoRole } from './personas.js'
 
 /**
  * The people a visitor signs in as. What each may do is ROLE_GRANTS alone:

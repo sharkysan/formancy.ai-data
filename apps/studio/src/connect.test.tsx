@@ -222,7 +222,7 @@ describe('connecting', () => {
     const steps = screen.getByRole('navigation', { name: 'Steps' })
     expect(within(steps).getByRole('button', { name: '4. Policy' })).toHaveProperty('disabled', false)
     const policy = await goTo(user, 'Policy')
-    expect((within(policy).getByLabelText('Roles that may read') as HTMLInputElement).value).toBe('clerk')
+    expect(within(policy).getByLabelText<HTMLInputElement>('Roles that may read').value).toBe('clerk')
     expect(paragraphs(await goTo(user, 'Publish')).join(' ')).toContain('its bindings to sales.order on fixture,')
 
     // The other connection's Choose step starts empty, and the root says what choosing one replaces.

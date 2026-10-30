@@ -405,6 +405,7 @@ export function FormView({
     if (view === 'record' && openRef.current !== null) after(() => detailHeading.current?.focus())
     else if (view === 'records') toOpenRow()
     // On each change made by history, and only then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- it runs on each change made by history, from the render that saw it, so what it reads is current
   }, [historyView])
 
   const sideBySide = layout === 'side-by-side'

@@ -111,7 +111,7 @@ async function allows(pool: mssql.ConnectionPool, sql: string): Promise<boolean>
   } catch (error) {
     const number = (error as { number?: unknown }).number
     if (number === 229 || number === 230) return false
-    throw new Error(`${sql} failed with ${String(number)}: ${(error as Error).message}`)
+    throw new Error(`${sql} failed with ${String(number)}: ${(error as Error).message}`, { cause: error })
   } finally {
     await transaction.rollback()
   }

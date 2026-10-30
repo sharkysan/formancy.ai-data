@@ -192,7 +192,7 @@ function carryFieldOverrides(rebase: Rebase, entries: readonly FieldPresentation
         const yours = entry[property]
         if (yours === undefined) continue
         const shown =
-          property === 'label' ? describeText(yours as Text) : property === 'section' ? describeSection(yours as SectionAnchor) : `'${String(yours)}'`
+          property === 'label' ? describeText(yours as Text) : property === 'section' ? describeSection(yours as SectionAnchor) : `'${String(entry.span)}'`
         add(subject, {
           kind: 'field-gone',
           field: entry.field,

@@ -42,15 +42,6 @@ const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scr
 /** The messages for a file of the repository, linted with its own content, as `pnpm lint` reads it. */
 const lintOwn = (file) => eslint.lintText(readFileSync(file, 'utf8'), { filePath: file }).then(([result]) => result.messages)
 
-/**
- * What stops ESLint reading a file: a message that no rule gave -- a parsing
- * error for a tsconfig it cannot read or a file in no project, or the warning
- * that the file is ignored. A rule's finding is `pnpm lint`'s and not the
- * wiring's: the findings are fixed in a change of their own, and this case
- * must not wait on them.
- */
-const unreadable = (file) => lintOwn(file).then((messages) => messages.filter((message) => message.ruleId === null))
-
 /** A package's source, which every rule holds, beside which the install fixtures are read. */
 const SOURCE = 'packages/data-core/src/adapter.ts'
 
@@ -207,7 +198,7 @@ describe('the linter', TYPED, () => {
         if (!existsSync(join(dir, 'tsconfig.json')) || !existsSync(join(dir, 'src'))) continue
         const file = firstSource(join(dir, 'src'))
         if (!file) continue
-        expect(await unreadable(file), file).toEqual([])
+        expect(await lintOwn(file), file).toEqual([])
         checked += 1
       }
     }
@@ -216,7 +207,7 @@ describe('the linter', TYPED, () => {
     const { fileNames, errors } = ts.parseJsonConfigFileContent(ts.readConfigFile(tools, ts.sys.readFile).config, ts.sys, root)
     expect(errors).toEqual([])
     expect(fileNames.length, 'files tsconfig.tools.json takes in').toBeGreaterThan(0)
-    for (const file of fileNames) expect(await unreadable(file), relative(root, file)).toEqual([])
+    for (const file of fileNames) expect(await lintOwn(file), relative(root, file)).toEqual([])
   })
 
   // A file TypeScript's wildcard drops is in no program and so is neither

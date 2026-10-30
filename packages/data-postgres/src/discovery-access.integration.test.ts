@@ -192,7 +192,7 @@ describe('a column renamed in the database', () => {
 })
 
 /** The server's answer to one statement: `ok`, or the SQLSTATE it refused with. */
-type Answer = 'ok' | string
+type Answer = string
 
 const ROLLED_BACK = new Error('rolled back')
 

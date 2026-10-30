@@ -105,7 +105,11 @@ export function cellText(row: GridRow | undefined, column: GridColumn): string {
   const label = row.labels[column.key]
   if (label !== undefined) return label
   const value = row.answers[column.key]
-  return value === null || value === undefined ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value)
+  return value === null || value === undefined
+    ? ''
+    : typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint'
+      ? String(value)
+      : JSON.stringify(value)
 }
 
 const range = (from: number, to: number): string => `${String(from)}–${String(to)}`

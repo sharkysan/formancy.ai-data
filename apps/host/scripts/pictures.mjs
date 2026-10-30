@@ -120,6 +120,7 @@ async function startPlane() {
   } catch (error) {
     throw new Error(
       `the host pictures need Docker, for their PostgreSQL, and testcontainers could not start one: ${String(error instanceof Error ? error.message : error).split('\n')[0]}`,
+      { cause: error },
     )
   }
   const url = new URL(fixture.writer)

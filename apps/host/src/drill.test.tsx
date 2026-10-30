@@ -172,9 +172,9 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     expect(trail()).toEqual(['Records', `Order ${order}`, `Order line ${lines[0] ?? ''}`])
     expect(screen.queryByRole('heading', { level: 3, name: `Order ${order}` })).toBeNull()
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=2`)
-    const quantity = await waitFor(() => within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByLabelText(/^Quantity\b/) as HTMLInputElement, ARRIVES)
+    const quantity = await waitFor(() => within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByLabelText<HTMLInputElement>(/^Quantity\b/), ARRIVES)
     await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
-    const parent = within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByRole('combobox', { name: /^Order\*?$/ }) as HTMLSelectElement
+    const parent = within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByRole<HTMLSelectElement>('combobox', { name: /^Order\*?$/ })
     expect({ disabled: parent.disabled, value: parent.value }).toEqual({ disabled: true, value: order })
 
     const nav = screen.getByRole('navigation', { name: 'Breadcrumb' })
@@ -275,7 +275,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
     await held.pass()
     await waitFor(() => expect(focusedName()).toBe(`Order line ${lines[0] ?? ''}`), ARRIVES)
-    const quantity = await waitFor(() => within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByLabelText(/^Quantity\b/) as HTMLInputElement, ARRIVES)
+    const quantity = await waitFor(() => within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByLabelText<HTMLInputElement>(/^Quantity\b/), ARRIVES)
     await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
     await user.type(quantity, '5')
     await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: `Order ${order}` }))
@@ -412,7 +412,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
       ok: true,
     })
     const sheet = screen.getByRole('region', { name: 'React' })
-    const carrier = (await waitFor(() => within(sheet).getByLabelText(/^Carrier\b/), ARRIVES)) as HTMLInputElement
+    const carrier = await waitFor(() => within(sheet).getByLabelText<HTMLInputElement>(/^Carrier\b/), ARRIVES)
     await user.clear(carrier)
     await user.type(carrier, `${words} Ship`)
     await user.click(within(sheet).getByRole('button', { name: 'Save' }))
@@ -537,7 +537,7 @@ async function crumb(user: User, name: string): Promise<void> {
 
 /** A field of a level's React pane, by its label, once drawn. */
 async function field(heading: string, label: RegExp): Promise<HTMLInputElement> {
-  return waitFor(() => within(pane(heading, 'React')).getByLabelText(label) as HTMLInputElement, ARRIVES)
+  return waitFor(() => within(pane(heading, 'React')).getByLabelText<HTMLInputElement>(label), ARRIVES)
 }
 
 /** Down from employee 1 to the approved order's line: level 3, with the keyboard on its heading. */
@@ -711,14 +711,14 @@ describe.each(ENGINES)('Drill down, deep, on $engine', (engine) => {
     await waitFor(() => expect(focusedName()).toBe('New Order line'), ARRIVES)
     expect(current()).toBe('New Order line')
     const sheet = pane('New Order line', 'React')
-    const parent = (await waitFor(() => within(sheet).getByRole('combobox', { name: /^Order\*?$/ }), ARRIVES)) as HTMLSelectElement
+    const parent = await waitFor(() => within(sheet).getByRole<HTMLSelectElement>('combobox', { name: /^Order\*?$/ }), ARRIVES)
     expect({ disabled: parent.disabled, value: parent.value }).toEqual({ disabled: true, value: order })
     for (const [label, value] of [
       [/^Line no\b/, '5'],
       [/^Quantity\b/, '3'],
       [/^Unit price\b/, '1.25'],
     ] as const) {
-      const input = within(sheet).getByLabelText(label) as HTMLInputElement
+      const input = within(sheet).getByLabelText<HTMLInputElement>(label)
       await user.clear(input)
       await user.type(input, value)
     }

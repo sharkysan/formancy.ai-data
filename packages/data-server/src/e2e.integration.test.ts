@@ -199,7 +199,7 @@ describe.each([
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode).toBe(200)
-    const proposed = proposal.json() as Proposal
+    const proposed = proposal.json<Proposal>()
     // Delete too (0050): the database numbers an order's key. Nothing grants it: its lines cascade from it.
     expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: true })
     const bundle = asProposed(connection, proposed, clerkPolicy(proposed.bindings.fields))
@@ -300,7 +300,7 @@ describe.each([
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const proposed = proposal.json() as Proposal
+    const proposed = proposal.json<Proposal>()
     // A line's key is typed: SQL Server's rowversion proves a line, a PostgreSQL version column does not (0050).
     expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: versionColumn === undefined })
     const policy: FormPolicy = {
@@ -443,7 +443,7 @@ async function exported(form: string, bearer: string, payload: Record<string, un
     status: response.statusCode,
     type: response.headers['content-type'],
     text: response.body,
-    json: () => response.json() as { code: string; message: string },
+    json: () => response.json<{ code: string; message: string }>(),
   }
 }
 
@@ -471,7 +471,7 @@ async function published(
 ): Promise<void> {
   const proposal = await call('POST', '/v1/form-proposals', admin, { connection, formId, title: formId, ...request })
   expect(proposal.statusCode, proposal.body).toBe(200)
-  const proposed = proposal.json() as Proposal
+  const proposed = proposal.json<Proposal>()
   const answer = await call('POST', `/v1/forms/${formId}/versions`, admin, {
     expectedBase: null,
     bundle: asProposed(connection, proposed, policyOf(proposed.bindings.fields)),
@@ -815,7 +815,7 @@ describe.each([
       pinned: ['tenant_id'],
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const proposed = proposal.json() as Proposal
+    const proposed = proposal.json<Proposal>()
     expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: true })
     const policy: FormPolicy = {
       version: 1,
@@ -876,7 +876,7 @@ describe('deleting an order line through its order on SQL Server', () => {
       lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const proposed = proposal.json() as Proposal
+    const proposed = proposal.json<Proposal>()
     const base = clerkPolicy(proposed.bindings.fields)
     const policy: FormPolicy = {
       ...base,
@@ -1076,7 +1076,7 @@ describe.each([
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const proposed = proposal.json() as Proposal
+    const proposed = proposal.json<Proposal>()
     expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: true })
     const base = clerkPolicy(proposed.bindings.fields)
     const policy: FormPolicy = { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES }
@@ -1108,7 +1108,7 @@ describe.each([
       answers: { customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '5', notes: 'deleted with its lines' },
     })
     expect(created.statusCode, created.body).toBe(201)
-    const { record, version } = created.json() as { record: string; version: string }
+    const { record, version } = created.json<{ record: string; version: string }>()
     const id = record.slice('k1:'.length)
     await rows.run(
       db === 'pg'
@@ -1256,7 +1256,7 @@ describe.each([
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(response.statusCode, response.body).toBe(200)
-    proposal = response.json() as Proposal
+    proposal = response.json<Proposal>()
     expect(orderOf(proposal.form)).toEqual(['customer', 'order_date', 'status', 'amount', 'notes', 'group', 'created_by', 'approved_by'])
 
     edited = JSON.parse(JSON.stringify(proposal.form)) as FormSchema

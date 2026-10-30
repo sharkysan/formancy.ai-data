@@ -268,7 +268,7 @@ describe('when the data server is not what answers', () => {
     const seen: string[] = []
     const original = globalThis.fetch
     globalThis.fetch = async (input) => {
-      seen.push(String(input))
+      seen.push(input instanceof Request ? input.url : String(input))
       return new Response(JSON.stringify({ rows: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
     }
     try {

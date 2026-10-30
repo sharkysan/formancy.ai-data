@@ -92,7 +92,7 @@ describe('signing in', () => {
   test('signing out forgets the token', async () => {
     const user = await signIn(plane)
     await user.click(screen.getByRole('button', { name: 'Sign out' }))
-    expect((screen.getByLabelText('Host token') as HTMLInputElement).value).toBe('')
+    expect(screen.getByLabelText<HTMLInputElement>('Host token').value).toBe('')
     expect(screen.queryByRole('navigation', { name: 'Steps' })).toBeNull()
   })
 
@@ -130,7 +130,9 @@ describe('signing in', () => {
     try {
       const user = userEvent.setup()
       mount(async (input, init) =>
-        String(input).endsWith('/v1/administration') ? Promise.reject(new TypeError('Failed to fetch')) : reviewed.fetch(input, init),
+        (input instanceof Request ? input.url : String(input)).endsWith('/v1/administration')
+          ? Promise.reject(new TypeError('Failed to fetch'))
+          : reviewed.fetch(input, init),
       )
       await user.type(screen.getByLabelText('Host token'), TOKENS.publisher)
       await user.click(screen.getByRole('button', { name: 'Sign in' }))

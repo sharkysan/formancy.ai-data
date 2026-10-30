@@ -147,6 +147,7 @@ export function ImportPanel({
   const file = chosen === null || chosen.state === 'not-a-version-file' ? null : chosen.file
   useEffect(() => {
     if (written !== 0 && file !== null) void readNewest(file, choice.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a write on the step is a reason to read again; a file is read when it is chosen, and the render that saw the write reads the current file
   }, [written])
 
   async function choose(event: ChangeEvent<HTMLInputElement>): Promise<void> {

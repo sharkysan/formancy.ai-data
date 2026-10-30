@@ -151,7 +151,7 @@ describe.each(ENGINES)("an order's lines on $engine", (engine) => {
     const order = await within(pane).findByRole('combobox', { name: /^Order\*?$/ }, ARRIVES)
     expect((order as HTMLSelectElement).disabled).toBe(true)
     await waitFor(() => expect(computeAccessibleName(within(order).getByRole('option', { selected: true }))).toBe(EDGES.orderDate), ARRIVES)
-    const field = (name: RegExp): HTMLInputElement => within(pane).getByLabelText(name) as HTMLInputElement
+    const field = (name: RegExp): HTMLInputElement => within(pane).getByLabelText<HTMLInputElement>(name)
     await user.clear(field(/^Line no\b/))
     await user.type(field(/^Line no\b/), '7')
     await user.clear(field(/^Quantity\b/))
@@ -174,7 +174,7 @@ describe.each(ENGINES)("an order's lines on $engine", (engine) => {
 
     await openRow(user, 'Order line', '1')
     const opened = await waitFor(() => childPane(`Order line ${mine.lines[0] ?? ''}`, renderer), ARRIVES)
-    const quantity = await waitFor(() => within(opened).getByLabelText(/^Quantity\b/) as HTMLInputElement, ARRIVES)
+    const quantity = await waitFor(() => within(opened).getByLabelText<HTMLInputElement>(/^Quantity\b/), ARRIVES)
     await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
     await user.clear(quantity)
     await user.type(quantity, '9')
@@ -236,7 +236,7 @@ describe.each(ENGINES)('an employee and the forms under it on $engine', (engine)
       await waitFor(() => expect(within(childPane(`Order ${approved}`, renderer)).getByLabelText(/^Amount\b/)).toBeTruthy(), ARRIVES)
     }
     // The order form is one this clerk may only read: its record's fields are drawn disabled.
-    expect((within(childPane(`Order ${EDGES.seededOrder}`, 'React')).getByLabelText(/^Amount\b/) as HTMLInputElement).disabled).toBe(true)
+    expect(within(childPane(`Order ${EDGES.seededOrder}`, 'React')).getByLabelText<HTMLInputElement>(/^Amount\b/).disabled).toBe(true)
 
     // Read from the DOM: an id has no role and no name.
     const ids = [...document.querySelectorAll('[id]')].map((element) => element.id)

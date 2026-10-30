@@ -298,7 +298,7 @@ describe('what an approval asks again', () => {
     expect(undecided.json()).toMatchObject({ code: 'keys-reassigned', keys: reassigned })
     const confirmed = await submit('author', { expectedBase: 1, bundle, keysConfirmed: reassigned })
     expect(confirmed.statusCode, confirmed.body).toBe(201)
-    const draft = (confirmed.json() as { draft: number }).draft
+    const draft = confirmed.json<{ draft: number }>().draft
     expect((await read('publisher', draft)).json().keysConfirmed).toEqual(reassigned)
     const approved = await approve('publisher', draft)
     expect([approved.statusCode, approved.json().version]).toEqual([201, 2])
@@ -457,15 +457,15 @@ describe('what the answers say a caller may do, against what every route does', 
           const { app: deployment } = await plane()
           await store.publish('employee', null, bundle)
           const pending = await submit(whose === 'own' ? caller : 'submitter', { expectedBase: 1, bundle }, 'employee', deployment)
-          const draft = (pending.json() as { draft: number }).draft
-          const administration = (await deployment.inject({ method: 'GET', url: '/v1/administration', headers: as(caller) })).json() as {
+          const draft = pending.json<{ draft: number }>().draft
+          const administration = (await deployment.inject({ method: 'GET', url: '/v1/administration', headers: as(caller) })).json<{
             review: boolean
             publisher: boolean
             refuses: Record<string, { code: string; message: string }>
-          }
-          const read = (await deployment.inject({ method: 'GET', url: `/v1/forms/employee/drafts/${String(draft)}`, headers: as(caller) })).json() as {
+          }>()
+          const read = (await deployment.inject({ method: 'GET', url: `/v1/forms/employee/drafts/${String(draft)}`, headers: as(caller) })).json<{
             refuses: Record<string, { code: string; message: string }>
-          }
+          }>()
           expect(administration).toMatchObject({ review: true, publisher: caller !== 'author' })
           expect(Object.fromEntries(Object.entries(administration.refuses).map(([name, refusal]) => [name, refusal.code]))).toEqual(expected.refuses)
           expect(Object.fromEntries(Object.entries(read.refuses).map(([name, refusal]) => [name, refusal.code]))).toEqual(expected[whose])
@@ -483,7 +483,7 @@ describe('what the answers say a caller may do, against what every route does', 
           })
           const answered =
             response.statusCode === 403
-              ? (response.json() as { code: string }).code
+              ? response.json<{ code: string }>().code
               : response.statusCode < 300
                 ? 'allowed'
                 : `answered ${String(response.statusCode)}: ${response.body}`
@@ -504,8 +504,8 @@ describe('what the answers say a caller may do, against what every route does', 
     await store.publish('employee', null, bundle)
     const before = await versionFile(1)
     const { app: deployment, routes } = await plane()
-    const others = ((await submit('colleague', { expectedBase: 1, bundle }, 'employee', deployment)).json() as { draft: number }).draft
-    const own = ((await submit('author', { expectedBase: 1, bundle }, 'employee', deployment)).json() as { draft: number }).draft
+    const others = (await submit('colleague', { expectedBase: 1, bundle }, 'employee', deployment)).json<{ draft: number }>().draft
+    const own = (await submit('author', { expectedBase: 1, bundle }, 'employee', deployment)).json<{ draft: number }>().draft
     let sent = 0
     for (const route of routes) {
       for (const draft of route.url.includes(':draft') ? [others, own] : [others]) {

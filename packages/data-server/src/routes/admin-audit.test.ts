@@ -160,6 +160,7 @@ const POLICY = {
 }
 
 /** A proposal published as proposed, format 2 (0030). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a test reads an untyped body on purpose, and asserts on the part it names
 function bundleOf(proposal: any) {
   return {
     format: 2,
@@ -294,7 +295,7 @@ describe('what holds the trail in place', () => {
     })
     await early.ready()
     const response = await early.inject({ method: 'POST', url: '/v1/forms/employee/records/archive', headers: as('clerk') })
-    expect({ status: response.statusCode, body: response.json() as unknown, ran }).toEqual({
+    expect({ status: response.statusCode, body: response.json<unknown>(), ran }).toEqual({
       status: 500,
       body: { code: 'unaudited-route', message: expect.any(String) },
       ran: false,
@@ -605,7 +606,7 @@ describe("the administrator plane's events", () => {
     expect((await server.inject({ method: 'GET', url: '/v1/forms/employee/nothing', headers: as('admin') })).statusCode).toBe(404)
     expect((await server.inject({ method: 'GET', url: `/v1/forms/e${'x'.repeat(128)}/versions/latest`, headers: as('admin') })).statusCode).toBe(414)
     const undecodable = await server.inject({ method: 'POST', url: '/v1/forms/%E0/versions', headers: as('admin') })
-    expect({ status: undecodable.statusCode, code: (undecodable.json() as { code: string }).code }).toEqual({ status: 400, code: 'FST_ERR_BAD_URL' })
+    expect({ status: undecodable.statusCode, code: undecodable.json<{ code: string }>().code }).toEqual({ status: 400, code: 'FST_ERR_BAD_URL' })
     expect(events).toEqual([
       event({ operation: 'connection-list', status: 200, outcome: 'ok' }),
       event({ operation: 'connection-list', actor: null, status: 429, outcome: 'http-429' }),
@@ -620,9 +621,9 @@ describe("the administrator plane's events", () => {
   test('a path that is not plain is one event with no actor on a route, and none off one', async () => {
     const server = await serve()
     const refused = await server.inject({ method: 'GET', url: '/v1/forms/a/versions/..%2F..%2Fb', headers: as('admin') })
-    expect({ status: refused.statusCode, code: (refused.json() as { code: string }).code }).toEqual({ status: 400, code: 'path-not-plain' })
+    expect({ status: refused.statusCode, code: refused.json<{ code: string }>().code }).toEqual({ status: 400, code: 'path-not-plain' })
     const nowhere = await server.inject({ method: 'GET', url: '/v1/forms/employee/nothing%2F..', headers: as('admin') })
-    expect({ status: nowhere.statusCode, code: (nowhere.json() as { code: string }).code }).toEqual({ status: 400, code: 'path-not-plain' })
+    expect({ status: nowhere.statusCode, code: nowhere.json<{ code: string }>().code }).toEqual({ status: 400, code: 'path-not-plain' })
     expect(events).toEqual([event({ operation: 'version-read', actor: null, form: 'a', status: 400, outcome: 'path-not-plain' })])
   })
 

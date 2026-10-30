@@ -141,7 +141,8 @@ afterAll(async () => {
 
 const inject = async (method: 'GET' | 'POST', url: string, payload?: Record<string, unknown>) => {
   const answer = await app.inject({ method, url, headers: ADMIN, ...(payload === undefined ? {} : { payload }) })
-  return { status: answer.statusCode, json: answer.json() as Record<string, any>, body: answer.body }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a test reads an untyped body on purpose, and asserts on the part it names
+  return { status: answer.statusCode, json: answer.json<Record<string, any>>(), body: answer.body }
 }
 
 /** The facts a standing is decided from, out of a ping's answer or a snapshot's `server`. */

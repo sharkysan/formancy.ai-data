@@ -280,7 +280,7 @@ describe('an instant and a time on update (0040)', () => {
   ])('a read that failed as %s refuses an update carrying an instant or a time with its answer, and sends nothing', async (code, status) => {
     readOutcome = { ok: false, code, message: 'connection reset by 10.0.0.5' }
     const refused = await update('writable', WRITABLE)
-    expect({ status: refused.statusCode, code: (refused.json() as { code: string }).code }).toEqual({ status, code })
+    expect({ status: refused.statusCode, code: refused.json<{ code: string }>().code }).toEqual({ status, code })
     expect(refused.body).not.toContain('10.0.0.5')
     expect(calls.updates).toEqual([])
     expect((await update('writable', { note: 'edited' })).statusCode).toBe(200)
@@ -319,7 +319,7 @@ describe('an instant and a time on update (0040)', () => {
     rowVersion = NEWER
     readOutcome = { ok: false, code: 'unavailable', message: 'no connection free' }
     const again = await sending()
-    expect({ status: again.statusCode, body: again.json() as unknown }).toEqual({ status: 200, body: first.json() as unknown })
+    expect({ status: again.statusCode, body: again.json<unknown>() }).toEqual({ status: 200, body: first.json<unknown>() })
     expect({ reads: calls.reads, updates: calls.updates.length }).toEqual({ reads: 1, updates: 1 })
   })
 })

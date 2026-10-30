@@ -223,7 +223,7 @@ function paper(renderer: RendererName): HTMLElement {
 
 /** A control by its exact accessible name; by label, because datetime-local and time inputs have no ARIA role. */
 function control(renderer: RendererName, name: string): HTMLInputElement {
-  return within(paper(renderer)).getByLabelText(name, { exact: true }) as HTMLInputElement
+  return within(paper(renderer)).getByLabelText<HTMLInputElement>(name, { exact: true })
 }
 
 const ARRIVES = { timeout: 20_000 }

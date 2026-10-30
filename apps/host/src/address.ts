@@ -43,7 +43,7 @@ function markOf(state: unknown): Mark | null {
 
 export interface History {
   /** The page's state into the address: pushed as a new entry, or written over the one the browser is on. */
-  write(place: Place, push: boolean): void
+  write: (place: Place, push: boolean) => void
   count: RefObject<string>
   /** The number of the page's own entry in its count. */
   entry: RefObject<number>

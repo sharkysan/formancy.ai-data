@@ -242,12 +242,12 @@ describe.each([
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const { form, bindings, snapshot, generation } = proposal.json() as {
+    const { form, bindings, snapshot, generation } = proposal.json<{
       form: unknown
       bindings: FormBindings
       snapshot: MetadataSnapshot
       generation: unknown
-    }
+    }>()
     const published = await development.call('POST', '/v1/forms/order/versions', admin, {
       expectedBase: null,
       bundle: {
@@ -362,7 +362,7 @@ describe.each([
     const writer = await deployment(connection, 'writer')
     const discovered = await writer.call('GET', '/v1/connections/erp/metadata', admin)
     expect(discovered.statusCode, discovered.body).toBe(200)
-    const drift = diffSnapshots(bundle.snapshot, discovered.json() as MetadataSnapshot, bundle.bindings, bundle.policy)
+    const drift = diffSnapshots(bundle.snapshot, discovered.json<MetadataSnapshot>(), bundle.bindings, bundle.policy)
     expect(drift.blocking).toBe(true)
     const imported = await writer.call('POST', '/v1/forms/order/imports', admin, { expectedBase: null, bundle })
     expect(imported.statusCode, imported.body).toBe(409)

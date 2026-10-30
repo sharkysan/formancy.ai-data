@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
-import type { DatabaseKind, FieldBinding, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
+import type { DatabaseKind, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
 import { answerBytes, EDGE_VALUES, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, startTcpHop } from '@formancy/data-fixtures'
 import type { PostgresFixture, SqlServerFixture, TcpHop } from '@formancy/data-fixtures'
 import { createIdentityVerifier } from '@formancy/data-identity'
@@ -226,7 +226,7 @@ function clerkPolicy(bindings: FormBindings): FormPolicy {
 async function publish(connection: string, formId: string, generation: Record<string, unknown>): Promise<void> {
   const proposal = await call('/v1/form-proposals', admin, { connection, formId, ...generation })
   expect(proposal.statusCode, proposal.body).toBe(200)
-  const proposed = proposal.json() as Proposal
+  const proposed = proposal.json<Proposal>()
   const published = await call(`/v1/forms/${formId}/versions`, admin, {
     expectedBase: null,
     bundle: asProposed(connection, proposed, clerkPolicy(proposed.bindings)),
@@ -238,7 +238,7 @@ async function publish(connection: string, formId: string, generation: Record<st
 async function publishDeleting(connection: string, formId: string, generation: Record<string, unknown>): Promise<void> {
   const proposal = await call('/v1/form-proposals', admin, { connection, formId, ...generation })
   expect(proposal.statusCode, proposal.body).toBe(200)
-  const proposed = proposal.json() as Proposal
+  const proposed = proposal.json<Proposal>()
   expect(proposed.bindings.operations.delete).toBe(true)
   const policy: FormPolicy = {
     version: 1,
@@ -368,7 +368,7 @@ describe.each([
       answers: { customer: customerToken, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '2', notes: 'before' },
     })
     expect(created.statusCode, created.body).toBe(201)
-    const { record, version, answers } = created.json() as { record: string; version: string; answers: Record<string, unknown> }
+    const { record, version, answers } = created.json<{ record: string; version: string; answers: Record<string, unknown> }>()
     const notes = `lost update ${connection} ${String(Date.now())}`
     const { response, sent } = await sentAndLost(
       notes,

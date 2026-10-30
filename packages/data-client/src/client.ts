@@ -6,7 +6,6 @@ import type {
   LookupResult,
   LookupRow,
   PublishedForm,
-  RecordDeleted,
   RecordExportQuery,
   RecordList,
   RecordListQuery,

@@ -7,6 +7,7 @@ import { ACCESSIBILITY_EXCLUSIONS, ACCESSIBILITY_TAGS, ACCESSIBILITY_UNMEASURABL
 import { App } from './app.js'
 import { generateExamples } from './examples.js'
 import type { Example } from './examples.js'
+import { fieldHeading } from './field-heading.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
 import { answerable, paragraphs } from './test-accessible.js'
 import { ANGULAR_ARRIVES } from './test-timing.js'
@@ -56,7 +57,7 @@ function pane(subject: Example, renderer: Renderer): HTMLElement {
 }
 
 function labelsOf(subject: Example): string[] {
-  return subject.generated.form.model.fields.map((field) => String(field.label))
+  return subject.generated.form.model.fields.map(fieldHeading)
 }
 
 /**
@@ -110,7 +111,7 @@ function verdict(element: HTMLElement): { invalid: boolean; describedAs: string 
 
 /** The labels of the fields the generator made required. */
 function requiredLabels(subject: Example): string[] {
-  return subject.generated.form.model.fields.filter((field) => field.required === true).map((field) => String(field.label))
+  return subject.generated.form.model.fields.filter((field) => field.required === true).map(fieldHeading)
 }
 
 /** What one preview tells a person about each required field, by name. */

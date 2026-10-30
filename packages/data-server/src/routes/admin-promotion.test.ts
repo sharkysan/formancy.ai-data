@@ -165,7 +165,7 @@ async function publish(on: FastifyInstance, expectedBase: number | null = null, 
     payload: { connection, root: { schema: 'sales', name: 'employee' }, formId: 'employee', title: 'Employee' },
   })
   expect(proposed.statusCode, proposed.body).toBe(200)
-  const proposal = proposed.json() as { form: FormSchema; bindings: FormBindings; snapshot: MetadataSnapshot; generation: unknown }
+  const proposal = proposed.json<{ form: FormSchema; bindings: FormBindings; snapshot: MetadataSnapshot; generation: unknown }>()
   const edited = JSON.parse(JSON.stringify(proposal.form)) as FormSchema
   const name = edited.model.fields.find((field) => field.key === 'name')
   if (name !== undefined) name.label = 'Full name'
@@ -194,6 +194,7 @@ async function publish(on: FastifyInstance, expectedBase: number | null = null, 
 }
 
 /** The export: development's version read through the route the studio downloads it from. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a test reads an untyped body on purpose, and asserts on the part it names
 async function exported(version = 1): Promise<Record<string, any>> {
   const read = await source.app.inject({ method: 'GET', url: `/v1/forms/employee/versions/${String(version)}`, headers: ADMIN })
   expect(read.statusCode, read.body).toBe(200)

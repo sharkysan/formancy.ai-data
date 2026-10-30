@@ -162,6 +162,7 @@ afterAll(async () => {
   if (root !== undefined) await rm(root, { recursive: true, force: true })
 })
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a test reads an untyped body on purpose, and asserts on the part it names
 async function call(method: 'GET' | 'POST', path: string, bearer: string, body?: unknown): Promise<{ status: number; json: any }> {
   const response = await fetch(`${base}${path}`, {
     method,
@@ -292,9 +293,9 @@ function expected(entry: DriftingCase, verdict: DriftVerdict, after: Held): Show
   }
 }
 
-describe.each([
-  { engine: 'PostgreSQL', kind: 'postgres' as Engine },
-  { engine: 'SQL Server', kind: 'sqlserver' as Engine },
+describe.each<{ engine: string; kind: Engine }>([
+  { engine: 'PostgreSQL', kind: 'postgres' },
+  { engine: 'SQL Server', kind: 'sqlserver' },
 ])('the runtime against a changed table, on $engine', ({ kind }) => {
   const connection = `${kind}-drifting`
   let ddl: Awaited<ReturnType<typeof owner>>

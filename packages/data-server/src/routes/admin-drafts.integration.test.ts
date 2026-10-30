@@ -251,12 +251,12 @@ describe.each([
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const { form, bindings, snapshot, generation } = proposal.json() as {
+    const { form, bindings, snapshot, generation } = proposal.json<{
       form: unknown
       bindings: FormBindings
       snapshot: MetadataSnapshot
       generation: unknown
-    }
+    }>()
     return {
       format: 2,
       connection: 'erp',

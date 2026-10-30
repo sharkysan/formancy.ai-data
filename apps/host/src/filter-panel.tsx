@@ -172,6 +172,7 @@ export function FilterPanel({
   const toggle = useRef<HTMLButtonElement>(null)
   const removes = useRef(new Map<string, HTMLButtonElement>())
   const after = useAfterRender()
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- the rule misses noUncheckedIndexedAccess here: without the assertion fields[0] is possibly undefined and tsc refuses four uses, and the panel is drawn only for a list with a field
   const field = byField.get(draft.field) ?? (fields[0] as PanelField)
   const hint = draftHint(draft, field)
   const held = filter.some((term) => term.field === draft.field)

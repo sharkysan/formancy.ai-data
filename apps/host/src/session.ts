@@ -325,7 +325,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
     saved,
     /** The engine on screen. The same object between opens, so `useSyncExternalStore` can read it. */
     opened: current,
-    subscribe(listener: () => void): () => void {
+    subscribe: (listener: () => void): (() => void) => {
       listeners.add(listener)
       return () => {
         listeners.delete(listener)

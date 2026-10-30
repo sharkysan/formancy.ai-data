@@ -192,7 +192,7 @@ describe('the policy editor', () => {
     await user.type(read, 'clerk, manager')
     expect((read as HTMLInputElement).value).toBe('clerk, manager')
     await user.click(within(policy).getByRole('button', { name: 'Fill every field from the operations' }))
-    expect((within(policy).getByLabelText('Read roles for Order date') as HTMLInputElement).value).toBe('clerk, manager')
+    expect(within(policy).getByLabelText<HTMLInputElement>('Read roles for Order date').value).toBe('clerk, manager')
     // A field the form never writes has nothing to grant, and says so.
     expect(within(policy).queryByLabelText('Write roles for Id')).toBeNull()
   })
@@ -248,7 +248,7 @@ describe('the policy editor', () => {
     await screen.findByRole('main', { name: 'Generate' })
 
     presentation = await goTo(user, 'Presentation')
-    expect((within(presentation).getByLabelText('Label of notes') as HTMLInputElement).value).toBe('Delivery notes')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of notes').value).toBe('Delivery notes')
     const order = within(within(presentation).getByRole('region', { name: 'Order' }))
       .getAllByRole('button', { name: /^Move up / })
       .map((button) => button.textContent)
@@ -524,10 +524,10 @@ describe('where the keyboard goes when a removal takes its button', () => {
     await user.click(within(policy).getByRole('button', { name: 'Add a row filter' }))
     await pressEnter(user, within(policy).getByRole('button', { name: 'Remove row filter 3' }))
     expect(focusedName()).toBe('Add a row filter')
-    const second = (within(policy).getByLabelText('Column of row filter 2') as HTMLSelectElement).value
+    const second = within(policy).getByLabelText<HTMLSelectElement>('Column of row filter 2').value
     await pressEnter(user, within(policy).getByRole('button', { name: 'Remove row filter 1' }))
     expect(focusedName()).toBe('Remove row filter 1')
-    expect((within(policy).getByLabelText('Column of row filter 1') as HTMLSelectElement).value).toBe(second)
+    expect(within(policy).getByLabelText<HTMLSelectElement>('Column of row filter 1').value).toBe(second)
   })
 
   // An entry the form no longer has is removed from a note that closes with
@@ -603,8 +603,8 @@ describe('keys that now stand for another column', () => {
     expect(within(policy).queryByRole('region', { name: 'Keys that now stand for something else' })).toBeNull()
     // The customer lookup's filter went with its grants, so validatePolicy now asks for a decision on it.
     expect(check(policy).problems).toEqual(['lookups has no entry for customer: say which rows of sales.customer it may offer, or [] for every row'])
-    expect((within(policy).getByLabelText('Read roles for Order date') as HTMLInputElement).value).toBe('clerk')
-    expect((within(policy).getByLabelText('Read roles for Customer') as HTMLInputElement).value).toBe('')
+    expect(within(policy).getByLabelText<HTMLInputElement>('Read roles for Order date').value).toBe('clerk')
+    expect(within(policy).getByLabelText<HTMLInputElement>('Read roles for Customer').value).toBe('')
   })
 })
 

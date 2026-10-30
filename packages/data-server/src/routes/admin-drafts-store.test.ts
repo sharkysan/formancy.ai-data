@@ -177,7 +177,7 @@ describe('the drafts store', () => {
     const bundles = await Promise.all(range.map((n) => proposed({ role: `clerk-${String(n)}` })))
     const answers = await Promise.all(bundles.map((bundle) => submit('author', { expectedBase: null, bundle })))
     expect(answers.map((each) => each.statusCode)).toEqual(range.map(() => 201))
-    const numbers = answers.map((each) => (each.json() as { draft: number }).draft)
+    const numbers = answers.map((each) => each.json<{ draft: number }>().draft)
     expect([...numbers].sort((a, b) => a - b)).toEqual(range)
     for (const [index, draft] of numbers.entries()) {
       expect((await read('publisher', draft)).json().bundle.policy.operations.read, `draft ${String(draft)}`).toEqual([`clerk-${String(index + 1)}`])

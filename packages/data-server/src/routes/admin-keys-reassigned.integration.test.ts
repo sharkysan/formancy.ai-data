@@ -163,6 +163,7 @@ afterAll(async () => {
   if (root !== undefined) await rm(root, { recursive: true, force: true })
 })
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a test reads an untyped body on purpose, and asserts on the part it names
 async function call(method: 'GET' | 'POST', path: string, bearer: string, body?: unknown): Promise<{ status: number; json: any }> {
   const response = await fetch(`${base}${path}`, {
     method,
@@ -223,9 +224,9 @@ interface Proposal {
 const anchors = (bindings: FormBindings) =>
   Object.fromEntries(bindings.fields.map((binding) => [binding.field, binding.kind === 'column' ? binding.column : binding.foreignKey]))
 
-describe.each([
-  { engine: 'PostgreSQL', kind: 'pg' as Engine },
-  { engine: 'SQL Server', kind: 'ms' as Engine },
+describe.each<{ engine: string; kind: Engine }>([
+  { engine: 'PostgreSQL', kind: 'pg' },
+  { engine: 'SQL Server', kind: 'ms' },
 ])('a publish whose keys now name other columns, on $engine', ({ kind }) => {
   const connection = `${kind}-rekey`
   const formId = `${kind}-rekey`

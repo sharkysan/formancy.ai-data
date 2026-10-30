@@ -56,7 +56,6 @@ async function runnable(
   origins: readonly string[] = ['https://app.example'],
   publisherRoles?: readonly string[],
 ): Promise<FastifyInstance> {
-  let app: FastifyInstance | undefined
   const planes = servedPlanes({
     registry: registry(),
     store,
@@ -65,9 +64,10 @@ async function runnable(
     auditKey: undefined,
     origins,
     lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
-    log: () => (app as FastifyInstance).log,
+    // `app` is initialised below, before any request reaches the plane's log.
+    log: () => app.log,
   })
-  app = await createDataServer({
+  const app = await createDataServer({
     verifyIdentity,
     logger: {
       stream: {
@@ -115,7 +115,7 @@ describe("the runnable server's log", () => {
       ['GET', `/v1/${raw}/nothing`, admin],
     ] as const) {
       const answer = await server.inject({ method, url, headers: { host: HOST, ...headers } })
-      answers.push(`${String(answer.statusCode)} ${String((answer.json() as { code?: unknown }).code)}`)
+      answers.push(`${String(answer.statusCode)} ${String(answer.json<{ code?: unknown }>().code)}`)
     }
     expect(answers).toEqual([
       '400 path-not-plain',
@@ -190,7 +190,7 @@ describe("the runnable server's log", () => {
       headers: { authorization: 'Bearer admin' },
       payload: { expectedBase: null },
     })
-    expect([refused.statusCode, (refused.json() as { code: string }).code]).toEqual([403, 'review-required'])
+    expect([refused.statusCode, refused.json<{ code: string }>().code]).toEqual([403, 'review-required'])
     expect(
       lines
         .filter((line) => line.msg === 'audit')

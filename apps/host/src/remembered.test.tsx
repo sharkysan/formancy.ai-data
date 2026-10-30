@@ -7,9 +7,10 @@ import { applied, applyCondition, listsSent } from './test-filter.js'
 import { ORDER_VIEWS, VIEWED } from './test-forms.js'
 import { answeredOnce, chooseForm, gridSection, gridStatus, load, loaded, mount, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
-import { childGrid, headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
+import { headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
+import { fieldHeading } from './field-heading.js'
 
 /*
  * What this browser keeps of a grid, and what it brings back (0106), on
@@ -63,7 +64,7 @@ async function definitionOf(formId: string): Promise<PublishedForm> {
 async function labelsOf(formId: string, parent: string | null = null): Promise<string[]> {
   const definition = await definitionOf(formId)
   const readable = new Set(definition.readable)
-  return definition.form.model.fields.filter((field) => readable.has(field.key) && field.key !== parent).map((field) => String(field.label ?? field.key))
+  return definition.form.model.fields.filter((field) => readable.has(field.key) && field.key !== parent).map(fieldHeading)
 }
 
 /** The page, signed in as tenant 1's clerk, with `formId` chosen and its grid answered: a first opening, or a reload. */

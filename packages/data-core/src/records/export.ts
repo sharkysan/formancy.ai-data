@@ -90,7 +90,7 @@ export function exportText(type: NormalizedType, value: ApiValue): string | null
 }
 
 /** The cells of one field: its value, or a lookup's label and token. */
-function cellsOf({ header, binding }: ExportField, answers: FormRecord['answers'], labels: ExportLabels): CsvCell[] | null {
+function cellsOf({ binding }: ExportField, answers: FormRecord['answers'], labels: ExportLabels): CsvCell[] | null {
   const answered = Object.hasOwn(answers, binding.field)
   if (binding.kind === 'column') {
     if (!answered) throw new Error(`The record has no answer for ${binding.field}, a field the person may read.`)

@@ -705,11 +705,11 @@ describe('the menu and the form it names (0045)', () => {
   test('names a form with the operations opening it offers, and no form opening it does not offer to read', async () => {
     const ids = ['blind', 'country', 'customer', 'line', 'memo', 'scoped']
     for (const token of ['clerk', 'clerk-042', 'stranger', 'editor', 'clerk-untenanted']) {
-      const menu = (await app.inject({ method: 'GET', url: '/v1/forms', headers: as(token) })).json() as { forms: Array<{ id: string; operations: string[] }> }
+      const menu = (await app.inject({ method: 'GET', url: '/v1/forms', headers: as(token) })).json<{ forms: Array<{ id: string; operations: string[] }> }>()
       for (const id of ids) {
         const opened = await app.inject({ method: 'GET', url: `/v1/forms/${id}`, headers: as(token) })
         const named = menu.forms.find((entry) => entry.id === id)
-        const offered: string[] = opened.statusCode === 200 ? (opened.json() as { operations: string[] }).operations : []
+        const offered: string[] = opened.statusCode === 200 ? opened.json<{ operations: string[] }>().operations : []
         expect([token, id, offered], opened.body).toEqual([token, id, named?.operations ?? offered.filter((operation) => operation !== 'read')])
       }
     }

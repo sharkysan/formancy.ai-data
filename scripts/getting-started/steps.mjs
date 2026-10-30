@@ -308,7 +308,7 @@ export function generatedRegions(markdown) {
     try {
       found[name] = readBlock(markdown, GENERATOR, { name })
     } catch (error) {
-      throw new Error(`docs/getting-started.md ${error.message}`)
+      throw new Error(`docs/getting-started.md ${error.message}`, { cause: error })
     }
   }
   return found

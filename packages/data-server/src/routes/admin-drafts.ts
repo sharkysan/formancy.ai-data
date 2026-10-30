@@ -127,6 +127,7 @@ export function reviewRoutes(app: FastifyInstance, options: ReviewOptions): void
   const caller = (request: FastifyRequest): Caller => callerOf(request.identity as HostIdentity, publisherRoles, options.browseRoles)
   const send = (reply: FastifyReply, refusal: Refusal) => refuse(reply, refusal.status, refusal.code, refusal.message, refusal.extra)
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- a Fastify handler is async by contract: it answers by returning
   app.get('/v1/administration', async (request) => administrationOf(caller(request), review))
 
   if (!review) return

@@ -181,13 +181,13 @@ describe.each(ENGINES)('answers that arrive late on $engine', (engine) => {
     await clickRow(user, 'Order line', '1')
     await waitFor(() => expect(holding.held).toHaveLength(1), ARRIVES)
     await user.click(within(gridSection('Order line')).getByRole('button', { name: 'New Order line' }))
-    const quantity = await waitFor(() => within(childPane('New Order line')).getByLabelText(/^Quantity\b/) as HTMLInputElement, ARRIVES)
+    const quantity = await waitFor(() => within(childPane('New Order line')).getByLabelText<HTMLInputElement>(/^Quantity\b/), ARRIVES)
     await user.type(quantity, '9')
 
     await holding.pass()
     await settle()
     expect(screen.getByRole('heading', { level: 5, name: 'New Order line' })).toBeTruthy()
-    expect((within(childPane('New Order line')).getByLabelText(/^Quantity\b/) as HTMLInputElement).value).toBe('9')
+    expect(within(childPane('New Order line')).getByLabelText<HTMLInputElement>(/^Quantity\b/).value).toBe('9')
     expect(unsavedNotice()).toBeNull()
   })
 

@@ -71,6 +71,7 @@ async function psql(args: string[], env: Record<string, string> = {}): Promise<v
 
 interface Answer {
   status: number
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a test reads an untyped body on purpose, and asserts on the part it names
   json: any
 }
 
@@ -342,7 +343,7 @@ describe('a publish that cannot', () => {
   // server judges a bundle before it compares the version it replaces.
   test("lists a refused bundle's problems", async () => {
     const withoutCascades: typeof fetch = async (input, init) => {
-      const body = JSON.parse(String(init?.body)) as { bundle?: { policy: { cascades?: unknown } } }
+      const body = JSON.parse(init?.body as string) as { bundle?: { policy: { cascades?: unknown } } }
       if (body.bundle !== undefined) delete body.bundle.policy.cascades
       return fetch(input, { ...init, body: JSON.stringify(body) })
     }
