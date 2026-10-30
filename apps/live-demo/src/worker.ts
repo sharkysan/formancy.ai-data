@@ -36,7 +36,7 @@ import { handle } from './worker/handle.js'
 import { IDLE_MINUTES, KEY_LIFETIME_MS } from './worker/limits.js'
 import { claimsFor, personaById } from './worker/session.js'
 import type { SignInResult } from './worker/session.js'
-import { failedStartLine, newKey, noInstance, startedLine, untilStopped, waitUntilHealthy } from './worker/start.js'
+import { failedStartLine, monitorRejected, newKey, noInstance, startedLine, untilStopped, waitUntilHealthy } from './worker/start.js'
 import type { FailedStart } from './worker/start.js'
 
 interface Env {
@@ -172,7 +172,7 @@ export class DemoServer extends DurableObject<Env> {
         if (refused !== undefined) {
           if (!noInstance(refused) || container.running) {
             failure = refused
-            throw new Error(`monitor() rejected: ${refused instanceof Error ? refused.message : JSON.stringify(refused)}`)
+            throw new Error(monitorRejected(refused))
           }
           restarts += 1
           launch()

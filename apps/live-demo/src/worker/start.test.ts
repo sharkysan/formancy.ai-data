@@ -1,8 +1,9 @@
+import { runInNewContext } from 'node:vm'
 import { createIdentityVerifier } from '@formancy/data-server'
 import { describe, expect, test } from 'vitest'
 import { AUDIENCE, ISSUER, MIN_KEY_BYTES, TENANT_CLAIM } from '../token.js'
 import { POLL_MS, START_DEADLINE_MS } from './limits.js'
-import { failedStartLine, newKey, noInstance, startedLine, untilStopped, waitUntilHealthy } from './start.js'
+import { failedStartLine, monitorRejected, newKey, noInstance, startedLine, untilStopped, waitUntilHealthy } from './start.js'
 
 /**
  * How the Durable Object starts a visitor's server (0070): with a key made
@@ -225,6 +226,20 @@ describe('a start Cloudflare has no instance for (0087)', () => {
     expect(noInstance(new Error('the image failed'))).toBe(false)
     expect(noInstance('There is no container instance that can be provided to this Durable Object')).toBe(false)
     expect(noInstance(undefined)).toBe(false)
+  })
+
+  // Any other rejection is said in the failed start's line, whatever it
+  // is: an error in its own words, and one from another realm, as a
+  // runtime may hand one across, by its own name and message, where JSON
+  // wrote "{}" and lost them; a string as itself, where JSON quoted it; and
+  // a value neither JSON nor String can write does not throw in place of
+  // the line.
+  test('any other rejection is said as the platform gave it, and saying it never throws', () => {
+    expect(monitorRejected(new Error('the image failed'))).toBe('monitor() rejected: the image failed')
+    expect(monitorRejected(runInNewContext("new Error('the image failed')"))).toBe('monitor() rejected: Error: the image failed')
+    expect(monitorRejected('the image failed')).toBe('monitor() rejected: the image failed')
+    expect(monitorRejected({ code: 10n })).toBe('monitor() rejected: [object Object]')
+    expect(monitorRejected(Object.create(null))).toBe('monitor() rejected: [object Object]')
   })
 
   // A start that answered says how long it took on Cloudflare, which no
