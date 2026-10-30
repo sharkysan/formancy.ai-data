@@ -29,7 +29,11 @@ afterEach(async () => {
 function problems(policy: HTMLElement): string[] {
   const region = within(policy).getByRole('region', { name: 'Policy check' })
   const list = within(region).queryByRole('list', { name: 'Policy check' })
-  return list === null ? [] : within(list).getAllByRole('listitem').map((item) => item.textContent ?? '')
+  return list === null
+    ? []
+    : within(list)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent ?? '')
 }
 
 /** Adds a move and types it in: an empty `from` is a move that starts a new record. */
@@ -131,14 +135,21 @@ describe('a draft’s moves, as its publisher reads them', () => {
     const base: FormPolicy = { version: 1, operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] }, fields: {}, rowFilters: [], lookups: {} }
     const moves: FormPolicy = {
       ...base,
-      transitions: { field: 'status', moves: [{ from: null, to: 'placed', roles: ['clerk'] }, { from: 'placed', to: 'shipped', roles: ['clerk', 'dispatcher'] }] },
+      transitions: {
+        field: 'status',
+        moves: [
+          { from: null, to: 'placed', roles: ['clerk'] },
+          { from: 'placed', to: 'shipped', roles: ['clerk', 'dispatcher'] },
+        ],
+      },
     }
     render(<DraftPolicy policy={moves} bindings={bindings} document={form} />)
     const list = screen.getByRole('list', { name: 'Moves of Status (status)' })
-    expect(within(list).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'A new record starts at placed: roles clerk.',
-      'From placed to shipped: roles clerk, dispatcher.',
-    ])
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['A new record starts at placed: roles clerk.', 'From placed to shipped: roles clerk, dispatcher.'])
     cleanup()
     render(<DraftPolicy policy={base} bindings={bindings} document={form} />)
     expect(screen.queryByRole('heading', { name: /^Moves of/ })).toBeNull()

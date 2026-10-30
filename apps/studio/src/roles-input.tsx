@@ -9,7 +9,17 @@ import { formatRoles, parseRoles } from './policy-model.js'
  * outside -- "fill every field" -- replaces the draft, and typing never does:
  * otherwise the comma just typed would vanish before the next role could be.
  */
-export function RolesInput({ id, label, roles, onRoles }: { id: string; label: ReactElement | string; roles: readonly string[]; onRoles: (roles: string[]) => void }): ReactElement {
+export function RolesInput({
+  id,
+  label,
+  roles,
+  onRoles,
+}: {
+  id: string
+  label: ReactElement | string
+  roles: readonly string[]
+  onRoles: (roles: string[]) => void
+}): ReactElement {
   const [draft, setDraft] = useState(formatRoles(roles))
   useEffect(() => {
     if (formatRoles(parseRoles(draft)) !== formatRoles(roles)) setDraft(formatRoles(roles))
