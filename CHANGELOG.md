@@ -357,7 +357,8 @@ later.
 
 - **A field whose label is a message reference is named by its key, not
   "[object Object]"**, in the host's grid columns, the filter panel, a
-  child's title and the line that says what a copy left out. A form stored
+  child's title, the line that says what a copy left out and the line a
+  tree of records (0110) says of a level that holds none. A form stored
   with a `{ $t }` label is served as stored (0079), and the CSV export
   already headed its column with the key; the page wrote `String(label)`.
   The rule is now one function, `fieldHeading`, exported by

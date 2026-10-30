@@ -4,6 +4,7 @@ import type { DataClient, FormRecord, PublishedForm } from '@formancy/data-clien
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { recordName } from './crumbs.js'
 import type { OpenHow } from './grid-options.js'
+import { emptyLevelLine } from './tree-lines.js'
 
 /*
  * A form that is its own child -- an employee and the employees whose
@@ -83,7 +84,6 @@ export function RecordTree({
   const [focused, setFocused] = useState<string | null>(null)
   const [line, setLine] = useState('Loading the records with no parent.')
   const items = useRef(new Map<string, HTMLLIElement>())
-  const fieldLabel = String(definition.form.model.fields.find((each) => each.key === field)?.label ?? field)
 
   const nameOf = (row: FormRecord): string => recordName(definition.form.model.fields, row.answers, field) ?? row.record ?? ''
 
@@ -112,7 +112,7 @@ export function RecordTree({
       known(answer.rows)
       setRoots({ records: answer.rows.map((row) => row.record as string), next: answer.next })
       setFocused(answer.rows[0]?.record ?? null)
-      setLine(answer.rows.length === 0 ? `No records have no ${fieldLabel}.` : '')
+      setLine(answer.rows.length === 0 ? emptyLevelLine(definition, field, null) : '')
     })
     return () => {
       current = false
@@ -138,7 +138,7 @@ export function RecordTree({
     setNodes((before) =>
       new Map(before).set(record, { ...node, expanded: true, below: { records: answer.rows.map((row) => row.record as string), next: answer.next } }),
     )
-    setLine(answer.rows.length === 0 ? `No records name ${node.name} as their ${fieldLabel}.` : '')
+    setLine(answer.rows.length === 0 ? emptyLevelLine(definition, field, node.name) : '')
   }
 
   function collapse(record: string): void {
