@@ -298,7 +298,7 @@ saved record" discards the draft
 ([0029](../decisions/0029-a-host-renders-a-published-form-through-one-client.md)).
 A lookup's list says that more rows match, never how many, and in a
 typeahead it says so only while the list is open, on a line every
-reference theme of formancy 0.6.0 and 0.7.0 draws the open list over: a screen
+reference theme of formancy 0.6.0 to 0.11.0 draws the open list over: a screen
 reader hears it, the eye does not
 ([0085](../decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)).
 A form the person may only read, chosen with no record open, holds each

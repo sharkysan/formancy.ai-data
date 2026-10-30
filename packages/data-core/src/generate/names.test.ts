@@ -11,7 +11,7 @@ describe('fieldKeyFor', () => {
     expect(fieldKeyFor('group')).toBe('group')
   })
 
-  // formancy 0.7.0 refuses `__proto__` as a key (`key.unstorable`, formancy.ai
+  // formancy refuses `__proto__` as a key from 0.7.0 (`key.unstorable`, formancy.ai
   // 0185), so a column of that name generated as it is would make a form
   // nobody can publish (0093). `constructor` is a key like any other since
   // 0.7.0 reads an answer as the value's own, and stays as it is.

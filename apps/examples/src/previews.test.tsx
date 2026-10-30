@@ -4,6 +4,8 @@ import { userEvent } from '@testing-library/user-event'
 import axe from 'axe-core'
 import { computeAccessibleDescription, computeAccessibleName } from 'dom-accessibility-api'
 import { ACCESSIBILITY_EXCLUSIONS, ACCESSIBILITY_TAGS, ACCESSIBILITY_UNMEASURABLE_IN_JSDOM } from '@formancy/conformance'
+import { countSentence, createFormText, errorSentence } from '@formancy/core/words'
+import type { FieldDef } from '@formancy/spec'
 import { App } from './app.js'
 import { generateExamples } from './examples.js'
 import type { Example } from './examples.js'
@@ -100,9 +102,8 @@ function control(subject: Example, renderer: Renderer, name: string): HTMLElemen
 
 /**
  * What a person, or a screen reader, is told about a control's answer: whether
- * it is invalid, and the error the renderer describes it with. The released
- * renderers write the engine's error codes as that text, which is what makes
- * "the same code" observable without reaching into either engine.
+ * it is invalid, and what the renderer describes it with -- a field's count
+ * where it has a limit, then its error (formancy.ai 0203).
  */
 function verdict(element: HTMLElement): { invalid: boolean; describedAs: string } {
   return {
@@ -121,9 +122,30 @@ function requiredVerdicts(subject: Example, renderer: Renderer): Array<{ field: 
   return requiredLabels(subject).map((field) => ({ field, ...verdict(control(subject, renderer, field)) }))
 }
 
+/** English, as both previews speak it: the page hands neither renderer a locale. */
+const TEXT = createFormText({ locale: '' })
+
+/**
+ * What a field empty and refused for `code` is described as: the sentence
+ * both renderers say for the engine's code since formancy 0.8.0, which drew
+ * the code itself through 0.7.0 (formancy.ai 0191), after the count of a
+ * field with a limit (0203). Derived from `@formancy/core/words`, which both
+ * renderers call, so "the same code" is the same sentence in both and is
+ * never retyped here.
+ */
+function describedFor(field: FieldDef | undefined, code: string | null, value: unknown = ''): string {
+  const count = field === undefined ? undefined : countSentence(TEXT, field, value)
+  return [count, code === null ? undefined : errorSentence(TEXT, field, code)].filter((said) => said !== undefined).join(' ')
+}
+
+/** The generated field a label names. */
+function fieldOf(subject: Example, label: string): FieldDef | undefined {
+  return subject.generated.form.model.fields.find((field) => String(field.label) === label)
+}
+
 /** Every required field invalid and described as `required`: what an empty submit must produce. */
 function allRequired(subject: Example): Array<{ field: string; invalid: boolean; describedAs: string }> {
-  return requiredLabels(subject).map((field) => ({ field, invalid: true, describedAs: 'required' }))
+  return requiredLabels(subject).map((field) => ({ field, invalid: true, describedAs: describedFor(fieldOf(subject, field), 'required') }))
 }
 
 describe.each(EXAMPLES.map((subject) => [tableOf(subject), subject] as const))('%s', (_table, subject) => {
@@ -204,7 +226,7 @@ describe('sales.order, at the edges the fixture inserts', () => {
   // Validate first, because that is the path a person takes to see a verdict:
   // the released engine checks answers once the form has been submitted, and
   // on every change after that (`runValidation` in @formancy/core, at 0.3.0
-  // to 0.7.0). Typed into an untouched form, both renderers rightly
+  // to 0.11.0). Typed into an untouched form, both renderers rightly
   // show nothing yet, and this test would pass by checking nothing -- which is
   // how its first version failed, on the second value.
   test('the largest amount is valid in both, and one fractional digit more is "pattern" in both', async () => {
@@ -223,17 +245,17 @@ describe('sales.order, at the edges the fixture inserts', () => {
     for (const renderer of RENDERERS) {
       const field = control(order, renderer, 'Amount')
       await user.click(within(pane(order, renderer)).getByRole('button', { name: 'Validate' }))
-      await waitFor(() => expect({ renderer, ...verdict(field) }).toEqual({ renderer, invalid: true, describedAs: 'required' }))
+      await waitFor(() => expect({ renderer, ...verdict(field) }).toEqual({ renderer, invalid: true, describedAs: describedFor(fieldOf(order, 'Amount'), 'required') }))
 
       await user.clear(field)
       await user.type(field, largest)
       await user.tab()
-      await waitFor(() => expect({ renderer, ...verdict(field) }).toEqual({ renderer, invalid: false, describedAs: '' }))
+      await waitFor(() => expect({ renderer, ...verdict(field) }).toEqual({ renderer, invalid: false, describedAs: describedFor(fieldOf(order, 'Amount'), null, largest) }))
 
       await user.clear(field)
       await user.type(field, `${largest}9`)
       await user.tab()
-      await waitFor(() => expect({ renderer, ...verdict(field) }).toEqual({ renderer, invalid: true, describedAs: 'pattern' }))
+      await waitFor(() => expect({ renderer, ...verdict(field) }).toEqual({ renderer, invalid: true, describedAs: describedFor(fieldOf(order, 'Amount'), 'pattern', `${largest}9`) }))
     }
   })
 

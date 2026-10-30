@@ -79,9 +79,9 @@ describe.each([
   // A field the person may not write is disabled by a rule, and the server
   // refuses a changed value in it (0022), so a control that still takes a
   // choice leads to a save refused for a change the page let them make.
-  // formancy's radio group, through 0.7.0, disables none of its radios
-  // (formancy.ai 0.7.0's CHANGELOG, hazard B6a); its select is disabled.
-  // Watched failing with the radio group: both radios enabled.
+  // formancy's radio group, through 0.8.0, disabled none of its radios
+  // (hazard B6a; fixed in 0.9.0, formancy.ai 0210); its select is disabled.
+  // Watched failing with the radio group at 0.7.0: both radios enabled.
   test('a rule that disables it leaves nothing to choose', async () => {
     const engine = previewEngine(disabledVip(customerForm()), renderer)
     render(<Pane tableId="t" table="sales.customer" engine={engine} sources={{}} />)

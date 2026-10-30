@@ -1139,7 +1139,7 @@
         },
         {
           "area": "host",
-          "says": "A TypeScript host whose renderer is at `@formancy/*` 0.3.0 casts `@formancy/data-client`'s published form to its own `FormSchema` or moves to 0.4.0 or later, because the client's types are `@formancy/spec` 0.5.0's, whose `specVersion` admits `\"4\"`."
+          "says": "A TypeScript host whose renderer is older than `@formancy/*` 0.8.0 casts `@formancy/data-client`'s published form to its own `FormSchema` or moves to 0.8.0 or later, because the client's types are `@formancy/spec` 0.11.0's, whose `specVersion` admits `\"5\"`."
         },
         {
           "area": "testing",
@@ -2541,7 +2541,7 @@
         },
         {
           "area": "studio",
-          "says": "A field's help text is not offered: `@formancy/spec` 0.5.0 has no property to hold it."
+          "says": "A field's help text is not offered: `description` is spec 5's, from `@formancy/spec` 0.8.0, and generated forms stay on spec 3 (0042)."
         }
       ]
     },
@@ -2785,7 +2785,7 @@
         },
         {
           "area": "host",
-          "says": "A typeahead says that more rows match only while its list is open, and every reference theme of formancy 0.6.0 and 0.7.0 draws the open list over that sentence, so a sighted person does not read it; a screen reader hears it from the field’s status line, and a plain select’s sentence is seen."
+          "says": "A typeahead says that more rows match only while its list is open, and every reference theme of formancy 0.6.0 to 0.11.0 draws the open list over that sentence, so a sighted person does not read it; a screen reader hears it from the field’s status line, and a plain select’s sentence is seen."
         },
         {
           "area": "forms",

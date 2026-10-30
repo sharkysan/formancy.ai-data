@@ -190,7 +190,7 @@ function actsOver(plane) {
       // "As clara types, the page asks the runtime plane": the answer to her
       // search itself, waited for. A list on the screen is not that, nor is
       // a query counted from here: @formancy/react's typeahead, at 0.5.0
-      // to 0.7.0, searches from no characters, so the page asks this lookup with an
+      // to 0.11.0, searches from no characters, so the page asks this lookup with an
       // empty search once the panes are drawn, and again later, and the box
       // keeps its last answer -- tenant 1's Muster AG -- on the screen until
       // the next arrives. A check that counted the queries routed after the

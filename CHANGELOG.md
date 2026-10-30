@@ -298,6 +298,67 @@ later.
 
 ### Changed
 
+- **Every `@formancy/*` dependency moves from 0.7.0 to 0.11.0, upstream's
+  release of 2026-10-30, adopted the day it was published, and generated
+  forms stay on spec 3** (0055, 0042). Why: 0.11.0 is upstream's newest
+  release, and the four since 0.7.0 say a field's error in words, count
+  while a field with a limit is typed into, check every answer for the
+  shape its type stores, and disable a radio group's radios under a rule.
+  The 23 exact pins in six manifests and the eight release-age exemptions
+  move together; the lockfile changes only in the eight `@formancy`
+  entries, and nothing new is installed. What you notice:
+  - **A field with a length limit shows a count under its box** -- every
+    field over a text column with a length, on the host page,
+    in the studio's previews and on the examples page -- "You can enter up
+    to 200 characters.", then what is left, and a status region of its own
+    that speaks once typing pauses (formancy.ai 0203). It counts as the
+    browser's check always did, in UTF-16 code units, so on a column that
+    counts bytes or a code page's characters it can say characters are
+    left where the save is refused, as the field's generation note already
+    says (0026).
+  - **A field's error is a sentence**: "This question needs an answer."
+    where both renderers drew `required` (formancy.ai 0191), with the code
+    on the sentence's `data-formancy-code`. The server's own sentences,
+    which the host page hands the renderers for a refused save, are drawn
+    as they were: an entry the renderers' words do not know is said as it
+    is.
+  - **An answer of another shape than its field's type is refused in the
+    browser** (formancy.ai 0189). A record whose float column holds NaN or
+    an infinity, read as the text the codec refuses (0016), is now refused
+    as of another type when it is saved, where 0.7.0 sent it and the server
+    refused it -- read from 0.11.0's code, not tested here. data-core's
+    tests hold the engine's new answers: `type` for a whole number given as
+    text and for a checkbox given anything but a boolean.
+  - **Generated forms stay on spec 3.** Every release since 0.8.0 reads
+    versions 1 to 5, and 0042 moves a generated document to a later version
+    only in a record of its own. Spec 5's `description` is the first of its
+    constructs a column gives -- its comment, which the snapshot already
+    holds -- so it is what such a record would weigh against an
+    integrator's renderer having to be at 0.8.0 first.
+  - **`@formancy/data-client`'s types are `@formancy/spec` 0.11.0's**, whose
+    `specVersion` admits `"5"`, so a TypeScript host whose renderer is
+    older than 0.8.0 casts the published form to its own `FormSchema`, read
+    from the declarations.
+  - **The studio's bundle** is 908.7 kB minified, 246.5 kB gzipped, where
+    main at 0.7.0 is 855.1 kB and 233.1 kB, both measured on 2026-10-30.
+    Main had already passed its 810 kB warning limit, which nobody reads,
+    and the limit is now 920 kB.
+  - **Still true at 0.11.0, each read again in upstream's source:** neither
+    renderer holds the form while a save is out; an answer is checked once
+    `validate()` has run and on every change after; a lookup searches 250
+    ms after its text changes, from no characters, for fifty rows, and
+    aborts the search it supersedes; a typeahead a rule disables asks only
+    for the name of what it holds; a failed source's reason is dropped;
+    React draws a sentence without `aria-required` where a lookup's options
+    cannot be filled, so the studio preview's Customer field still loses
+    its required marker; and every reference theme draws an open
+    typeahead's list over its status line, by the same rules as at 0.6.0.
+    A radio group a rule disables now disables its radios (0.9.0,
+    formancy.ai 0210), the second reason 0095 gave for a select; the first,
+    an empty choice that takes an answer back to "unknown", still holds.
+  - **The studio's review tests read its own status line**, not the
+    paper's: a draft's paper now holds a status region per counted field.
+    Upstream `@formancy/*` 0.7.0 → 0.11.0.
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's
   release of 2026-10-21, adopted the day after it was published, and
   generated forms stay on spec 3** (0055, 0042). Why: 0.7.0 is upstream's

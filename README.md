@@ -245,8 +245,8 @@ until then the address is formancy.ai's 404
   ([0066](./docs/decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
   It says when its list goes on, never how long it is, and when matching
   rows cannot be chosen here: under a plain select, where it is seen, and
-  from an open typeahead's status line, which formancy 0.6.0's and 0.7.0's themes draw
-  the open list over, so a screen reader hears it and the eye does not
+  from an open typeahead's status line, which the themes of formancy 0.6.0 to 0.11.0
+  draw the open list over, so a screen reader hears it and the eye does not
   ([0085](./docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)).
 - **Every write is one guarded statement.** A stale save is refused instead
   of overwriting
@@ -1263,14 +1263,14 @@ stops it. No command does that for you yet.
 | `@types/mssql`, by `@formancy/data-sqlserver` | 12.3.0 | `^12.3.0` |
 | `mssql`, by `@formancy/data-sqlserver` | 12.7.4 | `^12.0.0` |
 | `tedious`, under `mssql` | 20.3.7 | `^19.2.2 \|\| ^20.0.0`, by `mssql` |
-| `@formancy/angular` | 0.7.0 | `0.7.0` |
-| `@formancy/builder-core` | 0.7.0 | `0.7.0` |
-| `@formancy/conformance` | 0.7.0 | `0.7.0` |
-| `@formancy/core` | 0.7.0 | `0.7.0` |
-| `@formancy/expressions` (transitive) | 0.7.0 |  |
-| `@formancy/react` | 0.7.0 | `0.7.0` |
-| `@formancy/spec` | 0.7.0 | `0.7.0` |
-| `@formancy/themes` | 0.7.0 | `0.7.0` |
+| `@formancy/angular` | 0.11.0 | `0.11.0` |
+| `@formancy/builder-core` | 0.11.0 | `0.11.0` |
+| `@formancy/conformance` | 0.11.0 | `0.11.0` |
+| `@formancy/core` | 0.11.0 | `0.11.0` |
+| `@formancy/expressions` (transitive) | 0.11.0 |  |
+| `@formancy/react` | 0.11.0 | `0.11.0` |
+| `@formancy/spec` | 0.11.0 | `0.11.0` |
+| `@formancy/themes` | 0.11.0 | `0.11.0` |
 | Node, the workspace |  | `>=22.12.0` |
 | Node, the server image | `node:22.12-alpine`, every stage |  |
 | Node, CI | 22 |  |

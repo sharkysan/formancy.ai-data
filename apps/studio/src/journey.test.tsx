@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
-import { audit, discover, focusedName, generateOrder, goTo, grantOrderDelete, signIn, step, unnamed, writeOrderPolicy } from './test-studio.js'
+import { audit, discover, findStatus, focusedName, generateOrder, goTo, grantOrderDelete, signIn, step, unnamed, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { orderBundle, publishReviewed, PUBLISHER_REQUIRED, readOnly } from './test-review.js'
 import { OWNER_SNAPSHOT, startPlane, TOKENS, withoutColumn } from './test-server.js'
@@ -101,7 +101,7 @@ async function underReview(user: User, plane: TestPlane, record: (name: string) 
   const own = await openDraft(user, queue, 1)
   await record('Review, one’s own draft open')
   await user.click(within(own).getByRole('button', { name: 'Withdraw' }))
-  await within(own).findByRole('status')
+  await findStatus(own)
   await record('Review, a draft withdrawn')
   const again = await goTo(user, 'Submit')
   await user.click(await within(again).findByRole('button', { name: 'Submit version 1 for review' }))
