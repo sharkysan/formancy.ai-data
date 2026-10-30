@@ -1,4 +1,4 @@
-import { planList, recordPage, validateListQuery } from '@formancy/data-core'
+import { cursorRefusal, planList, recordPage, validateListQuery } from '@formancy/data-core'
 import type { DescribedTable, PolicyContext, RecordFailure, RecordList } from '@formancy/data-core'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
@@ -37,7 +37,9 @@ export interface ListRouteSteps {
  * that description after it ran, as a read is (0041), and also refused
  * when the table no longer holds the key to a total order: refused, its
  * rows are discarded and never reach the body, and the log says `list`, as
- * the audit does. The audit names the operation `list` and no record, never
+ * the audit does. A page asked for after a cursor (0108) is then refused
+ * `cursor-gone` when its statement found that row gone; otherwise the page
+ * gives the cursor its next page is asked for after. The audit names the operation `list` and no record, never
  * the search, the sort, the parent or the filter (0023).
  *
  * An adapter that answered `unknown-outcome` for a list -- which writes
@@ -57,6 +59,8 @@ export function registerListRoute(app: FastifyInstance, steps: ListRouteSteps): 
     if (!outcome.ok) return steps.answered(reply, await steps.unread(request, bundle, open, outcome, 'list'))
     const drifted = steps.undecided(request, bundle, outcome.described, 'list')
     if (drifted !== undefined) return steps.answered(reply, drifted)
-    return recordPage(bundle.bindings, plan.fields, outcome.rows, query.query.limit) satisfies RecordList
+    const gone = cursorRefusal(outcome)
+    if (gone !== undefined) return steps.answered(reply, planRefusal(gone.code, gone.message))
+    return recordPage(bundle.bindings, plan, outcome.rows) satisfies RecordList
   })
 }

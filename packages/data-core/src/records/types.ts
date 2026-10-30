@@ -139,8 +139,17 @@ export type RecordFilter =
  * `filter` narrows by the person's own conditions, each column once (0104);
  * `[]` for none. Neither adds a permission -- the filters and the throughs
  * still decide which rows exist. `search` is `null` for none. The adapter
- * fetches `limit + 1` rows from `offset`, so `recordPage` can tell whether
- * more follow without a COUNT.
+ * fetches `limit + 1` rows, so `recordPage` can tell whether more follow
+ * without a COUNT.
+ *
+ * Where the page starts (0108): `after`, the key of the row the page
+ * continues after, every identity column in the identity's order, or `null`
+ * for the first page; then `offset` rows on from there. A form's list pages
+ * by `after` alone, its offset always 0; a browse (0099), which may have no
+ * key to find a row by, pages by `offset` alone. The row `after` names is
+ * found under the trusted filters and every through, as a read finds it,
+ * and never under `equal`, `filter` or `search`: it is a place in the order,
+ * which a row that stopped matching them still has.
  */
 export interface ListRequest {
   target: RecordTarget
@@ -151,6 +160,7 @@ export interface ListRequest {
   filter: readonly RecordFilter[]
   search: ListSearch | null
   sort: readonly RecordSort[]
+  after: readonly RecordValue[] | null
   offset: number
   limit: number
 }
@@ -342,8 +352,14 @@ export type DescribedRead = { ok: true; described: DescribedTable; record: Omit<
 /**
  * A list's rows, up to `limit + 1` in the request's order, with the table as
  * that same statement found it, answered whether any row was found (0041).
+ *
+ * `after` says whether the statement found the row the request continues
+ * after (0108): `found`, `gone` when no row inside the trusted filters and
+ * every through has that key -- deleted, or moved out of them -- and `null`
+ * for a request with no `after`. A page after a row that is gone has no
+ * place to start, and holds no rows.
  */
-export type ListOutcome = { ok: true; described: DescribedTable; rows: Array<Omit<RecordRead, 'ok'>> } | RecordFailure
+export type ListOutcome = { ok: true; described: DescribedTable; rows: Array<Omit<RecordRead, 'ok'>>; after: 'found' | 'gone' | null } | RecordFailure
 
 /**
  * The record half of the database port, which both adapters implement and one

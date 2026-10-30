@@ -182,6 +182,32 @@ export function sizedRowsRead(): { tenant: number; table: number; perKey: number
   return { tenant: generated + FIXTURE_CUSTOMERS.filter((row) => row.tenantId === 1).length, table: SIZED_CUSTOMERS.rows + FIXTURE_CUSTOMERS.length, perKey: 1 }
 }
 
+/**
+ * A page of tenant 1's customers deep in key order (0108), and what asking
+ * for it costs each way, from the generator's numbers: the page after the
+ * customer `anchor`, `size` to a page; the rows of the tenant before it,
+ * which an offset to the same page reads and discards; and the rows each
+ * way reads -- after the anchor, the anchor found by its key and the page
+ * with its one extra row; at the offset, every row before the page and the
+ * page with its extra row. Both engines pin these by equality.
+ */
+export function sizedListPage(): { anchor: { tenantId: number; customerNo: number }; size: number; page: number[]; before: number; read: { after: number; offset: number } } {
+  const tenant = SIZED_CUSTOMERS.tenants.find((entry) => entry.tenantId === 1)
+  if (tenant === undefined) throw new Error('the sized customers have no tenant 1')
+  const anchor = { tenantId: 1, customerNo: tenant.firstCustomerNo + 49_999 }
+  const size = 50
+  // The fixture's own customers of tenant 1 come first in key order: their numbers are below the generated ones.
+  const fixtures = FIXTURE_CUSTOMERS.filter((row) => row.tenantId === 1 && row.customerNo < tenant.firstCustomerNo).length
+  const before = fixtures + (anchor.customerNo - tenant.firstCustomerNo + 1)
+  return {
+    anchor,
+    size,
+    page: Array.from({ length: size }, (_, index) => anchor.customerNo + 1 + index),
+    before,
+    read: { after: 1 + size + 1, offset: before + size + 1 },
+  }
+}
+
 /** `n` tenant-1 keys spread over its range, `customer_no` 1,000,001 + 1,000·j; 1 to 100, a resolve request's most. */
 export function sizedResolveKeys(n: number): Array<{ tenantId: number; customerNo: number }> {
   if (!Number.isInteger(n) || n < 1 || n > 100) throw new Error(`sizedResolveKeys takes 1 to 100 keys, not ${String(n)}`)

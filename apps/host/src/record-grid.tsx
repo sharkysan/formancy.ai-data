@@ -6,7 +6,7 @@ import type { DataClient, ListFilterTerm, ListSortTerm, PublishedForm, RecordLis
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { arrange } from './columns.js'
 import type { ColumnChoice } from './columns.js'
-import { answered, CANNOT_OPEN, createDatasource, loading, REFUSED_FILTER_HELP } from './grid-datasource.js'
+import { answered, CANNOT_OPEN, createDatasource, loading, REFUSED_FILTER_HELP, STARTED_AGAIN } from './grid-datasource.js'
 import type { DatasourceHooks, GridColumn, GridRow } from './grid-datasource.js'
 import { columnDefsOf, gridOptionsFor } from './grid-options.js'
 import type { OpenHow, RowDelete } from './grid-options.js'
@@ -309,6 +309,17 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         setStatus({ kind: 'refused', text: first([message]), help: filterRefused ? REFUSED_FILTER_HELP : null, clear: false, retry: !filterRefused })
         setPager((before) => ({ ...before, hasMore: false }))
         fit()
+      },
+      restart: () => {
+        // The row the asked page comes after is gone (0108): the first page
+        // is where the list starts again, and its line says why first. A
+        // task later, so AG Grid is out of the block it is failing.
+        shown.current = { ...shown.current, retrying: false }
+        removedLine.current = [STARTED_AGAIN]
+        setTimeout(() => {
+          const grid = api.current
+          if (grid !== null && !grid.isDestroyed()) grid.paginationGoToFirstPage()
+        }, 0)
       },
     }),
     [applySelection, fit, sizeOnce],

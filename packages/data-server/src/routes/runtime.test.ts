@@ -180,7 +180,7 @@ function registry(): ConnectionRegistry {
     // Lists are runtime-lists.test.ts's; here the port only has to be whole.
     list: async (request) => {
       const described = description(request.target.table)
-      return described.ok ? { ok: true, described: described.described, rows: [] } : described
+      return described.ok ? { ok: true, described: described.described, rows: [], after: null } : described
     },
     insert: async (request) => {
       calls.inserts.push(request)

@@ -378,6 +378,14 @@ server's description of the parameters, then binds and executes. The
 measurement's counting pass counts it through a TCP hop on every run, and
 [`docs/performance.md`](../../docs/performance.md) has the figures.
 
+A page of records deep in key order is held the same way (0108): tenant
+1's page after its 50,001st customer reads 52 rows of the table, an Index
+Only Scan of `pk_customer` finding the row it continues after and an Index
+Scan from that row for the page and its extra row, where the same request
+at an offset of 50,001 reads 50,052; serially, the counts `sizedListPage()`
+of `@formancy/data-fixtures`, which the SQL Server suite pins too. Measured
+on 2026-10-30; a count, not a time.
+
 ### When a lookup is abandoned, or its deadline passes
 
 [0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)
@@ -697,7 +705,8 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   objects planted on the search path.
 - `lookups-sized.integration.test.ts` — what a lookup reads and sends on the
   sized customers, in containers of its own: the plan of each statement the
-  adapter sent, serially and under the defaults (0034).
+  adapter sent, serially and under the defaults (0034); and what a page of
+  records deep in key order reads after a row, and at an offset (0108).
 - `lookups-limits.integration.test.ts` — a lookup whose signal aborts (0061),
   through the TCP hop, each statement waiting behind a lock `blockTable`
   holds so its end is read from `pg_locks`: a search, a resolve and a rejects
@@ -738,7 +747,10 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   through a TCP hop after a write was sent, and a read after a statement
   that failed part-way on its connection (0078).
 - `list.integration.test.ts` — a page of records (0044), each case
-  `LIST_PARITY`'s: key order and paging, a literal search, NULLs last both
+  `LIST_PARITY`'s: key order and paging after a row (0108), every order
+  walked a page at a time as its one page, a row inserted or deleted before
+  a page moving nothing, a page after a row gone or another tenant's
+  refused, a varchar walked a label at a time, a literal search, NULLs last both
   ways, a NOT NULL sort spelled without a placement, a parent over an
   integer and over a `char(2)` foreign key, a child's lines through their
   order, every row its read, and a page refused once its own description

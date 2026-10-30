@@ -1,4 +1,4 @@
-import { browsePage, browseRelations, driftRefusal, exportColumns, exportHeader, exportRecord, followTerms, generateForm, listTerms, planBrowse, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
+import { browsePage, browseRelations, cursorRefusal, driftRefusal, exportColumns, exportHeader, exportRecord, followTerms, generateForm, listCursor, listTerms, planBrowse, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
 import type { ApiValue, BrowseFilterTerm, BrowseQuery, BrowseRelation, FormBindings, FormPolicy, FormRecord, ListFilterTerm, ListOutcome, MetadataSnapshot, ObjectRef, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
 import {
   BROWSE_PARITY,
@@ -79,7 +79,7 @@ const SHIPMENT_POLICY: FormPolicy = {
 const CLARA: PolicyContext = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: { tenant: '1' } }
 /** The clerk of COLUMN_FILTER_ROWS' shipments' tenant, which no other case lists. */
 const SHIPPER: PolicyContext = { actor: { id: 'u-3', roles: ['clerk'] }, attributes: { tenant: COLUMN_FILTER_TENANT } }
-const EVERY: RecordListQuery = { search: '', sort: [], parent: null, filter: [], offset: 0, limit: 50 }
+const EVERY: RecordListQuery = { search: '', sort: [], parent: null, filter: [], after: null, limit: 50 }
 
 beforeAll(async () => {
   fixture = await startPostgresFixture()
@@ -138,7 +138,7 @@ async function listed(bindings: FormBindings, policy: FormPolicy, change: Partia
   if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
   const outcome = await adapter.list(plan.request)
   if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
-  return { ...recordPage(bindings, plan.fields, outcome.rows, query.limit), outcome }
+  return { ...recordPage(bindings, plan, outcome.rows), outcome }
 }
 
 /** The customer numbers of a page, in its order. */
@@ -148,13 +148,142 @@ const tokens = (page: RecordList): Array<string | null> => page.rows.map((row) =
 const lineToken = ([order, line]: readonly [string, string]): string => `k1:${order},${line}`
 
 describe('pages in key order', covers('postgres', listCase('pages')), () => {
-  // Offset paging over a total order: each page starts where the last one
-  // ended, says whether more follow from the one extra row it fetched, and
-  // one past the end is empty with nothing more.
-  test("lists tenant 1's customers a page at a time, saying whether more follow", async () => {
-    for (const page of LIST_PARITY.pages.pages) {
-      const answer = await listed(customers, CUSTOMER_POLICY, { offset: page.offset, limit: LIST_PARITY.pages.size })
-      expect({ offset: page.offset, keys: numbers(answer), hasMore: answer.hasMore }).toEqual({ offset: page.offset, keys: page.keys, hasMore: page.hasMore })
+  // Each page continues after the last row of the one before (0108), says
+  // whether more follow from the one extra row it fetched, and gives the
+  // cursor the next is asked for after; after the last row there is
+  // nothing, and nothing more.
+  test("lists tenant 1's customers a page at a time, each after the one before", async () => {
+    let after: string | null = null
+    for (const [index, page] of LIST_PARITY.pages.pages.entries()) {
+      const answer: RecordList = await listed(customers, CUSTOMER_POLICY, { after, limit: LIST_PARITY.pages.size })
+      expect({ index, keys: numbers(answer), hasMore: answer.hasMore, next: answer.next !== null }).toEqual({ index, keys: page.keys, hasMore: page.hasMore, next: page.hasMore })
+      after = answer.next
+    }
+    const [tenant, number] = LIST_PARITY.pages.afterLast.key
+    const last = await listed(customers, CUSTOMER_POLICY, { after: listCursor(customers.identity as string[], { tenant_id: tenant, customer_no: number }), limit: LIST_PARITY.pages.size })
+    expect({ keys: numbers(last), hasMore: last.hasMore, next: last.next, after: last.outcome.ok && last.outcome.after }).toEqual({ keys: LIST_PARITY.pages.afterLast.keys, hasMore: LIST_PARITY.pages.afterLast.hasMore, next: null, after: 'found' })
+  })
+})
+
+/** Every page of a list, `size` at a time, each asked for after the one before's `next`, as one list of customer numbers. */
+async function walked(change: Partial<RecordListQuery>, size: number): Promise<string[]> {
+  const keys: string[] = []
+  let after: string | null = null
+  for (;;) {
+    const page: RecordList = await listed(customers, CUSTOMER_POLICY, { ...change, after, limit: size })
+    expect(page.next !== null).toBe(page.hasMore)
+    keys.push(...numbers(page))
+    if (page.next === null) return keys
+    // A seek that went nowhere would ask for the same page for ever.
+    if (keys.length > LIST_ROWS.customers.length + 10) throw new Error('The walk does not end: a page after a row is not after it.')
+    after = page.next
+  }
+}
+
+describe('a page after a row', covers('postgres', listCase('after')), () => {
+  const { between } = LIST_PARITY.after
+  /** `between` written as the owner, or deleted again. */
+  const insertBetween = () => owner.unsafe('insert into sales.customer (tenant_id, customer_no, name) values (1, $1::int, $2)', [between.number, between.name])
+  const deleteBetween = () => owner.unsafe('delete from sales.customer where tenant_id = 1 and customer_no = $1::int', [between.number])
+
+  // Each page is compared with the row the one before ended with, column
+  // against column, in the order's own terms: NULLs last both ways, a
+  // descending column beside an ascending one, text under each engine's
+  // collation. Walked two at a time, the pages are the one page of every
+  // row, row for row. Watched failing with NULLs placed the other way in the
+  // seek (the walk never reached the customers with no credit limit), with
+  // the direction left ascending (a descending walk turned back after its
+  // first page: 2006, 2005, 2006), and with the seek left out (the walk
+  // never ended).
+  test('walks every order as the one page of every row', async () => {
+    for (const sort of LIST_PARITY.after.sorts) {
+      const whole = numbers(await listed(customers, CUSTOMER_POLICY, { sort: [...sort] }))
+      expect(await walked({ sort: [...sort] }, LIST_PARITY.after.size), JSON.stringify(sort)).toEqual(whole)
+    }
+  })
+
+  // An offset counts rows; a cursor names one. A row inserted before where
+  // the next page starts would show the last row of the page before again,
+  // and one deleted there would skip a row; after a row, neither moves the
+  // next page. Watched failing with the seek left out: the next page began
+  // at the first row again.
+  test('starts where the page before ended, whatever was inserted or deleted before it', async () => {
+    try {
+      const first = await listed(customers, CUSTOMER_POLICY, { limit: 3 })
+      expect(numbers(first)).toEqual(LIST_PARITY.after.inserted.first)
+      await insertBetween()
+      expect(numbers(await listed(customers, CUSTOMER_POLICY, { after: first.next, limit: 3 }))).toEqual(LIST_PARITY.after.inserted.next)
+
+      const again = await listed(customers, CUSTOMER_POLICY, { limit: 3 })
+      expect(numbers(again)).toEqual(LIST_PARITY.after.deleted.first)
+      await deleteBetween()
+      expect(numbers(await listed(customers, CUSTOMER_POLICY, { after: again.next, limit: 3 }))).toEqual(LIST_PARITY.after.deleted.next)
+    } finally {
+      await deleteBetween()
+    }
+  })
+
+  // The row is found again in the page's own statement, under the read
+  // filter: deleted, it is not there; another tenant's, it is not one the
+  // person may read, and its place in the order is not told. Either way the
+  // page has nowhere to start, holds no rows and is refused. Watched failing
+  // with the row looked for without the read filter: tenant 2's customer
+  // 1001 was found, and the page after it held tenant 1's customers past
+  // 1001; and with the row said found whatever the statement found.
+  test("is refused after a row that is gone, or that is another tenant's", async () => {
+    try {
+      await insertBetween()
+      const first = await listed(customers, CUSTOMER_POLICY, { limit: 2 })
+      expect(numbers(first)).toEqual(LIST_PARITY.after.gone.first)
+      await deleteBetween()
+      const gone = await listed(customers, CUSTOMER_POLICY, { after: first.next, limit: 2 })
+      if (!gone.outcome.ok) throw new Error('expected an answer')
+      expect({ after: gone.outcome.after, rows: gone.outcome.rows.length, refused: cursorRefusal(gone.outcome)?.code }).toEqual({ after: 'gone', rows: 0, refused: LIST_PARITY.after.gone.refused })
+    } finally {
+      await deleteBetween()
+    }
+    const [tenant, number] = LIST_PARITY.after.theirs.key
+    const theirs = await listed(customers, CUSTOMER_POLICY, { after: listCursor(customers.identity as string[], { tenant_id: tenant, customer_no: number }), limit: 2 })
+    if (!theirs.outcome.ok) throw new Error('expected an answer')
+    expect({ after: theirs.outcome.after, rows: theirs.outcome.rows.length, refused: cursorRefusal(theirs.outcome)?.code }).toEqual({ after: 'gone', rows: 0, refused: LIST_PARITY.after.theirs.refused })
+  })
+})
+
+describe('a varchar under the database collation', covers('postgres', listCase('collated')), () => {
+  // Text is compared as the order compares it: the column against the row
+  // the page continues after, so its collation decides both. Under the
+  // fixture's default collation PostgreSQL compares by code point, and a
+  // walk a label at a time is the one page of every label.
+  test('walks a label at a time as the one page of every label', async () => {
+    await owner.unsafe('create table sales.list_word (code integer primary key, label varchar(20) not null)')
+    try {
+      for (const [code, label] of LIST_PARITY.collated.rows) await owner.unsafe('insert into sales.list_word (code, label) values ($1::int, $2)', [code, label])
+      const worded = await discoverPostgres(owner, FIXTURE_SCOPE)
+      const bindings = generateForm(worded, { connection: 'test', root: { schema: 'sales', name: 'list_word' }, formId: 'list-word', title: 'Words', lookups: [] }).bindings
+      const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: { code: READ, label: READ }, rowFilters: [], lookups: {} }
+      const codes = (page: RecordList): string[] => page.rows.map((row) => String(row.answers['code']))
+      const page = async (change: Partial<RecordListQuery>): Promise<RecordList> => {
+        const plan = planList(worded, bindings, policy, CLARA, { ...EVERY, ...change })
+        if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
+        const outcome = await records.list(plan.request)
+        if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
+        return recordPage(bindings, plan, outcome.rows)
+      }
+      for (const direction of ['asc', 'desc'] as const) {
+        const sort = [{ field: 'label', direction }]
+        const whole = codes(await page({ sort }))
+        const walk: string[] = []
+        let after: string | null = null
+        do {
+          const one: RecordList = await page({ sort, after, limit: 1 })
+          walk.push(...codes(one))
+          after = one.next
+          if (walk.length > LIST_PARITY.collated.rows.length) throw new Error('The walk does not end: a page after a label is not after it.')
+        } while (after !== null)
+        expect(walk, direction).toEqual(whole)
+      }
+    } finally {
+      await owner.unsafe('drop table sales.list_word')
     }
   })
 })
@@ -258,7 +387,7 @@ describe('a parent over a text foreign key', covers('postgres', listCase('text-p
 })
 
 describe('a key the table no longer holds', covers('postgres', listCase('key')), () => {
-  // A page pages by the key, and offset paging needs the order to be total:
+  // A page continues after a row by its key, which needs the order total:
   // the key unique and NOT NULL. The snapshot says it is; a page decided
   // over its own statement's description asks again (0044). Made nullable,
   // PostgreSQL's UNIQUE lets the column hold many NULLs, which have no token
@@ -279,11 +408,11 @@ describe('a key the table no longer holds', covers('postgres', listCase('key')),
       if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
       const outcome = await records.list(plan.request)
       if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
-      return { fields: plan.fields, outcome, list: driftRefusal(keyed, bindings, policy, outcome.described, 'list'), read: driftRefusal(keyed, bindings, policy, outcome.described, 'read') }
+      return { plan, outcome, list: driftRefusal(keyed, bindings, policy, outcome.described, 'list'), read: driftRefusal(keyed, bindings, policy, outcome.described, 'read') }
     }
     const held = await page()
     expect(held.list).toBeUndefined()
-    expect(recordPage(bindings, held.fields, held.outcome.rows, EVERY.limit).rows.map((row) => String(row.answers['code']))).toEqual(LIST_PARITY.key.listed)
+    expect(recordPage(bindings, held.plan, held.outcome.rows).rows.map((row) => String(row.answers['code']))).toEqual(LIST_PARITY.key.listed)
 
     await owner.unsafe('alter table sales.list_key alter column code drop not null')
     await owner.unsafe(`insert into sales.list_key (code, label) values (null, 'none'), (null, 'nothing')`)
@@ -294,7 +423,7 @@ describe('a key the table no longer holds', covers('postgres', listCase('key')),
     await owner.unsafe(`insert into sales.list_key (code, label) values (1, 'again')`)
     const dropped = await page()
     expect({ list: dropped.list?.code, read: dropped.read }).toEqual({ list: LIST_PARITY.key.refused, read: undefined })
-    expect(() => recordPage(bindings, dropped.fields, dropped.outcome.rows, EVERY.limit)).toThrow('A record appears twice in one page')
+    expect(() => recordPage(bindings, dropped.plan, dropped.outcome.rows)).toThrow('A record appears twice in one page')
   })
 })
 
@@ -311,7 +440,7 @@ describe('a file of shipments', covers('postgres', exportCase('shipments')), () 
     if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
     const outcome = await records.list(plan.request)
     if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
-    const page = recordPage(shipments.bindings, plan.fields, outcome.rows, EVERY.limit)
+    const page = recordPage(shipments.bindings, plan, outcome.rows)
     expect(page.hasMore).toBe(false)
     const columns = exportColumns(shipments.form, shipments.bindings, plan.fields)
     const lines = [exportHeader(columns), ...page.rows.map((row) => exportRecord(columns, row, new Map()))]

@@ -59,8 +59,8 @@ describe('the status line', () => {
 })
 
 describe('what a grid asks for', () => {
-  // The grid's own numbers become the route's: its start row the offset and
-  // the block the limit; the sort is the section's, which the headers show
+  // The grid's block becomes the route's: the cursor it continues after
+  // (0108) and its size the limit; the sort is the section's, which the headers show
   // (0105); the search is the one submitted, never per keystroke, and the
   // filter the one applied, on every block, not only the first (watched
   // failing with the filter left out of the request: "filter": []).
@@ -73,15 +73,15 @@ describe('what a grid asks for', () => {
       { field: 'order_date', direction: 'desc' as const },
       { field: 'id', direction: 'asc' as const },
     ]
-    expect(listQuery({ search: 'Zug', sort, parent: null, filter, startRow: 50, endRow: 100 })).toEqual({
+    expect(listQuery({ search: 'Zug', sort, parent: null, filter, after: 'c1:50', size: 50 })).toEqual({
       search: 'Zug',
       sort,
       parent: null,
       filter,
-      offset: 50,
+      after: 'c1:50',
       limit: 50,
     })
-    expect(listQuery({ search: '', sort: [], parent: { field: 'order', record: 'k1:1' }, filter: [], startRow: 0, endRow: 50 })).toMatchObject({ parent: { field: 'order', record: 'k1:1' }, filter: [] })
+    expect(listQuery({ search: '', sort: [], parent: { field: 'order', record: 'k1:1' }, filter: [], after: null, size: 50 })).toMatchObject({ parent: { field: 'order', record: 'k1:1' }, filter: [], after: null })
   })
 
   // AG Grid's sort model, in its order, is what the datasource holds to the

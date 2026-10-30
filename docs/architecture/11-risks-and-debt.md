@@ -198,13 +198,19 @@ is shown to the second and a time to the minute on both engines
 ([0040](../decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).
 Lookup labels are not unique and not localised, and a key too long for a
 token, or a boolean, time or timestamp key, cannot be offered as a lookup
-(0012, 0028). A list has no total, and a row inserted before the offset
-between two pages shows one row twice or skips one (0044). A form published
+(0012, 0028). A list has no total and is walked a page at a time, never
+jumped to; a page continues after where its row is now, so that row edited
+between two pages in a sorted column moves the next page with it, and that
+row deleted starts the grid again at its first page
+([0108](../decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md)).
+A browse still pages by offset, and a row inserted before its offset between
+two pages shows one row twice or skips one (0044, 0099). A form published
 at 0.1.0 draws its lookups as plain selects until it is regenerated and
 published again
 ([0066](../decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
-A file of records is not the table at one moment: a row deleted meanwhile
-before an offset is missing unseen, and one inserted there refuses the file.
+A file of records is not the table at one moment: the row a page continues
+after, deleted meanwhile, refuses the file, and so does a record whose
+sorted column moved it past that row (0108).
 A text cell that starts as a formula, or with an apostrophe, carries one
 apostrophe the database does not hold; on SQL Server text UTF-8 cannot
 carry refuses the whole file, and so, on either engine, does a lookup
@@ -523,13 +529,18 @@ and 0033: an event is written after the database or the store commits, by
 another system, so a crash between the two loses it, and nothing stops a
 privileged operator editing the log.
 
-**A file of records read by offsets, not in one snapshot.** The cost of
+**A file of records read a page at a time, not in one snapshot.** The cost of
 [0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md), bought to keep every statement a guarded list page (0015) and
 no transaction across pages, which would hold a connection and VACUUM's
 horizon on PostgreSQL, and needs a database setting or blocks writers on
-SQL Server: page *k* reads every row before *k* × 50, and a row that moves
-between two pages is skipped unseen or refuses the file `moved`. Keyset
-paging, which 0044 declined, is what would pay it down.
+SQL Server. Since
+[0108](../decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md)
+each page continues after the last row of the one before, so a page in key
+order reads from that row and a row inserted or deleted before it moves
+nothing; a row whose sorted column moves it past that row between two
+pages is shown twice, which refuses the file `moved`, or skipped unseen,
+and an order no index serves still reads every admitted row for each
+page.
 
 **One verifier, two products, two installs.** The cost of
 [0091](../decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md),

@@ -1198,7 +1198,7 @@
       ]
     },
     "0044": {
-      "reviewed": "sha256:ae4771a11a452145680eea8e34411927db7a98e780729eebedcac14d9eff1d73",
+      "reviewed": "sha256:7c3f927d5bd1fc394d2b4972bf5f16f9786636b386350b29732d26b179e20e80",
       "limitations": [
         {
           "area": "forms",
@@ -1321,7 +1321,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:abc8fdd78f53f293441395c39cd579ab6b6be5f649b3ff51c8145451b0c0bf38",
+      "reviewed": "sha256:b413606a0a63136ff3439015d5d13f282be6b2b8e51cddb705e4632f6de5b47b",
       "limitations": [
         {
           "area": "host",
@@ -2593,7 +2593,7 @@
       ]
     },
     "0079": {
-      "reviewed": "sha256:102ceeaad97c926565b592e6405358eb1983e2ca681ec0e237fdaf990e751a4a",
+      "reviewed": "sha256:c5c3d62fb10a8628f556e87c346ee9c9b6b8bc436ac780991722102cac302a4f",
       "limitations": [
         {
           "area": "server",
@@ -3238,6 +3238,35 @@
         {
           "area": "server",
           "says": "@formancy/data-client refuses a form that offers create without saying what a copy carries as unexpected, so a host upgrades its server before its client.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0108": {
+      "reviewed": "sha256:2fbeba5aaf35c88a62954076e99fabf06fdcf350cea0741f2d9bee66d0de2ec8",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A page continues after the row the page before ended with, wherever that row is now: edited between two pages in a column the list is sorted by, it moves the next page with it, and rows are skipped or shown again; a file refuses a record shown twice, never one skipped.",
+          "heldBy": "packages/data-postgres/src/list.integration.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "When the row the next page comes after has been deleted meanwhile, or is no longer one the person may read, the grid starts again at its first page, and a file of records is refused as moved.",
+          "heldBy": "apps/host/src/workspace.test.tsx"
+        },
+        {
+          "area": "forms",
+          "says": "Pages are walked, never jumped to: there is no page number, no total and no last page, and an order no index serves still reads and sorts every row the list admits for every page.",
+          "heldBy": "packages/data-postgres/src/lookups-sized.integration.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "Browse still pages by offset, so a row inserted or deleted before a page between two pages shows a row twice or skips one."
+        },
+        {
+          "area": "server",
+          "says": "The server refuses an older client's offset as malformed, and @formancy/data-client refuses an older server's page, which has no cursor, as unexpected, so a host and its server are upgraded together.",
           "heldBy": "packages/data-client/src/transport.test.ts"
         }
       ]

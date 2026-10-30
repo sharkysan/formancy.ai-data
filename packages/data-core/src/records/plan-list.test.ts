@@ -5,8 +5,9 @@ import type { FormPolicy } from '../policy/types.js'
 import { unscopedLookups } from '../policy/through.js'
 import { validatePolicy } from '../policy/validate.js'
 import type { RecordListQuery } from '../runtime.js'
-import { listable, listColumns, planList, recordPage } from './list.js'
+import { CURSOR_GONE, cursorRefusal, listable, listColumns, planList, recordPage } from './list.js'
 import { planRead } from './plan.js'
+import type { DescribedTable } from './types.js'
 import {
   actor,
   AMOUNT,
@@ -45,7 +46,7 @@ import {
 } from './test-support.js'
 
 /** A first page, in key order, with nothing narrowed: what a grid asks for when it opens. */
-const FIRST: RecordListQuery = { search: '', sort: [], parent: null, filter: [], offset: 0, limit: 50 }
+const FIRST: RecordListQuery = { search: '', sort: [], parent: null, filter: [], after: null, limit: 50 }
 const query = (change: Partial<RecordListQuery>): RecordListQuery => ({ ...FIRST, ...change })
 
 const customers = customerForm(customerSource()).bindings
@@ -78,13 +79,14 @@ describe('planList', () => {
         filter: [],
         search: null,
         sort: [{ column: 'id', direction: 'asc', nulls: null }],
+        after: null,
         offset: 0,
         limit: 50,
       },
       fields: ['id', 'order_date', 'status'],
     })
-    const clerk = planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ offset: 100, limit: 7 }))
-    expect(clerk).toMatchObject({ ok: true, fields: CLERK_FIELDS, request: { columns: CLERK_COLUMNS, offset: 100, limit: 7 } })
+    const clerk = planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ after: 'c1:100', limit: 7 }))
+    expect(clerk).toMatchObject({ ok: true, fields: CLERK_FIELDS, request: { columns: CLERK_COLUMNS, after: [{ name: 'id', type: INT64, value: '100' }], offset: 0, limit: 7 } })
     // Each row of a list is what a read of its token shows: the same columns, the same fields.
     const read = planRead(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN)
     if (!read.ok || !clerk.ok) throw new Error('expected both to plan')
@@ -144,8 +146,8 @@ describe('planList', () => {
   })
 
   // A nullable unique key admits many NULLs on PostgreSQL. Rows tied on the
-  // sort with NULL keys have no defined order, and offset paging repeats or
-  // skips them, so such a form offers no list, on both engines -- though it
+  // sort with NULL keys have no defined order, and a page cannot continue
+  // after a row it cannot find by its key, so such a form offers no list, on both engines -- though it
   // can still be read by a token. Watched failing with addressability alone
   // checked: the list was planned.
   test('refuses a key that can be NULL, which a read still accepts', () => {
@@ -208,7 +210,7 @@ describe('planList', () => {
     expect(unscopedLookups(constructed, { ...shared, lookups: {} })).toEqual([])
   })
 
-  // The order must be total for offset paging to hold: the identity ends it.
+  // The order must be total for a page to continue after one row: the identity ends it.
   // A key column the request already sorts by is not named twice, and NULL
   // placement is spelled only for a column the snapshot says is nullable --
   // a NOT NULL one is left for an index to serve. Watched failing with every
@@ -419,13 +421,20 @@ describe('planList', () => {
 
 describe('recordPage', () => {
   const order = (id: string, notes: string | null) => ({ values: { id, order_date: '2026-10-08', status: 'placed', notes }, version: '1' })
+  /** A clerk's planned list of orders, `limit` to a page: what a page is built for. */
+  const planned = (limit: number, fields: string[]) => {
+    const plan = planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ limit }))
+    if (!plan.ok) throw new Error(plan.message)
+    return { request: plan.request, fields }
+  }
 
   // The extra row says whether more follow, and is never shown. A row whose
   // key does not fit a token stays in its place, so row n of the page is
-  // still record offset + n; dropping it would shift every row after it.
+  // still the nth after the row it continues after; dropping it would shift
+  // every row after it.
   test('keeps a row with no token in its place, and tells more from the extra row', () => {
     const long = '9'.repeat(5000)
-    const page = recordPage(PG_ORDER, ['id', 'notes'], [order('1', 'a'), order(long, 'b'), order('3', null), order('4', 'd')], 3)
+    const page = recordPage(PG_ORDER, planned(3, ['id', 'notes']), [order('1', 'a'), order(long, 'b'), order('3', null), order('4', 'd')])
     expect(page).toEqual({
       rows: [
         { record: 'k1:1', version: '1', answers: { id: '1', notes: 'a' } },
@@ -433,13 +442,65 @@ describe('recordPage', () => {
         { record: 'k1:3', version: '1', answers: { id: '3', notes: null } },
       ],
       hasMore: true,
+      next: 'c1:3',
     })
-    expect(recordPage(PG_ORDER, ['id'], [order('1', null)], 3)).toEqual({ rows: [{ record: 'k1:1', version: '1', answers: { id: '1' } }], hasMore: false })
+    expect(recordPage(PG_ORDER, planned(3, ['id']), [order('1', null)])).toEqual({ rows: [{ record: 'k1:1', version: '1', answers: { id: '1' } }], hasMore: false, next: null })
+  })
+
+  // The page after continues after the last row shown (0108), so its cursor
+  // is that row's key: the extra row's would skip the row it is, and a page
+  // ending on a key too long for a token could not be continued at all
+  // (cursor.test.ts reads one back). Watched failing with the cursor taken
+  // from the extra row, and with it taken from the record token.
+  test("gives the last row's key as the cursor, a key no token can hold included", () => {
+    const long = '9'.repeat(5000)
+    expect(recordPage(PG_ORDER, planned(2, ['id']), [order('1', null), order(long, null), order('3', null)]).next).toBe(`c1:${long}`)
+    const page = recordPage(PG_ORDER, planned(2, ['id']), [order('1', null), order('9007199254740993', null), order('3', null)])
+    expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ after: page.next }))).toMatchObject({ ok: true, request: { after: [{ name: 'id', type: INT64, value: '9007199254740993' }] } })
   })
 
   // A token twice on one page is an adapter that joined wrongly; a grid would
   // select one row and highlight two.
   test('throws on a record twice in one page', () => {
-    expect(() => recordPage(PG_ORDER, ['id'], [order('1', null), order('1', null)], 3)).toThrow('A record appears twice in one page')
+    expect(() => recordPage(PG_ORDER, planned(3, ['id']), [order('1', null), order('1', null)])).toThrow('A record appears twice in one page')
+  })
+
+  // listable lists only a key held NOT NULL, so a last row without its key
+  // is an adapter's bug, never a cursor the next page would misread.
+  test('throws on a last row without its key', () => {
+    expect(() => recordPage(PG_ORDER, planned(1, ['notes']), [order('1', null), order('2', null)].map((row) => ({ ...row, values: { notes: null } })))).toThrow('no key to continue after')
+  })
+})
+
+describe('a page after a cursor', () => {
+  // The cursor names a key of this form, spelled as its column holds it, or
+  // the page is refused before any statement: binding `007` would find
+  // record 7 on one engine and fail on the other, and a record token is not
+  // a cursor though it spells the same key. Watched failing with the
+  // cursor read as a token.
+  test('is planned after the key the cursor names, and refused for one that names none', () => {
+    expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ after: 'c1:9007199254740993' }))).toMatchObject({
+      ok: true,
+      request: { after: [{ name: 'id', type: INT64, value: '9007199254740993' }], offset: 0 },
+    })
+    for (const after of ['k1:7', 'c1:007', 'c1:7,8', 'c1:', 'c2:7', '7', 'c1:9223372036854775808']) {
+      expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ after })), after).toMatchObject({ ok: false, code: 'invalid-cursor' })
+    }
+  })
+
+  // Who may list is decided before the cursor is read: a person the policy
+  // does not let read is told only that, whatever they sent.
+  test('is refused by the policy before the cursor is read', () => {
+    expect(planList(PG, PG_ORDER, ORDER_POLICY, INTAKE, query({ after: 'k1:7' }))).toMatchObject({ ok: false, code: 'operation-denied' })
+  })
+
+  // The row is looked for by the page's own statement (0108): gone, the page
+  // is refused and its rows -- none -- never shown; found, or not asked
+  // for, the page stands.
+  test("is refused when the page's statement found the row gone", () => {
+    const described: DescribedTable = { kind: 'table', primaryKey: null, uniqueKeys: [], foreignKeys: [], columns: [], definition: 'd' }
+    expect(cursorRefusal({ ok: true, described, rows: [], after: 'gone' })).toEqual({ ok: false, code: 'cursor-gone', message: CURSOR_GONE })
+    expect(cursorRefusal({ ok: true, described, rows: [], after: 'found' })).toBeUndefined()
+    expect(cursorRefusal({ ok: true, described, rows: [], after: null })).toBeUndefined()
   })
 })

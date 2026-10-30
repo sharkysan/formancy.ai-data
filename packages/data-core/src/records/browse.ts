@@ -200,6 +200,8 @@ export function planBrowse(snapshot: MetadataSnapshot, query: BrowseQuery): Plan
     filter,
     search: query.search === '' ? null : { text: query.search, columns: searchable.map((column) => ({ name: column.name, type: column.type }) as LookupSearchColumn) },
     sort,
+    // By offset alone (0108): a view or a keyless table has no key a cursor could find its row by.
+    after: null,
     offset: query.offset,
     limit: query.limit,
   }

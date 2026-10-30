@@ -382,7 +382,7 @@ describe('an ALTER that commits while a request waits for it', () => {
       await transaction.begin()
       await batches(transaction, entry.alter.sqlserver as readonly string[])
       const { target: table, columns, filters } = read(entry.table)
-      const list = { target: table, columns, filters, through: [], equal: [], filter: [], search: null, sort: [{ column: 'id', direction: 'asc', nulls: null }], offset: 0, limit: 50 } as const
+      const list = { target: table, columns, filters, through: [], equal: [], filter: [], search: null, sort: [{ column: 'id', direction: 'asc', nulls: null }], after: null, offset: 0, limit: 50 } as const
       const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read(entry.table)), records.list(list), records.delete(stale.removal)] as const
       await waiting(5)
       await transaction.commit()

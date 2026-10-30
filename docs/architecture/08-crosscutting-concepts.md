@@ -229,7 +229,11 @@ never a permission
 a child form's rows are reached only through a parent its policy admits
 ([0043](../decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md));
 a page of records is listed under the read policy
-([0044](../decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md));
+([0044](../decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)),
+and the row a page continues after is found under it too, one the person
+may not read answered as one that is gone, so its place in the order is
+never told
+([0108](../decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md));
 the menu names only the forms a person may read
 ([0045](../decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md));
 a delete reaches other tables only through foreign keys the policy names

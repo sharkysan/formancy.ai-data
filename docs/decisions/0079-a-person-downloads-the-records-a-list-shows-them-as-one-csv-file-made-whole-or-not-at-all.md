@@ -1,6 +1,6 @@
 # 0079 — A person downloads the records a list shows them as one CSV file, made whole or not at all
 
-- **Status:** accepted; extended by [0080](0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md): the host page's Records panel and each child section under a saved parent download the file with Download CSV, the page sends the export route, and `@formancy/data-client` re-exports `exportFileName`; extended by [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md): an export takes a list's filter, and the file holds the records it admits
+- **Status:** accepted; extended by [0080](0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md): the host page's Records panel and each child section under a saved parent download the file with Download CSV, the page sends the export route, and `@formancy/data-client` re-exports `exportFileName`; extended by [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md): an export takes a list's filter, and the file holds the records it admits; extended by [0108](0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md): each page of a file is the list's after the last row of the page before, so a record deleted before a page is no longer left out, and the row a page continues after, gone, refuses the file `moved`
 - **Date:** 2026-10-17
 - **Deciders:** Daniel Bacher
 - **Verified by:**

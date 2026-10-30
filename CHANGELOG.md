@@ -232,6 +232,36 @@ later.
     2026-10-22 -- so the README's pictures keep their stylesheet digests,
     and every comment that named a renderer's behaviour at 0.6.0 names 0.7.0
     too.
+- **A form's list pages after the last row a page showed, not at an
+  offset** (0108). Why: a page at an offset read every row before it --
+  tenant 1's page after its 50,001st customer read 50,052 rows of the sized
+  table to show fifty -- and an offset counts rows, not records, so a row
+  inserted or deleted before it between two pages showed a record twice or
+  skipped one, and a file of records left a record deleted meanwhile out,
+  unseen. The page after a row finds that row again by its key in its own
+  statement and compares every row with it column against column, so it
+  reads 52 rows at that depth, on both engines, and a page starts where the
+  last one ended. What you notice:
+  - **`POST /v1/forms/:id/records/list` takes `after`, not `offset`**: the
+    `next` a page answers beside `hasMore`, the cursor of its last row
+    when more follow and `null` when none do. An `offset` is `400
+    malformed`; a cursor that names no key of the form is `400
+    invalid-cursor`; a page after a row deleted meanwhile, or no longer one
+    the person may read, is `409 cursor-gone`, and the first page is where
+    to start again.
+  - **The host and the server are upgraded together.** This release's
+    server refuses an older client's `offset`, and this release's
+    `@formancy/data-client` answers `unexpected` to an older server's page,
+    which has no `next`.
+  - **The host's grid starts again at its first page** when the row the
+    next page comes after is gone, and says so; Previous and Next are as
+    they were.
+  - **A file of records pages the same way**, and is refused `409 moved`
+    when the row a page continues after is deleted while it is made.
+  - A page continues after where its row is now: edited between two pages
+    in a sorted column, it moves the next page with it. An order no index
+    serves still reads and sorts every row the list admits. The studio's
+    Browse still pages by offset: a view has no key to continue after.
 - **A nullable yes/no column is generated as a select of Yes and No, not a
   radio group** (0095). Why: a radio group, once answered, could never be
   taken back to no answer, the NULL the column held; and neither formancy

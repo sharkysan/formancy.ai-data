@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createSnapshot, describedOf, EMPTY_PRESENTATION, generateForm, LIST_PAGE_SIZE, listColumns } from '@formancy/data-core'
+import { createSnapshot, CURSOR_GONE, describedOf, EMPTY_PRESENTATION, generateForm, LIST_PAGE_SIZE, listColumns } from '@formancy/data-core'
 import type { ColumnMeta, DatabaseAdapter, Described, DescribedTable, FormBindings, FormPolicy, GenerationRequest, ListOutcome, ListRequest, ListView, LookupAdapter, NormalizedType, ObjectRef, RecordAdapter } from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
@@ -149,7 +149,7 @@ function registry(): ConnectionRegistry {
     },
     list: async (request) => {
       lists.push(request)
-      return listOutcome ?? { ok: true, described: describedAs(request.target.table), rows: request.target.table.name === 'customer' ? [STORED] : [] }
+      return listOutcome ?? { ok: true, described: describedAs(request.target.table), rows: request.target.table.name === 'customer' ? [STORED] : [], after: request.after === null ? null : 'found' }
     },
     insert: async () => {
       throw new Error('a list never inserts')
@@ -208,11 +208,12 @@ describe('the list route', () => {
   // browser asked, no more: the search trimmed, the order made total, the
   // tenant's filter, the readable fields' columns and the key. And the page
   // comes back as reads do, the extra row telling more from the last page.
-  // Watched failing with the route paging from offset 0 whatever was asked.
+  // Watched failing with the route paging from the first row whatever
+  // cursor was sent.
   test('hands the port the planned request, and answers each row as a read would', async () => {
-    const response = await list('customer', { search: ' Muster ', sort: [{ field: 'credit_limit', direction: 'desc' }], offset: 50, limit: 25 })
+    const response = await list('customer', { search: ' Muster ', sort: [{ field: 'credit_limit', direction: 'desc' }], after: 'c1:1,6', limit: 25 })
     expect(response.statusCode, response.body).toBe(200)
-    expect(response.json()).toEqual({ rows: [{ record: 'k1:1,7', version: VERSION, answers: { tenant_id: 1, customer_no: 7, name: 'Muster AG', country: 'k1:CH', credit_limit: null } }], hasMore: false })
+    expect(response.json()).toEqual({ rows: [{ record: 'k1:1,7', version: VERSION, answers: { tenant_id: 1, customer_no: 7, name: 'Muster AG', country: 'k1:CH', credit_limit: null } }], hasMore: false, next: null })
     expect(lists).toEqual([
       {
         target: { table: ref('customer'), identity: [{ name: 'tenant_id', type: INT32 }, { name: 'customer_no', type: INT32 }], concurrency: { kind: 'rowversion', column: 'row_version' } },
@@ -233,15 +234,53 @@ describe('the list route', () => {
           { column: 'tenant_id', direction: 'asc', nulls: null },
           { column: 'customer_no', direction: 'asc', nulls: null },
         ],
-        offset: 50,
+        after: [
+          { name: 'tenant_id', type: INT32, value: '1' },
+          { name: 'customer_no', type: INT32, value: '6' },
+        ],
+        offset: 0,
         limit: 25,
       },
     ])
-    listOutcome = { ok: true, described: describedAs(ref('customer')), rows: [STORED, { ...STORED, values: { ...STORED.values, customer_no: '8' } }] }
-    expect((await list('customer', { limit: 1 })).json()).toMatchObject({ rows: [{ record: 'k1:1,7' }], hasMore: true })
+    // More follow: the page's cursor is its last row's key, which the next page is asked for after (0108).
+    listOutcome = { ok: true, described: describedAs(ref('customer')), rows: [STORED, { ...STORED, values: { ...STORED.values, customer_no: '8' } }], after: null }
+    expect((await list('customer', { limit: 1 })).json()).toMatchObject({ rows: [{ record: 'k1:1,7' }], hasMore: true, next: 'c1:1,7' })
     // An empty body is the first page, in key order, of the largest page.
     expect((await list('customer', {})).statusCode).toBe(200)
-    expect(lists.at(-1)).toMatchObject({ search: null, offset: 0, limit: LIST_PAGE_SIZE, sort: [{ column: 'tenant_id' }, { column: 'customer_no' }] })
+    expect(lists.at(-1)).toMatchObject({ search: null, after: null, offset: 0, limit: LIST_PAGE_SIZE, sort: [{ column: 'tenant_id' }, { column: 'customer_no' }] })
+  })
+
+  // A cursor that names no key of this form is the client's mistake, said
+  // before any statement; an offset is what a list took before 0108, and a
+  // client still sending one is told rather than shown the first page again.
+  // Watched failing with the planner's refusal left unmapped: 500.
+  test('refuses a cursor naming no key of the form, and an offset, without asking the port', async () => {
+    for (const [payload, code] of [
+      [{ after: 'k1:1,7' }, 'invalid-cursor'],
+      [{ after: 'c1:1' }, 'invalid-cursor'],
+      [{ after: 'c1:1,07' }, 'invalid-cursor'],
+      [{ after: 7 }, 'malformed'],
+      [{ offset: 50 }, 'malformed'],
+    ] as const) {
+      const response = await list('customer', payload)
+      expect({ status: response.statusCode, code: response.json().code }, JSON.stringify(payload)).toEqual({ status: 400, code })
+    }
+    expect(lists).toEqual([])
+  })
+
+  // The page's statement looks for the row it continues after (0108):
+  // gone -- deleted, or no longer one the person may read -- the page has
+  // no place to start. 409, the first page being where to start again, and
+  // nothing of the rows in the body; said in the log and the audit as the
+  // list it is. Watched failing with the outcome's answer left unread: 200
+  // and an empty page that said nothing follows.
+  test('refuses a page after a row its statement found gone', async () => {
+    listOutcome = { ok: true, described: describedAs(ref('customer')), rows: [STORED], after: 'gone' }
+    const response = await list('customer', { after: 'c1:1,6' })
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({ code: 'cursor-gone', message: CURSOR_GONE })
+    expect(response.body).not.toContain('Muster')
+    expect(events.at(-1)).toMatchObject({ operation: 'list', status: 409, outcome: 'cursor-gone', record: null })
   })
 
   // A line has no tenant (0043): its list carries the order's through to the
@@ -339,7 +378,8 @@ describe('the list route', () => {
       [{ sort: [{ field: 'name', direction: 'sideways' }] }, 'customer', 'malformed'],
       [{ search: 'x'.repeat(201) }, 'customer', 'search-too-long'],
       [{ search: 'a\u0000b' }, 'customer', 'search-control-character'],
-      [{ offset: -1 }, 'customer', 'offset-out-of-range'],
+      [{ offset: -1 }, 'customer', 'malformed'],
+      [{ after: 'c1:1,x' }, 'customer', 'invalid-cursor'],
       [{ limit: LIST_PAGE_SIZE + 1 }, 'customer', 'limit-out-of-range'],
       [{ sort: [{ field: 'country', direction: 'asc' }] }, 'customer', 'not-sortable'],
       [{ search: 'x' }, 'tag', 'not-searchable'],
@@ -442,7 +482,7 @@ describe('the list route', () => {
   // refused because a column it names is gone is decided over a description
   // asked once more. Watched failing with the description left undecided.
   test('refuses a page drift stops reading, and shows none of it', async () => {
-    listOutcome = { ok: true, described: RETYPED, rows: [STORED] }
+    listOutcome = { ok: true, described: RETYPED, rows: [STORED], after: null }
     const refused = await list('customer', {})
     expect(refused.statusCode).toBe(409)
     expect(refused.json()).toEqual({ code: 'drift', message: expect.stringMatching(/can no longer show its records faithfully/) })
@@ -470,7 +510,7 @@ describe('the list route', () => {
       ['gone', KEY_GONE, [STORED, STORED]],
       ['nullable', KEY_NULLABLE, [STORED, { ...STORED, values: { ...STORED.values, customer_no: null } }]],
     ] as const) {
-      listOutcome = { ok: true, described, rows: [...rows] }
+      listOutcome = { ok: true, described, rows: [...rows], after: null }
       const refused = await list('customer', {})
       expect({ name, status: refused.statusCode, body: refused.json() }).toEqual({ name, status: 409, body: { code: 'drift', message: expect.stringMatching(/no longer have an order a page can rely on/) } })
       expect(refused.body).not.toContain('Muster AG')
@@ -488,7 +528,7 @@ describe('the list route', () => {
     const lines: Array<Record<string, unknown>> = []
     const logged = await createDataServer({ verifyIdentity, logger: { stream: { write: (line: string) => void lines.push(JSON.parse(line) as Record<string, unknown>) } }, runtime: { registry: registry(), store: createFileConfigurationStore(root) } })
     const refusals = () => lines.filter((line) => line['msg'] === 'refused: the database no longer fits this form as published').map((line) => [line['operation'], line['changes']])
-    listOutcome = { ok: true, described: KEY_GONE, rows: [STORED] }
+    listOutcome = { ok: true, described: KEY_GONE, rows: [STORED], after: null }
     await logged.inject({ method: 'POST', url: '/v1/forms/customer/records/list', headers: as('clerk'), payload: {} })
     listOutcome = { ok: false, code: 'schema-changed', column: 'name', message: 'column name does not exist' }
     catalog = { ok: true, described: RETYPED }
