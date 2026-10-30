@@ -168,14 +168,15 @@ unformatted.
   in the release report
   ([0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md)).
 - **The format commits, merged as they are.** The format is one commit of
-  Prettier's output and nothing else; main was merged into the branch twice
-  while it was open, and what it brought unformatted was formatted in a
-  commit of Prettier's output after each merge. `.git-blame-ignore-revs`
-  names those commits by their SHAs, each under a line saying what it
-  formatted. **The pull request that brings this merges with "Create a
-  merge commit", never a squash or a rebase**: a squash folds the format
-  into one commit with everything else, a rebase gives each commit
-  another SHA, and either way the file names nothing on `main`.
+  Prettier's output and nothing else; main was merged into the branch
+  three times while it was open, and what it brought unformatted was
+  formatted in a commit of Prettier's output after each merge.
+  `.git-blame-ignore-revs` names those commits by their SHAs, each under a
+  line saying what it formatted. **The pull request that brings this
+  merges with "Create a merge commit", never a squash or a rebase**: a
+  squash folds the format into one commit with everything else, a rebase
+  gives each commit another SHA, and either way the file names nothing on
+  `main`.
 - **A merge across the format.** `scripts/prettier-merge.mjs` runs
   `git merge` with a merge driver, for that command alone, on every
   extension the shared style formats: the driver formats the common
@@ -184,11 +185,11 @@ unformatted.
   format rewrote conflicts only where both sides changed what it says.
   Prettier and the style are the script's own checkout's, so a branch
   begun before the format, which has neither, runs it from a checkout of
-  main, as CONTRIBUTING.md says. This branch took main twice through the
-  same driver: of the files both sides had changed, 72 of 76 merged
-  clean the first time, where `git merge-file` on the same unformatted
-  versions conflicted in 38, and 17 of 19 the second, where it conflicted
-  in 9.
+  main, as CONTRIBUTING.md says. This branch took main three times
+  through the same driver: of the files both sides had changed, 72 of 76
+  merged clean the first time, where `git merge-file` on the same
+  unformatted versions conflicted in 38, 17 of 19 the second, where it
+  conflicted in 9, and 36 of 37 the third, where it conflicted in 8.
 - **A copy until formancy.ai releases.** The swap is a pull request of its
   own, as Formancy Health's is: the package pinned exactly as a root
   devDependency, `scripts/code-style/` deleted, the two config files
@@ -207,8 +208,8 @@ not a habit, and the same in the four repositories.
 
 **What it costs.**
 - **Blame.** The format rewrote 638 files, 25,448 lines added and 6,973
-  removed; the two later format commits 9 and 6 files. GitHub's blame
-  skips them by `.git-blame-ignore-revs`; `git blame` only with
+  removed; the three later format commits 9, 6 and 13 files. GitHub's
+  blame skips them by `.git-blame-ignore-revs`; `git blame` only with
   `--ignore-revs-file` or `blame.ignoreRevsFile` set; and `git log -S` and
   `-L` see them, as does any tool that reads neither.
 - **Every branch open under the format conflicts with it.** Through
