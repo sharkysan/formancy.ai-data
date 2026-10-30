@@ -4,6 +4,8 @@ import {
   DECIDED_BY_TRIGGER_MESSAGE,
   DEFINITION_MOVED,
   DEFINITION_MOVED_MESSAGE,
+  NEXT_NOT_INSERTED,
+  NEXT_NOT_INSERTED_MESSAGE,
   NOT_ONE_ROW,
   NOT_ONE_ROW_MESSAGE,
   REACH_MOVED,
@@ -169,6 +171,9 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
   if (error.number === NOT_ONE_ROW && error.message === NOT_ONE_ROW_MESSAGE) {
     // The bindings named an identity that is not a key; the batch rolled back.
     throw new Error('The record identity matched more than one row, so the update was rolled back: the bindings do not name a key.')
+  }
+  if (error.number === NEXT_NOT_INSERTED && error.message === NEXT_NOT_INSERTED_MESSAGE) {
+    return failure('refused', 'A change from a date ended a version and inserted no next one, so the batch rolled it back; nothing was written (0113).')
   }
   if (error.number === DECIDED_BY_TRIGGER && error.message === DECIDED_BY_TRIGGER_MESSAGE) {
     return failure(

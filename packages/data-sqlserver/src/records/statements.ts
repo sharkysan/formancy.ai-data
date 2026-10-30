@@ -43,6 +43,9 @@ export const REACH_MOVED_MESSAGE = 'formancy: what refers to the table moved'
 /** Raised when a delete's account may not DELETE from a table past the root the delete reaches (0051). */
 export const REACH_UNDELETABLE = 51708
 export const REACH_UNDELETABLE_MESSAGE = 'formancy: this account may not delete from a table the delete reaches'
+/** A change from a date that ended a version and inserted no next one (0113): rolled back. */
+export const NEXT_NOT_INSERTED = 51709
+export const NEXT_NOT_INSERTED_MESSAGE = 'formancy: a change from a date ended a version and inserted no next one'
 
 /** A version as it is compared: the 8 bytes of a rowversion, or a version column's decimal string. */
 export type ExpectedVersion = { kind: 'rowversion'; bytes: Buffer } | { kind: 'version-column'; value: string }
@@ -85,7 +88,7 @@ function versionOf(concurrency: RecordConcurrency, source: string): Selected {
  */
 export const ROW = '[r]'
 
-function column(name: string): string {
+export function column(name: string): string {
   return `${ROW}.${quoteName(name)}`
 }
 
@@ -180,12 +183,23 @@ export function readStatement(request: ReadRequest, terms: readonly RowFilterTer
  * update is, inside the filters and every through (0043), so a record outside
  * them is not found whatever version was sent.
  */
-export function existsStatement(request: Pick<UpdateRequest, 'target' | 'key'>, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], definition: Buffer): Statement {
+export function existsStatement(
+  request: Pick<UpdateRequest, 'target' | 'key'>,
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  definition: Buffer,
+  ended?: { open: string; concurrency: RecordConcurrency; expected: ExpectedVersion },
+): Statement {
   const parameters = new Parameters()
   const table = request.target.table
   const same = `case when ${digestOf(factsOf(tableName(parameters, table)))} = ${parameters.add(mssql.VarBinary(32), definition)} then 1 else 0 end`
   const where = located(parameters, request.key, terms, through)
-  return parameters.statement(`select (select count(*) from ${quoteTable(table)} as ${ROW} where ${where.join(' and ')}) as [found], ${same} as [same]`)
+  // A version that has ended at the version sent (0113): the person read it ended, and nothing changed it since.
+  const over =
+    ended === undefined
+      ? '0'
+      : `(select count(*) from ${quoteTable(table)} as ${ROW} where ${[...located(parameters, request.key, terms, through), versionIs(parameters, ended.concurrency, ended.expected), `${column(ended.open)} is not null`].join(' and ')})`
+  return parameters.statement(`select (select count(*) from ${quoteTable(table)} as ${ROW} where ${where.join(' and ')}) as [found], ${same} as [same], ${over} as [ended]`)
 }
 
 /** A value a write assigns — an insert's VALUES or an update's SET — and the SQL it was bound as. */
@@ -251,9 +265,11 @@ function versionAfterTriggers(target: RecordTarget): Refind {
  * name is bound, as `object_id` reads it.
  */
 function insteadOfGuard(name: string, operation: Write['operation']): string {
+  // A change from a date (0113) updates one row and inserts another: a trigger instead of either decides it.
+  const events = operation === 'SUPERSEDE' ? "in (N'UPDATE', N'INSERT')" : `= N'${operation}'`
   const deciding =
     'select 1 from sys.triggers as [t] join sys.trigger_events as [e] on [e].[object_id] = [t].[object_id] ' +
-    `where [t].[parent_id] = object_id(${name}) and [t].[is_instead_of_trigger] = 1 and [t].[is_disabled] = 0 and [e].[type_desc] = N'${operation}'`
+    `where [t].[parent_id] = object_id(${name}) and [t].[is_instead_of_trigger] = 1 and [t].[is_disabled] = 0 and [e].[type_desc] ${events}`
   return `if exists (${deciding}) throw ${String(DECIDED_BY_TRIGGER)}, N'${DECIDED_BY_TRIGGER_MESSAGE}', 1;`
 }
 
@@ -271,9 +287,19 @@ export interface Write {
   target: RecordTarget
   /** The definition it was decided over (0041). */
   definition: Buffer
-  /** `DELETE` since 0050: it assigns nothing, and its row is not there to read a version back from. */
-  operation: 'INSERT' | 'UPDATE' | 'DELETE'
+  /**
+   * `DELETE` since 0050: it assigns nothing, and its row is not there to
+   * read a version back from. `SUPERSEDE` since 0113: an UPDATE that ends a
+   * version and an INSERT of the next, whose OUTPUT is the batch's.
+   */
+  operation: 'INSERT' | 'UPDATE' | 'DELETE' | 'SUPERSEDE'
   statement: (output: string) => string
+  /**
+   * The statement sets `@rows` itself. `@@ROWCOUNT` after several
+   * statements is the last one's -- an assignment's 1, or a skipped IF's --
+   * so a statement of several says which rows were written (0113).
+   */
+  counted?: boolean
   assigned: readonly Assigned[]
   returned: Selected[]
   /** Checks that may read `@rows`, the rows the statement changed. */
@@ -332,7 +358,7 @@ export interface Write {
  *   CATCH even when the transaction was doomed, once it is rolled back
  *   (measured, the probes before 0041).
  */
-export function writeBatch(parameters: Parameters, { target, definition, operation, statement, assigned, returned, afterWrite }: Write): string {
+export function writeBatch(parameters: Parameters, { target, definition, operation, statement, assigned, returned, afterWrite, counted = false }: Write): string {
   const guarded = assigned.flatMap(({ value, sql }, index) => (value.type.kind === 'text' && value.value !== null ? [{ value, sql, index }] : []))
   const stored = guarded.map(({ value }, position) => ({
     name: `[w${String(position)}]`,
@@ -361,7 +387,7 @@ export function writeBatch(parameters: Parameters, { target, definition, operati
     'begin transaction;',
     'set @transaction = current_transaction_id();',
     `${statement(output)};`,
-    'set @rows = @@rowcount;',
+    ...(counted ? [] : ['set @rows = @@rowcount;']),
     `if coalesce(current_transaction_id(), 0) <> @transaction throw ${String(TRANSACTION_REPLACED)}, N'${TRANSACTION_REPLACED_MESSAGE}', 1;`,
     ...moved,
     insteadOfGuard(table, operation),
@@ -383,6 +409,19 @@ export function writeBatch(parameters: Parameters, { target, definition, operati
   ].join('\n')
 }
 
+/**
+ * Whether no row has the chain's key a create writes (0113), compared with
+ * the values the insert binds: the insert's own condition, so it holds only
+ * where it starts a chain. UPDLOCK and HOLDLOCK keep the range of that key
+ * locked to the end of the batch's transaction, so a second create of the
+ * same chain waits, and then finds the first.
+ */
+function freshPredicate(request: InsertRequest, assigned: readonly Assigned[]): string | undefined {
+  if (request.fresh === undefined) return undefined
+  const parts = request.fresh.map((name) => `[c].${quoteName(name)} = ${(assigned.find(({ value }) => value.name === name) as Assigned).sql}`)
+  return `not exists (select 1 from ${quoteTable(request.target.table)} as [c] with (updlock, holdlock) where ${parts.join(' and ')})`
+}
+
 /** Exactly the given columns, so a column with a default gets it and a generated one is never named. */
 export function insertStatement(request: InsertRequest, definition: Buffer): Statement {
   const parameters = new Parameters()
@@ -390,11 +429,17 @@ export function insertStatement(request: InsertRequest, definition: Buffer): Sta
   const table = quoteTable(request.target.table)
   const columns = assigned.map(({ value }) => quoteName(value.name)).join(', ')
   const values = assigned.map(({ sql }) => sql).join(', ')
+  const fresh = freshPredicate(request, assigned)
   const sql = writeBatch(parameters, {
     target: request.target,
     definition,
     operation: 'INSERT',
-    statement: (output) => (assigned.length === 0 ? `insert into ${table} ${output} default values` : `insert into ${table} (${columns}) ${output} values (${values})`),
+    statement: (output) =>
+      assigned.length === 0
+        ? `insert into ${table} ${output} default values`
+        : fresh === undefined
+          ? `insert into ${table} (${columns}) ${output} values (${values})`
+          : `insert into ${table} (${columns}) ${output} select ${values} where ${fresh}`,
     assigned,
     returned: selection(request.returning, request.target.concurrency, 'inserted.'),
     afterWrite: [],
@@ -429,6 +474,8 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
   const version = column(target.concurrency.column)
   if (target.concurrency.kind === 'version-column') set.push(`${quoteName(target.concurrency.column)} = ${version} + 1`)
   const where = [...located(parameters, request.key, terms, through), versionIs(parameters, target.concurrency, expected)]
+  // A version that has ended is not updated (0113).
+  if (request.open !== undefined) where.push(`${column(request.open)} is null`)
   const sql = writeBatch(parameters, {
     target,
     definition,
