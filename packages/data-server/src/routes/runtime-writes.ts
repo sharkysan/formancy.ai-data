@@ -167,6 +167,7 @@ async function created(
     if (plan.code === 'invalid-values') return { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }
     return steps.refusal(request, 'create', plan)
   }
+  if (request.auditTrail !== undefined) request.auditTrail.moved = plan.moved
   const refused = await memberships(open, plan.memberships, request.log, steps.lookupDeadlineMs)
   if (refused !== undefined) return refused
   const outcome = await open.records.insert(plan.request)
@@ -243,6 +244,7 @@ async function updated(
     if (plan.code === 'record-not-read' && unread !== undefined) return recordFailure(bundle.bindings, unread)
     return steps.refusal(request, 'update', plan)
   }
+  if (request.auditTrail !== undefined) request.auditTrail.moved = plan.moved
   const refused = await memberships(open, plan.memberships, request.log, steps.lookupDeadlineMs)
   if (refused !== undefined) return refused
   const outcome = await open.records.update(plan.request)

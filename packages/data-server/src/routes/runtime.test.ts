@@ -923,6 +923,7 @@ describe('the operational audit trail', () => {
         outcome: 'ok',
         record: recordReference(KEY, 'k1:1,7'),
         rows: null,
+        moved: null,
       },
     ])
     expect(JSON.stringify(events)).not.toContain('Neu GmbH')

@@ -22,6 +22,7 @@ describe('logAuditSink', () => {
       outcome: 'ok',
       record: null,
       rows: null,
+      moved: null,
     }
     const admin: AuditEvent = {
       at: 't',

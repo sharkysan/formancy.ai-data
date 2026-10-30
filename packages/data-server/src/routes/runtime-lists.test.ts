@@ -734,6 +734,7 @@ describe('the list route', () => {
         outcome: 'ok',
         record: null,
         rows: null,
+        moved: null,
       },
       {
         at: '2026-10-11T12:00:00.000Z',
@@ -746,6 +747,7 @@ describe('the list route', () => {
         outcome: 'operation-denied',
         record: null,
         rows: null,
+        moved: null,
       },
       {
         at: '2026-10-11T12:00:00.000Z',
@@ -758,6 +760,7 @@ describe('the list route', () => {
         outcome: 'ok',
         record: null,
         rows: null,
+        moved: null,
       },
       {
         at: '2026-10-11T12:00:00.000Z',
@@ -770,6 +773,7 @@ describe('the list route', () => {
         outcome: 'not-filterable',
         record: null,
         rows: null,
+        moved: null,
       },
     ])
     expect(JSON.stringify(events)).not.toMatch(/Muster|quantity|k1:|31337|98765|filter-marker/)

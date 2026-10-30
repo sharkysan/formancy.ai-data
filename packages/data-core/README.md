@@ -362,6 +362,36 @@ re-points that key is asked about (0039) whether or not anybody holds a role
 on its field. Optional: a policy without it means what it meant, and a server
 older than it refuses a policy that uses it.
 
+A field holding where a record stands -- an order's status -- can be held to
+the moves the policy lists, each a pair of values for named roles
+([0112](../../docs/decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)):
+
+```ts
+const orderPolicy = {
+  …,
+  transitions: {
+    field: 'status',
+    moves: [
+      { from: null, to: 'placed', roles: ['clerk'] }, // a new record starts here
+      { from: 'placed', to: 'shipped', roles: ['clerk'] },
+      { from: 'shipped', to: 'delivered', roles: ['dispatcher'] },
+    ],
+  },
+}
+checkTransition(orderPolicy, context, bindings, 'shipped', 'placed')
+// { ok: false, code: 'transition-denied', message: 'status may not move from where it is to where this update puts it, for your roles.' }
+```
+
+`validatePolicy` refuses a field that is not a text or whole-number column
+field, a value its column could not hold, a move named twice or to the
+value it starts from, and a role that may not make the move: update, or
+create for a move from `null`, and read and write the field. The planner
+asks `checkTransition` of every create and update that changes the field,
+from the record as read -- a create from `null`, a create that leaves the
+field to its default unchecked -- and says on the plan whether it `moved`,
+for the audit. A move to NULL is refused; an update read at a newer version
+than it names is left to the version guard, which answers it stale.
+
 ## Record requests
 
 The one place a browser's request becomes an adapter's: the policy, the

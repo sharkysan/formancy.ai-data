@@ -79,6 +79,7 @@ describe('planCreate', () => {
         { field: 'customer', config: buildLookupConfig(PG_ORDER, 'customer', { snapshot: PG }), tokens: ['k1:1,1001'], filters: TENANT_ONE },
         { field: 'employee', config: buildLookupConfig(PG_ORDER, 'employee', { snapshot: PG }), tokens: ['k1:1'], filters: TENANT_ONE },
       ],
+      moved: null,
     })
   })
 

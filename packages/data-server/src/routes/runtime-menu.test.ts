@@ -317,6 +317,7 @@ describe('the menu route', () => {
         outcome: 'ok',
         record: null,
         rows: null,
+        moved: null,
       },
     ])
   })

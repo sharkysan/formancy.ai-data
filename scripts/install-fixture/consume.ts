@@ -95,6 +95,7 @@ await sink({
   outcome: 'unauthenticated',
   record: null,
   rows: null,
+  moved: null,
 })
 await sink({
   at: 't',

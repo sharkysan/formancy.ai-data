@@ -1,5 +1,5 @@
 import { deleteProblems, validatePolicy } from '@formancy/data-core'
-import type { CascadeRule, FieldBinding, FormBindings, FormPolicy, MetadataSnapshot, PolicyOperation, RowFilterRule } from '@formancy/data-core'
+import type { CascadeRule, FieldBinding, FormBindings, FormPolicy, MetadataSnapshot, PolicyOperation, RowFilterRule, TransitionRule } from '@formancy/data-core'
 
 /**
  * The policy the studio edits, as plain data, and the few things it derives
@@ -211,4 +211,25 @@ export function withoutCascadeAt(policy: FormPolicy, index: number): FormPolicy 
     policy,
     (policy.cascades ?? []).filter((_, at) => at !== index),
   )
+}
+
+/**
+ * The fields a policy may hold to moves (0112): a column field whose value
+ * is text or a whole number, the shapes a state is spelled in, as
+ * `validatePolicy` accepts -- and one the form writes, or nothing could
+ * move it.
+ */
+export function stateFields(bindings: FormBindings): string[] {
+  return bindings.fields
+    .filter(
+      (binding) =>
+        binding.kind === 'column' && (binding.type.kind === 'text' || binding.type.kind === 'integer') && (binding.writes.create || binding.writes.update),
+    )
+    .map((binding) => binding.field)
+}
+
+/** The policy with `transitions` set (0112), the property left out when there is no state field, as `through` is. */
+export function withTransitions(policy: FormPolicy, rule: TransitionRule | null): FormPolicy {
+  const { transitions: _, ...rest } = policy
+  return rule === null ? rest : { ...rest, transitions: { field: rule.field, moves: rule.moves.map((move) => ({ ...move, roles: [...move.roles] })) } }
 }

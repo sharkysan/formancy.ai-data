@@ -235,6 +235,32 @@ later.
   `blocking` change -- or a `review` one, with `--fail-on review` -- and 2
   for a form it could not check, never 0.
 
+- **A policy can hold a status field to the moves it lists, each for named
+  roles** (0112). Why: a field's write grant let anybody who may write an
+  order's status write any value -- delivered the day it was placed, or
+  back to placed -- and neither a CHECK constraint nor a trigger knows who
+  is asking. What you notice:
+  - **`transitions: { field, moves: [{ from, to, roles }] }`** in a
+    `FormPolicy`, `from: null` for a new record. Publication refuses a
+    field that is not a text or whole-number column field, a value the
+    column could not hold, a move named twice or to its own value, and a
+    role that may not make the move -- update, or create from a new
+    record, and read and write the field.
+  - **A create or an update that changes the field is a listed move for one
+    of the person's roles**, from the record as read, or 403
+    `transition-denied` before any statement, with a sentence naming the
+    field and no state. A create that leaves the field to its default is
+    not checked; emptying it is refused; a record that moved since its
+    person read it is answered `stale`, not refused.
+  - **Every runtime audit event gains `moved`**: whether a create or an
+    update moved the state field, `null` otherwise -- never from where or
+    to where. A sink that matches events exactly sees the new property,
+    and TypeScript code that builds a `RuntimeAuditEvent` must give it.
+  - **The studio's Policy step has State moves**, and a draft's review
+    lists each move with its roles for the publisher approving it.
+  - The form still offers every value the field accepts: a move the person
+    may not make is refused after Save, not hidden from the choice.
+
 ### Changed
 
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's

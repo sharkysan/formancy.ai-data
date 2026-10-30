@@ -52,9 +52,10 @@ declare module 'fastify' {
     /**
      * `repeated`: answered with an earlier sending's answer, and nothing
      * asked of the database (0031). `rows`: the records an export wrote
-     * into its file so far (0079).
+     * into its file so far (0079). `moved`: whether a planned create or
+     * update moves its policy's state field (0112).
      */
-    auditTrail?: { formVersion: number | null; record?: string; repeated?: boolean; rows?: number }
+    auditTrail?: { formVersion: number | null; record?: string; repeated?: boolean; rows?: number; moved?: boolean | null }
   }
 }
 
@@ -125,6 +126,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
         outcome: trail.repeated === true ? 'repeated' : base.outcome,
         record: recordReference(key, trail.record),
         rows: base.operation === 'export' ? (trail.rows ?? 0) : null,
+        moved: trail.repeated === true ? null : (trail.moved ?? null),
       }
     },
   })

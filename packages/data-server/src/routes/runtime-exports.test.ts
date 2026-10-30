@@ -912,6 +912,7 @@ describe('the export route', () => {
         outcome: 'ok',
         record: null,
         rows: 2,
+        moved: null,
       },
       {
         at: '2026-10-17T12:00:00.000Z',
@@ -924,6 +925,7 @@ describe('the export route', () => {
         outcome: 'operation-denied',
         record: null,
         rows: 0,
+        moved: null,
       },
       {
         at: '2026-10-17T12:00:00.000Z',
@@ -936,6 +938,7 @@ describe('the export route', () => {
         outcome: 'not-filterable',
         record: null,
         rows: 0,
+        moved: null,
       },
     ])
     expect(JSON.stringify(events)).not.toMatch(/Muster|k1:|"name"|filter-marker|98765|notes/)

@@ -107,7 +107,17 @@ export { codecFor } from './codecs/codec.js'
 export type { ApiValue, Codec, CodecOutcome } from './codecs/codec.js'
 export { canonicalFloat32 } from './codecs/numbers.js'
 export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
-export { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter, throughFilters } from './policy/evaluate.js'
+export {
+  authorizeOperation,
+  checkSubmittedFields,
+  checkTransition,
+  forcedValues,
+  lookupRowFilter,
+  readableFields,
+  rowFilter,
+  stateField,
+  throughFilters,
+} from './policy/evaluate.js'
 export { validatePolicy } from './policy/validate.js'
 export { isThroughKeyType, throughProblems, unscopedLookups } from './policy/through.js'
 export { actsOnDelete, deleteEffects, deleteProblems, deleteReach, deleteReview, grantsDelete, reachOf, reachTables, unaccepted } from './policy/cascades.js'
@@ -130,6 +140,8 @@ export type {
   RowFilterResult,
   RowFilterRule,
   ThroughFilters,
+  TransitionMove,
+  TransitionRule,
 } from './policy/types.js'
 export type {
   DeleteOutcome,
@@ -161,6 +173,7 @@ export type {
   UpdateRequest,
 } from './records/types.js'
 export { planCreate, planRead, planUpdate } from './records/plan.js'
+export type { PlannedMove } from './records/transition.js'
 export { planDelete } from './records/delete.js'
 export { deleteTerms, reachesPast } from './records/delete-terms.js'
 export type { DeleteTerms, ReachTerms } from './records/delete-terms.js'

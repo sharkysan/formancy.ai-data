@@ -183,6 +183,13 @@ existed would be documented and inert.
   route asks the adapter once and never again
   ([0031](../../docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
   A read never answers one; an adapter that reported one for a read is a 500.
+  A create or an update that changes a policy's state field other than by a
+  move listed for one of the person's roles is 403 `transition-denied`
+  before any statement, its sentence naming the field and no state; a move
+  from a record read at a newer version than the update names is left to
+  the version guard, 409 `stale`
+  ([0112](../../docs/decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
+  `routes/runtime-transitions.test.ts` holds what reaches the port.
   `e2e-lost-answer.integration.test.ts` drops the database's answer after the
   commit, on both engines, and fails if the write crosses to the database a
   second time.
@@ -450,7 +457,11 @@ existed would be documented and inert.
   names, so a resend is not counted as a second write (0031). Every runtime
   event carries `rows`: for an `export`, how many records its file held,
   or held when it was refused, 0 before any statement; `null` for every
-  other operation -- a number, never which records (0079).
+  other operation -- a number, never which records (0079). And `moved`: on
+  a create or an update of a form whose policy names a state field's moves,
+  whether the write as planned moves it, `null` otherwise, and for a write
+  refused before it was planned or answered again -- whether, never from
+  where or to where (0112).
 
   On the administrator's plane
   ([0033](../../docs/decisions/0033-the-administrator-plane-is-audited.md))

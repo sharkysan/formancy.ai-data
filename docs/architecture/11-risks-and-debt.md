@@ -61,6 +61,11 @@ One download reads every row a list would show the person
 token can page the list, but a stolen token reads a tenant's rows in one
 request rather than fifty a request, and no policy lets a person browse
 and not download -- only a proxy can drop the route, for everybody.
+A state field's moves hold the runtime plane's writes and nothing else: a
+create that leaves the field to its default, and a write by another
+application or by SQL, move it unchecked, and a move is a pair of values
+with no condition on anything else
+([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
 
 ### Lost updates and ambiguous writes
 
