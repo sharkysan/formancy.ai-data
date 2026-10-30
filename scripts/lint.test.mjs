@@ -29,8 +29,9 @@ import { FILES, prettierConfig } from './code-style/code-style.mjs'
  * file's own content and never another text at its path: on Linux, ESLint
  * linted the file on disk instead of the text given (Formancy Health's CI
  * run 41045406900, 30 October 2026), so a case that edits a repository
- * file's text would pass there having checked nothing. What a rule does to a text is held in
- * code-style.test.mjs, in a repository of real files it writes.
+ * file's text would pass there having checked nothing. What a rule does
+ * to a text is held in code-style.test.mjs, in a repository of real files
+ * it writes.
  *
  * What it cannot see: whether a rule's verdict is right. It holds that a
  * rule runs and fails the build, not that what it reports is a defect.
