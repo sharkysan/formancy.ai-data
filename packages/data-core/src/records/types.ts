@@ -192,6 +192,12 @@ export interface InsertRequest {
   returning: readonly RecordColumn[]
   /** The `definition` of the description this insert was decided over: it runs only while the table still has it (0041). */
   definition: string
+  /**
+   * A form over versions (0113): the chain's key columns, each among
+   * `values`. The insert starts a chain, so it holds only while no row has
+   * these values; otherwise it inserts nothing and is `chain-exists`.
+   */
+  fresh?: readonly string[]
 }
 
 /**
@@ -211,6 +217,41 @@ export interface UpdateRequest {
   through: readonly Through[]
   returning: readonly RecordColumn[]
   /** The `definition` of the description this update was decided over: it runs only while the table still has it (0041). */
+  definition: string
+  /**
+   * A form over versions (0113): the column a version ends at, NULL while it
+   * is open. The update holds only while it is NULL, so a version that has
+   * ended is `version-ended` rather than changed.
+   */
+  open?: string
+}
+
+/**
+ * A change from a date (0113): end the open version `key` names -- set
+ * `ends` to `start`'s value, under everything an update is guarded by and
+ * only while `ends` is NULL -- and insert the next version: the chain's
+ * key copied from the row ended, `start` where it begins, and `values`. One
+ * write that does both or neither, so a chain never has a gap, an overlap
+ * or two open versions made by it. Nothing ended is `stale`, `not-found` or
+ * `version-ended`, as an update's nothing is.
+ */
+export interface SupersedeRequest {
+  target: RecordTarget & { concurrency: RecordConcurrency }
+  key: readonly RecordValue[]
+  expectedVersion: string
+  filters: RowFilters
+  through: readonly Through[]
+  /** The column a version ends at, NULL while it is open. */
+  ends: string
+  /** The column the next version starts at, and where: the ended version's end too. */
+  start: RecordValue
+  /** The chain's key, copied from the row ended into the next version. */
+  chain: readonly RecordColumn[]
+  /** The next version's other values, as a create's: the person's answers and the pinned columns outside the chain's key. */
+  values: readonly RecordValue[]
+  /** What to read back from the next version. */
+  returning: readonly RecordColumn[]
+  /** The `definition` of the description this change was decided over (0041). */
   definition: string
 }
 
@@ -310,10 +351,16 @@ export interface RecordRead {
  * - `unknown-outcome` — the connection failed after a write was sent and
  *   before its result arrived. It may have committed. Never retried
  *   automatically (plan section 12): the host reconciles.
+ * - `version-ended` — an update or a change from a date of a version that
+ *   has ended (0113): its end is no longer NULL. Nothing was written.
+ * - `chain-exists` — a create of a chain's first version where the chain
+ *   already has one (0113). Nothing was written.
  */
 export type RecordFailureCode =
   | 'not-found'
   | 'stale'
+  | 'version-ended'
+  | 'chain-exists'
   | 'unique-violation'
   | 'foreign-key-violation'
   | 'not-null-violation'
@@ -392,6 +439,8 @@ export interface RecordAdapter {
   list(request: ListRequest): Promise<ListOutcome>
   insert(request: InsertRequest): Promise<RecordOutcome>
   update(request: UpdateRequest): Promise<RecordOutcome>
+  /** A change from a date (0113): the next version as read back, or why nothing was ended. */
+  supersede(request: SupersedeRequest): Promise<RecordOutcome>
   /** One record, by its key and the version its person read (0050): one guarded statement, never retried. */
   delete(request: DeleteRequest): Promise<DeleteOutcome>
 }
