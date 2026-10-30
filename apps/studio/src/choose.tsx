@@ -20,6 +20,7 @@ import {
   suggestedDisplay,
   versionCandidates,
 } from './choice.js'
+import { VersionsChoice } from './choose-versions.js'
 
 /** The attribute a newly pinned column is given until somebody types another: the one tenant isolation uses. */
 const DEFAULT_ATTRIBUTE = 'tenant'
@@ -359,6 +360,7 @@ export function ChooseStep({
           <LookupChoices snapshot={snapshot} root={root} choice={choice} onChoice={onChoice} />
           <Pins root={root} rowFilters={rowFilters} onRowFilters={onRowFilters} />
           <VersionColumn root={root} choice={choice} onChoice={onChoice} />
+          <VersionsChoice root={root} choice={choice} onChoice={onChoice} />
           {problems.length === 0 ? null : (
             <div role="alert" className="problem-box">
               <p>The form was not generated:</p>
