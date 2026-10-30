@@ -171,7 +171,8 @@ and the document says what. Three shapes, in order of preference:
    workspace package and when no section links a decision record -- it
    never reads whether a sentence is still true; `scripts/lint.test.mjs`
    fails when a TypeScript or JavaScript file git holds is not linted, has
-   a rule at warn or a recommended rule off beyond a test's relaxations and
+   a rule at warn or a recommended rule off beyond `require-await`, a test's
+   seven relaxations and
    the install fixtures' typed rules, is in no program lint types it with,
    or resolves to another style, and when the format check stops naming a
    misformatted file of an extension git holds (0113). All of them run as

@@ -94,7 +94,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Every request is audited, one event each (0033), by hooks installed before
  * any route, so a route added here without an audit name stops the server.
  */
-// eslint-disable-next-line @typescript-eslint/require-await -- a Fastify plugin is async by contract, and registers its routes by running
 export async function adminRoutes(app: FastifyInstance, options: AdminOptions): Promise<void> {
   const { registry, store } = options
   const admins = new Set(options.adminRoles)

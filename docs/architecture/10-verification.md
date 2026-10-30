@@ -191,7 +191,8 @@ and each of these fails on the change that breaks what it holds:
   doing what it says, on a repository of real files it writes.
   `scripts/lint.test.mjs`: this repository's wiring -- every TypeScript and
   JavaScript file git holds linted by the rules its kind is held to and
-  none at `warn`, in a program lint types it with unless it is an install
+  none at `warn`, `require-await` off in every file and a test's seven
+  relaxations in tests alone, in a program lint types it with unless it is an install
   fixture, and in the shared style, and the format check naming a
   misformatted file of every extension git holds.
   `scripts/prettier-merge.test.mjs`: a merge across the format through

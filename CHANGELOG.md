@@ -389,6 +389,12 @@ later.
   `@formancy/code-style`. Every file was formatted in one commit, which
   `.git-blame-ignore-revs` has blame skip, five files split first so that
   none passes the 600-line budget once formatted, and every finding fixed.
+  A test alone is relaxed in seven rules, `no-explicit-any` among them;
+  `require-await` is off in every file, because an `async` function with
+  no `await` is how a synchronous implementation of an async contract (a
+  test double, a Fastify handler or hook) keeps its throws as rejections,
+  and `no-floating-promises` still catches a forgotten `await`
+  (formancy.ai-health 0017).
   A branch begun before the format takes `main` through
   `scripts/prettier-merge.mjs`, which formats each side of a file before
   git merges it (`CONTRIBUTING.md`). The packages' API is what it was but

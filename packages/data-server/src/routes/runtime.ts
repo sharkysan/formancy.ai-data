@@ -96,12 +96,10 @@ function contextOf(identity: HostIdentity): PolicyContext {
  * policy's, through the planner (0018), and every database answer is the
  * adapter's, through the ports (0015).
  */
-// eslint-disable-next-line @typescript-eslint/require-await -- a Fastify plugin is async by contract, and registers its routes by running
 export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOptions): Promise<void> {
   const { registry, store } = options
   const writes = createWriteOnce()
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- a Fastify hook is async by contract: it ends by resolving
   app.addHook('onRequest', async (request) => {
     request.auditTrail = { formVersion: null }
   })

@@ -100,7 +100,6 @@ export function registry(): ConnectionRegistry {
   return {
     ids: () => [...db.allowlist],
     scope: (id) => (db.allowlist.includes(id) ? { schemas: ['sales'] } : undefined),
-    // eslint-disable-next-line @typescript-eslint/require-await -- a double of an async interface: a throw in it must reject, as the real one's does, and a returning branch must resolve
     open: async (id) => {
       if (!db.allowlist.includes(id)) return undefined
       if (!db.reachable) throw new Error('ECONNREFUSED 10.0.0.5:1433')

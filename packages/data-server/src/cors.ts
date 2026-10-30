@@ -261,7 +261,6 @@ export function crossOrigin(app: FastifyInstance, options: CrossOriginOptions): 
   app.addHook('onRoute', (route) => {
     for (const method of [route.method].flat()) routes.push({ method, url: route.url, constraints: route.constraints })
   })
-  // eslint-disable-next-line @typescript-eslint/require-await -- a Fastify hook that throws refuses the start only as a rejection
   app.addHook('onReady', async () => {
     const problems = routeProblems(routes)
     if (problems.length > 0)

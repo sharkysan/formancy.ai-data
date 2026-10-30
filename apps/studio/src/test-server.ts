@@ -279,7 +279,6 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
   const registry: ConnectionRegistry = {
     ids: () => [...databases.keys()].filter(allowed).sort(),
     scope: (id) => (allowed(id) ? { schemas: [...OWNER_SNAPSHOT.scope.schemas] } : undefined),
-    // eslint-disable-next-line @typescript-eslint/require-await -- a double of an async interface: a throw in it must reject, as the real one's does, and a returning branch must resolve
     open: async (id) => {
       const now = databases.get(id)
       if (now === undefined || !allowed(id)) return undefined
@@ -291,7 +290,6 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
         // The server the snapshot records (0068), as the adapters' ping and
         // discovery read it with one query. Every capture records one; a
         // ping cannot answer for a server nobody recorded.
-        // eslint-disable-next-line @typescript-eslint/require-await -- a double of an async interface: a throw in it must reject, as the real one's does, and a returning branch must resolve
         ping: async () => {
           if (now.server === undefined) throw new Error(`the snapshot of ${id} records no server, so nothing can answer its ping`)
           return { kind: now.kind, version: now.serverVersion, ...now.server }
@@ -301,7 +299,6 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
       }
       // The administrator plane never touches a lookup, and reads records only to browse them (0099), narrowed or not (0103), filtered or not (0104).
       const records = {
-        // eslint-disable-next-line @typescript-eslint/require-await -- a double of an async interface: a throw in it must reject, as the real one's does, and a returning branch must resolve
         list: async (request: ListRequest) => {
           const { schema, name } = request.target.table
           const narrowed = (rows.get(`${schema}.${name}`) ?? []).filter(

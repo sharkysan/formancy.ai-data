@@ -96,8 +96,9 @@ while this was open, and each came into this branch unformatted.
 - **The shared rules, with this repository's paths.** `eslint.config.mjs`
   calls `eslintConfig` from `scripts/code-style/code-style.mjs`, and
   `prettier.config.mjs` exports its `prettierConfig`. The directory, the
-  module and its test, is Formancy Health's at `8931d49`, byte for byte.
-  The rules, the eight relaxations in a test, the style, TypeScript and
+  module and its test, is Formancy Health's at `4f151a2`, byte for byte.
+  The rules, the seven relaxations in a test, `require-await` off in
+  every file, the style, TypeScript and
   JavaScript alone, the ignores and why each is so are formancy.ai-health
   0017's and are not restated here. A rule this repository needed beyond
   them -- a rejection that forwards an `unknown`, an `any` in a test --
@@ -214,6 +215,11 @@ not a habit, and the same in the four repositories.
   above, not measured on CI's runner; and `lint.test.mjs`'s typed cases
   wait up to 60 s, for programs measured at 16.8 s with the file run alone
   and 18.4 s inside `pnpm test:repo` (Apple M2, 30 October 2026).
+- **`require-await` is off everywhere.** A function marked `async` that
+  awaits nothing passes the linter in source and in tests, so one an
+  edit left behind is found by review alone; `no-floating-promises` and
+  `no-misused-promises` still catch a forgotten `await`. The reason, and
+  what it was measured to cost, is formancy.ai-health 0017's.
 - **The relaxations hide an `any` in a test.** A test may read a member a
   value does not have and pass the linter; tsc holds what is typed, and
   nothing holds what is not.
