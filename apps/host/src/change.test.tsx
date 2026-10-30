@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { audit, unnamed } from './test-accessible.js'
-import { answer, chooseForm, chooseRenderer, control, load, loaded, mount, said, save, signIn } from './test-host.js'
+import { chooseForm, chooseRenderer, load, loaded, mount, pane, said, signIn } from './test-host.js'
 import type { User } from './test-host.js'
 import { ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -54,6 +54,10 @@ async function priceOpen(engine: Engine, record: string): Promise<User> {
 
 const changeButton = (): HTMLElement | null => screen.queryByRole('button', { name: 'Change from a date' })
 
+/** The price's React paper, and a control of it by its name: the shared helpers' paper is the order's. */
+const paper = (): HTMLElement => within(pane('React')).getByRole('form', { name: 'Price, React' })
+const control = (name: string): HTMLInputElement => within(paper()).getByLabelText(name, { exact: true }) as HTMLInputElement
+
 describe.each(ENGINES)('a change from a date on $engine', (engine) => {
   // The next version holds the open one's answers but its start, which the
   // person gives, and its end; the chain's key is drawn unwritable. Saved,
@@ -64,15 +68,16 @@ describe.each(ENGINES)('a change from a date on $engine', (engine) => {
     const user = await priceOpen(engine, record)
     await user.click(changeButton() as HTMLElement)
     await screen.findByRole('heading', { level: 3, name: `Next version of ${record}` }, ARRIVES_WITHIN)
-    await waitFor(() => expect(control('React', 'Valid from').value).toBe(''), ARRIVES_WITHIN)
-    expect(control('React', 'Product no').disabled).toBe(true)
-    expect(control('React', 'Valid to').disabled).toBe(true)
+    await waitFor(() => expect(control('Valid from').value).toBe(''), ARRIVES_WITHIN)
+    expect(control('Product no').disabled).toBe(true)
+    expect(control('Valid to').disabled).toBe(true)
     expect(unnamed()).toEqual([])
     expect(await audit()).toEqual([])
 
-    fireEvent.change(control('React', 'Valid from'), { target: { value: '2026-07-01' } })
-    await answer(user, 'React', 'Amount', '10')
-    await save(user, 'React')
+    fireEvent.change(control('Valid from'), { target: { value: '2026-07-01' } })
+    await user.clear(control('Amount'))
+    await user.type(control('Amount'), '10')
+    await user.click(within(paper()).getByRole('button', { name: 'Save' }))
     const next = (await said('React', /^Created record /)).slice('Created record '.length, -1)
     await screen.findByRole('heading', { level: 3, name: `Price ${next}` }, ARRIVES_WITHIN)
 
@@ -93,7 +98,7 @@ describe.each(ENGINES)('a change from a date on $engine', (engine) => {
     if (!changed.ok || changed.value.record === null) throw new Error(`the change was not made: ${changed.ok ? 'no token' : changed.message}`)
     await priceOpen(engine, record)
     expect(changeButton()).toBeNull()
-    expect(control('React', 'Amount').disabled).toBe(true)
+    expect(control('Amount').disabled).toBe(true)
     cleanup()
     await priceOpen(engine, changed.value.record)
     expect(changeButton()).not.toBeNull()
