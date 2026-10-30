@@ -190,6 +190,14 @@ existed would be documented and inert.
   the version guard, 409 `stale`
   ([0112](../../docs/decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
   `routes/runtime-transitions.test.ts` holds what reaches the port.
+  `POST /v1/forms/:id/records/supersede` changes a form over versions from
+  a date: the open version, by its token and the version read, ended where
+  the answers start the next one, and the next inserted, in one write; 201
+  with the next version, 409 `version-ended` for an ended one, and a create
+  of a chain that has a version 409 `chain-exists`. `GET /v1/forms/:id`
+  names the form's `versions` to whoever may change one
+  ([0113](../../docs/decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md)).
+  `routes/runtime-supersede.test.ts` holds what reaches the port.
   `e2e-lost-answer.integration.test.ts` drops the database's answer after the
   commit, on both engines, and fails if the write crosses to the database a
   second time.
