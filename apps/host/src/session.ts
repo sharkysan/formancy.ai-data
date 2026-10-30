@@ -194,9 +194,9 @@ export function createSession({ client, formId, definition, renderer, namespace,
   const sources = lookupSources(client, formId, form, () => state.operation)
 
   /** The fields a next version takes from the one it follows, and its end: never the person's (0115). */
-  const following = form
+  const following = disableFields(form, definition.versions === null ? [] : [...definition.versions.key, definition.versions.to])
   /** Whether `record` is a version that has ended: history, drawn as nothing to write (0113). */
-  const ended = (_record: FormRecord | undefined): boolean => false
+  const ended = (record: FormRecord | undefined): boolean => definition.versions !== null && record !== undefined && (record.answers[definition.versions.to] ?? null) !== null
 
   function open(record?: FormRecord, follows?: SessionState['follows']): FormEngine {
     const token = record?.record ?? undefined
@@ -271,7 +271,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
     const { record, version, follows } = state
     // A next version ends the one it follows and is created in one write (0113).
     const outcome =
-      follows !== undefined && formId === ''
+      follows !== undefined
         ? await client.supersede(formId, { record: follows.record, version: follows.version, answers: sent })
         : record === undefined
           ? await client.create(formId, sent)

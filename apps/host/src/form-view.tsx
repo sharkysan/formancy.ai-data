@@ -509,7 +509,7 @@ export function FormView({
           canDuplicate={copied.length > 0}
           duplicateRef={duplicateButton}
           onDuplicate={() => startCopy('duplicate')}
-          canChange={open?.kind === 'record' && versions !== null && isOpen !== undefined}
+          canChange={open?.kind === 'record' && isOpen(stored, versions)}
           changeRef={changeButton}
           onChange={() => startCopy('change')}
           canDelete={canDelete}
