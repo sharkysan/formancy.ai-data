@@ -22,17 +22,20 @@ import type { DescribedTable, RecordColumn } from './types.js'
  */
 
 /**
- * The fields a version starts and ends at, where the form offers a change
- * from a date (0113), or `null`: what a page needs to offer one. Whether
+ * The fields a version starts and ends at, and those of the chain's key,
+ * where the form offers a change from a date (0113), or `null`: what a
+ * page needs to offer one, and to draw a next version (0115). Whether
  * this person may is the policy's -- create and update -- asked by the
  * caller with the rest of the operations.
  */
-export function versionFields(bindings: FormBindings): { from: string; to: string } | null {
+export function versionFields(bindings: FormBindings): { from: string; to: string; key: string[] } | null {
   const validity = bindings.validity
   if (validity === undefined || !offers(bindings, 'supersede')) return null
   const from = fieldOf(bindings, validity.from)
   const to = fieldOf(bindings, validity.to)
-  return from === undefined || to === undefined ? null : { from, to }
+  // The chain's key by the fields that hold it, each once: a lookup holds several of its columns.
+  const key = [...new Set(validity.key.flatMap((column) => fieldOf(bindings, column) ?? []))]
+  return from === undefined || to === undefined ? null : { from, to, key }
 }
 
 /** The field that stands for a column, if the form has one. */

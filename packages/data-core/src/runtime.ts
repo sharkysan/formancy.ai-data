@@ -125,7 +125,9 @@ export interface Deleting {
  * `create`, and `null` otherwise (0107). `versions` is the fields a version
  * starts and ends at where the form's rows are versions of one thing and
  * this person may change the open one from a date -- `operations` holds
- * both `create` and `update` -- and `null` otherwise (0113).
+ * both `create` and `update` -- and `null` otherwise (0113); with `key`,
+ * the fields of the chain's key, which a next version takes from the one
+ * it follows, so a page draws them unwritable (0115).
  */
 export interface PublishedForm {
   form: FormSchema
@@ -134,7 +136,7 @@ export interface PublishedForm {
   list: ListColumns | null
   deleting: Deleting | null
   copied: string[] | null
-  versions: { from: string; to: string } | null
+  versions: { from: string; to: string; key: string[] } | null
 }
 
 /**

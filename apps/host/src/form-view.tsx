@@ -13,79 +13,30 @@ import type { DeleteTarget } from './deletion.js'
 import { Detail } from './detail.js'
 import type { MasterOpen } from './detail.js'
 import { copiedLine, copyOf, leftOut } from './duplicate.js'
+import { FormHead } from './form-head.js'
 import { DrillLevel } from './drill-level.js'
 import { columnsOf } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
 import { paneEntry, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
 import type { Said } from './leave.js'
-import { LAYOUTS } from './layout.js'
 import type { Layout, View } from './layout.js'
 import { OneChild } from './one-child.js'
 import { useOpening } from './opening.js'
-import { operationTags } from './operations.js'
 import { renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
 import { DELETE_COLUMN } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
 import { Records } from './records.js'
 import { sectionShown } from './section.js'
-import { Segmented, focusChoice } from './segmented.js'
+import { focusChoice } from './segmented.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
 import { Split } from './split.js'
 import { Trail } from './trail.js'
 import { useDrill } from './use-drill.js'
 
-const LAYOUT_LABELS: Readonly<Record<Layout, string>> = { 'side-by-side': 'Side by side', stacked: 'Stacked', separate: 'Separate views', drill: 'Drill down' }
-
 const DISCARDED: Said = ['Discarded the unsaved changes. ']
-
-/**
- * The open form's header (UX-SPEC §5.5, §5.6): its heading, which names
- * main, what this person may do with it as tags -- a fill and no border, so
- * they are never taken for buttons -- and the Layout group, which says so
- * when the window draws Side by side stacked.
- */
-function FormHead({
-  title,
-  formId,
-  operations,
-  layout,
-  note,
-  headingRef,
-  onLayout,
-}: {
-  title: string
-  formId: string
-  operations: PublishedForm['operations']
-  layout: Layout
-  note: boolean
-  headingRef: RefObject<HTMLHeadingElement | null>
-  onLayout: (layout: Layout) => void
-}): ReactElement {
-  return (
-    <div className="form-head">
-      <div className="form-id">
-        <h2 id="form-heading" className="form-title" tabIndex={-1} ref={headingRef}>
-          <span>{title}</span> <code>{formId}</code>
-        </h2>
-        <ul className="ops" aria-label="Operations">
-          {operationTags(operations).map((tag) => (
-            <li key={tag}>{tag}</li>
-          ))}
-        </ul>
-      </div>
-      <Segmented legend="Layout" name="layout" className="layout" options={LAYOUTS.map((value) => ({ value, label: LAYOUT_LABELS[value] }))} value={layout} onChange={onLayout} describedBy={note ? 'layout-note' : undefined}>
-        {note ? (
-          <p className="hint layout-note" id="layout-note">
-            In a window this narrow, Side by side is drawn stacked.
-          </p>
-        ) : null}
-      </Segmented>
-    </div>
-  )
-}
 
 /**
  * One open form (0047): its header -- the title and id, what this person
