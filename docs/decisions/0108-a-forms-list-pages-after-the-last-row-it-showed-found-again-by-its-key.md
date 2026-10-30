@@ -38,8 +38,11 @@
   request at the offset that reaches that page reads 50,052; on PostgreSQL
   by an Index Only Scan and an Index Scan of `pk_customer` from the row,
   serially, on SQL Server by Clustered Index Seeks; the counts from
-  `sizedListPage()` in `@formancy/data-fixtures` (watched failing on both
-  with the tenant compared in the seek too: 50,053).
+  `sizedListPage()` in `@formancy/data-fixtures`, each one more on
+  PostgreSQL 15, whose window reads a row past the page
+  (`VERSION_FACTS.windowReadsAhead`, measured on 15, 16 and 18), and the
+  same on SQL Server 2019 and 2025, the matrix's other legs (watched
+  failing on both with the tenant compared in the seek too: 50,053).
   `packages/data-core/src/records/list-terms.test.ts` -- the key a page
   continues after is every identity column in order, spelled as it holds
   it, never beside an offset; the seek is the order less every column the
@@ -195,7 +198,9 @@ thousand and one first -- with `lookups-sized.integration.test.ts` on
 default `postgres:17-alpine` and `mcr.microsoft.com/mssql/server:2022-latest`:
 tenant 1's page after its 50,001st customer in key order reads 52 rows of
 the table on both engines, one to find the row and 51 for the page and its
-extra row; the same request at an offset of 50,001 reads 50,052. Rows read
+extra row; the same request at an offset of 50,001 reads 50,052. On
+PostgreSQL 15 each count is one more: its window reads a row past the
+page before it stops, which 16 and later do not. Rows read
 are counted by each engine's actual plan, as 0034 counts a lookup's, not
 timed; a count does not depend on the machine. And no row inserted or
 deleted before a page moves it: the grid's Next is the rows after the last

@@ -289,7 +289,8 @@ describe('a page of the sized customers deep in key order (0108)', () => {
   // that row: the row found by its key, then the page and its extra row --
   // whatever the page's depth. The same request at the offset that reaches
   // the same page, as a list was paged before 0108, reads every row of the
-  // tenant before it and discards them. Serially, so each count is exact.
+  // tenant before it and discards them. Serially, so each count is exact;
+  // on PostgreSQL 15 each is one more, its window reading past the page.
   // Watched failing with the tenant compared in the seek too: the page read
   // the tenant's rows from the first to the anchor, as the offset does.
   test('reads the row it continues after and the page, where the offset reads every row before it', async () => {
@@ -307,6 +308,8 @@ describe('a page of the sized customers deep in key order (0108)', () => {
     expect(recordPage(bindings, plan, offset.answer.rows).rows.map((row) => row.answers['customer_no'])).toEqual(deep.page)
     const atOffset = await explain(offset.statement, 'serial')
     console.log(`a page after the ${String(deep.before)}th customer: read ${String(rowsRead(after).read)} by ${JSON.stringify(customerScans(after).map((node) => `${node['Node Type']} ${String(node['Index Name'])} ${String(node['Index Cond'])}`))}; at the offset, read ${String(rowsRead(atOffset).read)} by ${JSON.stringify(customerScans(atOffset).map((node) => `${node['Node Type']} ${String(node['Index Name'])} ${String(node['Index Cond'])}`))}`)
-    expect({ after: rowsRead(after).read, offset: rowsRead(atOffset).read }).toEqual(deep.read)
+    // PostgreSQL 15's window reads one row past the page and its extra row, under either way (VERSION_FACTS.windowReadsAhead).
+    const ahead = versionFact('windowReadsAhead', fixture.server) ? 1 : 0
+    expect({ after: rowsRead(after).read, offset: rowsRead(atOffset).read }).toEqual({ after: deep.read.after + ahead, offset: deep.read.offset + ahead })
   })
 })

@@ -383,8 +383,10 @@ A page of records deep in key order is held the same way (0108): tenant
 Only Scan of `pk_customer` finding the row it continues after and an Index
 Scan from that row for the page and its extra row, where the same request
 at an offset of 50,001 reads 50,052; serially, the counts `sizedListPage()`
-of `@formancy/data-fixtures`, which the SQL Server suite pins too. Measured
-on 2026-10-30; a count, not a time.
+of `@formancy/data-fixtures`, which the SQL Server suite pins too, each one
+more on PostgreSQL 15, whose window reads a row past the page
+(`VERSION_FACTS.windowReadsAhead`). Measured on 2026-10-30; a count, not a
+time.
 
 ### When a lookup is abandoned, or its deadline passes
 
