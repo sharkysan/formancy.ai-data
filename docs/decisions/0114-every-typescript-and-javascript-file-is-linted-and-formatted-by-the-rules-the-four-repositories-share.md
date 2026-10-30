@@ -1,4 +1,4 @@
-# 0113 — Every TypeScript and JavaScript file is linted and formatted by the rules the four formancy repositories share, a copy of Formancy Health's until formancy.ai publishes them, and `verify` fails a change that breaks either; the change merges with a merge commit, so that blame can skip the format
+# 0114 — Every TypeScript and JavaScript file is linted and formatted by the rules the four formancy repositories share, a copy of Formancy Health's until formancy.ai publishes them, and `verify` fails a change that breaks either; the change merges with a merge commit, so that blame can skip the format
 
 - **Status:** accepted; narrows [0002](0002-depend-on-upstream-never-copy-it.md): its wait for a release, for the lint and format rules, which are a byte-for-byte copy of Formancy Health's until formancy.ai releases them as `@formancy/code-style`, and go when this repository pins it
 - **Date:** 2026-10-30
@@ -98,12 +98,11 @@ while this was open, and each came into this branch unformatted.
   `prettier.config.mjs` exports its `prettierConfig`. The directory, the
   module and its test, is Formancy Health's at `4f151a2`, byte for byte.
   The rules, the seven relaxations in a test, `require-await` off in
-  every file, the style, TypeScript and
-  JavaScript alone, the ignores and why each is so are formancy.ai-health
-  0017's and are not restated here. A rule this repository needed beyond
-  them -- a rejection that forwards an `unknown`, an `any` in a test --
-  went into Health's module first and was copied, so the copies stay one
-  set of rules.
+  every file, the style, TypeScript and JavaScript alone, the ignores and
+  why each is so are formancy.ai-health 0017's and are not restated here.
+  A rule this repository needed beyond them -- a rejection that forwards
+  an `unknown`, an `any` in a test -- went into Health's module first and
+  was copied, so the copies stay one set of rules.
 - **This repository's paths**, held by `scripts/lint.test.mjs`:
   - `project`, the tsconfigs lint types with: `./packages/*/tsconfig.json`
     and `./apps/*/tsconfig.json` by glob, so a new package or app is

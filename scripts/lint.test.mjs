@@ -27,9 +27,9 @@ import { FILES, prettierConfig } from './code-style/code-style.mjs'
  * file added, a rule a set adds, a relaxation or a warning anywhere is
  * seen without an edit here. The one case that lints hands ESLint a
  * file's own content and never another text at its path: on Linux, ESLint
- * linted the file on disk instead of the text given (CI run 41045406900,
- * 30 October 2026), so a case that edits a repository file's text would
- * pass there having checked nothing. What a rule does to a text is held in
+ * linted the file on disk instead of the text given (Formancy Health's CI
+ * run 41045406900, 30 October 2026), so a case that edits a repository
+ * file's text would pass there having checked nothing. What a rule does to a text is held in
  * code-style.test.mjs, in a repository of real files it writes.
  *
  * What it cannot see: whether a rule's verdict is right. It holds that a
@@ -51,7 +51,7 @@ const TEST = /\.(test|spec)(\.[cm]?[jt]sx?)$/
 /** The install fixtures, which import the packed tarballs and are linted without types. */
 const UNTYPED = 'scripts/install-fixture/'
 
-/** What the shared rules relax in a test, and nothing else (0113). */
+/** What the shared rules relax in a test, and nothing else (0114). */
 const RELAXED_IN_TESTS = [
   '@typescript-eslint/no-unsafe-assignment',
   '@typescript-eslint/no-unsafe-member-access',
@@ -62,7 +62,11 @@ const RELAXED_IN_TESTS = [
   '@typescript-eslint/no-explicit-any',
 ]
 
-/** What 0017 turns off in every file: a synchronous implementation of an async contract keeps its throws as rejections by being `async`. */
+/**
+ * What the shared rules turn off in every file (formancy.ai-health 0017,
+ * 0114): a synchronous implementation of an async contract keeps its
+ * throws as rejections by being `async`.
+ */
 const OFF_EVERYWHERE = ['@typescript-eslint/require-await']
 
 const HOOKS = ['react-hooks/rules-of-hooks', 'react-hooks/exhaustive-deps']
@@ -131,8 +135,8 @@ describe('the linter', TYPED, () => {
   // error, its typed half off only in the install fixtures, which differ
   // from a package's source by that half and nothing else; JavaScript to
   // the sets' rules that need no types; a test to its source's rules but
-  // the seven relaxations, and `require-await` off in every file; and a file of a workspace that declares React to
-  // the hooks rules.
+  // the seven relaxations; `require-await` off in every file; and a file of
+  // a workspace that declares React to the hooks rules.
   test('every TypeScript and JavaScript file git holds is linted, by the rules its kind is held to', async () => {
     expect(scripts.lint).toBe('eslint .')
     const recommended = {

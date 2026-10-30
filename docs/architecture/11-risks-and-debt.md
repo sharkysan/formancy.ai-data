@@ -480,7 +480,7 @@ swap pins the package exactly as a root devDependency, deletes the copy,
 has the two config files import the package, and extends
 [`upstream-deps.mjs`](../../scripts/upstream-deps.mjs) to the root
 manifest, which holds no `@formancy/*` dependency until then
-([0113](../decisions/0113-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+([0114](../decisions/0114-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 
 The README's *Status* paragraph names what is not there yet: figures for a
 page of records, the menu of forms and a delete; a host page on another
@@ -604,7 +604,7 @@ beside a squash and a rebase and nothing makes it choose. A branch begun
 before the format conflicts with it; `scripts/prettier-merge.mjs`, run
 from a checkout of main, merges main into it with each side formatted
 first, and what both sides changed is still the branch's to resolve
-([0113](../decisions/0113-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+([0114](../decisions/0114-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 
 **The 0.1.0 release notes are a summary written by hand**; why each change
 before it was made is in `CHANGELOG.md`, and nothing checks that the summary

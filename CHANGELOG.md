@@ -378,7 +378,7 @@ later.
   server whether it can write its own code and runs the image on a read-only
   root, and the live demo's gate asks its image the same. Found by the
   formancy.ai-report repository's review of its own server.
-- **CI fails a change that breaks the lint rules or the format** (0113).
+- **CI fails a change that breaks the lint rules or the format** (0114).
   Why: style was held by habit, and a promise nobody awaits, an `any` from
   a parse or an object printed as "[object Object]" by nobody; the linter
   found two such defects here, fixed below. `verify` now runs `pnpm lint`,

@@ -21,7 +21,7 @@ Three things follow, and each has a guard:
   `@formancy/code-style`, called with this repository's paths by
   `eslint.config.mjs`. A rule changes in Health's first and is copied here,
   never changed here alone, and the copy goes when this repository pins the
-  package ([0113](docs/decisions/0113-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+  package ([0114](docs/decisions/0114-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 - **Every package declares the source-available licence**, never Apache-2.0.
   `scripts/verify-licenses.mjs` refuses a manifest that says otherwise and a
   tarball without `LICENSE.md` and `NOTICE`. The realistic mistake is a
@@ -171,11 +171,11 @@ and the document says what. Three shapes, in order of preference:
    workspace package and when no section links a decision record -- it
    never reads whether a sentence is still true; `scripts/lint.test.mjs`
    fails when a TypeScript or JavaScript file git holds is not linted, has
-   a rule at warn or a recommended rule off beyond `require-await`, a test's
-   seven relaxations and
-   the install fixtures' typed rules, is in no program lint types it with,
-   or resolves to another style, and when the format check stops naming a
-   misformatted file of an extension git holds (0113). All of them run as
+   a rule at warn or a recommended rule off beyond `require-await`, a
+   test's seven relaxations and the install fixtures' typed rules, is in no
+   program lint types it with, or resolves to another style, and when the
+   format check stops naming a misformatted file of an extension git holds
+   (0114). All of them run as
    `pnpm test:repo`, and CI runs that — **a guard that is not a gate is a
    comment.**
 3. **Measure it.** Below.
@@ -351,7 +351,7 @@ Not a generated name: the branch is what a reviewer sees first.
 No stacked pull requests. Branch from `main`, target `main`, and where a branch
 replaces another say "supersedes #N" in the description rather than stacking.
 
-A branch begun before 0113's format conflicts with it nearly everywhere it
+A branch begun before 0114's format conflicts with it nearly everywhere it
 changed a line. Take `main` into it with `node scripts/prettier-merge.mjs
 main`, run from a checkout of `main` with its dependencies installed, as
 `CONTRIBUTING.md` shows: each side is formatted before git merges a file,
@@ -447,7 +447,7 @@ pnpm --filter @formancy/data-core exec vitest run -t "a test's name"       # one
 Run `pnpm format` before committing, and `pnpm lint` after `pnpm build`,
 since the type-aware rules read the built declarations: `verify` fails a
 TypeScript or JavaScript file that Prettier would write otherwise or that
-breaks a lint rule (0113). A finding is fixed, not disabled; a disable
+breaks a lint rule (0114). A finding is fixed, not disabled; a disable
 comment is for a finding that is deliberate, and says why after `--`.
 
 In the packages, a file that starts containers is named

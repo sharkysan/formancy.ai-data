@@ -7,7 +7,7 @@ import * as prettier from 'prettier'
 import { EXTENSIONS } from './code-style/code-style.mjs'
 
 /**
- * A merge across the format (0113): git's merge, with every TypeScript and
+ * A merge across the format (0114): git's merge, with every TypeScript and
  * JavaScript file both sides changed merged by a driver that formats each
  * of its three versions -- the common ancestor, ours and theirs -- in this
  * repository's style before `git merge-file` merges them. The format

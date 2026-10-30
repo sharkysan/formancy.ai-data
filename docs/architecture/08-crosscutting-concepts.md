@@ -479,7 +479,7 @@ format, `scripts/code-style/`, Formancy Health's byte for byte, which is
 what formancy.ai will publish as `@formancy/code-style` for the four
 repositories. A rule changes there first and is copied here, and the copy
 goes when this repository pins the package
-([0113](../decisions/0113-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+([0114](../decisions/0114-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 
 **What it costs.** A generic improvement waits for another repository's
 release. For an adopted release's first day, only the bump's own review

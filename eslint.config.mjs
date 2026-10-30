@@ -4,7 +4,7 @@ import { eslintConfig } from './scripts/code-style/code-style.mjs'
  * The repository's lint rules: the four formancy repositories' shared ones,
  * `scripts/code-style/code-style.mjs`, a copy of what formancy.ai will
  * publish as `@formancy/code-style` until this repository pins it, given
- * Formancy Data's paths (0113). `scripts/lint.test.mjs` holds what is passed
+ * Formancy Data's paths (0114). `scripts/lint.test.mjs` holds what is passed
  * here.
  */
 export default eslintConfig({
