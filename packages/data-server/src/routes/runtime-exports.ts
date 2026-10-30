@@ -1,4 +1,4 @@
-import { EXPORT_MAX_BYTES, exportColumns, exportFileName, exportHeader, exportRecord, LIST_PAGE_SIZE, planList, recordPage, validateExportQuery } from '@formancy/data-core'
+import { cursorRefusal, decodeListCursor, EXPORT_MAX_BYTES, exportColumns, exportFileName, exportHeader, exportRecord, LIST_PAGE_SIZE, planList, recordPage, validateExportQuery } from '@formancy/data-core'
 import type { ExportColumns, ExportLabels, FormRecord, ListRequest, RuntimeRefusal } from '@formancy/data-core'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
@@ -35,7 +35,7 @@ interface Making {
   request: ExportRequest
   bundle: PublishedBundle
   open: OpenConnection
-  /** The first page's request; every page is it at the next offset. */
+  /** The first page's request; every page is it after the last row of the one before (0108). */
   first: ListRequest
   fields: string[]
   columns: ExportColumns
@@ -108,13 +108,14 @@ async function labelsOf(steps: ExportRouteSteps, making: Making, rows: readonly 
 }
 
 /**
- * The whole file, page after page: each page the list's own request at the
- * next offset, one guarded statement (0015), decided over the description
+ * The whole file, page after page: each page the list's own request after
+ * the last row of the one before, as a grid asks for it by the page's
+ * `next` (0108), one guarded statement (0015), decided over the description
  * it carried as a list page is (0041, 0044), then its labels, then each
  * record written and counted. Refused at the first thing that stops it,
- * with nothing of what was written: a byte past `EXPORT_MAX_BYTES`, a key
- * already written -- the rows moved between two statements -- or text a
- * CSV file cannot carry.
+ * with nothing of what was written: a byte past `EXPORT_MAX_BYTES`, the row
+ * a page continues after gone or a key already written -- the rows moved
+ * between two statements -- or text a CSV file cannot carry.
  *
  * A record is known again by its key's values as the page read them, not
  * by its token: a key that needs more characters as a token than a token
@@ -127,16 +128,19 @@ async function made(steps: ExportRouteSteps, making: Making, header: string): Pr
   const { request, bundle, open, columns } = making
   const parts = [header]
   let bytes = Buffer.byteLength(header, 'utf8')
-  const key = making.first.target.identity.map((column) => column.name)
+  const identity = making.first.target.identity
+  const key = identity.map((column) => column.name)
   const written = new Set<string>()
-  for (let offset = 0; ; offset += LIST_PAGE_SIZE) {
+  let after: ListRequest['after'] = null
+  for (;;) {
     const halted = stopped(making)
     if (halted !== undefined) return halted
-    const outcome = await open.records.list({ ...making.first, offset })
+    const outcome = await open.records.list({ ...making.first, after })
     if (!outcome.ok) return stop(await steps.unread(request, bundle, open, outcome, 'list'))
     const drifted = steps.undecided(request, bundle, outcome.described, 'list')
     if (drifted !== undefined) return stop(drifted)
-    const page = recordPage(bundle.bindings, making.fields, outcome.rows, LIST_PAGE_SIZE)
+    if (cursorRefusal(outcome) !== undefined) return stop(MOVED)
+    const page = recordPage(bundle.bindings, { request: making.first, fields: making.fields }, outcome.rows)
     const labelled = await labelsOf(steps, making, page.rows)
     if (!labelled.ok) return labelled
     for (const [index, record] of page.rows.entries()) {
@@ -151,7 +155,11 @@ async function made(steps: ExportRouteSteps, making: Making, header: string): Pr
       parts.push(line.text)
       if (request.auditTrail !== undefined) request.auditTrail.rows = (request.auditTrail.rows ?? 0) + 1
     }
-    if (!page.hasMore) return { ok: true, text: parts.join('') }
+    if (page.next === null) return { ok: true, text: parts.join('') }
+    // The page's own cursor, read back as the next request carries it: the one spelling of where a page ends.
+    const next = decodeListCursor(identity, page.next)
+    if (!next.ok) throw new Error(`A page's own cursor did not read back: ${next.message}`)
+    after = next.key
   }
 }
 
@@ -172,9 +180,10 @@ async function made(steps: ExportRouteSteps, making: Making, header: string): Pr
  * Buffered, never streamed: the file is answered 200 only once it is
  * whole, with its length, and anything that stops it is a JSON refusal
  * with its own code -- so no truncated file is ever sent. Not a snapshot:
- * each page is its own statement, and a row deleted meanwhile before the
- * offset is skipped, unseen; a record that would appear twice refuses the
- * file. A page refused for drift is said in the log as a list, the
+ * each page is its own statement, after the last row of the one before
+ * (0108), so a row inserted or deleted before that one meanwhile moves
+ * nothing; that row deleted, or a record that would appear twice -- one
+ * whose order moved past it -- refuses the file as moved. A page refused for drift is said in the log as a list, the
  * decision it is; the audit names the request `export`, with the records
  * written and nothing the person sent (0023).
  */
@@ -189,7 +198,7 @@ export function registerExportRoute(app: FastifyInstance, steps: ExportRouteStep
     const bundle = await steps.published(request.params.id, reply)
     if (bundle === undefined) return reply
     const context = steps.context(request)
-    const plan = planList(bundle.snapshot, bundle.bindings, bundle.policy, context, { ...query.query, offset: 0, limit: LIST_PAGE_SIZE })
+    const plan = planList(bundle.snapshot, bundle.bindings, bundle.policy, context, { ...query.query, after: null, limit: LIST_PAGE_SIZE })
     if (!plan.ok) return steps.answered(reply, planRefusal(plan.code, plan.message))
     const columns = exportColumns(bundle.form, bundle.bindings, plan.fields)
     const header = exportHeader(columns)

@@ -1,6 +1,6 @@
 import type { ApiValue } from '../codecs/codec.js'
 import { decodeKeyToken, encodeKeyToken } from '../lookup/token.js'
-import type { KeyTokenErrorCode } from '../lookup/token.js'
+import type { KeyTokenDecoding, KeyTokenErrorCode } from '../lookup/token.js'
 import type { LookupKeyColumn } from '../lookup/types.js'
 import { isKeyValue, isLookupKeyType } from '../lookup/values.js'
 import type { InsertRequest, RecordColumn, RecordValue } from './types.js'
@@ -48,6 +48,14 @@ function refuse(code: RecordTokenErrorCode, message: string): RecordTokenRefusal
  * A number is refused too, because a canonical key value is text (0008).
  */
 export function recordToken(identity: readonly string[], values: Readonly<Record<string, ApiValue>>): RecordTokenEncoding {
+  const key = keyText(identity, values)
+  if (!key.ok) return key
+  const encoded = encodeKeyToken(key.values)
+  return encoded.ok ? encoded : refuse(encoded.code, encoded.message)
+}
+
+/** A record's identity values as a read returned them, each text, in the key's order: what a token and a list's cursor (0108) both spell. */
+export function keyText(identity: readonly string[], values: Readonly<Record<string, ApiValue>>): { ok: true; values: string[] } | RecordTokenRefusal {
   if (identity.length === 0) return refuse('no-value', 'This form identifies no record, so a record has no token.')
   const key: string[] = []
   for (const column of identity) {
@@ -55,8 +63,7 @@ export function recordToken(identity: readonly string[], values: Readonly<Record
     if (typeof value !== 'string') return refuse('no-value', `${column} holds no text, so this record cannot be addressed.`)
     key.push(value)
   }
-  const encoded = encodeKeyToken(key)
-  return encoded.ok ? encoded : refuse(encoded.code, encoded.message)
+  return { ok: true, values: key }
 }
 
 /**
@@ -69,6 +76,15 @@ export function recordToken(identity: readonly string[], values: Readonly<Record
  * engine and a quiet non-match on the other.
  */
 export function decodeRecordKey(identity: readonly RecordColumn[], token: string): RecordKeyDecoding {
+  return identityKey(identity, () => decodeKeyToken(token))
+}
+
+/**
+ * The key `decode` reads for `identity`, each value checked against its
+ * column as `decodeRecordKey` checks a token's: a token and a list's cursor
+ * (0108) name a record by the same rule.
+ */
+export function identityKey(identity: readonly RecordColumn[], decode: () => KeyTokenDecoding): RecordKeyDecoding {
   if (identity.length === 0) return refuse('not-addressable', 'This form identifies no record, so no token can name one.')
   const columns: LookupKeyColumn[] = []
   for (const column of identity) {
@@ -78,7 +94,7 @@ export function decodeRecordKey(identity: readonly RecordColumn[], token: string
     columns.push({ name: column.name, type: column.type })
   }
 
-  const decoded = decodeKeyToken(token)
+  const decoded = decode()
   if (!decoded.ok) return decoded
   if (decoded.values.length !== columns.length) {
     return refuse('wrong-length', `This token holds ${String(decoded.values.length)} values, and a record of this form is named by ${String(columns.length)}.`)

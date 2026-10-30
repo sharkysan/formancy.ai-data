@@ -24,6 +24,7 @@ const REQUEST: ListRequest = {
     { column: 'notes', direction: 'desc', nulls: 'last' },
     { column: 'id', direction: 'asc', nulls: null },
   ],
+  after: null,
   offset: 50,
   limit: 50,
 }
@@ -40,6 +41,7 @@ describe('listTerms', () => {
       filter: [],
       search: { text: 'Muster', columns: [{ name: 'status', type: text(20) }] },
       sort: REQUEST.sort,
+      after: null,
       offset: 50,
       limit: 50,
     })
@@ -160,6 +162,55 @@ describe('listTerms', () => {
       expect(() => listTerms(altered({ filter })), JSON.stringify(filter)).toThrow(/A list request/)
     }
     expect(() => listTerms(altered({ filter: undefined }))).toThrow(/A list request/)
+  })
+
+  // A page after a row (0108) compares each row with that row by the
+  // order's columns, less those the scope holds to one value: the trusted
+  // filter's tenant, the parent's customer, a person's equals. Every row
+  // the page could hold ties with that row there, so leaving them out
+  // changes no answer, and a key led by the tenant becomes a range of its
+  // second column. Watched failing with every column kept: the seek held
+  // tenant_id and customer_no.
+  test('reads the key a page continues after, and compares by the columns the scope does not hold', () => {
+    const sort = [
+      { column: 'tenant_id', direction: 'asc', nulls: null },
+      { column: 'customer_no', direction: 'desc', nulls: null },
+      { column: 'status', direction: 'asc', nulls: null },
+      { column: 'notes', direction: 'desc', nulls: 'last' },
+      { column: 'id', direction: 'asc', nulls: null },
+    ]
+    const filter = [
+      { op: 'equals', column: 'status', type: text(20), value: 'placed' },
+      { op: 'null', column: 'notes' },
+    ]
+    const read = listTerms(altered({ sort, filter, offset: 0, after: [{ name: 'id', type: INT64, value: '9007199254740993' }] }))
+    expect(read.after).toEqual({
+      key: [{ name: 'id', type: INT64, value: '9007199254740993' }],
+      seek: [
+        { column: 'notes', direction: 'desc', nulls: 'last' },
+        { column: 'id', direction: 'asc', nulls: null },
+      ],
+    })
+    expect(read.sort).toEqual(sort)
+    expect(listTerms(altered({ offset: 0 })).after).toBeNull()
+  })
+
+  // The key is bound as its column's type and compared with that row's own;
+  // one not of the identity, or spelled otherwise, would find another row on
+  // one engine and fail on the other. An offset beside it would skip rows
+  // past the place the page starts at.
+  test('refuses a key to continue after that is not the identity, spelled as it holds it, or one beside an offset', () => {
+    for (const after of [
+      [],
+      [{ name: 'id', type: INT64, value: '007' }],
+      [{ name: 'id', type: INT64, value: 7 }],
+      [{ name: 'notes', type: INT64, value: '7' }],
+      [{ name: 'id', type: INT64, value: '7' }, { name: 'id', type: INT64, value: '8' }],
+      'k1:7',
+    ]) {
+      expect(() => listTerms(altered({ offset: 0, after })), JSON.stringify(after)).toThrow(/continues after/)
+    }
+    expect(() => listTerms(altered({ offset: 50, after: [{ name: 'id', type: INT64, value: '7' }] }))).toThrow(/either after a key or at an offset/)
   })
 
   // The filters and throughs are read as for every other request: a list

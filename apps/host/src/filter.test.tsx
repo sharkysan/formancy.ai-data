@@ -134,9 +134,9 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
 
     const sent = listsSent(plane.sent, engine.formId)
     expect(sent.map(({ body }) => body.filter)).toEqual([filter.slice(0, 1), filter])
-    expect(sent.map(({ body }) => Object.keys(body).sort())).toEqual(sent.map(() => ['filter', 'limit', 'offset', 'parent', 'search', 'sort']))
+    expect(sent.map(({ body }) => Object.keys(body).sort())).toEqual(sent.map(() => ['after', 'filter', 'limit', 'parent', 'search', 'sort']))
     // Each a new list, from its first row.
-    expect(sent.map(({ body }) => body.offset)).toEqual([0, 0])
+    expect(sent.map(({ body }) => body.after)).toEqual([null, null])
     for (const { url } of sent) expect(url.toLowerCase()).not.toContain(notes)
   })
 
@@ -154,7 +154,9 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     plane.sent.length = 0
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Next rows' }))
     await says('Records', 'Rows 51–55. Filtered by Notes.')
-    const second = await plane.clerk.list(engine.formId, { filter: [{ field: 'notes', op: 'contains', text: notes }], offset: 50 })
+    const first = await plane.clerk.list(engine.formId, { filter: [{ field: 'notes', op: 'contains', text: notes }] })
+    if (!first.ok) throw new Error(first.message)
+    const second = await plane.clerk.list(engine.formId, { filter: [{ field: 'notes', op: 'contains', text: notes }], after: first.value.next })
     if (!second.ok) throw new Error(second.message)
     expect(recordKeys()).toEqual(second.value.rows.map((row) => String(row.answers['id'])))
     expect(filtersSent(plane.sent, engine.formId)).toEqual([[{ field: 'notes', op: 'contains', text: notes }]])

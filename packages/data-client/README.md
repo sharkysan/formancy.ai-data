@@ -80,8 +80,12 @@ but a date. So is a list without `views`, as from a server older than
 views, or with a view a page could not send: no name, a condition with no
 field or an operator data-core does not name, a direction other than `asc`
 or `desc`, or a `default` other than `true`. `list` sends exactly `search`, `sort`, `parent`,
-`filter`, `offset` and `limit` in a POST body, each left out the server's
-default, so the search and a filter's values are in no URL. `filter` is a
+`filter`, `after` and `limit` in a POST body, each left out the server's
+default, so the search and a filter's values are in no URL. A page
+answers `next`, the cursor of its last row when more follow, which the
+page after it is asked for as `after` (0108); a page without one, from a
+server older than that, is `unexpected`, and a page after a row that is
+gone is refused `cursor-gone`, the first page being where to start again. `filter` is a
 list of `{ field, op, … }`, each field once, every condition holding:
 `{ op: 'equals', value }`, `{ op: 'range', from, to }` with either bound
 `null`, `{ op: 'contains', text }`, `{ op: 'null' }` or

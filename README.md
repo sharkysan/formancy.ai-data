@@ -265,6 +265,11 @@ until then the address is formancy.ai's 404
   [host page](#host-example) draws them in an AG Grid Community grid
   ([0044](./docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md),
   [0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
+  Each page continues after the last row the page before showed, found
+  again by its key in the page's own statement, so a row inserted or
+  deleted before it moves nothing, and a page deep in an order an index
+  serves reads from that row rather than every row before it
+  ([0108](./docs/decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md)).
   Ordered by a uuid key, a list comes in each engine's own order of uuid --
   PostgreSQL's bytes in turn, SQL Server's byte groups -- total and stable on
   both, and not the same
@@ -374,7 +379,8 @@ until then the address is formancy.ai's 404
   ([0050](./docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md));
   performance measured through the shipped server on both engines, for every
   runtime request but a page of records, the menu of forms and a delete, and held in CI by rows read and
-  round trips, never a time
+  round trips, never a time -- a page of records deep in key order held by
+  the rows it reads, untimed
   ([0034](./docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
 - **A host identity key rotates without a restart.** A JSON Web Key Set
   file, each key selected by the `kid` a token names and read again on

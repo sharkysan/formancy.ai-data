@@ -21,7 +21,7 @@ import { AUDITOR, CLERK, ORDER_ID, ORDER_POLICY, ORDER_TOKEN, orderForm, PG } fr
  */
 
 const ORDER = orderForm(PG)
-const EVERYTHING = { search: '', sort: [], parent: null, filter: [], offset: 0, limit: 50 }
+const EVERYTHING = { search: '', sort: [], parent: null, filter: [], after: null, limit: 50 }
 
 /** The fields `planList` lets `who` read, in the bindings' order: what the server hands the export. */
 function readableBy(who: typeof CLERK): string[] {

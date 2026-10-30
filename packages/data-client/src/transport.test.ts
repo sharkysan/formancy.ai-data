@@ -71,6 +71,37 @@ describe('when the data server is not what answers', () => {
     expect(await createDataClient({ token: () => 't', base }).form('pg-order')).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
   })
 
+  // A page's `next` is the cursor the next page is asked for after (0108):
+  // text when more follow, `null` when none do. A page without one -- a
+  // server that paged by offset -- or with one that disagrees with
+  // `hasMore` is not this server's page: a grid would offer Next rows and
+  // have nothing to ask for. Watched failing with `next` left unchecked.
+  test("a page without the server's cursor, or with one that disagrees with hasMore, is unexpected", async () => {
+    let body: unknown
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    for (const page of [
+      { rows: [], hasMore: true },
+      { rows: [], hasMore: false },
+      { rows: [], hasMore: true, next: null },
+      { rows: [], hasMore: true, next: '' },
+      { rows: [], hasMore: false, next: 'c1:7' },
+      { rows: [], hasMore: true, next: 7 },
+    ]) {
+      body = page
+      expect(await client.list('pg-order'), JSON.stringify(page)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
+    for (const page of [
+      { rows: [], hasMore: true, next: 'c1:7' },
+      { rows: [], hasMore: false, next: null },
+    ]) {
+      body = page
+      expect(await client.list('pg-order'), JSON.stringify(page)).toEqual({ ok: true, value: page })
+    }
+  })
+
   // A form's `list` says whether a grid may be offered (0044). A reply
   // without one -- a server older than lists -- is not this server's form:
   // taken for one, `list !== null` would hold for `undefined`, and a host

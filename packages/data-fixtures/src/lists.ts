@@ -51,9 +51,9 @@ const KEY_ORDER = ['1001', '2001', '2002', '2003', '2004', '2005', '2006']
 /**
  * The shared expectations, by case. `listCase(name)` is each one's id.
  *
- * - `pages`: tenant 1's customers in key order, three to a page, from offset
- *   0, one page in, and the last, with whether more follow -- and an offset
- *   past the end, which is an empty page with no more.
+ * - `pages`: tenant 1's customers in key order, three to a page, each page
+ *   asked for after the one before's `next` (0108), with whether more
+ *   follow -- and a page after the last row, which is empty with no more.
  * - `search`: `%`, `_` and `[x]` match themselves: `100%` is not "100 and
  *   anything", `A_B` not "A, a character, B", and `[x]` not SQL Server's
  *   character class, which would find "x Labs".
@@ -77,6 +77,21 @@ const KEY_ORDER = ['1001', '2001', '2002', '2003', '2004', '2005', '2006']
  *   collation folds case -- the fixture's on SQL Server -- and none where it
  *   does not, PostgreSQL's default. Either way it narrows within the rows the
  *   person may read.
+ * - `after`: a page continues after the row the page before ended with
+ *   (0108). Walked a page of two at a time under each of `sorts` -- NULLs
+ *   last both ways, a mixed direction, text in each engine's collation --
+ *   the pages are the one page of every row, in its order, row for row. A
+ *   customer inserted before where the next page starts, or deleted there,
+ *   leaves the next page what it was, where an offset would show a row
+ *   again or skip one. A page after the row the page before ended with,
+ *   once that row is deleted, has no place to start and is refused; so is
+ *   one after tenant 2's customer, which tenant 1 may not read, though it
+ *   is there.
+ * - `collated`: a table the suite creates, whose `label` is a varchar under
+ *   the database's collation -- SQL_Latin1_General_CP1_CI_AS on SQL Server,
+ *   which orders a varchar by that collation's own rules and an nvarchar
+ *   by Unicode's, as `co-op` and `coo` tell apart -- walked a label at a
+ *   time, is the one page of every label, in its order.
  * - `key`: a table the suite creates, whose key is a unique NOT NULL
  *   column, lists in key order; once the column is made nullable and holds a
  *   NULL, and again once its unique key is dropped and a key value is
@@ -86,11 +101,48 @@ const KEY_ORDER = ['1001', '2001', '2002', '2003', '2004', '2005', '2006']
 export const LIST_PARITY = {
   pages: {
     size: 3,
+    /** Each page asked for after the `next` of the one before it, the first after none. */
     pages: [
-      { offset: 0, keys: KEY_ORDER.slice(0, 3), hasMore: true },
-      { offset: 3, keys: KEY_ORDER.slice(3, 6), hasMore: true },
-      { offset: 6, keys: KEY_ORDER.slice(6), hasMore: false },
-      { offset: 7, keys: [], hasMore: false },
+      { keys: KEY_ORDER.slice(0, 3), hasMore: true },
+      { keys: KEY_ORDER.slice(3, 6), hasMore: true },
+      { keys: KEY_ORDER.slice(6), hasMore: false },
+    ],
+    /** The key of the last row, `tenant_id` and `customer_no`: a page after it is empty, with no more. */
+    afterLast: { key: ['1', '2006'], keys: [], hasMore: false },
+  },
+  after: {
+    size: 2,
+    sorts: [
+      [{ field: 'customer_no', direction: 'asc' }],
+      [{ field: 'customer_no', direction: 'desc' }],
+      [{ field: 'credit_limit', direction: 'asc' }],
+      [{ field: 'credit_limit', direction: 'desc' }],
+      [{ field: 'active', direction: 'asc' }, { field: 'credit_limit', direction: 'desc' }],
+      [{ field: 'name', direction: 'asc' }],
+      [{ field: 'name', direction: 'desc' }],
+    ],
+    /** A customer of tenant 1 between 1001 and 2001 in key order, inserted and deleted around a page; no other case lists it. */
+    between: { number: '1500', name: 'Between GmbH' },
+    /** Three in key order, then `between` inserted before where the next page starts: the next is what it was. */
+    inserted: { first: KEY_ORDER.slice(0, 3), next: KEY_ORDER.slice(3, 6) },
+    /** `between` there, three in key order, then `between` deleted: the next starts where the first ended. */
+    deleted: { first: ['1001', '1500', '2001'], next: ['2002', '2003', '2004'] },
+    /** Two in key order, ending on `between`, then `between` deleted: the page after it is refused. */
+    gone: { first: ['1001', '1500'], refused: 'cursor-gone' },
+    /** Tenant 2's customer 1001, `tenant_id` and `customer_no`: there, and not one tenant 1 may read. */
+    theirs: { key: ['2', '1001'], refused: 'cursor-gone' },
+  },
+  collated: {
+    /** `code`, `label`: hyphens, an apostrophe, a space and a capital, which a word sort and a string sort place apart. */
+    rows: [
+      ['1', 'coo'],
+      ['2', 'co-op'],
+      ['3', 'coop'],
+      ['4', "co'op"],
+      ['5', 'co op'],
+      ['6', 'Co-op'],
+      ['7', 'cop'],
+      ['8', 'co-op'],
     ],
   },
   search: [

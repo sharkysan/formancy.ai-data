@@ -260,6 +260,9 @@ export function createDataClient(options: DataClientOptions) {
      * A property left out is the server's default -- no search, the key's
      * order, no parent, no filter, the first page, the largest page -- and
      * exactly the route's keys are sent, whatever else the object carries.
+     * The page after this one is asked for with `after` set to this page's
+     * `next` (0108); a page after a row that is gone is refused
+     * `cursor-gone`, and the first page is where to start again.
      * `filter` is the person's conditions on the fields the form's
      * `list.filterable` offers them on (0104), refused `not-filterable`
      * otherwise. A POST, so the search and a filter's values are never in a
@@ -270,7 +273,7 @@ export function createDataClient(options: DataClientOptions) {
         method: 'POST',
         names: [formId],
         route: ([form]) => `/v1/forms/${String(form)}/records/list`,
-        body: { search: query.search, sort: query.sort, parent: query.parent, filter: query.filter, offset: query.offset, limit: query.limit },
+        body: { search: query.search, sort: query.sort, parent: query.parent, filter: query.filter, after: query.after, limit: query.limit },
         read: (body) => (isRecordList(body) ? body : undefined),
         signal,
       }),

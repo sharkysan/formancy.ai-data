@@ -25,10 +25,10 @@ const CONFIG: LookupConfig = {
   maxPageSize: DEFAULT_MAX_PAGE_SIZE,
 }
 
-/** What each validator made of one search and one page: the trimmed text, or the code it refused with. */
-function bothSay(search: unknown, offset: unknown = 0, limit: unknown = 10): { lookup: string; list: string } {
-  const lookup = validateLookupQuery(CONFIG, { search, offset, limit })
-  const list = validateListQuery({ search, offset, limit })
+/** What each validator made of one search and one page size: the trimmed text, or the code it refused with. A list has no offset (0108); a lookup's is 0. */
+function bothSay(search: unknown, limit: unknown = 10): { lookup: string; list: string } {
+  const lookup = validateLookupQuery(CONFIG, { search, offset: 0, limit })
+  const list = validateListQuery({ search, limit })
   return { lookup: lookup.ok ? `ok:${lookup.query.search}` : lookup.code, list: list.ok ? `ok:${list.query.search}` : list.code }
 }
 
@@ -55,22 +55,19 @@ describe('checkSearch and checkPage, through both validators', () => {
     expect(bothSay(search)).toEqual({ lookup: said, list: said })
   })
 
-  // A page is an OFFSET and a LIMIT on both engines, in a select and in a
-  // grid: one bound, the same refusals. LIST_PAGE_SIZE is a lookup's default
-  // page size so that the bound is one number.
+  // A page's size is a LIMIT on both engines, in a select and in a grid:
+  // one bound, the same refusals. LIST_PAGE_SIZE is a lookup's default page
+  // size so that the bound is one number. Where a page starts differs: a
+  // lookup's at an offset, a list's after a cursor (0108).
   test.each([
-    [0, 1, 'ok:'],
-    [100, LIST_PAGE_SIZE, 'ok:'],
-    [-1, 10, 'offset-out-of-range'],
-    [0.5, 10, 'offset-out-of-range'],
-    [2 ** 53, 10, 'offset-out-of-range'],
-    ['0', 10, 'offset-out-of-range'],
-    [0, 0, 'limit-out-of-range'],
-    [0, 1.5, 'limit-out-of-range'],
-    [0, LIST_PAGE_SIZE + 1, 'limit-out-of-range'],
-    [0, '10', 'limit-out-of-range'],
-  ])('offset %j and limit %j are %s in a lookup and in a list', (offset, limit, said) => {
+    [1, 'ok:'],
+    [LIST_PAGE_SIZE, 'ok:'],
+    [0, 'limit-out-of-range'],
+    [1.5, 'limit-out-of-range'],
+    [LIST_PAGE_SIZE + 1, 'limit-out-of-range'],
+    ['10', 'limit-out-of-range'],
+  ])('a limit of %j is %s in a lookup and in a list', (limit, said) => {
     expect(LIST_PAGE_SIZE).toBe(CONFIG.maxPageSize)
-    expect(bothSay('', offset, limit)).toEqual({ lookup: said, list: said })
+    expect(bothSay('', limit)).toEqual({ lookup: said, list: said })
   })
 })

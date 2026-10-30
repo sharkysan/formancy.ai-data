@@ -320,6 +320,13 @@ not set by `connectSqlServer`), then sends the statement. The measurement's
 counting pass counts it through a TCP hop on every run, and
 [`docs/performance.md`](../../docs/performance.md) has the figures.
 
+A page of records deep in key order is held the same way (0108): tenant
+1's page after its 50,001st customer reads 52 rows of the table, by
+Clustered Index Seeks for the row it continues after and for the page and
+its extra row, where the same request at an offset of 50,001 reads 50,052;
+the counts `sizedListPage()` of `@formancy/data-fixtures`, which the
+PostgreSQL suite pins too. Measured on 2026-10-30; a count, not a time.
+
 ### When a lookup's caller goes
 
 Every lookup method takes the caller's `AbortSignal`, last
@@ -377,7 +384,10 @@ statement is doing, and none of these is a bound.
 `createSqlServerRecords(pool)` reads, inserts, updates and deletes one
 record, and lists a page of records -- one statement, an OUTER APPLY with
 OFFSET and FETCH beside the table's description, a nullable column's NULLs
-placed by a CASE
+placed by a CASE, and for a page after a row (0108) a second OUTER APPLY
+that finds the row by its key, every row compared with it column against
+column, so a `varchar` under a `SQL_` collation is compared by that
+collation's rules, as it is ordered
 ([0015](../../docs/decisions/0015-a-record-operation-is-one-guarded-statement.md),
 [0017](../../docs/decisions/0017-sqlserver-operations.md),
 [0044](../../docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)).
@@ -607,12 +617,13 @@ checked once, by hand, on 2026-10-09, and is not a test.
 
 `pnpm test` starts SQL Server through `@formancy/data-fixtures`, once per
 test file, and runs the suite against it: discovery, the spike, lookups,
-what a lookup reads on the sized customers (0034), a lookup stopped when
+what a lookup and a page of records deep in key order read on the sized
+customers (0034, 0108), a lookup stopped when
 its caller goes (0061), records, a page of them, a page narrowed by a
 person's filter -- each case `COLUMN_FILTER_PARITY`'s, and this engine's
 own `datetime`, `smalldatetime` and `datetime2` at midnight -- and a file
 of the shipments written by data-core (`list.integration.test.ts`, 0044,
-0079, 0104),
+0079, 0104, and paging after a row, 0108),
 the ways a record operation fails, a write whose answer is lost on the way back, and a
 uuid key end to end (`uuid.integration.test.ts`, 0056: discovered, generated
 read-only, its token in lower case, created, updated, listed in this

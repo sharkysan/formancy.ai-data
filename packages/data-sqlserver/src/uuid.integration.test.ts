@@ -125,7 +125,7 @@ const ORDER_POLICY: FormPolicy = {
 const clerk = (tenant: string): PolicyContext => ({ actor: { id: `u-${tenant}`, roles: ['clerk'] }, attributes: { tenant } })
 const CLARA = clerk('1')
 const OTTO = clerk('2')
-const EVERY: RecordListQuery = { search: '', sort: [], parent: null, filter: [], offset: 0, limit: 50 }
+const EVERY: RecordListQuery = { search: '', sort: [], parent: null, filter: [], after: null, limit: 50 }
 
 beforeAll(async () => {
   fixture = await startSqlServerFixture()
@@ -214,7 +214,7 @@ async function listed(actor: PolicyContext, change: Partial<RecordListQuery>): P
   if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
   const outcome = await records.list(plan.request)
   if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
-  return recordPage(deliveries, plan.fields, outcome.rows, query.limit)
+  return recordPage(deliveries, plan, outcome.rows)
 }
 
 const keysOf = (page: RecordList): string[] => page.rows.map((row) => String(row.answers['id']))
@@ -438,21 +438,25 @@ describe('a list ordered by the uuid key', covers('sqlserver', uuidCase('order')
   // order they come in is the order in which SQL Server weighs the bytes:
   // bytes 10 to 15 of the text most, then 8 and 9, then 7 down to 0, which
   // the adapter does not reorder -- the column's own order, which its
-  // primary key's index serves. Paged five at a time the pages join without
-  // a gap or a repeat, and asked again a page is the same, which is what
-  // offset paging needs of an order; that PostgreSQL's order is another is
-  // held here too, so a uuidOrder that gave one order for both would fail.
+  // primary key's index serves. Paged five at a time, each page after the
+  // one before (0108), the pages join without a gap or a repeat, and asked
+  // again a page is the same: a page after a uniqueidentifier is compared by
+  // its byte groups, as the order is, never by its text. That PostgreSQL's
+  // order is another is held here too, so a uuidOrder that gave one order
+  // for both would fail.
   test("pages sixteen deliveries in SQL Server's order of uniqueidentifier, the same rows each time", async () => {
     const { parent, size, keys } = UUID_PARITY.order
     const expected = uuidOrder('sqlserver', keys)
     expect(expected).not.toEqual(uuidOrder('postgres', keys))
     const seen: string[] = []
-    for (let offset = 0; offset < keys.length; offset += size) {
-      const query = { parent: { field: 'order', record: parent }, offset, limit: size }
-      const page = await listed(OTTO, query)
-      expect({ offset, keys: keysOf(page), hasMore: page.hasMore }).toEqual({ offset, keys: expected.slice(offset, offset + size), hasMore: offset + size < keys.length })
+    let after: string | null = null
+    for (let start = 0; start < keys.length; start += size) {
+      const query = { parent: { field: 'order', record: parent }, after, limit: size }
+      const page: RecordList = await listed(OTTO, query)
+      expect({ start, keys: keysOf(page), hasMore: page.hasMore }).toEqual({ start, keys: expected.slice(start, start + size), hasMore: start + size < keys.length })
       expect(keysOf(await listed(OTTO, query))).toEqual(keysOf(page))
       seen.push(...keysOf(page))
+      after = page.next
     }
     expect(seen).toEqual(expected)
   })

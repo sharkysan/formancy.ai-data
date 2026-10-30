@@ -78,6 +78,7 @@ export {
   sizedCustomerRows,
   sizedDigest,
   sizedDigester,
+  sizedListPage,
   sizedLookupPage,
   sizedReadBack,
   sizedResolveKeys,

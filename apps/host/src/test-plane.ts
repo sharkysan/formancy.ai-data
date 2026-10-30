@@ -139,6 +139,8 @@ export interface Plane {
     countOrders(connection: Engine['connection'], notes: string): Promise<number>
     /** `count` orders of tenant 1's, for Muster AG, noted `<notes> <n>`, written by the owner in one statement: more than a page. */
     insertOrders(connection: Engine['connection'], count: number, notes: string): Promise<void>
+    /** The order `record` names, with no lines, deleted by the owner, as another application would. */
+    deleteOrder(connection: Engine['connection'], record: string): Promise<void>
     /** A row of `parity.removable_child` that refers to the removable record `record`, with NO ACTION: a delete of it is refused while this row is there. */
     referToRemovable(connection: Engine['connection'], record: string): Promise<void>
     /**
@@ -507,6 +509,11 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
         const id = Number(record.slice('k1:'.length))
         if (connection === 'pg') await pgAdmin`insert into parity.removable_child (removable_id, note) values (${id}, 'refers to it')`
         else await msAdmin.request().input('id', mssql.Int, id).query("insert into parity.removable_child (removable_id, note) values (@id, N'refers to it')")
+      },
+      deleteOrder: async (connection, record) => {
+        const id = record.slice('k1:'.length)
+        if (connection === 'pg') await pgAdmin`delete from sales."order" where id = ${id}::bigint`
+        else await msAdmin.request().input('id', mssql.BigInt, id).query('delete from sales.[order] where id = @id')
       },
       countOrders: async (connection, notes) => {
         if (connection === 'pg') return (await pgAdmin<Array<{ n: number }>>`select count(*)::int as n from sales."order" where notes = ${notes}`)[0]?.n ?? 0

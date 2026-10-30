@@ -168,7 +168,9 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
       const described = describedBy(rows[0] as Row)
       if (described === 'cut') return CUT
       if (described === undefined) return NOT_DESCRIBED
-      return { ok: true, described, rows: rows.filter((row) => row.found !== null).map((row) => recordFrom(row, request.columns, request.target.concurrency)) }
+      // Whether the row the page continues after was found (0108), on every row.
+      const after = request.after === null ? null : (rows[0] as Row).anchored === 1 ? 'found' : 'gone'
+      return { ok: true, described, rows: rows.filter((row) => row.found !== null).map((row) => recordFrom(row, request.columns, request.target.concurrency)), after }
     },
 
     async insert(request) {

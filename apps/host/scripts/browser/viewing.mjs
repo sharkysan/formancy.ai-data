@@ -70,7 +70,7 @@ async function listsWhile(page, act, line) {
     page.off('request', heard)
     page.off('response', answered)
   }
-  return bodies.map(({ filter, sort, offset }) => ({ filter, sort, offset }))
+  return bodies.map(({ filter, sort, after }) => ({ filter, sort, after }))
 }
 
 /**
@@ -133,7 +133,7 @@ export function viewJourney(plane, { check }) {
     ['A view shown (Records)', async (page) => {
       const before = page.url()
       const sent = await listsWhile(page, () => pressShowView(page), /^Rows 1–\d+(; more follow)?\. Filtered by Notes\.$/)
-      check('a view shown: one first page, with its filter and its sort', same(sent, [{ filter: NOTED.filter, sort: NOTED.sort, offset: 0 }]))
+      check('a view shown: one first page, with its filter and its sort', same(sent, [{ filter: NOTED.filter, sort: NOTED.sort, after: null }]))
       check('a view shown: the headers show its two columns', same([await sortOf(page, 'Amount'), await sortOf(page, 'Id')], ['descending', 'ascending']))
       check('a view shown: the picker names it', same((await choices(page)).shown, NOTED.name))
       check('a view shown: the keyboard stays on Show view', await focusedOn(page, showView(page)))
@@ -149,7 +149,7 @@ export function viewJourney(plane, { check }) {
         },
         /^Rows 1–\d+(; more follow)?\. Filtered by Notes\.$/,
       )
-      check('a sort of your own: one first page, in the view’s filter and the header’s sort', same(sent, [{ filter: NOTED.filter, sort: [{ field: 'order_date', direction: 'asc' }], offset: 0 }]))
+      check('a sort of your own: one first page, in the view’s filter and the header’s sort', same(sent, [{ filter: NOTED.filter, sort: [{ field: 'order_date', direction: 'asc' }], after: null }]))
       check('a sort of your own: the Order date header says it sorts ascending', same(await sortOf(page, 'Order date'), 'ascending'))
       check('a sort of your own: the picker says so', same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name, OWN], shown: OWN }))
       check('a sort of your own: the view’s columns no longer sorted', same([await sortOf(page, 'Amount'), await sortOf(page, 'Id')], [null, null]))
@@ -165,7 +165,7 @@ export function viewJourney(plane, { check }) {
     ['All records again (Records)', async (page) => {
       await picker(page).selectOption({ label: 'All records' })
       const sent = await listsWhile(page, () => pressShowView(page), /^Rows 1–\d+(; more follow)?\.$/)
-      check('all records: one first page, with neither a filter nor a sort', same(sent, [{ filter: [], sort: [], offset: 0 }]))
+      check('all records: one first page, with neither a filter nor a sort', same(sent, [{ filter: [], sort: [], after: null }]))
       check('all records: no header sorted', same(await sortOf(page, 'Order date'), null))
       check('all records: the picker says so, and offers no filter of your own', same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name], shown: 'All records' }))
     }],

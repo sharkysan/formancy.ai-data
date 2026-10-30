@@ -162,9 +162,11 @@ export function isFormRecord(body: unknown): body is FormRecord {
   return isRecord(body) && isNullableString(body['record']) && isNullableString(body['version']) && isRecord(body['answers'])
 }
 
-/** A page of records (0044): every row a record, and whether more follow. */
+/** A page of records (0044): every row a record, whether more follow, and the cursor the next is asked for after (0108). */
 export function isRecordList(body: unknown): body is RecordList {
-  return isRecord(body) && Array.isArray(body['rows']) && body['rows'].every(isFormRecord) && typeof body['hasMore'] === 'boolean'
+  if (!isRecord(body) || !Array.isArray(body['rows']) || !body['rows'].every(isFormRecord) || typeof body['hasMore'] !== 'boolean') return false
+  // A cursor exactly when more follow (0108): a page from a server that pages by offset has none, and a host could never ask for the next.
+  return body['hasMore'] ? typeof body['next'] === 'string' && body['next'] !== '' : body['next'] === null
 }
 
 export function isLookupResult(body: unknown): body is LookupResult {

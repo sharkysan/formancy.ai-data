@@ -33,6 +33,7 @@ export type VersionFactName =
   | 'restrictViolation'
   | 'notNullConstraints'
   | 'viewSecurityDefinition'
+  | 'windowReadsAhead'
 
 export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
   transactionTimeout: {
@@ -150,6 +151,23 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
     heldBy: {
       file: 'packages/data-sqlserver/src/discovery-access.integration.test.ts',
       test: 'VIEW SECURITY DEFINITION alone does not settle row security',
+    },
+  },
+  windowReadsAhead: {
+    engine: 'postgres',
+    says:
+      'PostgreSQL computes a row_number() over an ORDER BY under the window’s default RANGE frame, which reads past each row to its last peer, so the window under a page’s LIMIT reads one row more than the page and its extra row before it stops (0108); a server that runs such a window in ROWS mode reads none past them',
+    values: { 15: true, 16: false, 17: false, 18: false },
+    source: 'PostgreSQL 16’s release notes, under the optimizer: window functions use the faster ROWS mode internally when RANGE mode is active but unnecessary',
+    measured: {
+      15: '2026-10-30, postgres:15-alpine answering 15.19, on Docker Desktop on an arm64 Mac: under the WindowAgg that returned 51 rows, the Index Scan of customer read 52 for the page after the 50,001st customer and 50,053 at the offset that reaches it',
+      16: '2026-10-30, postgres:16-alpine answering 16.15, on Docker Desktop on an arm64 Mac: the Index Scan read 51 under the WindowAgg’s 51, and 50,052 at the offset',
+      17: 'every run, on the default image: as 16',
+      18: '2026-10-30, postgres:18-alpine answering 18.6, on Docker Desktop on an arm64 Mac: as 16',
+    },
+    heldBy: {
+      file: 'packages/data-postgres/src/lookups-sized.integration.test.ts',
+      test: 'reads the row it continues after and the page, where the offset reads every row before it',
     },
   },
 }

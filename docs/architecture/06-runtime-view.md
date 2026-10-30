@@ -216,8 +216,11 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    infinite row model, the search sent on Search or Enter, never per key
    (0047), and with every block the conditions its Filter panel applied
    (`apps/host/src/filter-panel.tsx`, over the fields `list.filterable`
-   names) and the section's sort; a new filter or sort starts the grid again
-   from its first row. A View picker (`apps/host/src/view-picker.tsx`) offers
+   names) and the section's sort, each block after the last row of the
+   block before: the datasource keeps every answered page's `next` by the
+   row the page after it starts at
+   ([0108](../decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md));
+   a new filter or sort starts the grid again from its first row. A View picker (`apps/host/src/view-picker.tsx`) offers
    `list.views`, and its Show view sets both at once, as one first page; a
    choice in its select alone sends nothing. The grid opens on what the
    viewer's browser kept for the form -- a view by name, or a sort -- else
@@ -234,16 +237,25 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    `columnFilter` plans each of the person's conditions on a readable
    column field, its values spelled as the column holds them, or refuses it
    400 `not-filterable`
-   ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
-4. Each adapter's `records/list.ts` runs one statement: the description and
-   `limit + 1` rows from the offset, searched through `sql/search.ts`,
+   ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md));
+   `decodeListCursor` (`records/cursor.ts`) reads the key a page continues
+   after from `after`, or refuses it 400 `invalid-cursor` (0108).
+4. Each adapter's `records/list.ts` runs one statement: the description,
+   the row the page continues after found by its key under the read filter
+   and every through, and `limit + 1` rows after it -- each compared with
+   that row column against column, by the order's columns less those the
+   scope holds to one value (`after` in `sql/order.ts`, `seekOf` in
+   `records/list-terms.ts`, 0108) -- searched through `sql/search.ts`,
    ordered through `sql/order.ts`, its filters compared exactly
    ([0028](../decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)),
    and each condition of the person's filter one more predicate, its
    values bound as the column's type (0104).
-   A page drift stops is 409 `drift`, its rows never sent (0041).
+   A page drift stops is 409 `drift`, its rows never sent (0041); a page
+   whose row is gone is 409 `cursor-gone` (`cursorRefusal`), and the grid
+   starts again at its first page.
    `recordPage` makes each row what a read by its token returns, the extra
-   row saying whether more follow; the grid then resolves lookup labels.
+   row saying whether more follow and `next` the cursor of the last row;
+   the grid then resolves lookup labels.
 
 Held by each adapter's `list.integration.test.ts`, its shared cases in
 `LIST_PARITY` and `COLUMN_FILTER_PARITY`; `routes/runtime-lists.test.ts`;
@@ -252,9 +264,12 @@ Held by each adapter's `list.integration.test.ts`, its shared cases in
 `packages/data-core/src/presentation`; `lists.integration.test.ts` in
 `packages/data-client/src`; and `apps/host/src/grid-datasource.test.ts`,
 `filter.test.tsx`, `views.test.ts`, `view-picker.test.tsx`,
-`columns.test.ts`, `columns-panel.test.tsx` and `remembered.test.tsx`.
-What it costs: a page reads every row before it, by how the engines run an
-offset, not measured here; the rest is 0044's and 0061's, in
+`columns.test.ts`, `columns-panel.test.tsx`, `remembered.test.tsx` and
+`workspace.test.tsx`; and the rows a deep page reads by both adapters'
+`lookups-sized.integration.test.ts`.
+What it costs: a page continues after where its row is now, an order no
+index serves reads and sorts every admitted row for every page, and pages
+are walked, never jumped to (0108); the rest is 0044's and 0061's, in
 [section 11.2](11-risks-and-debt.md#112-known-limitations-by-area).
 
 ## 6.6 Opening, creating and updating a record
@@ -492,13 +507,16 @@ and a publisher alone restores any version, unreviewed ones too (0065).
 3. The connection's gate: one export at a time per allowlisted connection
    in this server, another meanwhile 503 `export-busy`, before any
    statement.
-4. Page after page, each the first page's request at the next offset:
+4. Page after page, each the first page's request after the last row of
+   the page before, read back from that page's `next`
+   ([0108](../decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md)):
    before each, the export stops for a client that left (499,
    `routes/abandoned.ts`) or a deadline passed (503 `export-timeout`,
    `export-limits.ts`); then the adapter's one list statement, decided over
    its own description as a list page is
    ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)),
-   and `recordPage`. Then one resolve per lookup field for the page's
+   refused 409 `moved` when the row it continues after is gone, and
+   `recordPage`. Then one resolve per lookup field for the page's
    tokens, its signal the lookup deadline cut to what is left of the
    export's
    ([0061](../decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)).
@@ -531,8 +549,9 @@ and `transport.test.ts` in `packages/data-client/src`; the host's
 `export.test.tsx`, `save-file.test.ts` and `page.test.tsx`, and the
 browser gate's `apps/host/scripts/browser/exporting.mjs`, whose download event
 compares every byte with the server's (0080). What it costs: the
-file is not the table at one moment, each page reads every row before its
-offset, and the bounds are a budget and a derivation, not measurements
+file is not the table at one moment -- a row edited between two pages in a
+sorted column moves the next page with it (0108) -- and the bounds are a
+budget and a derivation, not measurements
 ([section 11.2](11-risks-and-debt.md#112-known-limitations-by-area)).
 
 ## 6.11 Drilling down a form's levels

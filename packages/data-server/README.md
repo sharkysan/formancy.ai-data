@@ -238,7 +238,12 @@ existed would be documented and inert.
   `records/read` returns for its token, a POST so the search and a filter's
   values are in no URL, and audited as `list` with no record and never the
   search, the sort, the parent or the filter. Its body is `{ search?, sort?,
-  parent?, filter?, offset?, limit? }`, and nothing else (400 `malformed`).
+  parent?, filter?, after?, limit? }`, and nothing else (400 `malformed`):
+  `after` is the `next` of the page before, the cursor of its last row
+  (0108), which the page's own statement finds again by its key under the
+  read filter and every through -- 400 `invalid-cursor` for one naming no
+  key of the form, 409 `cursor-gone` when the row is deleted or no longer
+  one the person may read. A page answers `{ rows, hasMore, next }`.
   `GET /v1/forms/:id` sends `list` -- what a page may be searched, sorted
   and filtered by, `{ searchable, sortable, filterable }` -- or `null` where
   the person would be refused one: a key
@@ -303,13 +308,15 @@ existed would be documented and inert.
   sends a `list`, and refused as a list is, a filter it does not offer
   `not-filterable` among them. Its body is those four keys and nothing else
   (400 `malformed`). The server pages the list itself, the list's own
-  request -- the filter planned once -- at each offset, one guarded statement a page decided
+  request -- the filter planned once -- after the last row of each page
+  (0108), one guarded statement a page decided
   as a list page is, with one resolve a page per lookup field under the
   person's read filter for it, and builds the whole file before it sends
   a byte: 200 with `content-type: text/csv; charset=utf-8`,
   `content-disposition: attachment; filename="<form id>.csv"` and its
   length, or a JSON refusal and nothing of the file -- 409 `drift`,
-  `moved` when a record would appear twice because the rows moved between
+  `moved` when the row a page continues after is gone, or a record would
+  appear twice because the rows moved between
   two pages -- known by its key's values, so a record whose key fits no
   token is held to it too -- or `unencodable` for text UTF-8 cannot carry,
   which names the column, and for a lookup whose key is too long for a

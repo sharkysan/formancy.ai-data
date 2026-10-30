@@ -12,26 +12,38 @@ describe('validateListQuery', () => {
   // A grid opening sends almost nothing; what it leaves out is the first
   // page in key order, of the largest page the server serves.
   test('fills what a body leaves out, and returns a fresh query', () => {
-    expect(validateListQuery({})).toEqual({ ok: true, query: { search: '', sort: [], parent: null, filter: [], offset: 0, limit: LIST_PAGE_SIZE } })
-    const body = { search: ' Muster ', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'name', op: 'contains', text: ' AG ' }], offset: 50, limit: 25 }
+    expect(validateListQuery({})).toEqual({ ok: true, query: { search: '', sort: [], parent: null, filter: [], after: null, limit: LIST_PAGE_SIZE } })
+    const body = { search: ' Muster ', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'name', op: 'contains', text: ' AG ' }], after: 'c1:9', limit: 25 }
     const checked = validateListQuery(body)
     expect(checked).toEqual({
       ok: true,
-      query: { search: 'Muster', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'name', op: 'contains', text: 'AG' }], offset: 50, limit: 25 },
+      query: { search: 'Muster', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'name', op: 'contains', text: 'AG' }], after: 'c1:9', limit: 25 },
     })
     if (checked.ok) {
       expect(checked.query.sort[0]).not.toBe(body.sort[0])
       expect(checked.query.parent).not.toBe(body.parent)
       expect(checked.query.filter[0]).not.toBe(body.filter[0])
     }
-    expect(validateListQuery({ parent: null })).toMatchObject({ ok: true, query: { parent: null } })
+    expect(validateListQuery({ parent: null, after: null })).toMatchObject({ ok: true, query: { parent: null, after: null } })
   })
 
   // A property ignored today is one somebody reads tomorrow: a `filters` or
   // a `columns` in a body must not reach a planner that may one day look.
-  test('refuses anything but an object of the six properties', () => {
-    for (const body of [null, 'x', [], { filters: [] }, { search: '', columns: ['tenant_id'] }]) {
+  // An `offset` is what a list took before it paged by cursor (0108):
+  // ignored, a client still sending one would be shown the first page
+  // again for every page it asked for. Watched failing with `offset` among
+  // the properties.
+  test('refuses anything but an object of the six properties, an offset included', () => {
+    for (const body of [null, 'x', [], { filters: [] }, { search: '', columns: ['tenant_id'] }, { offset: 0 }, { offset: 50, limit: 50 }]) {
       expect(validateListQuery(body), JSON.stringify(body)).toMatchObject({ ok: false, code: 'malformed' })
+    }
+  })
+
+  // The cursor is text the server gave, read against the form by the
+  // planner; a number or an object is a client that made one up.
+  test('refuses a cursor that is not text', () => {
+    for (const after of [0, 50, { key: '7' }, ['c1:7'], true]) {
+      expect(validateListQuery({ after }), JSON.stringify(after)).toMatchObject({ ok: false, code: 'malformed' })
     }
   })
 
