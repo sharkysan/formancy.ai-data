@@ -21,6 +21,20 @@ import type { DescribedTable, RecordColumn } from './types.js'
  * request the adapter runs as one write.
  */
 
+/**
+ * The fields a version starts and ends at, where the form offers a change
+ * from a date (0113), or `null`: what a page needs to offer one. Whether
+ * this person may is the policy's -- create and update -- asked by the
+ * caller with the rest of the operations.
+ */
+export function versionFields(bindings: FormBindings): { from: string; to: string } | null {
+  const validity = bindings.validity
+  if (validity === undefined || !offers(bindings, 'supersede')) return null
+  const from = fieldOf(bindings, validity.from)
+  const to = fieldOf(bindings, validity.to)
+  return from === undefined || to === undefined ? null : { from, to }
+}
+
 /** The field that stands for a column, if the form has one. */
 function fieldOf(bindings: FormBindings, column: string): string | undefined {
   return bindings.fields.find((binding) => columnsOf(binding).includes(column))?.field

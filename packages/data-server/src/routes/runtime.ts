@@ -17,6 +17,7 @@ import {
   rejectedSelection,
   runtimeOperations,
   toFormAnswers,
+  versionFields,
 } from '@formancy/data-core'
 import type {
   DescribedTable,
@@ -29,6 +30,7 @@ import type {
   PolicyOperation,
   PublishedForm,
   RecordFailure,
+  UnknownOutcome,
 } from '@formancy/data-core'
 import type { HostIdentity } from '@formancy/data-identity'
 import { canonicalize } from '@formancy/spec'
@@ -46,6 +48,7 @@ import { registerExportRoute } from './runtime-exports.js'
 import { registerListRoute } from './runtime-lists.js'
 import { registerLookupRoutes } from './runtime-lookups.js'
 import { registerMenuRoute } from './runtime-menu.js'
+import { registerSupersedeRoute } from './runtime-supersede.js'
 import { createWriteOnce, INVALID_WRITE_ID, writeId } from './write-once.js'
 import type { WriteAnswer } from './write-once.js'
 
@@ -93,6 +96,7 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'POST /v1/forms/:id/records/create': 'create',
   'POST /v1/forms/:id/records/update': 'update',
   'POST /v1/forms/:id/records/delete': 'delete',
+  'POST /v1/forms/:id/records/supersede': 'supersede',
   'POST /v1/forms/:id/lookups/:source/query': 'lookup-query',
   'POST /v1/forms/:id/lookups/:source/resolve': 'lookup-resolve',
 }
@@ -233,7 +237,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    * log, with the adapter's sentence, which names no value; answered with what
    * was addressed; and never sent again -- each route asks the adapter once.
    */
-  function lost(request: FastifyRequest<{ Params: { id: string } }>, operation: 'create' | 'update' | 'delete', record: string | null, version: string | null, failure: string): WriteAnswer {
+  function lost(request: FastifyRequest<{ Params: { id: string } }>, operation: UnknownOutcome['operation'], record: string | null, version: string | null, failure: string): WriteAnswer {
     request.log.warn({ form: request.params.id, operation, failure }, 'a write was sent and its answer lost; it is not retried')
     return { ...unknownOutcome(operation, record, version), record: record ?? undefined }
   }
@@ -245,7 +249,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    */
   async function sendOnce(
     request: FastifyRequest<{ Params: { id: string } }>,
-    operation: 'create' | 'update' | 'delete',
+    operation: UnknownOutcome['operation'],
     id: string | undefined,
     perform: () => Promise<WriteAnswer>,
   ): Promise<WriteAnswer & { repeated?: boolean }> {
@@ -372,24 +376,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const actor = context(request)
     const authorized = authorizeOperation(bundle.policy, actor, 'update')
     if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
-    let current: FormRecord | undefined
-    let unread: RecordFailure | undefined
-    let described: DescribedTable | undefined
-    const reading = planRead(bundle.snapshot, bundle.bindings, bundle.policy, actor, record)
-    if (reading.ok) {
-      const stored = await open.records.read(reading.request)
-      if (!stored.ok) unread = stored
-      else {
-        described = stored.described
-        if (stored.record === null) unread = NOT_FOUND
-        else current = toFormAnswers(bundle.bindings, reading.fields, { ok: true, ...stored.record })
-      }
-    }
-    if (described === undefined) {
-      const root = await describedRoot(bundle, open)
-      if (!root.ok) return root.answer
-      described = root.described
-    }
+    const read = await readForWrite(bundle, open, actor, record)
+    if (!read.ok) return read.answer
+    const { current, unread, described } = read
     // The record as read now is newer than the one the person saved over: the
     // database will answer stale, and an echo the change moved is not theirs.
     const behind = current !== undefined && current.version !== null && current.version !== version
@@ -406,6 +395,41 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     if (!outcome.ok && outcome.code === 'unknown-outcome') return lost(request, 'update', record, version, outcome.message)
     if (!outcome.ok) return recordFailure(bundle.bindings, outcome)
     return { status: 200, body: toFormAnswers(bundle.bindings, plan.fields, outcome) }
+  }
+
+  /**
+   * The record a write decides over, as this actor reads it, and the root's
+   * description that read carried -- or, for an actor who may not read, or
+   * after a read that failed, the root described in a statement of its own.
+   * `unread` is the read's failure, which the caller answers where only the
+   * read could tell an echo from a change (0040). An update's, and a change
+   * from a date's (0113).
+   */
+  async function readForWrite(
+    bundle: PublishedBundle,
+    open: OpenConnection,
+    actor: PolicyContext,
+    record: string,
+  ): Promise<{ ok: true; current: FormRecord | undefined; unread: RecordFailure | undefined; described: DescribedTable } | { ok: false; answer: WriteAnswer }> {
+    let current: FormRecord | undefined
+    let unread: RecordFailure | undefined
+    let described: DescribedTable | undefined
+    const reading = planRead(bundle.snapshot, bundle.bindings, bundle.policy, actor, record)
+    if (reading.ok) {
+      const stored = await open.records.read(reading.request)
+      if (!stored.ok) unread = stored
+      else {
+        described = stored.described
+        if (stored.record === null) unread = NOT_FOUND
+        else current = toFormAnswers(bundle.bindings, reading.fields, { ok: true, ...stored.record })
+      }
+    }
+    if (described === undefined) {
+      const root = await describedRoot(bundle, open)
+      if (!root.ok) return { ok: false, answer: root.answer }
+      described = root.described
+    }
+    return { ok: true, current, unread, described }
   }
 
   /**
@@ -473,7 +497,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const deleting = operations.includes('delete') ? deleteEffects(bundle.snapshot, bundle.bindings.root, bundle.policy) : null
     // What a copy of a record carries into a new one: only where a create is offered (0107).
     const copied = operations.includes('create') ? copiedFields(bundle.snapshot, bundle.bindings, bundle.policy, actor) : null
-    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list, deleting, copied } satisfies PublishedForm
+    // Where a version may be changed from a date: it ends one and creates the next (0113).
+    const versions = operations.includes('create') && operations.includes('update') ? versionFields(bundle.bindings) : null
+    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list, deleting, copied, versions } satisfies PublishedForm
   })
 
   /**
@@ -541,6 +567,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
 
   // One record, by its token and the version read (0050): the update's steps, a delete's answers.
   registerDeleteRoute(app, { published, connection, context, sendOnce, lost, refusal, answered })
+
+  // A change from a date (0113): the update's read and steps, a create's answer.
+  registerSupersedeRoute(app, { published, connection, context, sendOnce, lost, refusal, answered, readForWrite, withoutEchoes, memberships })
 
   // A lookup's options and labels, each one statement that stops when its request is abandoned or its deadline passes (0061).
   registerLookupRoutes(app, { published, connection, context, lookupDeadlineMs: options.lookupDeadlineMs })

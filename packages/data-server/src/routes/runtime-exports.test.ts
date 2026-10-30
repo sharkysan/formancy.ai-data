@@ -180,6 +180,9 @@ function registry(): ConnectionRegistry {
     update: async () => {
       throw new Error('an export never updates')
     },
+    supersede: async () => {
+      throw new Error('these routes never change a version from a date')
+    },
     delete: async () => {
       throw new Error('an export never deletes')
     },

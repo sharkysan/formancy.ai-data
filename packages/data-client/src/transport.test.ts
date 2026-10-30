@@ -369,6 +369,7 @@ describe('across origins (0060)', () => {
       exportRecords: () => client.exportRecords('pg-order', { search: 'a' }),
       create: () => client.create('pg-order', { notes: 'a' }),
       update: () => client.update('pg-order', CHANGE),
+      supersede: () => client.supersede('pg-order', CHANGE),
       delete: () => client.delete('pg-order', { record: 'k1:7', version: '00000000000007d1' }),
       reconcile: () => client.reconcile('pg-order', lost),
       query: () => client.query('pg-order', 'order.customer', { operation: 'read', search: 'a' }),

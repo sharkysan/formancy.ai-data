@@ -50,6 +50,9 @@ export function planRefusal(code: PlanRefusalCode, message: string): HttpRefusal
       // person may read (0108): the request was sound, the data moved under
       // it, and the first page is where to start again.
       return { status: 409, body: { code, message } }
+    case 'version-ended':
+      // The version as read had ended (0113): history, which the person cannot change here.
+      return { status: 409, body: { code, message } }
     case 'record-not-read':
       // The update route plans with the record it read and answers a read
       // that failed itself (0040), so only a read that came back as another
@@ -93,6 +96,11 @@ export function recordFailure(bindings: FormBindings, failure: RecordFailure): H
       return { status: 404, body: { code: 'not-found', message: 'No such record.' } }
     case 'stale':
       return { status: 409, body: { code: 'stale', message: 'The record changed since it was read. Reload it, review the changes, and save again.' } }
+    case 'version-ended':
+      // An ended version is history; the open one is changed from a date instead (0113).
+      return { status: 409, body: { code: 'version-ended', message: 'This version has ended, and only the open version is changed. Nothing was saved.' } }
+    case 'chain-exists':
+      return { status: 409, body: { code: 'chain-exists', message: 'This already has versions: change its open version from a date instead. Nothing was saved.' } }
     case 'unique-violation':
       return withField(422, 'unique-violation', 'Another record already has this value.')
     case 'foreign-key-violation':
@@ -140,6 +148,9 @@ export function deleteFailure(failure: RecordFailure): HttpRefusal {
       return { status: 404, body: { code: 'not-found', message: 'No such record.' } }
     case 'stale':
       return { status: 409, body: { code: 'stale', message: 'The record changed since it was read. Reload it and review the changes before deleting it.' } }
+    case 'version-ended':
+    case 'chain-exists':
+      throw new Error('a delete neither ends a version nor starts a chain (0113): a form over versions offers none')
     case 'foreign-key-violation':
       return { status: 422, body: { code: 'referenced', message: 'Other records still refer to this one, so the database keeps it. Nothing was deleted.' } }
     case 'unique-violation':
@@ -174,9 +185,13 @@ export function deleteFailure(failure: RecordFailure): HttpRefusal {
  * whose key the insert named can be read by it. A create whose key the
  * database numbers cannot be found by anything here.
  */
-export function unknownOutcome(operation: 'create' | 'update' | 'delete', record: string | null, version: string | null): { status: 502; body: UnknownOutcome } {
+export function unknownOutcome(operation: UnknownOutcome['operation'], record: string | null, version: string | null): { status: 502; body: UnknownOutcome } {
   let message: string
-  if (operation === 'delete') {
+  if (operation === 'supersede') {
+    // It ended the version sent, or nothing: sent again with that version, a
+    // change that committed finds the version moved on (0113).
+    message = 'The connection to the database failed after the change from a date was sent. It may have been saved. Sending it again with the same version is safe: it is stored at most once, and if it was, that is answered as changed since it was read.'
+  } else if (operation === 'delete') {
     // A delete is protected by its version as an update is, and a key a
     // version proves a record by is never another record's (0050).
     message = 'The connection to the database failed after the deletion was sent. It may have been deleted. Deleting again with the same version deletes nothing else: if it was deleted, that is answered as not found.'

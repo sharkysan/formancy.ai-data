@@ -122,7 +122,10 @@ export interface Deleting {
  * what a delete also does, exactly when `operations` holds `delete`, and
  * `null` otherwise (0050). `copied` is the fields a copy of a record carries
  * into a new one, from `copiedFields`, exactly when `operations` holds
- * `create`, and `null` otherwise (0107).
+ * `create`, and `null` otherwise (0107). `versions` is the fields a version
+ * starts and ends at where the form's rows are versions of one thing and
+ * this person may change the open one from a date -- `operations` holds
+ * both `create` and `update` -- and `null` otherwise (0113).
  */
 export interface PublishedForm {
   form: FormSchema
@@ -131,6 +134,7 @@ export interface PublishedForm {
   list: ListColumns | null
   deleting: Deleting | null
   copied: string[] | null
+  versions: { from: string; to: string } | null
 }
 
 /**
@@ -313,9 +317,9 @@ export interface RuntimeRefusal {
  */
 export interface UnknownOutcome extends RuntimeRefusal {
   code: 'unknown-outcome'
-  /** `delete` since 0050. */
-  operation: 'create' | 'update' | 'delete'
-  /** Update and delete: the token sent. Create: `intendedRecord(...)`, or null when the database numbers the key. */
+  /** `delete` since 0050, `supersede` -- a change from a date -- since 0113. */
+  operation: 'create' | 'update' | 'delete' | 'supersede'
+  /** Update, delete and supersede: the token sent. Create: `intendedRecord(...)`, or null when the database numbers the key. */
   record: string | null
   /**
    * Update and delete: the version sent -- saving again with exactly it is

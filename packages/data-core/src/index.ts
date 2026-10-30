@@ -165,7 +165,7 @@ export type {
   UpdateRequest,
 } from './records/types.js'
 export { planCreate, planRead, planUpdate } from './records/plan.js'
-export { planSupersede } from './records/supersede.js'
+export { planSupersede, versionFields } from './records/supersede.js'
 export type { PlannedMove } from './records/transition.js'
 export { planDelete } from './records/delete.js'
 export { deleteTerms, reachesPast } from './records/delete-terms.js'
