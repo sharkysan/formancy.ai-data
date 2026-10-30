@@ -59,7 +59,8 @@ const sectionPaper = (): HTMLElement => within(section() as HTMLElement).getByRo
 const sectionControl = (name: string): HTMLInputElement => within(sectionPaper()).getByLabelText(name, { exact: true }) as HTMLInputElement
 
 /** A control of the party's own React paper, by its name. */
-const partyControl = (name: string): HTMLInputElement => within(screen.getByRole('form', { name: 'Party, React' })).getByLabelText(name, { exact: true }) as HTMLInputElement
+const partyControl = (name: string): HTMLInputElement =>
+  within(screen.getByRole('form', { name: 'Party, React' })).getByLabelText(name, { exact: true }) as HTMLInputElement
 
 describe.each(ENGINES)('a section on $engine', (engine) => {
   // A company party's details: none yet, so the section says so and offers
@@ -83,7 +84,15 @@ describe.each(ENGINES)('a section on $engine', (engine) => {
 
     await user.type(sectionControl('Vat no'), 'CHE-109.000.001')
     await user.click(within(sectionPaper()).getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(within(shown).getAllByRole('status').map((line) => line.textContent)).toContain(`Created ${record}.`), ARRIVES_WITHIN)
+    await waitFor(
+      () =>
+        expect(
+          within(shown)
+            .getAllByRole('status')
+            .map((line) => line.textContent),
+        ).toContain(`Created ${record}.`),
+      ARRIVES_WITHIN,
+    )
     const rows = await plane.clerk.list(engine.company, { parent: { field: 'party', record } })
     expect(rows.ok && rows.value.rows.map((row) => [row.record, row.answers['vat_no']])).toEqual([[record, 'CHE-109.000.001']])
 

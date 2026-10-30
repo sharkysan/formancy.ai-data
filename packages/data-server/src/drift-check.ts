@@ -28,8 +28,7 @@ export interface DriftCheckIo {
 }
 
 export const DRIFT_CHECK_USAGE =
-  'Usage: drift-check-cli.mjs [--fail-on blocking|review] <server URL> <form id>...\n' +
-  'The administrator token is read from FORMANCY_DATA_ADMIN_TOKEN.'
+  'Usage: drift-check-cli.mjs [--fail-on blocking|review] <server URL> <form id>...\n' + 'The administrator token is read from FORMANCY_DATA_ADMIN_TOKEN.'
 
 /** What failing on a severity means: the severities that fail the check. */
 const FAILS: Readonly<Record<'blocking' | 'review', ReadonlySet<DriftChange['severity']>>> = {
@@ -44,7 +43,11 @@ function isReport(body: unknown): body is DriftReport & { version: number } {
   if (!isRecord(body) || typeof body['blocking'] !== 'boolean' || typeof body['version'] !== 'number' || !Array.isArray(body['changes'])) return false
   return body['changes'].every(
     (change: unknown) =>
-      isRecord(change) && typeof change['kind'] === 'string' && typeof change['message'] === 'string' && isRecord(change['subject']) && ['blocking', 'review', 'info'].includes(change['severity'] as string),
+      isRecord(change) &&
+      typeof change['kind'] === 'string' &&
+      typeof change['message'] === 'string' &&
+      isRecord(change['subject']) &&
+      ['blocking', 'review', 'info'].includes(change['severity'] as string),
   )
 }
 
@@ -65,7 +68,10 @@ function subjectOf(subject: DriftSubject): string {
 /** One report as the lines a log shows: the form, its version and its count, then each change. */
 function reportLines(form: string, report: DriftReport & { version: number }, fails: ReadonlySet<DriftChange['severity']>): string {
   const failing = report.changes.filter((change) => fails.has(change.severity)).length
-  const counted = report.changes.length === 0 ? 'no changes' : `${String(report.changes.length)} ${report.changes.length === 1 ? 'change' : 'changes'}, ${String(failing)} failing the check`
+  const counted =
+    report.changes.length === 0
+      ? 'no changes'
+      : `${String(report.changes.length)} ${report.changes.length === 1 ? 'change' : 'changes'}, ${String(failing)} failing the check`
   const lines = [`${form} (version ${String(report.version)}): ${counted}`]
   for (const change of report.changes) lines.push(`  ${change.severity.padEnd(8)} ${change.kind} ${subjectOf(change.subject)}: ${change.message}`)
   return `${lines.join('\n')}\n`
@@ -91,7 +97,8 @@ function readArguments(argv: readonly string[]): { ok: true; failOn: 'blocking' 
   }
   if (server.protocol !== 'http:' && server.protocol !== 'https:') return { ok: false, problem: 'The server is a URL, http or https.' }
   const unnamed = forms.find((form) => !CONFIGURATION_ID.test(form))
-  if (unnamed !== undefined) return { ok: false, problem: 'A form id is lower-case letters, digits, dots, hyphens and underscores, starting with a letter or a digit.' }
+  if (unnamed !== undefined)
+    return { ok: false, problem: 'A form id is lower-case letters, digits, dots, hyphens and underscores, starting with a letter or a digit.' }
   return { ok: true, failOn, server, forms }
 }
 
@@ -122,11 +129,14 @@ export async function runDriftCheck(argv: readonly string[], env: Readonly<Recor
       if (body.changes.some((change) => fails.has(change.severity))) failed += 1
       continue
     }
-    const said = isRecord(body) && typeof body['code'] === 'string' ? ` ${body['code']}${typeof body['message'] === 'string' ? `: ${body['message']}` : ''}` : ''
+    const said =
+      isRecord(body) && typeof body['code'] === 'string' ? ` ${body['code']}${typeof body['message'] === 'string' ? `: ${body['message']}` : ''}` : ''
     io.stderr(`${form}: the server answered ${String(answer.status)}${said}${answer.status === 200 ? ', which is not a drift report' : ''}\n`)
     unchecked += 1
   }
   const checked = read.forms.length - unchecked
-  io.stdout(`${String(checked)} of ${String(read.forms.length)} ${read.forms.length === 1 ? 'form' : 'forms'} checked; ${String(failed)} with a change failing on ${read.failOn}.\n`)
+  io.stdout(
+    `${String(checked)} of ${String(read.forms.length)} ${read.forms.length === 1 ? 'form' : 'forms'} checked; ${String(failed)} with a change failing on ${read.failOn}.\n`,
+  )
   return unchecked > 0 ? 2 : failed > 0 ? 1 : 0
 }

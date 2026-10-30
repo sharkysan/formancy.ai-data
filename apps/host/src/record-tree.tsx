@@ -37,7 +37,9 @@ interface Level {
 }
 
 /** An item as the arrows walk it: a record, or a level's "More". */
-type Item = { kind: 'record'; record: string; depth: number; parent: string | null; size: number; position: number } | { kind: 'more'; parent: string | null; depth: number; size: number; position: number }
+type Item =
+  | { kind: 'record'; record: string; depth: number; parent: string | null; size: number; position: number }
+  | { kind: 'more'; parent: string | null; depth: number; size: number; position: number }
 
 const key = (item: Item): string => (item.kind === 'record' ? item.record : `more:${item.parent ?? ''}`)
 
@@ -96,7 +98,8 @@ export function RecordTree({
   function known(rows: readonly FormRecord[]): void {
     setNodes((before) => {
       const after = new Map(before)
-      for (const row of rows) if (!after.has(row.record as string)) after.set(row.record as string, { record: row.record as string, name: nameOf(row), expanded: false })
+      for (const row of rows)
+        if (!after.has(row.record as string)) after.set(row.record as string, { record: row.record as string, name: nameOf(row), expanded: false })
       return after
     })
   }
@@ -132,7 +135,9 @@ export function RecordTree({
     const answer = await page(record, null)
     if ('refused' in answer) return setLine(answer.refused)
     known(answer.rows)
-    setNodes((before) => new Map(before).set(record, { ...node, expanded: true, below: { records: answer.rows.map((row) => row.record as string), next: answer.next } }))
+    setNodes((before) =>
+      new Map(before).set(record, { ...node, expanded: true, below: { records: answer.rows.map((row) => row.record as string), next: answer.next } }),
+    )
     setLine(answer.rows.length === 0 ? `No records name ${node.name} as their ${fieldLabel}.` : '')
   }
 

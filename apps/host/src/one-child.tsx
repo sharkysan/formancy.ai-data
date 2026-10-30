@@ -70,7 +70,10 @@ export function OneChild({
   const canCreate = menu.operations.includes('create') && definition.operations.includes('create')
 
   const sessions = useMemo(
-    () => (['react', 'angular'] as const).map((which) => createSession({ client, formId: child.form, definition, renderer: which, namespace: owner, fixed: [child.field] })),
+    () =>
+      (['react', 'angular'] as const).map((which) =>
+        createSession({ client, formId: child.form, definition, renderer: which, namespace: owner, fixed: [child.field] }),
+      ),
     [client, child.form, child.field, definition, owner],
   )
   const entries = useMemo<PaneEntry[]>(
@@ -180,7 +183,15 @@ export function OneChild({
             {sessions
               .filter((session) => renderersOf(renderer).includes(session.renderer))
               .map((session) => (
-                <Pane key={session.renderer} session={session} title={held.kind === 'record' ? `${title} ${held.token}` : `New ${title}`} level={6} idBase={owner} namedBy={`${headingId}-detail`} onAnswer={(result) => answered(result, session)} />
+                <Pane
+                  key={session.renderer}
+                  session={session}
+                  title={held.kind === 'record' ? `${title} ${held.token}` : `New ${title}`}
+                  level={6}
+                  idBase={owner}
+                  namedBy={`${headingId}-detail`}
+                  onAnswer={(result) => answered(result, session)}
+                />
               ))}
           </div>
         </div>
