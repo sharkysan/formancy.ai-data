@@ -231,7 +231,7 @@ export function insertStatement(request: InsertRequest, definition: Definition, 
   const table = `insert into ${quoteTable(request.target.table)} as ${ROW}`
   const columns = request.values.length === 0 ? '' : ` (${request.values.map((value) => quoteIdentifier(value.name)).join(', ')})`
   const values = request.values.map((value) => bound(statement, value)).join(', ')
-  const fresh = freshSql(statement, request)
+  const fresh = undefined as string | undefined
   const body = `select ${values}\nwhere ${[...guard(statement, request.target.table, definition, path), ...(fresh === undefined ? [] : [fresh])].join(' and ')}`
   const returning = outputs(request.target, request.returning)
   const text = [`${table}${columns}`, body, returning.length > 0 ? `returning ${returning.join(', ')}` : ''].filter((part) => part !== '').join('\n')
