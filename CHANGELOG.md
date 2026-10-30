@@ -226,6 +226,15 @@ later.
     parent is out of the person's reach, or in a cycle, is in none of its
     levels.
 
+- **A deploy pipeline checks drift with `dist/drift-check-cli.mjs`** (0111).
+  Why: a migration that breaks a published form was found when somebody
+  opened the studio, or when the runtime refused the form -- after the
+  deploy. The server image ships a command that asks the server's drift
+  route for each form it names, with the administrator's token from
+  `FORMANCY_DATA_ADMIN_TOKEN`, and exits 0 with nothing failing, 1 with a
+  `blocking` change -- or a `review` one, with `--fail-on review` -- and 2
+  for a form it could not check, never 0.
+
 ### Changed
 
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's

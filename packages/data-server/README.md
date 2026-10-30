@@ -717,6 +717,25 @@ the database's size and the date it was measured on, is in
 ([0034](../../docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md));
 lists came after those figures, and 0044 says what measuring them needs.
 
+### Checking drift in a deploy pipeline
+
+After a pipeline's migrations run against staging, and before the deploy
+goes on, it asks the server whether a published form still fits the
+database
+([0111](../../docs/decisions/0111-a-deploy-pipeline-checks-drift-with-a-command-that-fails-on-a-blocking-change.md)):
+
+```sh
+docker run --rm -e FORMANCY_DATA_ADMIN_TOKEN ghcr.io/sharkysan/formancy-data-server:<version> \
+  node dist/drift-check-cli.mjs https://staging.example/ order order-line
+```
+
+It asks `POST /v1/forms/:id/drift` of each form named, prints one line a
+form and one a change, and exits 0 when no form has a `blocking` change, 1
+when one has, and 2 when a form could not be checked -- unreachable,
+refused, unknown -- or it was given what it cannot run with.
+`--fail-on review` fails on `review` changes too. The token, an
+administrator's, is read from the environment and never printed.
+
 ### Rotating the identity key
 
 A key set file is `{"keys":[…]}`, a provider's certs document as it is
