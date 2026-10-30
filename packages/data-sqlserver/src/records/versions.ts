@@ -3,7 +3,19 @@ import { quoteName, quoteTable } from '../sql/quote.js'
 import { Parameters } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
 import { bindValue } from '../sql/values.js'
-import { column, keyPredicates, located, NEXT_NOT_INSERTED, NEXT_NOT_INSERTED_MESSAGE, NOT_ONE_ROW, NOT_ONE_ROW_MESSAGE, ROW, selection, versionIs, writeBatch } from './statements.js'
+import {
+  column,
+  keyPredicates,
+  located,
+  NEXT_NOT_INSERTED,
+  NEXT_NOT_INSERTED_MESSAGE,
+  NOT_ONE_ROW,
+  NOT_ONE_ROW_MESSAGE,
+  ROW,
+  selection,
+  versionIs,
+  writeBatch,
+} from './statements.js'
 import type { Assigned, ExpectedVersion } from './statements.js'
 
 /*
@@ -29,7 +41,13 @@ import type { Assigned, ExpectedVersion } from './statements.js'
  * batch's guards are the INSERT's: what it stored, its text, the version
  * read back after triggers; and no INSTEAD OF trigger on either statement.
  */
-export function supersedeStatement(request: SupersedeRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], expected: ExpectedVersion, definition: Buffer): Statement {
+export function supersedeStatement(
+  request: SupersedeRequest,
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  expected: ExpectedVersion,
+  definition: Buffer,
+): Statement {
   const parameters = new Parameters()
   const { target } = request
   const table = quoteTable(target.table)

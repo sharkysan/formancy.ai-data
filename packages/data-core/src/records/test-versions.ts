@@ -25,7 +25,9 @@ export function priced(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void
           col('valid_to', 4, DATE, { nullable: true }),
           col('amount', 5, AMOUNT),
           col('note', 6, text(100), { nullable: true }),
-          kind === 'sqlserver' ? col('row_version', 7, { kind: 'rowversion' }, { generated: 'rowversion' }) : col('row_version', 7, INT64, { hasDefault: true }),
+          kind === 'sqlserver'
+            ? col('row_version', 7, { kind: 'rowversion' }, { generated: 'rowversion' })
+            : col('row_version', 7, INT64, { hasDefault: true }),
         ],
         { primaryKey: { name: 'pk_price', columns: ['tenant_id', 'product_no', 'valid_from'] } },
       ),

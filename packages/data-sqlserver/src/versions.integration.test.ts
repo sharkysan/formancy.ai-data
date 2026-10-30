@@ -45,7 +45,16 @@ beforeAll(async () => {
   owner = await new mssql.ConnectionPool(fixture.admin).connect()
   parity = await discoverSqlServer(owner, PARITY_SCOPE)
   for (const table of ['price', 'price_declined'] as const) {
-    const request = { connection: 'test', root: { schema: 'parity', name: table }, formId: table.replace('_', '-'), title: table, lookups: [], pinned: ['tenant_id'], versionColumn: 'version', validity: { from: 'valid_from', to: 'valid_to' } }
+    const request = {
+      connection: 'test',
+      root: { schema: 'parity', name: table },
+      formId: table.replace('_', '-'),
+      title: table,
+      lookups: [],
+      pinned: ['tenant_id'],
+      versionColumn: 'version',
+      validity: { from: 'valid_from', to: 'valid_to' },
+    }
     forms.set(table, generateForm(parity, request).bindings)
   }
   records = createSqlServerRecords(owner)
@@ -66,14 +75,24 @@ async function inserted(table: Table, row: { tenant?: number; product: number; f
     .input('ends', mssql.NVarChar(10), row.ends ?? null)
     .input('amount', mssql.NVarChar(40), row.amount ?? '9.5000')
     .input('note', mssql.NVarChar(50), row.note ?? null)
-    .query(`insert into parity.${table} (tenant_id, product_no, valid_from, valid_to, amount, note) values (@tenant, @product, convert(date, @from, 23), convert(date, @ends, 23), convert(decimal(18, 4), @amount), @note)`)
-  const token = recordToken(['tenant_id', 'product_no', 'valid_from'], { tenant_id: String(row.tenant ?? 1), product_no: String(row.product), valid_from: row.from })
+    .query(
+      `insert into parity.${table} (tenant_id, product_no, valid_from, valid_to, amount, note) values (@tenant, @product, convert(date, @from, 23), convert(date, @ends, 23), convert(decimal(18, 4), @amount), @note)`,
+    )
+  const token = recordToken(['tenant_id', 'product_no', 'valid_from'], {
+    tenant_id: String(row.tenant ?? 1),
+    product_no: String(row.product),
+    valid_from: row.from,
+  })
   if (!token.ok) throw new Error(token.message)
   return token.token
 }
 
 /** One product's versions as the owner reads them, by start. */
-async function versionsOf(table: Table, product: number, tenant = 1): Promise<Array<{ from: string; to: string | null; amount: string; note: string | null; version: string }>> {
+async function versionsOf(
+  table: Table,
+  product: number,
+  tenant = 1,
+): Promise<Array<{ from: string; to: string | null; amount: string; note: string | null; version: string }>> {
   const result = await owner
     .request()
     .input('tenant', mssql.Int, tenant)
@@ -105,7 +124,13 @@ async function asRead(table: Table, token: string): Promise<FormRecord> {
 }
 
 /** A change from a date planned over `read` and sent; its answer, as VERSION_PARITY names one. */
-async function changed(table: Table, token: string, version: string, answers: Record<string, unknown>, read: FormRecord): Promise<{ answer: string; outcome: RecordOutcome }> {
+async function changed(
+  table: Table,
+  token: string,
+  version: string,
+  answers: Record<string, unknown>,
+  read: FormRecord,
+): Promise<{ answer: string; outcome: RecordOutcome }> {
   const plan = planSupersede(parity, form(table), POLICY, CLARA, token, version, answers, read, await described(table))
   if (!plan.ok) throw new Error(`expected a change, got ${plan.code}: ${plan.message}`)
   const outcome = await records.supersede(plan.request)
@@ -120,7 +145,11 @@ describe('a change from a date on SQL Server (0113)', () => {
     const token = await inserted('price', { product: 1, from: '2026-01-01' })
     const { answer, outcome } = await changed('price', token, '1', { valid_from: '2026-07-01', amount: '10.0000' }, await asRead('price', token))
     expect(answer).toBe(expected('changed'))
-    expect(outcome).toMatchObject({ ok: true, values: { tenant_id: '1', product_no: '1', valid_from: '2026-07-01', valid_to: null, amount: '10.0000' }, version: '1' })
+    expect(outcome).toMatchObject({
+      ok: true,
+      values: { tenant_id: '1', product_no: '1', valid_from: '2026-07-01', valid_to: null, amount: '10.0000' },
+      version: '1',
+    })
     expect(await versionsOf('price', 1)).toEqual([
       { from: '2026-01-01', to: '2026-07-01', amount: '9.5000', note: null, version: '2' },
       { from: '2026-07-01', to: null, amount: '10.0000', note: null, version: '1' },
@@ -151,7 +180,11 @@ describe('a change from a date on SQL Server (0113)', () => {
   // sends: not found, and nothing written.
   test('finds no other tenant’s version', covers('sqlserver', versionCase('other-tenant')), async () => {
     const token = await inserted('price', { tenant: 2, product: 4, from: '2026-01-01' })
-    const read: FormRecord = { record: token, version: '1', answers: { tenant_id: 2, product_no: 4, valid_from: '2026-01-01', valid_to: null, amount: '9.5000', note: null } }
+    const read: FormRecord = {
+      record: token,
+      version: '1',
+      answers: { tenant_id: 2, product_no: 4, valid_from: '2026-01-01', valid_to: null, amount: '9.5000', note: null },
+    }
     expect((await changed('price', token, '1', { valid_from: '2026-07-01', amount: '10.0000' }, read)).answer).toBe(expected('other-tenant'))
     expect(await versionsOf('price', 4, 2)).toEqual([{ from: '2026-01-01', to: null, amount: '9.5000', note: null, version: '1' }])
   })
@@ -178,7 +211,14 @@ describe('a change from a date on SQL Server (0113)', () => {
   test('creates a chain’s first version only where it has none', covers('sqlserver', versionCase('chain-exists')), async () => {
     await inserted('price', { product: 6, from: '2026-01-01' })
     const create = async (product: number) => {
-      const plan = planCreate(parity, form('price'), POLICY, CLARA, { product_no: product, valid_from: '2026-03-01', amount: '1.0000' }, await described('price'))
+      const plan = planCreate(
+        parity,
+        form('price'),
+        POLICY,
+        CLARA,
+        { product_no: product, valid_from: '2026-03-01', amount: '1.0000' },
+        await described('price'),
+      )
       if (!plan.ok) throw new Error(`expected a create, got ${plan.code}`)
       const outcome = await records.insert(plan.request)
       return outcome.ok ? 'created' : outcome.code
@@ -196,7 +236,10 @@ describe('a change from a date on SQL Server (0113)', () => {
   // moved, nothing was inserted, and the change was answered not-found.
   test('is undone where the database declines the next version', covers('sqlserver', versionCase('next-declined')), async () => {
     const token = await inserted('price_declined', { product: 8, from: '2026-01-01', note: 'open' })
-    expect((await changed('price_declined', token, '1', { valid_from: '2026-07-01', amount: '10.0000', note: 'next' }, await asRead('price_declined', token))).answer).toBe(expected('next-declined'))
+    expect(
+      (await changed('price_declined', token, '1', { valid_from: '2026-07-01', amount: '10.0000', note: 'next' }, await asRead('price_declined', token)))
+        .answer,
+    ).toBe(expected('next-declined'))
     expect(await versionsOf('price_declined', 8)).toEqual([{ from: '2026-01-01', to: null, amount: '9.5000', note: 'open', version: '1' }])
   })
 })

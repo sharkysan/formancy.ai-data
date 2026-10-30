@@ -84,7 +84,10 @@ describe('the Versions of a root', () => {
     const regenerated = await within(drift).findByRole('region', { name: 'Regenerated from version 1' })
     await user.click(within(regenerated).getByRole('button', { name: 'Continue to presentation' }))
     const again = await goTo(user, 'Choose')
-    expect(within(again).getByRole('checkbox', { name: 'Each row of sales.price is a version, valid from a date until the next one starts' })).toHaveProperty('checked', true)
+    expect(within(again).getByRole('checkbox', { name: 'Each row of sales.price is a version, valid from a date until the next one starts' })).toHaveProperty(
+      'checked',
+      true,
+    )
     expect((within(again).getByLabelText('Valid from') as HTMLSelectElement).value).toBe('valid_from')
     await user.click(within(again).getByRole('button', { name: 'Generate the form' }))
     await screen.findByRole('main', { name: 'Generate' })

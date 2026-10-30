@@ -33,8 +33,8 @@ export function VersionsChoice({ root, choice, onChoice }: { root: ObjectMeta; c
         <label htmlFor="versions">Each row of {describeRef(root.ref)} is a version, valid from a date until the next one starts</label>
       </div>
       <p id="versions-hint" className="hint">
-        A person then changes the open version from a date: it ends there, and the next one starts, in one save. An ended
-        version is not edited, and no version is deleted, through the form.
+        A person then changes the open version from a date: it ends there, and the next one starts, in one save. An ended version is not edited, and no version
+        is deleted, through the form.
       </p>
       {chosen === null ? null : (
         <div className="pair">

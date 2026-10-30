@@ -76,7 +76,8 @@ export function planSupersede(
   const { prepared } = ready
   const validity = bindings.validity
   const concurrency = prepared.target.concurrency
-  if (validity === undefined || concurrency === null || !offers(bindings, 'supersede')) return refuse('operation-unavailable', 'This form does not offer a change from a date.')
+  if (validity === undefined || concurrency === null || !offers(bindings, 'supersede'))
+    return refuse('operation-unavailable', 'This form does not offer a change from a date.')
   if (!prepared.addressable) return unaddressable(prepared)
   for (const operation of ['update', 'create'] as const) {
     const authorized = authorizeOperation(policy, context, operation)
@@ -86,7 +87,8 @@ export function planSupersede(
   if (!read.ok) return read
   const fromField = fieldOf(bindings, validity.from)
   const toField = fieldOf(bindings, validity.to)
-  if (fromField === undefined || toField === undefined) return refuse('invalid-bindings', `A chain's ${validity.from} and ${validity.to} are fields of its form.`)
+  if (fromField === undefined || toField === undefined)
+    return refuse('invalid-bindings', `A chain's ${validity.from} and ${validity.to} are fields of its form.`)
   const opened = openAsRead(asRead, recordToken, fromField, toField)
   if (!opened.ok) return opened
   const submitted = withoutChainEchoes(bindings, validity, read.answers, opened.asRead)
@@ -105,7 +107,8 @@ export function planSupersede(
   }
   const key = decodeRecordKey(prepared.target.identity, recordToken)
   if (!key.ok) return refuse('invalid-record-token', key.message)
-  if (!versionFits(prepared, concurrency.kind, concurrency.column, expectedVersion)) return refuse('invalid-version', `This is not a version a ${concurrency.kind} returns.`)
+  if (!versionFits(prepared, concurrency.kind, concurrency.column, expectedVersion))
+    return refuse('invalid-version', `This is not a version a ${concurrency.kind} returns.`)
 
   const chain = new Set(validity.key)
   const fixed = new Map<string, ApiValue>(pinned.values.filter((entry) => !chain.has(entry.name)).map((entry) => [entry.name, entry.value]))
@@ -119,7 +122,8 @@ export function planSupersede(
   // at most, and both spelled as one shape, so their text orders them.
   if (asRead?.version === expectedVersion) {
     if (asRead.answers[toField] !== null) return refuse('version-ended', 'This version has ended; only the open version of a chain changes from a date.')
-    if (start.value <= String(asRead.answers[fromField])) return invalid([{ field: fromField, code: 'not-after', message: 'The next version must start after the open one starts.' }])
+    if (start.value <= String(asRead.answers[fromField]))
+      return invalid([{ field: fromField, code: 'not-after', message: 'The next version must start after the open one starts.' }])
   }
   const memberships = membershipChecks(snapshot, bindings, policy, context, 'create', decoded.selections)
   if (!memberships.ok) return memberships
@@ -151,7 +155,8 @@ export function planSupersede(
 
 /** The open version as read, holding its start and its end for this actor, or why a change cannot be planned without them. */
 function openAsRead(asRead: FormRecord | undefined, recordToken: string, fromField: string, toField: string): { ok: true; asRead: FormRecord } | PlanRefusal {
-  if (asRead === undefined) return refuse('record-not-read', 'A change from a date is planned with the version as read: where it starts, and whether it is open.')
+  if (asRead === undefined)
+    return refuse('record-not-read', 'A change from a date is planned with the version as read: where it starts, and whether it is open.')
   if (asRead.record !== recordToken) return refuse('record-not-read', 'The version as read is not the one this change addresses.')
   if (!Object.hasOwn(asRead.answers, fromField) || !Object.hasOwn(asRead.answers, toField)) {
     return refuse('field-denied', `A change from a date needs ${fromField} and ${toField} read, and this actor may not read both.`)
@@ -171,13 +176,25 @@ const held = (answer: unknown): string => canonicalize(answer === '' || answer =
  * starts ended -- refused as an update refuses a changed field it may not
  * write (0022).
  */
-function withoutChainEchoes(bindings: FormBindings, validity: ValidityBinding, answers: ReadonlyMap<string, unknown>, asRead: FormRecord): { ok: true; answers: ReadonlyMap<string, unknown> } | PlanRefusal {
+function withoutChainEchoes(
+  bindings: FormBindings,
+  validity: ValidityBinding,
+  answers: ReadonlyMap<string, unknown>,
+  asRead: FormRecord,
+): { ok: true; answers: ReadonlyMap<string, unknown> } | PlanRefusal {
   const kept = new Map(answers)
   for (const column of [...validity.key, validity.to]) {
     const field = fieldOf(bindings, column)
     if (field === undefined || !kept.has(field)) continue
-    const echoed = column === validity.to ? held(kept.get(field)) === held(null) : Object.hasOwn(asRead.answers, field) && held(kept.get(field)) === held(asRead.answers[field])
-    if (!echoed) return refuse('over-posting', `${field} is the server's in a change from a date: the next version's ${column === validity.to ? 'end is open' : 'chain is the one it follows'}.`)
+    const echoed =
+      column === validity.to
+        ? held(kept.get(field)) === held(null)
+        : Object.hasOwn(asRead.answers, field) && held(kept.get(field)) === held(asRead.answers[field])
+    if (!echoed)
+      return refuse(
+        'over-posting',
+        `${field} is the server's in a change from a date: the next version's ${column === validity.to ? 'end is open' : 'chain is the one it follows'}.`,
+      )
     kept.delete(field)
   }
   return { ok: true, answers: kept }

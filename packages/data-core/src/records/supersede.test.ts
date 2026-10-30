@@ -2,7 +2,24 @@ import { describe, expect, test } from 'vitest'
 import { planCreate, planUpdate } from './plan.js'
 import type { FormRecord } from './plan-types.js'
 import { planSupersede } from './supersede.js'
-import { AMOUNT, AUDITOR, CLERK, column, DATE, DEFINITION, described, INT32, orderForm, ORDER_POLICY, ORDER_TOKEN, sales, snapshot, TENANT_ONE, text, value } from './test-support.js'
+import {
+  AMOUNT,
+  AUDITOR,
+  CLERK,
+  column,
+  DATE,
+  DEFINITION,
+  described,
+  INT32,
+  orderForm,
+  ORDER_POLICY,
+  ORDER_TOKEN,
+  sales,
+  snapshot,
+  TENANT_ONE,
+  text,
+  value,
+} from './test-support.js'
 import { priced, priceForm, PRICE_POLICY } from './test-versions.js'
 import { recordToken } from './token.js'
 
@@ -41,7 +58,11 @@ describe('a change from a date', () => {
     expect(change()).toEqual({
       ok: true,
       request: {
-        target: { table: sales('price'), identity: [column('tenant_id', INT32), column('product_no', INT32), column('valid_from', DATE)], concurrency: { kind: 'version-column', column: 'row_version' } },
+        target: {
+          table: sales('price'),
+          identity: [column('tenant_id', INT32), column('product_no', INT32), column('valid_from', DATE)],
+          concurrency: { kind: 'version-column', column: 'row_version' },
+        },
         key: [value('tenant_id', INT32, '1'), value('product_no', INT32, '7'), value('valid_from', DATE, '2026-01-01')],
         expectedVersion: '1',
         filters: TENANT_ONE,
@@ -50,7 +71,14 @@ describe('a change from a date', () => {
         start: value('valid_from', DATE, '2026-07-01'),
         chain: [column('tenant_id', INT32), column('product_no', INT32)],
         values: [value('amount', AMOUNT, '10.0000'), value('note', text(100), 'summer')],
-        returning: [column('tenant_id', INT32), column('product_no', INT32), column('valid_from', DATE), column('valid_to', DATE), column('amount', AMOUNT), column('note', text(100))],
+        returning: [
+          column('tenant_id', INT32),
+          column('product_no', INT32),
+          column('valid_from', DATE),
+          column('valid_to', DATE),
+          column('amount', AMOUNT),
+          column('note', text(100)),
+        ],
         definition: DEFINITION,
       },
       fields: ['tenant_id', 'product_no', 'valid_from', 'valid_to', 'amount', 'note'],
@@ -68,7 +96,11 @@ describe('a change from a date', () => {
   test('refuses an ended version and a start not after the open one, as read at the version named', () => {
     expect(change(NEXT, asRead({ valid_to: '2026-06-01' }))).toMatchObject({ ok: false, code: 'version-ended' })
     for (const start of ['2026-01-01', '2025-12-31']) {
-      expect(change({ ...NEXT, valid_from: start }), start).toMatchObject({ ok: false, code: 'invalid-values', fieldErrors: [{ field: 'valid_from', code: 'not-after' }] })
+      expect(change({ ...NEXT, valid_from: start }), start).toMatchObject({
+        ok: false,
+        code: 'invalid-values',
+        fieldErrors: [{ field: 'valid_from', code: 'not-after' }],
+      })
     }
     expect(change(NEXT, asRead({ valid_to: '2026-06-01' }, '2'))).toMatchObject({ ok: true })
     expect(change({ amount: '10.0000' })).toMatchObject({ ok: false, code: 'invalid-values', fieldErrors: [{ field: 'valid_from', code: 'required' }] })
@@ -98,7 +130,9 @@ describe('a change from a date', () => {
     const updater = { ...PRICE_POLICY, operations: { ...PRICE_POLICY.operations, create: [] } }
     expect(planSupersede(PG, PRICE, updater, CLERK, TOKEN, '1', NEXT, asRead(), described(PG, PRICE))).toMatchObject({ ok: false, code: 'operation-denied' })
     const order = orderForm(snapshot('postgres')).bindings
-    expect(planSupersede(snapshot('postgres'), order, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', {}, undefined, described(snapshot('postgres'), order))).toMatchObject({ ok: false, code: 'operation-unavailable' })
+    expect(
+      planSupersede(snapshot('postgres'), order, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', {}, undefined, described(snapshot('postgres'), order)),
+    ).toMatchObject({ ok: false, code: 'operation-unavailable' })
   })
 })
 
@@ -115,7 +149,17 @@ describe('a form over versions', () => {
     const updated = planUpdate(PG, PRICE, PRICE_POLICY, CLERK, TOKEN, '1', { amount: '9.9000' }, asRead(), described(PG, PRICE))
     expect(updated).toMatchObject({ ok: true, request: { open: 'valid_to' } })
     const order = orderForm(snapshot('postgres')).bindings
-    const plain = planUpdate(snapshot('postgres'), order, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(snapshot('postgres'), order))
+    const plain = planUpdate(
+      snapshot('postgres'),
+      order,
+      ORDER_POLICY,
+      CLERK,
+      ORDER_TOKEN,
+      '1',
+      { notes: 'x' },
+      undefined,
+      described(snapshot('postgres'), order),
+    )
     expect(plain.ok && Object.hasOwn(plain.request, 'open')).toBe(false)
   })
 })
