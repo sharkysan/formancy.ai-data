@@ -429,7 +429,7 @@ export function insertStatement(request: InsertRequest, definition: Buffer): Sta
   const table = quoteTable(request.target.table)
   const columns = assigned.map(({ value }) => quoteName(value.name)).join(', ')
   const values = assigned.map(({ sql }) => sql).join(', ')
-  const fresh = undefined as string | undefined
+  const fresh: string | undefined = freshPredicate({ ...request, fresh: undefined }, assigned)
   const sql = writeBatch(parameters, {
     target: request.target,
     definition,
