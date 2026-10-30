@@ -74,12 +74,16 @@ describe('a change from a date', () => {
     expect(change({ amount: '10.0000' })).toMatchObject({ ok: false, code: 'invalid-values', fieldErrors: [{ field: 'valid_from', code: 'required' }] })
   })
 
-  // The chain and the end are the server's: an answer for either is
-  // over-posting, so no change starts another product's chain or opens a
-  // version that already ended. Watched failing with the chain's key left
-  // out of the check: the change was planned, product 8 among the next
-  // version's values.
-  test('refuses an answer for the chain’s key or for the end', () => {
+  // The chain and the end are the server's. A renderer submits every field,
+  // so a copy of the version echoes both: equal to it, and the end empty,
+  // they are dropped; another product, or an end, is over-posting -- no
+  // change starts another product's chain or a version already ended.
+  // Watched failing with the chain's key left out of the check: the change
+  // was planned, product 8 among the next version's values.
+  test('drops an echo of the chain’s key and of the empty end, and refuses another', () => {
+    const echoed = change({ ...NEXT, tenant_id: 1, product_no: 7, valid_to: '' })
+    expect(echoed).toMatchObject({ ok: true })
+    expect(echoed.ok && echoed.request.values.map((entry) => entry.name)).toEqual(['amount', 'note'])
     expect(change({ ...NEXT, product_no: 8 })).toMatchObject({ ok: false, code: 'over-posting' })
     expect(change({ ...NEXT, valid_to: '2026-12-31' })).toMatchObject({ ok: false, code: 'over-posting' })
   })

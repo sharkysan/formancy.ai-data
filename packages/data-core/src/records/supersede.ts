@@ -1,6 +1,7 @@
+import { canonicalize } from '@formancy/spec'
 import type { ApiValue } from '../codecs/codec.js'
 import { offers } from '../generate/offers.js'
-import type { FormBindings } from '../generate/types.js'
+import type { FormBindings, ValidityBinding } from '../generate/types.js'
 import type { ColumnMeta, MetadataSnapshot } from '../metadata.js'
 import { authorizeOperation, checkSubmittedFields } from '../policy/evaluate.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
@@ -67,17 +68,15 @@ export function planSupersede(
     const authorized = authorizeOperation(policy, context, operation)
     if (!authorized.ok) return authorized
   }
-  const submitted = readAnswers(answers)
-  if (!submitted.ok) return submitted
+  const read = readAnswers(answers)
+  if (!read.ok) return read
   const fromField = fieldOf(bindings, validity.from)
   const toField = fieldOf(bindings, validity.to)
   if (fromField === undefined || toField === undefined) return refuse('invalid-bindings', `A chain's ${validity.from} and ${validity.to} are fields of its form.`)
-  for (const column of [...validity.key, validity.to]) {
-    const field = fieldOf(bindings, column)
-    if (field !== undefined && submitted.answers.has(field)) {
-      return refuse('over-posting', `${field} is the server's in a change from a date: the next version's ${column === validity.to ? 'end is open' : 'chain is the one it follows'}.`)
-    }
-  }
+  const opened = openAsRead(asRead, recordToken, fromField, toField)
+  if (!opened.ok) return opened
+  const submitted = withoutChainEchoes(bindings, validity, read.answers, opened.asRead)
+  if (!submitted.ok) return submitted
   const filters = filtersFor(prepared, policy, context, 'update')
   if (!filters.ok) return filters
   const through = throughFor(snapshot, bindings, prepared, policy, context, 'update')
@@ -93,8 +92,6 @@ export function planSupersede(
   const key = decodeRecordKey(prepared.target.identity, recordToken)
   if (!key.ok) return refuse('invalid-record-token', key.message)
   if (!versionFits(prepared, concurrency.kind, concurrency.column, expectedVersion)) return refuse('invalid-version', `This is not a version a ${concurrency.kind} returns.`)
-  const read = openAsRead(asRead, recordToken, fromField, toField)
-  if (!read.ok) return read
 
   const chain = new Set(validity.key)
   const fixed = new Map<string, ApiValue>(pinned.values.filter((entry) => !chain.has(entry.name)).map((entry) => [entry.name, entry.value]))
@@ -139,11 +136,35 @@ export function planSupersede(
 }
 
 /** The open version as read, holding its start and its end for this actor, or why a change cannot be planned without them. */
-function openAsRead(asRead: FormRecord | undefined, recordToken: string, fromField: string, toField: string): { ok: true } | PlanRefusal {
+function openAsRead(asRead: FormRecord | undefined, recordToken: string, fromField: string, toField: string): { ok: true; asRead: FormRecord } | PlanRefusal {
   if (asRead === undefined) return refuse('record-not-read', 'A change from a date is planned with the version as read: where it starts, and whether it is open.')
   if (asRead.record !== recordToken) return refuse('record-not-read', 'The version as read is not the one this change addresses.')
   if (!Object.hasOwn(asRead.answers, fromField) || !Object.hasOwn(asRead.answers, toField)) {
     return refuse('field-denied', `A change from a date needs ${fromField} and ${toField} read, and this actor may not read both.`)
   }
-  return { ok: true }
+  return { ok: true, asRead }
+}
+
+/** An answer as one value: an empty one is NULL, as a renderer sends an empty date. */
+const held = (answer: unknown): string => canonicalize(answer === '' || answer === undefined ? null : answer)
+
+/**
+ * The answers less the echoes of what the server gives the next version:
+ * the chain's key, copied from the version ended, and the end, which a new
+ * version holds open. A renderer submits every field, so a copy of the
+ * version sends them as read; equal to it, each is dropped, and the end
+ * empty. Anything else is over-posting -- another chain, a version that
+ * starts ended -- refused as an update refuses a changed field it may not
+ * write (0022).
+ */
+function withoutChainEchoes(bindings: FormBindings, validity: ValidityBinding, answers: ReadonlyMap<string, unknown>, asRead: FormRecord): { ok: true; answers: ReadonlyMap<string, unknown> } | PlanRefusal {
+  const kept = new Map(answers)
+  for (const column of [...validity.key, validity.to]) {
+    const field = fieldOf(bindings, column)
+    if (field === undefined || !kept.has(field)) continue
+    const echoed = column === validity.to ? held(kept.get(field)) === held(null) : Object.hasOwn(asRead.answers, field) && held(kept.get(field)) === held(asRead.answers[field])
+    if (!echoed) return refuse('over-posting', `${field} is the server's in a change from a date: the next version's ${column === validity.to ? 'end is open' : 'chain is the one it follows'}.`)
+    kept.delete(field)
+  }
+  return { ok: true, answers: kept }
 }
