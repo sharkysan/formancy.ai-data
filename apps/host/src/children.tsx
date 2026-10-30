@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DataClient, FormMenuChild, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { ColumnsPanel } from './columns-panel.js'
+import { fieldHeading } from './field-heading.js'
 import { FilterPanel } from './filter-panel.js'
 import { panelFields } from './filter-terms.js'
 import { columnsOf } from './grid-datasource.js'
@@ -138,7 +139,7 @@ export function ChildSection({
   openRef.current = open
 
   const title = menu.title
-  const fieldLabel = String(definition.form.model.fields.find((field) => field.key === child.field)?.label ?? child.field)
+  const fieldLabel = fieldHeading(definition.form.model.fields.find((field) => field.key === child.field) ?? { key: child.field })
   const headingId = `${idBase}-${String(index)}-heading`
   const canCreate = menu.operations.includes('create') && definition.operations.includes('create')
   const waiting = parent.kind === 'new'

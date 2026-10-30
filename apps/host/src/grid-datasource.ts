@@ -1,5 +1,6 @@
 import type { IDatasource, IGetRowsParams, SortModelItem } from 'ag-grid-community'
 import type { DataClient, FormRecord, ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
+import { fieldHeading } from './field-heading.js'
 import { sameSort } from './views.js'
 
 /*
@@ -52,7 +53,7 @@ export function columnsOf(definition: PublishedForm, parentField: string | null)
     .filter((field) => readable.has(field.key) && field.key !== parentField)
     .map((field) => {
       const source = (field as { optionsSource?: unknown }).optionsSource
-      return { key: field.key, label: String(field.label ?? field.key), sortable: sortable.has(field.key), source: typeof source === 'string' ? source : null }
+      return { key: field.key, label: fieldHeading(field), sortable: sortable.has(field.key), source: typeof source === 'string' ? source : null }
     })
 }
 

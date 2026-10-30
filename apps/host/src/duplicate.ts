@@ -1,5 +1,6 @@
 import type { FormRecord } from '@formancy/data-client'
 import type { FieldDef } from '@formancy/spec'
+import { fieldHeading } from './field-heading.js'
 import type { Said } from './leave.js'
 
 /*
@@ -31,7 +32,7 @@ export function copyOf(record: FormRecord, copied: readonly string[]): FormRecor
 /** The labels of the fields that held a value in `record` and are not copied, in the form's order: the values a person will not see carried. */
 export function leftOut(fields: readonly FieldDef[], record: FormRecord, copied: readonly string[]): string[] {
   const kept = new Set(copied)
-  return fields.filter((field) => !kept.has(field.key) && held(record.answers[field.key])).map((field) => String(field.label ?? field.key))
+  return fields.filter((field) => !kept.has(field.key) && held(record.answers[field.key])).map((field) => fieldHeading(field))
 }
 
 /** What the detail's line says of a copy: the record copied, into which forms, and the fields left out. */

@@ -79,6 +79,16 @@ describe('the fields a panel offers', () => {
     expect(panelFields(redrawn).find((offered) => offered.field === 'shipped_at')?.days).toBe('utc')
     expect(panelFields({ ...definition, list: null })).toEqual([])
   })
+
+  // A label may be `{ $t }`, which the page cannot resolve (0079): the panel
+  // offers the field by its key, never as "[object Object]".
+  test('offer a field whose label is a message reference by its key', () => {
+    const referenced = {
+      ...definition,
+      form: { ...definition.form, model: { fields: [{ key: 'carrier', type: 'text', label: { $t: 'shipment.carrier' } }] } },
+    } as unknown as PublishedForm
+    expect(panelFields(referenced).find((offered) => offered.field === 'carrier')?.label).toBe('carrier')
+  })
 })
 
 describe('the condition a draft asks for', () => {

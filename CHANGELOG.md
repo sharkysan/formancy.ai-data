@@ -277,6 +277,12 @@ later.
 
 ### Fixed
 
+- **A field whose label is a message reference is named by its key, not
+  "[object Object]"**, in the host's grid columns, the filter panel, a
+  child's title and the line that says what a copy left out. A form stored
+  with a `{ $t }` label is served as stored (0079), and the CSV export
+  already headed its column with the key; the page wrote `String(label)`.
+  Found by the linter's `no-base-to-string`.
 - **A grid's row says what Space and Enter do in Drill down**: both open
   the record and move the keyboard to it. AG Grid's live region said what
   the other layouts do -- Space opens it and keeps the keyboard in the

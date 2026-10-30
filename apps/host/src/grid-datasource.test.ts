@@ -181,4 +181,16 @@ describe("a grid's columns", () => {
     ])
     expect(columnsOf(definition, 'order').map((column) => column.key)).toEqual(['line_no', 'quantity'])
   })
+
+  // A label may be `{ $t }`, a reference into a catalogue the page cannot
+  // read (0079): the column is headed by the key, as the export heads its
+  // own, and not "[object Object]" (watched failing with `String(label)`).
+  test('are headed by the key where the label is a message reference', () => {
+    const referenced = {
+      ...definition,
+      form: { ...definition.form, model: { fields: [{ key: 'quantity', type: 'integer', label: { $t: 'line.quantity' } }] } },
+      readable: ['quantity'],
+    } as unknown as PublishedForm
+    expect(columnsOf(referenced, null).map((column) => column.label)).toEqual(['quantity'])
+  })
 })
