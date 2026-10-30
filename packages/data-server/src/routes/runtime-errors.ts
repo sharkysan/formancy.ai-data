@@ -63,6 +63,9 @@ function fieldOf(bindings: FormBindings, column: string | undefined): string | u
   return undefined
 }
 
+/** A read that found no record inside the filters, as the port's failure, for the answers that need one. */
+export const NOT_FOUND: RecordFailure = { ok: false, code: 'not-found', message: 'No such record exists inside the filters.' }
+
 /**
  * A database's refusal as an HTTP answer (0015).
  *

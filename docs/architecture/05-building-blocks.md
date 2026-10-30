@@ -260,7 +260,8 @@ The routes, one plane per file prefix:
 | `routes/admin-browse.ts` | administrator | a connection's browse: a page of a table or view, discovered again and planned by `planBrowse` (0099), narrowed to a row's values when it follows a foreign key, 400 `not-comparable` for a narrowing the plan refuses (0103), and filtered by a person's conditions by column, 400 `not-filterable` for one the plan refuses (0104) |
 | `routes/admin-gate.ts` | administrator | the gate an import, a submit and an approval each pass |
 | `routes/admin-audit.ts` | administrator | `ADMIN_OPERATIONS`, every route's audit name (0033) |
-| `routes/runtime.ts` | runtime | a form, a record's read, create and update; `ROUTE_OPERATIONS`; registers the files below ([0022](../decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)) |
+| `routes/runtime.ts` | runtime | a form and a record's read; `ROUTE_OPERATIONS`; registers the files below ([0022](../decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)) |
+| `routes/runtime-writes.ts` | runtime | a create and an update, each once per sending of its write id (0031), an echo of a field the person may not write removed first (0022, 0098) and each selection checked against its lookup within the lookup deadline (0061) |
 | `routes/runtime-menu.ts` | runtime | `GET /v1/forms`, each bundle read alone (0045) |
 | `routes/runtime-lists.ts` | runtime | a page of records (0044) |
 | `routes/runtime-exports.ts` | runtime | a file of every page, made whole or refused, one export per connection at a time, its labels through `lookupScope` (0079) |

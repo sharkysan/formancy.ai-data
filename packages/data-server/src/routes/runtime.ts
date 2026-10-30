@@ -1,52 +1,34 @@
 import {
-  authorizeOperation,
-  checkSubmittedFields,
   copiedFields,
   deleteEffects,
   driftRefusal,
   grantedOperations,
-  intendedRecord,
   listable,
   listColumns,
   NOTHING_LEFT,
-  planCreate,
   planRead,
-  planUpdate,
   READ_REFUSED,
   readableFields,
-  rejectedSelection,
   runtimeOperations,
   toFormAnswers,
 } from '@formancy/data-core'
-import type {
-  DescribedTable,
-  DriftChange,
-  FieldError,
-  FormRecord,
-  MembershipCheck,
-  PlanRefusal,
-  PolicyContext,
-  PolicyOperation,
-  PublishedForm,
-  RecordFailure,
-} from '@formancy/data-core'
+import type { DescribedTable, DriftChange, PlanRefusal, PolicyContext, PolicyOperation, PublishedForm, RecordFailure } from '@formancy/data-core'
 import type { HostIdentity } from '@formancy/data-identity'
-import { canonicalize } from '@formancy/spec'
-import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry, OpenConnection } from '../connections.js'
 import type { AuditSink, RuntimeAuditEvent, RuntimeOperation } from '../audit.js'
 import { auditedForm, auditRequests, recordReference } from '../audit.js'
-import { lookupDeadline } from '../lookup-deadline.js'
 import { loadPublished } from '../published.js'
 import { registerDeleteRoute } from './runtime-deletes.js'
-import { planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
+import { NOT_FOUND, planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
 import { registerExportRoute } from './runtime-exports.js'
 import { registerListRoute } from './runtime-lists.js'
 import { registerLookupRoutes } from './runtime-lookups.js'
 import { registerMenuRoute } from './runtime-menu.js'
-import { createWriteOnce, INVALID_WRITE_ID, writeId } from './write-once.js'
+import { registerWriteRoutes } from './runtime-writes.js'
+import { createWriteOnce } from './write-once.js'
 import type { WriteAnswer } from './write-once.js'
 
 export interface RuntimeOptions {
@@ -98,56 +80,12 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
 
 export { MAX_RESOLVE } from './runtime-lookups.js'
 
-/** A read that found no record inside the filters, as the port's failure, for the answers that need one. */
-const NOT_FOUND: RecordFailure = { ok: false, code: 'not-found', message: 'No such record exists inside the filters.' }
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function contextOf(identity: HostIdentity): PolicyContext {
   return { actor: { id: identity.actor.id, roles: [...identity.actor.roles] }, attributes: { ...identity.attributes } }
-}
-
-/**
- * The answers a renderer submits, minus the fields it echoed back that this
- * actor may not write.
- *
- * A formancy renderer submits every field, disabled ones included, and the
- * policy calls a submitted field the actor may not write over-posting (0011).
- * Whether the actor may write a field is the policy's decision, so it is asked
- * — one key at a time, through `checkSubmittedFields` — rather than restated
- * here: a defaulted column the generator left writable can still be one the
- * policy grants nobody. The echo is removed on create when it is empty, and on
- * update when it equals what the record holds. Anything else in such a field
- * still reaches the planner and is refused: a changed value there is
- * tampering, and is not saved (0022). Unless the record has moved on since
- * the version the person sent (`behind`): then the echo is what they read
- * before another write moved the field -- a computed total, a stamp a trigger
- * sets -- so it is removed too, and the guarded statement answers the save as
- * the stale one it is (0098). An unedited instant or time the actor may write
- * is the planner's to remove, against the same read (0040).
- */
-function withoutEchoes(
-  bundle: PublishedBundle,
-  actor: PolicyContext,
-  operation: 'create' | 'update',
-  answers: unknown,
-  current?: Readonly<Record<string, unknown>>,
-  behind = false,
-): unknown {
-  if (!isRecord(answers)) return answers
-  const kept: Record<string, unknown> = { ...answers }
-  for (const binding of bundle.bindings.fields) {
-    if (!Object.hasOwn(kept, binding.field)) continue
-    if (checkSubmittedFields(bundle.policy, actor, bundle.bindings, operation, [binding.field]).ok) continue
-    const value = kept[binding.field]
-    const echo = behind || (current === undefined
-      ? value === null || value === undefined || value === ''
-      : Object.hasOwn(current, binding.field) && canonicalize(value ?? null) === canonicalize(current[binding.field] ?? null))
-    if (echo) delete kept[binding.field]
-  }
-  return kept
 }
 
 /**
@@ -286,125 +224,6 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   }
 
   /**
-   * Runs every membership check: undefined when every selection is a member,
-   * otherwise the refusal to answer. Answered rather than sent, so an
-   * update's checks run inside the sending they belong to (0031).
-   *
-   * Each check has a lookup deadline of its own, counted from when the
-   * adapter is asked for it, and nothing else (0061): a write goes on after
-   * its client leaves (0031), so no abandonment stops it. A check
-   * past its deadline keeps the answer every failed check has, nothing
-   * saved, and the log says the deadline passed.
-   */
-  async function memberships(open: OpenConnection, checks: readonly MembershipCheck[], log: FastifyBaseLogger): Promise<WriteAnswer | undefined> {
-    const errors: FieldError[] = []
-    for (const check of checks) {
-      const deadline = lookupDeadline(options.lookupDeadlineMs)
-      try {
-        const rejected = await open.lookups.rejects(check.config, check.tokens, check.filters, deadline.signal)
-        if (rejected.length > 0) errors.push(rejectedSelection(check.field))
-      } catch (error) {
-        // Fails closed, as formancy's own membership port does (formancy.ai 0077).
-        if (deadline.signal.aborted && error === deadline.signal.reason) log.warn({ field: check.field, deadlineMs: options.lookupDeadlineMs }, 'a lookup could not vouch for a selection: it passed its deadline, and the database was told to stop it')
-        else log.warn({ field: check.field, error: (error as Error).message }, 'a lookup could not vouch for a selection')
-        return { status: 503, body: { code: 'unavailable', message: 'A selection could not be checked. Nothing was saved.' } }
-      } finally {
-        deadline.clear()
-      }
-    }
-    return errors.length === 0 ? undefined : { status: 422, body: { code: 'invalid-values', message: 'A selection is not one of the options.', fieldErrors: errors } }
-  }
-
-  /**
-   * One create, from the description it is decided over to the insert,
-   * answered rather than sent: the create route runs it once per sending, so
-   * a write id that arrives again is answered with this answer and asks the
-   * database nothing (0031). The mirror of `updated`.
-   *
-   * The policy is asked before any statement, so an actor it refuses reaches
-   * none (0041). Then the root is described, the one statement before the
-   * planner: a create the description stops is refused there, with no
-   * membership check and no insert sent, and the insert carries the
-   * definition it was decided over.
-   */
-  async function created(request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, open: OpenConnection, answers: Record<string, unknown>): Promise<WriteAnswer> {
-    const actor = context(request)
-    const authorized = authorizeOperation(bundle.policy, actor, 'create')
-    if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
-    const root = await describedRoot(bundle, open)
-    if (!root.ok) return root.answer
-    const plan = planCreate(bundle.snapshot, bundle.bindings, bundle.policy, actor, withoutEchoes(bundle, actor, 'create', answers), root.described)
-    if (!plan.ok) {
-      if (plan.code === 'invalid-values') return { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }
-      return refusal(request, 'create', plan)
-    }
-    const refused = await memberships(open, plan.memberships, request.log)
-    if (refused !== undefined) return refused
-    const outcome = await open.records.insert(plan.request)
-    if (!outcome.ok && outcome.code === 'unknown-outcome') return lost(request, 'create', intendedRecord(plan.request), null, outcome.message)
-    if (!outcome.ok) return recordFailure(bundle.bindings, outcome)
-    const done = toFormAnswers(bundle.bindings, plan.fields, outcome)
-    return { status: 201, body: done, record: done.record ?? undefined }
-  }
-
-  /**
-   * One update, from the read that tells an echo from a change to the write,
-   * answered rather than sent: the update route runs it once per sending, so
-   * a write id that arrives again is answered with this answer and asks the
-   * database nothing, its read included (0031).
-   *
-   * The policy is asked first, before any statement (0041). The record as it
-   * stands is read next, and the read carries the table's description, which
-   * the update is decided over. Against the record 0022 removes an unchanged
-   * echo of a field the actor may not write, and the planner one of an
-   * instant or a time they may (0040). An actor who may update and not read
-   * gets no echo removed, and the planner needs no read for them: the table
-   * is described for them in a statement of its own, as it is after a read
-   * that failed. When the planner cannot tell an echo from a change because
-   * the read failed, whatever the failure, that failure is the answer: sent
-   * anyway, a read that failed and a write that did not would store the cut
-   * value.
-   */
-  async function updated(request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, open: OpenConnection, record: string, version: string, answers: Record<string, unknown>): Promise<WriteAnswer> {
-    const actor = context(request)
-    const authorized = authorizeOperation(bundle.policy, actor, 'update')
-    if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
-    let current: FormRecord | undefined
-    let unread: RecordFailure | undefined
-    let described: DescribedTable | undefined
-    const reading = planRead(bundle.snapshot, bundle.bindings, bundle.policy, actor, record)
-    if (reading.ok) {
-      const stored = await open.records.read(reading.request)
-      if (!stored.ok) unread = stored
-      else {
-        described = stored.described
-        if (stored.record === null) unread = NOT_FOUND
-        else current = toFormAnswers(bundle.bindings, reading.fields, { ok: true, ...stored.record })
-      }
-    }
-    if (described === undefined) {
-      const root = await describedRoot(bundle, open)
-      if (!root.ok) return root.answer
-      described = root.described
-    }
-    // The record as read now is newer than the one the person saved over: the
-    // database will answer stale, and an echo the change moved is not theirs.
-    const behind = current !== undefined && current.version !== null && current.version !== version
-    const plan = planUpdate(bundle.snapshot, bundle.bindings, bundle.policy, actor, record, version, withoutEchoes(bundle, actor, 'update', answers, current?.answers, behind), current, described)
-    if (!plan.ok) {
-      if (plan.code === 'invalid-values') return { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }
-      if (plan.code === 'record-not-read' && unread !== undefined) return recordFailure(bundle.bindings, unread)
-      return refusal(request, 'update', plan)
-    }
-    const refused = await memberships(open, plan.memberships, request.log)
-    if (refused !== undefined) return refused
-    const outcome = await open.records.update(plan.request)
-    if (!outcome.ok && outcome.code === 'unknown-outcome') return lost(request, 'update', record, version, outcome.message)
-    if (!outcome.ok) return recordFailure(bundle.bindings, outcome)
-    return { status: 200, body: toFormAnswers(bundle.bindings, plan.fields, outcome) }
-  }
-
-  /**
    * A read the database refused, a record's or a page's: one that names a
    * column that is gone -- `schema-changed` -- returned no description, so
    * the table is described once more and the read decided over that, and a
@@ -506,34 +325,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   // A file of every page a list would show (0079): the list's steps, page after page, and a lookup's for the labels.
   registerExportRoute(app, { published, connection, context, unread, undecided, answered, lookupDeadlineMs: options.lookupDeadlineMs })
 
-  app.post<{ Params: { id: string } }>('/v1/forms/:id/records/create', async (request, reply) => {
-    const body = request.body
-    if (!isRecord(body) || !isRecord(body['answers'])) return reply.code(400).send({ code: 'invalid-request', message: 'Expected { answers }.' })
-    const id = writeId(request)
-    if (id === null) return answered(reply, INVALID_WRITE_ID)
-    const bundle = await published(request.params.id, reply)
-    if (bundle === undefined) return reply
-    const open = await connection(bundle, reply)
-    if (open === undefined) return reply
-    const answers = body['answers']
-    return answered(reply, await sendOnce(request, 'create', id, () => created(request, bundle, open, answers)))
-  })
-
-  app.post<{ Params: { id: string } }>('/v1/forms/:id/records/update', async (request, reply) => {
-    const body = request.body
-    if (!isRecord(body) || typeof body['record'] !== 'string' || typeof body['version'] !== 'string' || !isRecord(body['answers'])) {
-      return reply.code(400).send({ code: 'invalid-request', message: 'Expected { record, version, answers }.' })
-    }
-    if (request.auditTrail !== undefined) request.auditTrail.record = body['record']
-    const id = writeId(request)
-    if (id === null) return answered(reply, INVALID_WRITE_ID)
-    const bundle = await published(request.params.id, reply)
-    if (bundle === undefined) return reply
-    const open = await connection(bundle, reply)
-    if (open === undefined) return reply
-    const { record, version, answers } = body
-    return answered(reply, await sendOnce(request, 'update', id, () => updated(request, bundle, open, record, version, answers)))
-  })
+  // A record's answers written once per sending of a write id (0031): its echoes removed and its selections checked first.
+  registerWriteRoutes(app, { published, connection, context, sendOnce, lost, refusal, describedRoot, answered, lookupDeadlineMs: options.lookupDeadlineMs })
 
   // One record, by its token and the version read (0050): the update's steps, a delete's answers.
   registerDeleteRoute(app, { published, connection, context, sendOnce, lost, refusal, answered })
