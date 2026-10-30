@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { derivedLimitations, renderContent, renderReport, renderSummary } from './render.mjs'
+import { derivedLimitations } from './derived-limitations.mjs'
+import { renderContent, renderReport, renderSummary } from './render.mjs'
 import { buildReport } from './report.mjs'
 import { copy, greenCiRun, greenRun, job, server, withFirefox, withWebKit } from './synthetic-run.mjs'
 
