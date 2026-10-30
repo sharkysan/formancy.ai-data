@@ -10,6 +10,8 @@ import type { GridColumn } from './grid-datasource.js'
 import { RecordGrid } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt, RowDelete } from './record-grid.js'
 import type { GridSection } from './prefs.js'
+import { RecordTree } from './record-tree.js'
+import { Segmented } from './segmented.js'
 import { useGridState } from './use-grid-state.js'
 import { ViewPicker } from './view-picker.js'
 
@@ -54,6 +56,8 @@ export function Records({
   remove,
   after,
   drilling,
+  tree,
+  onTreeOpen,
 }: {
   client: DataClient
   formId: string
@@ -78,8 +82,13 @@ export function Records({
   after: ReactNode
   /** Shown in Drill down: the grid's rows say so (0090). */
   drilling: boolean
+  /** The lookup field through which the form is its own child, which offers its records as a tree (0110); null for none. */
+  tree: string | null
+  /** A record opened from the tree; `back` gives the keyboard back to its item. */
+  onTreeOpen: (token: string, how: OpenHow, back: () => void) => void
 }): ReactElement {
   const [typed, setTyped] = useState(search)
+  const [shape, setShape] = useState<'grid' | 'tree'>('grid')
   const views = definition.list?.views ?? []
   /** The filter as applied, the sort and the columns: the grid's, and the file's but for the columns, for this form, which mounts the panel again (form-view.tsx). */
   const state = useGridState({ formId, section: RECORDS, columns, list: definition.list })
@@ -125,6 +134,22 @@ export function Records({
         ) : null}
         {definition.list === null ? null : <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort, parent: null, filter })} />}
       </div>
+      {tree === null ? null : (
+        <Segmented
+          legend="Show the records as"
+          name="records-shape"
+          className="records-shape"
+          options={[
+            { value: 'grid', label: 'Grid' },
+            { value: 'tree', label: 'Tree' },
+          ]}
+          value={shape}
+          onChange={setShape}
+        />
+      )}
+      {tree !== null && shape === 'tree' ? (
+        <RecordTree client={client} formId={formId} definition={definition} field={tree} labelledBy="records-heading" openToken={openToken} onOpen={onTreeOpen} />
+      ) : (
       <RecordGrid
         ref={grid}
         client={client}
@@ -160,6 +185,7 @@ export function Records({
           searchRef.current?.focus()
         }}
       />
+      )}
     </section>
   )
 }

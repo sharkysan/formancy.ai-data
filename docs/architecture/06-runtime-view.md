@@ -223,7 +223,12 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    block before: the datasource keeps every answered page's `next` by the
    row the page after it starts at
    ([0108](../decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md));
-   a new filter or sort starts the grid again from its first row. A View picker (`apps/host/src/view-picker.tsx`) offers
+   a new filter or sort starts the grid again from its first row. A form
+   that is its own child can show its records as a tree instead
+   (`apps/host/src/record-tree.tsx`): each level the same list with
+   `parent`, the roots with `record: null`, the field's columns NULL
+   ([0110](../decisions/0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md)).
+   A View picker (`apps/host/src/view-picker.tsx`) offers
    `list.views`, and its Show view sets both at once, as one first page; a
    choice in its select alone sends nothing. The grid opens on what the
    viewer's browser kept for the form -- a view by name, or a sort -- else

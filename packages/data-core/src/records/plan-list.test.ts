@@ -403,6 +403,23 @@ describe('planList', () => {
     })
   })
 
+  // No parent (0110): the rows whose field references nothing, every one of
+  // its columns NULL -- a tree's roots -- as the person's own `null`
+  // conditions, beside theirs, so an adapter spells it as it spells those
+  // (0104). A field the actor may not read names no roots either: their
+  // absence would say which rows reference something. Watched failing with
+  // the NULL conditions left out: the roots were every order.
+  test('narrows to the rows referencing no parent, every column of the field NULL', () => {
+    const planned = planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ parent: { field: 'employee', record: null }, filter: [{ field: 'notes', op: 'null' }] }))
+    expect(planned).toMatchObject({ ok: true, request: { equal: [], filter: [{ op: 'null', column: 'notes' }, { op: 'null', column: 'created_by' }] } })
+    expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ parent: { field: 'customer', record: null } }))).toMatchObject({
+      ok: true,
+      request: { equal: [], filter: [{ op: 'null', column: 'tenant_id' }, { op: 'null', column: 'customer_no' }] },
+    })
+    const hidden: FormPolicy = { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, customer: { read: [], write: ['clerk'] } } }
+    expect(planList(PG, PG_ORDER, hidden, CLERK, query({ parent: { field: 'customer', record: null } }))).toMatchObject({ ok: false, code: 'invalid-request' })
+  })
+
   // Bindings from another snapshot name columns that may mean something else,
   // and are refused before the policy is asked, which reads them. A key no
   // token can carry addresses nothing, and is refused with its own code

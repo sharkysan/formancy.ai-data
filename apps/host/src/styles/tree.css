@@ -1,0 +1,62 @@
+/*
+ * A form's records as a tree (0110): each level indented under the record
+ * it belongs to, the open record marked as a grid's open row is, and the
+ * room's focus ring on the one item in the tab order.
+ */
+
+.tree,
+.tree [role='group'] {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree [role='group'] {
+  padding-inline-start: 1.25rem;
+  border-inline-start: 1px solid var(--edge);
+  margin-inline-start: 0.5rem;
+}
+
+.tree-item {
+  padding: 0.125rem 0;
+  cursor: pointer;
+}
+
+.tree-item > .tree-name {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  /* A name is one long word on a phone. */
+  overflow-wrap: anywhere;
+}
+
+/* Expandable or expanded: a mark before the name says which, drawn and not read. */
+.tree-item[aria-expanded] > .tree-name::before {
+  content: '▸' / '';
+  display: inline-block;
+  inline-size: 1em;
+  margin-inline-end: 0.25rem;
+}
+
+.tree-item[aria-expanded='true'] > .tree-name::before {
+  content: '▾' / '';
+}
+
+.tree-item[aria-selected='true'] > .tree-name {
+  background: color-mix(in srgb, var(--client) 25%, transparent);
+}
+
+.tree-item:focus-visible {
+  outline: none;
+}
+
+.tree-item:focus-visible > .tree-name,
+.tree-more:focus-visible {
+  outline: 2px solid var(--server);
+  outline-offset: 2px;
+}
+
+.tree-more {
+  padding: 0.25rem 0.5rem;
+  color: var(--client);
+}

@@ -430,6 +430,9 @@ draws a child that is a section of the record -- its one row in a form, or
 Add -- shown by `src/section.ts` while the record as stored holds its
 condition's answer
 ([0109](../decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md));
+`src/record-tree.tsx` shows a form that is its own child as a tree of its
+records, a level asked for when it is expanded
+([0110](../decisions/0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md));
 Drill down, a layout of one level at a time, is
 `src/use-drill.ts` -- the levels below the record, in memory -- with
 `src/drill-level.tsx` drawing a level, `src/trail.tsx` the trail back up,

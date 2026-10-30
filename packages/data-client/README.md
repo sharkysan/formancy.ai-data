@@ -142,7 +142,9 @@ the forms the server says this person may read, each with its title, the
 operations its policy grants them as published, and its children -- a
 child form and the lookup field its rows name this form's records by, so a
 host lists one record's children with
-`list(child.form, { parent: { field: child.field, record } })`. The server
+`list(child.form, { parent: { field: child.field, record } })` -- and,
+with `record: null`, the rows whose field references none: a tree's roots
+(0110). The server
 asks no database for it: `form(formId)` says what the database allows now,
 and can still refuse a form the menu named. A child that is `one` is a
 section of the record (0109): at most one of its rows references it, a page

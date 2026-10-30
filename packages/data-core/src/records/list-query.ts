@@ -72,12 +72,12 @@ export function readSort(sort: unknown): { ok: true; sort: ListSortTerm[] } | Ma
   return { ok: true, sort: terms }
 }
 
-/** The parent: absent or `null` for none, otherwise exactly a field key and a record token, both text. */
+/** The parent: absent or `null` for none, otherwise exactly a field key and a record token, both text, or the token `null` for the rows referencing none (0110). */
 function parentOf(parent: unknown): { ok: true; parent: RecordListQuery['parent'] } | Malformed {
   if (parent === undefined || parent === null) return { ok: true, parent: null }
   if (!isRecord(parent) || !hasExactly(parent, ['field', 'record'])) return malformed('The parent is { field, record } and nothing else, or null.')
   const { field, record } = parent
-  if (typeof field !== 'string' || field === '' || typeof record !== 'string') return malformed("The parent names a lookup field by its key and the parent's record token.")
+  if (typeof field !== 'string' || field === '' || (typeof record !== 'string' && record !== null)) return malformed("The parent names a lookup field by its key and the parent's record token, or null for none.")
   return { ok: true, parent: { field, record } }
 }
 
