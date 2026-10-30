@@ -106,7 +106,7 @@ describe('the state moves', () => {
     await addMove(user, policy, 2, 'placed', 'shipped', 'clerk')
     await pressEnter(user, within(policy).getByRole('button', { name: 'Remove move 1' }))
     expect(focusedName()).toBe('Remove move 1')
-    expect((within(policy).getByLabelText('From in move 1') as HTMLInputElement).value).toBe('placed')
+    expect(within(policy).getByLabelText<HTMLInputElement>('From in move 1').value).toBe('placed')
     await pressEnter(user, within(policy).getByRole('button', { name: 'Remove move 1' }))
     expect(focusedName()).toBe('Add a move')
     await user.selectOptions(within(policy).getByLabelText('State field'), '')
