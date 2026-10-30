@@ -128,7 +128,8 @@ describe('a change from a date on PostgreSQL (0113)', () => {
   })
 
   // Ended at the version sent -- by another writer that left its version --
-  // the version is history: version-ended, and nothing is written.
+  // the version is history: version-ended, and nothing is written. Watched
+  // failing with the NULL end left out of the statement: it was changed.
   test('refuses a version that has ended at the version sent', covers('postgres', versionCase('ended')), async () => {
     const token = await inserted('price', { product: 3, from: '2026-01-01' })
     const read = await asRead('price', token)
@@ -147,7 +148,8 @@ describe('a change from a date on PostgreSQL (0113)', () => {
   })
 
   // An update holds only an open version: an ended one is history, and
-  // the open one updates as any record does.
+  // the open one updates as any record does. Watched failing with `open`
+  // left out of the update's WHERE: the ended version was updated.
   test('updates the open version, and refuses one that has ended', covers('postgres', versionCase('update-ended')), async () => {
     const ended = await inserted('price', { product: 5, from: '2026-01-01', ends: '2026-07-01' })
     const open = await inserted('price', { product: 5, from: '2026-07-01' })
@@ -179,7 +181,8 @@ describe('a change from a date on PostgreSQL (0113)', () => {
 
   // The trigger returns NULL for the next version after the open one was
   // ended in the same statement: the statement's own check fails it, 21000,
-  // which undoes the end too.
+  // which undoes the end too. Watched failing with the check narrowed to
+  // two versions ended: the end stood, answered as a change.
   test('is undone where the database declines the next version', covers('postgres', versionCase('next-declined')), async () => {
     const token = await inserted('price_declined', { product: 8, from: '2026-01-01', note: 'open' })
     expect((await changed('price_declined', token, '1', { valid_from: '2026-07-01', amount: '10.0000', note: 'next' }, await asRead('price_declined', token))).answer).toBe(expected('next-declined'))

@@ -137,7 +137,8 @@ describe('a change from a date on SQL Server (0113)', () => {
   })
 
   // Ended at the version sent -- by another writer that left its version --
-  // the version is history: version-ended, and nothing is written.
+  // the version is history: version-ended, and nothing is written. Watched
+  // failing with the NULL end left out of the statement: it was changed.
   test('refuses a version that has ended at the version sent', covers('sqlserver', versionCase('ended')), async () => {
     const token = await inserted('price', { product: 3, from: '2026-01-01' })
     const read = await asRead('price', token)
@@ -156,7 +157,8 @@ describe('a change from a date on SQL Server (0113)', () => {
   })
 
   // An update holds only an open version: an ended one is history, and
-  // the open one updates as any record does.
+  // the open one updates as any record does. Watched failing with `open`
+  // left out of the update's WHERE: the ended version was updated.
   test('updates the open version, and refuses one that has ended', covers('sqlserver', versionCase('update-ended')), async () => {
     const ended = await inserted('price', { product: 5, from: '2026-01-01', ends: '2026-07-01' })
     const open = await inserted('price', { product: 5, from: '2026-07-01' })
@@ -171,7 +173,8 @@ describe('a change from a date on SQL Server (0113)', () => {
     expect((await versionsOf('price', 5)).map((row) => row.amount)).toEqual(['9.5000', '11.0000'])
   })
 
-  // A create starts a chain only where the chain has none.
+  // A create starts a chain only where the chain has none. Watched failing
+  // with the insert's condition left out: a second chain was created.
   test('creates a chain’s first version only where it has none', covers('sqlserver', versionCase('chain-exists')), async () => {
     await inserted('price', { product: 6, from: '2026-01-01' })
     const create = async (product: number) => {
@@ -189,6 +192,8 @@ describe('a change from a date on SQL Server (0113)', () => {
   // The trigger moves the version just ended to another product, so the
   // batch does not find it again to copy its chain from, and the next
   // version is not inserted: the batch's own check rolls the end back too.
+  // Watched failing with the check left out: the end committed, the row
+  // moved, nothing was inserted, and the change was answered not-found.
   test('is undone where the database declines the next version', covers('sqlserver', versionCase('next-declined')), async () => {
     const token = await inserted('price_declined', { product: 8, from: '2026-01-01', note: 'open' })
     expect((await changed('price_declined', token, '1', { valid_from: '2026-07-01', amount: '10.0000', note: 'next' }, await asRead('price_declined', token))).answer).toBe(expected('next-declined'))
