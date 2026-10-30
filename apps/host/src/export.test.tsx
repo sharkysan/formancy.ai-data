@@ -5,7 +5,8 @@ import type { PublishedForm, RecordExportQuery } from '@formancy/data-client'
 import { focusedName } from './test-accessible.js'
 import { answeredOnce, chooseForm, exportButton, exportLine, formLink, gridSection, gridStatus, keeping, load, loaded, mount, newRecord, searchRecords, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
-import { EDGES, ENGINES, holdingRequests, startPlane, TOKENS } from './test-plane.js'
+import { holdingRequests } from './test-network.js'
+import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane, Sent } from './test-plane.js'
 
 /*

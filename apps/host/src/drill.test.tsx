@@ -5,7 +5,8 @@ import type { DataClient } from '@formancy/data-client'
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { answeredOnce, chooseForm, gridSection, mount, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { RendererName, User } from './test-host.js'
-import { EDGES, ENGINES, holdingRequests, startPlane, TOKENS } from './test-plane.js'
+import { holdingRequests } from './test-network.js'
+import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
 /*

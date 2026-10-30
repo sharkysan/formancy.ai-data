@@ -4,7 +4,8 @@ import { NOT_FOUND } from './deletion.js'
 import { focusedName, paragraphs } from './test-accessible.js'
 import { chooseForm, chooseRenderer, gridSection, gridStatus, mount, newRecord, rendered, searchRecords, shows, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { User } from './test-host.js'
-import { EDGES, ENGINES, losingWrites, startPlane, TOKENS } from './test-plane.js'
+import { losingWrites } from './test-network.js'
+import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
 /*

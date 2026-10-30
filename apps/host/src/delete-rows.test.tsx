@@ -5,7 +5,8 @@ import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { focusedName, paragraphs } from './test-accessible.js'
 import { answer, answeredOnce, chooseForm, chooseRenderer, gridSection, gridStatus, mount, rendered, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { User } from './test-host.js'
-import { EDGES, ENGINES, holdingRequests, startPlane, TOKENS } from './test-plane.js'
+import { holdingRequests } from './test-network.js'
+import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
 /*

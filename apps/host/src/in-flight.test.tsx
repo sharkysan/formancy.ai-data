@@ -2,8 +2,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, waitFor, within } from '@testing-library/react'
 import { answer, chooseCustomer, control, load, newRecord, openWith, RENDERERS, said, save, shows, statuses, unsavedNotice } from './test-host.js'
 import type { User } from './test-host.js'
-import { EDGES, ENGINES, holdingWrites, startPlane } from './test-plane.js'
-import type { Engine, Holding, Plane } from './test-plane.js'
+import { holdingWrites } from './test-network.js'
+import type { Holding } from './test-network.js'
+import { EDGES, ENGINES, startPlane } from './test-plane.js'
+import type { Engine, Plane } from './test-plane.js'
 
 /*
  * A save the server has not answered yet, through the page. Neither renderer

@@ -14,7 +14,8 @@ import { demoDoor } from './test-demo.js'
 import type { DemoDoor } from './test-demo.js'
 import { chooseForm, chooseRenderer, formLink, load, loaded, mount, signInAs } from './test-host.js'
 import type { User } from './test-host.js'
-import { EDGES, ENGINES, holdingRequests, startPlane } from './test-plane.js'
+import { holdingRequests } from './test-network.js'
+import { EDGES, ENGINES, startPlane } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 
 /*

@@ -5,7 +5,8 @@ import { CASCADES, HELD, NOT_FOUND, REMOVED, RESTRICTED, SAVE_OUT } from './dele
 import { focusedName, paragraphs } from './test-accessible.js'
 import { answer, answeredOnce, chooseForm, chooseRenderer, gridSection, gridStatus, mount, newRecord, notice, paper, rendered, said, save, searchRecords, shows, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { User } from './test-host.js'
-import { EDGES, ENGINES, holdingRequests, holdingWrites, startPlane, TOKENS } from './test-plane.js'
+import { holdingRequests, holdingWrites } from './test-network.js'
+import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
 /*

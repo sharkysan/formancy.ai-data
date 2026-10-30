@@ -3,8 +3,10 @@ import type { DataClient, FormRecord, PublishedForm } from '@formancy/data-clien
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest'
 import { CHANGED_SINCE_UNKNOWN, createSession, HELD } from './session.js'
 import type { Session } from './session.js'
-import { EDGES, ENGINES, holdingWrites, losingWrites, startPlane, TOKENS } from './test-plane.js'
-import type { Holding, Losing, Plane } from './test-plane.js'
+import { holdingWrites, losingWrites } from './test-network.js'
+import type { Holding, Losing } from './test-network.js'
+import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
+import type { Plane } from './test-plane.js'
 
 /*
  * What one pane's session does with a save, against the real server on both
