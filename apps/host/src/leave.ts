@@ -62,6 +62,8 @@ export type LeaveRequest =
   | { kind: 'load'; record: string }
   /** Duplicate record (0107): a new record copied from `record`, which replaces the detail's. */
   | { kind: 'duplicate'; record: string }
+  /** Change from a date (0115): the next version of `record`, which replaces the detail's. */
+  | { kind: 'change'; record: string }
   | { kind: 'form'; title: string }
   | { kind: 'history'; direction: 'back' | 'forward' }
   | { kind: 'sign-out' }
@@ -150,6 +152,7 @@ export function discards(request: LeaveRequest): Discarded | null {
     case 'new':
     case 'load':
     case 'duplicate':
+    case 'change':
       return { owners: 'all', spares: RECORDS_GRID, renderers: 'all' }
     case 'form':
     case 'history':
@@ -209,6 +212,8 @@ export function lead(request: LeaveRequest): Said {
       return ['Loading ', { code: request.record }, closes]
     case 'duplicate':
       return ['Copying ', { code: request.record }, ` into a new record${closes}`]
+    case 'change':
+      return ['Starting the next version of ', { code: request.record }, closes]
     case 'created':
       return ['Opening ', { code: request.record }, `, just created in ${RENDERER_NAMES[request.by]},${closes}`]
     case 'new':

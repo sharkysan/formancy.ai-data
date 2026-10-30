@@ -148,8 +148,11 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // by a page that did less (watched failing with 0050's exception for the
     // delete route removed before the page had a control: delete unused;
     // and with 0079's for the export removed before Download CSV: export
-    // unused). A change from a date is the one exception: the server has it
-    // since 0113, and the page has no control that sends it yet.
+    // unused). A change from a date is the one exception: the page sends it
+    // since 0115, from a form over versions, and this journey's forms are
+    // not one -- their tenant travels in a lookup's token, where a price's
+    // tenant is a column a renderer echoes, which the rule below refuses.
+    // change.test.tsx sends it, through the page, on both engines.
     const UNSENT: ReadonlySet<string> = new Set(['supersede'])
     expect(ROUTES.filter(({ matches, operation }) => !UNSENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
 

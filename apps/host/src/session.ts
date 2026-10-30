@@ -92,6 +92,11 @@ export interface SessionState {
   version: string | undefined
   /** What the form is open for, which decides the policy's lookup filter. */
   operation: LookupOperation
+  /**
+   * A next version (0113, 0115): the open version it follows, by token and
+   * the version read, which its save ends. Absent for a record or a new one.
+   */
+  follows?: { record: string; version: string }
 }
 
 /** The engine on screen, and how many times the session has opened one: a new number is a new form. */
@@ -188,17 +193,22 @@ export function createSession({ client, formId, definition, renderer, namespace,
   /** Read through a getter, so moving from create to update needs no new map -- in Angular, no new application. */
   const sources = lookupSources(client, formId, form, () => state.operation)
 
-  function open(record?: FormRecord): FormEngine {
+  /** The fields a next version takes from the one it follows, and its end: never the person's (0115). */
+  const following = disableFields(form, definition.versions === null ? [] : [...definition.versions.key, definition.versions.to])
+  /** Whether `record` is a version that has ended: history, drawn as nothing to write (0113). */
+  const ended = (record: FormRecord | undefined): boolean => definition.versions !== null && record !== undefined && (record.answers[definition.versions.to] ?? null) !== null
+
+  function open(record?: FormRecord, follows?: SessionState['follows']): FormEngine {
     const token = record?.record ?? undefined
     const engine = createFormEngine({
-      schema: token !== undefined && !allows('update') ? readOnly : form,
+      schema: follows !== undefined ? following : token !== undefined && (!allows('update') || ended(record)) ? readOnly : form,
       // One id namespace per renderer: two renderers of one document on one
       // page would otherwise mint every element id twice (formancy.ai 0095).
       formId: `${ids}-${renderer}`,
       ...(record === undefined ? {} : { initialValue: record.answers }),
       capabilities: CAPABILITIES,
     })
-    state = { record: token, version: record?.version ?? undefined, operation: operationFor(token) }
+    state = { record: token, version: record?.version ?? undefined, operation: operationFor(token), ...(follows === undefined ? {} : { follows }) }
     baseline = structuredClone(engine.value()) as Record<string, unknown>
     opened = { engine, generation: (opened?.generation ?? 0) + 1 }
     notify()
@@ -225,7 +235,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
     // Stale against the version this form's unknown update sent: the record
     // moved on, most likely by that update. Still unknown, and still checkable.
     const here = lostHere()
-    if (!outcome.ok && outcome.status === 409 && outcome.code === 'stale' && here?.write.operation === 'update' && here.write.record === at.record && here.write.version === at.version) {
+    if (!outcome.ok && outcome.status === 409 && outcome.code === 'stale' && (here?.write.operation === 'update' || here?.write.operation === 'supersede') && here.write.record === at.record && here.write.version === at.version) {
       return { kind: 'unknown', message: CHANGED_SINCE_UNKNOWN, unknown: here.write }
     }
     // Answered: an earlier unknown save of this form is no longer the last one.
@@ -258,15 +268,18 @@ export function createSession({ client, formId, definition, renderer, namespace,
   async function send(engine: FormEngine, generation: number, answers: Record<string, unknown>): Promise<SaveResult> {
     // A copy: the answers as they went, whatever the engine holds by the time the server answers.
     const sent = structuredClone(answers)
-    const { record, version } = state
+    const { record, version, follows } = state
+    // A next version ends the one it follows and is created in one write (0113).
     const outcome =
-      record === undefined
-        ? await client.create(formId, sent)
-        : await client.update(formId, { record, version: version ?? '', answers: sent })
+      follows !== undefined
+        ? await client.supersede(formId, { record: follows.record, version: follows.version, answers: sent })
+        : record === undefined
+          ? await client.create(formId, sent)
+          : await client.update(formId, { record, version: version ?? '', answers: sent })
     // Load or New replaced the form while this was in flight: the answer must
     // not move the new form's record, and is still said, as the old form's.
     if (current().generation !== generation) return { kind: 'replaced', message: `${REPLACED} ${said(outcome, record === undefined)}` }
-    return settle(engine, generation, sent, { record, version }, outcome, record === undefined)
+    return settle(engine, generation, sent, follows ?? { record, version }, outcome, record === undefined)
   }
 
   /** The record as this form was opened or last saved: its token, its version, and the answers as stored. */
@@ -303,7 +316,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
      * and an unknown write's hold goes, as Load and New clear it (0031).
      */
     discard(): void {
-      open(saved())
+      open(saved(), state.follows)
     },
     /**
      * The record as opened or last saved, with nothing typed since: what
@@ -319,7 +332,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
       }
     },
     state: (): SessionState => ({ ...state }),
-    /** A new engine over `record`, or over nothing for a new record. The old one, and its draft, are dropped. */
+    /** A new engine over `record`, or over nothing for a new record -- or the next version of `follows` (0115). The old one, and its draft, are dropped. */
     open,
     /**
      * Read the record again and open it: "Load the saved record" after a
