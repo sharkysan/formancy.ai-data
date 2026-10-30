@@ -49,25 +49,25 @@ import type { DescribedTable, RecordColumn, RecordValue } from './types.js'
  */
 
 /** The answers by field key, own properties only, so `constructor` is never found on a prototype. */
-function readAnswers(answers: unknown): { ok: true; answers: ReadonlyMap<string, unknown> } | PlanRefusal {
+export function readAnswers(answers: unknown): { ok: true; answers: ReadonlyMap<string, unknown> } | PlanRefusal {
   if (typeof answers !== 'object' || answers === null || Array.isArray(answers)) {
     return refuse('invalid-request', 'The answers are an object of field keys and values.')
   }
   return { ok: true, answers: new Map(Object.entries(answers)) }
 }
 
-function invalid(errors: FieldError[]): InvalidValues {
+export function invalid(errors: FieldError[]): InvalidValues {
   return { ok: false, code: 'invalid-values', message: `${errors.map((error) => error.field).join(', ')} cannot be written`, fieldErrors: errors }
 }
 
 /** Values in the root's catalog order, however they were assembled. */
-function inCatalogValues(root: ObjectMeta, values: readonly RecordValue[]): RecordValue[] {
+export function inCatalogValues(root: ObjectMeta, values: readonly RecordValue[]): RecordValue[] {
   const position = new Map(root.columns.map((column, index) => [column.name, index]))
   return [...values].sort((left, right) => (position.get(left.name) as number) - (position.get(right.name) as number))
 }
 
 /** What a write reads back, and the fields `toFormAnswers` may show: nothing but the key for an actor who may not read. */
-function readBack(prepared: Prepared, bindings: FormBindings, policy: FormPolicy, context: PolicyContext): { fields: string[]; returning: RecordColumn[] } {
+export function readBack(prepared: Prepared, bindings: FormBindings, policy: FormPolicy, context: PolicyContext): { fields: string[]; returning: RecordColumn[] } {
   const readable = readableFields(policy, context, bindings)
   const fields = readable.ok ? readable.fields : []
   return { fields, returning: readColumns(prepared, bindings, fields) }
@@ -89,21 +89,24 @@ const REQUIRED = { code: 'required', message: 'A value is required.' } as const
  * NULL, no default, not generated and not pinned. One with a default is left
  * out of the request, which is how the default applies. A field a through
  * names (`scoping`) is required on create and may not be cleared, whatever
- * its column allows (0043).
+ * its column allows (0043). A column the write takes from elsewhere
+ * (`supplied`) -- a chain's key, copied from the version a change from a
+ * date ends (0113) -- is not required of the answers.
  */
-function decodeAnswers(
+export function decodeAnswers(
   prepared: Prepared,
   bindings: FormBindings,
   answers: ReadonlyMap<string, unknown>,
   fixed: ReadonlyMap<string, ApiValue>,
   operation: 'create' | 'update',
   scoping: ReadonlySet<string>,
+  supplied: ReadonlySet<string> = new Set(),
 ): DecodedAnswers {
   const decoded: DecodedAnswers = { values: [], errors: [], selections: [] }
   for (const binding of bindings.fields) {
     const columns = columnsOf(binding).map((name) => prepared.columns.get(name) as ColumnMeta)
     if (!answers.has(binding.field)) {
-      const required = scoping.has(binding.field) || columns.some((column) => !fixed.has(column.name) && !column.nullable && !column.hasDefault && column.generated === 'none')
+      const required = scoping.has(binding.field) || columns.some((column) => !fixed.has(column.name) && !supplied.has(column.name) && !column.nullable && !column.hasDefault && column.generated === 'none')
       if (operation === 'create' && required) decoded.errors.push({ field: binding.field, ...REQUIRED })
       continue
     }
@@ -129,7 +132,7 @@ function decodeAnswers(
  * the lookup's target. A lookup that cannot be configured offers no options,
  * so a selection of it cannot be rechecked and the request is refused.
  */
-function membershipChecks(
+export function membershipChecks(
   snapshot: MetadataSnapshot,
   bindings: FormBindings,
   policy: FormPolicy,
@@ -184,7 +187,7 @@ export function planRead(snapshot: MetadataSnapshot, bindings: FormBindings, pol
 }
 
 /** The pinned columns a create writes from the context, through their columns' codecs. */
-function pinnedValues(prepared: Prepared, policy: FormPolicy, context: PolicyContext): { ok: true; values: RecordValue[] } | PlanRefusal {
+export function pinnedValues(prepared: Prepared, policy: FormPolicy, context: PolicyContext): { ok: true; values: RecordValue[] } | PlanRefusal {
   const forced = forcedValues(policy, context)
   if (!forced.ok) return forced
   const scoped = scopeRowFilters(prepared.root, forced.values, 'rowFilters')
@@ -236,9 +239,15 @@ export function planCreate(snapshot: MetadataSnapshot, bindings: FormBindings, p
   if (!move.ok) return move
 
   const { fields, returning } = readBack(prepared, bindings, policy, context)
+  const values = inCatalogValues(prepared.root, [...pinned.values, ...decoded.values])
+  // A create of a chain's first version holds only where the chain has none
+  // (0113), asked of the key's values it writes. A key part the database
+  // fills is not compared: a part of the key alone would match other chains.
+  const chain = bindings.validity?.key ?? []
+  const fresh = chain.length > 0 && chain.every((name) => values.some((value) => value.name === name)) ? { fresh: [...chain] } : {}
   return {
     ok: true,
-    request: { target: prepared.target, values: inCatalogValues(prepared.root, [...pinned.values, ...decoded.values]), returning, definition: described.definition },
+    request: { target: prepared.target, values, returning, definition: described.definition, ...fresh },
     fields,
     memberships: memberships.checks,
     moved: move.moved,
@@ -386,6 +395,8 @@ export function planUpdate(
       through: through.through,
       returning,
       definition: described.definition,
+      // An update of a version that has ended matches nothing (0113).
+      ...(bindings.validity === undefined ? {} : { open: bindings.validity.to }),
     },
     fields,
     memberships: memberships.checks,

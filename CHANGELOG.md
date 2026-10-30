@@ -261,6 +261,34 @@ later.
   - The form still offers every value the field accepts: a move the person
     may not make is refused after Save, not hidden from the choice.
 
+- **A form over a table of versions changes the open version from a date,
+  ending it and starting the next in one write** (0113). Why: a price, a
+  rate or a contract's terms is kept as versions, each valid from one date
+  until the next starts, and a form over such a table either overwrote the
+  current version or needed two saves -- which could leave a gap, an
+  overlap or two open versions. What you notice:
+  - **A generation request may name `validity: { from, to }`**: the columns
+    a version starts and ends at, both dates or both instants, the open
+    version NULL in its end, with a key holding the start. The generator
+    refuses any other pair. The end is never written by the form, the
+    start and the chain's key on create only, and no delete is offered.
+  - **`POST /v1/forms/:id/records/supersede`** ends the open version where
+    the answers start the next one and inserts the next, needing create
+    and update from the policy: one statement on PostgreSQL, and on SQL
+    Server two in the one transaction its write batch already is. It
+    answers 201 with the next version, 409 `version-ended` for a version
+    that has ended, and a field error for a start not after the open one's.
+    `@formancy/data-client` has `supersede`.
+  - **A create of a chain that has a version is 409 `chain-exists`**, and an
+    update of a version that has ended 409 `version-ended`.
+  - **`GET /v1/forms/:id` gains `versions`**, the fields a version starts
+    and ends at, or `null`. This release's `@formancy/data-client` reads a
+    form without it as unexpected, so a host and its server are upgraded
+    together. The audit names the operation `supersede`.
+  - Append only: an ended version is not edited through the form. The
+    studio cannot yet name a chain and the host page does not yet offer a
+    change; both follow.
+
 ### Changed
 
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's

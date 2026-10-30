@@ -20,9 +20,9 @@ export interface UnknownWrite {
   code: 'unknown-outcome'
   /** The server's sentence when the database lost the answer; the client's own when the page lost it. */
   message: string
-  /** `delete` since 0050. */
-  operation: 'create' | 'update' | 'delete'
-  /** Update and delete: the token sent. Create: the token the server says it would have, or null. */
+  /** `delete` since 0050, `supersede` -- a change from a date -- since 0113. */
+  operation: 'create' | 'update' | 'delete' | 'supersede'
+  /** Update, delete and supersede: the token sent. Create: the token the server says it would have, or null. */
   record: string | null
   /**
    * Update and delete: the version sent -- saving again with exactly it is
@@ -49,7 +49,7 @@ export function isUnknownWrite(outcome: { ok: boolean }): outcome is UnknownWrit
 
 /** What a write addressed, as the call knows it: the transport can lose an answer, never the call's own arguments. */
 export interface WriteIntent {
-  operation: 'create' | 'update' | 'delete'
+  operation: 'create' | 'update' | 'delete' | 'supersede'
   record: string | null
   version: string | null
 }
@@ -82,7 +82,7 @@ function lost(intent: WriteIntent, status: number): UnknownWrite {
  * 6. Anything else -- a 500, another 502 or 504 -- was lost.
  */
 export function writeOutcome(answer: WriteAnswer, intent: WriteIntent & { operation: 'delete' }): DeleteOutcome
-export function writeOutcome(answer: WriteAnswer, intent: WriteIntent & { operation: 'create' | 'update' }): WriteOutcome
+export function writeOutcome(answer: WriteAnswer, intent: WriteIntent & { operation: 'create' | 'update' | 'supersede' }): WriteOutcome
 export function writeOutcome(answer: WriteAnswer, intent: WriteIntent): WriteOutcome | DeleteOutcome {
   if (!answer.answered) return lost(intent, 0)
   const { status, body } = answer

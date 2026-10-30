@@ -90,6 +90,11 @@ export function versionIs(statement: Statement, request: Pick<UpdateRequest, 'ta
   return `${column(request.target.concurrency.column)} ${op('=')} ${statement.as(request.expectedVersion, 'pg_catalog.numeric')}`
 }
 
+/** A form over versions (0113): the update holds only while the version is open, its end NULL. */
+function openSql(request: Pick<UpdateRequest, 'open'>): string[] {
+  return request.open === undefined ? [] : [`${column(request.open)} is null`]
+}
+
 export function selectFrom(table: ObjectRef, select: readonly string[], where: readonly string[]): string {
   // An empty select list is legal in PostgreSQL, and reads as a mistake.
   return [`select ${select.length > 0 ? select.join(', ') : 'true'}`, `from ${quoteTable(table)} as ${ROW}`, `where ${where.join(' and ')}`].join('\n')
@@ -169,13 +174,21 @@ export function readStatement(request: ReadRequest, terms: readonly RowFilterTer
  * `false`, or NULL for no such record. The digest depends on no session
  * (definition.ts), so any connection answers it as the write's would.
  */
-export function nothingChangedStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], withVersion: boolean, definition: Definition): RecordStatement {
+export function nothingChangedStatement(
+  request: Pick<UpdateRequest, 'target' | 'key' | 'expectedVersion' | 'open'>,
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  withVersion: boolean,
+  definition: Definition,
+): RecordStatement {
   const statement = new Statement()
   const same = `(${digestOf(factsOf(statement, request.target.table))} ${op('=')} ${statement.text(definition.digest)})::pg_catalog.text`
   const where = located(statement, request.key, terms, through)
   const unchanged = withVersion ? `(${versionIs(statement, request)})::pg_catalog.text` : `'false'`
-  const found = `${selectFrom(request.target.table, [`${unchanged} as "unchanged"`], where)}\nlimit 1`
-  return { text: `select ${same}, ${ISOLATION}, "found"."unchanged"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`, params: statement.params }
+  // A version that has ended (0113): `'false'` where it has, `'true'` for a version still open or a form without versions.
+  const open = request.open === undefined ? `'true'` : `(${column(request.open)} is null)::pg_catalog.text`
+  const found = `${selectFrom(request.target.table, [`${unchanged} as "unchanged"`, `${open} as "open"`], where)}\nlimit 1`
+  return { text: `select ${same}, ${ISOLATION}, "found"."unchanged", "found"."open"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`, params: statement.params }
 }
 
 /** Whether the table's definition is still `definition`, and this connection's isolation: after a write that wrote nothing or failed. */
@@ -183,6 +196,25 @@ export function definitionStatement(table: ObjectRef, definition: Definition): R
   const statement = new Statement()
   const same = `(${digestOf(factsOf(statement, table))} ${op('=')} ${statement.text(definition.digest)})::pg_catalog.text`
   return { text: `select ${same}, ${ISOLATION}`, params: statement.params }
+}
+
+/** The alias of the rows a chain's other versions are looked for among (0113). */
+const CHAIN = '"c"'
+
+/**
+ * Whether no row has the chain's key a create writes: a condition on the
+ * insert's own SELECT, so the insert holds only where it starts a chain.
+ * Each part compares with pg_catalog's operator, as a key does. Under READ
+ * COMMITTED two creates of one chain at once both find none, and both
+ * insert -- unless the table holds one open version per chain itself.
+ */
+export function freshSql(statement: Statement, request: InsertRequest): string | undefined {
+  if (request.fresh === undefined) return undefined
+  const parts = request.fresh.map((name) => {
+    const value = request.values.find((entry) => entry.name === name) as RecordValue
+    return `${CHAIN}.${quoteIdentifier(name)} ${op('=')} ${bound(statement, value)}`
+  })
+  return `not exists (select from ${quoteTable(request.target.table)} as ${CHAIN} where ${parts.join(' and ')})`
 }
 
 /**
@@ -199,7 +231,8 @@ export function insertStatement(request: InsertRequest, definition: Definition, 
   const table = `insert into ${quoteTable(request.target.table)} as ${ROW}`
   const columns = request.values.length === 0 ? '' : ` (${request.values.map((value) => quoteIdentifier(value.name)).join(', ')})`
   const values = request.values.map((value) => bound(statement, value)).join(', ')
-  const body = `select ${values}\nwhere ${guard(statement, request.target.table, definition, path).join(' and ')}`
+  const fresh = freshSql(statement, request)
+  const body = `select ${values}\nwhere ${[...guard(statement, request.target.table, definition, path), ...(fresh === undefined ? [] : [fresh])].join(' and ')}`
   const returning = outputs(request.target, request.returning)
   const text = [`${table}${columns}`, body, returning.length > 0 ? `returning ${returning.join(', ')}` : ''].filter((part) => part !== '').join('\n')
   return { text, params: statement.params }
@@ -218,7 +251,7 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
   const version = request.target.concurrency.column
   const set = request.set.map((value) => `${quoteIdentifier(value.name)} = ${bound(statement, value)}`)
   set.push(`${quoteIdentifier(version)} = ${column(version)} ${op('+')} 1`)
-  const where = [...located(statement, request.key, terms, through), versionIs(statement, request), ...guard(statement, request.target.table, definition, path)]
+  const where = [...located(statement, request.key, terms, through), versionIs(statement, request), ...openSql(request), ...guard(statement, request.target.table, definition, path)]
   const text = [
     `update ${quoteTable(request.target.table)} as ${ROW}`,
     `set ${set.join(', ')}`,

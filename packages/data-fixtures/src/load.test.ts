@@ -102,6 +102,8 @@ describe('the fixture files', () => {
       'keyed',
       'party',
       'party_company',
+      'price',
+      'price_declined',
       'removable',
       'removable_cascade',
       'removable_child',

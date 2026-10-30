@@ -123,7 +123,7 @@ describe('when the data server is not what answers', () => {
   // data-core does not name, a direction but ascending or descending, a
   // default but `true`. Watched failing with `views` left unchecked.
   test("a form without the server's list is unexpected, and a list of null or columns is the server's", async () => {
-    const FORM = { form: { model: {} }, operations: ['read'], readable: ['id'], deleting: null, copied: null }
+    const FORM = { form: { model: {} }, operations: ['read'], readable: ['id'], deleting: null, copied: null, versions: null }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
@@ -369,6 +369,7 @@ describe('across origins (0060)', () => {
       exportRecords: () => client.exportRecords('pg-order', { search: 'a' }),
       create: () => client.create('pg-order', { notes: 'a' }),
       update: () => client.update('pg-order', CHANGE),
+      supersede: () => client.supersede('pg-order', CHANGE),
       delete: () => client.delete('pg-order', { record: 'k1:7', version: '00000000000007d1' }),
       reconcile: () => client.reconcile('pg-order', lost),
       query: () => client.query('pg-order', 'order.customer', { operation: 'read', search: 'a' }),
@@ -634,7 +635,7 @@ describe('a delete (0050)', () => {
   // all, is no form this server sent, as a form without `list` is not
   // (watched failing with `deleting` left unchecked).
   test("a form's deleting is null exactly when it offers no delete", async () => {
-    const FORM = { form: { model: {} }, readable: ['id'], list: null, copied: null }
+    const FORM = { form: { model: {} }, readable: ['id'], list: null, copied: null, versions: null }
     const DELETING = { cascades: false, clears: false, restricted: true }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -667,7 +668,7 @@ describe('a delete (0050)', () => {
   // copy nobody decided -- as one from a server older than 0107, which
   // sends nothing, would.
   test("a form's copied is null exactly when it offers no create, and field keys when it does", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null }
+    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
@@ -691,6 +692,38 @@ describe('a delete (0050)', () => {
     ] as const) {
       body = { ...FORM, operations, copied }
       expect(await client.form('pg-ticket')).toEqual({ ok: true, value: body })
+    }
+  })
+
+  // `versions` names where a version starts and ends only on a form that
+  // offers both create and update, and is null otherwise (0113): a reply
+  // naming them without both, naming something else, or saying nothing --
+  // a server older than 0113 -- is no form this server sent, and a page
+  // that offered a change from it would offer one nobody decided.
+  test("a form's versions are null, or the start and end where it offers create and update", async () => {
+    const FORM = { form: { model: {} }, readable: ['id', 'valid_from', 'valid_to'], list: null, deleting: null, copied: [] }
+    const VERSIONS = { from: 'valid_from', to: 'valid_to' }
+    let body: unknown = FORM
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    for (const [operations, versions] of [
+      [['read', 'create', 'update'], undefined],
+      [['read', 'create'], VERSIONS],
+      [['read', 'create', 'update'], { from: 'valid_from' }],
+      [['read', 'create', 'update'], 'valid_from'],
+    ] as const) {
+      body = { ...FORM, operations, versions }
+      expect(await client.form('pg-price'), JSON.stringify(body)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
+    for (const [operations, versions] of [
+      [['read', 'create'], null],
+      [['read', 'create', 'update'], VERSIONS],
+      [['read', 'create', 'update'], null],
+    ] as const) {
+      body = { ...FORM, operations, versions }
+      expect(await client.form('pg-price')).toEqual({ ok: true, value: body })
     }
   })
 

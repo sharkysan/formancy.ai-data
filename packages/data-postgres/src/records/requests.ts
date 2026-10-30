@@ -1,4 +1,4 @@
-import type { InsertRequest, RecordTarget, RecordValue, RowFilterTerm, UpdateRequest } from '@formancy/data-core'
+import type { InsertRequest, RecordTarget, RecordValue, RowFilterTerm, SupersedeRequest, UpdateRequest } from '@formancy/data-core'
 
 /**
  * Checks on the shape of a record request, made before anything is sent.
@@ -31,6 +31,9 @@ export function checkKey(target: RecordTarget, key: readonly RecordValue[]): voi
 
 export function checkInsert(request: InsertRequest): void {
   once(request.values, 'the values to insert')
+  for (const name of request.fresh ?? []) {
+    if (!request.values.some((value) => value.name === name)) throw new Error(`${name} is part of the chain a create starts, and the create does not write it.`)
+  }
 }
 
 /**
@@ -48,5 +51,27 @@ export function checkUpdate(request: UpdateRequest, terms: readonly RowFilterTer
   for (const value of request.set) {
     if (value.name === concurrency.column) throw new Error(`${value.name} is the version column; an update moves it, and never sets it.`)
     if (terms.some((term) => term.column === value.name)) throw new Error(`${value.name} is a filter column; setting it could move the record out of the rows this actor may write.`)
+    if (value.name === request.open) throw new Error(`${value.name} is where a version ends; an update of a version never sets it (0113).`)
+  }
+}
+
+/**
+ * A change from a date (0113) locates its open version as an update does
+ * and writes the next one's columns each once: the chain's key from the row
+ * ended, the start, and the values -- never the end, which the change sets
+ * on the version ended, nor the version column, which the insert leaves to
+ * its default.
+ */
+export function checkSupersede(request: SupersedeRequest): void {
+  checkKey(request.target, request.key)
+  const concurrency = request.target.concurrency
+  if (concurrency.kind !== 'version-column') throw new Error('PostgreSQL has no rowversion; a change here is guarded by a version column.')
+  if (request.chain.length === 0) throw new Error('A change from a date copies the chain it follows, and this one names no column of it.')
+  const written = [...request.chain.map((column) => column.name), request.start.name, ...request.values.map((value) => value.name)]
+  const seen = new Set<string>()
+  for (const name of written) {
+    if (seen.has(name)) throw new Error(`${name} is written twice in the next version.`)
+    if (name === request.ends || name === concurrency.column) throw new Error(`${name} is not the next version's to be given: the change ends one version and the insert leaves its version to the default.`)
+    seen.add(name)
   }
 }

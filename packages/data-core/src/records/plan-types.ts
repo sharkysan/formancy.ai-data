@@ -2,7 +2,7 @@ import type { ApiValue } from '../codecs/codec.js'
 import type { DriftChange } from '../drift/types.js'
 import type { LookupConfig, RowFilters } from '../lookup/types.js'
 import type { PolicyRefusalCode } from '../policy/types.js'
-import type { DeleteRequest, InsertRequest, ListRequest, ReadRequest, UpdateRequest } from './types.js'
+import type { DeleteRequest, InsertRequest, ListRequest, ReadRequest, SupersedeRequest, UpdateRequest } from './types.js'
 
 /**
  * Why the planner produced no request, as a stable code.
@@ -49,6 +49,8 @@ import type { DeleteRequest, InsertRequest, ListRequest, ReadRequest, UpdateRequ
  * - `cursor-gone` — a page asked for after a row that is gone: deleted, or
  *   no longer inside the actor's read filter and throughs (0108). Decided
  *   from the page's own statement, never before it.
+ * - `version-ended` — a change from a date of a version that has ended, as
+ *   read at the version the change names (0113).
  */
 export type PlanRefusalCode =
   | PolicyRefusalCode
@@ -65,6 +67,7 @@ export type PlanRefusalCode =
   | 'not-filterable'
   | 'invalid-cursor'
   | 'cursor-gone'
+  | 'version-ended'
 
 export interface PlanRefusal {
   ok: false
@@ -142,6 +145,19 @@ export type PlannedUpdate =
       fields: string[]
       memberships: MembershipCheck[]
       /** Whether the update moves the policy's state field (0112), `null` when the policy names none. */
+      moved: boolean | null
+    }
+  | InvalidValues
+  | PlanRefusal
+
+/** A change from a date planned (0113): the one request an adapter runs, and what a create of the next version rechecks and reads back. */
+export type PlannedSupersede =
+  | {
+      ok: true
+      request: SupersedeRequest
+      fields: string[]
+      memberships: MembershipCheck[]
+      /** Whether the next version moves the policy's state field, as a create does (0112); `null` when the policy names none. */
       moved: boolean | null
     }
   | InvalidValues

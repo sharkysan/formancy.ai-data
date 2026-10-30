@@ -681,3 +681,35 @@ followed; following what refers to a row may read the whole referring
 table, since neither engine indexes its columns by itself; and the trail
 is lost on a reload
 ([section 11.2](11-risks-and-debt.md#112-known-limitations-by-area)).
+
+## 6.13 Changing a version from a date
+
+1. A form generated with `validity: { from, to }` is over a table of
+   versions: `GET /v1/forms/:id` names its `versions` to whoever may create
+   and update, and offers no delete
+   ([0113](../decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md)).
+   A client sends `POST /v1/forms/:id/records/supersede` with the open
+   version's token, the version its person read, the next version's answers
+   -- its start in `from`'s field -- and a write id.
+2. `routes/runtime-supersede.ts` asks the policy for update and create,
+   reads the version as an update reads its record, and drops the echo of a
+   field the person may not write on create; `planSupersede`
+   (`packages/data-core/src/records/supersede.ts`) drops the chain's own
+   echoes, refuses an ended version and an early start from the read at
+   the version named, and decodes the next version as a create.
+3. Each adapter's `records/versions.ts` ends the open version, only while
+   its end is NULL, and inserts the next from the row it ended: one
+   statement on PostgreSQL, which fails itself when no next version was
+   inserted; on SQL Server the UPDATE and the INSERT in the write batch's
+   one transaction.
+4. The answer is 201 with the next version; 409 `version-ended`, `stale` or
+   `schema-changed`; 404; 422 with a field error on the start; or 502
+   `unknown-outcome` naming the version sent. A create of a chain that has
+   a version is 409 `chain-exists`, and an update of an ended version 409
+   `version-ended`, each decided in its own statement.
+
+Held by `packages/data-core/src/generate/validity.test.ts` and
+`records/supersede.test.ts`; each adapter's
+`versions.integration.test.ts`; `routes/runtime-supersede.test.ts`. What it
+costs: one spelling of a chain, append only, and no studio control or host
+page offer yet.

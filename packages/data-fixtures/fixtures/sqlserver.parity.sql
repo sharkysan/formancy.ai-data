@@ -246,4 +246,43 @@ create table parity.party_company (
 );
 GO
 
+-- A product's prices per tenant (0113): each version valid from valid_from
+-- until, not including, valid_to, the open one NULL there. The key is the
+-- chain's -- tenant and product -- and the start, so one product's prices
+-- are one chain. Versioned by a column the module moves. price_declined is
+-- the same, but an AFTER UPDATE trigger moves a version that has ended to
+-- another product: no INSTEAD OF trigger, which the batch refuses, can keep
+-- the next version out, and this keeps the batch from finding again the
+-- row it ended, so the next version is not inserted.
+create table parity.price (
+  tenant_id int not null,
+  product_no int not null,
+  valid_from date not null,
+  valid_to date null,
+  amount decimal(18, 4) not null,
+  note nvarchar(50) null,
+  version int not null constraint df_price_version default 1,
+  constraint pk_price primary key (tenant_id, product_no, valid_from)
+);
+create table parity.price_declined (
+  tenant_id int not null,
+  product_no int not null,
+  valid_from date not null,
+  valid_to date null,
+  amount decimal(18, 4) not null,
+  note nvarchar(50) null,
+  version int not null constraint df_price_declined_version default 1,
+  constraint pk_price_declined primary key (tenant_id, product_no, valid_from)
+);
+GO
+create trigger parity.tr_price_declined on parity.price_declined after update as
+begin
+  set nocount on;
+  update [p] set [product_no] = [p].[product_no] + 1000
+  from parity.price_declined as [p]
+  join inserted as [i] on [i].[tenant_id] = [p].[tenant_id] and [i].[product_no] = [p].[product_no] and [i].[valid_from] = [p].[valid_from]
+  where [i].[valid_to] is not null;
+end
+GO
+
 update statistics parity.tenant_item with fullscan;

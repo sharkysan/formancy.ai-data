@@ -42,6 +42,7 @@ export type {
   LookupChoice,
   SectionBinding,
   SectionCondition,
+  ValidityBinding,
 } from './generate/types.js'
 export { describedOf, diffRootDefinition, diffSnapshots, ROOT_DEFINITION } from './drift/diff.js'
 export type { DescribedRoot } from './drift/diff.js'
@@ -159,10 +160,12 @@ export type {
   RecordSort,
   RecordValue,
   RangeFilterType,
+  SupersedeRequest,
   Through,
   UpdateRequest,
 } from './records/types.js'
 export { planCreate, planRead, planUpdate } from './records/plan.js'
+export { planSupersede, versionFields } from './records/supersede.js'
 export type { PlannedMove } from './records/transition.js'
 export { planDelete } from './records/delete.js'
 export { deleteTerms, reachesPast } from './records/delete-terms.js'
@@ -203,6 +206,7 @@ export type {
   PlannedInsert,
   PlannedList,
   PlannedRead,
+  PlannedSupersede,
   PlannedUpdate,
   PlanRefusal,
   PlanRefusalCode,

@@ -95,6 +95,9 @@ function registry(): ConnectionRegistry {
       if (request.expectedVersion !== rowVersion) return { ok: false, code: 'stale', message: 'changed' }
       return { ok: true, values: stored(), version: NEWER }
     },
+    supersede: async () => {
+      throw new Error('these routes never change a version from a date')
+    },
     delete: async () => {
       throw new Error('these routes never delete')
     },

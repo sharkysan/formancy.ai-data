@@ -148,8 +148,10 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // by a page that did less (watched failing with 0050's exception for the
     // delete route removed before the page had a control: delete unused;
     // and with 0079's for the export removed before Download CSV: export
-    // unused).
-    expect(ROUTES.filter(({ matches }) => !sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
+    // unused). A change from a date is the one exception: the server has it
+    // since 0113, and the page has no control that sends it yet.
+    const UNSENT: ReadonlySet<string> = new Set(['supersede'])
+    expect(ROUTES.filter(({ matches, operation }) => !UNSENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(({ operation }) => operation)).toEqual([])
 
     // Only the forms the menu named: a form is asked for by the id the
     // server listed, never one the page made up.
