@@ -75,8 +75,11 @@ export function notShot({ options, id, record, text }) {
  * changes under the camera, which refuses it -- measured: the host's stale
  * scene, on 2026-10-30. The count is the element the box's
  * `aria-describedby` names by formancy's `:count` id, read from the DOM,
- * since a description has no role to find it by. A field with no limit, or
- * one whose count the value leaves as it was, says nothing more.
+ * since a description has no role to find it by. Angular draws the new
+ * count a moment after the fill, so it is waited for too (measured: the
+ * examples scene read the old one, on 2026-10-30). A count says only the
+ * answer's length, so a field with no limit, or a value as long as the one
+ * it replaces, says nothing new and is only filled.
  */
 export async function fillField(part, box, value, { within }) {
   const count = async () => {
@@ -84,10 +87,18 @@ export async function fillField(part, box, value, { within }) {
     return id === undefined ? undefined : ((await part.page().locator(`[id="${id}"]`).textContent()) ?? undefined)
   }
   const before = await count()
+  const says = before !== undefined && (await box.inputValue()).length !== value.length
   await box.fill(value)
-  const after = await count()
-  if (after === undefined || after === before) return
-  await part.getByRole('status').filter({ hasText: after }).first().waitFor({ timeout: within })
+  if (!says) return
+  const deadline = Date.now() + within
+  let after = await count()
+  while (after === before) {
+    if (Date.now() > deadline) throw new Error(`the count under a field still said “${String(before)}” ${String(within)} ms after it was filled`)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    after = await count()
+  }
+  const exactly = new RegExp(`^${String(after).replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+  await part.getByRole('status').filter({ hasText: exactly }).first().waitFor({ timeout: within })
 }
 
 /**
