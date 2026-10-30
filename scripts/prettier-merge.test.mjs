@@ -74,7 +74,12 @@ function mergeThroughScript() {
   return { status: run.status, output: run.stdout + run.stderr, text: readFileSync(join(dir, FILE), 'utf8') }
 }
 
-describe('a merge of main into a branch begun before the format', () => {
+// Each case runs git several times and Prettier on three versions: about a
+// second alone, but 6.0 and 6.5 s were measured in Formancy Report's
+// `pnpm test:repo` beside every other guard on 30 October 2026, past
+// vitest's 5 s default, which failed two runs in three. So the cases wait a
+// minute, for a merge that hangs.
+describe('a merge of main into a branch begun before the format', { timeout: 60_000 }, () => {
   // The format rewrote every line of every file, so git's own merge
   // conflicts wherever the branch changed a line at all, though main
   // changed nothing it says: every branch open under the format would be
