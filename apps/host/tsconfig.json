@@ -9,5 +9,10 @@
     "moduleResolution": "bundler",
     "types": ["vite/client"]
   },
+  // Where two files differ only in their extension, a wildcard in `include`
+  // takes the .ts and drops the .tsx (TypeScript's documented precedence), so
+  // duplicate.test.tsx, beside duplicate.test.ts, was in no program: neither
+  // type-checked nor linted with types. Named here, it is in this one.
+  "files": ["src/duplicate.test.tsx"],
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }
